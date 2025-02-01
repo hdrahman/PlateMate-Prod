@@ -1,19 +1,9 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity
-} from 'react-native';//test
-
-// For small macro rings
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import { View, Text, StyleSheet, Dimensions, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';// For small macro rings
 // Changed import for Expo projects
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons'; // Or 'react-native-vector-icons/Ionicons' if not using Expo
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -25,19 +15,16 @@ const STROKE_WIDTH = 20;
 const MACRO_RING_SIZE = 60;
 const MACRO_STROKE_WIDTH = 6;
 
-// Dummy data
+// Dummy data -> will be replaced with actual backend code
 const dailyCalorieGoal = 2500;
 const consumedCalories = 1022; // Example
 const remainingCalories = dailyCalorieGoal - consumedCalories; // 1478
 const percentConsumed = (consumedCalories / dailyCalorieGoal) * 100;
-
 const fatPercent = 20;
 const carbsPercent = 70;
 const proteinPercent = 40;
-const morePercent = 55; // or "OTHER" macro
-
+const morePercent = 55; // or "OTHER" macro -> this is supposed to just be a button to segway into the macros screen
 const totalBurned = 500;
-
 const fats = 13;
 const carbs = 59;
 const protein = 50;
@@ -58,13 +45,12 @@ export default function Home() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header */}
         <View style={styles.headerRow}>
-          <Text style={styles.headerText}>STREAK TO GOAL</Text>
+          <Text style={styles.headerText}>replace with bar later</Text>
         </View>
-
         {/* Circular ring container */}
         <View style={styles.ringContainer}>
           {/* Glow behind the ring (optional) */}
-          <View style={styles.ringGlow} />
+          {<View style={styles.ringGlow} />}
 
           {/* The ring itself (SVG) */}
           <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
@@ -124,9 +110,11 @@ export default function Home() {
           <MacroRing label="MORE" percent={morePercent} />
         </View>
 
-        {/* Burn slider row */}
+        {/* weight slider - honestly I say we dev this a bit more 
+        so that we get rid of text and make it a simple slider to show how much weight they have
+        gained or lost compared to their goal. this is probaly further in the future.*/}
         <View style={styles.burnContainer}>
-          <Text style={styles.burnTitle}>Burn</Text>
+          <Text style={styles.burnTitle}>Weight Lost{/*or gained*/}</Text>
           <View style={styles.burnBarBackground}>
             <View style={[styles.burnBarFill, { width: '70%' }]} />
           </View>
@@ -161,8 +149,8 @@ export default function Home() {
           </Text>
         </View>
 
-        {/* Bottom stats circles */}
-        <View style={styles.statsRow}>
+        {/* Bottom stats circles - a bit reduntant and not really what I want*/}
+        {/*<View style={styles.statsRow}>
           <View style={styles.statCircle}>
             <Text style={styles.statValue}>{dailyCalorieGoal}</Text>
             <Text style={styles.statLabel}>Goal</Text>
@@ -179,7 +167,7 @@ export default function Home() {
             <Text style={styles.statValue}>{protein}</Text>
             <Text style={styles.statLabel}>Protein (g)</Text>
           </View>
-        </View>
+        </View>*/}
       </ScrollView>
     </SafeAreaView>
   );
@@ -266,15 +254,15 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 20
   },
-  ringGlow: {
+  ringGlow: {//we need to work on this
     position: 'absolute',
-    width: CIRCLE_SIZE * 1.3,
-    height: CIRCLE_SIZE * 1.3,
-    borderRadius: (CIRCLE_SIZE * 1.3) / 2,
+    width: CIRCLE_SIZE - STROKE_WIDTH * 2,
+    height: CIRCLE_SIZE - STROKE_WIDTH * 2,
+    borderRadius: (CIRCLE_SIZE),
     backgroundColor: '#9B00FF',
     opacity: 0.2,
-    top: -(CIRCLE_SIZE * 0.15),
-    left: -(CIRCLE_SIZE * 0.15)
+    top: (STROKE_WIDTH),
+    left: (STROKE_WIDTH)
   },
   centerTextContainer: {
     position: 'absolute',
