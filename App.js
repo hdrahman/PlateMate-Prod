@@ -173,7 +173,7 @@ function GlowIcon({ name, size, gradientColors }) {
         shadowRadius: 10,
         shadowOpacity: 0.6,
         // Minimal fallback for Android
-        elevation: 10,
+        elevation: 6,
       }}
     >
       <MaskedView
