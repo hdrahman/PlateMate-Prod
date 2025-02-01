@@ -5,16 +5,14 @@ import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
 import Workout from "./src/screens/Workout";
 import Chatbot from "./src/screens/Chatbot";
-
-// EXAMPLE icons from react-native-vector-icons / Expo
 import { Ionicons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
 
+
 export default function App() {
   return (
     <NavigationContainer
-      // Override the default theme to use a dark background for the nav area
       theme={{
         ...DefaultTheme,
         colors: {
