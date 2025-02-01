@@ -7,7 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity
-} from 'react-native';
+} from 'react-native';//test
 
 // For small macro rings
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
