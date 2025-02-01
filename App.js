@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
 
-
+//working version
 export default function App() {
   return (
     <NavigationContainer
@@ -17,8 +17,8 @@ export default function App() {
         ...DefaultTheme,
         colors: {
           ...DefaultTheme.colors,
-          background: "#000", // main background
-          card: "#000"        // header/tab background
+          background: "#000",
+          card: "#000"
         }
       }}
     >
@@ -27,11 +27,11 @@ export default function App() {
         screenOptions={{
           // Make the header always say "Plate Mate" 
           // instead of using the screen name.
-          headerTitle: "Plate Mate",
+          headerTitle: "PlateMate",
           headerStyle: {
             backgroundColor: "#000"
           },
-          headerTitleStyle: {
+          headerTitleStyle: { //We are going to want to change this from white. Most likely match it to the gemini theme
             color: "#FFF",
             fontSize: 20,
             letterSpacing: 1,
@@ -41,19 +41,17 @@ export default function App() {
           // Customize the bottom tab bar
           tabBarStyle: {
             backgroundColor: "#000",
-            borderTopColor: "transparent"
+            borderTopColor: "transparent" //investigate this
           },
           tabBarActiveTintColor: "#FF00F5",
-          tabBarInactiveTintColor: "#666" // or #888, whichever you prefer
+          tabBarInactiveTintColor: "#888"
         }}
       >
         <Tab.Screen
           name="Home"
           component={Home}
           options={{
-            // The label that appears under the tab icon
             tabBarLabel: "Home",
-            // Ionicon example (you can pick any icon)
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home-outline" color={color} size={size} />
             )
@@ -83,7 +81,7 @@ export default function App() {
           name="Chatbot"
           component={Chatbot}
           options={{
-            tabBarLabel: "Chatbot",
+            tabBarLabel: "Advisor",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="chatbubble-ellipses-outline" color={color} size={size} />
             )
@@ -93,3 +91,4 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
