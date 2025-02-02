@@ -135,7 +135,7 @@ export default function Home() {
                 cx={CIRCLE_SIZE / 2}
                 cy={CIRCLE_SIZE / 2}
                 r={radius}
-                stroke="rgba(255, 255, 255, 0.14)"
+                stroke="rgba(255, 255, 255, 0.12)"
                 strokeWidth={STROKE_WIDTH}
                 fill="none"
               />
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '95%',
-    backgroundColor: 'hsla(0, 0%, 100%, 0.11)',
+    backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
     borderRadius: 10,
     padding: 10,
     marginVertical: 8,
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase'
   },
   rightCard: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.09)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 12,
