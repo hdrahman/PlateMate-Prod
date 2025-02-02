@@ -17,25 +17,32 @@ import Svg, {
   Circle,
   Defs,
   LinearGradient as SvgLinearGradient,
-  Stop
+  Stop,
+  Path
 } from 'react-native-svg';
 
 // Using Expo’s LinearGradient:
 import { LinearGradient } from 'expo-linear-gradient';
 
+// d3 for our line chart
+import * as d3Scale from 'd3-scale';
+import * as d3Shape from 'd3-shape';
+
 const { width } = Dimensions.get('window');
 
-// Make the main ring slightly smaller (55% of screen width)
+// Main ring dimensions
 const CIRCLE_SIZE = width * 0.55;
 const STROKE_WIDTH = 20;
 
+// Macro ring dimensions
 const MACRO_RING_SIZE = 60;
-const MACRO_STROKE_WIDTH = 6;
 
-// Dummy data
+// ─────────────────────────────────────────────────────────────────────────────
+// DUMMY DATA
+// ─────────────────────────────────────────────────────────────────────────────
 const dailyCalorieGoal = 2500;
 const consumedCalories = 1022;
-const remainingCalories = dailyCalorieGoal - consumedCalories; // 1478
+const remainingCalories = dailyCalorieGoal - consumedCalories;
 const percentConsumed = (consumedCalories / dailyCalorieGoal) * 100;
 
 const fatPercent = 20;
@@ -49,15 +56,22 @@ const cheatDaysTotal = 7;
 const cheatDaysCompleted = 3;
 const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
 
+// Weight history data
+const weightHistory = [
+  { date: '11/03', weight: 104 },
+  { date: '12/03', weight: 98 },
+  { date: '02/01', weight: 107 },
+];
+
 export default function Home() {
   const navigation = useNavigation();
 
-  // Big ring math
+  // Calculate values for the main ring.
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const consumedStroke = (percentConsumed / 100) * circumference;
 
-  // Right card items (no circles)
+  // Data for the right card.
   const rightStats = [
     { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline' },
     { label: 'Food', value: consumedCalories, icon: 'restaurant-outline' },
@@ -73,7 +87,6 @@ export default function Home() {
           <View style={styles.cheatDayContainer}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={styles.cheatDayLabel}>Days until cheat day</Text>
-              {/* Settings button removed from Home.tsx */}
             </View>
             <View style={styles.cheatDayBarBackground}>
               <LinearGradient
@@ -89,7 +102,7 @@ export default function Home() {
           </View>
         </View>
 
-        {/* RING + RIGHT CARD */}
+        {/* MAIN RING + RIGHT CARD */}
         <View style={styles.ringAndRightCard}>
           {/* MAIN RING */}
           <View style={styles.ringContainer}>
@@ -102,8 +115,6 @@ export default function Home() {
                   <Stop offset="100%" stopColor="#00CFFF" />
                 </SvgLinearGradient>
               </Defs>
-
-              {/* Background circle */}
               <Circle
                 cx={CIRCLE_SIZE / 2}
                 cy={CIRCLE_SIZE / 2}
@@ -112,7 +123,6 @@ export default function Home() {
                 strokeWidth={STROKE_WIDTH}
                 fill="none"
               />
-              {/* Foreground arc */}
               <Circle
                 cx={CIRCLE_SIZE / 2}
                 cy={CIRCLE_SIZE / 2}
@@ -126,24 +136,23 @@ export default function Home() {
                 transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
               />
             </Svg>
-
-            {/* Center text */}
             <View style={styles.centerTextContainer}>
               <Text style={styles.remainingValue}>{remainingCalories}</Text>
               <Text style={styles.remainingLabel}>REMAINING</Text>
             </View>
           </View>
 
-          {/* VERTICAL CARD */}
+          {/* RIGHT VERTICAL CARD */}
           <View style={styles.rightCard}>
             {rightStats.map((item) => {
               const IconComponent =
-                item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
-
+                item.iconSet === 'MaterialCommunityIcons'
+                  ? MaterialCommunityIcons
+                  : Ionicons;
               return (
                 <View key={item.label} style={styles.statRow}>
                   <IconComponent
-                    name={item.icon as any}
+                    name={item.icon}
                     size={20}
                     color="#FF00F5"
                     style={{ marginRight: 8 }}
@@ -161,13 +170,13 @@ export default function Home() {
         {/* MACROS CARD */}
         <View style={styles.card}>
           <View style={styles.macrosRow}>
-            <MacroRing label="PROTEIN" percent={proteinPercent} />
-            <MacroRing label="CARBS" percent={carbsPercent} />
-            <MacroRing label="FATS" percent={fatPercent} />
-            {/* The last macro is "OTHER" as a button with a gradient-filled nutrient icon */}
+            <MacroRing label="PROTEIN" percent={proteinPercent} current={proteinPercent} />
+            <MacroRing label="CARBS" percent={carbsPercent} current={carbsPercent} />
+            <MacroRing label="FATS" percent={fatPercent} current={fatPercent} />
             <MacroRing
               label="OTHER"
               percent={100}
+              current={0}
               onPress={() => navigation.navigate('Nutrients' as never)}
             />
           </View>
@@ -183,87 +192,207 @@ export default function Home() {
             <Text style={styles.burnDetails}>{totalBurned} Calories burned</Text>
           </View>
         </View>
+
+        {/* WEIGHT TREND CARD */}
+        <View style={styles.card}>
+          <WeightGraph data={weightHistory} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/** SMALL MACRO RING COMPONENT */
+/** ────────────────────────────────────────────
+ *  WEIGHT GRAPH COMPONENT
+ *  Using d3-scale + d3-shape
+ *  ────────────────────────────────────────────
+ */
+function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
+  // Dimensions for the chart
+  const GRAPH_WIDTH = 0.9 * width;
+  const GRAPH_HEIGHT = 200;
+  const MARGIN = 20;
+
+  // X-values: just indices of data
+  const xValues = data.map((_, i) => i);
+  // Y-values: actual weight
+  const yValues = data.map(d => d.weight);
+
+  // Build scales
+  const scaleX = d3Scale
+    .scaleLinear()
+    .domain([0, xValues.length - 1])
+    .range([MARGIN, GRAPH_WIDTH - MARGIN]);
+
+  const minWeight = Math.min(...yValues);
+  const maxWeight = Math.max(...yValues);
+  const scaleY = d3Scale
+    .scaleLinear()
+    .domain([minWeight - 1, maxWeight + 1]) // small buffer
+    .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
+
+  // Generate path
+  const lineGenerator = d3Shape
+    .line<{ date: string; weight: number }>()
+    .x((d, i) => scaleX(i))
+    .y(d => scaleY(d.weight))
+    .curve(d3Shape.curveMonotoneX);
+
+  const pathData = lineGenerator(data);
+
+  return (
+    <View style={{ width: '100%', alignItems: 'center' }}>
+      <Text style={styles.weightGraphTitle}>Weight Trend</Text>
+      <ScrollView horizontal style={{ width: '100%' }}>
+        <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
+          {/* line path */}
+          <Path
+            d={pathData || ''}
+            fill="none"
+            stroke="#9B00FF"
+            strokeWidth={2}
+          />
+          {/* data points */}
+          {data.map((d, i) => {
+            const cx = scaleX(i);
+            const cy = scaleY(d.weight);
+            return (
+              <Circle
+                key={`circle-${i}`}
+                cx={cx}
+                cy={cy}
+                r={4}
+                fill="#FF00F5"
+                stroke="#FFF"
+                strokeWidth={1}
+              />
+            );
+          })}
+        </Svg>
+      </ScrollView>
+    </View>
+  );
+}
+
+/** ────────────────────────────────────────────
+ *  MACRO RING COMPONENT
+ *  ────────────────────────────────────────────
+ */
 interface MacroRingProps {
   label: string;
   percent: number;
+  current: number; // current grams (assume goal is 100g)
   onPress?: () => void;
 }
 
-function MacroRing({ label, percent, onPress }: MacroRingProps) {
+function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
+  const MACRO_STROKE_WIDTH = 6;
+  const isOther = label.toUpperCase() === 'OTHER';
+  const goal = 100; // Assume each macro has a goal of 100g
+  const diff = goal - current;
+  let subText = "";
+  let subTextColor = "";
+
+  if (!isOther) {
+    if (diff > 0) {
+      subText = `${diff}g Left`;
+      subTextColor = "#9E9E9E";
+    } else if (diff < 0) {
+      subText = `${Math.abs(diff)}g over`;
+      subTextColor = "#FF8A80";
+    } else {
+      subText = `Goal met`;
+      subTextColor = "#ccc";
+    }
+  } else {
+    // For "OTHER", we just say "Nutrients"
+    subTextColor = "#9E9E9E";
+  }
+
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const fillStroke = (percent / 100) * circumference;
 
-  // Wrap the ring in a TouchableOpacity if an onPress is provided.
+  // Wrap the ring in a Touchable if onPress provided
   const Container = onPress ? TouchableOpacity : View;
 
   return (
-    <Container style={styles.macroRingContainer} onPress={onPress}>
-      <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
-        <Defs>
-          <SvgLinearGradient id={`macroGradient-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor="#FF00F5" />
-            <Stop offset="50%" stopColor="#9B00FF" />
-            <Stop offset="100%" stopColor="#00CFFF" />
-          </SvgLinearGradient>
-        </Defs>
-        {/* Background circle */}
-        <Circle
-          cx={MACRO_RING_SIZE / 2}
-          cy={MACRO_RING_SIZE / 2}
-          r={radius}
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth={MACRO_RING_SIZE / 10}
-          fill="none"
-        />
-        {/* Foreground arc */}
-        <Circle
-          cx={MACRO_RING_SIZE / 2}
-          cy={MACRO_RING_SIZE / 2}
-          r={radius}
-          stroke={`url(#macroGradient-${label})`}
-          strokeWidth={MACRO_RING_SIZE / 10}
-          fill="none"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={circumference - fillStroke}
-          strokeLinecap="round"
-          transform={`rotate(-90, ${MACRO_RING_SIZE / 2}, ${MACRO_RING_SIZE / 2})`}
-        />
-      </Svg>
-      <View style={styles.macroRingCenter}>
-        {label.toUpperCase() === "OTHER" ? (
-          // Instead of text, use a nutrient icon with a full gradient fill.
-          <MaskedView
-            style={{ height: 18, width: 18 }}
-            maskElement={
-              <View style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' }}>
-                <MaterialCommunityIcons name="food-apple" size={18} color="black" />
-              </View>
-            }
-          >
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-              style={{ flex: 1 }}
-            />
-          </MaskedView>
-        ) : (
-          <Text style={styles.macroRingText}>{percent}%</Text>
-        )}
+    <Container style={styles.macroRingWrapper} onPress={onPress}>
+      {/* Macro name above the ring */}
+      <Text style={styles.macroRingLabelTop}>{label}</Text>
+      <View style={{ position: 'relative' }}>
+        <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
+          <Defs>
+            <SvgLinearGradient id={`macroGradient-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop offset="0%" stopColor="#FF00F5" />
+              <Stop offset="50%" stopColor="#9B00FF" />
+              <Stop offset="100%" stopColor="#00CFFF" />
+            </SvgLinearGradient>
+          </Defs>
+          <Circle
+            cx={MACRO_RING_SIZE / 2}
+            cy={MACRO_RING_SIZE / 2}
+            r={radius}
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth={MACRO_STROKE_WIDTH}
+            fill="none"
+          />
+          <Circle
+            cx={MACRO_RING_SIZE / 2}
+            cy={MACRO_RING_SIZE / 2}
+            r={radius}
+            stroke={`url(#macroGradient-${label})`}
+            strokeWidth={MACRO_STROKE_WIDTH}
+            fill="none"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={circumference - fillStroke}
+            strokeLinecap="round"
+            transform={`rotate(-90, ${MACRO_RING_SIZE / 2}, ${MACRO_RING_SIZE / 2})`}
+          />
+        </Svg>
+        <View style={styles.macroRingCenter}>
+          {isOther ? (
+            <MaskedView
+              style={{ height: 40, width: 40 }} // <— Larger container
+              maskElement={
+                <View
+                  style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: 'transparent'
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="food-apple"
+                    size={40} // <— Larger icon
+                    color="black"
+                  />
+                </View>
+              }
+            >
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={{ flex: 1 }}
+              />
+            </MaskedView>
+          ) : (
+            <Text style={styles.macroRingText}>{percent}%</Text>
+          )}
+        </View>
       </View>
-      <Text style={styles.macroRingLabel}>{label}</Text>
+      {/* Sub-label */}
+      <Text style={[styles.macroRingSubLabel, { color: subTextColor }]}>
+        {isOther ? "Nutrients" : subText}
+      </Text>
     </Container>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 // STYLES
+// ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -274,27 +403,21 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     paddingTop: 20
   },
-
-  /* CARD STYLE */
   card: {
     width: '95%',
-    backgroundColor: 'hsla(0, 0.00%, 100.00%, 0.11)',
+    backgroundColor: 'hsla(0, 0%, 100%, 0.11)',
     borderRadius: 10,
     padding: 15,
     marginVertical: 10,
-    // Shadow for iOS
+    // Shadows
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 3,
-    // Elevation for Android
     elevation: 3
   },
-
   /* Cheat Day */
-  cheatDayContainer: {
-    // The card wrapper already provides padding and margin
-  },
+  cheatDayContainer: {},
   cheatDayLabel: {
     color: '#FFF',
     fontSize: 14,
@@ -317,7 +440,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: 'uppercase'
   },
-
   /* Ring + Right Card */
   ringAndRightCard: {
     width: '95%',
@@ -357,7 +479,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: 'uppercase'
   },
-
   rightCard: {
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 10,
@@ -381,15 +502,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700'
   },
-
-  /* Macros (4 small rings) */
+  /* Macros */
   macrosRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center'
   },
-  macroRingContainer: {
-    alignItems: 'center'
+  macroRingWrapper: {
+    alignItems: 'center',
+    marginHorizontal: 10
+  },
+  macroRingLabelTop: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    marginBottom: 4
   },
   macroRingCenter: {
     position: 'absolute',
@@ -403,17 +530,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700'
   },
-  macroRingLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 11,
-    textTransform: 'uppercase',
+  macroRingSubLabel: {
+    fontSize: 12,
     marginTop: 4
   },
-
-  /* Weight Lost Slider */
-  burnContainer: {
-    // The card wrapper already provides padding
-  },
+  /* Weight Lost */
+  burnContainer: {},
   burnTitle: {
     color: '#FFF',
     fontSize: 14,
@@ -435,5 +557,12 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     marginTop: 4
-  }
+  },
+  /* Weight Trend */
+  weightGraphTitle: {
+    color: '#FFF',
+    fontSize: 14,
+    marginBottom: 8,
+    textTransform: 'uppercase'
+  },
 });
