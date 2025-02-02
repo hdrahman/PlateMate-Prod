@@ -399,9 +399,8 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
  *  STEPS GRAPH COMPONENT (Second Card)
  ************************************/
 function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
-  // Adjusted dimensions to match WeightGraph
-  const GRAPH_WIDTH = 0.94 * width; // was 0.9 * width
-  const GRAPH_HEIGHT = 220;         // was 200
+  const GRAPH_WIDTH = 0.9 * width;
+  const GRAPH_HEIGHT = 200;
   const MARGIN = 30;
 
   // X-values

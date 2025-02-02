@@ -57,8 +57,7 @@ export default function App() {
                       textTransform: "uppercase",
                       color: "white",
                       fontWeight: "600",
-                    }}
-                  >
+                    }}>
                     PlateMate
                   </Text>
                 }
