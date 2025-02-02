@@ -90,9 +90,15 @@ export default function App() {
             </TouchableOpacity>
           ),
           headerRight: () => (
-            <TouchableOpacity style={{ marginRight: 15 }}>
+            <TouchableOpacity
+              style={{ marginRight: 15 }}
+              onPress={() => {
+                // Add your settings action here (e.g., navigate to Settings screen)
+                console.log("Settings pressed");
+              }}
+            >
               <GlowIcon
-                name="notifications-outline"
+                name="settings-outline"
                 size={25}
                 gradientColors={["#5A60EA", "#FF00F5"]}
               />

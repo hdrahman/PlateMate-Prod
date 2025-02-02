@@ -1,5 +1,8 @@
 import React from 'react';
+import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Ionicons } from '@expo/vector-icons';
+import MaskedView from '@react-native-masked-view/masked-view';
 
 import {
   View,
@@ -17,11 +20,8 @@ import Svg, {
   Stop
 } from 'react-native-svg';
 
-// If you're using Expo:
+// Using Expo’s LinearGradient:
 import { LinearGradient } from 'expo-linear-gradient';
-// If not Expo, you'd likely do: import LinearGradient from 'react-native-linear-gradient';
-
-import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -41,7 +41,7 @@ const percentConsumed = (consumedCalories / dailyCalorieGoal) * 100;
 const fatPercent = 20;
 const carbsPercent = 70;
 const proteinPercent = 40;
-const morePercent = 55;
+const morePercent = 55; // This value is no longer used to fill inner text for the Other macro.
 const totalBurned = 500;
 const stepsCount = 4500;
 
@@ -51,6 +51,8 @@ const cheatDaysCompleted = 3;
 const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
 
 export default function Home() {
+  const navigation = useNavigation();
+
   // Big ring math
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -61,9 +63,8 @@ export default function Home() {
     { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline' },
     { label: 'Food', value: consumedCalories, icon: 'restaurant-outline' },
     { label: 'Exercise', value: totalBurned, icon: 'barbell-outline' },
-    // For Steps, we use MaterialCommunityIcons with 'foot-print'
     { label: 'Steps', value: stepsCount, icon: 'walk', iconSet: 'MaterialCommunityIcons' }
-  ];//shoe-print, walk
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -72,9 +73,7 @@ export default function Home() {
         <View style={styles.cheatDayContainer}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text style={styles.cheatDayLabel}>Days until cheat day</Text>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => { }}>
-              <Ionicons name="settings-outline" size={20} color="#FFF" />
-            </TouchableOpacity>
+            {/* Settings button has been removed from Home.tsx */}
           </View>
           <View style={styles.cheatDayBarBackground}>
             <LinearGradient
@@ -132,29 +131,20 @@ export default function Home() {
               <Text style={styles.remainingValue}>{remainingCalories}</Text>
               <Text style={styles.remainingLabel}>REMAINING</Text>
             </View>
-
-            {/* SHIFTED to top-left for % consumed */}
-            <View style={styles.consumedContainer}>
-              <Text style={styles.consumedValue}>
-                {Math.round(percentConsumed)}%
-              </Text>
-              <Text style={styles.consumedLabel}>CONSUMED</Text>
-            </View>
           </View>
 
           {/* VERTICAL CARD */}
           <View style={styles.rightCard}>
             {rightStats.map((item) => {
-              // Conditionally choose which icon library
               const IconComponent =
                 item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
 
               return (
                 <View key={item.label} style={styles.statRow}>
                   <IconComponent
-                    name={item.icon}
+                    name={item.icon as any}
                     size={20}
-                    color="#FF00F5" // neon icon color?
+                    color="#FF00F5"
                     style={{ marginRight: 8 }}
                   />
                   <View style={{ flex: 1 }}>
@@ -172,7 +162,12 @@ export default function Home() {
           <MacroRing label="PROTEIN" percent={proteinPercent} />
           <MacroRing label="CARBS" percent={carbsPercent} />
           <MacroRing label="FATS" percent={fatPercent} />
-          <MacroRing label="MORE" percent={morePercent} />
+          {/* The last macro is now "OTHER" as a button with a gradient-filled nutrient icon */}
+          <MacroRing
+            label="OTHER"
+            percent={morePercent}
+            onPress={() => navigation.navigate('Nutrients' as never)}
+          />
         </View>
 
         {/* WEIGHT LOST SLIDER */}
@@ -189,13 +184,22 @@ export default function Home() {
 }
 
 /** SMALL MACRO RING COMPONENT */
-function MacroRing({ label, percent }: { label: string; percent: number }) {
+interface MacroRingProps {
+  label: string;
+  percent: number;
+  onPress?: () => void;
+}
+
+function MacroRing({ label, percent, onPress }: MacroRingProps) {
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const fillStroke = (percent / 100) * circumference;
 
+  // Wrap the ring in a TouchableOpacity if an onPress is provided.
+  const Container = onPress ? TouchableOpacity : View;
+
   return (
-    <View style={styles.macroRingContainer}>
+    <Container style={styles.macroRingContainer} onPress={onPress}>
       <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
         <Defs>
           <SvgLinearGradient id={`macroGradient-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -228,10 +232,29 @@ function MacroRing({ label, percent }: { label: string; percent: number }) {
         />
       </Svg>
       <View style={styles.macroRingCenter}>
-        <Text style={styles.macroRingText}>{percent}%</Text>
+        {label.toUpperCase() === "OTHER" ? (
+          // Instead of text, use a nutrient icon with a full gradient fill.
+          <MaskedView
+            style={{ height: 18, width: 18 }}
+            maskElement={
+              <View style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' }}>
+                <MaterialCommunityIcons name="food-apple" size={18} color="black" />
+              </View>
+            }
+          >
+            <LinearGradient
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+              style={{ flex: 1 }}
+            />
+          </MaskedView>
+        ) : (
+          <Text style={styles.macroRingText}>{percent}%</Text>
+        )}
       </View>
       <Text style={styles.macroRingLabel}>{label}</Text>
-    </View>
+    </Container>
   );
 }
 
@@ -318,28 +341,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: 'uppercase'
   },
-  consumedContainer: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    alignItems: 'center'
-  },
-  consumedValue: {
-    color: '#FF00F5',
-    fontSize: 16,
-    fontWeight: '700'
-  },
-  consumedLabel: {
-    color: '#FFF',
-    fontSize: 10,
-    textTransform: 'uppercase'
-  },
+
   rightCard: {
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 12,
-    width: '38%' // slightly larger to fit text
+    width: '38%'
   },
   statRow: {
     flexDirection: 'row',
