@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 
 import {
   View,
@@ -60,7 +61,7 @@ const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
 const weightHistory = [
   { date: '11/03', weight: 104 },
   { date: '12/03', weight: 98 },
-  { date: '02/01', weight: 107 },
+  { date: '02/01', weight: 107 }
 ];
 
 export default function Home() {
@@ -76,7 +77,12 @@ export default function Home() {
     { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline' },
     { label: 'Food', value: consumedCalories, icon: 'restaurant-outline' },
     { label: 'Exercise', value: totalBurned, icon: 'barbell-outline' },
-    { label: 'Steps', value: stepsCount, icon: 'walk', iconSet: 'MaterialCommunityIcons' }
+    {
+      label: 'Steps',
+      value: stepsCount,
+      icon: 'walk',
+      iconSet: 'MaterialCommunityIcons'
+    }
   ];
 
   return (
@@ -146,13 +152,11 @@ export default function Home() {
           <View style={styles.rightCard}>
             {rightStats.map((item) => {
               const IconComponent =
-                item.iconSet === 'MaterialCommunityIcons'
-                  ? MaterialCommunityIcons
-                  : Ionicons;
+                item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
               return (
                 <View key={item.label} style={styles.statRow}>
                   <IconComponent
-                    name={item.icon}
+                    name={item.icon as any}
                     size={20}
                     color="#FF00F5"
                     style={{ marginRight: 8 }}
@@ -202,72 +206,158 @@ export default function Home() {
   );
 }
 
-/** ────────────────────────────────────────────
+/************************************
  *  WEIGHT GRAPH COMPONENT
- *  Using d3-scale + d3-shape
- *  ────────────────────────────────────────────
- */
+ ************************************/
 function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
   // Dimensions for the chart
   const GRAPH_WIDTH = 0.9 * width;
   const GRAPH_HEIGHT = 200;
-  const MARGIN = 20;
+  const MARGIN = 30; // a bit bigger margin for labels
 
-  // X-values: just indices of data
+  // X-values: indices of data
   const xValues = data.map((_, i) => i);
   // Y-values: actual weight
-  const yValues = data.map(d => d.weight);
+  const yValues = data.map((d) => d.weight);
 
   // Build scales
+  const minWeight = Math.min(...yValues);
+  const maxWeight = Math.max(...yValues);
+
+  // Add a small top buffer (+1) so final dot isn’t at the very top
+  const scaleY = d3Scale
+    .scaleLinear()
+    .domain([minWeight, maxWeight + 1])
+    .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
+
   const scaleX = d3Scale
     .scaleLinear()
     .domain([0, xValues.length - 1])
     .range([MARGIN, GRAPH_WIDTH - MARGIN]);
 
-  const minWeight = Math.min(...yValues);
-  const maxWeight = Math.max(...yValues);
-  const scaleY = d3Scale
-    .scaleLinear()
-    .domain([minWeight - 1, maxWeight + 1]) // small buffer
-    .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
+  // We'll get about 4-5 ticks for Y
+  const yTickValues = d3Scale.scaleLinear().domain([minWeight, maxWeight + 1]).ticks(5);
 
-  // Generate path
+  // Straight lines between points
   const lineGenerator = d3Shape
     .line<{ date: string; weight: number }>()
     .x((d, i) => scaleX(i))
-    .y(d => scaleY(d.weight))
-    .curve(d3Shape.curveMonotoneX);
+    .y((d) => scaleY(d.weight))
+    .curve(d3Shape.curveLinear);
 
   const pathData = lineGenerator(data);
 
   return (
-    <View style={{ width: '100%', alignItems: 'center' }}>
-      <Text style={styles.weightGraphTitle}>Weight Trend</Text>
-      <ScrollView horizontal style={{ width: '100%' }}>
+    <View style={{ width: '100%', alignItems: 'center', paddingBottom: 5 }}>
+      {/* TITLE + PLUS ICON */}
+      <View
+        style={{
+          width: '90%',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 5
+        }}
+      >
+        <Text style={styles.weightGraphTitle}>Weight Trend</Text>
+        <TouchableOpacity onPress={() => console.log('Add more dates!')}>
+          <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
+        </TouchableOpacity>
+      </View>
+
+      {/* SCROLLABLE CHART */}
+      <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
         <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
-          {/* line path */}
-          <Path
-            d={pathData || ''}
-            fill="none"
-            stroke="#9B00FF"
-            strokeWidth={2}
-          />
-          {/* data points */}
-          {data.map((d, i) => {
-            const cx = scaleX(i);
-            const cy = scaleY(d.weight);
-            return (
-              <Circle
-                key={`circle-${i}`}
-                cx={cx}
-                cy={cy}
-                r={4}
-                fill="#FF00F5"
-                stroke="#FFF"
-                strokeWidth={1}
+          {/* ───────── GRID + AXES ───────── */}
+          <G>
+            {/* Horizontal grid + Y labels */}
+            {yTickValues.map((tickValue) => {
+              const yCoord = scaleY(tickValue);
+              return (
+                <React.Fragment key={`y-tick-${tickValue}`}>
+                  {/* Horizontal grid line */}
+                  <SvgLine
+                    x1={MARGIN}
+                    x2={GRAPH_WIDTH - MARGIN}
+                    y1={yCoord}
+                    y2={yCoord}
+                    stroke="rgba(255,255,255,0.2)"
+                    strokeWidth={1}
+                  />
+                  {/* Y-axis label */}
+                  <SvgText
+                    x={MARGIN - 5}
+                    y={yCoord}
+                    fill="#FFF"
+                    fontSize={10}
+                    textAnchor="end"
+                    alignmentBaseline="middle"
+                  >
+                    {tickValue}
+                  </SvgText>
+                </React.Fragment>
+              );
+            })}
+
+            {/* Vertical grid + X labels */}
+            {data.map((d, i) => {
+              const xCoord = scaleX(i);
+              return (
+                <React.Fragment key={`x-tick-${i}`}>
+                  {/* Vertical grid line */}
+                  <SvgLine
+                    x1={xCoord}
+                    x2={xCoord}
+                    y1={GRAPH_HEIGHT - MARGIN}
+                    y2={MARGIN}
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth={1}
+                  />
+                  {/* X-axis label */}
+                  <SvgText
+                    x={xCoord}
+                    y={GRAPH_HEIGHT - MARGIN / 2}
+                    fill="#FFF"
+                    fontSize={10}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    {d.date}
+                  </SvgText>
+                </React.Fragment>
+              );
+            })}
+          </G>
+
+          {/* ───────── LINE + POINTS ───────── */}
+          <G>
+            {/* The line path */}
+            {pathData && (
+              <Path
+                d={pathData}
+                fill="none"
+                stroke="#9B00FF"
+                strokeWidth={2}
               />
-            );
-          })}
+            )}
+
+            {/* Data point circles */}
+            {data.map((d, i) => {
+              const cx = scaleX(i);
+              const cy = scaleY(d.weight);
+              return (
+                <Circle
+                  key={`circle-${i}`}
+                  cx={cx}
+                  cy={cy}
+                  r={4}
+                  fill="#FF00F5"
+                  stroke="#FFF"
+                  strokeWidth={1}
+                />
+              );
+            })}
+          </G>
         </Svg>
       </ScrollView>
     </View>
@@ -290,23 +380,23 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
   const isOther = label.toUpperCase() === 'OTHER';
   const goal = 100; // Assume each macro has a goal of 100g
   const diff = goal - current;
-  let subText = "";
-  let subTextColor = "";
+  let subText = '';
+  let subTextColor = '';
 
   if (!isOther) {
     if (diff > 0) {
       subText = `${diff}g Left`;
-      subTextColor = "#9E9E9E";
+      subTextColor = '#9E9E9E';
     } else if (diff < 0) {
       subText = `${Math.abs(diff)}g over`;
-      subTextColor = "#FF8A80";
+      subTextColor = '#FF8A80';
     } else {
       subText = `Goal met`;
-      subTextColor = "#ccc";
+      subTextColor = '#ccc';
     }
   } else {
     // For "OTHER", we just say "Nutrients"
-    subTextColor = "#9E9E9E";
+    subTextColor = '#9E9E9E';
   }
 
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
@@ -353,7 +443,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
         <View style={styles.macroRingCenter}>
           {isOther ? (
             <MaskedView
-              style={{ height: 40, width: 40 }} // <— Larger container
+              style={{ height: 40, width: 40 }} // Larger container
               maskElement={
                 <View
                   style={{
@@ -364,7 +454,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
                 >
                   <MaterialCommunityIcons
                     name="food-apple"
-                    size={40} // <— Larger icon
+                    size={40} // Larger icon
                     color="black"
                   />
                 </View>
@@ -384,7 +474,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
       </View>
       {/* Sub-label */}
       <Text style={[styles.macroRingSubLabel, { color: subTextColor }]}>
-        {isOther ? "Nutrients" : subText}
+        {isOther ? 'Nutrients' : subText}
       </Text>
     </Container>
   );
@@ -407,8 +497,8 @@ const styles = StyleSheet.create({
     width: '95%',
     backgroundColor: 'hsla(0, 0%, 100%, 0.11)',
     borderRadius: 10,
-    padding: 15,
-    marginVertical: 10,
+    padding: 10,           // Reduced from 15
+    marginVertical: 8,     // Reduced from 10
     // Shadows
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -564,5 +654,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
     textTransform: 'uppercase'
-  },
+  }
 });
