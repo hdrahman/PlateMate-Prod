@@ -41,7 +41,6 @@ const percentConsumed = (consumedCalories / dailyCalorieGoal) * 100;
 const fatPercent = 20;
 const carbsPercent = 70;
 const proteinPercent = 40;
-const morePercent = 55; // This value is no longer used to fill inner text for the Other macro.
 const totalBurned = 500;
 const stepsCount = 4500;
 
@@ -69,26 +68,28 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* CHEAT DAY BAR */}
-        <View style={styles.cheatDayContainer}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={styles.cheatDayLabel}>Days until cheat day</Text>
-            {/* Settings button has been removed from Home.tsx */}
+        {/* CHEAT DAY CARD */}
+        <View style={styles.card}>
+          <View style={styles.cheatDayContainer}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.cheatDayLabel}>Days until cheat day</Text>
+              {/* Settings button removed from Home.tsx */}
+            </View>
+            <View style={styles.cheatDayBarBackground}>
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={[styles.cheatDayBarFill, { width: `${cheatProgress}%` }]}
+              />
+            </View>
+            <Text style={styles.cheatDayStatus}>
+              {cheatDaysCompleted} / {cheatDaysTotal} days
+            </Text>
           </View>
-          <View style={styles.cheatDayBarBackground}>
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-              style={[styles.cheatDayBarFill, { width: `${cheatProgress}%` }]}
-            />
-          </View>
-          <Text style={styles.cheatDayStatus}>
-            {cheatDaysCompleted} / {cheatDaysTotal} days
-          </Text>
         </View>
 
-        {/* RING + VERTICAL CARD */}
+        {/* RING + RIGHT CARD */}
         <View style={styles.ringAndRightCard}>
           {/* MAIN RING */}
           <View style={styles.ringContainer}>
@@ -107,7 +108,7 @@ export default function Home() {
                 cx={CIRCLE_SIZE / 2}
                 cy={CIRCLE_SIZE / 2}
                 r={radius}
-                stroke="rgba(255,255,255,0.1)"
+                stroke="rgba(255, 255, 255, 0.14)"
                 strokeWidth={STROKE_WIDTH}
                 fill="none"
               />
@@ -157,26 +158,30 @@ export default function Home() {
           </View>
         </View>
 
-        {/* MACROS ROW: 4 SMALL RINGS */}
-        <View style={styles.macrosRow}>
-          <MacroRing label="PROTEIN" percent={proteinPercent} />
-          <MacroRing label="CARBS" percent={carbsPercent} />
-          <MacroRing label="FATS" percent={fatPercent} />
-          {/* The last macro is now "OTHER" as a button with a gradient-filled nutrient icon */}
-          <MacroRing
-            label="OTHER"
-            percent={morePercent}
-            onPress={() => navigation.navigate('Nutrients' as never)}
-          />
+        {/* MACROS CARD */}
+        <View style={styles.card}>
+          <View style={styles.macrosRow}>
+            <MacroRing label="PROTEIN" percent={proteinPercent} />
+            <MacroRing label="CARBS" percent={carbsPercent} />
+            <MacroRing label="FATS" percent={fatPercent} />
+            {/* The last macro is "OTHER" as a button with a gradient-filled nutrient icon */}
+            <MacroRing
+              label="OTHER"
+              percent={100}
+              onPress={() => navigation.navigate('Nutrients' as never)}
+            />
+          </View>
         </View>
 
-        {/* WEIGHT LOST SLIDER */}
-        <View style={styles.burnContainer}>
-          <Text style={styles.burnTitle}>Weight Lost</Text>
-          <View style={styles.burnBarBackground}>
-            <View style={[styles.burnBarFill, { width: '70%' }]} />
+        {/* WEIGHT LOST CARD */}
+        <View style={styles.card}>
+          <View style={styles.burnContainer}>
+            <Text style={styles.burnTitle}>Weight Lost</Text>
+            <View style={styles.burnBarBackground}>
+              <View style={[styles.burnBarFill, { width: '70%' }]} />
+            </View>
+            <Text style={styles.burnDetails}>{totalBurned} Calories burned</Text>
           </View>
-          <Text style={styles.burnDetails}>{totalBurned} Calories burned</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -266,23 +271,34 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     alignItems: 'center',
-    paddingBottom: 40
+    paddingBottom: 40,
+    paddingTop: 20
+  },
+
+  /* CARD STYLE */
+  card: {
+    width: '95%',
+    backgroundColor: 'hsla(0, 0.00%, 100.00%, 0.11)',
+    borderRadius: 10,
+    padding: 15,
+    marginVertical: 10,
+    // Shadow for iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    // Elevation for Android
+    elevation: 3
   },
 
   /* Cheat Day */
   cheatDayContainer: {
-    width: '85%',
-    marginTop: 20,
-    marginBottom: 20
+    // The card wrapper already provides padding and margin
   },
   cheatDayLabel: {
     color: '#FFF',
     fontSize: 14,
     textTransform: 'uppercase'
-  },
-  settingsBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4
   },
   cheatDayBarBackground: {
     marginTop: 8,
@@ -343,7 +359,7 @@ const styles = StyleSheet.create({
   },
 
   rightCard: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 12,
@@ -370,9 +386,7 @@ const styles = StyleSheet.create({
   macrosRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    width: '90%',
-    marginBottom: 20,
-    marginTop: 10
+    alignItems: 'center'
   },
   macroRingContainer: {
     alignItems: 'center'
@@ -398,8 +412,7 @@ const styles = StyleSheet.create({
 
   /* Weight Lost Slider */
   burnContainer: {
-    width: '85%',
-    marginBottom: 20
+    // The card wrapper already provides padding
   },
   burnTitle: {
     color: '#FFF',
