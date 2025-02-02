@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,9 @@ import {
   Dimensions,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity
+  TouchableOpacity,
+  NativeSyntheticEvent,
+  NativeScrollEvent
 } from 'react-native';
 import Svg, {
   Circle,
@@ -21,21 +23,14 @@ import Svg, {
   Stop,
   Path
 } from 'react-native-svg';
-
-// Using Expo’s LinearGradient:
 import { LinearGradient } from 'expo-linear-gradient';
-
-// d3 for our line chart
 import * as d3Scale from 'd3-scale';
 import * as d3Shape from 'd3-shape';
-
 const { width } = Dimensions.get('window');
-
-// Main ring dimensions
+//ring dimensions
 const CIRCLE_SIZE = width * 0.55;
 const STROKE_WIDTH = 20;
 
-// Macro ring dimensions
 const MACRO_RING_SIZE = 60;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,8 +59,23 @@ const weightHistory = [
   { date: '02/01', weight: 107 }
 ];
 
+// Steps history
+const stepsHistory = [
+  { date: '11/03', steps: 2400 },
+  { date: '12/03', steps: 3700 },
+  { date: '02/01', steps: 5000 }
+];
+
 export default function Home() {
   const navigation = useNavigation();
+  // Keep track of which "page" (card) we are on in the horizontal scroll
+  const [activeIndex, setActiveIndex] = useState(0);
+  // Handler: updates activeIndex when user scrolls horizontally
+  const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / width);
+    setActiveIndex(newIndex);
+  };
 
   // Calculate values for the main ring.
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
@@ -197,9 +207,37 @@ export default function Home() {
           </View>
         </View>
 
-        {/* WEIGHT TREND CARD */}
-        <View style={styles.card}>
-          <WeightGraph data={weightHistory} />
+        {/* -- TREND CARDS WRAPPED IN A HORIZONTAL SCROLL -- */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onScrollEnd}
+          style={{ width: '100%' }}
+        >
+          {/* WEIGHT TREND CARD (1st page) */}
+          <View style={{ width }}>
+            <View style={[styles.card, { width: '95%', marginLeft: '2.5%' }]}>
+              <View style={styles.trendContainer}>
+                <WeightGraph data={weightHistory} />
+              </View>
+            </View>
+          </View>
+
+          {/* STEPS TREND CARD (2nd page) */}
+          <View style={{ width }}>
+            <View style={[styles.card, { width: '95%', marginLeft: '2.5%' }]}>
+              <View style={styles.trendContainer}>
+                <StepsGraph data={stepsHistory} />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* PAGINATION DOTS */}
+        <View style={styles.dotsContainer}>
+          <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
+          <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -211,14 +249,14 @@ export default function Home() {
  ************************************/
 function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
   // Dimensions for the chart
-  const GRAPH_WIDTH = 0.9 * width;
-  const GRAPH_HEIGHT = 200;
+  const GRAPH_WIDTH = 0.94 * width;
+  const GRAPH_HEIGHT = 220;
   const MARGIN = 30; // a bit bigger margin for labels
 
   // X-values: indices of data
   const xValues = data.map((_, i) => i);
   // Y-values: actual weight
-  const yValues = data.map((d) => d.weight);
+  const yValues = data.map(d => d.weight);
 
   // Build scales
   const minWeight = Math.min(...yValues);
@@ -242,7 +280,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
   const lineGenerator = d3Shape
     .line<{ date: string; weight: number }>()
     .x((d, i) => scaleX(i))
-    .y((d) => scaleY(d.weight))
+    .y(d => scaleY(d.weight))
     .curve(d3Shape.curveLinear);
 
   const pathData = lineGenerator(data);
@@ -256,7 +294,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 5
+          marginBottom: -10 // was 5
         }}
       >
         <Text style={styles.weightGraphTitle}>Weight Trend</Text>
@@ -275,7 +313,6 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
               const yCoord = scaleY(tickValue);
               return (
                 <React.Fragment key={`y-tick-${tickValue}`}>
-                  {/* Horizontal grid line */}
                   <SvgLine
                     x1={MARGIN}
                     x2={GRAPH_WIDTH - MARGIN}
@@ -284,7 +321,6 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
                     stroke="rgba(255,255,255,0.2)"
                     strokeWidth={1}
                   />
-                  {/* Y-axis label */}
                   <SvgText
                     x={MARGIN - 5}
                     y={yCoord}
@@ -304,7 +340,6 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
               const xCoord = scaleX(i);
               return (
                 <React.Fragment key={`x-tick-${i}`}>
-                  {/* Vertical grid line */}
                   <SvgLine
                     x1={xCoord}
                     x2={xCoord}
@@ -313,7 +348,6 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
                     stroke="rgba(255,255,255,0.1)"
                     strokeWidth={1}
                   />
-                  {/* X-axis label */}
                   <SvgText
                     x={xCoord}
                     y={GRAPH_HEIGHT - MARGIN / 2}
@@ -331,7 +365,6 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
 
           {/* ───────── LINE + POINTS ───────── */}
           <G>
-            {/* The line path */}
             {pathData && (
               <Path
                 d={pathData}
@@ -340,8 +373,6 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
                 strokeWidth={2}
               />
             )}
-
-            {/* Data point circles */}
             {data.map((d, i) => {
               const cx = scaleX(i);
               const cy = scaleY(d.weight);
@@ -352,6 +383,152 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
                   cy={cy}
                   r={4}
                   fill="#FF00F5"
+                  stroke="#FFF"
+                  strokeWidth={1}
+                />
+              );
+            })}
+          </G>
+        </Svg>
+      </ScrollView>
+    </View>
+  );
+}
+
+/************************************
+ *  STEPS GRAPH COMPONENT (Second Card)
+ ************************************/
+function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
+  // Adjusted dimensions to match WeightGraph
+  const GRAPH_WIDTH = 0.94 * width; // was 0.9 * width
+  const GRAPH_HEIGHT = 220;         // was 200
+  const MARGIN = 30;
+
+  // X-values
+  const xValues = data.map((_, i) => i);
+  // Y-values: steps
+  const yValues = data.map(d => d.steps);
+
+  const minSteps = Math.min(...yValues);
+  const maxSteps = Math.max(...yValues);
+
+  // buffer to avoid top cutoff
+  const scaleY = d3Scale
+    .scaleLinear()
+    .domain([minSteps, maxSteps + 500])
+    .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
+
+  const scaleX = d3Scale
+    .scaleLinear()
+    .domain([0, xValues.length - 1])
+    .range([MARGIN, GRAPH_WIDTH - MARGIN]);
+
+  // Ticks
+  const yTickValues = d3Scale.scaleLinear().domain([minSteps, maxSteps + 500]).ticks(5);
+
+  // Straight lines
+  const lineGenerator = d3Shape
+    .line<{ date: string; steps: number }>()
+    .x((d, i) => scaleX(i))
+    .y(d => scaleY(d.steps))
+    .curve(d3Shape.curveLinear);
+
+  const pathData = lineGenerator(data);
+
+  return (
+    <View style={{ width: '100%', alignItems: 'center', paddingBottom: 5 }}>
+      <View
+        style={{
+          width: '90%',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: -10 // was 5
+        }}
+      >
+        <Text style={styles.weightGraphTitle}>Steps Trend</Text>
+        <TouchableOpacity onPress={() => console.log('Add more steps!')}>
+          <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
+        <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
+          <G>
+            {/* Horizontal grid + Y labels */}
+            {yTickValues.map((tickValue) => {
+              const yCoord = scaleY(tickValue);
+              return (
+                <React.Fragment key={`steps-y-${tickValue}`}>
+                  <SvgLine
+                    x1={MARGIN}
+                    x2={GRAPH_WIDTH - MARGIN}
+                    y1={yCoord}
+                    y2={yCoord}
+                    stroke="rgba(255,255,255,0.2)"
+                    strokeWidth={1}
+                  />
+                  <SvgText
+                    x={MARGIN - 5}
+                    y={yCoord}
+                    fill="#FFF"
+                    fontSize={10}
+                    textAnchor="end"
+                    alignmentBaseline="middle"
+                  >
+                    {tickValue}
+                  </SvgText>
+                </React.Fragment>
+              );
+            })}
+            {/* Vertical grid + X labels */}
+            {data.map((d, i) => {
+              const xCoord = scaleX(i);
+              return (
+                <React.Fragment key={`steps-x-${i}`}>
+                  <SvgLine
+                    x1={xCoord}
+                    x2={xCoord}
+                    y1={GRAPH_HEIGHT - MARGIN}
+                    y2={MARGIN}
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth={1}
+                  />
+                  <SvgText
+                    x={xCoord}
+                    y={GRAPH_HEIGHT - MARGIN / 2}
+                    fill="#FFF"
+                    fontSize={10}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    {d.date}
+                  </SvgText>
+                </React.Fragment>
+              );
+            })}
+          </G>
+
+          {/* Steps line + points */}
+          <G>
+            {pathData && (
+              <Path
+                d={pathData}
+                fill="none"
+                stroke="#00CFFF"
+                strokeWidth={2}
+              />
+            )}
+            {data.map((d, i) => {
+              const cx = scaleX(i);
+              const cy = scaleY(d.steps);
+              return (
+                <Circle
+                  key={`steps-circle-${i}`}
+                  cx={cx}
+                  cy={cy}
+                  r={4}
+                  fill="#9B00FF"
                   stroke="#FFF"
                   strokeWidth={1}
                 />
@@ -391,24 +568,21 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
       subText = `${Math.abs(diff)}g over`;
       subTextColor = '#FF8A80';
     } else {
-      subText = `Goal met`;
+      subText = 'Goal met';
       subTextColor = '#ccc';
     }
   } else {
-    // For "OTHER", we just say "Nutrients"
-    subTextColor = '#9E9E9E';
+    subTextColor = '#9E9E9E'; // "Nutrients"
   }
 
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const fillStroke = (percent / 100) * circumference;
 
-  // Wrap the ring in a Touchable if onPress provided
   const Container = onPress ? TouchableOpacity : View;
 
   return (
     <Container style={styles.macroRingWrapper} onPress={onPress}>
-      {/* Macro name above the ring */}
       <Text style={styles.macroRingLabelTop}>{label}</Text>
       <View style={{ position: 'relative' }}>
         <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
@@ -443,7 +617,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
         <View style={styles.macroRingCenter}>
           {isOther ? (
             <MaskedView
-              style={{ height: 40, width: 40 }} // Larger container
+              style={{ height: 40, width: 40 }}
               maskElement={
                 <View
                   style={{
@@ -452,11 +626,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
                     backgroundColor: 'transparent'
                   }}
                 >
-                  <MaterialCommunityIcons
-                    name="food-apple"
-                    size={40} // Larger icon
-                    color="black"
-                  />
+                  <MaterialCommunityIcons name="food-apple" size={40} color="black" />
                 </View>
               }
             >
@@ -472,7 +642,6 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
           )}
         </View>
       </View>
-      {/* Sub-label */}
       <Text style={[styles.macroRingSubLabel, { color: subTextColor }]}>
         {isOther ? 'Nutrients' : subText}
       </Text>
@@ -497,8 +666,8 @@ const styles = StyleSheet.create({
     width: '95%',
     backgroundColor: 'hsla(0, 0%, 100%, 0.11)',
     borderRadius: 10,
-    padding: 10,           // Reduced from 15
-    marginVertical: 8,     // Reduced from 10
+    padding: 10,
+    marginVertical: 8,
     // Shadows
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -654,5 +823,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
     textTransform: 'uppercase'
+  },
+  /* Pagination Dots */
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 8
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 5
+  },
+  dotActive: {
+    backgroundColor: '#FFF'
+  },
+  // New style for positioning the trend elements (StepsTrend and WeightTrend)
+  trendContainer: {
+    marginTop: 10
   }
 });
