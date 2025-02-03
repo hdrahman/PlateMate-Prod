@@ -20,29 +20,24 @@ function CustomTabBarButton({ children, onPress }) {
         position: 'absolute',
         left: '50%',
         top: -20,
-        marginLeft: -30
+        marginLeft: -27.5 // Adjusted to center the 55px container
       }}
     >
-      <LinearGradient
-        colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-        style={{
-          position: 'absolute',
-          width: 70,
-          height: 70,
-          borderRadius: 35,
-          opacity: 0.6
-        }}
-      />
       <TouchableOpacity
-        onPress={onPress}
         style={{
-          justifyContent: 'center',
-          alignItems: 'center',
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          backgroundColor: '#000'
+          justifyContent: "center",
+          alignItems: "center",
+          width: 55, // Slightly smaller
+          height: 55, // Slightly smaller
+          borderRadius: 27.5, // Half of the new size
+          backgroundColor: "#000", // or any background color you prefer
+          shadowColor: "#FF00F5",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.6,
+          shadowRadius: 10,
+          elevation: 4,
         }}
+        onPress={onPress}
       >
         {children}
       </TouchableOpacity>
@@ -155,6 +150,7 @@ export default function App() {
           tabBarStyle: {
             backgroundColor: "#000",
             borderTopColor: "transparent",
+            borderTopWidth: 0, // Remove the white line above the bottom navigation bar
           },
           tabBarActiveTintColor: "#FF00F5",
           tabBarInactiveTintColor: "#888",

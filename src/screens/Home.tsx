@@ -119,9 +119,8 @@ export default function Home() {
           </View>
         </View>
 
-        {/* MAIN RING + RIGHT CARD */}
-        <View style={styles.ringAndRightCard}>
-          {/* MAIN RING */}
+        {/* GOAL CARD (Unified circular bar + stats overlay) */}
+        <View style={styles.goalCard}>
           <View style={styles.ringContainer}>
             <View style={styles.ringGlow} />
             <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
@@ -158,20 +157,12 @@ export default function Home() {
               <Text style={styles.remainingLabel}>REMAINING</Text>
             </View>
           </View>
-
-          {/* RIGHT VERTICAL CARD */}
-          <View style={styles.rightCard}>
+          <View style={styles.rightCardVertical}>
             {rightStats.map((item) => {
-              const IconComponent =
-                item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
+              const IconComponent = item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
               return (
-                <View key={item.label} style={styles.statRow}>
-                  <IconComponent
-                    name={item.icon as any}
-                    size={20}
-                    color={item.color}
-                    style={{ marginRight: 8 }}
-                  />
+                <View key={item.label} style={styles.statRowVertical}>
+                  <IconComponent name={item.icon as any} size={20} color={item.color} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
                     <Text style={styles.statValue}>{item.value}</Text>
@@ -728,7 +719,9 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   ringContainer: {
-    position: 'relative'
+    position: 'relative',
+    marginRight: 8, // Shift the circle slightly more to the right
+    marginLeft: 15 // Add space between the circle and the left edge
   },
   ringGlow: {
     position: 'absolute',
@@ -864,5 +857,27 @@ const styles = StyleSheet.create({
   // New style for positioning the trend elements (StepsTrend and WeightTrend)
   trendContainer: {
     marginTop: 10
+  },
+  goalCard: {
+    width: '95%',
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  rightCardVertical: {
+    flex: 1,
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+    paddingLeft: 20 // Shift the stack to the right
+  },
+  statRowVertical: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12
   }
 });
