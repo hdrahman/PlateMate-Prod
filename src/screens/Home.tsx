@@ -28,7 +28,7 @@ import * as d3Scale from 'd3-scale';
 import * as d3Shape from 'd3-shape';
 const { width } = Dimensions.get('window');
 //ring dimensions
-const CIRCLE_SIZE = width * 0.55;
+const CIRCLE_SIZE = Math.min(width * 0.50, 300); // Slightly bigger circle size
 const STROKE_WIDTH = 20;
 
 const MACRO_RING_SIZE = 60;
@@ -119,6 +119,9 @@ export default function Home() {
           </View>
         </View>
 
+        {/* Add space between the cards */}
+        <View style={{ height: 6 }} />
+
         {/* GOAL CARD (Unified circular bar + stats overlay) */}
         <View style={styles.goalCard}>
           <View style={styles.ringContainer}>
@@ -157,7 +160,7 @@ export default function Home() {
               <Text style={styles.remainingLabel}>REMAINING</Text>
             </View>
           </View>
-          <View style={styles.rightCardVertical}>
+          <View style={[styles.rightCardVertical, { marginTop: 13 }]}>
             {rightStats.map((item) => {
               const IconComponent = item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
               return (
@@ -172,6 +175,9 @@ export default function Home() {
             })}
           </View>
         </View>
+
+        {/* Add space between the cards */}
+        <View style={{ height: 5 }} />
 
         {/* MACROS CARD */}
         <View style={styles.card}>
@@ -188,6 +194,9 @@ export default function Home() {
           </View>
         </View>
 
+        {/* Add space between the cards */}
+        <View style={{ height: 5 }} />
+
         {/* WEIGHT LOST CARD */}
         <View style={styles.card}>
           <View style={styles.burnContainer}>
@@ -198,6 +207,9 @@ export default function Home() {
             <Text style={styles.burnDetails}>{totalBurned} Calories burned</Text>
           </View>
         </View>
+
+        {/* Add space between the cards */}
+        <View style={{ height: 6 }} />
 
         {/* -- TREND CARDS WRAPPED IN A HORIZONTAL SCROLL -- */}
         <ScrollView
@@ -671,14 +683,14 @@ const styles = StyleSheet.create({
   scrollContainer: {
     alignItems: 'center',
     paddingBottom: 40,
-    paddingTop: 20
+    paddingTop: 10 // Reduced padding for less space between header and first card
   },
   card: {
     width: '95%',
     backgroundColor: 'hsla(0, 0%, 100%, 0.1)',
     borderRadius: 10,
     padding: 10,
-    marginVertical: 8,
+    marginVertical: 4, // Slightly reduced margin for uniform spacing
     // Shadows
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -720,8 +732,8 @@ const styles = StyleSheet.create({
   },
   ringContainer: {
     position: 'relative',
-    marginRight: 8, // Shift the circle slightly more to the right
-    marginLeft: 15 // Add space between the circle and the left edge
+    marginRight: 20, // Add space between the circle and the stack
+    marginLeft: 10 // Add space between the circle and the left edge
   },
   ringGlow: {
     position: 'absolute',
@@ -863,17 +875,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.09)',
     borderRadius: 10,
     padding: 10,
-    marginBottom: 10,
+    marginBottom: 4, // Slightly reduced margin for uniform spacing
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'flex-start', // Ensure the stack is next to the circle
+    height: 235 // Slightly taller card to prevent overflow
   },
   rightCardVertical: {
     flex: 1,
-    justifyContent: 'space-around',
+    justifyContent: 'space-between', // Align with top and bottom of the ring
     alignItems: 'flex-start',
-    paddingLeft: 20 // Shift the stack to the right
+    paddingLeft: 10, // Adjust padding to ensure the stack is next to the circle
+    marginTop: 10 // Move the stack slightly lower
   },
   statRowVertical: {
     flexDirection: 'row',
