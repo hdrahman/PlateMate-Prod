@@ -13,6 +13,51 @@ import Chatbot from "./src/screens/Chatbot";
 
 const Tab = createBottomTabNavigator();
 
+function CustomTabBarButton({ children, onPress }) {
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: -20,
+        marginLeft: -30
+      }}
+    >
+      <LinearGradient
+        colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+        style={{
+          position: 'absolute',
+          width: 70,
+          height: 70,
+          borderRadius: 35,
+          opacity: 0.6
+        }}
+      />
+      <TouchableOpacity
+        onPress={onPress}
+        style={{
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          backgroundColor: '#000'
+        }}
+      >
+        {children}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function CameraScreen() {
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <Text>Camera Screen</Text>
+    </View>
+  );
+}
+
 export default function App() {
   return (
     <NavigationContainer
@@ -132,6 +177,17 @@ export default function App() {
             tabBarLabel: "Food Log",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="restaurant-outline" color={color} size={size} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Camera"
+          component={CameraScreen}
+          options={{
+            tabBarButton: (props) => (
+              <CustomTabBarButton {...props}>
+                <Ionicons name="camera-outline" size={30} color="#FF00F5" />
+              </CustomTabBarButton>
             ),
           }}
         />

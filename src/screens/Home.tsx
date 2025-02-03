@@ -653,7 +653,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={gradientColors}
+                colors={gradientColors as [string, string, ...string[]]}
                 style={{ flex: 1 }}
               />
             </MaskedView>
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '95%',
-    backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
+    backgroundColor: 'hsla(0, 0%, 100%, 0.1)',
     borderRadius: 10,
     padding: 10,
     marginVertical: 8,
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase'
   },
   rightCard: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: 'rgba(255,255,255,0.11)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 12,
