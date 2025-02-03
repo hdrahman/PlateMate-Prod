@@ -82,16 +82,17 @@ export default function Home() {
   const circumference = 2 * Math.PI * radius;
   const consumedStroke = (percentConsumed / 100) * circumference;
 
-  // Data for the right card.
+  // Data for the right card with updated colors.
   const rightStats = [
-    { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline' },
-    { label: 'Food', value: consumedCalories, icon: 'restaurant-outline' },
-    { label: 'Exercise', value: totalBurned, icon: 'barbell-outline' },
+    { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline', color: '#FFB74D' }, // warm orange hue
+    { label: 'Food', value: consumedCalories, icon: 'restaurant-outline', color: '#FF8A65' }, // soft red hue
+    { label: 'Exercise', value: totalBurned, icon: 'barbell-outline', color: '#66BB6A' }, // updated green
     {
       label: 'Steps',
       value: stepsCount,
       icon: 'walk',
-      iconSet: 'MaterialCommunityIcons'
+      iconSet: 'MaterialCommunityIcons',
+      color: '#E040FB' // updated purple
     }
   ];
 
@@ -168,11 +169,11 @@ export default function Home() {
                   <IconComponent
                     name={item.icon as any}
                     size={20}
-                    color="#FF00F5"
+                    color={item.color}
                     style={{ marginRight: 8 }}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.statLabel}>{item.label}</Text>
+                    <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
                     <Text style={styles.statValue}>{item.value}</Text>
                   </View>
                 </View>
@@ -578,6 +579,26 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
   const circumference = 2 * Math.PI * radius;
   const fillStroke = (percent / 100) * circumference;
 
+  // More saturated, vibrant gradient colors for each macro.
+  let gradientColors = ['#FF00F5', '#9B00FF', '#00CFFF']; // default
+  switch (label.toUpperCase()) {
+    case 'PROTEIN':
+      gradientColors = ['#FF5252', '#FF1744', '#D50000'];
+      break;
+    case 'CARBS':
+      gradientColors = ['#29B6F6', '#03A9F4', '#0288D1'];
+      break;
+    case 'FATS':
+      gradientColors = ['#66BB6A', '#43A047', '#2E7D32'];
+      break;
+    case 'OTHER':
+      // Updated gradient: darker and more saturated to complement the overall style.
+      gradientColors = ['#6A1B9A', '#8E24AA', '#D81B60'];
+      break;
+    default:
+      break;
+  }
+
   const Container = onPress ? TouchableOpacity : View;
 
   return (
@@ -587,9 +608,9 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
         <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
           <Defs>
             <SvgLinearGradient id={`macroGradient-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#FF00F5" />
-              <Stop offset="50%" stopColor="#9B00FF" />
-              <Stop offset="100%" stopColor="#00CFFF" />
+              <Stop offset="0%" stopColor={gradientColors[0]} />
+              <Stop offset="50%" stopColor={gradientColors[1]} />
+              <Stop offset="100%" stopColor={gradientColors[2]} />
             </SvgLinearGradient>
           </Defs>
           <Circle
@@ -632,7 +653,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                colors={gradientColors}
                 style={{ flex: 1 }}
               />
             </MaskedView>
