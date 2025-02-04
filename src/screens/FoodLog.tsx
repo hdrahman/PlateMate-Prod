@@ -145,3 +145,169 @@ const DiaryScreen: React.FC = () => {
         </SafeAreaView>
     );
 };
+
+export default DiaryScreen;
+
+const PRIMARY_COLOR = '#AA00FF'; // A vibrant purple accent
+const BACKGROUND_COLOR = '#1C1C1E'; // iOS dark mode background style
+const CARD_COLOR = '#2C2C2E';
+const TEXT_COLOR = '#FFFFFF';
+const SUBTEXT_COLOR = '#BBBBBB';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: BACKGROUND_COLOR,
+    },
+    scrollContent: {
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+    },
+    headerContainer: {
+        marginBottom: 16,
+    },
+    headerTitle: {
+        fontSize: 28,
+        color: TEXT_COLOR,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    headerDate: {
+        fontSize: 18,
+        color: SUBTEXT_COLOR,
+    },
+    summaryCard: {
+        backgroundColor: CARD_COLOR,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    summaryTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: TEXT_COLOR,
+        marginBottom: 8,
+    },
+    calorieRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginVertical: 4,
+    },
+    calorieLabel: {
+        color: SUBTEXT_COLOR,
+        fontSize: 16,
+    },
+    calorieValue: {
+        color: TEXT_COLOR,
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    dividerLine: {
+        height: 1,
+        backgroundColor: SUBTEXT_COLOR,
+        marginVertical: 8,
+        opacity: 0.3,
+    },
+    remainingVal: {
+        color: PRIMARY_COLOR,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    mealContainer: {
+        backgroundColor: CARD_COLOR,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    mealHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    mealTitle: {
+        color: TEXT_COLOR,
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    mealCals: {
+        color: TEXT_COLOR,
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    macrosText: {
+        color: SUBTEXT_COLOR,
+        fontSize: 14,
+        marginBottom: 8,
+    },
+    itemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginVertical: 2,
+    },
+    itemName: {
+        color: TEXT_COLOR,
+        fontSize: 16,
+    },
+    itemCals: {
+        color: TEXT_COLOR,
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    addFoodBtn: {
+        marginTop: 8,
+        paddingVertical: 8,
+        backgroundColor: PRIMARY_COLOR,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    addFoodBtnText: {
+        color: TEXT_COLOR,
+        fontWeight: '700',
+        fontSize: 16,
+    },
+    exerciseContainer: {
+        backgroundColor: CARD_COLOR,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    exerciseHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    exerciseTitle: {
+        color: TEXT_COLOR,
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    exerciseCals: {
+        color: TEXT_COLOR,
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    addExerciseBtn: {
+        marginTop: 8,
+        paddingVertical: 8,
+        backgroundColor: PRIMARY_COLOR,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    addExerciseBtnText: {
+        color: TEXT_COLOR,
+        fontWeight: '700',
+        fontSize: 16,
+    },
+    completeDiaryBtn: {
+        marginTop: 8,
+        paddingVertical: 12,
+        backgroundColor: PRIMARY_COLOR,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    completeDiaryBtnText: {
+        color: TEXT_COLOR,
+        fontWeight: '700',
+        fontSize: 16,
+    },
+});
