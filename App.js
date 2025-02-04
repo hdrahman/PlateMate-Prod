@@ -1,7 +1,7 @@
 import React from "react";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { TouchableOpacity, View, Text, StatusBar } from "react-native";
+import { TouchableOpacity, View, Text, StatusBar, Dimensions } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,12 @@ import FoodLog from "./src/screens/FoodLog";
 import Workout from "./src/screens/Workout";
 import Chatbot from "./src/screens/Chatbot";
 
+const { width } = Dimensions.get("window");
+const BASE_BUTTON_SIZE = 55;
+const BUTTON_SIZE = Math.min(BASE_BUTTON_SIZE, width * 0.15);
+const BUTTON_RADIUS = BUTTON_SIZE / 2;
+const OFFSET = BUTTON_RADIUS; // to center the button
+
 const Tab = createBottomTabNavigator();
 
 function CustomTabBarButton({ children, onPress }) {
@@ -21,17 +27,19 @@ function CustomTabBarButton({ children, onPress }) {
         position: 'absolute',
         left: '50%',
         top: -20,
-        marginLeft: -27.5 // Adjusted to center the 55px container
+        marginLeft: -OFFSET, // Center the container
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       <TouchableOpacity
         style={{
           justifyContent: "center",
           alignItems: "center",
-          width: 55, // Slightly smaller
-          height: 55, // Slightly smaller
-          borderRadius: 27.5, // Half of the new size
-          backgroundColor: "#000", // or any background color you prefer
+          width: BUTTON_SIZE,
+          height: BUTTON_SIZE,
+          borderRadius: BUTTON_RADIUS,
+          backgroundColor: "#000",
           shadowColor: "#FF00F5",
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 0.6,
@@ -172,6 +180,11 @@ export default function App() {
             /**
              * 3) Tab bar styling
              */
+            tabBarLabelStyle: {
+              fontSize: 12,
+              fontWeight: 'bold',
+              fontStyle: 'italic' // add creative font styling to tab labels
+            },
             tabBarStyle: {
               backgroundColor: "#000",
               borderTopColor: "transparent",
@@ -207,7 +220,14 @@ export default function App() {
             options={{
               tabBarButton: (props) => (
                 <CustomTabBarButton {...props}>
-                  <Ionicons name="camera-outline" size={30} color="#FF00F5" />
+                  <GlowIcon
+                    name="camera-outline"
+                    size={30}
+                    gradientColors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                    // Diagonal gradient for camera: from top left to bottom right.
+                    gradientStart={{ x: 0, y: 0 }}
+                    gradientEnd={{ x: 1, y: 1 }}
+                  />
                 </CustomTabBarButton>
               ),
             }}
@@ -246,7 +266,7 @@ export default function App() {
  * A reusable component that masks an Ionicon with a linear gradient,
  * and also adds a surrounding glow.
  */
-function GlowIcon({ name, size, gradientColors }) {
+function GlowIcon({ name, size, gradientColors, gradientStart, gradientEnd }) {
   return (
     <View
       style={{
@@ -271,8 +291,8 @@ function GlowIcon({ name, size, gradientColors }) {
       >
         <LinearGradient
           colors={gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          start={gradientStart || { x: 0, y: 0 }}
+          end={gradientEnd || { x: 1, y: 0 }}
           style={{ width: size, height: size }}
         />
       </MaskedView>

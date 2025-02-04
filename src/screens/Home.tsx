@@ -27,8 +27,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as d3Scale from 'd3-scale';
 import * as d3Shape from 'd3-shape';
 const { width } = Dimensions.get('window');
-//ring dimensions
-const CIRCLE_SIZE = Math.min(width * 0.50, 300); // Slightly bigger circle size
+const BASE_WIDTH = 375; // base width for scaling
+const scaleFactor = Math.min(width / BASE_WIDTH, 1);
+const CIRCLE_SIZE = width * 0.50 * scaleFactor; // scales proportionally
 const STROKE_WIDTH = 20;
 
 const MACRO_RING_SIZE = 60;
@@ -130,7 +131,7 @@ export default function Home() {
               <Defs>
                 <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                   <Stop offset="0%" stopColor="#FF00F5" />
-                  <Stop offset="50%" stopColor="#9B00FF" />
+                  <Stop offset="60%" stopColor="#9B00FF" />
                   <Stop offset="100%" stopColor="#00CFFF" />
                 </SvgLinearGradient>
               </Defs>
@@ -202,9 +203,14 @@ export default function Home() {
           <View style={styles.burnContainer}>
             <Text style={styles.burnTitle}>Weight Lost</Text>
             <View style={styles.burnBarBackground}>
-              <View style={[styles.burnBarFill, { width: '70%' }]} />
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={[styles.burnBarFill, { width: '70%' }]}
+              />
             </View>
-            <Text style={styles.burnDetails}>{totalBurned} Calories burned</Text>
+            <Text style={styles.burnDetails}>{totalBurned} Kilograms Lost!</Text>
           </View>
         </View>
 
@@ -595,12 +601,15 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
       gradientColors = ['#66BB6A', '#43A047', '#2E7D32'];
       break;
     case 'OTHER':
-      // Updated gradient: darker and more saturated to complement the overall style.
-      gradientColors = ['#6A1B9A', '#8E24AA', '#D81B60'];
       break;
     default:
       break;
   }
+
+  // Use diagonal gradient direction for the OTHER macro
+  const gradientDirection = isOther
+    ? { x1: "0%", y1: "0%", x2: "100%", y2: "100%" }
+    : { x1: "0%", y1: "0%", x2: "100%", y2: "0%" };
 
   const Container = onPress ? TouchableOpacity : View;
 
@@ -610,11 +619,20 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
       <View style={{ position: 'relative' }}>
         <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
           <Defs>
-            <SvgLinearGradient id={`macroGradient-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor={gradientColors[0]} />
-              <Stop offset="50%" stopColor={gradientColors[1]} />
-              <Stop offset="100%" stopColor={gradientColors[2]} />
-            </SvgLinearGradient>
+            {isOther ? (
+              <SvgLinearGradient id={`macroGradient-${label}`} {...gradientDirection}>
+                <Stop offset="0%" stopColor="#00A8FF" />
+                <Stop offset="10%" stopColor="#00A8FF" />
+                <Stop offset="60%" stopColor="#9B00FF" />
+                <Stop offset="100%" stopColor="#FF00F5" />
+              </SvgLinearGradient>
+            ) : (
+              <SvgLinearGradient id={`macroGradient-${label}`} {...gradientDirection}>
+                <Stop offset="0%" stopColor={gradientColors[0]} />
+                <Stop offset="50%" stopColor={gradientColors[1]} />
+                <Stop offset="100%" stopColor={gradientColors[2]} />
+              </SvgLinearGradient>
+            )}
           </Defs>
           <Circle
             cx={MACRO_RING_SIZE / 2}
@@ -639,27 +657,59 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
         </Svg>
         <View style={styles.macroRingCenter}>
           {isOther ? (
-            <MaskedView
-              style={{ height: 40, width: 40 }}
-              maskElement={
-                <View
-                  style={{
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: 'transparent'
-                  }}
+            <>
+              {/* Apple ring with updated gradient */}
+              <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE} style={{ position: 'absolute', top: 0, left: 0 }}>
+                <Defs>
+                  <SvgLinearGradient id="appleRingGradient" {...gradientDirection}>
+                    <Stop offset="0%" stopColor="#00A8FF" />
+                    <Stop offset="10%" stopColor="#00A8FF" />
+                    <Stop offset="60%" stopColor="#9B00FF" />
+                    <Stop offset="100%" stopColor="#FF00F5" />
+                  </SvgLinearGradient>
+                </Defs>
+                <Circle
+                  cx={MACRO_RING_SIZE / 2}
+                  cy={MACRO_RING_SIZE / 2}
+                  r={(MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2}
+                  stroke="url(#appleRingGradient)"
+                  strokeWidth={MACRO_STROKE_WIDTH}
+                  fill="none"
+                />
+              </Svg>
+              <View
+                style={{
+                  shadowColor: "#00A8FF",
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.6,
+                  shadowRadius: 10,
+                  elevation: 6,
+                }}
+              >
+                <MaskedView
+                  style={{ height: 40, width: 40 }}
+                  maskElement={
+                    <View
+                      style={{
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'transparent',
+                      }}
+                    >
+                      <MaterialCommunityIcons name="food-apple" size={40} color="black" />
+                    </View>
+                  }
                 >
-                  <MaterialCommunityIcons name="food-apple" size={40} color="black" />
-                </View>
-              }
-            >
-              <LinearGradient
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                colors={gradientColors as [string, string, ...string[]]}
-                style={{ flex: 1 }}
-              />
-            </MaskedView>
+                  <LinearGradient
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    colors={["#00A8FF", "#00A8FF", "#9B00FF", "#FF00F5", "#FF00F5"]}
+                    locations={[0, 0.15, 0.80, 0.85, 1]}
+                    style={{ flex: 1 }}
+                  />
+                </MaskedView>
+              </View>
+            </>
           ) : (
             <Text style={styles.macroRingText}>{percent}%</Text>
           )}
@@ -703,7 +753,10 @@ const styles = StyleSheet.create({
   cheatDayLabel: {
     color: '#FFF',
     fontSize: 14,
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    fontStyle: 'italic', // added italic
+    fontWeight: 'bold',   // added bold
+    fontFamily: 'Georgia', // new font for extra flair
   },
   cheatDayBarBackground: {
     marginTop: 8,
@@ -755,7 +808,11 @@ const styles = StyleSheet.create({
   remainingValue: {
     color: '#FFF',
     fontSize: 30,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+    textShadowColor: '#9B00FF', // added soft purple shadow
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    fontFamily: 'Georgia', // adding a custom font
   },
   remainingLabel: {
     color: '#FFF',
@@ -800,7 +857,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 11,
     textTransform: 'uppercase',
-    marginBottom: 4
+    marginBottom: 4,
+    fontFamily: 'Georgia', // updated font for macro label
   },
   macroRingCenter: {
     position: 'absolute',
@@ -840,14 +898,21 @@ const styles = StyleSheet.create({
   burnDetails: {
     color: '#FFF',
     fontSize: 12,
-    marginTop: 4
+    marginTop: 4,
+    fontStyle: 'italic', // added italic styling
+    fontWeight: 'bold',   // added bold styling
+    fontFamily: 'Courier New', // change font here
   },
   /* Weight Trend */
   weightGraphTitle: {
     color: '#FFF',
     fontSize: 14,
     marginBottom: 8,
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
+    fontStyle: 'italic',      // added italic
+    fontWeight: 'bold',       // added bold
+    textDecorationLine: 'underline', // added underline
+    fontFamily: 'Courier New', // new font style
   },
   /* Pagination Dots */
   dotsContainer: {
