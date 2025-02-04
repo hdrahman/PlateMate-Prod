@@ -6,11 +6,7 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
-    Image,
-    Platform,
 } from 'react-native';
-// If you use icons, install/react-native-vector-icons or your preferred icon library
-// import Icon from 'react-native-vector-icons/Ionicons';
 
 const mockDiaryData = {
     goal: 1800,
@@ -36,9 +32,10 @@ const mockDiaryData = {
         },
     ],
     exerciseList: [
-        { name: '600\n60 minutes', cals: 600 },
-        { name: 'Connect a step tracker\nAutomatically track steps and calories burned', cals: 0 },
+        { name: 'Cardio (60 minutes)', calories: 600 },
+        { name: 'Walk (30 minutes)', calories: 450 },
     ],
+    water: true,
 };
 
 const DiaryScreen: React.FC = () => {
@@ -47,33 +44,16 @@ const DiaryScreen: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* NAV BAR */}
-            <View style={styles.navBar}>
-                <TouchableOpacity style={styles.navBtn}>
-                    {/* 
-            If you have an icon library:
-            <Icon name="arrow-back" size={24} color="#fff" />
-          */}
-                    <Text style={styles.navBtnText}>{'<'} </Text>
-                </TouchableOpacity>
-                <Text style={styles.navTitle}>Today</Text>
-                {/* Could place icons (lightning bolt, message, etc.) on the right side */}
-                <View style={styles.navRight} />
-            </View>
-
             <ScrollView contentContainerStyle={styles.scrollInner}>
-                {/* Premium Banner */}
-                <View style={styles.premiumBanner}>
-                    <Text style={styles.premiumText}>Say goodbye to ads.</Text>
-                    <TouchableOpacity style={styles.premiumBtn}>
-                        <Text style={styles.premiumBtnText}>Go Premium</Text>
-                    </TouchableOpacity>
+                {/* Top Title / Date */}
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Diary</Text>
+                    <Text style={styles.headerSub}>Today</Text>
                 </View>
 
-                {/* CALORIES SUMMARY */}
-                <View style={styles.calorieSummaryCard}>
-                    <Text style={styles.sectionHeading}>Calories Remaining</Text>
-                    {/* The row: 1800 - 1637 + 450 = 613 */}
+                {/* Calories Remaining summary */}
+                <View style={styles.summaryCard}>
+                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
                     <View style={styles.equationRow}>
                         <Text style={styles.equationValue}>{goal}</Text>
                         <Text style={styles.equationSign}>-</Text>
@@ -85,50 +65,49 @@ const DiaryScreen: React.FC = () => {
                     </View>
                 </View>
 
-                {/* MEALS */}
+                {/* Meals */}
                 {meals.map((meal, idx) => (
                     <View key={idx} style={styles.mealSection}>
                         <View style={styles.mealHeader}>
                             <Text style={styles.mealTitle}>{meal.title}</Text>
-                            <Text style={styles.mealTotal}>{meal.total}</Text>
+                            <Text style={styles.mealCal}>{meal.total}</Text>
                         </View>
-                        <Text style={styles.macros}>
+                        <Text style={styles.macrosText}>
                             Carbs {meal.macros.carbs}% • Fat {meal.macros.fat}% • Protein {meal.macros.protein}%
                         </Text>
+
                         {meal.items.map((item, i) => (
-                            <View key={i} style={styles.foodRow}>
-                                <Text style={styles.foodName}>{item.name}</Text>
-                                <Text style={styles.foodCals}>{item.calories}</Text>
+                            <View key={i} style={styles.logRow}>
+                                <Text style={styles.logItemText}>{item.name}</Text>
+                                <Text style={styles.logCalText}>{item.calories}</Text>
                             </View>
                         ))}
-                        {/* 3-dot menu on the right, for example */}
+
                         <TouchableOpacity style={styles.addBtn}>
                             <Text style={styles.addBtnText}>ADD FOOD</Text>
                         </TouchableOpacity>
-                        {idx < meals.length - 1 && <View style={styles.divider} />}
                     </View>
                 ))}
 
-                {/* EXERCISE */}
+                {/* Exercise */}
                 <View style={styles.mealSection}>
                     <View style={styles.mealHeader}>
                         <Text style={styles.mealTitle}>Exercise</Text>
-                        <Text style={styles.mealTotal}>{exercise}</Text>
+                        <Text style={styles.mealCal}>{exercise}</Text>
                     </View>
                     {exerciseList.map((ex, i) => (
-                        <View key={i} style={styles.foodRow}>
-                            <Text style={styles.foodName}>{ex.name}</Text>
-                            <Text style={styles.foodCals}>
-                                {ex.cals > 0 ? ex.cals : ''}
-                            </Text>
+                        <View key={i} style={styles.logRow}>
+                            <Text style={styles.logItemText}>{ex.name}</Text>
+                            <Text style={styles.logCalText}>{ex.calories}</Text>
                         </View>
                     ))}
+
                     <TouchableOpacity style={styles.addBtn}>
                         <Text style={styles.addBtnText}>ADD EXERCISE</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* WATER */}
+                {/* Water */}
                 <View style={styles.mealSection}>
                     <View style={styles.mealHeader}>
                         <Text style={styles.mealTitle}>Water</Text>
@@ -138,15 +117,12 @@ const DiaryScreen: React.FC = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* ACTION TABS (Nutrition | Notes | Complete Diary) */}
-                <View style={styles.footerBar}>
-                    <TouchableOpacity style={styles.footerTab}>
-                        <Text style={styles.footerTabText}>Nutrition</Text>
+                {/* Bottom action row */}
+                <View style={styles.bottomActions}>
+                    <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
+                        <Text style={styles.tabBtnText}>Nutrition</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.footerTab}>
-                        <Text style={styles.footerTabText}>Notes</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.completeBtn}>
+                    <TouchableOpacity style={[styles.completeBtn, { flex: 1 }]}>
                         <Text style={styles.completeBtnText}>Complete Diary</Text>
                     </TouchableOpacity>
                 </View>
@@ -157,111 +133,79 @@ const DiaryScreen: React.FC = () => {
 
 export default DiaryScreen;
 
-/** COLORS & FONTS (adjust to fit your brand) */
-const DARK_BG = '#1C1C1E';
-const CARD_BG = '#2C2C2E';
-const TEXT_COLOR = '#FFFFFF';
-const SUBTEXT_COLOR = '#AAAAAA';
-const ACCENT_BLUE = '#2296F3'; // MFP’s typical accent, you can change to purple if desired
+/** COLOR PALETTE from your PlateMate theme */
+const PRIMARY_BG = '#000000';     // or #1A1A1A — choose whichever dark shade suits best
+const CARD_BG = '#1C1C1E';     // slightly lighter dark for cards
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
+const PURPLE_ACCENT = '#AA00FF';  // main accent (like your plate/circle in image 2)
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: DARK_BG,
-    },
-    navBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingTop: Platform.OS === 'android' ? 8 : 0,
-        paddingBottom: 8,
-    },
-    navBtn: {
-        paddingRight: 10,
-    },
-    navBtnText: {
-        color: ACCENT_BLUE,
-        fontSize: 20,
-    },
-    navTitle: {
-        color: TEXT_COLOR,
-        fontSize: 18,
-        fontWeight: '600',
-        flex: 1,
-        textAlign: 'center',
-    },
-    navRight: {
-        width: 30,
-    },
-    premiumBanner: {
-        backgroundColor: CARD_BG,
-        marginHorizontal: 12,
-        marginBottom: 8,
-        borderRadius: 8,
-        padding: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    premiumText: {
-        color: SUBTEXT_COLOR,
-        fontSize: 14,
-    },
-    premiumBtn: {
-        backgroundColor: ACCENT_BLUE,
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
-    premiumBtnText: {
-        color: TEXT_COLOR,
-        fontWeight: '600',
+        backgroundColor: PRIMARY_BG,
     },
     scrollInner: {
-        paddingBottom: 60,
+        paddingBottom: 20,
     },
-    calorieSummaryCard: {
+    header: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        backgroundColor: PRIMARY_BG,
+    },
+    headerTitle: {
+        fontSize: 26,
+        color: PURPLE_ACCENT,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    headerSub: {
+        fontSize: 16,
+        color: WHITE,
+        fontWeight: '400',
+    },
+    summaryCard: {
         backgroundColor: CARD_BG,
-        marginHorizontal: 12,
+        marginHorizontal: 16,
         borderRadius: 8,
         padding: 16,
-        marginBottom: 8,
+        marginBottom: 12,
     },
-    sectionHeading: {
-        color: TEXT_COLOR,
+    summaryTitle: {
         fontSize: 16,
+        color: WHITE,
         fontWeight: '600',
         marginBottom: 8,
     },
     equationRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        alignItems: 'flex-end',
+        alignItems: 'center',
     },
     equationValue: {
-        color: TEXT_COLOR,
+        color: WHITE,
         fontSize: 16,
         fontWeight: '500',
         marginRight: 6,
     },
     equationSign: {
-        color: TEXT_COLOR,
+        color: WHITE,
         fontSize: 16,
         fontWeight: '300',
         marginRight: 6,
     },
     equationResult: {
-        color: ACCENT_BLUE,
+        color: PURPLE_ACCENT,
         fontSize: 18,
         fontWeight: '700',
         marginRight: 6,
     },
     mealSection: {
         backgroundColor: CARD_BG,
-        marginHorizontal: 12,
+        marginHorizontal: 16,
         borderRadius: 8,
         padding: 16,
-        marginBottom: 8,
+        marginBottom: 12,
     },
     mealHeader: {
         flexDirection: 'row',
@@ -269,90 +213,80 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     mealTitle: {
-        color: TEXT_COLOR,
         fontSize: 16,
+        color: WHITE,
         fontWeight: '600',
     },
-    mealTotal: {
-        color: TEXT_COLOR,
+    mealCal: {
         fontSize: 16,
+        color: WHITE,
         fontWeight: '600',
     },
-    macros: {
-        color: SUBTEXT_COLOR,
+    macrosText: {
         fontSize: 13,
+        color: SUBDUED,
         marginBottom: 8,
     },
-    foodRow: {
+    logRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginVertical: 6,
     },
-    foodName: {
-        color: TEXT_COLOR,
+    logItemText: {
         fontSize: 14,
-        width: '80%',
+        color: WHITE,
         lineHeight: 18,
+        width: '80%',
     },
-    foodCals: {
-        color: TEXT_COLOR,
+    logCalText: {
         fontSize: 14,
+        color: WHITE,
         fontWeight: '500',
-        textAlign: 'right',
     },
     addBtn: {
         marginTop: 8,
-        paddingVertical: 6,
-        borderWidth: 1,
-        borderColor: ACCENT_BLUE,
         borderRadius: 6,
+        borderWidth: 1,
+        borderColor: PURPLE_ACCENT,
+        paddingVertical: 6,
         alignItems: 'center',
     },
     addBtnText: {
-        color: ACCENT_BLUE,
+        color: PURPLE_ACCENT,
         fontSize: 14,
         fontWeight: '600',
     },
-    divider: {
-        height: 1,
-        backgroundColor: SUBTEXT_COLOR,
-        opacity: 0.3,
-        marginTop: 12,
-    },
-    footerBar: {
+    bottomActions: {
         flexDirection: 'row',
-        backgroundColor: DARK_BG,
         marginTop: 8,
-        paddingHorizontal: 12,
-        paddingTop: 8,
-        paddingBottom: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#3A3A3C',
+        paddingHorizontal: 16,
     },
-    footerTab: {
+    tabBtn: {
         flex: 1,
-        marginRight: 8,
-        borderRadius: 6,
         borderWidth: 1,
-        borderColor: ACCENT_BLUE,
+        borderColor: PURPLE_ACCENT,
+        borderRadius: 6,
+        marginRight: 8,
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
     },
-    footerTabText: {
-        color: ACCENT_BLUE,
+    tabBtnText: {
+        color: PURPLE_ACCENT,
         fontWeight: '600',
+        fontSize: 14,
     },
     completeBtn: {
-        flex: 1.5,
-        backgroundColor: ACCENT_BLUE,
+        flex: 1,
+        backgroundColor: PURPLE_ACCENT,
         borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
     },
     completeBtnText: {
-        color: TEXT_COLOR,
+        color: WHITE,
         fontWeight: '700',
+        fontSize: 14,
     },
 });
