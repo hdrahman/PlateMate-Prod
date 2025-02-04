@@ -132,12 +132,16 @@ export default function Home() {
               <Defs>
                 <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                   <Stop offset="0%" stopColor="#FF00F5" />
-                  <Stop offset="60%" stopColor="#9B00FF" />
+                  <Stop offset="50%" stopColor="#9B00FF" />
                   <Stop offset="100%" stopColor="#00CFFF" />
                 </SvgLinearGradient>
                 <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                   <Stop offset="0%" stopColor="#FFD700" />
                   <Stop offset="100%" stopColor="#FF8C00" />
+                </SvgLinearGradient>
+                <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <Stop offset="0%" stopColor="#8A2BE2" />
+                  <Stop offset="100%" stopColor="#4B0082" />
                 </SvgLinearGradient>
               </Defs>
               <Circle
@@ -147,6 +151,18 @@ export default function Home() {
                 stroke="rgba(255, 255, 255, 0.12)"
                 strokeWidth={STROKE_WIDTH}
                 fill="none"
+              />
+              <Circle
+                cx={CIRCLE_SIZE / 2}
+                cy={CIRCLE_SIZE / 2}
+                r={radius}
+                stroke="url(#ringGradient)"
+                strokeWidth={STROKE_WIDTH}
+                fill="none"
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={circumference - consumedStroke}
+                strokeLinecap="butt"
+                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
               />
               <Circle
                 cx={CIRCLE_SIZE / 2}
@@ -169,8 +185,44 @@ export default function Home() {
                 fill="none"
                 strokeDasharray={`${circumference} ${circumference}`}
                 strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
+                strokeLinecap="butt"
+                transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+              />
+              <Circle
+                cx={CIRCLE_SIZE / 2}
+                cy={CIRCLE_SIZE / 2}
+                r={radius}
+                stroke="url(#exerciseGradient)"
+                strokeWidth={STROKE_WIDTH}
+                fill="none"
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
                 strokeLinecap="round"
-                transform={`rotate(270, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+                transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+              />
+              <Circle
+                cx={CIRCLE_SIZE / 2}
+                cy={CIRCLE_SIZE / 2}
+                r={radius}
+                stroke="url(#eatenGradient)" // Gradient for calories eaten bar
+                strokeWidth={STROKE_WIDTH}
+                fill="none"
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={circumference - consumedStroke}
+                strokeLinecap="butt"
+                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+              />
+              <Circle
+                cx={CIRCLE_SIZE / 2}
+                cy={CIRCLE_SIZE / 2}
+                r={radius}
+                stroke="url(#eatenGradient)" // Gradient for calories eaten bar
+                strokeWidth={STROKE_WIDTH}
+                fill="none"
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={circumference - consumedStroke}
+                strokeLinecap="round"
+                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
               />
             </Svg>
             <View style={styles.centerTextContainer}>
@@ -672,6 +724,18 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
             fill="none"
             strokeDasharray={`${circumference} ${circumference}`}
             strokeDashoffset={circumference - fillStroke}
+            strokeLinecap="butt"
+            transform={`rotate(-90, ${MACRO_RING_SIZE / 2}, ${MACRO_RING_SIZE / 2})`}
+          />
+          <Circle
+            cx={MACRO_RING_SIZE / 2}
+            cy={MACRO_RING_SIZE / 2}
+            r={radius}
+            stroke={`url(#macroGradient-${label})`}
+            strokeWidth={MACRO_STROKE_WIDTH}
+            fill="none"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={circumference - fillStroke}
             strokeLinecap="round"
             transform={`rotate(-90, ${MACRO_RING_SIZE / 2}, ${MACRO_RING_SIZE / 2})`}
           />
@@ -679,7 +743,6 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
         <View style={styles.macroRingCenter}>
           {isOther ? (
             <>
-              {/* Apple ring with updated gradient */}
               <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE} style={{ position: 'absolute', top: 0, left: 0 }}>
                 <Defs>
                   <SvgLinearGradient id="appleRingGradient" {...gradientDirection}>
