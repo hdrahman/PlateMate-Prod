@@ -69,84 +69,66 @@ const DiaryScreen: React.FC = () => {
                 <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                     <Text style={styles.headerTitle}>Diary</Text>
                     <View style={styles.headerRight}>
-                        <View style={styles.streakContainer}>
-                            <Text style={styles.streakNumber}>7</Text>
-                            <MaskedView
-                                maskElement={<Ionicons name="flame" size={20} color="#FFF" />}
-                            >
-                                <LinearGradient
-                                    colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{ width: 20, height: 20 }}
-                                />
-                            </MaskedView>
-                        </View>
-
+                        <Text style={styles.streakNumber}>7</Text>
+                        <MaskedView
+                            maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
+                        >
+                            <LinearGradient
+                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ width: 27, height: 27 }}
+                            />
+                        </MaskedView>
                         <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
-                            <MaskedView
-                                maskElement={<Ionicons name="pie-chart-outline" size={20} color="#FFF" />}
-                            >
-                                <LinearGradient
-                                    colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{ width: 20, height: 20 }}
-                                />
-                            </MaskedView>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => console.log('Open Settings')} style={styles.iconButton}>
-                            <MaskedView
-                                maskElement={<Ionicons name="ellipsis-vertical" size={20} color="#FFF" />}
-                            >
-                                <LinearGradient
-                                    colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{ width: 20, height: 20 }}
-                                />
-                            </MaskedView>
+                            <Ionicons name="pie-chart-outline" size={22} color="#CCC" />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* 
-                  * 1) Header area 
-                  * (We won’t add the day-bar code now. If you want the day-bar,
-                  * that typically lives in this file, not in App.js, unless
-                  * you want it across all screens.)
-                  */}
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Diary</Text>
-                    <View style={[styles.dayNavCard, { marginHorizontal: -16 }]}>
-                        <TouchableOpacity style={styles.arrowButton}>
-                            <Ionicons name="chevron-back" size={16} color="#FFF" />
-                        </TouchableOpacity>
-                        <Text style={[styles.headerSub, { fontSize: 14 }]}>Today</Text>
-                        <TouchableOpacity style={styles.arrowButton}>
-                            <Ionicons name="chevron-forward" size={16} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
+                {/* Day Bar */}
+                <View style={[styles.dayNavCard, { marginHorizontal: -8, borderWidth: 0.5, borderColor: 'rgba(255, 255, 255, 0.3)' }]}>
+                    <TouchableOpacity style={[styles.arrowButton, { marginLeft: 4 }]}>
+                        <Ionicons name="chevron-back" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                    <Text style={[styles.headerSub, { fontSize: 14 }]}>Today</Text>
+                    <TouchableOpacity style={[styles.arrowButton, { marginRight: 4 }]}>
+                        <Ionicons name="chevron-forward" size={16} color="#FFF" />
+                    </TouchableOpacity>
                 </View>
+
+                {/* Add space between the "Today" card and the card below it */}
+                <View style={{ height: 10 }} />
 
                 {/* 2) Calories Remaining */}
                 <View style={styles.summaryCard}>
-                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
+                    <Text style={[styles.summaryTitle, { fontSize: 14 }]}>Calories Remaining</Text>
                     <View style={styles.equationRow}>
-                        <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
-                            {goal}
-                        </Text>
-                        <Text style={styles.equationSign}>-</Text>
-                        <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
-                            {food}
-                        </Text>
-                        <Text style={styles.equationSign}>+</Text>
-                        <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
-                            {exercise}
-                        </Text>
-                        <Text style={styles.equationSign}>=</Text>
-                        <Text style={styles.equationResult}>{remaining}</Text>
+                        <View style={styles.equationColumn}>
+                            <Text style={[styles.equationValue, { color: '#FFB74D', fontSize: 20 }]}>
+                                {goal}
+                            </Text>
+                            <Text style={styles.equationLabel}>Base</Text>
+                        </View>
+                        <Text style={[styles.equationSign, { marginTop: 10 }]}>-</Text>
+                        <View style={styles.equationColumn}>
+                            <Text style={[styles.equationValue, { color: '#FF8A65', fontSize: 20 }]}>
+                                {food}
+                            </Text>
+                            <Text style={styles.equationLabel}>Food</Text>
+                        </View>
+                        <Text style={[styles.equationSign, { marginTop: 10 }]}>+</Text>
+                        <View style={styles.equationColumn}>
+                            <Text style={[styles.equationValue, { color: '#66BB6A', fontSize: 20 }]}>
+                                {exercise}
+                            </Text>
+                            <Text style={styles.equationLabel}>Exercise</Text>
+                        </View>
+                        <Text style={[styles.equationSign, { marginTop: 10 }]}>=</Text>
+                        <View style={styles.equationColumn}>
+                            <Text style={[styles.equationResult, { fontSize: 22 }]}>{remaining}</Text>
+                            <Text style={styles.equationLabel}>Remaining</Text>
+                        </View>
                     </View>
                 </View>
 
@@ -186,7 +168,14 @@ const DiaryScreen: React.FC = () => {
                         <View style={styles.dividerLine} />
 
                         <TouchableOpacity style={styles.addBtn}>
-                            <Text style={styles.addBtnText}>ADD FOOD</Text>
+                            <LinearGradient
+                                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.addBtnGradient}
+                            >
+                                <Text style={styles.addBtnText}>ADD FOOD</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
                 ))}
@@ -275,15 +264,19 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     header: {
-        paddingVertical: 10,
+        paddingVertical: 5, // Move the header slightly up
         paddingHorizontal: 16,
         backgroundColor: PRIMARY_BG,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     headerTitle: {
         fontSize: 26,
         color: PURPLE_ACCENT,
         fontWeight: '700',
-        marginBottom: 4,
+        textAlign: 'left', // Left align the title
+        flex: 1,
     },
     headerSub: {
         fontSize: 16,
@@ -294,11 +287,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
+        backgroundColor: 'hsla(0, 0%, 100%, 0.06)',
         borderRadius: 6,
         paddingVertical: 6,
         paddingHorizontal: 10,
-        marginTop: 8
+        marginTop: 8,
+        marginHorizontal: -8, // Reduced margins
+        borderWidth: 0.5, // Thinner border
+        borderColor: 'rgba(255, 255, 255, 0.3)', // Less noticeable color
     },
     arrowButton: {
         paddingHorizontal: 12,
@@ -319,7 +315,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     summaryTitle: {
-        fontSize: 16,
+        fontSize: 14, // Slightly smaller font size
         color: WHITE,
         fontWeight: '600',
         marginBottom: 8,
@@ -328,9 +324,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         alignItems: 'center',
+        justifyContent: 'space-between', // Spread the items
+    },
+    equationColumn: {
+        alignItems: 'center',
     },
     equationValue: {
-        fontSize: 16,
+        fontSize: 20, // Bigger font size for numbers
         fontWeight: '500',
         marginRight: 6,
     },
@@ -342,9 +342,14 @@ const styles = StyleSheet.create({
     },
     equationResult: {
         color: PURPLE_ACCENT,
-        fontSize: 18,
+        fontSize: 22, // Bigger font size for result
         fontWeight: '700',
         marginRight: 6,
+    },
+    equationLabel: {
+        color: SUBDUED,
+        fontSize: 12,
+        marginTop: 4,
     },
 
     // Meal/Exercise/Water Sections
@@ -417,9 +422,17 @@ const styles = StyleSheet.create({
         borderColor: PURPLE_ACCENT,
         paddingVertical: 6,
         alignItems: 'center',
+        overflow: 'hidden', // Ensure gradient doesn't overflow
+    },
+    addBtnGradient: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        height: '100%',
     },
     addBtnText: {
-        color: PURPLE_ACCENT,
+        color: WHITE,
         fontSize: 14,
         fontWeight: '600',
     },
@@ -473,19 +486,15 @@ const styles = StyleSheet.create({
     },
     headerRight: {
         flexDirection: 'row',
-        alignItems: 'center'
-    },
-    streakContainer: {
-        flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 12
+        justifyContent: 'center',
     },
     streakNumber: {
         color: '#FFF',
-        fontSize: 14,
-        marginRight: 4
+        fontSize: 16,
+        marginRight: 4,
     },
     iconButton: {
-        marginLeft: 12
+        marginLeft: 12,
     },
 });
