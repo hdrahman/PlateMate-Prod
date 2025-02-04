@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -6,10 +6,12 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from 'react-native-gesture-handler';
 
 const mockDiaryData = {
     goal: 1800,
@@ -53,8 +55,8 @@ const mockDiaryData = {
         },
     ],
     exerciseList: [
-        { name: 'Cardio (60 minutes)', calories: 600 },
-        { name: 'Walk (30 minutes)', calories: 450 },
+        { name: 'Cardio', duration: '60 minutes', calories: 600 },
+        { name: 'Walk', duration: '30 minutes', calories: 450 },
     ],
     water: true,
 };
@@ -62,187 +64,269 @@ const mockDiaryData = {
 const DiaryScreen: React.FC = () => {
     const { goal, food, exercise, meals, exerciseList } = mockDiaryData;
     const remaining = goal - food + exercise;
+    const [showStreakInfo, setShowStreakInfo] = useState(false);
+    const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
+    const [currentDate, setCurrentDate] = useState(new Date());
+
+    const toggleStreakInfo = () => {
+        setShowStreakInfo(!showStreakInfo);
+    };
+
+    const toggleMacrosDisplay = () => {
+        setShowMacrosAsPercent(!showMacrosAsPercent);
+    };
+
+    const handleOutsidePress = () => {
+        if (showStreakInfo) {
+            setShowStreakInfo(false);
+        }
+    };
+
+    const gotoPrevDay = () => {
+        setCurrentDate(prev => {
+            const newDate = new Date(prev);
+            newDate.setDate(newDate.getDate() - 1);
+            return newDate;
+        });
+    };
+
+    const gotoNextDay = () => {
+        setCurrentDate(prev => {
+            const newDate = new Date(prev);
+            newDate.setDate(newDate.getDate() + 1);
+            return newDate;
+        });
+    };
+
+    const formatDate = (date: Date): string => {
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+        const tomorrow = new Date();
+        tomorrow.setDate(today.getDate() + 1);
+
+        // Remove time
+        const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const t = stripTime(today);
+        const d = stripTime(date);
+        const diff = d.getTime() - t.getTime();
+
+        if (diff === 0) return "Today";
+        if (diff === -86400000) return "Yesterday";
+        if (diff === 86400000) return "Tomorrow";
+
+        // Fallback: e.g., Sunday, Feb 02
+        const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: '2-digit' };
+        return date.toLocaleDateString(undefined, options);
+    };
+
+    const onHandlerStateChange = (event: any) => {
+        if (event.nativeEvent.state === GestureState.END) {
+            const { translationX, translationY } = event.nativeEvent;
+            if (Math.abs(translationX) > 100 && Math.abs(translationX) > Math.abs(translationY)) {
+                translationX > 0 ? gotoPrevDay() : gotoNextDay();
+            }
+        }
+    };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollInner}>
-                <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                    <Text style={styles.headerTitle}>Diary</Text>
-                    <View style={styles.headerRight}>
-                        <Text style={styles.streakNumber}>7</Text>
-                        <MaskedView
-                            maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
-                        >
-                            <LinearGradient
-                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={{ width: 27, height: 27 }}
-                            />
-                        </MaskedView>
-                        <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
-                            <Ionicons name="pie-chart-outline" size={22} color="#CCC" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Day Bar */}
-                <View style={[styles.dayNavCard, { marginHorizontal: -8, borderWidth: 0.5, borderColor: 'rgba(255, 255, 255, 0.3)' }]}>
-                    <TouchableOpacity style={[styles.arrowButton, { marginLeft: 4 }]}>
-                        <Ionicons name="chevron-back" size={16} color="#FFF" />
-                    </TouchableOpacity>
-                    <Text style={[styles.headerSub, { fontSize: 14 }]}>Today</Text>
-                    <TouchableOpacity style={[styles.arrowButton, { marginRight: 4 }]}>
-                        <Ionicons name="chevron-forward" size={16} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Add space between the "Today" card and the card below it */}
-                <View style={{ height: 10 }} />
-
-                {/* 2) Calories Remaining */}
-                <View style={styles.summaryCard}>
-                    <Text style={[styles.summaryTitle, { fontSize: 14 }]}>Calories Remaining</Text>
-                    <View style={styles.equationRow}>
-                        <View style={styles.equationColumn}>
-                            <Text style={[styles.equationValue, { color: '#FFB74D', fontSize: 20 }]}>
-                                {goal}
-                            </Text>
-                            <Text style={styles.equationLabel}>Base</Text>
-                        </View>
-                        <Text style={[styles.equationSign, { marginTop: 10 }]}>-</Text>
-                        <View style={styles.equationColumn}>
-                            <Text style={[styles.equationValue, { color: '#FF8A65', fontSize: 20 }]}>
-                                {food}
-                            </Text>
-                            <Text style={styles.equationLabel}>Food</Text>
-                        </View>
-                        <Text style={[styles.equationSign, { marginTop: 10 }]}>+</Text>
-                        <View style={styles.equationColumn}>
-                            <Text style={[styles.equationValue, { color: '#66BB6A', fontSize: 20 }]}>
-                                {exercise}
-                            </Text>
-                            <Text style={styles.equationLabel}>Exercise</Text>
-                        </View>
-                        <Text style={[styles.equationSign, { marginTop: 10 }]}>=</Text>
-                        <View style={styles.equationColumn}>
-                            <Text style={[styles.equationResult, { fontSize: 22 }]}>{remaining}</Text>
-                            <Text style={styles.equationLabel}>Remaining</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* 3) Meals */}
-                {meals.map((meal, idx) => (
-                    <View key={idx} style={styles.mealSection}>
-                        {/* Title row */}
-                        <View style={styles.mealHeader}>
-                            <Text style={styles.mealTitle}>{meal.title}</Text>
-                            <Text style={styles.mealCal}>{meal.total}</Text>
-                        </View>
-
-                        {/* Macros */}
-                        <Text style={styles.macrosText}>
-                            Carbs {meal.macros.carbs}% • Fat {meal.macros.fat}% • Protein {meal.macros.protein}%
-                        </Text>
-
-                        {/* Divider line under macros */}
-                        <View style={styles.dividerLine} />
-
-                        {/* Entries */}
-                        {meal.items.map((item, i) => (
-                            <View key={i}>
-                                <View style={styles.logRow}>
-                                    <Text style={styles.logItemText}>{item.name}</Text>
-                                    <Text style={styles.logCalText}>{item.calories}</Text>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <PanGestureHandler onHandlerStateChange={onHandlerStateChange}>
+                <View style={{ flex: 1 }}>
+                    <TouchableWithoutFeedback onPress={handleOutsidePress}>
+                        <SafeAreaView style={styles.container}>
+                            <ScrollView contentContainerStyle={styles.scrollInner}>
+                                <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                                    <Text style={styles.headerTitle}>Diary</Text>
+                                    <View style={styles.headerRight}>
+                                        <Text style={styles.streakNumber}>7</Text>
+                                        <TouchableOpacity onPress={toggleStreakInfo}>
+                                            <MaskedView
+                                                maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
+                                            >
+                                                <LinearGradient
+                                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                                    start={{ x: 0, y: 0 }}
+                                                    end={{ x: 1, y: 1 }}
+                                                    style={{ width: 27, height: 27 }}
+                                                />
+                                            </MaskedView>
+                                        </TouchableOpacity>
+                                        {showStreakInfo && (
+                                            <View style={styles.streakInfo}>
+                                                <View style={styles.streakInfoArrow} />
+                                                <Text style={styles.streakInfoText}>This is your streak count. Keep logging daily to maintain your streak!</Text>
+                                            </View>
+                                        )}
+                                        <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
+                                            <Ionicons name="pie-chart-outline" size={22} color="#CCC" />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
 
-                                {/* Divider line under each entry */}
-                                {i < meal.items.length - 1 && (
-                                    <View style={styles.entryDividerLine} />
-                                )}
-                            </View>
-                        ))}
+                                {/* Day Bar */}
+                                <View style={styles.dayNavCard}>
+                                    <TouchableOpacity onPress={gotoPrevDay} style={styles.arrowButton}>
+                                        <Ionicons name="chevron-back" size={16} color="#FFF" />
+                                    </TouchableOpacity>
+                                    <Text style={[styles.headerSub, { fontSize: 14 }]}>
+                                        {formatDate(currentDate)}
+                                    </Text>
+                                    <TouchableOpacity onPress={gotoNextDay} style={styles.arrowButton}>
+                                        <Ionicons name="chevron-forward" size={16} color="#FFF" />
+                                    </TouchableOpacity>
+                                </View>
 
-                        {/* Divider line before Add Food button */}
-                        <View style={styles.dividerLine} />
+                                {/* Add space between the "Today" card and the card below it */}
+                                <View style={{ height: 10 }} />
 
-                        <TouchableOpacity style={styles.addBtn}>
-                            <LinearGradient
-                                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.addBtnGradient}
-                            >
-                                <Text style={styles.addBtnText}>ADD FOOD</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
-                ))}
+                                {/* 2) Calories Remaining */}
+                                <View style={styles.summaryCard}>
+                                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
+                                    <View style={styles.equationRow}>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                                                {goal}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Base</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                                                {food}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Food</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                                                {exercise}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Exercise</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
+                                            <Text style={styles.equationLabel}>Remaining</Text>
+                                        </View>
+                                    </View>
+                                </View>
 
-                {/* 4) Exercise */}
-                <View style={styles.mealSection}>
-                    <View style={styles.mealHeader}>
-                        <Text style={styles.mealTitle}>Exercise</Text>
-                        <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
-                    </View>
+                                {/* 3) Meals */}
+                                {meals.map((meal, idx) => (
+                                    <View key={idx} style={styles.mealSection}>
+                                        {/* Title row */}
+                                        <View style={styles.mealHeader}>
+                                            <Text style={styles.mealTitle}>{meal.title}</Text>
+                                            <Text style={styles.mealCal}>{meal.total}</Text>
+                                        </View>
 
-                    {/* Divider line under heading */}
-                    <View style={styles.dividerLine} />
+                                        {/* Macros */}
+                                        <TouchableOpacity onPress={toggleMacrosDisplay}>
+                                            <Text style={styles.macrosText}>
+                                                {showMacrosAsPercent
+                                                    ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
+                                                    : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
+                                            </Text>
+                                        </TouchableOpacity>
 
-                    {exerciseList.map((ex, i) => (
-                        <View key={i}>
-                            <View style={styles.logRow}>
-                                <Text style={styles.logItemText}>{ex.name}</Text>
-                                <Text style={styles.logCalText}>{ex.calories}</Text>
-                            </View>
-                            {/* Divider line under each entry */}
-                            {i < exerciseList.length - 1 && (
-                                <View style={styles.entryDividerLine} />
-                            )}
-                        </View>
-                    ))}
+                                        {/* Divider line under macros */}
+                                        <View style={styles.dividerLine} />
 
-                    {/* Divider line before Add Exercise button */}
-                    <View style={styles.dividerLine} />
+                                        {/* Entries */}
+                                        {meal.items.map((item, i) => (
+                                            <View key={i}>
+                                                <View style={styles.logRow}>
+                                                    <Text style={styles.logItemText}>{item.name}</Text>
+                                                    <Text style={styles.logCalText}>{item.calories}</Text>
+                                                </View>
 
-                    <TouchableOpacity style={styles.addBtn}>
-                        <Text style={styles.addBtnText}>ADD EXERCISE</Text>
-                    </TouchableOpacity>
+                                                {/* Divider line under each entry */}
+                                                {i < meal.items.length - 1 && (
+                                                    <View style={styles.entryDividerLine} />
+                                                )}
+                                            </View>
+                                        ))}
+
+                                        {/* Divider line before Add Food button */}
+                                        <View style={styles.dividerLine} />
+
+                                        <TouchableOpacity style={styles.addBtn}>
+                                            <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+
+                                {/* 4) Exercise */}
+                                <View style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={[styles.mealTitle, { fontSize: 18 }]}>{mockDiaryData.exercise}</Text>
+                                        <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
+                                    </View>
+
+                                    {/* Divider line under heading */}
+                                    <View style={styles.dividerLine} />
+
+                                    {exerciseList.map((ex, i) => (
+                                        <View key={i}>
+                                            <View style={styles.logRow}>
+                                                <View style={{ flexDirection: 'column' }}>
+                                                    <Text style={[styles.logItemText, { fontSize: 16 }]}>{ex.name}</Text>
+                                                    <Text style={styles.logItemDuration}>{ex.duration}</Text>
+                                                </View>
+                                                <Text style={styles.logCalText}>{ex.calories}</Text>
+                                            </View>
+                                            {/* Divider line under each entry */}
+                                            {i < exerciseList.length - 1 && (
+                                                <View style={styles.entryDividerLine} />
+                                            )}
+                                        </View>
+                                    ))}
+
+                                    {/* Divider line before Add Exercise button */}
+                                    <View style={styles.dividerLine} />
+
+                                    <TouchableOpacity style={styles.addBtn}>
+                                        <Text style={styles.addBtnText}>ADD EXERCISE</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* 5) Water */}
+                                <View style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={styles.mealTitle}>Water</Text>
+                                    </View>
+                                    {/* Divider line under heading */}
+                                    <View style={styles.dividerLine} />
+
+                                    <TouchableOpacity style={styles.addBtn}>
+                                        <Text style={styles.addBtnText}>ADD WATER</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* 6) Bottom action row */}
+                                <View style={styles.bottomActions}>
+                                    <View style={styles.topActionsRow}>
+                                        <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>
+                                            <Text style={styles.tabBtnText}>Nutrition</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
+                                            <Text style={styles.tabBtnText}>Complete Diary</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={styles.bottomAnalyzeRow}>
+                                        <TouchableOpacity style={[styles.analyzeBtn, { flex: 1 }]}>
+                                            <Text style={styles.analyzeBtnText}>Analyze</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                                <View style={{ height: 20 }} />
+                            </ScrollView>
+                        </SafeAreaView>
+                    </TouchableWithoutFeedback>
                 </View>
-
-                {/* 5) Water */}
-                <View style={styles.mealSection}>
-                    <View style={styles.mealHeader}>
-                        <Text style={styles.mealTitle}>Water</Text>
-                    </View>
-                    {/* Divider line under heading */}
-                    <View style={styles.dividerLine} />
-
-                    <TouchableOpacity style={styles.addBtn}>
-                        <Text style={styles.addBtnText}>ADD WATER</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* 6) Bottom action row */}
-                <View style={styles.bottomActions}>
-                    <View style={styles.topActionsRow}>
-                        <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.tabBtnText}>Nutrition</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
-                            <Text style={styles.tabBtnText}>Complete Diary</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.bottomAnalyzeRow}>
-                        <TouchableOpacity style={[styles.analyzeBtn, { flex: 1 }]}>
-                            <Text style={styles.analyzeBtnText}>Analyze</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-                <View style={{ height: 20 }} />
-            </ScrollView>
-        </SafeAreaView>
+            </PanGestureHandler>
+        </GestureHandlerRootView>
     );
 };
 
@@ -264,19 +348,15 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     header: {
-        paddingVertical: 5, // Move the header slightly up
+        paddingVertical: 10,
         paddingHorizontal: 16,
         backgroundColor: PRIMARY_BG,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
     },
     headerTitle: {
         fontSize: 26,
         color: PURPLE_ACCENT,
         fontWeight: '700',
-        textAlign: 'left', // Left align the title
-        flex: 1,
+        marginBottom: 4,
     },
     headerSub: {
         fontSize: 16,
@@ -287,14 +367,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'hsla(0, 0%, 100%, 0.06)',
+        backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
         borderRadius: 6,
         paddingVertical: 6,
         paddingHorizontal: 10,
-        marginTop: 8,
-        marginHorizontal: -8, // Reduced margins
-        borderWidth: 0.5, // Thinner border
-        borderColor: 'rgba(255, 255, 255, 0.3)', // Less noticeable color
+        marginTop: 8
     },
     arrowButton: {
         paddingHorizontal: 12,
@@ -315,41 +392,49 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     summaryTitle: {
-        fontSize: 14, // Slightly smaller font size
+        fontSize: 16,
         color: WHITE,
         fontWeight: '600',
         marginBottom: 8,
     },
     equationRow: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap', // ensure one line
         alignItems: 'center',
-        justifyContent: 'space-between', // Spread the items
+        justifyContent: 'center', // Center align row
     },
     equationColumn: {
         alignItems: 'center',
+        marginHorizontal: 10, // Add space between columns
     },
     equationValue: {
-        fontSize: 20, // Bigger font size for numbers
+        fontSize: 18, // Increase font size for better readability
         fontWeight: '500',
-        marginRight: 6,
+        marginRight: 10, // Shift slightly to the right
+        textAlign: 'center', // Center align text
     },
     equationSign: {
         color: WHITE,
-        fontSize: 16,
+        fontSize: 18, // Increase font size for better readability
         fontWeight: '300',
-        marginRight: 6,
+        marginRight: 10, // Shift slightly to the right
+        marginTop: -10, // Align with numbers
+        textAlign: 'center', // Center align text
     },
     equationResult: {
         color: PURPLE_ACCENT,
-        fontSize: 22, // Bigger font size for result
+        fontSize: 20, // Increase font size for better readability
         fontWeight: '700',
-        marginRight: 6,
+        marginRight: 10, // Shift slightly to the right
+        marginLeft: 10, // Shift slightly to the right
+        textAlign: 'center', // Center align text
     },
     equationLabel: {
         color: SUBDUED,
         fontSize: 12,
         marginTop: 4,
+        marginRight: 10, // Shift slightly to the right
+        textAlign: 'center', // Center align text
     },
 
     // Meal/Exercise/Water Sections
@@ -408,6 +493,10 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         width: '80%',
     },
+    logItemDuration: {
+        fontSize: 12,
+        color: SUBDUED,
+    },
     logCalText: {
         fontSize: 14,
         color: WHITE,
@@ -422,17 +511,9 @@ const styles = StyleSheet.create({
         borderColor: PURPLE_ACCENT,
         paddingVertical: 6,
         alignItems: 'center',
-        overflow: 'hidden', // Ensure gradient doesn't overflow
-    },
-    addBtnGradient: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: '100%',
-        height: '100%',
     },
     addBtnText: {
-        color: WHITE,
+        color: PURPLE_ACCENT,
         fontSize: 14,
         fontWeight: '600',
     },
@@ -486,15 +567,46 @@ const styles = StyleSheet.create({
     },
     headerRight: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    iconButton: {
+        marginLeft: 12
     },
     streakNumber: {
         color: '#FFF',
         fontSize: 16,
         marginRight: 4,
     },
-    iconButton: {
-        marginLeft: 12,
+    streakInfo: {
+        position: 'absolute',
+        top: 30,
+        left: -200, // Shift to the left
+        right: 10,
+        backgroundColor: '#333',
+        padding: 20, // Increase padding for better readability
+        borderRadius: 10,
+        zIndex: 1,
+        overflow: 'hidden',
+        width: 250, // Make the dropdown text a lot wider
+    },
+    streakInfoArrow: {
+        position: 'absolute',
+        top: -10,
+        left: '50%',
+        marginLeft: -10,
+        width: 0,
+        height: 0,
+        borderLeftWidth: 10,
+        borderRightWidth: 10,
+        borderBottomWidth: 10,
+        borderStyle: 'solid',
+        backgroundColor: 'transparent',
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: '#333',
+    },
+    streakInfoText: {
+        color: '#FFF',
+        fontSize: 12,
     },
 });
