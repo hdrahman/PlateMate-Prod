@@ -30,6 +30,24 @@ const mockDiaryData = {
                 { name: 'Quick Add\nProtein 50.0g', calories: 900 },
             ],
         },
+        {
+            title: 'Snacks',
+            total: 300,
+            macros: { carbs: 0, fat: 0, protein: 100 },
+            items: [
+                { name: 'Quick Add\nProtein 10.0g', calories: 150 },
+                { name: 'Quick Add\nProtein 10.0g', calories: 150 },
+            ],
+        },
+        {
+            title: 'Dinner',
+            total: 500,
+            macros: { carbs: 0, fat: 0, protein: 100 },
+            items: [
+                { name: 'Quick Add\nProtein 25.0g', calories: 250 },
+                { name: 'Quick Add\nProtein 25.0g', calories: 250 },
+            ],
+        },
     ],
     exerciseList: [
         { name: 'Cardio (60 minutes)', calories: 600 },
@@ -45,43 +63,71 @@ const DiaryScreen: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollInner}>
-                {/* Top Title / Date */}
+                {/* 
+                  * 1) Header area 
+                  * (We won’t add the day-bar code now. If you want the day-bar,
+                  * that typically lives in this file, not in App.js, unless
+                  * you want it across all screens.)
+                  */}
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Diary</Text>
                     <Text style={styles.headerSub}>Today</Text>
                 </View>
 
-                {/* Calories Remaining summary */}
+                {/* 2) Calories Remaining */}
                 <View style={styles.summaryCard}>
                     <Text style={styles.summaryTitle}>Calories Remaining</Text>
                     <View style={styles.equationRow}>
-                        <Text style={styles.equationValue}>{goal}</Text>
+                        <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                            {goal}
+                        </Text>
                         <Text style={styles.equationSign}>-</Text>
-                        <Text style={styles.equationValue}>{food}</Text>
+                        <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                            {food}
+                        </Text>
                         <Text style={styles.equationSign}>+</Text>
-                        <Text style={styles.equationValue}>{exercise}</Text>
+                        <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                            {exercise}
+                        </Text>
                         <Text style={styles.equationSign}>=</Text>
                         <Text style={styles.equationResult}>{remaining}</Text>
                     </View>
                 </View>
 
-                {/* Meals */}
+                {/* 3) Meals */}
                 {meals.map((meal, idx) => (
                     <View key={idx} style={styles.mealSection}>
+                        {/* Title row */}
                         <View style={styles.mealHeader}>
                             <Text style={styles.mealTitle}>{meal.title}</Text>
                             <Text style={styles.mealCal}>{meal.total}</Text>
                         </View>
+
+                        {/* Macros */}
                         <Text style={styles.macrosText}>
                             Carbs {meal.macros.carbs}% • Fat {meal.macros.fat}% • Protein {meal.macros.protein}%
                         </Text>
 
+                        {/* Divider line under macros */}
+                        <View style={styles.dividerLine} />
+
+                        {/* Entries */}
                         {meal.items.map((item, i) => (
-                            <View key={i} style={styles.logRow}>
-                                <Text style={styles.logItemText}>{item.name}</Text>
-                                <Text style={styles.logCalText}>{item.calories}</Text>
+                            <View key={i}>
+                                <View style={styles.logRow}>
+                                    <Text style={styles.logItemText}>{item.name}</Text>
+                                    <Text style={styles.logCalText}>{item.calories}</Text>
+                                </View>
+
+                                {/* Divider line under each entry */}
+                                {i < meal.items.length - 1 && (
+                                    <View style={styles.entryDividerLine} />
+                                )}
                             </View>
                         ))}
+
+                        {/* Divider line before Add Food button */}
+                        <View style={styles.dividerLine} />
 
                         <TouchableOpacity style={styles.addBtn}>
                             <Text style={styles.addBtnText}>ADD FOOD</Text>
@@ -89,43 +135,67 @@ const DiaryScreen: React.FC = () => {
                     </View>
                 ))}
 
-                {/* Exercise */}
+                {/* 4) Exercise */}
                 <View style={styles.mealSection}>
                     <View style={styles.mealHeader}>
                         <Text style={styles.mealTitle}>Exercise</Text>
-                        <Text style={styles.mealCal}>{exercise}</Text>
+                        <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
                     </View>
+
+                    {/* Divider line under heading */}
+                    <View style={styles.dividerLine} />
+
                     {exerciseList.map((ex, i) => (
-                        <View key={i} style={styles.logRow}>
-                            <Text style={styles.logItemText}>{ex.name}</Text>
-                            <Text style={styles.logCalText}>{ex.calories}</Text>
+                        <View key={i}>
+                            <View style={styles.logRow}>
+                                <Text style={styles.logItemText}>{ex.name}</Text>
+                                <Text style={styles.logCalText}>{ex.calories}</Text>
+                            </View>
+                            {/* Divider line under each entry */}
+                            {i < exerciseList.length - 1 && (
+                                <View style={styles.entryDividerLine} />
+                            )}
                         </View>
                     ))}
+
+                    {/* Divider line before Add Exercise button */}
+                    <View style={styles.dividerLine} />
 
                     <TouchableOpacity style={styles.addBtn}>
                         <Text style={styles.addBtnText}>ADD EXERCISE</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Water */}
+                {/* 5) Water */}
                 <View style={styles.mealSection}>
                     <View style={styles.mealHeader}>
                         <Text style={styles.mealTitle}>Water</Text>
                     </View>
+                    {/* Divider line under heading */}
+                    <View style={styles.dividerLine} />
+
                     <TouchableOpacity style={styles.addBtn}>
                         <Text style={styles.addBtnText}>ADD WATER</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Bottom action row */}
+                {/* 6) Bottom action row */}
                 <View style={styles.bottomActions}>
-                    <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
-                        <Text style={styles.tabBtnText}>Nutrition</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.completeBtn, { flex: 1 }]}>
-                        <Text style={styles.completeBtnText}>Complete Diary</Text>
-                    </TouchableOpacity>
+                    <View style={styles.topActionsRow}>
+                        <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>
+                            <Text style={styles.tabBtnText}>Nutrition</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
+                            <Text style={styles.tabBtnText}>Complete Diary</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.bottomAnalyzeRow}>
+                        <TouchableOpacity style={[styles.analyzeBtn, { flex: 1 }]}>
+                            <Text style={styles.analyzeBtnText}>Analyze</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
+                <View style={{ height: 20 }} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -133,12 +203,12 @@ const DiaryScreen: React.FC = () => {
 
 export default DiaryScreen;
 
-/** COLOR PALETTE from your PlateMate theme */
-const PRIMARY_BG = '#000000';     // or #1A1A1A — choose whichever dark shade suits best
-const CARD_BG = '#1C1C1E';     // slightly lighter dark for cards
+/** COLOR PALETTE */
+const PRIMARY_BG = '#000000';
+const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';  // main accent (like your plate/circle in image 2)
+const PURPLE_ACCENT = '#AA00FF';
 
 const styles = StyleSheet.create({
     container: {
@@ -164,10 +234,12 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: '400',
     },
+
+    // Calories Remaining Card
     summaryCard: {
-        backgroundColor: CARD_BG,
-        marginHorizontal: 16,
-        borderRadius: 8,
+        backgroundColor: '#181818', // slightly darker background
+        marginHorizontal: 0,
+        borderRadius: 0,
         padding: 16,
         marginBottom: 12,
     },
@@ -183,7 +255,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     equationValue: {
-        color: WHITE,
         fontSize: 16,
         fontWeight: '500',
         marginRight: 6,
@@ -200,10 +271,12 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         marginRight: 6,
     },
+
+    // Meal/Exercise/Water Sections
     mealSection: {
-        backgroundColor: CARD_BG,
-        marginHorizontal: 16,
-        borderRadius: 8,
+        backgroundColor: '#181818', // slightly darker background
+        marginHorizontal: 0,
+        borderRadius: 0,
         padding: 16,
         marginBottom: 12,
     },
@@ -227,10 +300,27 @@ const styles = StyleSheet.create({
         color: SUBDUED,
         marginBottom: 8,
     },
+
+    // Dividers
+    dividerLine: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+        marginVertical: 8,
+        marginHorizontal: -16, // extend to the edges
+    },
+    entryDividerLine: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+        marginTop: 6,
+        marginBottom: 6,
+        marginHorizontal: -16, // extend to the edges
+    },
+
+    // Items
     logRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginVertical: 6,
+        marginVertical: 2,
     },
     logItemText: {
         fontSize: 14,
@@ -243,6 +333,8 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: '500',
     },
+
+    // Buttons
     addBtn: {
         marginTop: 8,
         borderRadius: 6,
@@ -256,10 +348,18 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+
+    // Bottom actions
     bottomActions: {
-        flexDirection: 'row',
+        flexDirection: 'column',
         marginTop: 8,
         paddingHorizontal: 16,
+    },
+    topActionsRow: {
+        flexDirection: 'row',
+    },
+    bottomAnalyzeRow: {
+        marginTop: 8,
     },
     tabBtn: {
         flex: 1,
@@ -276,15 +376,22 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 14,
     },
-    completeBtn: {
+    analyzeBtn: {
         flex: 1,
         backgroundColor: PURPLE_ACCENT,
         borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
+        marginRight: 8,
+        transform: [{ translateY: -2 }],
+        shadowColor: PURPLE_ACCENT,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+        elevation: 5,
     },
-    completeBtnText: {
+    analyzeBtnText: {
         color: WHITE,
         fontWeight: '700',
         fontSize: 14,
