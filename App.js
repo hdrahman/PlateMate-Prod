@@ -45,6 +45,8 @@ function CustomTabBarButton({ children, onPress }) {
           shadowOpacity: 0.6,
           shadowRadius: 10,
           elevation: 4,
+          borderWidth: 0.7,          // reduced from 1 to 0.5
+          borderColor: '#FF00F520', // semi-transparent pink border
         }}
         onPress={onPress}
       >

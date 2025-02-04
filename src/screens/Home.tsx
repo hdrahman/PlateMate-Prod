@@ -47,6 +47,7 @@ const carbsPercent = 70;
 const proteinPercent = 40;
 const totalBurned = 500;
 const stepsCount = 4500;
+const WeightLost = 8;
 
 // Cheat day data
 const cheatDaysTotal = 7;
@@ -134,6 +135,10 @@ export default function Home() {
                   <Stop offset="60%" stopColor="#9B00FF" />
                   <Stop offset="100%" stopColor="#00CFFF" />
                 </SvgLinearGradient>
+                <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <Stop offset="0%" stopColor="#FFD700" />
+                  <Stop offset="100%" stopColor="#FF8C00" />
+                </SvgLinearGradient>
               </Defs>
               <Circle
                 cx={CIRCLE_SIZE / 2}
@@ -155,6 +160,18 @@ export default function Home() {
                 strokeLinecap="round"
                 transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
               />
+              <Circle
+                cx={CIRCLE_SIZE / 2}
+                cy={CIRCLE_SIZE / 2}
+                r={radius}
+                stroke="url(#exerciseGradient)"
+                strokeWidth={STROKE_WIDTH}
+                fill="none"
+                strokeDasharray={`${circumference} ${circumference}`}
+                strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
+                strokeLinecap="round"
+                transform={`rotate(270, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+              />
             </Svg>
             <View style={styles.centerTextContainer}>
               <Text style={styles.remainingValue}>{remainingCalories}</Text>
@@ -167,7 +184,7 @@ export default function Home() {
               return (
                 <View key={item.label} style={styles.statRowVertical}>
                   <IconComponent name={item.icon as any} size={20} color={item.color} />
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
                     <Text style={styles.statValue}>{item.value}</Text>
                   </View>
@@ -206,11 +223,15 @@ export default function Home() {
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                style={[styles.burnBarFill, { width: '70%' }]}
+                colors={['#006400', '#006400', '#00FF00']} // smoother gradient, first half dark green
+                style={[styles.burnBarFill, { width: `${Math.min((WeightLost / 10) * 100, 100)}%` }]} // dynamically adjust width
               />
             </View>
-            <Text style={styles.burnDetails}>{totalBurned} Kilograms Lost!</Text>
+            <View style={styles.weightLabelsContainer}>
+              <Text style={styles.weightLabel}>104 kg</Text>
+              <Text style={styles.burnDetails}>{WeightLost} Kilograms Lost!</Text> {/* Centered text */}
+              <Text style={styles.weightLabel}>96 kg</Text>
+            </View>
           </View>
         </View>
 
@@ -307,7 +328,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
           marginBottom: -10 // was 5
         }}
       >
-        <Text style={styles.weightGraphTitle}>Weight Trend</Text>
+        <Text style={styles.weightGraphTitle}>Weight Trend:</Text>
         <TouchableOpacity onPress={() => console.log('Add more dates!')}>
           <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
         </TouchableOpacity>
@@ -379,7 +400,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
               <Path
                 d={pathData}
                 fill="none"
-                stroke="#9B00FF"
+                stroke="#FF6347"  // changed color to tomato
                 strokeWidth={2}
               />
             )}
@@ -392,7 +413,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
                   cx={cx}
                   cy={cy}
                   r={4}
-                  fill="#FF00F5"
+                  fill="#FF4500"  // changed color to orange red
                   stroke="#FFF"
                   strokeWidth={1}
                 />
@@ -455,7 +476,7 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
           marginBottom: -10 // was 5
         }}
       >
-        <Text style={styles.weightGraphTitle}>Steps Trend</Text>
+        <Text style={styles.weightGraphTitle}>Steps Trend:</Text>
         <TouchableOpacity onPress={() => console.log('Add more steps!')}>
           <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
         </TouchableOpacity>
@@ -524,7 +545,7 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
               <Path
                 d={pathData}
                 fill="none"
-                stroke="#00CFFF"
+                stroke="#1E90FF"  // changed color to dodger blue
                 strokeWidth={2}
               />
             )}
@@ -537,7 +558,7 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
                   cx={cx}
                   cy={cy}
                   r={4}
-                  fill="#9B00FF"
+                  fill="#4169E1"  // changed color to royal blue
                   stroke="#FFF"
                   strokeWidth={1}
                 />
@@ -785,8 +806,8 @@ const styles = StyleSheet.create({
   },
   ringContainer: {
     position: 'relative',
-    marginRight: 20, // Add space between the circle and the stack
-    marginLeft: 10 // Add space between the circle and the left edge
+    marginRight: 22, // Add space between the circle and the stack
+    marginLeft: 18 // Add space between the circle and the left edge
   },
   ringGlow: {
     position: 'absolute',
@@ -898,10 +919,11 @@ const styles = StyleSheet.create({
   burnDetails: {
     color: '#FFF',
     fontSize: 12,
-    marginTop: 4,
     fontStyle: 'italic', // added italic styling
     fontWeight: 'bold',   // added bold styling
     fontFamily: 'Courier New', // change font here
+    textAlign: 'center', // Center the text horizontally
+    flex: 1, // Allow the text to take up available space
   },
   /* Weight Trend */
   weightGraphTitle: {
@@ -958,5 +980,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12
-  }
+  },
+  weightLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center', // Center the text vertically
+    marginTop: 4,
+  },
+  weightLabel: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });
