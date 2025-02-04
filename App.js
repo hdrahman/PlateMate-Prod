@@ -193,7 +193,7 @@ export default function App() {
               borderTopWidth: 0, // Remove the white line above the bottom navigation bar
             },
             tabBarActiveTintColor: "#FF00F5",
-            tabBarInactiveTintColor: "#888",
+            tabBarInactiveTintColor: "#7B1FA2",
           })}
         >
           <Tab.Screen

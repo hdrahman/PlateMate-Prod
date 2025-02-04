@@ -42,7 +42,7 @@ const consumedCalories = 1022;
 const remainingCalories = dailyCalorieGoal - consumedCalories;
 const percentConsumed = (consumedCalories / dailyCalorieGoal) * 100;
 
-const fatPercent = 20;
+const fatPercent = 30;
 const carbsPercent = 70;
 const proteinPercent = 40;
 const totalBurned = 500;
@@ -131,17 +131,17 @@ export default function Home() {
             <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
               <Defs>
                 <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#FF00F5" />
+                  <Stop offset="0%" stopColor="#2E0854" />
                   <Stop offset="50%" stopColor="#9B00FF" />
                   <Stop offset="100%" stopColor="#00CFFF" />
                 </SvgLinearGradient>
                 <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#FFD700" />
-                  <Stop offset="100%" stopColor="#FF8C00" />
+                  <Stop offset="0%" stopColor="#8B0000" />
+                  <Stop offset="100%" stopColor="#FFD700" />
                 </SvgLinearGradient>
                 <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#8A2BE2" />
-                  <Stop offset="100%" stopColor="#4B0082" />
+                  <Stop offset="0%" stopColor="#4B0082" />
+                  <Stop offset="100%" stopColor="#8A2BE2" />
                 </SvgLinearGradient>
               </Defs>
               <Circle
@@ -671,7 +671,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
       gradientColors = ['#29B6F6', '#03A9F4', '#0288D1'];
       break;
     case 'FATS':
-      gradientColors = ['#66BB6A', '#43A047', '#2E7D32'];
+      gradientColors = ['#66BB6A', '#43A047', '#18d621'];
       break;
     case 'OTHER':
       break;
