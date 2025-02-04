@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     SafeAreaView,
     TouchableWithoutFeedback,
+    Animated,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -67,6 +68,7 @@ const DiaryScreen: React.FC = () => {
     const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const [currentDate, setCurrentDate] = useState(new Date());
+    const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
 
     const toggleStreakInfo = () => {
         setShowStreakInfo(!showStreakInfo);
@@ -82,19 +84,39 @@ const DiaryScreen: React.FC = () => {
         }
     };
 
+    const animateSwipe = (direction: number, updateDate: () => void) => {
+        Animated.sequence([
+            Animated.timing(slideAnim, {
+                toValue: direction * 50,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+        ]).start();
+        updateDate();
+    };
+
     const gotoPrevDay = () => {
-        setCurrentDate(prev => {
-            const newDate = new Date(prev);
-            newDate.setDate(newDate.getDate() - 1);
-            return newDate;
+        animateSwipe(1, () => {
+            setCurrentDate(prev => {
+                const newDate = new Date(prev);
+                newDate.setDate(newDate.getDate() - 1);
+                return newDate;
+            });
         });
     };
 
     const gotoNextDay = () => {
-        setCurrentDate(prev => {
-            const newDate = new Date(prev);
-            newDate.setDate(newDate.getDate() + 1);
-            return newDate;
+        animateSwipe(-1, () => {
+            setCurrentDate(prev => {
+                const newDate = new Date(prev);
+                newDate.setDate(newDate.getDate() + 1);
+                return newDate;
+            });
         });
     };
 
@@ -131,7 +153,11 @@ const DiaryScreen: React.FC = () => {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <PanGestureHandler onHandlerStateChange={onHandlerStateChange}>
+            <PanGestureHandler
+                onHandlerStateChange={onHandlerStateChange}
+                activeOffsetX={[-100, 100]}
+                failOffsetY={[-10, 10]}
+            >
                 <View style={{ flex: 1 }}>
                     <TouchableWithoutFeedback onPress={handleOutsidePress}>
                         <SafeAreaView style={styles.container}>
@@ -169,9 +195,11 @@ const DiaryScreen: React.FC = () => {
                                     <TouchableOpacity onPress={gotoPrevDay} style={styles.arrowButton}>
                                         <Ionicons name="chevron-back" size={16} color="#FFF" />
                                     </TouchableOpacity>
-                                    <Text style={[styles.headerSub, { fontSize: 14 }]}>
-                                        {formatDate(currentDate)}
-                                    </Text>
+                                    <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
+                                        <Text style={[styles.headerSub, { fontSize: 14 }]}>
+                                            {formatDate(currentDate)}
+                                        </Text>
+                                    </Animated.View>
                                     <TouchableOpacity onPress={gotoNextDay} style={styles.arrowButton}>
                                         <Ionicons name="chevron-forward" size={16} color="#FFF" />
                                     </TouchableOpacity>
