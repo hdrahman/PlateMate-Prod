@@ -7,6 +7,9 @@ import {
     TouchableOpacity,
     SafeAreaView,
 } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const mockDiaryData = {
     goal: 1800,
@@ -63,6 +66,51 @@ const DiaryScreen: React.FC = () => {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollInner}>
+                <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <Text style={styles.headerTitle}>Diary</Text>
+                    <View style={styles.headerRight}>
+                        <View style={styles.streakContainer}>
+                            <Text style={styles.streakNumber}>7</Text>
+                            <MaskedView
+                                maskElement={<Ionicons name="flame" size={20} color="#FFF" />}
+                            >
+                                <LinearGradient
+                                    colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ width: 20, height: 20 }}
+                                />
+                            </MaskedView>
+                        </View>
+
+                        <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
+                            <MaskedView
+                                maskElement={<Ionicons name="pie-chart-outline" size={20} color="#FFF" />}
+                            >
+                                <LinearGradient
+                                    colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ width: 20, height: 20 }}
+                                />
+                            </MaskedView>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={() => console.log('Open Settings')} style={styles.iconButton}>
+                            <MaskedView
+                                maskElement={<Ionicons name="ellipsis-vertical" size={20} color="#FFF" />}
+                            >
+                                <LinearGradient
+                                    colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ width: 20, height: 20 }}
+                                />
+                            </MaskedView>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 {/* 
                   * 1) Header area 
                   * (We won’t add the day-bar code now. If you want the day-bar,
@@ -71,7 +119,15 @@ const DiaryScreen: React.FC = () => {
                   */}
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Diary</Text>
-                    <Text style={styles.headerSub}>Today</Text>
+                    <View style={[styles.dayNavCard, { marginHorizontal: -16 }]}>
+                        <TouchableOpacity style={styles.arrowButton}>
+                            <Ionicons name="chevron-back" size={16} color="#FFF" />
+                        </TouchableOpacity>
+                        <Text style={[styles.headerSub, { fontSize: 14 }]}>Today</Text>
+                        <TouchableOpacity style={styles.arrowButton}>
+                            <Ionicons name="chevron-forward" size={16} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* 2) Calories Remaining */}
@@ -234,6 +290,25 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: '400',
     },
+    dayNavCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
+        borderRadius: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        marginTop: 8
+    },
+    arrowButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 4
+    },
+    arrowSymbol: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#FFF'
+    },
 
     // Calories Remaining Card
     summaryCard: {
@@ -395,5 +470,22 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: '700',
         fontSize: 14,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    streakContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 12
+    },
+    streakNumber: {
+        color: '#FFF',
+        fontSize: 14,
+        marginRight: 4
+    },
+    iconButton: {
+        marginLeft: 12
     },
 });
