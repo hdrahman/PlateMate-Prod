@@ -8,11 +8,14 @@ import {
     SafeAreaView,
     TouchableWithoutFeedback,
     Animated,
+    Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from 'react-native-gesture-handler';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const mockDiaryData = {
     goal: 1800,
@@ -69,6 +72,7 @@ const DiaryScreen: React.FC = () => {
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const [currentDate, setCurrentDate] = useState(new Date());
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
+    const swipeAnim = useRef(new Animated.Value(0)).current; // new animated value for full page swiping
 
     const toggleStreakInfo = () => {
         setShowStreakInfo(!showStreakInfo);
@@ -142,218 +146,272 @@ const DiaryScreen: React.FC = () => {
         return date.toLocaleDateString(undefined, options);
     };
 
+    const onGestureEvent = Animated.event(
+        [{ nativeEvent: { translationX: swipeAnim } }],
+        { useNativeDriver: true }
+    );
+
+    const handleSwipeRelease = (translationX: number) => {
+        const threshold = 100;
+        if (translationX <= -threshold) {
+            // swipe left -> next day
+            Animated.timing(swipeAnim, {
+                toValue: -screenWidth,
+                duration: 200,
+                useNativeDriver: true,
+            }).start(() => {
+                setCurrentDate(prev => {
+                    const newDate = new Date(prev);
+                    newDate.setDate(newDate.getDate() + 1);
+                    return newDate;
+                });
+                swipeAnim.setValue(screenWidth);
+                Animated.timing(swipeAnim, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+                }).start();
+            });
+        } else if (translationX >= threshold) {
+            // swipe right -> previous day
+            Animated.timing(swipeAnim, {
+                toValue: screenWidth,
+                duration: 200,
+                useNativeDriver: true,
+            }).start(() => {
+                setCurrentDate(prev => {
+                    const newDate = new Date(prev);
+                    newDate.setDate(newDate.getDate() - 1);
+                    return newDate;
+                });
+                swipeAnim.setValue(-screenWidth);
+                Animated.timing(swipeAnim, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+                }).start();
+            });
+        } else {
+            // not enough swipe; snap back
+            Animated.timing(swipeAnim, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            }).start();
+        }
+    };
+
     const onHandlerStateChange = (event: any) => {
         if (event.nativeEvent.state === GestureState.END) {
-            const { translationX, translationY } = event.nativeEvent;
-            if (Math.abs(translationX) > 100 && Math.abs(translationX) > Math.abs(translationY)) {
-                translationX > 0 ? gotoPrevDay() : gotoNextDay();
-            }
+            const { translationX } = event.nativeEvent;
+            handleSwipeRelease(translationX);
         }
     };
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <PanGestureHandler
-                onHandlerStateChange={onHandlerStateChange}
-                activeOffsetX={[-100, 100]}
-                failOffsetY={[-10, 10]}
-            >
-                <View style={{ flex: 1 }}>
-                    <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                        <SafeAreaView style={styles.container}>
-                            <ScrollView contentContainerStyle={styles.scrollInner}>
-                                <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                                    <Text style={styles.headerTitle}>Diary</Text>
-                                    <View style={styles.headerRight}>
-                                        <Text style={styles.streakNumber}>7</Text>
-                                        <TouchableOpacity onPress={toggleStreakInfo}>
-                                            <MaskedView
-                                                maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
-                                            >
-                                                <LinearGradient
-                                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                                    start={{ x: 0, y: 0 }}
-                                                    end={{ x: 1, y: 1 }}
-                                                    style={{ width: 27, height: 27 }}
-                                                />
-                                            </MaskedView>
-                                        </TouchableOpacity>
-                                        {showStreakInfo && (
-                                            <View style={styles.streakInfo}>
-                                                <View style={styles.streakInfoArrow} />
-                                                <Text style={styles.streakInfoText}>This is your streak count. Keep logging daily to maintain your streak!</Text>
-                                            </View>
-                                        )}
-                                        <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
-                                            <Ionicons name="pie-chart-outline" size={22} color="#CCC" />
-                                        </TouchableOpacity>
+            <SafeAreaView style={styles.container}>
+                {/* Fixed header & day bar */}
+                <TouchableWithoutFeedback onPress={handleOutsidePress}>
+                    <>
+                        <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                            <Text style={styles.headerTitle}>Diary</Text>
+                            <View style={styles.headerRight}>
+                                <Text style={styles.streakNumber}>7</Text>
+                                <TouchableOpacity onPress={toggleStreakInfo}>
+                                    <MaskedView
+                                        maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
+                                    >
+                                        <LinearGradient
+                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={{ width: 27, height: 27 }}
+                                        />
+                                    </MaskedView>
+                                </TouchableOpacity>
+                                {showStreakInfo && (
+                                    <View style={styles.streakInfo}>
+                                        <View style={styles.streakInfoArrow} />
+                                        <Text style={styles.streakInfoText}>This is your streak count. Keep logging daily to maintain your streak!</Text>
                                     </View>
-                                </View>
+                                )}
+                                <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
+                                    <Ionicons name="pie-chart-outline" size={22} color="#CCC" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                        <View style={styles.dayNavCard}>
+                            <TouchableOpacity onPress={gotoPrevDay} style={styles.arrowButton}>
+                                <Ionicons name="chevron-back" size={16} color="#FFF" />
+                            </TouchableOpacity>
+                            <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
+                                <Text style={[styles.headerSub, { fontSize: 14 }]}>
+                                    {formatDate(currentDate)}
+                                </Text>
+                            </Animated.View>
+                            <TouchableOpacity onPress={gotoNextDay} style={styles.arrowButton}>
+                                <Ionicons name="chevron-forward" size={16} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                </TouchableWithoutFeedback>
 
-                                {/* Day Bar */}
-                                <View style={styles.dayNavCard}>
-                                    <TouchableOpacity onPress={gotoPrevDay} style={styles.arrowButton}>
-                                        <Ionicons name="chevron-back" size={16} color="#FFF" />
-                                    </TouchableOpacity>
-                                    <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
-                                        <Text style={[styles.headerSub, { fontSize: 14 }]}>
-                                            {formatDate(currentDate)}
+                {/* Swipeable content below day bar */}
+                <PanGestureHandler
+                    onGestureEvent={onGestureEvent}
+                    onHandlerStateChange={onHandlerStateChange}
+                    activeOffsetX={[-20, 20]} // increased offset to reduce sensitivity
+                >
+                    <Animated.View style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}>
+                        <ScrollView contentContainerStyle={styles.scrollInner}>
+                            <View style={{ height: 10 }} />
+
+                            {/* 2) Calories Remaining */}
+                            <View style={styles.summaryCard}>
+                                <Text style={styles.summaryTitle}>Calories Remaining</Text>
+                                <View style={styles.equationRow}>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                                            {goal}
                                         </Text>
-                                    </Animated.View>
-                                    <TouchableOpacity onPress={gotoNextDay} style={styles.arrowButton}>
-                                        <Ionicons name="chevron-forward" size={16} color="#FFF" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Add space between the "Today" card and the card below it */}
-                                <View style={{ height: 10 }} />
-
-                                {/* 2) Calories Remaining */}
-                                <View style={styles.summaryCard}>
-                                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
-                                    <View style={styles.equationRow}>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
-                                                {goal}
-                                            </Text>
-                                            <Text style={styles.equationLabel}>Base</Text>
-                                        </View>
-                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
-                                                {food}
-                                            </Text>
-                                            <Text style={styles.equationLabel}>Food</Text>
-                                        </View>
-                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
-                                                {exercise}
-                                            </Text>
-                                            <Text style={styles.equationLabel}>Exercise</Text>
-                                        </View>
-                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
-                                            <Text style={styles.equationLabel}>Remaining</Text>
-                                        </View>
+                                        <Text style={styles.equationLabel}>Base</Text>
+                                    </View>
+                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                                            {food}
+                                        </Text>
+                                        <Text style={styles.equationLabel}>Food</Text>
+                                    </View>
+                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                                            {exercise}
+                                        </Text>
+                                        <Text style={styles.equationLabel}>Exercise</Text>
+                                    </View>
+                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
+                                        <Text style={styles.equationLabel}>Remaining</Text>
                                     </View>
                                 </View>
+                            </View>
 
-                                {/* 3) Meals */}
-                                {meals.map((meal, idx) => (
-                                    <View key={idx} style={styles.mealSection}>
-                                        {/* Title row */}
-                                        <View style={styles.mealHeader}>
-                                            <Text style={styles.mealTitle}>{meal.title}</Text>
-                                            <Text style={styles.mealCal}>{meal.total}</Text>
-                                        </View>
-
-                                        {/* Macros */}
-                                        <TouchableOpacity onPress={toggleMacrosDisplay}>
-                                            <Text style={styles.macrosText}>
-                                                {showMacrosAsPercent
-                                                    ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
-                                                    : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        {/* Divider line under macros */}
-                                        <View style={styles.dividerLine} />
-
-                                        {/* Entries */}
-                                        {meal.items.map((item, i) => (
-                                            <View key={i}>
-                                                <View style={styles.logRow}>
-                                                    <Text style={styles.logItemText}>{item.name}</Text>
-                                                    <Text style={styles.logCalText}>{item.calories}</Text>
-                                                </View>
-
-                                                {/* Divider line under each entry */}
-                                                {i < meal.items.length - 1 && (
-                                                    <View style={styles.entryDividerLine} />
-                                                )}
-                                            </View>
-                                        ))}
-
-                                        {/* Divider line before Add Food button */}
-                                        <View style={styles.dividerLine} />
-
-                                        <TouchableOpacity style={styles.addBtn}>
-                                            <Text style={styles.addBtnText}>ADD FOOD</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                ))}
-
-                                {/* 4) Exercise */}
-                                <View style={styles.mealSection}>
+                            {/* 3) Meals */}
+                            {meals.map((meal, idx) => (
+                                <View key={idx} style={styles.mealSection}>
+                                    {/* Title row */}
                                     <View style={styles.mealHeader}>
-                                        <Text style={[styles.mealTitle, { fontSize: 18 }]}>{mockDiaryData.exercise}</Text>
-                                        <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
+                                        <Text style={styles.mealTitle}>{meal.title}</Text>
+                                        <Text style={styles.mealCal}>{meal.total}</Text>
                                     </View>
 
-                                    {/* Divider line under heading */}
+                                    {/* Macros */}
+                                    <TouchableOpacity onPress={toggleMacrosDisplay}>
+                                        <Text style={styles.macrosText}>
+                                            {showMacrosAsPercent
+                                                ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
+                                                : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Divider line under macros */}
                                     <View style={styles.dividerLine} />
 
-                                    {exerciseList.map((ex, i) => (
+                                    {/* Entries */}
+                                    {meal.items.map((item, i) => (
                                         <View key={i}>
                                             <View style={styles.logRow}>
-                                                <View style={{ flexDirection: 'column' }}>
-                                                    <Text style={[styles.logItemText, { fontSize: 16 }]}>{ex.name}</Text>
-                                                    <Text style={styles.logItemDuration}>{ex.duration}</Text>
-                                                </View>
-                                                <Text style={styles.logCalText}>{ex.calories}</Text>
+                                                <Text style={styles.logItemText}>{item.name}</Text>
+                                                <Text style={styles.logCalText}>{item.calories}</Text>
                                             </View>
+
                                             {/* Divider line under each entry */}
-                                            {i < exerciseList.length - 1 && (
+                                            {i < meal.items.length - 1 && (
                                                 <View style={styles.entryDividerLine} />
                                             )}
                                         </View>
                                     ))}
 
-                                    {/* Divider line before Add Exercise button */}
+                                    {/* Divider line before Add Food button */}
                                     <View style={styles.dividerLine} />
 
                                     <TouchableOpacity style={styles.addBtn}>
-                                        <Text style={styles.addBtnText}>ADD EXERCISE</Text>
+                                        <Text style={styles.addBtnText}>ADD FOOD</Text>
                                     </TouchableOpacity>
                                 </View>
+                            ))}
 
-                                {/* 5) Water */}
-                                <View style={styles.mealSection}>
-                                    <View style={styles.mealHeader}>
-                                        <Text style={styles.mealTitle}>Water</Text>
+                            {/* 4) Exercise */}
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={[styles.mealTitle, { fontSize: 18 }]}>{mockDiaryData.exercise}</Text>
+                                    <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
+                                </View>
+
+                                {/* Divider line under heading */}
+                                <View style={styles.dividerLine} />
+
+                                {exerciseList.map((ex, i) => (
+                                    <View key={i}>
+                                        <View style={styles.logRow}>
+                                            <View style={{ flexDirection: 'column' }}>
+                                                <Text style={[styles.logItemText, { fontSize: 16 }]}>{ex.name}</Text>
+                                                <Text style={styles.logItemDuration}>{ex.duration}</Text>
+                                            </View>
+                                            <Text style={styles.logCalText}>{ex.calories}</Text>
+                                        </View>
+                                        {/* Divider line under each entry */}
+                                        {i < exerciseList.length - 1 && (
+                                            <View style={styles.entryDividerLine} />
+                                        )}
                                     </View>
-                                    {/* Divider line under heading */}
-                                    <View style={styles.dividerLine} />
+                                ))}
 
-                                    <TouchableOpacity style={styles.addBtn}>
-                                        <Text style={styles.addBtnText}>ADD WATER</Text>
+                                {/* Divider line before Add Exercise button */}
+                                <View style={styles.dividerLine} />
+
+                                <TouchableOpacity style={styles.addBtn}>
+                                    <Text style={styles.addBtnText}>ADD EXERCISE</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* 5) Water */}
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={styles.mealTitle}>Water</Text>
+                                </View>
+                                {/* Divider line under heading */}
+                                <View style={styles.dividerLine} />
+
+                                <TouchableOpacity style={styles.addBtn}>
+                                    <Text style={styles.addBtnText}>ADD WATER</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* 6) Bottom action row */}
+                            <View style={styles.bottomActions}>
+                                <View style={styles.topActionsRow}>
+                                    <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>
+                                        <Text style={styles.tabBtnText}>Nutrition</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
+                                        <Text style={styles.tabBtnText}>Complete Diary</Text>
                                     </TouchableOpacity>
                                 </View>
-
-                                {/* 6) Bottom action row */}
-                                <View style={styles.bottomActions}>
-                                    <View style={styles.topActionsRow}>
-                                        <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>
-                                            <Text style={styles.tabBtnText}>Nutrition</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
-                                            <Text style={styles.tabBtnText}>Complete Diary</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={styles.bottomAnalyzeRow}>
-                                        <TouchableOpacity style={[styles.analyzeBtn, { flex: 1 }]}>
-                                            <Text style={styles.analyzeBtnText}>Analyze</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                <View style={styles.bottomAnalyzeRow}>
+                                    <TouchableOpacity style={[styles.analyzeBtn, { flex: 1 }]}>
+                                        <Text style={styles.analyzeBtnText}>Analyze</Text>
+                                    </TouchableOpacity>
                                 </View>
-                                <View style={{ height: 20 }} />
-                            </ScrollView>
-                        </SafeAreaView>
-                    </TouchableWithoutFeedback>
-                </View>
-            </PanGestureHandler>
+                            </View>
+                            <View style={{ height: 20 }} />
+                        </ScrollView>
+                    </Animated.View>
+                </PanGestureHandler>
+            </SafeAreaView>
         </GestureHandlerRootView>
     );
 };
