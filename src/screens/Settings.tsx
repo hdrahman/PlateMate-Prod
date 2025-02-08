@@ -17,32 +17,46 @@ const SettingsScreen = () => {
                 <Text style={styles.headerTitle}>Settings</Text>
             </View>
             <ScrollView contentContainerStyle={styles.content}>
+                {/* Appearance Section at the top */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Appearance</Text>
-                    <View style={styles.itemRow}>
+                    <View style={[styles.itemRow, styles.fullWidthItem]}>
                         <Text style={styles.itemText}>Dark Mode</Text>
                         <Switch value={isDarkTheme} onValueChange={toggleTheme} />
                     </View>
                 </View>
-
+                {/* Account Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Account</Text>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditProfileScreen")}>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditProfileScreen")}>
                         <Text style={styles.itemText}>Edit Profile</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditGoalsScreen")}>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditGoalsScreen")}>
                         <Text style={styles.itemText}>Edit Goals</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PremiumSubscriptionScreen")}>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PremiumSubscriptionScreen")}>
                         <Text style={styles.itemText}>Premium Subscription</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("ChangePasswordScreen")}>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("ChangePasswordScreen")}>
                         <Text style={styles.itemText}>Change Password</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccountScreen")}>
+                </View>
+                {/* Privacy & Security Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Privacy & Security</Text>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("NotificationsScreen")}>
+                        <Text style={styles.itemText}>Notifications</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DataSharingScreen")}>
+                        <Text style={styles.itemText}>Data Sharing</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PrivacyPolicyScreen")}>
+                        <Text style={styles.itemText}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DeleteAccountScreen")}>
                         <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => { /* handle log out action */ }}>
+                    <TouchableOpacity style={styles.item} onPress={() => { /* handle log out action */ }}>
                         <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
                     </TouchableOpacity>
                 </View>
@@ -54,6 +68,7 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        // ...existing code...
     },
     dark: {
         backgroundColor: "#000",
@@ -91,21 +106,26 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+        marginHorizontal: -20,       // added to extend border edge-to-edge
+        paddingHorizontal: 20,       // added padding between text and sides
         paddingVertical: 15,
         borderBottomWidth: 1,
         borderColor: "#333",
     },
     item: {
         paddingVertical: 15,
+        marginHorizontal: -20, // keep border spanning edge-to-edge
+        paddingHorizontal: 20, // added padding between text and sides
         borderBottomWidth: 1,
         borderColor: "#333",
     },
     fullWidthItem: {
-        marginHorizontal: 0,
+        marginHorizontal: -20,
     },
     itemText: {
         fontSize: 16,
         color: "#FFF",
+        marginLeft: 10, // added left margin to indent text relative to section headers
     },
     dangerText: {
         color: "#FF4C4C",
