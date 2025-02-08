@@ -1,11 +1,12 @@
 import React from 'react';
-import { SafeAreaView, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
-const EditGoals = () => (
-    <SafeAreaView style={styles.container}>
-        <Text>Edit Goals Screen</Text>
-    </SafeAreaView>
-);
+export default function EditGoals() {
+    return (
+        <View style={styles.container}>
+            <Text>Edit Goals Screen</Text>
+        </View>
+    );
+}
 
 const styles = StyleSheet.create({ container: { flex: 1, justifyContent: 'center', alignItems: 'center' } });
-export default EditGoals;
