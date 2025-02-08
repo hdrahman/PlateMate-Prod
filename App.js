@@ -151,7 +151,7 @@ function MainTabs() {
          * 2) Header Icons (Gradient + Glow)
          */
         headerLeft: () => (
-          <TouchableOpacity style={{ marginLeft: 15 }} onPress={() => navigation.navigate('EditProfile')}>
+          <TouchableOpacity style={{ marginLeft: 15 }} onPress={() => navigation.navigate('EditProfile', { slideFrom: 'left' })}>
             <GlowIcon
               name="person-circle-outline"
               size={35}
@@ -162,7 +162,7 @@ function MainTabs() {
         headerRight: () => (
           <TouchableOpacity
             style={{ marginRight: 15 }}
-            onPress={() => navigation.navigate('Settings')}
+            onPress={() => navigation.navigate('Settings', { slideFrom: 'right' })}
           >
             <GlowIcon
               name="settings-outline"
@@ -269,14 +269,62 @@ export default function App() {
           },
         }}
       >
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: "slide_from_right", // fast slide transition when pushing and popping screens
+            animationDuration: 1,         // transition duration set to 200ms for both directions
+          }}
+        >
           <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="EditProfile" component={EditProfile} />
-          <Stack.Screen name="EditGoals" component={EditGoals} />
-          <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
-          <Stack.Screen name="ChangePassword" component={ChangePassword} />
-          <Stack.Screen name="AboutUs" component={AboutUs} />
-          <Stack.Screen name="Settings" component={Settings} />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfile}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="EditGoals"
+            component={EditGoals}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="DeleteAccount"
+            component={DeleteAccount}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePassword}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="AboutUs"
+            component={AboutUs}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={Settings}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </>

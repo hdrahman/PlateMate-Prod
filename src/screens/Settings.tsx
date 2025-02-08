@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView } from "react-native";
+import React, { useContext, useRef, useEffect } from "react";
+import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView, Animated } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,15 @@ import { Ionicons } from "@expo/vector-icons";
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+        }).start();
+    }, [fadeAnim]);
 
     return (
         <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]}>
@@ -16,51 +25,53 @@ const SettingsScreen = () => {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Settings</Text>
             </View>
-            <ScrollView contentContainerStyle={styles.content}>
-                {/* Appearance Section at the top */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Appearance</Text>
-                    <View style={[styles.itemRow, styles.fullWidthItem]}>
-                        <Text style={styles.itemText}>Dark Mode</Text>
-                        <Switch value={isDarkTheme} onValueChange={toggleTheme} />
+            <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
+                <ScrollView contentContainerStyle={styles.content}>
+                    {/* Appearance Section at the top */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Appearance</Text>
+                        <View style={[styles.itemRow, styles.fullWidthItem]}>
+                            <Text style={styles.itemText}>Dark Mode</Text>
+                            <Switch value={isDarkTheme} onValueChange={toggleTheme} />
+                        </View>
                     </View>
-                </View>
-                {/* Account Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account</Text>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditProfileScreen")}>
-                        <Text style={styles.itemText}>Edit Profile</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditGoalsScreen")}>
-                        <Text style={styles.itemText}>Edit Goals</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PremiumSubscriptionScreen")}>
-                        <Text style={styles.itemText}>Premium Subscription</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("ChangePasswordScreen")}>
-                        <Text style={styles.itemText}>Change Password</Text>
-                    </TouchableOpacity>
-                </View>
-                {/* Privacy & Security Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Privacy & Security</Text>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("NotificationsScreen")}>
-                        <Text style={styles.itemText}>Notifications</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DataSharingScreen")}>
-                        <Text style={styles.itemText}>Data Sharing</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PrivacyPolicyScreen")}>
-                        <Text style={styles.itemText}>Privacy Policy</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DeleteAccountScreen")}>
-                        <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.item} onPress={() => { /* handle log out action */ }}>
-                        <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+                    {/* Account Section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Account</Text>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditProfileScreen")}>
+                            <Text style={styles.itemText}>Edit Profile</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditGoalsScreen")}>
+                            <Text style={styles.itemText}>Edit Goals</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PremiumSubscriptionScreen")}>
+                            <Text style={styles.itemText}>Premium Subscription</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("ChangePasswordScreen")}>
+                            <Text style={styles.itemText}>Change Password</Text>
+                        </TouchableOpacity>
+                    </View>
+                    {/* Privacy & Security Section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Privacy & Security</Text>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("NotificationsScreen")}>
+                            <Text style={styles.itemText}>Notifications</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DataSharingScreen")}>
+                            <Text style={styles.itemText}>Data Sharing</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PrivacyPolicyScreen")}>
+                            <Text style={styles.itemText}>Privacy Policy</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.item, styles.dangerItem]} onPress={() => navigation.navigate("DeleteAccountScreen")}>
+                            <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.item, styles.dangerItem]} onPress={() => { /* handle log out action */ }}>
+                            <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </Animated.View>
         </SafeAreaView>
     );
 };
@@ -101,6 +112,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: "#9B00FF",
         marginBottom: 10,
+        marginLeft: -5, // updated from -10 to -5 to reduce alignment difference
     },
     itemRow: {
         flexDirection: "row",
@@ -125,11 +137,16 @@ const styles = StyleSheet.create({
     itemText: {
         fontSize: 16,
         color: "#FFF",
-        marginLeft: 10, // added left margin to indent text relative to section headers
+        marginLeft: 10, // indent text relative to section headers
     },
     dangerText: {
         color: "#FF4C4C",
         textAlign: "center",
+    },
+    dangerItem: {
+        marginHorizontal: 0,
+        paddingHorizontal: 0,
+        alignItems: "center",
     },
 });
 
