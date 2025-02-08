@@ -268,6 +268,7 @@ const DiaryScreen: React.FC = () => {
                                 <Ionicons name="chevron-forward" size={16} color="#FFF" />
                             </TouchableOpacity>
                         </View>
+                        <View style={{ height: 10 }} /> {/* Added space below the Today bar */}
                     </>
                 </TouchableWithoutFeedback>
 
@@ -279,8 +280,6 @@ const DiaryScreen: React.FC = () => {
                 >
                     <Animated.View style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}>
                         <ScrollView contentContainerStyle={styles.scrollInner}>
-                            <View style={{ height: 10 }} />
-
                             {/* 2) Calories Remaining */}
                             <View style={styles.summaryCard}>
                                 <Text style={styles.summaryTitle}>Calories Remaining</Text>
@@ -421,7 +420,7 @@ const DiaryScreen: React.FC = () => {
                                     </TouchableOpacity>
                                 </View>
                             </View>
-                            <View style={{ height: 20 }} />
+                            <View style={{ height: 10 }} />
                         </ScrollView>
                     </Animated.View>
                 </PanGestureHandler>
