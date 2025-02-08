@@ -11,6 +11,7 @@ import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
 import Workout from "./src/screens/Workout";
 import Chatbot from "./src/screens/Chatbot";
+import Settings from "./src/screens/Settings";
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -163,13 +164,10 @@ export default function App() {
                 />
               </TouchableOpacity>
             ),
-            headerRight: () => (
+            headerRight: ({ navigation }) => (
               <TouchableOpacity
                 style={{ marginRight: 15 }}
-                onPress={() => {
-                  // Add your settings action here (e.g., navigate to Settings screen)
-                  console.log("Settings pressed");
-                }}
+                onPress={() => navigation.navigate('Settings')}
               >
                 <GlowIcon
                   name="settings-outline"
