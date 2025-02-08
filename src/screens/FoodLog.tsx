@@ -217,8 +217,17 @@ const DiaryScreen: React.FC = () => {
                         <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                             <Text style={styles.headerTitle}>Diary</Text>
                             <View style={styles.headerRight}>
-                                <Text style={styles.streakNumber}>7</Text>
-                                <TouchableOpacity onPress={toggleStreakInfo}>
+                                <TouchableOpacity onPress={toggleStreakInfo} style={styles.streakButton}>
+                                    <MaskedView
+                                        maskElement={<Text style={styles.streakNumber}>7</Text>}
+                                    >
+                                        <LinearGradient
+                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={{ width: 27, height: 27 }} // Adjusted size to align with other icons
+                                        />
+                                    </MaskedView>
                                     <MaskedView
                                         maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
                                     >
@@ -236,8 +245,13 @@ const DiaryScreen: React.FC = () => {
                                         <Text style={styles.streakInfoText}>This is your streak count. Keep logging daily to maintain your streak!</Text>
                                     </View>
                                 )}
+                                {/* New icon button */}
+                                <TouchableOpacity onPress={() => console.log('OpenImage')} style={styles.iconButton}>
+                                    <Ionicons name="image" size={22} color="#00BFFF" />
+                                </TouchableOpacity>
+                                {/* Updated pie chart icon color */}
                                 <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
-                                    <Ionicons name="pie-chart-outline" size={22} color="#CCC" />
+                                    <Ionicons name="pie-chart-outline" size={22} color="#FFA500" />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -655,18 +669,24 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center'
     },
+    streakButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     iconButton: {
-        marginLeft: 12
+        marginLeft: 8 // Reduced margin
     },
     streakNumber: {
-        color: '#FFF',
-        fontSize: 16,
-        marginRight: 4,
+        fontSize: 20, // Increased font size
+        fontWeight: 'bold',
+        textAlign: 'center', // Center align text
+        lineHeight: 25, // Align with icon height
+        marginRight: -10, // Reduced margin
     },
     streakInfo: {
         position: 'absolute',
-        top: 30,
-        left: -200, // Shift to the left
+        top: 35,
+        left: -150, // Shift to the left
         right: 10,
         backgroundColor: '#333',
         padding: 20, // Increase padding for better readability
