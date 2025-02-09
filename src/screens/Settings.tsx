@@ -1,6 +1,6 @@
 import React, { useContext } from "react";
 import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -8,10 +8,24 @@ const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
 
+    useFocusEffect(
+        React.useCallback(() => {
+            navigation.setOptions({
+                cardStyle: { backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" },
+            });
+
+            return () => {
+                navigation.setOptions({
+                    cardStyle: { backgroundColor: "#000" }, // Ensure it resets properly
+                });
+            };
+        }, [navigation, isDarkTheme])
+    );
+
     return (
-        <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
+            <View style={[styles.header, isDarkTheme ? styles.dark : styles.light]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Settings</Text>
@@ -58,7 +72,7 @@ const SettingsScreen = () => {
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccountScreen")}>
                         <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => { navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] }) }}>
                         <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
                     </TouchableOpacity>
                 </View>
@@ -70,6 +84,7 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: "#000", // Ensures smooth transition
     },
     dark: {
         backgroundColor: "#000",
@@ -84,6 +99,10 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: "#444",
         paddingHorizontal: 16,
+        // Removed backgroundColor to use dynamic styling
+    },
+    backButton: {
+        backgroundColor: "#000", // Matches container to avoid white flash
     },
     headerTitle: {
         color: "#FFF",

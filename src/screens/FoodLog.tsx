@@ -268,7 +268,7 @@ const DiaryScreen: React.FC = () => {
                                 <Ionicons name="chevron-forward" size={16} color="#FFF" />
                             </TouchableOpacity>
                         </View>
-                        <View style={{ height: 10 }} /> {/* Added space below the Today bar */}
+                        <View style={{ height: 5 }} /> {/* Reduced space below the Today bar */}
                     </>
                 </TouchableWithoutFeedback>
 
@@ -470,7 +470,8 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         paddingVertical: 6,
         paddingHorizontal: 10,
-        marginTop: 8
+        marginTop: -5,
+        marginBottom: 5,
     },
     arrowButton: {
         paddingHorizontal: 12,

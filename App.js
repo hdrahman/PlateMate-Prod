@@ -77,6 +77,7 @@ function MainTabs() {
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={({ navigation }) => ({
+        detachPreviousScreen: false,
         // Keep the header slightly lighter and add a downward curve
         headerStyle: {
           backgroundColor: "#000", // Back to black background
@@ -265,16 +266,20 @@ export default function App() {
           colors: {
             ...DefaultTheme.colors,
             background: "#000",
-            card: "#111", // Slightly lighter color for differentiation
+            card: "#000",
           },
         }}
       >
         <Stack.Navigator
+          detachInactiveScreens={false} // Ensure inactive screens are not detached
           screenOptions={{
             headerShown: false,
-            animation: "slide_from_right", // fast slide transition when pushing and popping screens
-            animationDuration: 1,         // transition duration set to 200ms for both directions
+            animation: "slide_from_right",
+            animationDuration: 1,
+            cardStyle: { backgroundColor: "#000" },
           }}
+          style={{ flex: 1 }}
+          transitionerStyle={{ backgroundColor: 'black' }} // Ensure background remains black during transitions
         >
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen
@@ -321,6 +326,7 @@ export default function App() {
             name="Settings"
             component={Settings}
             options={({ route }) => ({
+              detachPreviousScreen: false, // keep previous screen attached to prevent white flash on swipe out
               animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
               animationDuration: 200,
             })}

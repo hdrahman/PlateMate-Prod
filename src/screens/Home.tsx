@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +26,8 @@ import Svg, {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as d3Scale from 'd3-scale';
 import * as d3Shape from 'd3-shape';
+import { ThemeContext } from '../ThemeContext';
+
 const { width } = Dimensions.get('window');
 const BASE_WIDTH = 375; // base width for scaling
 const scaleFactor = Math.min(width / BASE_WIDTH, 1);
@@ -70,6 +72,7 @@ const stepsHistory = [
 
 export default function Home() {
   const navigation = useNavigation();
+  const { isDarkTheme } = useContext(ThemeContext);
   // Keep track of which "page" (card) we are on in the horizontal scroll
   const [activeIndex, setActiveIndex] = useState(0);
   // Handler: updates activeIndex when user scrolls horizontally
@@ -99,7 +102,7 @@ export default function Home() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* CHEAT DAY CARD */}
         <View style={styles.card}>
