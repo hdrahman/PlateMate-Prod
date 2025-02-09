@@ -1,7 +1,7 @@
 import React from "react";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack'; // Update import
 import { TouchableOpacity, View, Text, StatusBar, Dimensions } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,7 +26,7 @@ const BUTTON_RADIUS = BUTTON_SIZE / 2;
 const OFFSET = BUTTON_RADIUS; // to center the button
 
 const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator(); // Use createStackNavigator
 
 function CustomTabBarButton({ children, onPress }) {
   return (
@@ -275,8 +275,7 @@ export default function App() {
             detachInactiveScreens={false} // Ensure inactive screens are not detached
             screenOptions={{
               headerShown: false,
-              animation: "slide_from_right",
-              animationDuration: 1,
+              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS, // Custom card style interpolator for smooth transitions
               cardStyle: { backgroundColor: "#000" },
             }}
             style={{ flex: 1 }}
