@@ -1,7 +1,7 @@
 import React from "react";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack'; // Update import
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TouchableOpacity, View, Text, StatusBar, Dimensions } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,7 +26,7 @@ const BUTTON_RADIUS = BUTTON_SIZE / 2;
 const OFFSET = BUTTON_RADIUS; // to center the button
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator(); // Use createStackNavigator
+const Stack = createNativeStackNavigator();
 
 function CustomTabBarButton({ children, onPress }) {
   return (
@@ -77,7 +77,6 @@ function MainTabs() {
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={({ navigation }) => ({
-        detachPreviousScreen: false,
         // Keep the header slightly lighter and add a downward curve
         headerStyle: {
           backgroundColor: "#000", // Back to black background
@@ -260,80 +259,75 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <View style={{ flex: 1, backgroundColor: '#000' }}> {/* Wrap with black View */}
-        <NavigationContainer
-          theme={{
-            ...DefaultTheme,
-            colors: {
-              ...DefaultTheme.colors,
-              background: "#000",
-              card: "#000",
-            },
+      <NavigationContainer
+        theme={{
+          ...DefaultTheme,
+          colors: {
+            ...DefaultTheme.colors,
+            background: "#000",
+            card: "#111", // Slightly lighter color for differentiation
+          },
+        }}
+      >
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: "slide_from_right",
+            animationDuration: 1,
+            cardStyle: { backgroundColor: "#000" }
           }}
         >
-          <Stack.Navigator
-            detachInactiveScreens={false} // Ensure inactive screens are not detached
-            screenOptions={{
-              headerShown: false,
-              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS, // Custom card style interpolator for smooth transitions
-              cardStyle: { backgroundColor: "#000" },
-            }}
-            style={{ flex: 1 }}
-            transitionerStyle={{ backgroundColor: 'black' }} // Ensure background remains black during transitions
-          >
-            <Stack.Screen name="MainTabs" component={MainTabs} />
-            <Stack.Screen
-              name="EditProfile"
-              component={EditProfile}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-              })}
-            />
-            <Stack.Screen
-              name="EditGoals"
-              component={EditGoals}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-              })}
-            />
-            <Stack.Screen
-              name="DeleteAccount"
-              component={DeleteAccount}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-              })}
-            />
-            <Stack.Screen
-              name="ChangePassword"
-              component={ChangePassword}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-              })}
-            />
-            <Stack.Screen
-              name="AboutUs"
-              component={AboutUs}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-              })}
-            />
-            <Stack.Screen
-              name="Settings"
-              component={Settings}
-              options={({ route }) => ({
-                detachPreviousScreen: false, // keep previous screen attached to prevent white flash on swipe out
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-              })}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </View>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfile}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="EditGoals"
+            component={EditGoals}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="DeleteAccount"
+            component={DeleteAccount}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePassword}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="AboutUs"
+            component={AboutUs}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={Settings}
+            options={({ route }) => ({
+              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+              animationDuration: 200,
+            })}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
     </>
   );
 }
