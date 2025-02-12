@@ -11,7 +11,13 @@ cursor.execute("""
                proteins INT NOT NULL,
                carbs INT NOT NULL,
                fats INT NOT NULL,
-               image_url TEXT,
-               date TIMESTAMP DEFAULT NOW()
+               image_url TEXT, --store the cloiud storage URL, not the actual image.
+               healthiness_rating INT CHECK(healthiness_rating BETWEEN 1 AND 10),
+               date TIMESTAMP DEFAULT NOW(),
     )
 """)
+
+conn.commit()  # Save changes to the database
+print("✅ Food Logs table created successfully on Neon!")
+
+
