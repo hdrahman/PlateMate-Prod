@@ -1,17 +1,18 @@
 import openai
-import base64
 import boto3
 import os
+import base64
+import re
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from db import SessionLocal
 from models import FoodLog
 
 load_dotenv()
 router = APIRouter()
 
-#AWS S3 client
+# AWS S3 client
 s3_client = boto3.client(
     's3',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
@@ -22,86 +23,138 @@ s3_client = boto3.client(
 bucket_name = os.getenv('AWS_BUCKET_NAME')
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-#Function to analyze image using GPT-4o
-def analyze_food_image(image_url):
+
+# Function to analyze images using GPT-4o Vision API
+def analyze_food_images(image_urls):
+    """Send multiple image URLs to GPT-4o Vision for analysis."""
     try:
         response = openai.ChatCompletion.create(
-            model = 'gpt-4o'
-            {"role": "system", "content": "You are a nutrition assistant. Analyze the food in the image and provide an estimate of calories, macronutrients, and a healthiness rating (1-10)."},
-            {"role": "user", "content": f"Analyze this food image: {image_url}"}
-        ) #review on the above content, for fine tuning.
+            model="gpt-4-vision-preview",
+            messages=[
+                {"role": "system", "content": "You are a nutrition assistant. Analyze the food in these images and provide an estimate of calories, macronutrients, and a healthiness rating (1-10). Compare the top and side views for volume analysis."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What can you determine about the food in these images?"},
+                        *[
+                            {"type": "image_url", "image_url": {"url": img_url}}
+                            for img_url in image_urls
+                        ]
+                    ],
+                }
+            ],
+            max_tokens=500
+        )
 
-@router.post("/upload-image")
-def upload_image(file: UploadFile = File(..., media_type="image/*"), user_id: int = 1):
-    file_key = f'user_{user_id}/{file.filename}'
+        extracted_data = response["choices"][0]["message"]["content"]
+        return extracted_data  # GPT-4o returns structured text
+
+    except Exception as e:
+        print(f"❌ GPT-4o API Error: {e}")
+        return None
+
+
+@router.post("/upload-images")
+def upload_images(
+    user_id: int = Form(...),
+    top_view: UploadFile = File(...),
+    side_view: UploadFile = File(...),
+    extra_view: UploadFile = File(None)  # Optional third image
+):
+    """Requires top and side view images, and optionally accepts a third extra image."""
+    file_keys = []
+    image_urls = []
 
     try:
-        s3_client.upload_fileobj(file.file, bucket_name, file_key)
+        # Upload required images to S3
+        for image, label in zip([top_view, side_view, extra_view], ["top", "side", "extra"]):
+            if image:  # Skip if extra_view is missing
+                file_key = f'user_{user_id}/{label}_{image.filename}'
+                s3_client.upload_fileobj(image.file, bucket_name, file_key)
+                
+                # Generate presigned URL
+                file_url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': bucket_name, 'Key': file_key},
+                    ExpiresIn=10800  # 3 hours
+                )
 
-        file_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': bucket_name, 'Key': file_key},
-            ExpiresIn=10800 #3 hours
-        )
-        
-        # ✅ Save file key & URL to PostgreSQL
+                file_keys.append(file_key)
+                image_urls.append(file_url)
+
+        # Step 2: Send image URLs to GPT-4o Vision
+        extracted_data = analyze_food_images(image_urls)
+        if not extracted_data:
+            raise HTTPException(status_code=500, detail="GPT-4o analysis failed.")
+
+        # Step 3: Parse extracted data
+        nutrition_data = parse_gpt4_response(extracted_data)
+
+        # Step 4: Save extracted data into PostgreSQL
         db: Session = SessionLocal()
         food_log = FoodLog(
             user_id=user_id,
-            food_name="Example Food",  # You can modify this
-            calories=100,  # Modify if needed -- This will be more fleshed out after teh openai integration.
-            image_url=file_url,
-            file_key=file_key
+            food_name=nutrition_data["food_name"],
+            calories=nutrition_data["calories"],
+            proteins=nutrition_data["proteins"],
+            carbs=nutrition_data["carbs"],
+            fats=nutrition_data["fats"],
+            image_url=", ".join(image_urls),  # Store all image URLs
+            file_key=", ".join(file_keys),
+            healthiness_rating=nutrition_data["healthiness_rating"]
         )
         db.add(food_log)
         db.commit()
-        db.refresh(food_log)  # Refresh to return the new entry
+        db.refresh(food_log)
         db.close()
-        
+
         return {
-            "message": "Image uploaded successfully", 
-            'file_key': file_key,
-            'file_url': file_url
-            }
+            "message": "✅ Images uploaded and analyzed successfully",
+            "image_urls": image_urls,
+            "nutrition_data": nutrition_data
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Upload failed: {e}')
+        raise HTTPException(status_code=500, detail=f'❌ Upload failed: {e}')
 
-@router.delete("/delete-image")
-def delete_image(file_key: str):
-    """Delete an image from S3 and remove from database."""
+
+def parse_gpt4_response(response_text):
+    """Extracts individual food components and their nutritional values from GPT-4o response."""
     try:
-        db: Session = SessionLocal()
+        # Split response into sections based on food names
+        food_sections = re.split(r'\d+\.\s+', response_text)[1:]  # Split on "1. Scrambled Eggs..."
+        
+        food_items = []  # Store all extracted components
 
-        # Check if file exists in DB
-        food_log = db.query(FoodLog).filter(FoodLog.file_key == file_key).first()
-        if not food_log:
-            raise HTTPException(status_code=404, detail=f"❌ File '{file_key}' not found in database.")
+        for section in food_sections:
+            # Extract food name
+            food_name_match = re.match(r'(.+?)\s*\(.*?\)', section)
+            food_name = food_name_match.group(1) if food_name_match else "Unknown Food"
 
-        # Delete from S3
-        s3_client.delete_object(Bucket=bucket_name, Key=file_key)
+            # Extract macronutrients (handle ranges)
+            def extract_value(pattern, text):
+                match = re.search(pattern, text)
+                if match:
+                    nums = [int(num) for num in match.groups() if num and num.isdigit()]
+                    return sum(nums) // 2 if len(nums) == 2 else nums[0]  # Take average if range
+                return 0  # Default to 0 if not found
 
-        # Delete from DB
-        db.delete(food_log)
-        db.commit()
-        db.close()
+            calories = extract_value(r'Calories:\s*(\d+)-(\d+)|Calories:\s*(\d+)', section)
+            proteins = extract_value(r'Protein:\s*(\d+)-(\d+)|Protein:\s*(\d+)g', section)
+            carbs = extract_value(r'Carbs:\s*(\d+)-(\d+)|Carbs:\s*(\d+)g', section)
+            fats = extract_value(r'Fats:\s*(\d+)-(\d+)|Fats:\s*(\d+)g', section)
 
-        return {"message": f"✅ Successfully deleted {file_key} from S3 and database"}
-    
-    except s3_client.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == '404':
-            raise HTTPException(status_code=404, detail=f"❌ File '{file_key}' not found in S3.")
-        else:
-            raise HTTPException(status_code=500, detail=f"❌ Failed to delete {file_key}: {e}")
+            # Store extracted data
+            food_items.append({
+                "food_name": food_name,
+                "calories": calories,
+                "proteins": proteins,
+                "carbs": carbs,
+                "fats": fats
+            })
 
+        return food_items  # Return a list of parsed food components
 
-@router.get("/user-images")
-def get_user_images(user_id: int):
-    """Fetch all images uploaded by a specific user"""
-    db: Session = SessionLocal()
-    images = db.query(FoodLog.image_url, FoodLog.file_key).filter(FoodLog.user_id == user_id).all()
-    db.close()
-
-    return {
-        "user_id": user_id,
-        "images": [{"url": img.image_url, "file_key": img.file_key} for img in images]
-    }
+    except Exception as e:
+        print(f"❌ Failed to parse GPT-4o response: {e}")
+        return []
