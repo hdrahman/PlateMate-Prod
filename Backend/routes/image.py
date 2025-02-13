@@ -1,18 +1,17 @@
+import openai
+import base64
 import boto3
 import os
 from dotenv import load_dotenv
-from fastapi import APIRouter, File, UploadFile, HTTPException
-from models import FoodLog
 from sqlalchemy.orm import Session
+from fastapi import APIRouter, File, UploadFile, HTTPException
 from db import SessionLocal
-
+from models import FoodLog
 
 load_dotenv()
-
 router = APIRouter()
 
 #AWS S3 client
-
 s3_client = boto3.client(
     's3',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
@@ -21,6 +20,16 @@ s3_client = boto3.client(
 )
 
 bucket_name = os.getenv('AWS_BUCKET_NAME')
+openai.api_key = os.getenv('OPENAI_API_KEY')
+
+#Function to analyze image using GPT-4o
+def analyze_food_image(image_url):
+    try:
+        response = openai.ChatCompletion.create(
+            model = 'gpt-4o'
+            {"role": "system", "content": "You are a nutrition assistant. Analyze the food in the image and provide an estimate of calories, macronutrients, and a healthiness rating (1-10)."},
+            {"role": "user", "content": f"Analyze this food image: {image_url}"}
+        ) #review on the above content, for fine tuning.
 
 @router.post("/upload-image")
 def upload_image(file: UploadFile = File(..., media_type="image/*"), user_id: int = 1):
