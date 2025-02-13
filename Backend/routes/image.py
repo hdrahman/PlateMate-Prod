@@ -27,7 +27,7 @@ def upload_image(file: UploadFile = File(..., media_type="image/*"), user_id: in
 
         file_url = s3_client.generate_presigned_url(
             'get_object',
-            params={'bucket': bucket_name, 'key': file_key},
+            Params={'Bucket': bucket_name, 'Key': file_key},
             ExpiresIn=10800 #3 hours
         )
         return {
