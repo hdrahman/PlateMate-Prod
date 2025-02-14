@@ -2,15 +2,40 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Button, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { launchImageLibraryAsync, launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
+import { uploadImageToBackend } from '../utils/api'; // Assume this utility function exists
 
 export default function App() {
     const [permission, requestPermission] = useCameraPermissions();
     const navigation = useNavigation();
+    const [image, setImage] = useState(null);
 
     useEffect(() => {
         console.log('Camera permissions:', permission);
     }, [permission]);
+
+    const handleTakePhoto = async () => {
+        const result = await launchCameraAsync({
+            mediaTypes: MediaTypeOptions.Images,
+            quality: 1,
+        });
+
+        if (!result.canceled) {
+            uploadImageToBackend(result.assets[0].uri);
+        }
+    };
+
+    const handlePickImage = async () => {
+        const result = await launchImageLibraryAsync({
+            mediaTypes: MediaTypeOptions.Images,
+            quality: 1,
+        });
+
+        if (!result.canceled) {
+            uploadImageToBackend(result.assets[0].uri);
+        }
+    };
 
     if (!permission) {// Camera permissions are still loading.
         return <View />;
@@ -36,6 +61,10 @@ export default function App() {
             </View>
             <CameraView style={styles.camera} facing={'back'}>
             </CameraView>
+            <View style={styles.buttonContainer}>
+                <Button title="Take Photo" onPress={handleTakePhoto} />
+                <Button title="Pick from Gallery" onPress={handlePickImage} />
+            </View>
         </View>
     );
 }
@@ -71,5 +100,10 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 20
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        margin: 20,
     },
 });

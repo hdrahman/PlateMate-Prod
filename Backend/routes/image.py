@@ -54,61 +54,43 @@ def analyze_food_images(image_urls):
         return None
 
 
-@router.post("/upload-images")
-def upload_images(
+@router.post("/upload-image")
+def upload_image(
     user_id: int = Form(...),
-    top_view: UploadFile = File(...),
-    side_view: UploadFile = File(...),
-    extra_view: UploadFile = File(None)  # Optional third image
+    image: UploadFile = File(...)
 ):
-    """Requires top and side view images, and optionally accepts a third extra image."""
-    file_keys = []
-    image_urls = []
-
-    # Generate a unique meal ID (timestamp-based)
-    meal_id = int(datetime.utcnow().timestamp())
-
+    """Accepts a single image and processes it with OpenAI."""
     try:
-        # Upload required images to S3
-        for image, label in zip([top_view, side_view, extra_view], ["top", "side", "extra"]):
-            if image:  # Skip if extra_view is missing
-                file_key = f'user_{user_id}/{label}_{image.filename}'
-                s3_client.upload_fileobj(image.file, bucket_name, file_key)
+        # Read image file
+        image_data = image.file.read()
+        encoded_image = base64.b64encode(image_data).decode('utf-8')
 
-                # Generate presigned URL
-                file_url = s3_client.generate_presigned_url(
-                    'get_object',
-                    Params={'Bucket': bucket_name, 'Key': file_key},
-                    ExpiresIn=10800  # 3 hours
-                )
+        # Send image to GPT-4o Vision
+        response = openai.Image.create(
+            file=encoded_image,
+            model="gpt-4-vision-preview"
+        )
 
-                file_keys.append(file_key)
-                image_urls.append(file_url)
-
-        # Step 2: Send image URLs to GPT-4o Vision
-        gpt_response = analyze_food_images(image_urls)
-        if not gpt_response:
-            raise HTTPException(status_code=500, detail="GPT-4o analysis failed.")
-
-        # Step 3: Parse extracted data from GPT-4o response
+        # Parse response
+        gpt_response = response["choices"][0]["message"]["content"]
         extracted_foods = parse_gpt4_response(gpt_response)
+
         if not extracted_foods:
             raise HTTPException(status_code=500, detail="Parsing GPT-4o response failed.")
 
-        # Step 4: Save each food component as a separate database entry
+        # Save to database
         db: Session = SessionLocal()
+        meal_id = int(datetime.utcnow().timestamp())
         for food in extracted_foods:
             food_log = FoodLog(
-                meal_id=meal_id,  # ✅ Group entries under the same meal
+                meal_id=meal_id,
                 user_id=user_id,
                 food_name=food["food_name"],
                 calories=food["calories"],
                 proteins=food["proteins"],
                 carbs=food["carbs"],
                 fats=food["fats"],
-                image_url=", ".join(image_urls),  # Store all image URLs
-                file_key=", ".join(file_keys),
-                healthiness_rating=None  # Optional for now
+                image_url=image.filename
             )
             db.add(food_log)
 
@@ -116,9 +98,8 @@ def upload_images(
         db.close()
 
         return {
-            "message": "✅ Images uploaded and analyzed successfully",
+            "message": "✅ Image uploaded and analyzed successfully",
             "meal_id": meal_id,
-            "image_urls": image_urls,
             "nutrition_data": extracted_foods
         }
 
