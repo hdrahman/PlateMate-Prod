@@ -18,6 +18,7 @@ import DeleteAccount from './src/screens/DeleteAccount';
 import ChangePassword from './src/screens/ChangePassword';
 import AboutUs from './src/screens/AboutUs';
 import Settings from './src/screens/Settings';
+import CameraScreen from './src/screens/Camera'
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -60,14 +61,6 @@ function CustomTabBarButton({ children, onPress }) {
       >
         {children}
       </TouchableOpacity>
-    </View>
-  );
-}
-
-function CameraScreen() {
-  return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>Camera Screen</Text>
     </View>
   );
 }
