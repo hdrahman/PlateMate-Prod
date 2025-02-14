@@ -1,17 +1,22 @@
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { useState } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Button, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { useEffect } from 'react';
 
 export default function App() {
     const [permission, requestPermission] = useCameraPermissions();
+    const navigation = useNavigation();
 
-    if (!permission) {
-        // Camera permissions are still loading.
+    useEffect(() => {
+        console.log('Camera permissions:', permission);
+    }, [permission]);
+
+    if (!permission) {// Camera permissions are still loading.
         return <View />;
     }
 
-    if (!permission.granted) {
-        // Camera permissions are not granted yet.
+    if (!permission.granted) {// Camera permissions are not granted yet.
         return (
             <View style={styles.container}>
                 <Text style={styles.message}>We need your permission to show the camera</Text>
@@ -20,8 +25,15 @@ export default function App() {
         );
     }
 
+    console.log('Rendering CameraView');
+
     return (
-        <View style={styles.container}>
+        <View style={styles.cameraContainer}>
+            <View style={[styles.header]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+            </View>
             <CameraView style={styles.camera} facing={'back'}>
             </CameraView>
         </View>
@@ -37,23 +49,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingBottom: 10,
     },
+    cameraContainer: {
+        flex: 1,
+    },
     camera: {
         flex: 1,
     },
-    buttonContainer: {
-        flex: 1,
+    header: {
         flexDirection: 'row',
-        backgroundColor: 'transparent',
-        margin: 64,
-    },
-    button: {
-        flex: 1,
-        alignSelf: 'flex-end',
         alignItems: 'center',
+        padding: 10,
     },
-    text: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: 'white',
+    backButton: {
+        marginRight: 10,
+    },
+    headerTitle: {
+        fontSize: 20
     },
 });

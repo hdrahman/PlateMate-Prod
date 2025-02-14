@@ -202,10 +202,13 @@ function MainTabs() {
           ),
         }}
       />
+
       <Tab.Screen
         name="Camera"
         component={CameraScreen}
         options={{
+          headerShown: false,
+          tabBarStyle: { display: 'none' }, // Hide the tab bar
           tabBarButton: (props) => (
             <CustomTabBarButton {...props}>
               <GlowIcon
@@ -220,6 +223,8 @@ function MainTabs() {
           ),
         }}
       />
+
+
       <Tab.Screen
         name="Workouts"
         component={Workout}
