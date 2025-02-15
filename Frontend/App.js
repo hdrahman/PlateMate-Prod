@@ -7,6 +7,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from 'react-native-svg';
+import { handleTakePhoto } from './src/screens/Camera';
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
@@ -26,9 +27,13 @@ const BUTTON_SIZE = Math.min(BASE_BUTTON_SIZE, width * 0.15);
 const BUTTON_RADIUS = BUTTON_SIZE / 2;
 const OFFSET = BUTTON_RADIUS; // to center the button
 
+const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
+  ? `http://${process.env.REACT_APP_MACHINE_IP}:8000`
+  : "http://172.31.153.15:8000";  // Fallback to hardcoded IP
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-function CustomTabBarButton({ children, onPress }) {
+function CustomTabBarButton({ children }) {
   return (
     <View
       style={{
@@ -56,7 +61,7 @@ function CustomTabBarButton({ children, onPress }) {
           borderWidth: 0.7,          // reduced from 1 to 0.5
           borderColor: '#FF00F520', // semi-transparent pink border
         }}
-        onPress={onPress}
+        onPress={() => handleTakePhoto(BACKEND_URL)}
       >
         {children}
       </TouchableOpacity>
