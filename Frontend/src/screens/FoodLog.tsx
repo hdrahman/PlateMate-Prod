@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -67,12 +67,28 @@ const mockDiaryData = {
 
 const DiaryScreen: React.FC = () => {
     const { goal, food, exercise, meals, exerciseList } = mockDiaryData;
+    const [mealData, setMealData] = useState([]);
     const remaining = goal - food + exercise;
     const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const [currentDate, setCurrentDate] = useState(new Date());
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
     const swipeAnim = useRef(new Animated.Value(0)).current; // new animated value for full page swiping
+
+    useEffect(() => {
+        // Fetch meal data from backend
+        const fetchMealData = async () => {
+            try {
+                const response = await fetch('http://localhost:8000/images/meal-data');
+                const data = await response.json();
+                setMealData(data);
+            } catch (error) {
+                console.error('Failed to fetch meal data:', error);
+            }
+        };
+
+        fetchMealData();
+    }, []);
 
     const toggleStreakInfo = () => {
         setShowStreakInfo(!showStreakInfo);
@@ -280,6 +296,18 @@ const DiaryScreen: React.FC = () => {
                 >
                     <Animated.View style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}>
                         <ScrollView contentContainerStyle={styles.scrollInner}>
+                            {/* Display fetched meal data */}
+                            {mealData.map((meal, idx) => (
+                                <View key={idx} style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={styles.mealTitle}>{meal.food_name}</Text>
+                                        <Text style={styles.mealCal}>{meal.calories} kcal</Text>
+                                    </View>
+                                    <Text style={styles.macrosText}>Protein: {meal.proteins}g • Carbs: {meal.carbs}g • Fats: {meal.fats}g</Text>
+                                    <View style={styles.dividerLine} />
+                                </View>
+                            ))}
+
                             {/* 2) Calories Remaining */}
                             <View style={styles.summaryCard}>
                                 <Text style={styles.summaryTitle}>Calories Remaining</Text>
