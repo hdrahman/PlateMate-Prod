@@ -7,7 +7,7 @@ class FoodLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     meal_id = Column(Integer, nullable=False)  # ✅ Group multiple entries under one meal
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, default=1)  # Allow NULLs, Default to 1
+    user_id = Column(Integer, nullable=True, default=1)  # No ForeignKey
     food_name = Column(String, nullable=False)
     calories = Column(Integer, nullable=False)
     proteins = Column(Integer, nullable=False)
