@@ -28,7 +28,6 @@ const OFFSET = BUTTON_RADIUS; // to center the button
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-
 function CustomTabBarButton({ children, onPress }) {
   return (
     <View

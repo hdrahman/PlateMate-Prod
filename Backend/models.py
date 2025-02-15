@@ -7,7 +7,7 @@ class FoodLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     meal_id = Column(Integer, nullable=False)  # ✅ Group multiple entries under one meal
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, default=1)  # Allow NULLs, Default to 1
     food_name = Column(String, nullable=False)
     calories = Column(Integer, nullable=False)
     proteins = Column(Integer, nullable=False)
@@ -15,5 +15,6 @@ class FoodLog(Base):
     fats = Column(Integer, nullable=False)
     image_url = Column(String, nullable=False)  # Store cloud storage URL
     file_key = Column(String, nullable=False)  # Store cloud storage key
-    healthiness_rating = Column(Integer, nullable=True)  # Rating is optional now
+    healthiness_rating = Column(Integer, nullable=True)
     date = Column(DateTime, default=func.now())  # Auto timestamp
+    meal_type = Column(String, nullable=True)  # Add meal type for future use -> needs to be implemented for now
