@@ -14,7 +14,7 @@ class FoodLog(Base):
     carbs = Column(Integer, nullable=False)
     fats = Column(Integer, nullable=False)
     image_url = Column(String, nullable=False)  # Store cloud storage URL
-    file_key = Column(String, nullable=False)  # Store cloud storage key
+    file_key = Column(String, nullable=False, default='default_file_key')  # Store cloud storage key
     healthiness_rating = Column(Integer, nullable=True)
     date = Column(DateTime, default=func.now())  # Auto timestamp
     meal_type = Column(String, nullable=True)  # Add meal type for future use -> needs to be implemented for now
