@@ -388,7 +388,7 @@ const DiaryScreen: React.FC = () => {
                             {/* 4) Exercise */}
                             <View style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
-                                    <Text style={[styles.mealTitle, { fontSize: 18 }]}>{mockDiaryData.exercise}</Text>
+                                    <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
                                     <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
                                 </View>
 
