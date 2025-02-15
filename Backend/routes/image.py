@@ -45,38 +45,12 @@ def encode_image(image_file):
         raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
 
 def analyze_food_image(image_data):
-    """Send a single image to GPT-4o Vision for food analysis."""
-    try:
-        print("📤 Sending image to OpenAI for analysis...")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_data}"
-                            },
-                        },
-                    ],
-                },
-                {
-                    "role": "system",
-                    "content": "You are a nutrition assistant. Analyze the food in this image and provide an estimate of calories, macronutrients, and a healthiness rating (1-10). Respond in a structured format: 'Food Name: <name>, Calories: <calories>, Protein: <protein>g, Carbs: <carbs>g, Fats: <fats>g'.",
-                },
-            ]
-        )
-        
-        gpt_response = response.choices[0].message.content
-        print(f"📝 GPT-4o Raw Response: {gpt_response}")  # Log raw response
-        return gpt_response
-
-    except Exception as e:
-        print(f"❌ OpenAI API Error: {e}")
-        raise HTTPException(status_code=500, detail=f"OpenAI API Error: {str(e)}")
-
+    """Mocked function to return a fixed response for testing purposes."""
+    print("📤 Mocking image analysis with OpenAI...")
+    # Return a fixed response
+    gpt_response = "Food Name: Chewing Gum\nCalories: 5\nProtein: 0g\nCarbs: 2g\nFats: 0g\nHealthiness Rating: 5/10"
+    print(f"📝 Mocked GPT-4o Raw Response: {gpt_response}")  # Log mocked response
+    return gpt_response
 
 import re
 
