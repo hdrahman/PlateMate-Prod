@@ -14,81 +14,47 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from 'react-native-gesture-handler';
+import axios from 'axios';
 
 const { width: screenWidth } = Dimensions.get('window');
-
-const mockDiaryData = {
-    goal: 1800,
-    food: 1637,
-    exercise: 450,
-    meals: [
-        {
-            title: 'Breakfast',
-            total: 600,
-            macros: { carbs: 0, fat: 0, protein: 100 },
-            items: [
-                { name: 'Quick Add\nProtein 14.0g', calories: 210 },
-                { name: 'Quick Add\nProtein 33.0g', calories: 390 },
-            ],
-        },
-        {
-            title: 'Lunch',
-            total: 1037,
-            macros: { carbs: 0, fat: 0, protein: 100 },
-            items: [
-                { name: 'Quick Add\nProtein 50.0g', calories: 900 },
-            ],
-        },
-        {
-            title: 'Snacks',
-            total: 300,
-            macros: { carbs: 0, fat: 0, protein: 100 },
-            items: [
-                { name: 'Quick Add\nProtein 10.0g', calories: 150 },
-                { name: 'Quick Add\nProtein 10.0g', calories: 150 },
-            ],
-        },
-        {
-            title: 'Dinner',
-            total: 500,
-            macros: { carbs: 0, fat: 0, protein: 100 },
-            items: [
-                { name: 'Quick Add\nProtein 25.0g', calories: 250 },
-                { name: 'Quick Add\nProtein 25.0g', calories: 250 },
-            ],
-        },
-    ],
-    exerciseList: [
-        { name: 'Cardio', duration: '60 minutes', calories: 600 },
-        { name: 'Walk', duration: '30 minutes', calories: 450 },
-    ],
-    water: true,
-};
+const BACKEND_URL = 'http://172.31.153.15:8000'
 
 const DiaryScreen: React.FC = () => {
-    const { goal, food, exercise, meals, exerciseList } = mockDiaryData;
     const [mealData, setMealData] = useState([]);
-    const remaining = goal - food + exercise;
+    const [breakfastEntries, setBreakfastEntries] = useState([]);
+    const [exerciseList, setExerciseList] = useState([
+        { name: 'Running', calories: 250, duration: '30 min' },
+        { name: 'Cycling', calories: 180, duration: '20 min' },
+    ]);
+
+    const updateMealItems = (mealType, entries) => {
+        return entries.map(entry => ({
+            name: `${entry.food_name}\nProtein ${entry.proteins}g`,
+            calories: entry.calories
+        }));
+    };
+
+    useEffect(() => {
+        const fetchMeals = async () => {
+            try {
+                const response = await axios.get(`${BACKEND_URL}/meal_entries/meal-data`);
+                setMealData(response.data);
+            } catch (error) {
+                console.error('Error fetching meal data:', error);
+            }
+        };
+        fetchMeals();
+    }, []);
+
+    const goal = 1800;
+    const exercise = 450;
+    const foodTotal = mealData.reduce((acc, meal) => acc + meal.total, 0);
+    const remaining = goal - foodTotal + exercise;
     const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const [currentDate, setCurrentDate] = useState(new Date());
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
     const swipeAnim = useRef(new Animated.Value(0)).current; // new animated value for full page swiping
-
-    useEffect(() => {
-        // Fetch meal data from backend
-        const fetchMealData = async () => {
-            try {
-                const response = await fetch('http://localhost:8000/images/meal-data');
-                const data = await response.json();
-                setMealData(data);
-            } catch (error) {
-                console.error('Failed to fetch meal data:', error);
-            }
-        };
-
-        fetchMealData();
-    }, []);
 
     const toggleStreakInfo = () => {
         setShowStreakInfo(!showStreakInfo);
@@ -296,18 +262,6 @@ const DiaryScreen: React.FC = () => {
                 >
                     <Animated.View style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}>
                         <ScrollView contentContainerStyle={styles.scrollInner}>
-                            {/* Display fetched meal data */}
-                            {mealData.map((meal, idx) => (
-                                <View key={idx} style={styles.mealSection}>
-                                    <View style={styles.mealHeader}>
-                                        <Text style={styles.mealTitle}>{meal.food_name}</Text>
-                                        <Text style={styles.mealCal}>{meal.calories} kcal</Text>
-                                    </View>
-                                    <Text style={styles.macrosText}>Protein: {meal.proteins}g • Carbs: {meal.carbs}g • Fats: {meal.fats}g</Text>
-                                    <View style={styles.dividerLine} />
-                                </View>
-                            ))}
-
                             {/* 2) Calories Remaining */}
                             <View style={styles.summaryCard}>
                                 <Text style={styles.summaryTitle}>Calories Remaining</Text>
@@ -321,7 +275,7 @@ const DiaryScreen: React.FC = () => {
                                     <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
                                     <View style={styles.equationColumn}>
                                         <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
-                                            {food}
+                                            {foodTotal}
                                         </Text>
                                         <Text style={styles.equationLabel}>Food</Text>
                                     </View>
@@ -341,15 +295,14 @@ const DiaryScreen: React.FC = () => {
                             </View>
 
                             {/* 3) Meals */}
-                            {meals.map((meal, idx) => (
+                            {mealData.map((meal, idx) => (
                                 <View key={idx} style={styles.mealSection}>
-                                    {/* Title row */}
+                                    {/* Filter out 100 kcal meals */}
                                     <View style={styles.mealHeader}>
                                         <Text style={styles.mealTitle}>{meal.title}</Text>
                                         <Text style={styles.mealCal}>{meal.total}</Text>
                                     </View>
 
-                                    {/* Macros */}
                                     <TouchableOpacity onPress={toggleMacrosDisplay}>
                                         <Text style={styles.macrosText}>
                                             {showMacrosAsPercent
@@ -358,25 +311,20 @@ const DiaryScreen: React.FC = () => {
                                         </Text>
                                     </TouchableOpacity>
 
-                                    {/* Divider line under macros */}
                                     <View style={styles.dividerLine} />
 
-                                    {/* Entries */}
-                                    {meal.items.map((item, i) => (
-                                        <View key={i}>
-                                            <View style={styles.logRow}>
-                                                <Text style={styles.logItemText}>{item.name}</Text>
-                                                <Text style={styles.logCalText}>{item.calories}</Text>
+                                    {meal.items
+                                        .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
+                                        .map((item, i) => (
+                                            <View key={i}>
+                                                <View style={styles.logRow}>
+                                                    <Text style={styles.logItemText}>{item.name}</Text>
+                                                    <Text style={styles.logCalText}>{item.calories}</Text>
+                                                </View>
+                                                {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
                                             </View>
+                                        ))}
 
-                                            {/* Divider line under each entry */}
-                                            {i < meal.items.length - 1 && (
-                                                <View style={styles.entryDividerLine} />
-                                            )}
-                                        </View>
-                                    ))}
-
-                                    {/* Divider line before Add Food button */}
                                     <View style={styles.dividerLine} />
 
                                     <TouchableOpacity style={styles.addBtn}>
@@ -385,11 +333,47 @@ const DiaryScreen: React.FC = () => {
                                 </View>
                             ))}
 
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={styles.mealTitle}>Lunch</Text>
+                                    <Text style={styles.mealCal}>0</Text>
+                                </View>
+                                <Text style={styles.macrosText}>Carbs 0g • Fat 0g • Protein 0g</Text>
+                                <View style={styles.dividerLine} />
+                                <TouchableOpacity style={styles.addBtn}>
+                                    <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={styles.mealTitle}>Dinner</Text>
+                                    <Text style={styles.mealCal}>0</Text>
+                                </View>
+                                <Text style={styles.macrosText}>Carbs 0g • Fat 0g • Protein 0g</Text>
+                                <View style={styles.dividerLine} />
+                                <TouchableOpacity style={styles.addBtn}>
+                                    <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={styles.mealTitle}>Snacks</Text>
+                                    <Text style={styles.mealCal}>0</Text>
+                                </View>
+                                <Text style={styles.macrosText}>Carbs 0g • Fat 0g • Protein 0g</Text>
+                                <View style={styles.dividerLine} />
+                                <TouchableOpacity style={styles.addBtn}>
+                                    <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                </TouchableOpacity>
+                            </View>
+
                             {/* 4) Exercise */}
                             <View style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
                                     <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
-                                    <Text style={styles.mealCal}>{mockDiaryData.exercise}</Text>
+                                    <Text style={styles.mealCal}>{exercise}</Text>
                                 </View>
 
                                 {/* Divider line under heading */}
@@ -409,7 +393,7 @@ const DiaryScreen: React.FC = () => {
                                             <View style={styles.entryDividerLine} />
                                         )}
                                     </View>
-                                ))}
+                                ))}can
 
                                 {/* Divider line before Add Exercise button */}
                                 <View style={styles.dividerLine} />
@@ -432,7 +416,7 @@ const DiaryScreen: React.FC = () => {
                                 </TouchableOpacity>
                             </View>
 
-                            {/* 6) Bottom action row */}
+                            {/* 7) Bottom action row */}
                             <View style={styles.bottomActions}>
                                 <View style={styles.topActionsRow}>
                                     <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>

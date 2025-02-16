@@ -27,9 +27,9 @@ const BUTTON_SIZE = Math.min(BASE_BUTTON_SIZE, width * 0.15);
 const BUTTON_RADIUS = BUTTON_SIZE / 2;
 const OFFSET = BUTTON_RADIUS; // to center the button
 
-const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
+export const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
   ? `http://${process.env.REACT_APP_MACHINE_IP}:8000`
-  : "http://172.31.153.15:8000";  // Fallback to hardcoded IP
+  : "http://localhost:8000";  // Use localhost for local development
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();

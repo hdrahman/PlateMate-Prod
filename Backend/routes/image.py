@@ -6,8 +6,8 @@ import re
 import traceback  # Added to capture full error logs
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form
-from db import SessionLocal
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
+from db import SessionLocal, get_db
 from models import FoodLog
 from datetime import datetime
 
@@ -160,3 +160,10 @@ def upload_image(
         error_trace = traceback.format_exc()
         print(f"\n❌ FINAL ERROR TRACEBACK:\n{error_trace}\n")
         raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}", headers={"X-Error-Trace": error_trace})
+
+@router.get("/meal-data")
+def get_meal_data(db: Session = Depends(get_db)):
+    # Example query or return mock
+    # result = db.execute("SELECT * FROM Meals")
+    # return result.fetchall()
+    return []
