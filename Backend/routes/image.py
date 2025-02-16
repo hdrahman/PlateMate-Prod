@@ -52,8 +52,6 @@ def analyze_food_image(image_data):
     print(f"📝 Mocked GPT-4o Raw Response: {gpt_response}")  # Log mocked response
     return gpt_response
 
-import re
-
 def parse_gpt4_response(response_text):
     """Extracts individual food components and their nutritional values from GPT-4o response."""
     try:

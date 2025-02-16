@@ -25,7 +25,11 @@ export async function handleTakePhoto(BACKEND_URL) {
         } as any);
 
         try {
-            const response = await fetch(`${BACKEND_URL}/images/upload-image`, {
+            console.log('📤 Uploading image to backend...');
+            console.log('? Backend URL:', BACKEND_URL);
+            console.log('📤 FormData:', formData);
+
+            const response = await fetch(`http://172.31.153.15:8000/images/upload-image`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -34,14 +38,20 @@ export async function handleTakePhoto(BACKEND_URL) {
                 body: formData,
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
             console.log('✅ Upload success:', data);
             // Assuming setAnalysisResult is a state setter in App component
             // setAnalysisResult(JSON.stringify(data.nutrition_data, null, 2));
 
         } catch (error) {
-            console.error('Upload failed:', error);
+            console.error('❌ Upload failed:', error);
         }
+    } else {
+        console.log('❌ Image capture canceled');
     }
 }
 
@@ -58,6 +68,8 @@ export default function App() {
     const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
         ? `http://${process.env.REACT_APP_MACHINE_IP}:8000`
         : "http://172.31.153.15:8000";  // Fallback to hardcoded IP
+
+    console.log('Using BACKEND_URL:', BACKEND_URL);  // Log the backend URL to ensure it's correct
 
     if (!permission) {
         return <View />;
@@ -78,11 +90,12 @@ export default function App() {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
+                <Text style={styles.headerTitle}>Breakfast</Text> {/* Re-added Breakfast tab */}
             </View>
             <CameraView style={styles.camera} facing={'back'}>
             </CameraView>
             <View style={styles.buttonContainer}>
-                <Button title="Take Photo" onPress={() => handleTakePhoto(BACKEND_URL)} />
+                <Button title="Take Photo" onPress={() => handleTakePhoto("http://172.31.153.15:8000")} />
                 {analysisResult && (
                     <Text style={styles.resultText}>{analysisResult}</Text>
                 )}
@@ -129,5 +142,11 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 16,
         textAlign: 'center',
+    },
+    headerTitle: {
+        flex: 1,
+        textAlign: 'center',
+        fontSize: 20,
+        color: '#FFF',
     },
 });
