@@ -61,7 +61,14 @@ def analyze_food_image(image_data):
                 },
                 {
                     "role": "system",
-                    "content": "You are a nutrition assistant. Analyze the food in this image and provide an estimate of calories, macronutrients, and a healthiness rating (1-10). Respond in a structured format: 'Food Name: <name>, Calories: <calories>, Protein: <protein>g, Carbs: <carbs>g, Fats: <fats>g'.",
+                    "content": "You are a nutrition assistant. Analyze the food in this image and provide an estimate of its nutritional content. Respond in the following structured format:\n\n"
+               "Food Name: <name>\n"
+               "Calories: <calories>\n"
+               "Protein: <protein>g\n"
+               "Carbs: <carbs>g\n"
+               "Fats: <fats>g\n"
+               "Healthiness Rating: <rating>/10\n\n"
+               "Ensure the food name is specific (e.g., apple, cookie), and provide exact numerical values without ranges.",
                 },
             ]
         )
@@ -144,7 +151,7 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
                     carbs=food["carbs"],
                     fats=food["fats"],
                     image_url=image.filename,
-                    meal_type="Breakfast"
+                    meal_type="lunch"
                 )
                 db.add(food_log)
             db.commit()
@@ -161,3 +168,4 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
         error_trace = traceback.format_exc()
         print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
         raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
+

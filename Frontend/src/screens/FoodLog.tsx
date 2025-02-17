@@ -333,17 +333,6 @@ const DiaryScreen: React.FC = () => {
                                 </View>
                             ))}
 
-                            <View style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={styles.mealTitle}>Lunch</Text>
-                                    <Text style={styles.mealCal}>0</Text>
-                                </View>
-                                <Text style={styles.macrosText}>Carbs 0g • Fat 0g • Protein 0g</Text>
-                                <View style={styles.dividerLine} />
-                                <TouchableOpacity style={styles.addBtn}>
-                                    <Text style={styles.addBtnText}>ADD FOOD</Text>
-                                </TouchableOpacity>
-                            </View>
 
                             <View style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
