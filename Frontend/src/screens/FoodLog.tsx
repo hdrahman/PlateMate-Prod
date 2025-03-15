@@ -15,17 +15,115 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from 'react-native-gesture-handler';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { getFoodLogsByDate } from '../utils/database';
+import { isOnline } from '../utils/syncService';
 
 const { width: screenWidth } = Dimensions.get('window');
 const BACKEND_URL = 'http://172.31.153.15:8000'
 
+// Helper function to format date as YYYY-MM-DD
+const formatDateToString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Define the navigation type
+type RootStackParamList = {
+    ImageCapture: { mealType: string };
+    // Add other screens as needed
+};
+
+type NavigationProp = StackNavigationProp<RootStackParamList>;
+
+// Define types for meal data
+interface MealItem {
+    name: string;
+    calories: number;
+}
+
+interface MealMacros {
+    carbs: number;
+    fat: number;
+    protein: number;
+}
+
+interface Meal {
+    title: string;
+    total: number;
+    macros: MealMacros;
+    items: MealItem[];
+}
+
+// Define type for food log entry from database
+interface FoodLogEntry {
+    id: number;
+    meal_id: number;
+    user_id: number;
+    food_name: string;
+    calories: number;
+    proteins: number;
+    carbs: number;
+    fats: number;
+    image_url: string;
+    file_key: string;
+    healthiness_rating?: number;
+    date: string;
+    meal_type: string;
+    brand_name?: string;
+    quantity?: string;
+    notes?: string;
+    synced: number;
+    sync_action: string;
+    last_modified: string;
+}
+
 const DiaryScreen: React.FC = () => {
-    const [mealData, setMealData] = useState([]);
+    const [mealData, setMealData] = useState<Meal[]>([]);
     const [breakfastEntries, setBreakfastEntries] = useState([]);
     const [exerciseList, setExerciseList] = useState([
         { name: 'Running', calories: 250, duration: '30 min' },
         { name: 'Cycling', calories: 180, duration: '20 min' },
     ]);
+    const navigation = useNavigation<NavigationProp>();
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const processedMealData = useRef(false);
+
+    // Initialize with default meal types on component mount
+    useEffect(() => {
+        // Create default meal structure with all required types
+        const defaultMeals: Meal[] = [
+            {
+                title: 'Breakfast',
+                total: 0,
+                macros: { carbs: 0, fat: 0, protein: 0 },
+                items: []
+            },
+            {
+                title: 'Lunch',
+                total: 0,
+                macros: { carbs: 0, fat: 0, protein: 0 },
+                items: []
+            },
+            {
+                title: 'Dinner',
+                total: 0,
+                macros: { carbs: 0, fat: 0, protein: 0 },
+                items: []
+            },
+            {
+                title: 'Snacks',
+                total: 0,
+                macros: { carbs: 0, fat: 0, protein: 0 },
+                items: []
+            }
+        ];
+
+        setMealData(defaultMeals);
+    }, []);
 
     const updateMealItems = (mealType, entries) => {
         return entries.map(entry => ({
@@ -37,14 +135,118 @@ const DiaryScreen: React.FC = () => {
     useEffect(() => {
         const fetchMeals = async () => {
             try {
-                const response = await axios.get(`${BACKEND_URL}/meal_entries/meal-data`);
-                setMealData(response.data);
+                processedMealData.current = false; // Reset before fetching new data
+
+                // Format the current date to match the database format (YYYY-MM-DD)
+                const formattedDate = formatDateToString(currentDate);
+
+                // First try to get data from local SQLite database
+                const localMealData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
+
+                // Process local data into the format needed for display
+                if (localMealData && localMealData.length > 0) {
+                    // Get current meal data to merge with
+                    const currentMeals = [...mealData];
+                    const mealDict: Record<string, Meal> = {};
+
+                    // Initialize with existing meals
+                    currentMeals.forEach(meal => {
+                        mealDict[meal.title] = {
+                            ...meal,
+                            total: 0, // Reset totals as we'll recalculate
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        };
+                    });
+
+                    // Group by meal type
+                    localMealData.forEach(entry => {
+                        if (!entry.meal_type) return; // Skip entries without meal type
+
+                        if (!mealDict[entry.meal_type]) {
+                            mealDict[entry.meal_type] = {
+                                title: entry.meal_type,
+                                total: 0,
+                                macros: { carbs: 0, fat: 0, protein: 0 },
+                                items: []
+                            };
+                        }
+
+                        // Add food entry to respective meal
+                        mealDict[entry.meal_type].total += entry.calories;
+                        mealDict[entry.meal_type].macros.carbs += entry.carbs;
+                        mealDict[entry.meal_type].macros.fat += entry.fats;
+                        mealDict[entry.meal_type].macros.protein += entry.proteins;
+                        mealDict[entry.meal_type].items.push({
+                            name: `${entry.food_name}\nProtein ${entry.proteins}g`,
+                            calories: entry.calories
+                        });
+                    });
+
+                    // Convert back to array and ensure all meal types are present
+                    const updatedMeals = Object.values(mealDict);
+
+                    // Sort meals in the correct order
+                    updatedMeals.sort((a, b) => {
+                        const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
+                        return order[a.title] - order[b.title];
+                    });
+
+                    setMealData(updatedMeals);
+                }
+
+                // Try to fetch from backend if online
+                const online = await isOnline();
+                if (online) {
+                    try {
+                        const response = await axios.get(`${BACKEND_URL}/meal_entries/meal-data`);
+                        if (response.data && response.data.length > 0) {
+                            // Merge backend data with default meal types
+                            const backendMeals = response.data;
+                            const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+                            const existingMealTitles = backendMeals.map(meal => meal.title);
+
+                            // Add any missing meal types
+                            mealTypes.forEach(type => {
+                                if (!existingMealTitles.includes(type)) {
+                                    backendMeals.push({
+                                        title: type,
+                                        total: 0,
+                                        macros: { carbs: 0, fat: 0, protein: 0 },
+                                        items: []
+                                    });
+                                }
+                            });
+
+                            // Sort meals in the correct order
+                            backendMeals.sort((a, b) => {
+                                const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
+                                return order[a.title] - order[b.title];
+                            });
+
+                            setMealData(backendMeals);
+                        }
+                    } catch (backendError) {
+                        console.error('Error fetching meal data from backend:', backendError);
+                        // Continue with local data if backend fetch fails
+                    }
+                }
             } catch (error) {
                 console.error('Error fetching meal data:', error);
+                // No need to set empty meal data since we initialize with defaults
             }
         };
+
         fetchMeals();
-    }, []);
+    }, [currentDate]); // Remove mealData from dependencies to avoid infinite loops
+
+    useEffect(() => {
+        // This useEffect is now simplified since we handle meal type initialization elsewhere
+        // It just marks the data as processed to prevent infinite loops
+        if (!processedMealData.current && mealData.length > 0) {
+            processedMealData.current = true;
+        }
+    }, [mealData]);
 
     const goal = 1800;
     const exercise = 450;
@@ -52,7 +254,6 @@ const DiaryScreen: React.FC = () => {
     const remaining = goal - foodTotal + exercise;
     const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
-    const [currentDate, setCurrentDate] = useState(new Date());
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
     const swipeAnim = useRef(new Animated.Value(0)).current; // new animated value for full page swiping
 
@@ -87,6 +288,7 @@ const DiaryScreen: React.FC = () => {
     };
 
     const gotoPrevDay = () => {
+        processedMealData.current = false; // Reset when date changes
         animateSwipe(1, () => {
             setCurrentDate(prev => {
                 const newDate = new Date(prev);
@@ -97,6 +299,7 @@ const DiaryScreen: React.FC = () => {
     };
 
     const gotoNextDay = () => {
+        processedMealData.current = false; // Reset when date changes
         animateSwipe(-1, () => {
             setCurrentDate(prev => {
                 const newDate = new Date(prev);
@@ -137,6 +340,7 @@ const DiaryScreen: React.FC = () => {
         const threshold = 100;
         if (translationX <= -threshold) {
             // swipe left -> next day
+            processedMealData.current = false; // Reset when date changes
             Animated.timing(swipeAnim, {
                 toValue: -screenWidth,
                 duration: 200,
@@ -156,6 +360,7 @@ const DiaryScreen: React.FC = () => {
             });
         } else if (translationX >= threshold) {
             // swipe right -> previous day
+            processedMealData.current = false; // Reset when date changes
             Animated.timing(swipeAnim, {
                 toValue: screenWidth,
                 duration: 200,
@@ -297,12 +502,13 @@ const DiaryScreen: React.FC = () => {
                             {/* 3) Meals */}
                             {mealData.map((meal, idx) => (
                                 <View key={idx} style={styles.mealSection}>
-                                    {/* Filter out 100 kcal meals */}
+                                    {/* Always show meal title and calories */}
                                     <View style={styles.mealHeader}>
                                         <Text style={styles.mealTitle}>{meal.title}</Text>
                                         <Text style={styles.mealCal}>{meal.total}</Text>
                                     </View>
 
+                                    {/* Always show macros, even if they're all zero */}
                                     <TouchableOpacity onPress={toggleMacrosDisplay}>
                                         <Text style={styles.macrosText}>
                                             {showMacrosAsPercent
@@ -313,50 +519,32 @@ const DiaryScreen: React.FC = () => {
 
                                     <View style={styles.dividerLine} />
 
-                                    {meal.items
-                                        .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
-                                        .map((item, i) => (
-                                            <View key={i}>
-                                                <View style={styles.logRow}>
-                                                    <Text style={styles.logItemText}>{item.name}</Text>
-                                                    <Text style={styles.logCalText}>{item.calories}</Text>
-                                                </View>
-                                                {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
-                                            </View>
-                                        ))}
+                                    {/* Only show items if there are any */}
+                                    {meal.items.length > 0 ? (
+                                        <>
+                                            {meal.items
+                                                .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
+                                                .map((item, i) => (
+                                                    <View key={i}>
+                                                        <View style={styles.logRow}>
+                                                            <Text style={styles.logItemText}>{item.name}</Text>
+                                                            <Text style={styles.logCalText}>{item.calories}</Text>
+                                                        </View>
+                                                        {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
+                                                    </View>
+                                                ))}
+                                            <View style={styles.dividerLine} />
+                                        </>
+                                    ) : null}
 
-                                    <View style={styles.dividerLine} />
-
-                                    <TouchableOpacity style={styles.addBtn}>
+                                    <TouchableOpacity
+                                        style={styles.addBtn}
+                                        onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title })}
+                                    >
                                         <Text style={styles.addBtnText}>ADD FOOD</Text>
                                     </TouchableOpacity>
                                 </View>
                             ))}
-
-
-                            <View style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={styles.mealTitle}>Dinner</Text>
-                                    <Text style={styles.mealCal}>0</Text>
-                                </View>
-                                <Text style={styles.macrosText}>Carbs 0g • Fat 0g • Protein 0g</Text>
-                                <View style={styles.dividerLine} />
-                                <TouchableOpacity style={styles.addBtn}>
-                                    <Text style={styles.addBtnText}>ADD FOOD</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={styles.mealTitle}>Snacks</Text>
-                                    <Text style={styles.mealCal}>0</Text>
-                                </View>
-                                <Text style={styles.macrosText}>Carbs 0g • Fat 0g • Protein 0g</Text>
-                                <View style={styles.dividerLine} />
-                                <TouchableOpacity style={styles.addBtn}>
-                                    <Text style={styles.addBtnText}>ADD FOOD</Text>
-                                </TouchableOpacity>
-                            </View>
 
                             {/* 4) Exercise */}
                             <View style={styles.mealSection}>
@@ -382,7 +570,7 @@ const DiaryScreen: React.FC = () => {
                                             <View style={styles.entryDividerLine} />
                                         )}
                                     </View>
-                                ))}can
+                                ))}
 
                                 {/* Divider line before Add Exercise button */}
                                 <View style={styles.dividerLine} />

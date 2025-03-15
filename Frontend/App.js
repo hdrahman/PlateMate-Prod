@@ -1,13 +1,15 @@
-import React from "react";
-import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
+import React, { useState, useEffect } from "react";
+import { NavigationContainer, DefaultTheme, useNavigation } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TouchableOpacity, View, Text, StatusBar, Dimensions } from "react-native";
+import { TouchableOpacity, View, Text, StatusBar, Dimensions, ActivityIndicator } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from 'react-native-svg';
 import { handleTakePhoto } from './src/screens/Camera';
+import { initDatabase } from './src/utils/database';
+import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
@@ -19,7 +21,8 @@ import DeleteAccount from './src/screens/DeleteAccount';
 import ChangePassword from './src/screens/ChangePassword';
 import AboutUs from './src/screens/AboutUs';
 import Settings from './src/screens/Settings';
-import CameraScreen from './src/screens/Camera'
+import CameraScreen from './src/screens/Camera';
+import ImageCaptureScreen from './src/screens/ImageCapture';
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -34,6 +37,8 @@ export const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 function CustomTabBarButton({ children }) {
+  const navigation = useNavigation();
+
   return (
     <View
       style={{
@@ -61,7 +66,7 @@ function CustomTabBarButton({ children }) {
           borderWidth: 0.7,          // reduced from 1 to 0.5
           borderColor: '#FF00F520', // semi-transparent pink border
         }}
-        onPress={() => handleTakePhoto(BACKEND_URL)}
+        onPress={() => navigation.navigate('ImageCapture', { mealType: 'Snacks' })}
       >
         {children}
       </TouchableOpacity>
@@ -258,6 +263,42 @@ function MainTabs() {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState('dark');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize database and sync service
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        // Initialize the SQLite database
+        await initDatabase();
+        console.log('✅ Database initialized successfully');
+
+        // Start periodic sync
+        await startPeriodicSync();
+        console.log('✅ Periodic sync started');
+
+        // Set up online sync
+        setupOnlineSync();
+        console.log('✅ Online sync set up');
+      } catch (error) {
+        console.error('❌ Error initializing app:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initApp();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
+        <ActivityIndicator size="large" color="#8A2BE2" />
+      </View>
+    );
+  }
+
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
@@ -327,6 +368,11 @@ export default function App() {
               animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
               animationDuration: 200,
             })}
+          />
+          <Stack.Screen
+            name="ImageCapture"
+            component={ImageCaptureScreen}
+            options={{ headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>

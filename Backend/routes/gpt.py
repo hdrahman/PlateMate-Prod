@@ -1,0 +1,136 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from db import get_db
+from models import FoodLog
+from pydantic import BaseModel, HttpUrl
+from typing import List, Optional, Union
+import requests
+import os
+import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Get OpenAI API key from environment variables
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    logger.warning("Warning: OPENAI_API_KEY not found in environment variables")
+
+# Pydantic model for request
+class FoodAnalysisRequest(BaseModel):
+    image_urls: List[str]
+    food_name: str
+    meal_type: str
+
+# Pydantic model for response
+class FoodAnalysisResponse(BaseModel):
+    description: str
+    healthiness_rating: Optional[int] = None
+
+@router.post("/analyze-food", response_model=FoodAnalysisResponse)
+async def analyze_food(request: FoodAnalysisRequest):
+    """
+    Analyze food images using GPT-4 Vision and provide a description and healthiness rating.
+    """
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+    
+    try:
+        logger.info(f"Analyzing food: {request.food_name} for meal type: {request.meal_type}")
+        logger.info(f"Received {len(request.image_urls)} image URLs")
+        
+        # Validate image URLs
+        valid_urls = []
+        for url in request.image_urls:
+            if not url or not isinstance(url, str):
+                logger.warning(f"Invalid URL: {url}")
+                continue
+                
+            if not url.startswith(('http://', 'https://')):
+                logger.warning(f"URL doesn't start with http:// or https://: {url}")
+                continue
+                
+            valid_urls.append(url)
+        
+        if not valid_urls:
+            raise HTTPException(status_code=400, detail="No valid image URLs provided")
+        
+        logger.info(f"Processing {len(valid_urls)} valid image URLs")
+        
+        # Prepare the prompt for GPT-4 Vision
+        prompt = f"""
+        Analyze these food images for a {request.meal_type} meal.
+        The food appears to be {request.food_name}.
+        
+        Please provide:
+        1. A detailed description of the food
+        2. Estimated nutritional information
+        3. Health benefits and concerns
+        4. Suggestions for making it healthier (if applicable)
+        
+        Keep your response concise but informative, around 100-150 words.
+        """
+        
+        # Prepare the image URLs for GPT-4 Vision
+        image_content = []
+        for url in valid_urls:
+            image_content.append({
+                "type": "image_url",
+                "image_url": {"url": url}
+            })
+        
+        # Add the text prompt
+        content = [
+            {"type": "text", "text": prompt},
+            *image_content
+        ]
+        
+        logger.info(f"Sending request to OpenAI with {len(image_content)} images")
+        
+        # Make the API request to OpenAI
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {OPENAI_API_KEY}"
+            },
+            json={
+                "model": "gpt-4-vision-preview",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": content
+                    }
+                ],
+                "max_tokens": 300
+            }
+        )
+        
+        # Check if the request was successful
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"OpenAI API error: {response.text}"
+            )
+        
+        # Extract the description from the response
+        result = response.json()
+        description = result["choices"][0]["message"]["content"].strip()
+        logger.info(f"Successfully analyzed food with GPT")
+        
+        return {
+            "description": description,
+            "healthiness_rating": None  # Let the frontend calculate this
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing food: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error analyzing food: {str(e)}") 
