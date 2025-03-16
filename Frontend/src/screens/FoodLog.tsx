@@ -21,7 +21,7 @@ import { getFoodLogsByDate } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 
 const { width: screenWidth } = Dimensions.get('window');
-const BACKEND_URL = 'http://172.31.153.15:8000'
+const BACKEND_URL = 'http://192.168.0.162:8000'
 
 // Helper function to format date as YYYY-MM-DD
 const formatDateToString = (date: Date): string => {

@@ -10,6 +10,7 @@ from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
 from db import SessionLocal, get_db
 from models import FoodLog
 from datetime import datetime
+from typing import List
 
 # Load environment variables
 load_dotenv()
@@ -54,15 +55,9 @@ def analyze_food_image(image_data):
             model="gpt-4o",
             messages=[
                 {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}},
-                    ],
-                },
-                {
                     "role": "system",
                     "content": "You are a nutrition assistant. Analyze the food in this image and provide an estimate of its nutritional content. Respond in the following structured format:\n\n"
-               "Food Name: <name>\n"
+               "Food Name: <n>\n"
                "Calories: <calories>\n"
                "Protein: <protein>g\n"
                "Carbs: <carbs>g\n"
@@ -70,6 +65,13 @@ def analyze_food_image(image_data):
                "Healthiness Rating: <rating>/10\n\n"
                "Ensure the food name is specific (e.g., apple, cookie), and provide exact numerical values without ranges.",
                 },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Analyze this food and provide nutritional information."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                    ]
+                }
             ]
         )
         
@@ -163,6 +165,104 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
             raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
         return {"message": "✅ Image uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": extracted_foods}
+
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
+
+
+@router.post("/upload-multiple-images")
+async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFile] = File(...)):
+    """Accepts multiple images and processes them together with OpenAI."""
+    try:
+        print(f"📸 Received multiple image upload from user {user_id}")
+        print(f"Number of images: {len(images)}")
+        
+        # Encode all images
+        encoded_images = []
+        for image in images:
+            try:
+                image_data = encode_image(image.file)
+                encoded_images.append(image_data)
+                print("✅ Image encoded successfully")
+            except Exception as e:
+                print(f"❌ Error encoding image: {e}")
+                raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
+        
+        # Create content array with all images
+        content = [{"type": "text", "text": "Analyze these food images together as they are part of the same meal."}]
+        
+        # Add all encoded images to the content array
+        for image_data in encoded_images:
+            content.append({
+                "type": "image_url", 
+                "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
+            })
+        
+        # Send all images to OpenAI in a single request
+        try:
+            print("📤 Sending multiple images to OpenAI for analysis...")
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a nutrition assistant. Analyze the food in these images and provide an estimate of the combined nutritional content. Respond in the following structured format:\n\n"
+                   "Food Name: <n>\n"
+                   "Calories: <calories>\n"
+                   "Protein: <protein>g\n"
+                   "Carbs: <carbs>g\n"
+                   "Fats: <fats>g\n"
+                   "Healthiness Rating: <rating>/10\n\n"
+                   "Ensure the food name is specific, and provide exact numerical values without ranges.",
+                    },
+                    {
+                        "role": "user",
+                        "content": content
+                    }
+                ]
+            )
+            
+            gpt_response = response.choices[0].message.content.strip()
+            print(f"📝 GPT-4o Raw Response: {gpt_response}")
+        except Exception as e:
+            print(f"❌ OpenAI analysis failed: {e}")
+            raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
+
+        try:
+            extracted_foods = parse_gpt4_response(gpt_response)
+        except Exception as e:
+            print(f"❌ Error parsing GPT-4o response: {e}")
+            raise HTTPException(status_code=500, detail=f"Parsing GPT-4o response failed: {str(e)}")
+
+        try:
+            db: Session = SessionLocal()
+            meal_id = int(datetime.utcnow().timestamp())
+            for food in extracted_foods:
+                food_log = FoodLog(
+                    meal_id=meal_id,
+                    user_id=user_id,
+                    food_name=food["food_name"],
+                    calories=food["calories"],
+                    proteins=food["proteins"],
+                    carbs=food["carbs"],
+                    fats=food["fats"],
+                    image_url=images[0].filename,  # Use the first image as the main image
+                    file_key="default_file_key",
+                    healthiness_rating=food.get("healthiness_rating"),
+                    meal_type="lunch"
+                )
+                db.add(food_log)
+            db.commit()
+            db.close()
+            print("✅ Saved data to the database successfully")
+        except Exception as e:
+            print(f"❌ Database Error: {e}")
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+
+        return {"message": "✅ Multiple images uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": extracted_foods}
 
     except Exception as e:
         error_trace = traceback.format_exc()

@@ -308,7 +308,12 @@ export default function App() {
           colors: {
             ...DefaultTheme.colors,
             background: "#000",
-            card: "#111", // Slightly lighter color for differentiation
+            card: "#111",
+            primary: "#8A2BE2",
+            text: "#fff",
+            border: "#333",
+            notification: "#8A2BE2",
+            cardOverlay: 'rgba(0,0,0,0.8)',
           },
         }}
       >
@@ -316,8 +321,10 @@ export default function App() {
           screenOptions={{
             headerShown: false,
             animation: "slide_from_right",
-            animationDuration: 1,
-            cardStyle: { backgroundColor: "#000" }
+            animationDuration: 200,
+            cardStyle: { backgroundColor: "#000" },
+            contentStyle: { backgroundColor: "#000" },
+            presentation: 'card',
           }}
         >
           <Stack.Screen name="MainTabs" component={MainTabs} />

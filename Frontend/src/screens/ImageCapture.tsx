@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { addFoodLog } from '../utils/database';
 
 const { width } = Dimensions.get('window');
-const BACKEND_URL = 'http://172.31.153.15:8000';
+const BACKEND_URL = 'http://192.168.0.162:8000';
 
 type ImageInfo = {
     uri: string;
@@ -222,6 +222,47 @@ const ImageCapture: React.FC = () => {
         }
     };
 
+    const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any }> => {
+        try {
+            const formData = new FormData();
+            formData.append('user_id', '1');
+
+            // Add all images to the form data
+            for (let i = 0; i < imageUris.length; i++) {
+                const uri = imageUris[i];
+                const fileInfo = await FileSystem.getInfoAsync(uri);
+
+                formData.append('images', {
+                    uri,
+                    type: 'image/jpeg',
+                    name: fileInfo.uri.split('/').pop(),
+                } as any);
+            }
+
+            const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'multipart/form-data',
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return {
+                meal_id: data.meal_id,
+                nutrition_data: data.nutrition_data || {}
+            };
+        } catch (error) {
+            console.error('Multiple image upload failed:', error);
+            throw error;
+        }
+    };
+
     const handleSubmit = async () => {
         // Check if at least 2 images are taken
         const filledImages = images.filter(img => img.uri !== '');
@@ -240,66 +281,32 @@ const ImageCapture: React.FC = () => {
         setIsAnalyzing(true);
 
         try {
-            // Upload all images first
-            console.log('Uploading images...');
-            const uploadPromises = filledImages.map(img => uploadImage(img.uri));
-            const uploadResults = await Promise.all(uploadPromises);
-            console.log('All images uploaded successfully');
+            // Get all image URIs
+            const imageUris = filledImages.map(img => img.uri);
 
-            // Combine nutrition data from all images
-            const combinedData = uploadResults.reduce<NutritionData>((acc, result) => {
-                const data = result.data;
-                if (!data) return acc;
+            // Upload all images at once
+            console.log('Uploading multiple images...');
+            const result = await uploadMultipleImages(imageUris);
+            console.log('Multiple images uploaded successfully');
 
-                // Combine calories, proteins, carbs, fats
-                acc.calories = (acc.calories || 0) + (data.calories || 0);
-                acc.proteins = (acc.proteins || 0) + (data.proteins || 0);
-                acc.carbs = (acc.carbs || 0) + (data.carbs || 0);
-                acc.fats = (acc.fats || 0) + (data.fats || 0);
+            // Extract nutrition data
+            const nutritionData = result.nutrition_data[0] || {};
 
-                // Use the food name from the first image if not already set
-                if (!acc.food_name && data.food_name) {
-                    acc.food_name = data.food_name;
-                }
-
-                return acc;
-            }, {});
-
-            // Get valid image URLs for GPT analysis
-            const imageUrls = uploadResults
-                .map(result => result.url)
-                .filter(url => url && typeof url === 'string');
-
-            console.log('Image URLs for GPT analysis:', imageUrls);
-
-            if (imageUrls.length === 0) {
-                throw new Error('No valid image URLs available for analysis');
-            }
-
-            // Analyze food with GPT - do this only once with all images
-            console.log('Sending to GPT for analysis...');
-            const description = await analyzeFoodWithGPT(imageUrls, combinedData.food_name || 'Unknown Food');
-            console.log('GPT analysis complete');
-            setGptDescription(description);
-
-            // Calculate healthiness rating based on GPT analysis (1-10 scale)
-            const healthinessRating = calculateHealthinessRating(description);
-
-            // Create a new food log entry
+            // Create a food log entry
             const foodLog = {
-                meal_id: Date.now(),
-                food_name: combinedData.food_name || 'Unknown Food',
-                calories: combinedData.calories || 0,
-                proteins: combinedData.proteins || 0,
-                carbs: combinedData.carbs || 0,
-                fats: combinedData.fats || 0,
-                image_url: uploadResults[0]?.url || '', // Use the first image as the main image
-                file_key: uploadResults[0]?.key || 'default_key',
-                healthiness_rating: healthinessRating,
+                meal_id: result.meal_id,
+                food_name: nutritionData.food_name || 'Unknown Food',
+                calories: nutritionData.calories || 0,
+                proteins: nutritionData.proteins || 0,
+                carbs: nutritionData.carbs || 0,
+                fats: nutritionData.fats || 0,
+                image_url: imageUris[0] || '', // Use the first image as the main image
+                file_key: 'default_key',
+                healthiness_rating: nutritionData.healthiness_rating || 5,
                 meal_type: mealType,
                 brand_name: brandName,
                 quantity: quantity,
-                notes: notes ? `${notes}\n\nGPT Analysis: ${description}` : `GPT Analysis: ${description}`
+                notes: notes
             };
 
             // Add to local database
@@ -555,24 +562,26 @@ const ImageCapture: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
+        backgroundColor: '#000',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingTop: 25,
-        paddingBottom: 15,
+        paddingTop: 15,
+        paddingBottom: 10,
         paddingHorizontal: 20,
         justifyContent: 'space-between',
     },
     backButton: {
-        marginRight: 15,
         width: 28,
     },
     headerTitleContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'absolute',
+        left: 0,
+        right: 0,
     },
     headerTitle: {
         fontSize: 24,
@@ -686,12 +695,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        flex: 0,
-        marginRight: 40,
-        paddingVertical: 8,
-        borderBottomWidth: 2,
+        paddingVertical: 6,
+        borderBottomWidth: 0,
         borderBottomColor: 'rgba(138, 43, 226, 0.7)',
-        paddingHorizontal: 0,
         alignSelf: 'center',
     },
     dropdownIcon: {

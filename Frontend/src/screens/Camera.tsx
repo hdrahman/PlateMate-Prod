@@ -18,7 +18,7 @@ export default function App() {
 
     const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
         ? `http://${process.env.REACT_APP_MACHINE_IP}:8000`
-        : "http://172.31.153.15:8000";  // Fallback to hardcoded IP
+        : "http://192.168.0.162:8000";  // Fallback to hardcoded IP
 
     console.log('Using BACKEND_URL:', BACKEND_URL);  // Log the backend URL to ensure it's correct
 

@@ -67,7 +67,7 @@ async def analyze_food(request: FoodAnalysisRequest):
         if len(valid_urls) > 1:
             logger.info(f"Multiple images detected ({len(valid_urls)}). Analyzing them together as part of the same meal.")
         
-        # Prepare the prompt for GPT-4 Vision
+        # Prepare the prompt for GPT-4o
         prompt = f"""
         Analyze these food images together as they are all part of the same {request.meal_type} meal.
         The meal appears to be {request.food_name}.
@@ -82,21 +82,19 @@ async def analyze_food(request: FoodAnalysisRequest):
         Keep your response concise but informative, around 150-200 words.
         """
         
-        # Prepare the content with all images together in the same message
-        content = [
-            {"type": "text", "text": prompt}
-        ]
+        # Create content array with text and all images
+        content = [{"type": "text", "text": prompt}]
         
-        # Add all image URLs to the same content array
+        # Add all image URLs to the content array
         for url in valid_urls:
             content.append({
-                "type": "image_url",
+                "type": "image_url", 
                 "image_url": {"url": url}
             })
         
         logger.info(f"Sending request to OpenAI with {len(valid_urls)} images in a single message")
         
-        # Make the API request to OpenAI
+        # Make the API request to OpenAI with the correct format
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers={
@@ -104,7 +102,7 @@ async def analyze_food(request: FoodAnalysisRequest):
                 "Authorization": f"Bearer {OPENAI_API_KEY}"
             },
             json={
-                "model": "gpt-4-vision-preview",
+                "model": "gpt-4o",
                 "messages": [
                     {
                         "role": "user",

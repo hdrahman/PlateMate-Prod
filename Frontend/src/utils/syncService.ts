@@ -8,7 +8,7 @@ import {
     purgeOldData
 } from './database';
 
-const BACKEND_URL = 'http://172.31.153.15:8000'; // Replace with your backend URL
+const BACKEND_URL = 'http://192.168.0.162:8000'; // Replace with your backend URL
 const SYNC_INTERVAL = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
 
 // Check if the device is online
