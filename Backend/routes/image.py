@@ -51,33 +51,20 @@ def analyze_food_image(image_data):
     """Send image to GPT-4o Vision for food analysis."""
     try:
         print("📤 Sending image to OpenAI for analysis...")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a nutrition assistant. Analyze the food in this image and provide an estimate of its nutritional content. Respond in the following structured format:\n\n"
-               "Food Name: <n>\n"
-               "Calories: <calories>\n"
-               "Protein: <protein>g\n"
-               "Carbs: <carbs>g\n"
-               "Fats: <fats>g\n"
-               "Healthiness Rating: <rating>/10\n\n"
-               "Ensure the food name is specific (e.g., apple, cookie), and provide exact numerical values without ranges.",
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Analyze this food and provide nutritional information."},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
-                    ]
-                }
-            ]
-        )
         
-        gpt_response = response.choices[0].message.content.strip()
-        print(f"📝 GPT-4o Raw Response: {gpt_response}")
-        return gpt_response
+        # Mock response instead of calling OpenAI API
+        mock_response = """Food Name: Fried Chicken Sandwich with Fries and Pickles
+
+Calories: 920
+Protein: 30g
+Carbs: 88g
+Fats: 50g
+Healthiness Rating: 4/10
+
+This meal consists of a fried chicken sandwich, crinkle-cut fries, and pickles. The high calorie and fat content, primarily from frying, affect the healthiness rating."""
+        
+        print(f"📝 GPT-4o Raw Response: {mock_response}")
+        return mock_response
     except Exception as e:
         print(f"❌ OpenAI API Error: {e}")
         raise HTTPException(status_code=500, detail=f"OpenAI API Error: {str(e)}")
@@ -203,28 +190,19 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
         # Send all images to OpenAI in a single request
         try:
             print("📤 Sending multiple images to OpenAI for analysis...")
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a nutrition assistant. Analyze the food in these images and provide an estimate of the combined nutritional content. Respond in the following structured format:\n\n"
-                   "Food Name: <n>\n"
-                   "Calories: <calories>\n"
-                   "Protein: <protein>g\n"
-                   "Carbs: <carbs>g\n"
-                   "Fats: <fats>g\n"
-                   "Healthiness Rating: <rating>/10\n\n"
-                   "Ensure the food name is specific, and provide exact numerical values without ranges.",
-                    },
-                    {
-                        "role": "user",
-                        "content": content
-                    }
-                ]
-            )
             
-            gpt_response = response.choices[0].message.content.strip()
+            # Mock response instead of calling OpenAI API
+            mock_response = """Food Name: Fried Chicken Sandwich with Fries and Pickles
+
+Calories: 940
+Protein: 30g
+Carbs: 88g
+Fats: 50g
+Healthiness Rating: 4/10
+
+This meal consists of a fried chicken sandwich, crinkle-cut fries, and pickles. The high calorie and fat content, primarily from frying, affect the healthiness rating."""
+            
+            gpt_response = mock_response
             print(f"📝 GPT-4o Raw Response: {gpt_response}")
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
