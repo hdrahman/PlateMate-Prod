@@ -80,8 +80,7 @@ const ImageCapture: React.FC = () => {
             const result = await launchCameraAsync({
                 mediaTypes: MediaTypeOptions.Images,
                 quality: 1,
-                allowsEditing: true,
-                aspect: [4, 3]
+                allowsEditing: false,
             });
 
             if (!result.canceled) {
@@ -104,8 +103,7 @@ const ImageCapture: React.FC = () => {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: MediaTypeOptions.Images,
                 quality: 1,
-                allowsEditing: true,
-                aspect: [4, 3]
+                allowsEditing: false,
             });
 
             if (!result.canceled) {

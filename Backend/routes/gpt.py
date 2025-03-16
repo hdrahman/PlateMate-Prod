@@ -64,35 +64,37 @@ async def analyze_food(request: FoodAnalysisRequest):
         
         logger.info(f"Processing {len(valid_urls)} valid image URLs")
         
+        if len(valid_urls) > 1:
+            logger.info(f"Multiple images detected ({len(valid_urls)}). Analyzing them together as part of the same meal.")
+        
         # Prepare the prompt for GPT-4 Vision
         prompt = f"""
-        Analyze these food images for a {request.meal_type} meal.
-        The food appears to be {request.food_name}.
+        Analyze these food images together as they are all part of the same {request.meal_type} meal.
+        The meal appears to be {request.food_name}.
         
-        Please provide:
-        1. A detailed description of the food
-        2. Estimated nutritional information
-        3. Health benefits and concerns
-        4. Suggestions for making it healthier (if applicable)
+        Please provide a combined analysis of all images including:
+        1. A detailed description of all food items present
+        2. Combined estimated nutritional information for the entire meal
+        3. Health benefits and concerns for the complete meal
+        4. Suggestions for making the overall meal healthier (if applicable)
         
-        Keep your response concise but informative, around 100-150 words.
+        Consider all images as one complete meal and provide a unified analysis.
+        Keep your response concise but informative, around 150-200 words.
         """
         
-        # Prepare the image URLs for GPT-4 Vision
-        image_content = []
+        # Prepare the content with all images together in the same message
+        content = [
+            {"type": "text", "text": prompt}
+        ]
+        
+        # Add all image URLs to the same content array
         for url in valid_urls:
-            image_content.append({
+            content.append({
                 "type": "image_url",
                 "image_url": {"url": url}
             })
         
-        # Add the text prompt
-        content = [
-            {"type": "text", "text": prompt},
-            *image_content
-        ]
-        
-        logger.info(f"Sending request to OpenAI with {len(image_content)} images")
+        logger.info(f"Sending request to OpenAI with {len(valid_urls)} images in a single message")
         
         # Make the API request to OpenAI
         response = requests.post(
@@ -109,7 +111,7 @@ async def analyze_food(request: FoodAnalysisRequest):
                         "content": content
                     }
                 ],
-                "max_tokens": 300
+                "max_tokens": 500
             }
         )
         
