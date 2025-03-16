@@ -9,6 +9,9 @@ import os
 import logging
 from dotenv import load_dotenv
 
+# Toggle between mock and real API
+USE_MOCK_API = True  # Set to False to use the real OpenAI API
+
 # Load environment variables
 load_dotenv()
 
@@ -94,35 +97,57 @@ async def analyze_food(request: FoodAnalysisRequest):
         
         logger.info(f"Sending request to OpenAI with {len(valid_urls)} images in a single message")
         
-        # Mock response instead of making the API request to OpenAI
-        mock_response_text = """Food Name: Fried Chicken Sandwich with Fries and Pickles
+        if USE_MOCK_API:
+            # Mock response instead of making the API request to OpenAI
+            mock_response_text = """Food Name: Fried Chicken Sandwich with Fries and Pickles
 
-Calories: 940
+Calories: 920
 Protein: 30g
 Carbs: 88g
 Fats: 50g
 Healthiness Rating: 4/10
 
 This meal consists of a fried chicken sandwich, crinkle-cut fries, and pickles. The high calorie and fat content, primarily from frying, affect the healthiness rating."""
-        
-        # Create a mock response object
-        class MockResponse:
-            def __init__(self, text, status_code=200):
-                self.text = text
-                self.status_code = status_code
-                
-            def json(self):
-                return {
-                    "choices": [
-                        {
-                            "message": {
-                                "content": self.text
+            
+            # Create a mock response object
+            class MockResponse:
+                def __init__(self, text, status_code=200):
+                    self.text = text
+                    self.status_code = status_code
+                    
+                def json(self):
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": self.text
+                                }
                             }
+                        ]
+                    }
+            
+            response = MockResponse(mock_response_text)
+            logger.info("Using mock response for OpenAI API")
+        else:
+            # Make the real API request to OpenAI
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {OPENAI_API_KEY}"
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": content
                         }
-                    ]
+                    ],
+                    "max_tokens": 500
                 }
-        
-        response = MockResponse(mock_response_text)
+            )
+            logger.info("Using real OpenAI API")
         
         # Check if the request was successful
         if response.status_code != 200:
