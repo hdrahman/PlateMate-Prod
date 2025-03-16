@@ -357,28 +357,46 @@ const ImageCapture: React.FC = () => {
         const image = images[index];
         const isRequired = index < 2;
 
+        // Function to remove an image
+        const handleRemoveImage = () => {
+            const newImages = [...images];
+            newImages[index] = {
+                ...newImages[index],
+                uri: '',
+                uploaded: false
+            };
+            setImages(newImages);
+        };
+
         return (
             <View style={styles.imagePlaceholder}>
                 {image.uri ? (
-                    <Image source={{ uri: image.uri }} style={styles.image} />
+                    // Image is present - show the image with an X button
+                    <View style={styles.imageContainer}>
+                        <Image source={{ uri: image.uri }} style={styles.image} />
+                        <TouchableOpacity
+                            style={styles.removeImageButton}
+                            onPress={handleRemoveImage}
+                        >
+                            <Ionicons name="close" size={16} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 ) : (
-                    <View style={styles.placeholderContent}>
+                    // No image - make the entire box clickable for camera
+                    <TouchableOpacity
+                        style={styles.placeholderContent}
+                        onPress={() => handleTakePhoto(index)}
+                    >
                         <Ionicons name="camera" size={40} color="#8A2BE2" />
                         <Text style={styles.placeholderText}>
                             {index === 0 ? 'Top View' : index === 1 ? 'Side View' : 'Additional'}
                         </Text>
                         {isRequired && <Text style={styles.requiredText}>Required</Text>}
-                    </View>
+                    </TouchableOpacity>
                 )}
 
+                {/* Keep only the gallery button at the bottom */}
                 <View style={styles.imageActions}>
-                    <TouchableOpacity
-                        style={[styles.imageButton, styles.cameraButton]}
-                        onPress={() => handleTakePhoto(index)}
-                    >
-                        <Ionicons name="camera" size={20} color="#fff" />
-                    </TouchableOpacity>
-
                     <TouchableOpacity
                         style={[styles.imageButton, styles.galleryButton]}
                         onPress={() => handlePickImage(index)}
@@ -737,6 +755,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#fff',
         lineHeight: 20,
+    },
+    imageContainer: {
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+    },
+    removeImageButton: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        borderRadius: 12,
+        width: 24,
+        height: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
     },
 });
 
