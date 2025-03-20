@@ -7,8 +7,11 @@ let db: SQLite.SQLiteDatabase;
 // Initialize the database
 export const initDatabase = async () => {
     try {
+        console.log('🔄 Initializing database...');
+
         // Open the database
         db = await SQLite.openDatabaseAsync('platemate.db');
+        console.log('✅ Database opened successfully');
 
         // Create tables
         await db.execAsync(`
@@ -37,6 +40,22 @@ export const initDatabase = async () => {
         console.log('✅ food_logs table created successfully');
 
         await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS exercises (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 1,
+        exercise_name TEXT NOT NULL,
+        calories_burned INTEGER NOT NULL,
+        duration INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        notes TEXT,
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL
+      )
+    `);
+        console.log('✅ exercises table created successfully');
+
+        await db.execAsync(`
       CREATE TABLE IF NOT EXISTS sync_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         last_sync TEXT,
@@ -45,8 +64,35 @@ export const initDatabase = async () => {
     `);
         console.log('✅ sync_log table created successfully');
 
+        // Verify database tables
+        const foodLogsTable = await db.getFirstAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='food_logs'`);
+        const exercisesTable = await db.getFirstAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='exercises'`);
+
+        console.log('Database tables verification:');
+        console.log('food_logs table exists:', !!foodLogsTable);
+        console.log('exercises table exists:', !!exercisesTable);
+
+        if (!foodLogsTable || !exercisesTable) {
+            console.error('⚠️ Some tables are missing! Database might not be initialized correctly.');
+        } else {
+            console.log('✅ All required tables exist and database is correctly initialized');
+        }
+
         // Enable WAL mode for better performance
         await db.execAsync('PRAGMA journal_mode = WAL');
+
+        // Add test data if the database is empty (for demo purposes)
+        const foodLogCount = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM food_logs');
+        if (foodLogCount && foodLogCount.count === 0) {
+            console.log('🔄 Adding sample food log data...');
+            await addSampleFoodLogData();
+        }
+
+        const exerciseCount = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM exercises');
+        if (exerciseCount && exerciseCount.count === 0) {
+            console.log('🔄 Adding sample exercise data...');
+            await addSampleExerciseData();
+        }
 
         return db;
     } catch (error) {
@@ -55,8 +101,169 @@ export const initDatabase = async () => {
     }
 };
 
-// Get the current date in ISO format
-export const getCurrentDate = () => {
+// Helper function to add sample food log data
+const addSampleFoodLogData = async () => {
+    if (!db) return;
+
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const yesterdayFormatted = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    const sampleFoods = [
+        {
+            meal_id: 1,
+            food_name: 'Oatmeal with Berries',
+            calories: 250,
+            proteins: 8,
+            carbs: 40,
+            fats: 6,
+            image_url: 'https://example.com/oatmeal.jpg',
+            date: todayFormatted,
+            meal_type: 'Breakfast'
+        },
+        {
+            meal_id: 2,
+            food_name: 'Grilled Chicken Salad',
+            calories: 350,
+            proteins: 30,
+            carbs: 15,
+            fats: 12,
+            image_url: 'https://example.com/chicken_salad.jpg',
+            date: todayFormatted,
+            meal_type: 'Lunch'
+        },
+        {
+            meal_id: 3,
+            food_name: 'Salmon with Vegetables',
+            calories: 420,
+            proteins: 35,
+            carbs: 20,
+            fats: 22,
+            image_url: 'https://example.com/salmon.jpg',
+            date: todayFormatted,
+            meal_type: 'Dinner'
+        },
+        {
+            meal_id: 4,
+            food_name: 'Greek Yogurt',
+            calories: 120,
+            proteins: 15,
+            carbs: 8,
+            fats: 0,
+            image_url: 'https://example.com/yogurt.jpg',
+            date: yesterdayFormatted,
+            meal_type: 'Breakfast'
+        },
+        {
+            meal_id: 5,
+            food_name: 'Turkey Sandwich',
+            calories: 380,
+            proteins: 25,
+            carbs: 40,
+            fats: 10,
+            image_url: 'https://example.com/sandwich.jpg',
+            date: yesterdayFormatted,
+            meal_type: 'Lunch'
+        }
+    ];
+
+    try {
+        for (const food of sampleFoods) {
+            await db.runAsync(
+                `INSERT INTO food_logs (
+                  meal_id, user_id, food_name, calories, proteins, carbs, fats, 
+                  image_url, file_key, date, meal_type, synced, sync_action, last_modified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    food.meal_id,
+                    1,
+                    food.food_name,
+                    food.calories,
+                    food.proteins,
+                    food.carbs,
+                    food.fats,
+                    food.image_url,
+                    'sample_file_key',
+                    food.date,
+                    food.meal_type,
+                    1, // synced
+                    'create',
+                    getCurrentDate()
+                ]
+            );
+        }
+        console.log('✅ Sample food log data added successfully');
+    } catch (error) {
+        console.error('❌ Error adding sample food log data:', error);
+    }
+};
+
+// Helper function to add sample exercise data
+const addSampleExerciseData = async () => {
+    if (!db) return;
+
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const yesterdayFormatted = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    const sampleExercises = [
+        {
+            exercise_name: 'Running',
+            calories_burned: 350,
+            duration: 30,
+            date: todayFormatted,
+            notes: '5K morning run'
+        },
+        {
+            exercise_name: 'Weight Training',
+            calories_burned: 250,
+            duration: 45,
+            date: todayFormatted,
+            notes: 'Upper body workout'
+        },
+        {
+            exercise_name: 'Cycling',
+            calories_burned: 400,
+            duration: 60,
+            date: yesterdayFormatted,
+            notes: 'Evening bike ride'
+        }
+    ];
+
+    try {
+        for (const exercise of sampleExercises) {
+            await db.runAsync(
+                `INSERT INTO exercises (
+                  user_id, exercise_name, calories_burned, duration,
+                  date, notes, synced, sync_action, last_modified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    1,
+                    exercise.exercise_name,
+                    exercise.calories_burned,
+                    exercise.duration,
+                    exercise.date,
+                    exercise.notes,
+                    1, // synced
+                    'create',
+                    getCurrentDate()
+                ]
+            );
+        }
+        console.log('✅ Sample exercise data added successfully');
+    } catch (error) {
+        console.error('❌ Error adding sample exercise data:', error);
+    }
+};
+
+// Helper function to get current timestamp
+export const getCurrentDate = (): string => {
     return new Date().toISOString();
 };
 
@@ -84,6 +291,27 @@ export const addFoodLog = async (foodLog: any) => {
         notes = ''
     } = foodLog;
 
+    // Ensure date is in the correct format (YYYY-MM-DD)
+    let formattedDate = date;
+    if (date) {
+        // If date is already in YYYY-MM-DD format, use it as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            formattedDate = date;
+        } else {
+            // Otherwise, try to extract the date part
+            try {
+                const dateObj = new Date(date);
+                formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+            } catch (error) {
+                console.error('❌ Error formatting date:', error);
+                // Fall back to current date if parsing fails
+                formattedDate = getCurrentDate().split('T')[0];
+            }
+        }
+    }
+
+    console.log(`📝 Adding food log with date: ${formattedDate}`);
+
     try {
         const result = await db.runAsync(
             `INSERT INTO food_logs (
@@ -102,7 +330,7 @@ export const addFoodLog = async (foodLog: any) => {
                 image_url,
                 file_key,
                 healthiness_rating,
-                date,
+                formattedDate,
                 meal_type,
                 brand_name,
                 quantity,
@@ -127,10 +355,60 @@ export const getFoodLogsByDate = async (date: string) => {
     }
 
     try {
-        const result = await db.getAllAsync(
+        console.log(`🔍 Getting food logs for date: ${date}`);
+
+        // Normalize the input date to YYYY-MM-DD format
+        const normalizedDate = date.split('T')[0]; // Remove any time component
+        console.log(`Normalized date for query: ${normalizedDate}`);
+
+        // First try exact date match with normalized date
+        let result = await db.getAllAsync(
             `SELECT * FROM food_logs WHERE date(date) = date(?)`,
-            [date]
+            [normalizedDate]
         );
+        console.log(`Found ${result.length} records with exact date match`);
+
+        // If no results, try with LIKE for partial matching
+        if (result.length === 0) {
+            console.log(`No exact matches found, trying with LIKE for date: ${normalizedDate}`);
+            result = await db.getAllAsync(
+                `SELECT * FROM food_logs WHERE date LIKE ?`,
+                [`%${normalizedDate}%`]
+            );
+            console.log(`Found ${result.length} records with LIKE match`);
+        }
+
+        // If still no results, try getting all and filter in JS
+        if (result.length === 0) {
+            console.log(`No LIKE matches found, getting all food logs and filtering in JS`);
+            const allLogs = await db.getAllAsync(`SELECT * FROM food_logs`);
+            console.log(`Total food logs in database: ${allLogs.length}`);
+
+            // Log all dates for debugging
+            if (allLogs.length > 0) {
+                console.log('Available dates in database:');
+                allLogs.forEach(log => {
+                    if (log && typeof log === 'object' && 'date' in log) {
+                        console.log(`- ${(log as { date: string }).date}`);
+                    }
+                });
+            }
+
+            // Try to match the date part only
+            result = allLogs.filter(log => {
+                if (!log || typeof log !== 'object' || !('date' in log)) return false;
+
+                // Extract date part from the log date
+                const logDateStr = (log as { date: string }).date;
+                const logDatePart = logDateStr.split('T')[0].split(' ')[0]; // Handle both ISO and space-separated formats
+
+                console.log(`Comparing log date ${logDatePart} with target date ${normalizedDate}`);
+                return logDatePart === normalizedDate;
+            });
+            console.log(`Found ${result.length} records after JS filtering`);
+        }
+
+        console.log(`✅ Final result: Found ${result.length} food logs for date ${date}`);
         return result;
     } catch (error) {
         console.error('❌ Error getting food logs by date:', error);
@@ -342,6 +620,105 @@ export const purgeOldData = async () => {
         console.log(`✅ Purged ${result.changes} old food logs`);
     } catch (error) {
         console.error('❌ Error purging old data:', error);
+        throw error;
+    }
+};
+
+// Get exercises by date
+export const getExercisesByDate = async (date: string) => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        console.log(`🔍 Getting exercises for date: ${date}`);
+
+        // Normalize the input date to YYYY-MM-DD format
+        const normalizedDate = date.split('T')[0]; // Remove any time component
+        console.log(`Normalized date for query: ${normalizedDate}`);
+
+        // First try exact date match with normalized date
+        let result = await db.getAllAsync(
+            `SELECT * FROM exercises WHERE date(date) = date(?)`,
+            [normalizedDate]
+        );
+        console.log(`Found ${result.length} exercise records with exact date match`);
+
+        // If no results, try with LIKE for partial matching
+        if (result.length === 0) {
+            console.log(`No exact matches found, trying with LIKE for date: ${normalizedDate}`);
+            result = await db.getAllAsync(
+                `SELECT * FROM exercises WHERE date LIKE ?`,
+                [`%${normalizedDate}%`]
+            );
+            console.log(`Found ${result.length} exercise records with LIKE match`);
+        }
+
+        return result;
+    } catch (error) {
+        console.error('❌ Error getting exercises:', error);
+        throw error;
+    }
+};
+
+// Add an exercise entry
+export const addExercise = async (exercise: any) => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    const {
+        user_id = 1,
+        exercise_name,
+        calories_burned,
+        duration,
+        date = getCurrentDate(),
+        notes = ''
+    } = exercise;
+
+    // Ensure date is in the correct format (YYYY-MM-DD)
+    let formattedDate = date;
+    if (date) {
+        // If date is already in YYYY-MM-DD format, use it as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            formattedDate = date;
+        } else {
+            // Otherwise, try to extract the date part
+            try {
+                const dateObj = new Date(date);
+                formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+            } catch (error) {
+                console.error('❌ Error formatting date:', error);
+                // Fall back to current date if parsing fails
+                formattedDate = getCurrentDate().split('T')[0];
+            }
+        }
+    }
+
+    console.log(`📝 Adding exercise with date: ${formattedDate}`);
+
+    try {
+        const result = await db.runAsync(
+            `INSERT INTO exercises (
+        user_id, exercise_name, calories_burned, duration,
+        date, notes, synced, sync_action, last_modified
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                user_id,
+                exercise_name,
+                calories_burned,
+                duration,
+                formattedDate,
+                notes,
+                0, // not synced
+                'create', // sync action
+                getCurrentDate()
+            ]
+        );
+        console.log('✅ Exercise added successfully', result.lastInsertRowId);
+        return result.lastInsertRowId;
+    } catch (error) {
+        console.error('❌ Error adding exercise:', error);
         throw error;
     }
 };

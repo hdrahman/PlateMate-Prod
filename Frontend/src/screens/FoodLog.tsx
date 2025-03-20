@@ -9,6 +9,7 @@ import {
     TouchableWithoutFeedback,
     Animated,
     Dimensions,
+    ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -17,11 +18,11 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate } from '../utils/database';
+import { getFoodLogsByDate, getExercisesByDate, addExercise } from '../utils/database';
 import { isOnline } from '../utils/syncService';
+import { BACKEND_URL } from '../utils/config';
 
 const { width: screenWidth } = Dimensions.get('window');
-const BACKEND_URL = 'http://192.168.0.162:8000'
 
 // Helper function to format date as YYYY-MM-DD
 const formatDateToString = (date: Date): string => {
@@ -81,16 +82,24 @@ interface FoodLogEntry {
     last_modified: string;
 }
 
+// Define the Exercise interface
+interface Exercise {
+    id?: number;
+    exercise_name: string;
+    calories_burned: number;
+    duration: number;
+    date?: string;
+    notes?: string;
+}
+
 const DiaryScreen: React.FC = () => {
     const [mealData, setMealData] = useState<Meal[]>([]);
     const [breakfastEntries, setBreakfastEntries] = useState([]);
-    const [exerciseList, setExerciseList] = useState([
-        { name: 'Running', calories: 250, duration: '30 min' },
-        { name: 'Cycling', calories: 180, duration: '20 min' },
-    ]);
+    const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
     const navigation = useNavigation<NavigationProp>();
     const [currentDate, setCurrentDate] = useState(new Date());
     const processedMealData = useRef(false);
+    const [loading, setLoading] = useState(false);
 
     // Initialize with default meal types on component mount
     useEffect(() => {
@@ -135,22 +144,53 @@ const DiaryScreen: React.FC = () => {
     useEffect(() => {
         const fetchMeals = async () => {
             try {
+                // Don't set loading true right away, we want to show existing data immediately
                 processedMealData.current = false; // Reset before fetching new data
 
                 // Format the current date to match the database format (YYYY-MM-DD)
                 const formattedDate = formatDateToString(currentDate);
+                console.log('Fetching meals for date:', formattedDate);
+
+                // Setup default meals
+                const defaultMeals: Meal[] = [
+                    {
+                        title: 'Breakfast',
+                        total: 0,
+                        macros: { carbs: 0, fat: 0, protein: 0 },
+                        items: []
+                    },
+                    {
+                        title: 'Lunch',
+                        total: 0,
+                        macros: { carbs: 0, fat: 0, protein: 0 },
+                        items: []
+                    },
+                    {
+                        title: 'Dinner',
+                        total: 0,
+                        macros: { carbs: 0, fat: 0, protein: 0 },
+                        items: []
+                    },
+                    {
+                        title: 'Snacks',
+                        total: 0,
+                        macros: { carbs: 0, fat: 0, protein: 0 },
+                        items: []
+                    }
+                ];
 
                 // First try to get data from local SQLite database
+                console.log('Fetching from local SQLite database...');
                 const localMealData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
+                console.log('Local meal data:', localMealData);
 
                 // Process local data into the format needed for display
                 if (localMealData && localMealData.length > 0) {
                     // Get current meal data to merge with
-                    const currentMeals = [...mealData];
                     const mealDict: Record<string, Meal> = {};
 
-                    // Initialize with existing meals
-                    currentMeals.forEach(meal => {
+                    // Initialize with default meal types
+                    defaultMeals.forEach(meal => {
                         mealDict[meal.title] = {
                             ...meal,
                             total: 0, // Reset totals as we'll recalculate
@@ -189,56 +229,90 @@ const DiaryScreen: React.FC = () => {
                     // Sort meals in the correct order
                     updatedMeals.sort((a, b) => {
                         const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
-                        return order[a.title] - order[b.title];
+                        return (order[a.title] || 99) - (order[b.title] || 99);
                     });
 
+                    // Set meal data immediately from local database
                     setMealData(updatedMeals);
+                    console.log('Updated meal data from local database:', updatedMeals);
+                } else {
+                    // If no local data, just set the defaults
+                    setMealData(defaultMeals);
                 }
 
-                // Try to fetch from backend if online
+                // After showing local data, try to fetch from backend in the background
+                setLoading(false); // Ensure we're not showing loading state anymore
+
+                // Fetch from backend if online
                 const online = await isOnline();
                 if (online) {
                     try {
-                        const response = await axios.get(`${BACKEND_URL}/meal_entries/meal-data`);
-                        if (response.data && response.data.length > 0) {
-                            // Merge backend data with default meal types
-                            const backendMeals = response.data;
-                            const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
-                            const existingMealTitles = backendMeals.map(meal => meal.title);
+                        console.log('Fetching from backend API...');
+                        // Get data by date from the backend
+                        const dateResponse = await fetch(`${BACKEND_URL}/meal_entries/by-date/${formattedDate}`);
 
-                            // Add any missing meal types
-                            mealTypes.forEach(type => {
-                                if (!existingMealTitles.includes(type)) {
-                                    backendMeals.push({
+                        if (dateResponse.ok) {
+                            const backendDateData = await dateResponse.json();
+                            console.log('Backend data by date:', backendDateData);
+
+                            if (backendDateData && backendDateData.length > 0) {
+                                // Process backend data by date
+                                const mealDict: Record<string, Meal> = {};
+
+                                // Initialize with default meal types
+                                const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+                                mealTypes.forEach(type => {
+                                    mealDict[type] = {
                                         title: type,
                                         total: 0,
                                         macros: { carbs: 0, fat: 0, protein: 0 },
                                         items: []
+                                    };
+                                });
+
+                                // Group by meal type
+                                backendDateData.forEach(entry => {
+                                    if (!entry.meal_type) return; // Skip entries without meal type
+
+                                    // Add food entry to respective meal
+                                    mealDict[entry.meal_type].total += entry.calories;
+                                    mealDict[entry.meal_type].macros.carbs += entry.carbs;
+                                    mealDict[entry.meal_type].macros.fat += entry.fats;
+                                    mealDict[entry.meal_type].macros.protein += entry.proteins;
+                                    mealDict[entry.meal_type].items.push({
+                                        name: `${entry.food_name}\nProtein ${entry.proteins}g`,
+                                        calories: entry.calories
                                     });
-                                }
-                            });
+                                });
 
-                            // Sort meals in the correct order
-                            backendMeals.sort((a, b) => {
-                                const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
-                                return order[a.title] - order[b.title];
-                            });
+                                // Convert back to array
+                                const updatedMeals = Object.values(mealDict);
 
-                            setMealData(backendMeals);
+                                // Sort meals in the correct order
+                                updatedMeals.sort((a, b) => {
+                                    const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
+                                    return (order[a.title] || 99) - (order[b.title] || 99);
+                                });
+
+                                setMealData(updatedMeals);
+                                console.log('Updated meal data from backend by date:', updatedMeals);
+                            }
                         }
                     } catch (backendError) {
                         console.error('Error fetching meal data from backend:', backendError);
                         // Continue with local data if backend fetch fails
                     }
+                } else {
+                    console.log('Device is offline, using only local data');
                 }
             } catch (error) {
-                console.error('Error fetching meal data:', error);
-                // No need to set empty meal data since we initialize with defaults
+                console.error('Error fetching meals:', error);
+                setLoading(false);
             }
         };
 
         fetchMeals();
-    }, [currentDate]); // Remove mealData from dependencies to avoid infinite loops
+    }, [currentDate]); // Only re-run when the date changes
 
     useEffect(() => {
         // This useEffect is now simplified since we handle meal type initialization elsewhere
@@ -249,9 +323,10 @@ const DiaryScreen: React.FC = () => {
     }, [mealData]);
 
     const goal = 1800;
-    const exercise = 450;
+    // Calculate total exercise calories based on exerciseList instead of hardcoded value
+    const totalExerciseCalories = exerciseList.reduce((total, exercise) => total + exercise.calories_burned, 0);
     const foodTotal = mealData.reduce((acc, meal) => acc + meal.total, 0);
-    const remaining = goal - foodTotal + exercise;
+    const remaining = goal - foodTotal + totalExerciseCalories;
     const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
@@ -351,12 +426,8 @@ const DiaryScreen: React.FC = () => {
                     newDate.setDate(newDate.getDate() + 1);
                     return newDate;
                 });
-                swipeAnim.setValue(screenWidth);
-                Animated.timing(swipeAnim, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-                }).start();
+                swipeAnim.setValue(0); // Set to 0 directly instead of screenWidth
+                // No need for another animation, this prevents the "half-screen" issue
             });
         } else if (translationX >= threshold) {
             // swipe right -> previous day
@@ -371,12 +442,8 @@ const DiaryScreen: React.FC = () => {
                     newDate.setDate(newDate.getDate() - 1);
                     return newDate;
                 });
-                swipeAnim.setValue(-screenWidth);
-                Animated.timing(swipeAnim, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-                }).start();
+                swipeAnim.setValue(0); // Set to 0 directly instead of -screenWidth
+                // No need for another animation, this prevents the "half-screen" issue
             });
         } else {
             // not enough swipe; snap back
@@ -392,6 +459,113 @@ const DiaryScreen: React.FC = () => {
         if (event.nativeEvent.state === GestureState.END) {
             const { translationX } = event.nativeEvent;
             handleSwipeRelease(translationX);
+        }
+    };
+
+    const fetchExercises = async () => {
+        try {
+            const formattedDate = formatDateToString(currentDate);
+            console.log('Fetching exercises for date:', formattedDate);
+
+            // Fetch exercises from local database
+            const localExerciseData = await getExercisesByDate(formattedDate);
+            console.log('Local exercise data:', localExerciseData);
+
+            if (localExerciseData && localExerciseData.length > 0) {
+                // Transform the data to match the Exercise interface
+                const transformedData = localExerciseData.map((exercise: any) => ({
+                    id: exercise.id,
+                    exercise_name: exercise.exercise_name,
+                    calories_burned: exercise.calories_burned,
+                    duration: exercise.duration,
+                    date: exercise.date,
+                    notes: exercise.notes || ''
+                }));
+                setExerciseList(transformedData);
+            } else {
+                setExerciseList([]);
+            }
+
+            // Fetch from backend if online
+            const online = await isOnline();
+            if (online) {
+                try {
+                    const response = await fetch(`${BACKEND_URL}/exercises/by-date/${formattedDate}`);
+                    if (response.ok) {
+                        const backendExerciseData = await response.json();
+                        console.log('Backend exercise data:', backendExerciseData);
+
+                        // Transform the data to match the Exercise interface
+                        const transformedData = backendExerciseData.map((exercise: any) => ({
+                            id: exercise.id,
+                            exercise_name: exercise.exercise_name,
+                            calories_burned: exercise.calories_burned,
+                            duration: exercise.duration,
+                            date: exercise.date,
+                            notes: exercise.notes || ''
+                        }));
+                        setExerciseList(transformedData);
+                    }
+                } catch (error) {
+                    console.error('Error fetching from backend:', error);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching exercises:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchExercises();
+    }, [currentDate]); // Fetch exercises when the date changes
+
+    // Update the exercise card to use the new data structure
+    const renderExerciseList = () => {
+        // If there are no exercises, return null instead of an empty row
+        if (exerciseList.length === 0) {
+            return null;
+        }
+
+        return exerciseList.map((exercise, index) => (
+            <View key={index}>
+                <View style={styles.logRow}>
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={[styles.logItemText, { fontSize: 16 }]} numberOfLines={1} ellipsizeMode="tail">
+                            {exercise.exercise_name}
+                        </Text>
+                        <Text style={styles.logItemDuration}>{exercise.duration} min</Text>
+                    </View>
+                    <Text style={styles.logCalText}>{exercise.calories_burned}</Text>
+                </View>
+                {/* Divider line under each entry */}
+                {index < exerciseList.length - 1 && (
+                    <View style={styles.entryDividerLine} />
+                )}
+            </View>
+        ));
+    };
+
+    // Add a test exercise function
+    const addTestExercise = async () => {
+        try {
+            const formattedDate = formatDateToString(currentDate);
+            console.log('Adding test exercise for date:', formattedDate);
+
+            const exerciseData = {
+                exercise_name: 'Test Exercise',
+                calories_burned: 150,
+                duration: 30,
+                date: formattedDate,
+                notes: 'Added for testing'
+            };
+
+            const result = await addExercise(exerciseData);
+            console.log('Test exercise added with ID:', result);
+
+            // Refresh exercise list
+            fetchExercises();
+        } catch (error) {
+            console.error('Error adding test exercise:', error);
         }
     };
 
@@ -465,8 +639,11 @@ const DiaryScreen: React.FC = () => {
                     onHandlerStateChange={onHandlerStateChange}
                     activeOffsetX={[-20, 20]} // increased offset to reduce sensitivity
                 >
-                    <Animated.View style={{ flex: 1, transform: [{ translateX: swipeAnim }] }}>
-                        <ScrollView contentContainerStyle={styles.scrollInner}>
+                    <Animated.View style={[styles.animatedContent, { transform: [{ translateX: swipeAnim }] }]}>
+                        <ScrollView
+                            contentContainerStyle={styles.scrollInner}
+                            showsVerticalScrollIndicator={false}
+                        >
                             {/* 2) Calories Remaining */}
                             <View style={styles.summaryCard}>
                                 <Text style={styles.summaryTitle}>Calories Remaining</Text>
@@ -487,7 +664,7 @@ const DiaryScreen: React.FC = () => {
                                     <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
                                     <View style={styles.equationColumn}>
                                         <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
-                                            {exercise}
+                                            {totalExerciseCalories}
                                         </Text>
                                         <Text style={styles.equationLabel}>Exercise</Text>
                                     </View>
@@ -550,32 +727,18 @@ const DiaryScreen: React.FC = () => {
                             <View style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
                                     <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
-                                    <Text style={styles.mealCal}>{exercise}</Text>
+                                    <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
                                 </View>
 
                                 {/* Divider line under heading */}
                                 <View style={styles.dividerLine} />
 
-                                {exerciseList.map((ex, i) => (
-                                    <View key={i}>
-                                        <View style={styles.logRow}>
-                                            <View style={{ flexDirection: 'column' }}>
-                                                <Text style={[styles.logItemText, { fontSize: 16 }]}>{ex.name}</Text>
-                                                <Text style={styles.logItemDuration}>{ex.duration}</Text>
-                                            </View>
-                                            <Text style={styles.logCalText}>{ex.calories}</Text>
-                                        </View>
-                                        {/* Divider line under each entry */}
-                                        {i < exerciseList.length - 1 && (
-                                            <View style={styles.entryDividerLine} />
-                                        )}
-                                    </View>
-                                ))}
+                                {renderExerciseList()}
 
-                                {/* Divider line before Add Exercise button */}
-                                <View style={styles.dividerLine} />
+                                {/* Only show divider line if there are exercises already */}
+                                {exerciseList.length > 0 && <View style={styles.dividerLine} />}
 
-                                <TouchableOpacity style={styles.addBtn}>
+                                <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
                                     <Text style={styles.addBtnText}>ADD EXERCISE</Text>
                                 </TouchableOpacity>
                             </View>
@@ -632,9 +795,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: PRIMARY_BG,
     },
-    scrollInner: {
-        paddingBottom: 20,
-    },
     header: {
         paddingVertical: 10,
         paddingHorizontal: 16,
@@ -659,8 +819,9 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         paddingVertical: 6,
         paddingHorizontal: 10,
+        marginHorizontal: 16, // Add horizontal margin to match content
         marginTop: -5,
-        marginBottom: 5,
+        marginBottom: 8, // Reduced from 10 to 8
     },
     arrowButton: {
         paddingHorizontal: 12,
@@ -674,11 +835,12 @@ const styles = StyleSheet.create({
 
     // Calories Remaining Card
     summaryCard: {
-        backgroundColor: '#181818', // slightly darker background
-        marginHorizontal: 0,
-        borderRadius: 0,
+        backgroundColor: '#121212',
+        marginTop: 8, // Reduced from 12 to 8
+        marginBottom: 12, // Added margin bottom to match spacing between other cards
+        borderRadius: 8,
         padding: 16,
-        marginBottom: 12,
+        width: '100%', // Consistent width
     },
     summaryTitle: {
         fontSize: 16,
@@ -728,16 +890,18 @@ const styles = StyleSheet.create({
 
     // Meal/Exercise/Water Sections
     mealSection: {
-        backgroundColor: '#181818', // slightly darker background
+        backgroundColor: '#181818',
         marginHorizontal: 0,
-        borderRadius: 0,
+        borderRadius: 8,
         padding: 16,
         marginBottom: 12,
+        width: '100%', // Ensure full width matches summary card
     },
     mealHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 4,
+        width: '100%', // Ensure full width
     },
     mealTitle: {
         fontSize: 16,
@@ -760,14 +924,14 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#333',
         marginVertical: 8,
-        marginHorizontal: -16, // extend to the edges
+        marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
     },
     entryDividerLine: {
         borderBottomWidth: 1,
         borderBottomColor: '#333',
         marginTop: 6,
         marginBottom: 6,
-        marginHorizontal: -16, // extend to the edges
+        marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
     },
 
     // Items
@@ -780,7 +944,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: WHITE,
         lineHeight: 18,
-        width: '80%',
+        width: '100%', // Ensure full width for exercise names
     },
     logItemDuration: {
         fontSize: 12,
@@ -811,7 +975,8 @@ const styles = StyleSheet.create({
     bottomActions: {
         flexDirection: 'column',
         marginTop: 8,
-        paddingHorizontal: 16,
+        paddingHorizontal: 0, // Remove extra padding
+        width: '100%',
     },
     topActionsRow: {
         flexDirection: 'row',
@@ -903,5 +1068,26 @@ const styles = StyleSheet.create({
     streakInfoText: {
         color: '#FFF',
         fontSize: 12,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#121212',
+    },
+    loadingText: {
+        color: '#fff',
+        marginTop: 10,
+        fontSize: 16,
+    },
+    animatedContent: {
+        flex: 1,
+        width: '100%',
+    },
+    scrollInner: {
+        paddingHorizontal: 16,
+        paddingBottom: 100,
+        width: '100%',
+        alignItems: 'center',
     },
 });

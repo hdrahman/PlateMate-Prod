@@ -1,9 +1,32 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from db import get_db  # Import correct database session
 from models import FoodLog
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
 
 router = APIRouter()
+
+class FoodLogCreate(BaseModel):
+    meal_id: int
+    user_id: Optional[int] = 1
+    food_name: str
+    calories: int
+    proteins: int
+    carbs: float
+    fats: int
+    image_url: str
+    file_key: Optional[str] = "default_file_key"
+    healthiness_rating: Optional[int] = None
+    date: Optional[str] = None
+    meal_type: Optional[str] = None
+    brand_name: Optional[str] = None
+    quantity: Optional[str] = None
+    notes: Optional[str] = None
+
+class FoodLogUpdate(FoodLogCreate):
+    pass
 
 @router.get("/meal-data")
 def get_meal_data(db: Session = Depends(get_db)):
@@ -34,3 +57,157 @@ def get_meal_data(db: Session = Depends(get_db)):
         })
 
     return list(meal_dict.values())
+
+@router.post("/create", status_code=201)
+def create_food_log(food_log: FoodLogCreate, db: Session = Depends(get_db)):
+    """Create a new food log entry"""
+    try:
+        # Convert string date to datetime if provided
+        date_obj = None
+        if food_log.date:
+            try:
+                date_obj = datetime.fromisoformat(food_log.date.replace('Z', '+00:00'))
+            except ValueError:
+                # Try different format if ISO format fails
+                date_obj = datetime.strptime(food_log.date, "%Y-%m-%d")
+        
+        # Create new food log entry
+        db_food_log = FoodLog(
+            meal_id=food_log.meal_id,
+            user_id=food_log.user_id,
+            food_name=food_log.food_name,
+            calories=food_log.calories,
+            proteins=food_log.proteins,
+            carbs=food_log.carbs,
+            fats=food_log.fats,
+            image_url=food_log.image_url,
+            file_key=food_log.file_key,
+            healthiness_rating=food_log.healthiness_rating,
+            date=date_obj or datetime.now(),
+            meal_type=food_log.meal_type,
+        )
+        
+        db.add(db_food_log)
+        db.commit()
+        db.refresh(db_food_log)
+        
+        return {"id": db_food_log.id, "message": "Food log created successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create food log: {str(e)}")
+
+@router.put("/update/{food_log_id}")
+def update_food_log(food_log_id: int, food_log: FoodLogUpdate, db: Session = Depends(get_db)):
+    """Update an existing food log entry"""
+    try:
+        # Check if food log exists
+        db_food_log = db.query(FoodLog).filter(FoodLog.id == food_log_id).first()
+        if not db_food_log:
+            raise HTTPException(status_code=404, detail="Food log not found")
+        
+        # Convert string date to datetime if provided
+        if food_log.date:
+            try:
+                date_obj = datetime.fromisoformat(food_log.date.replace('Z', '+00:00'))
+                db_food_log.date = date_obj
+            except ValueError:
+                # Try different format if ISO format fails
+                try:
+                    date_obj = datetime.strptime(food_log.date, "%Y-%m-%d")
+                    db_food_log.date = date_obj
+                except ValueError:
+                    pass  # Keep existing date if parsing fails
+        
+        # Update fields
+        db_food_log.meal_id = food_log.meal_id
+        db_food_log.user_id = food_log.user_id
+        db_food_log.food_name = food_log.food_name
+        db_food_log.calories = food_log.calories
+        db_food_log.proteins = food_log.proteins
+        db_food_log.carbs = food_log.carbs
+        db_food_log.fats = food_log.fats
+        db_food_log.image_url = food_log.image_url
+        db_food_log.file_key = food_log.file_key
+        db_food_log.healthiness_rating = food_log.healthiness_rating
+        db_food_log.meal_type = food_log.meal_type
+        
+        db.commit()
+        db.refresh(db_food_log)
+        
+        return {"id": db_food_log.id, "message": "Food log updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update food log: {str(e)}")
+
+@router.delete("/delete/{food_log_id}")
+def delete_food_log(food_log_id: int, db: Session = Depends(get_db)):
+    """Delete a food log entry"""
+    try:
+        # Check if food log exists
+        db_food_log = db.query(FoodLog).filter(FoodLog.id == food_log_id).first()
+        if not db_food_log:
+            raise HTTPException(status_code=404, detail="Food log not found")
+        
+        # Delete the food log
+        db.delete(db_food_log)
+        db.commit()
+        
+        return {"id": food_log_id, "message": "Food log deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete food log: {str(e)}")
+
+@router.get("/by-date/{date}")
+def get_food_logs_by_date(date: str, db: Session = Depends(get_db)):
+    """Get all food logs for a specific date"""
+    try:
+        # Parse the date string
+        try:
+            # First try ISO format
+            date_obj = datetime.fromisoformat(date.replace('Z', '+00:00'))
+        except ValueError:
+            try:
+                # Try YYYY-MM-DD format
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                # If all else fails, try to extract the date part
+                date_part = date.split('T')[0].split(' ')[0]  # Handle both ISO and space-separated formats
+                date_obj = datetime.strptime(date_part, "%Y-%m-%d")
+        
+        print(f"Searching for food logs on date: {date_obj.date()}")
+        
+        # Get all food logs for the date
+        food_logs = db.query(FoodLog).filter(
+            FoodLog.date >= date_obj.replace(hour=0, minute=0, second=0, microsecond=0),
+            FoodLog.date < date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+        ).all()
+        
+        print(f"Found {len(food_logs)} food logs for date {date_obj.date()}")
+        
+        # Convert to dict for JSON response
+        result = []
+        for log in food_logs:
+            result.append({
+                "id": log.id,
+                "meal_id": log.meal_id,
+                "user_id": log.user_id,
+                "food_name": log.food_name,
+                "calories": log.calories,
+                "proteins": log.proteins,
+                "carbs": log.carbs,
+                "fats": log.fats,
+                "image_url": log.image_url,
+                "file_key": log.file_key,
+                "healthiness_rating": log.healthiness_rating,
+                "date": log.date.isoformat(),
+                "meal_type": log.meal_type
+            })
+        
+        return result
+    except Exception as e:
+        print(f"Error getting food logs by date: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get food logs: {str(e)}")

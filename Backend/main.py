@@ -6,6 +6,7 @@ import traceback
 from routes.image import router as image_router
 from routes.meal_entries import router as meal_entries_router  # Include meal_entries
 from routes.gpt import router as gpt_router  # Include GPT router
+from routes.exercises import router as exercises_router  # Include exercises router
 
 app = FastAPI()
 
@@ -32,6 +33,7 @@ app.add_middleware(
 app.include_router(image_router, prefix='/images', tags=['images'])
 app.include_router(meal_entries_router, prefix='/meal_entries', tags=['meals'])  # Correctly included meal_entries
 app.include_router(gpt_router, prefix='/gpt', tags=['gpt'])  # Include GPT router
+app.include_router(exercises_router, tags=['exercises'])  # Include exercises router
 
 @app.get("/")
 def home():

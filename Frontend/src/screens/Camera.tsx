@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useEffect, useState, useRef } from 'react';
 import * as FileSystem from 'expo-file-system';
+import { BACKEND_URL } from '../utils/config';
 
 export default function App() {
     const [permission, requestPermission] = useCameraPermissions();
@@ -16,11 +17,7 @@ export default function App() {
         console.log('Camera permissions:', permission);
     }, [permission]);
 
-    const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
-        ? `http://${process.env.REACT_APP_MACHINE_IP}:8000`
-        : "http://192.168.0.162:8000";  // Fallback to hardcoded IP
-
-    console.log('Using BACKEND_URL:', BACKEND_URL);  // Log the backend URL to ensure it's correct
+    console.log('Using BACKEND_URL:', BACKEND_URL);
 
     async function handleCapturePhoto() {
         if (!cameraRef.current) {

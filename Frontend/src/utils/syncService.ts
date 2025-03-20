@@ -7,9 +7,33 @@ import {
     updateLastSyncTime,
     purgeOldData
 } from './database';
+import { BACKEND_URL } from './config';
 
-const BACKEND_URL = 'http://192.168.0.162:8000'; // Replace with your backend URL
-const SYNC_INTERVAL = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+// Sync interval in milliseconds (3 hours)
+const SYNC_INTERVAL = 3 * 60 * 60 * 1000;
+
+// Define a type for food log entries
+interface FoodLogEntry {
+    id: number;
+    meal_id: number;
+    user_id: number;
+    food_name: string;
+    calories: number;
+    proteins: number;
+    carbs: number;
+    fats: number;
+    image_url: string;
+    file_key: string;
+    healthiness_rating?: number;
+    date: string;
+    meal_type: string;
+    brand_name?: string;
+    quantity?: string;
+    notes?: string;
+    synced: number;
+    sync_action: string;
+    last_modified: string;
+}
 
 // Check if the device is online
 export const isOnline = async (): Promise<boolean> => {
@@ -18,20 +42,44 @@ export const isOnline = async (): Promise<boolean> => {
 };
 
 // Sync a single food log
-const syncFoodLog = async (foodLog: any): Promise<number> => {
+const syncFoodLog = async (foodLog: FoodLogEntry): Promise<number> => {
     try {
         const { id, sync_action, ...data } = foodLog;
+        console.log(`🔄 Syncing food log ID ${id} with action: ${sync_action}`);
+
+        // Ensure date is in the correct format (YYYY-MM-DD)
+        let formattedData = { ...data };
+        if (data.date) {
+            // If date is already in YYYY-MM-DD format, use it as is
+            if (/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+                formattedData.date = data.date;
+            } else {
+                // Otherwise, try to extract the date part
+                try {
+                    const dateStr = data.date.split('T')[0].split(' ')[0]; // Handle both ISO and space-separated formats
+                    formattedData.date = dateStr;
+                } catch (error) {
+                    console.error('❌ Error formatting date for sync:', error);
+                    // Keep original date if parsing fails
+                }
+            }
+        }
+
+        console.log('Food log data for sync:', formattedData);
 
         let response;
 
         switch (sync_action) {
             case 'create':
-                response = await axios.post(`${BACKEND_URL}/meal_entries/create`, data);
+                console.log(`Creating new food log on backend: ${BACKEND_URL}/meal_entries/create`);
+                response = await axios.post(`${BACKEND_URL}/meal_entries/create`, formattedData);
                 break;
             case 'update':
-                response = await axios.put(`${BACKEND_URL}/meal_entries/update/${id}`, data);
+                console.log(`Updating food log on backend: ${BACKEND_URL}/meal_entries/update/${id}`);
+                response = await axios.put(`${BACKEND_URL}/meal_entries/update/${id}`, formattedData);
                 break;
             case 'delete':
+                console.log(`Deleting food log on backend: ${BACKEND_URL}/meal_entries/delete/${id}`);
                 response = await axios.delete(`${BACKEND_URL}/meal_entries/delete/${id}`);
                 break;
             default:
@@ -41,6 +89,7 @@ const syncFoodLog = async (foodLog: any): Promise<number> => {
         if (response.status >= 200 && response.status < 300) {
             // Mark as synced in local database
             const serverId = response.data.id || id;
+            console.log(`✅ Sync successful. Server ID: ${serverId}`);
             await markFoodLogAsSynced(id, serverId);
             return 1; // Successfully synced
         } else {
@@ -64,7 +113,8 @@ export const syncFoodLogs = async (): Promise<{ success: number, failed: number 
         }
 
         // Get all unsynced food logs
-        const unsyncedLogs = await getUnsyncedFoodLogs();
+        const unsyncedLogs = await getUnsyncedFoodLogs() as FoodLogEntry[];
+        console.log(`📊 Found ${unsyncedLogs.length} unsynced food logs`);
 
         if (unsyncedLogs.length === 0) {
             console.log('✅ No unsynced food logs to sync');
@@ -77,13 +127,35 @@ export const syncFoodLogs = async (): Promise<{ success: number, failed: number 
         // Sync each food log
         let success = 0;
         let failed = 0;
+        const maxRetries = 3;
 
         for (const log of unsyncedLogs) {
-            const result = await syncFoodLog(log);
-            if (result === 1) {
-                success++;
-            } else {
+            let retries = 0;
+            let synced = false;
+
+            while (retries < maxRetries && !synced) {
+                try {
+                    const result = await syncFoodLog(log);
+                    if (result === 1) {
+                        success++;
+                        synced = true;
+                    } else {
+                        retries++;
+                        console.log(`⚠️ Retry ${retries}/${maxRetries} for food log ID ${log.id}`);
+                        // Wait a bit before retrying
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                } catch (error) {
+                    retries++;
+                    console.error(`❌ Error on retry ${retries}/${maxRetries} for food log ID ${log.id}:`, error);
+                    // Wait a bit before retrying
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            if (!synced) {
                 failed++;
+                console.error(`❌ Failed to sync food log ID ${log.id} after ${maxRetries} retries`);
             }
         }
 

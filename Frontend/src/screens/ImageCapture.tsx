@@ -19,9 +19,9 @@ import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { addFoodLog } from '../utils/database';
+import { BACKEND_URL } from '../utils/config';
 
 const { width } = Dimensions.get('window');
-const BACKEND_URL = 'http://192.168.0.162:8000';
 
 type ImageInfo = {
     uri: string;
@@ -292,6 +292,12 @@ const ImageCapture: React.FC = () => {
             // Extract nutrition data
             const nutritionData = result.nutrition_data[0] || {};
 
+            // Format current date as ISO string (YYYY-MM-DD)
+            const today = new Date();
+            // Ensure consistent date format (YYYY-MM-DD) without time component
+            const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            console.log(`Saving food log with date: ${formattedDate}`);
+
             // Create a food log entry
             const foodLog = {
                 meal_id: result.meal_id,
@@ -303,14 +309,18 @@ const ImageCapture: React.FC = () => {
                 image_url: imageUris[0] || '', // Use the first image as the main image
                 file_key: 'default_key',
                 healthiness_rating: nutritionData.healthiness_rating || 5,
+                date: formattedDate, // Add formatted date
                 meal_type: mealType,
                 brand_name: brandName,
                 quantity: quantity,
                 notes: notes
             };
 
+            console.log('Saving food log to local database:', foodLog);
+
             // Add to local database
             await addFoodLog(foodLog);
+            console.log('Food log saved to local database successfully');
 
             // Navigate back to the food log screen
             Alert.alert('Success', 'Food added successfully', [

@@ -30,10 +30,6 @@ const BUTTON_SIZE = Math.min(BASE_BUTTON_SIZE, width * 0.15);
 const BUTTON_RADIUS = BUTTON_SIZE / 2;
 const OFFSET = BUTTON_RADIUS; // to center the button
 
-export const BACKEND_URL = process.env.REACT_APP_MACHINE_IP
-  ? `http://${process.env.REACT_APP_MACHINE_IP}:8000`
-  : "http://localhost:8000";  // Use localhost for local development
-
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 function CustomTabBarButton({ children }) {
@@ -270,9 +266,11 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
+        console.log('🔄 Starting app initialization...');
+
         // Initialize the SQLite database
-        await initDatabase();
-        console.log('✅ Database initialized successfully');
+        const db = await initDatabase();
+        console.log('✅ Database initialized successfully', db ? 'Database connected' : 'Database not properly connected');
 
         // Start periodic sync
         await startPeriodicSync();
@@ -284,7 +282,10 @@ export default function App() {
       } catch (error) {
         console.error('❌ Error initializing app:', error);
       } finally {
-        setIsLoading(false);
+        // Short delay to ensure database is fully initialized
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
       }
     };
 
