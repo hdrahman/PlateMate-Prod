@@ -819,9 +819,9 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         paddingVertical: 6,
         paddingHorizontal: 10,
-        marginHorizontal: 16, // Add horizontal margin to match content
+        marginHorizontal: 10, // Match with scrollInner paddingHorizontal
         marginTop: -5,
-        marginBottom: 8, // Reduced from 10 to 8
+        marginBottom: 3, // Reduced to minimize space between day and calories card
     },
     arrowButton: {
         paddingHorizontal: 12,
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
     // Calories Remaining Card
     summaryCard: {
         backgroundColor: '#121212',
-        marginTop: 8, // Reduced from 12 to 8
+        marginTop: 3, // Reduced from 8 to 3 to minimize space
         marginBottom: 12, // Added margin bottom to match spacing between other cards
         borderRadius: 8,
         padding: 16,
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     scrollInner: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 10, // Reduced from 16 to 10 to make cards wider
         paddingBottom: 100,
         width: '100%',
         alignItems: 'center',

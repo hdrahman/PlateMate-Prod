@@ -1,6 +1,6 @@
 import requests
 
-url = "http://127.0.0.1:8000/images/upload-image"
+url = "http://192.168.128.130:8000/images/upload-image"
 file_path = r"C:\Users\Haame\Downloads\Mockups\Platemate_mockup.jpg"
 
 files = {"file": open(file_path, "rb")}
