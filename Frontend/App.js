@@ -23,6 +23,7 @@ import AboutUs from './src/screens/AboutUs';
 import Settings from './src/screens/Settings';
 import CameraScreen from './src/screens/Camera';
 import ImageCaptureScreen from './src/screens/ImageCapture';
+import Nutrients from './src/screens/Nutrients';
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -380,6 +381,11 @@ export default function App() {
           <Stack.Screen
             name="ImageCapture"
             component={ImageCaptureScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Nutrients"
+            component={Nutrients}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

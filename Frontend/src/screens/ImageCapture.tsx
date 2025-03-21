@@ -13,15 +13,26 @@ import {
     Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, StackActions } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { addFoodLog } from '../utils/database';
 import { BACKEND_URL } from '../utils/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
+
+// Define navigation types
+type RootStackParamList = {
+    FoodLog: { refresh?: number };
+    ImageCapture: { mealType: string };
+    // Add other screens as needed
+};
+
+type NavigationProp = StackNavigationProp<RootStackParamList, 'ImageCapture'>;
 
 type ImageInfo = {
     uri: string;
@@ -42,7 +53,7 @@ type NutritionData = {
 };
 
 const ImageCapture: React.FC = () => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
     const { mealType: initialMealType } = route.params as { mealType: string };
 
@@ -322,9 +333,23 @@ const ImageCapture: React.FC = () => {
             await addFoodLog(foodLog);
             console.log('Food log saved to local database successfully');
 
-            // Navigate back to the food log screen
+            // Navigate back to the food log screen with refresh parameter
             Alert.alert('Success', 'Food added successfully', [
-                { text: 'OK', onPress: () => navigation.goBack() }
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        // Fix navigation by using goBack and not passing complex params
+                        navigation.goBack();
+                        // Use AsyncStorage to trigger refresh on FoodLog screen
+                        try {
+                            const refreshTime = Date.now().toString();
+                            AsyncStorage.setItem('FOOD_LOG_REFRESH_TRIGGER', refreshTime)
+                                .then(() => console.log('Set refresh trigger:', refreshTime));
+                        } catch (err) {
+                            console.error('Failed to set refresh trigger:', err);
+                        }
+                    }
+                }
             ]);
         } catch (error) {
             console.error('Error submitting food:', error);

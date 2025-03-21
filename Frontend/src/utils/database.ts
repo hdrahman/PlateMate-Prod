@@ -417,61 +417,41 @@ export const getFoodLogsByDate = async (date: string) => {
 };
 
 // Update a food log entry
-export const updateFoodLog = async (id: number, foodLog: any) => {
+export const updateFoodLog = async (id: number, updates: any) => {
     if (!db) {
         throw new Error('Database not initialized');
     }
 
-    const {
-        meal_id,
-        user_id,
-        food_name,
-        calories,
-        proteins,
-        carbs,
-        fats,
-        image_url,
-        file_key,
-        healthiness_rating,
-        date,
-        meal_type,
-        brand_name,
-        quantity,
-        notes
-    } = foodLog;
-
     try {
-        await db.runAsync(
-            `UPDATE food_logs SET 
-        meal_id = ?, user_id = ?, food_name = ?, calories = ?, 
-        proteins = ?, carbs = ?, fats = ?, image_url = ?, 
-        file_key = ?, healthiness_rating = ?, date = ?, 
-        meal_type = ?, brand_name = ?, quantity = ?, notes = ?,
-        synced = ?, sync_action = ?, last_modified = ?
-      WHERE id = ?`,
-            [
-                meal_id,
-                user_id,
-                food_name,
-                calories,
-                proteins,
-                carbs,
-                fats,
-                image_url,
-                file_key,
-                healthiness_rating,
-                date,
-                meal_type,
-                brand_name,
-                quantity,
-                notes,
-                0, // not synced
-                'update', // sync action
-                getCurrentDate(),
-                id
-            ]
-        );
-        console.log('✅ Food log updated successfully');
+        console.log(`📝 Updating food log with ID ${id}:`, updates);
+
+        // Build the SET clause dynamically based on the updates
+        const setClauses = [];
+        const values = [];
+
+        for (const [key, value] of Object.entries(updates)) {
+            setClauses.push(`${key} = ?`);
+            values.push(value);
+        }
+
+        // Also update the sync fields
+        setClauses.push('synced = ?');
+        values.push(0); // Mark as not synced
+
+        setClauses.push('sync_action = ?');
+        values.push('update');
+
+        setClauses.push('last_modified = ?');
+        values.push(getCurrentDate());
+
+        // Add the ID as the last value for the WHERE clause
+        values.push(id);
+
+        const sql = `UPDATE food_logs SET ${setClauses.join(', ')} WHERE id = ?`;
+        const result = await db.runAsync(sql, values);
+
+        console.log('✅ Food log updated successfully', result.changes);
+        return result.changes;
     } catch (error) {
         console.error('❌ Error updating food log:', error);
         throw error;
@@ -485,26 +465,10 @@ export const deleteFoodLog = async (id: number) => {
     }
 
     try {
-        // Mark for deletion (for sync purposes)
-        await db.runAsync(
-            `UPDATE food_logs SET 
-        synced = ?, sync_action = ?, last_modified = ?
-      WHERE id = ?`,
-            [
-                0, // not synced
-                'delete', // sync action
-                getCurrentDate(),
-                id
-            ]
-        );
-        console.log('✅ Food log marked for deletion successfully');
-
-        // Now actually delete it locally
-        await db.runAsync(
-            `DELETE FROM food_logs WHERE id = ?`,
-            [id]
-        );
-        console.log('✅ Food log deleted locally successfully');
+        console.log(`🗑️ Deleting food log with ID ${id}`);
+        const result = await db.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
+        console.log('✅ Food log deleted successfully', result.changes);
+        return result.changes;
     } catch (error) {
         console.error('❌ Error deleting food log:', error);
         throw error;

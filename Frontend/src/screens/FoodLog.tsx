@@ -10,17 +10,21 @@ import {
     Animated,
     Dimensions,
     ActivityIndicator,
+    Modal,
+    TouchableHighlight,
+    Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from 'react-native-gesture-handler';
 import axios from 'axios';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getExercisesByDate, addExercise } from '../utils/database';
+import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -44,6 +48,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 interface MealItem {
     name: string;
     calories: number;
+    healthiness?: number;  // Add healthiness rating
 }
 
 interface MealMacros {
@@ -69,6 +74,8 @@ interface FoodLogEntry {
     proteins: number;
     carbs: number;
     fats: number;
+    weight?: number;  // Add weight field
+    weight_unit?: string;  // Add weight unit field
     image_url: string;
     file_key: string;
     healthiness_rating?: number;
@@ -92,14 +99,56 @@ interface Exercise {
     notes?: string;
 }
 
+// Add interface for route params
+type FoodLogRouteParams = {
+    refresh?: number;
+};
+
+const GradientCard = ({ children, style = {} }) => {
+    return (
+        <LinearGradient
+            colors={["rgba(0, 168, 255, 0.5)", "rgba(170, 0, 255, 0.5)", "rgba(255, 0, 245, 0.5)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.gradientBorder, style]}
+        >
+            <View style={styles.cardInner}>
+                {children}
+            </View>
+        </LinearGradient>
+    );
+};
+
 const DiaryScreen: React.FC = () => {
     const [mealData, setMealData] = useState<Meal[]>([]);
     const [breakfastEntries, setBreakfastEntries] = useState([]);
     const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
     const navigation = useNavigation<NavigationProp>();
+    const route = useRoute();
     const [currentDate, setCurrentDate] = useState(new Date());
     const processedMealData = useRef(false);
     const [loading, setLoading] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const localMealDataRef = useRef<FoodLogEntry[] | null>(null);
+
+    // Define valid meal types
+    const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+
+    // Helper function to get color based on healthiness rating
+    const getHealthinessColor = (rating: number): string => {
+        if (rating <= 4) return '#FF5252'; // Red for unhealthy (0-4)
+        if (rating <= 7) return '#FFD740'; // Yellow for moderate (5-7)
+        return '#4CAF50'; // Green for healthy (8-10)
+    };
+
+    // Check for navigation params that should trigger a refresh
+    useEffect(() => {
+        const params = route.params as FoodLogRouteParams;
+        if (params?.refresh) {
+            console.log('Received refresh parameter from navigation:', params.refresh);
+            refreshMealData();
+        }
+    }, [route.params]);
 
     // Initialize with default meal types on component mount
     useEffect(() => {
@@ -133,6 +182,21 @@ const DiaryScreen: React.FC = () => {
 
         setMealData(defaultMeals);
     }, []);
+
+    // Add a function to trigger refresh
+    const refreshMealData = () => {
+        setRefreshTrigger(prev => prev + 1);
+    };
+
+    // Subscribe to navigation focus events to refresh data when returning to this screen
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            console.log('Screen focused, refreshing data...');
+            refreshMealData();
+        });
+
+        return unsubscribe;
+    }, [navigation]);
 
     const updateMealItems = (mealType, entries) => {
         return entries.map(entry => ({
@@ -181,18 +245,21 @@ const DiaryScreen: React.FC = () => {
 
                 // First try to get data from local SQLite database
                 console.log('Fetching from local SQLite database...');
-                const localMealData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
-                console.log('Local meal data:', localMealData);
+                const localData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
+                console.log('Local meal data:', localData);
+
+                // Store local data in a ref for later use
+                localMealDataRef.current = localData;
 
                 // Process local data into the format needed for display
-                if (localMealData && localMealData.length > 0) {
+                if (localData && localData.length > 0) {
                     // Get current meal data to merge with
                     const mealDict: Record<string, Meal> = {};
 
                     // Initialize with default meal types
-                    defaultMeals.forEach(meal => {
-                        mealDict[meal.title] = {
-                            ...meal,
+                    mealTypes.forEach(type => {
+                        mealDict[type] = {
+                            title: type,
                             total: 0, // Reset totals as we'll recalculate
                             macros: { carbs: 0, fat: 0, protein: 0 },
                             items: []
@@ -200,26 +267,32 @@ const DiaryScreen: React.FC = () => {
                     });
 
                     // Group by meal type
-                    localMealData.forEach(entry => {
+                    localData.forEach(entry => {
                         if (!entry.meal_type) return; // Skip entries without meal type
 
-                        if (!mealDict[entry.meal_type]) {
-                            mealDict[entry.meal_type] = {
-                                title: entry.meal_type,
-                                total: 0,
-                                macros: { carbs: 0, fat: 0, protein: 0 },
-                                items: []
-                            };
-                        }
+                        // Normalize meal_type - capitalize first letter to match our mealTypes
+                        let normalizedMealType = entry.meal_type.charAt(0).toUpperCase() + entry.meal_type.slice(1).toLowerCase();
+
+                        // Check if the meal type exists in our predefined types
+                        const validMealType = mealTypes.includes(normalizedMealType) ?
+                            normalizedMealType :
+                            'Snacks'; // Default to Snacks if unknown type
 
                         // Add food entry to respective meal
-                        mealDict[entry.meal_type].total += entry.calories;
-                        mealDict[entry.meal_type].macros.carbs += entry.carbs;
-                        mealDict[entry.meal_type].macros.fat += entry.fats;
-                        mealDict[entry.meal_type].macros.protein += entry.proteins;
-                        mealDict[entry.meal_type].items.push({
-                            name: `${entry.food_name}\nProtein ${entry.proteins}g`,
-                            calories: entry.calories
+                        mealDict[validMealType].total += entry.calories || 0;
+                        mealDict[validMealType].macros.carbs += entry.carbs || 0;
+                        mealDict[validMealType].macros.fat += entry.fats || 0;
+                        mealDict[validMealType].macros.protein += entry.proteins || 0;
+
+                        // Format the item name with appropriate nutritional info
+                        const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';
+                        const proteinInfo = `Protein: ${entry.proteins}g`;
+                        const itemDescription = weightInfo ? `${proteinInfo}\n${weightInfo}` : proteinInfo;
+
+                        mealDict[validMealType].items.push({
+                            name: `${entry.food_name}\n${itemDescription}`,
+                            calories: entry.calories || 0,
+                            healthiness: entry.healthiness_rating || 5
                         });
                     });
 
@@ -260,7 +333,6 @@ const DiaryScreen: React.FC = () => {
                                 const mealDict: Record<string, Meal> = {};
 
                                 // Initialize with default meal types
-                                const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
                                 mealTypes.forEach(type => {
                                     mealDict[type] = {
                                         title: type,
@@ -274,14 +346,29 @@ const DiaryScreen: React.FC = () => {
                                 backendDateData.forEach(entry => {
                                     if (!entry.meal_type) return; // Skip entries without meal type
 
+                                    // Normalize meal_type - capitalize first letter to match our mealTypes
+                                    let normalizedMealType = entry.meal_type.charAt(0).toUpperCase() + entry.meal_type.slice(1).toLowerCase();
+
+                                    // Check if the meal type exists in our predefined types
+                                    const validMealType = mealTypes.includes(normalizedMealType) ?
+                                        normalizedMealType :
+                                        'Snacks'; // Default to Snacks if unknown type
+
                                     // Add food entry to respective meal
-                                    mealDict[entry.meal_type].total += entry.calories;
-                                    mealDict[entry.meal_type].macros.carbs += entry.carbs;
-                                    mealDict[entry.meal_type].macros.fat += entry.fats;
-                                    mealDict[entry.meal_type].macros.protein += entry.proteins;
-                                    mealDict[entry.meal_type].items.push({
-                                        name: `${entry.food_name}\nProtein ${entry.proteins}g`,
-                                        calories: entry.calories
+                                    mealDict[validMealType].total += entry.calories || 0;
+                                    mealDict[validMealType].macros.carbs += entry.carbs || 0;
+                                    mealDict[validMealType].macros.fat += entry.fats || 0;
+                                    mealDict[validMealType].macros.protein += entry.proteins || 0;
+
+                                    // Format the item name with appropriate nutritional info
+                                    const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';
+                                    const proteinInfo = `Protein: ${entry.proteins}g`;
+                                    const itemDescription = weightInfo ? `${proteinInfo}\n${weightInfo}` : proteinInfo;
+
+                                    mealDict[validMealType].items.push({
+                                        name: `${entry.food_name}\n${itemDescription}`,
+                                        calories: entry.calories || 0,
+                                        healthiness: entry.healthiness_rating || 5
                                     });
                                 });
 
@@ -312,7 +399,7 @@ const DiaryScreen: React.FC = () => {
         };
 
         fetchMeals();
-    }, [currentDate]); // Only re-run when the date changes
+    }, [currentDate, refreshTrigger]); // Re-run when date changes or refresh is triggered
 
     useEffect(() => {
         // This useEffect is now simplified since we handle meal type initialization elsewhere
@@ -325,12 +412,22 @@ const DiaryScreen: React.FC = () => {
     const goal = 1800;
     // Calculate total exercise calories based on exerciseList instead of hardcoded value
     const totalExerciseCalories = exerciseList.reduce((total, exercise) => total + exercise.calories_burned, 0);
-    const foodTotal = mealData.reduce((acc, meal) => acc + meal.total, 0);
+
+    // Add null check to prevent the "Cannot read property 'total' of undefined" error
+    const foodTotal = mealData && mealData.length
+        ? mealData.reduce((acc, meal) => acc + (meal?.total || 0), 0)
+        : 0;
+
     const remaining = goal - foodTotal + totalExerciseCalories;
     const [showStreakInfo, setShowStreakInfo] = useState(false);
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
     const swipeAnim = useRef(new Animated.Value(0)).current; // new animated value for full page swiping
+
+    // Add state for action modal
+    const [actionModalVisible, setActionModalVisible] = useState(false);
+    const [selectedFoodItem, setSelectedFoodItem] = useState<{ id?: number, name: string, meal: string, index: number } | null>(null);
+    const [moveModalVisible, setMoveModalVisible] = useState(false);
 
     const toggleStreakInfo = () => {
         setShowStreakInfo(!showStreakInfo);
@@ -569,6 +666,212 @@ const DiaryScreen: React.FC = () => {
         }
     };
 
+    // Add effect to check for AsyncStorage refresh trigger
+    useEffect(() => {
+        const checkAsyncStorageTrigger = async () => {
+            try {
+                const trigger = await AsyncStorage.getItem('FOOD_LOG_REFRESH_TRIGGER');
+                if (trigger) {
+                    console.log('Found refresh trigger in AsyncStorage:', trigger);
+                    // Clear the trigger and refresh
+                    await AsyncStorage.removeItem('FOOD_LOG_REFRESH_TRIGGER');
+                    refreshMealData();
+                }
+            } catch (error) {
+                console.error('Error checking AsyncStorage trigger:', error);
+            }
+        };
+
+        // Check on initial load
+        checkAsyncStorageTrigger();
+
+        // Set up a listener to check periodically
+        const interval = setInterval(checkAsyncStorageTrigger, 1000);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, []);
+
+    // Function to handle long press on a food item
+    const handleFoodItemLongPress = (foodId: number | undefined, foodName: string, mealType: string, index: number) => {
+        console.log('Long press detected:', { foodId, foodName, mealType, index });
+
+        if (!foodId) {
+            console.log('Warning: No food ID found for', foodName);
+
+            // Try to find the item in localMealDataRef.current
+            if (localMealDataRef.current) {
+                const matchingItem = localMealDataRef.current.find(entry =>
+                    entry.food_name === foodName &&
+                    entry.meal_type.toLowerCase() === mealType.toLowerCase()
+                );
+
+                if (matchingItem) {
+                    console.log('Found matching item with ID:', matchingItem.id);
+                    foodId = matchingItem.id;
+                } else {
+                    console.log('No matching item found in local data for:', foodName);
+                }
+            }
+        }
+
+        setSelectedFoodItem({
+            id: foodId,
+            name: foodName,
+            meal: mealType,
+            index: index
+        });
+
+        console.log('Selected food item set to:', {
+            id: foodId,
+            name: foodName,
+            meal: mealType,
+            index: index
+        });
+
+        setActionModalVisible(true);
+    };
+
+    // Function to move food item to different meal type
+    const moveFood = async (foodId: number | undefined, newMealType: string) => {
+        if (!foodId) return;
+
+        setLoading(true);
+
+        try {
+            // Update the food log entry with the new meal type
+            await updateFoodLog(foodId, { meal_type: newMealType });
+            console.log(`Food item moved to ${newMealType}`);
+
+            // Close modals
+            setMoveModalVisible(false);
+            setActionModalVisible(false);
+
+            // Reset selected food item
+            setSelectedFoodItem(null);
+
+            // Refresh the meal data
+            refreshMealData();
+
+            // Show success message
+            Alert.alert('Success', `Food item moved to ${newMealType}`);
+        } catch (error) {
+            console.error('Error moving food item:', error);
+            Alert.alert('Error', 'Failed to move food item');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Function to handle moving a food item to a different meal
+    const handleMoveFoodItem = async (newMealType: string) => {
+        if (!selectedFoodItem || !selectedFoodItem.id) {
+            console.error('No food item selected for moving');
+            return;
+        }
+
+        try {
+            // Update the meal type in local database
+            await updateFoodLog(selectedFoodItem.id, { meal_type: newMealType });
+            console.log(`Food item moved to ${newMealType} in local database`);
+
+            // Try to update in backend if online
+            const online = await isOnline();
+            if (online) {
+                try {
+                    const response = await fetch(`${BACKEND_URL}/meal_entries/${selectedFoodItem.id}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ meal_type: newMealType }),
+                    });
+
+                    if (response.ok) {
+                        console.log(`Food item moved to ${newMealType} in backend`);
+                    } else {
+                        console.error('Failed to update meal type in backend');
+                    }
+                } catch (error) {
+                    console.error('Error updating meal type in backend:', error);
+                }
+            }
+
+            // Refresh the food log
+            refreshMealData();
+        } catch (error) {
+            console.error('Error moving food item:', error);
+            Alert.alert('Error', 'Failed to move food item');
+        } finally {
+            setMoveModalVisible(false);
+            setActionModalVisible(false);
+            setSelectedFoodItem(null);
+        }
+    };
+
+    // Function to handle deleting a food item
+    const handleDeleteFoodItem = async () => {
+        if (!selectedFoodItem || !selectedFoodItem.id) {
+            console.error('No food item selected for deletion');
+            return;
+        }
+
+        // Show confirmation dialog
+        Alert.alert(
+            "Delete Food Item",
+            `Are you sure you want to delete "${selectedFoodItem.name}"?`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                    onPress: () => setActionModalVisible(false)
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setActionModalVisible(false);
+                            setLoading(true);
+
+                            // Delete from local database
+                            await deleteFoodLog(selectedFoodItem.id);
+                            console.log('Food item deleted from local database');
+
+                            // Try to delete from backend if online
+                            const online = await isOnline();
+                            if (online) {
+                                try {
+                                    const response = await fetch(`${BACKEND_URL}/meal_entries/${selectedFoodItem.id}`, {
+                                        method: 'DELETE',
+                                    });
+
+                                    if (response.ok) {
+                                        console.log('Food item deleted from backend');
+                                    } else {
+                                        console.error('Failed to delete food item from backend');
+                                    }
+                                } catch (error) {
+                                    console.error('Error deleting food item from backend:', error);
+                                }
+                            }
+
+                            // Refresh the food log
+                            refreshMealData();
+                        } catch (error) {
+                            console.error('Error deleting food item:', error);
+                            Alert.alert('Error', 'Failed to delete food item');
+                        } finally {
+                            setLoading(false);
+                            setSelectedFoodItem(null);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={styles.container}>
@@ -611,7 +914,10 @@ const DiaryScreen: React.FC = () => {
                                     <Ionicons name="image" size={22} color="#00BFFF" />
                                 </TouchableOpacity>
                                 {/* Updated pie chart icon color */}
-                                <TouchableOpacity onPress={() => console.log('Open Nutrients')} style={styles.iconButton}>
+                                <TouchableOpacity
+                                    onPress={() => navigation.navigate('Nutrients' as never)}
+                                    style={styles.iconButton}
+                                >
                                     <Ionicons name="pie-chart-outline" size={22} color="#FFA500" />
                                 </TouchableOpacity>
                             </View>
@@ -645,121 +951,182 @@ const DiaryScreen: React.FC = () => {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* 2) Calories Remaining */}
-                            <View style={styles.summaryCard}>
-                                <Text style={styles.summaryTitle}>Calories Remaining</Text>
-                                <View style={styles.equationRow}>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
-                                            {goal}
-                                        </Text>
-                                        <Text style={styles.equationLabel}>Base</Text>
-                                    </View>
-                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
-                                            {foodTotal}
-                                        </Text>
-                                        <Text style={styles.equationLabel}>Food</Text>
-                                    </View>
-                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
-                                            {totalExerciseCalories}
-                                        </Text>
-                                        <Text style={styles.equationLabel}>Exercise</Text>
-                                    </View>
-                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
-                                        <Text style={styles.equationLabel}>Remaining</Text>
+                            <GradientCard>
+                                <View style={styles.summaryCard}>
+                                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
+                                    <View style={styles.equationRow}>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                                                {goal}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Base</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                                                {foodTotal}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Food</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                                                {totalExerciseCalories}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Exercise</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
+                                            <Text style={styles.equationLabel}>Remaining</Text>
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
+                            </GradientCard>
 
                             {/* 3) Meals */}
                             {mealData.map((meal, idx) => (
-                                <View key={idx} style={styles.mealSection}>
-                                    {/* Always show meal title and calories */}
-                                    <View style={styles.mealHeader}>
-                                        <Text style={styles.mealTitle}>{meal.title}</Text>
-                                        <Text style={styles.mealCal}>{meal.total}</Text>
+                                <GradientCard key={idx}>
+                                    <View style={styles.mealSection}>
+                                        {/* Always show meal title and calories */}
+                                        <View style={styles.mealHeader}>
+                                            <Text style={styles.mealTitle}>{meal.title}</Text>
+                                            <Text style={styles.mealCal}>{meal.total}</Text>
+                                        </View>
+
+                                        {/* Always show macros, even if they're all zero */}
+                                        <TouchableOpacity onPress={toggleMacrosDisplay}>
+                                            <Text style={styles.macrosText}>
+                                                {showMacrosAsPercent
+                                                    ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
+                                                    : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <View style={styles.dividerLine} />
+
+                                        {/* Only show items if there are any */}
+                                        {meal.items.length > 0 ? (
+                                            <>
+                                                {meal.items
+                                                    .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
+                                                    .map((item, i) => {
+                                                        // First extract food name without the weight info
+                                                        const foodName = item.name.split('\n')[0];
+                                                        // Try to find the ID from localMealDataRef
+                                                        let foodId = undefined;
+
+                                                        if (localMealDataRef.current) {
+                                                            // Try exact match first
+                                                            const exactMatch = localMealDataRef.current.find(entry =>
+                                                                entry.food_name === foodName &&
+                                                                entry.meal_type.toLowerCase() === meal.title.toLowerCase()
+                                                            );
+
+                                                            if (exactMatch) {
+                                                                foodId = exactMatch.id;
+                                                            } else {
+                                                                // If no exact match, try just by food name
+                                                                const nameMatch = localMealDataRef.current.find(entry =>
+                                                                    entry.food_name === foodName
+                                                                );
+
+                                                                if (nameMatch) {
+                                                                    foodId = nameMatch.id;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        return (
+                                                            <TouchableHighlight
+                                                                key={i}
+                                                                underlayColor="#333"
+                                                                onLongPress={() => {
+                                                                    handleFoodItemLongPress(foodId, foodName, meal.title, i);
+                                                                }}
+                                                                delayLongPress={500}
+                                                            >
+                                                                <View>
+                                                                    <View style={styles.logRow}>
+                                                                        <View style={{ flex: 1 }}>
+                                                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                                <Text style={styles.logItemText}>{foodName}</Text>
+                                                                                <View style={[
+                                                                                    styles.healthinessCircle,
+                                                                                    { borderColor: getHealthinessColor(item.healthiness || 5), marginLeft: 4 }
+                                                                                ]}>
+                                                                                    <Text style={[styles.healthinessText, { color: getHealthinessColor(item.healthiness || 5) }]}>
+                                                                                        {Math.round(item.healthiness || 5)}
+                                                                                    </Text>
+                                                                                </View>
+                                                                            </View>
+                                                                            <Text style={styles.weightText}>{item.name.split('\n').slice(1).join('\n')}</Text>
+                                                                        </View>
+                                                                        <Text style={styles.logCalText}>{item.calories}</Text>
+                                                                    </View>
+                                                                    {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
+                                                                </View>
+                                                            </TouchableHighlight>
+                                                        );
+                                                    })}
+                                                <View style={styles.dividerLine} />
+                                            </>
+                                        ) : null}
+
+                                        <TouchableOpacity
+                                            style={styles.addBtn}
+                                            onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title })}
+                                        >
+                                            <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                        </TouchableOpacity>
                                     </View>
-
-                                    {/* Always show macros, even if they're all zero */}
-                                    <TouchableOpacity onPress={toggleMacrosDisplay}>
-                                        <Text style={styles.macrosText}>
-                                            {showMacrosAsPercent
-                                                ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
-                                                : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    <View style={styles.dividerLine} />
-
-                                    {/* Only show items if there are any */}
-                                    {meal.items.length > 0 ? (
-                                        <>
-                                            {meal.items
-                                                .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
-                                                .map((item, i) => (
-                                                    <View key={i}>
-                                                        <View style={styles.logRow}>
-                                                            <Text style={styles.logItemText}>{item.name}</Text>
-                                                            <Text style={styles.logCalText}>{item.calories}</Text>
-                                                        </View>
-                                                        {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
-                                                    </View>
-                                                ))}
-                                            <View style={styles.dividerLine} />
-                                        </>
-                                    ) : null}
-
-                                    <TouchableOpacity
-                                        style={styles.addBtn}
-                                        onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title })}
-                                    >
-                                        <Text style={styles.addBtnText}>ADD FOOD</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                </GradientCard>
                             ))}
 
                             {/* 4) Exercise */}
-                            <View style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
-                                    <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
+                            <GradientCard>
+                                <View style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
+                                        <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
+                                    </View>
+
+                                    {/* Divider line under heading */}
+                                    <View style={styles.dividerLine} />
+
+                                    {renderExerciseList()}
+
+                                    {/* Only show divider line if there are exercises already */}
+                                    {exerciseList.length > 0 && <View style={styles.dividerLine} />}
+
+                                    <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
+                                        <Text style={styles.addBtnText}>ADD EXERCISE</Text>
+                                    </TouchableOpacity>
                                 </View>
-
-                                {/* Divider line under heading */}
-                                <View style={styles.dividerLine} />
-
-                                {renderExerciseList()}
-
-                                {/* Only show divider line if there are exercises already */}
-                                {exerciseList.length > 0 && <View style={styles.dividerLine} />}
-
-                                <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
-                                    <Text style={styles.addBtnText}>ADD EXERCISE</Text>
-                                </TouchableOpacity>
-                            </View>
+                            </GradientCard>
 
                             {/* 5) Water */}
-                            <View style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={styles.mealTitle}>Water</Text>
-                                </View>
-                                {/* Divider line under heading */}
-                                <View style={styles.dividerLine} />
+                            <GradientCard>
+                                <View style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={styles.mealTitle}>Water</Text>
+                                    </View>
+                                    {/* Divider line under heading */}
+                                    <View style={styles.dividerLine} />
 
-                                <TouchableOpacity style={styles.addBtn}>
-                                    <Text style={styles.addBtnText}>ADD WATER</Text>
-                                </TouchableOpacity>
-                            </View>
+                                    <TouchableOpacity style={styles.addBtn}>
+                                        <Text style={styles.addBtnText}>ADD WATER</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </GradientCard>
 
                             {/* 7) Bottom action row */}
                             <View style={styles.bottomActions}>
                                 <View style={styles.topActionsRow}>
-                                    <TouchableOpacity style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}>
+                                    <TouchableOpacity
+                                        style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}
+                                        onPress={() => navigation.navigate('Nutrients' as never)}
+                                    >
                                         <Text style={styles.tabBtnText}>Nutrition</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
@@ -776,6 +1143,113 @@ const DiaryScreen: React.FC = () => {
                         </ScrollView>
                     </Animated.View>
                 </PanGestureHandler>
+
+                {/* Action Modal */}
+                <Modal
+                    animationType="fade"
+                    transparent={true}
+                    visible={actionModalVisible}
+                    onRequestClose={() => setActionModalVisible(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setActionModalVisible(false)}>
+                        <View style={styles.modalOverlay}>
+                            <TouchableWithoutFeedback>
+                                <View style={styles.actionModalContent}>
+                                    <Text style={styles.actionModalTitle}>
+                                        {selectedFoodItem?.name || 'Food Item'}
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                        onPress={() => {
+                                            setActionModalVisible(false);
+                                            setMoveModalVisible(true);
+                                        }}
+                                    >
+                                        <Ionicons name="arrow-forward-circle-outline" size={22} color="#8A2BE2" />
+                                        <Text style={styles.actionButtonText}>Move to Different Meal</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, styles.deleteButton]}
+                                        onPress={handleDeleteFoodItem}
+                                    >
+                                        <Ionicons name="trash-outline" size={22} color="#FF5252" />
+                                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.cancelButton}
+                                        onPress={() => setActionModalVisible(false)}
+                                    >
+                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+
+                {/* Move Modal */}
+                <Modal
+                    animationType="slide"
+                    transparent={true}
+                    visible={moveModalVisible}
+                    onRequestClose={() => setMoveModalVisible(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setMoveModalVisible(false)}>
+                        <View style={styles.modalOverlay}>
+                            <TouchableWithoutFeedback>
+                                <View style={styles.moveModalContent}>
+                                    <Text style={styles.moveModalTitle}>Move to Meal</Text>
+
+                                    {mealTypes.map((type) => (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.mealTypeButton,
+                                                selectedFoodItem?.meal === type && styles.currentMealType
+                                            ]}
+                                            key={type}
+                                            onPress={() => moveFood(selectedFoodItem?.id, type)}
+                                            disabled={selectedFoodItem?.meal === type}
+                                        >
+                                            <Text style={[
+                                                styles.mealTypeButtonText,
+                                                selectedFoodItem?.meal === type && styles.currentMealTypeText
+                                            ]}>
+                                                {type}
+                                                {selectedFoodItem?.meal === type ? ' (Current)' : ''}
+                                            </Text>
+                                            {selectedFoodItem?.meal !== type && (
+                                                <Ionicons
+                                                    name="chevron-forward"
+                                                    size={18}
+                                                    color={PURPLE_ACCENT}
+                                                    style={{ position: 'absolute', right: 15 }}
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+                                    ))}
+
+                                    <TouchableOpacity
+                                        style={styles.cancelButton}
+                                        onPress={() => setMoveModalVisible(false)}
+                                    >
+                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+
+                {/* Loading overlay */}
+                {loading && (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                        <Text style={styles.loadingText}>Processing...</Text>
+                    </View>
+                )}
             </SafeAreaView>
         </GestureHandlerRootView>
     );
@@ -944,7 +1418,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: WHITE,
         lineHeight: 18,
-        width: '100%', // Ensure full width for exercise names
+        flexShrink: 1,
     },
     logItemDuration: {
         fontSize: 12,
@@ -1089,5 +1563,127 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
         width: '100%',
         alignItems: 'center',
+    },
+    healthinessCircle: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'transparent',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    healthinessText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    actionModalContent: {
+        backgroundColor: '#1C1C1E',
+        padding: 20,
+        borderRadius: 10,
+        width: '80%',
+    },
+    actionModalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 15,
+        textAlign: 'center',
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#252525',
+        padding: 15,
+        borderRadius: 8,
+        marginBottom: 10,
+        width: '100%',
+    },
+    actionButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        marginLeft: 10,
+    },
+    deleteButton: {
+        backgroundColor: '#3A0505',
+    },
+    deleteButtonText: {
+        color: '#FF5252',
+    },
+    cancelButton: {
+        backgroundColor: '#333',
+        padding: 15,
+        borderRadius: 8,
+        width: '100%',
+        alignItems: 'center',
+        marginTop: 5,
+    },
+    cancelButtonText: {
+        color: '#AAA',
+        fontSize: 16,
+    },
+    moveModalContent: {
+        backgroundColor: '#1C1C1E',
+        padding: 20,
+        borderRadius: 10,
+        width: '80%',
+    },
+    moveModalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 15,
+        textAlign: 'center',
+    },
+    mealTypeButton: {
+        padding: 15,
+        borderWidth: 1,
+        borderColor: PURPLE_ACCENT,
+        borderRadius: 8,
+        marginBottom: 10,
+        width: '100%',
+        alignItems: 'center',
+    },
+    currentMealType: {
+        backgroundColor: '#2D1640',
+    },
+    mealTypeButtonText: {
+        color: PURPLE_ACCENT,
+        fontSize: 16,
+    },
+    currentMealTypeText: {
+        color: WHITE,
+    },
+    buttonText: {
+        color: PURPLE_ACCENT,
+        fontSize: 16,
+    },
+    weightText: {
+        fontSize: 12,
+        color: '#999999',
+        marginTop: 2,
+    },
+    gradientBorder: {
+        borderRadius: 16,
+        overflow: 'hidden',
+        padding: 2,
+        marginBottom: 12,
+    },
+    cardInner: {
+        borderRadius: 14,
+        overflow: 'hidden',
+        backgroundColor: PRIMARY_BG,
     },
 });

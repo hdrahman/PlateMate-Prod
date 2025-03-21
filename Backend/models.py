@@ -13,6 +13,8 @@ class FoodLog(Base):
     proteins = Column(Integer, nullable=False)
     carbs = Column(Integer, nullable=False)
     fats = Column(Integer, nullable=False)
+    weight = Column(Float, nullable=True)  # Weight of the food item
+    weight_unit = Column(String, nullable=True, default='g')  # Unit of measurement (g, oz, etc.)
     image_url = Column(String, nullable=False)  # Store cloud storage URL
     file_key = Column(String, nullable=False, default='default_file_key')  # Store cloud storage key
     healthiness_rating = Column(Integer, nullable=True)
