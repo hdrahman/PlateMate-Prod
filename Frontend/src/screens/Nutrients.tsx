@@ -43,11 +43,12 @@ const macroGoals = {
     iron: { current: 0, goal: 100, unit: '%' }
 };
 
-const GradientText = ({ text, colors, style }) => {
+// Add a GradientText component for text with gradient
+const GradientText = ({ text, style, colors }) => {
     return (
         <MaskedView
             maskElement={
-                <Text style={style}>
+                <Text style={[style, { opacity: 1 }]}>
                     {text}
                 </Text>
             }
@@ -56,15 +57,17 @@ const GradientText = ({ text, colors, style }) => {
                 colors={colors}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={{ flex: 1 }}
-            />
+            >
+                <Text style={[style, { opacity: 0 }]}>
+                    {text}
+                </Text>
+            </LinearGradient>
         </MaskedView>
     );
 };
 
 const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation();
-    const [activeTab, setActiveTab] = useState('NUTRIENTS');
 
     // Calculate the remaining amount for each nutrient
     const calculateRemaining = (current: number, goal: number) => {
@@ -120,51 +123,22 @@ const NutrientsScreen: React.FC = () => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={28} color={WHITE} />
                 </TouchableOpacity>
-                <GradientText
-                    text="NUTRIENTS"
-                    colors={["#5A60EA", "#FF00F5"]}
-                    style={styles.headerTitle}
-                />
+                <View style={styles.titleContainer}>
+                    <GradientText
+                        text="NUTRIENTS"
+                        colors={["#5A60EA", "#FF00F5"]}
+                        style={styles.headerTitle}
+                    />
+                </View>
                 <View style={{ width: 28 }} />
             </View>
 
-            {/* Tabs */}
-            <View style={styles.tabContainer}>
-                {['OVERVIEW', 'CALORIES', 'NUTRIENTS', 'MACROS'].map((tab) => (
-                    <TouchableOpacity
-                        key={tab}
-                        style={[styles.tab, activeTab === tab && styles.activeTab]}
-                        onPress={() => setActiveTab(tab)}
-                    >
-                        <Text
-                            style={[
-                                styles.tabText,
-                                activeTab === tab ? styles.activeTabText : null
-                            ]}
-                        >
-                            {tab}
-                        </Text>
-                        {activeTab === tab && (
-                            <LinearGradient
-                                colors={["#5A60EA", "#FF00F5"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.activeTabIndicator}
-                            />
-                        )}
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Day Navigation */}
+            {/* Day Navigation - Centered */}
             <View style={styles.dayNavContainer}>
                 <TouchableOpacity style={styles.dayNavButton}>
                     <Ionicons name="chevron-back" size={20} color={WHITE} />
                 </TouchableOpacity>
-                <View>
-                    <Text style={styles.dayViewText}>Day View</Text>
-                    <Text style={styles.todayText}>Today</Text>
-                </View>
+                <Text style={styles.todayText}>Today</Text>
                 <TouchableOpacity style={styles.dayNavButton}>
                     <Ionicons name="chevron-forward" size={20} color={WHITE} />
                 </TouchableOpacity>
@@ -192,19 +166,6 @@ const NutrientsScreen: React.FC = () => {
 
                 <View style={styles.spacer} />
             </ScrollView>
-
-            {/* Navigation Bar */}
-            <View style={styles.navBar}>
-                <TouchableOpacity style={styles.navButton}>
-                    <Ionicons name="chevron-back" size={24} color={WHITE} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.navButton}>
-                    <Ionicons name="square-outline" size={24} color={WHITE} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.navButton}>
-                    <Ionicons name="apps" size={24} color={WHITE} />
-                </TouchableOpacity>
-            </View>
         </SafeAreaView>
     );
 };
@@ -224,60 +185,33 @@ const styles = StyleSheet.create({
     backButton: {
         padding: 4,
     },
-    headerTitle: {
-        fontSize: 26,
-        fontWeight: 'bold',
-        color: WHITE,
-    },
-    tabContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 16,
-        marginBottom: 8,
-    },
-    tab: {
+    titleContainer: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 12,
-        position: 'relative',
+        justifyContent: 'center',
     },
-    activeTab: {},
-    activeTabIndicator: {
-        position: 'absolute',
-        bottom: 0,
-        left: 10,
-        right: 10,
-        height: 3,
-        borderRadius: 1.5,
-    },
-    tabText: {
-        fontSize: 14,
-        color: SUBDUED,
-        fontWeight: '500',
-    },
-    activeTabText: {
-        color: WHITE,
+    headerTitle: {
+        fontSize: 24,
         fontWeight: 'bold',
+        color: WHITE,
+        textAlign: 'center',
     },
     dayNavContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 30,
-        paddingVertical: 8,
+        paddingVertical: 4,
         backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
         borderRadius: 6,
         marginHorizontal: 10,
+        marginTop: 5,
     },
     dayNavButton: {
-        padding: 10,
-    },
-    dayViewText: {
-        fontSize: 14,
-        color: SUBDUED,
-        textAlign: 'center',
+        padding: 8,
     },
     todayText: {
-        fontSize: 18,
+        fontSize: 16,
         color: WHITE,
         textAlign: 'center',
     },
@@ -347,17 +281,6 @@ const styles = StyleSheet.create({
     progressBar: {
         height: '100%',
         borderRadius: 2.5,
-    },
-    navBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingVertical: 12,
-        backgroundColor: CARD_BG,
-        borderTopWidth: 1,
-        borderTopColor: '#333',
-    },
-    navButton: {
-        padding: 8,
     },
     spacer: {
         height: 20,
