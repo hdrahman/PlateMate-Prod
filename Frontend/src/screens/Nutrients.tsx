@@ -75,40 +75,45 @@ const NutrientsScreen: React.FC = () => {
     };
 
     // Get colors based on nutrient type
-    const getNutrientColors = (label: string): [string, string] => {
+    const getNutrientColors = (label: string): readonly [string, string] => {
         const lowerLabel = label.toLowerCase();
 
-        if (lowerLabel.includes('vitamin') || lowerLabel.includes('calcium') || lowerLabel.includes('iron')) {
-            return ['#4CAF50', '#8BC34A']; // Green gradient for vitamins and minerals
+        if (lowerLabel.includes('protein')) {
+            return ['#B71C1C', '#D32F2F'] as const; // Dark red to slightly lighter red
+        } else if (lowerLabel.includes('carbs')) {
+            return ['#0D47A1', '#0D47A1'] as const; // Dark blue (no gradient)
+        } else if (lowerLabel.includes('fiber')) {
+            return ['#2E7D32', '#2E7D32'] as const; // Dark rich green (no gradient)
+        } else if (lowerLabel.includes('sugar')) {
+            return ['#4A148C', '#6A1B9A'] as const; // Dark purple to slightly lighter purple
         } else if (lowerLabel.includes('fat')) {
-            return ['#FF9800', '#FFC107']; // Orange gradient for fats
-        } else if (lowerLabel.includes('protein')) {
-            return ['#F44336', '#FF5722']; // Red gradient for protein
-        } else if (lowerLabel.includes('carb') || lowerLabel.includes('sugar') || lowerLabel.includes('fiber')) {
-            return ['#2196F3', '#03A9F4']; // Blue gradient for carbs
+            return ['#F57F17', '#FFC107'] as const; // Dark amber to lighter amber
         } else {
-            return ['#9C27B0', '#673AB7']; // Purple gradient for others
+            return ['#4A148C', '#7B1FA2'] as const; // Default purple gradient
         }
     };
 
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
         const remaining = calculateRemaining(current, goal);
-        const progressPercent = Math.min((current / goal) * 100, 100);
+        // Set all progress bars to 100% temporarily
+        const progressPercent = 100;
         const gradientColors = getNutrientColors(label);
 
         return (
             <View key={label} style={styles.nutrientRow}>
-                <Text style={styles.nutrientLabel}>{label}</Text>
                 <View style={styles.nutrientValues}>
-                    <Text style={styles.currentValue}>{current}</Text>
-                    <Text style={styles.goalValue}>{goal}</Text>
-                    <Text style={styles.remainingValue}>{remaining}{unit}</Text>
+                    <View style={styles.leftValues}>
+                        <Text style={styles.remainingValue}>{remaining}{unit}</Text>
+                    </View>
+                    <Text style={styles.nutrientLabel}>{label}</Text>
+                    <Text style={styles.rightValue}>{current}/{goal}</Text>
                 </View>
                 <View style={styles.progressBarContainer}>
                     <LinearGradient
                         colors={gradientColors}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
+                        locations={[0, 0.6]}
                         style={[styles.progressBar, { width: `${progressPercent}%` }]}
                     />
                 </View>
@@ -145,10 +150,13 @@ const NutrientsScreen: React.FC = () => {
             </View>
 
             {/* Column Headers */}
-            <View style={styles.columnHeaders}>
-                <Text style={[styles.columnHeader, { flex: 2 }]}>Total</Text>
-                <Text style={[styles.columnHeader, { flex: 1 }]}>Goal</Text>
-                <Text style={[styles.columnHeader, { flex: 1 }]}>Left</Text>
+            <View style={styles.columnHeadersContainer}>
+                <View style={styles.columnHeaders}>
+                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left' }]}>Remaining</Text>
+                    <View style={{ flex: 2 }} />
+                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right' }]}>Total/Goal</Text>
+                </View>
+                <View style={styles.headerDivider} />
             </View>
 
             {/* Nutrients List */}
@@ -215,20 +223,26 @@ const styles = StyleSheet.create({
         color: WHITE,
         textAlign: 'center',
     },
+    columnHeadersContainer: {
+        marginTop: 14,
+        marginHorizontal: 10,
+        backgroundColor: CARD_BG,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+    },
     columnHeaders: {
         flexDirection: 'row',
         paddingHorizontal: 16,
         paddingVertical: 14,
-        backgroundColor: CARD_BG,
-        marginTop: 14,
-        borderTopLeftRadius: 8,
-        borderTopRightRadius: 8,
-        marginHorizontal: 10,
+    },
+    headerDivider: {
+        height: 1,
+        backgroundColor: '#333',
+        marginHorizontal: 16,
     },
     columnHeader: {
         fontSize: 16,
         color: WHITE,
-        textAlign: 'center',
         fontWeight: '600',
     },
     scrollView: {
@@ -239,38 +253,37 @@ const styles = StyleSheet.create({
     nutrientRow: {
         flexDirection: 'column',
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 10,
         borderBottomWidth: 1,
         borderBottomColor: '#333',
     },
     nutrientLabel: {
         fontSize: 16,
         color: WHITE,
-        marginBottom: 8,
         fontWeight: '500',
+        flex: 2,
+        textAlign: 'center',
     },
     nutrientValues: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        alignItems: 'center',
+        marginBottom: 8,
     },
-    currentValue: {
-        flex: 2,
+    leftValues: {
+        flex: 1,
+        justifyContent: 'flex-start',
+    },
+    rightValue: {
+        flex: 1,
         fontSize: 16,
         color: WHITE,
-        textAlign: 'center',
-    },
-    goalValue: {
-        flex: 1,
-        fontSize: 16,
-        color: SUBDUED,
-        textAlign: 'center',
+        textAlign: 'right',
     },
     remainingValue: {
-        flex: 1,
         fontSize: 16,
-        color: SUBDUED,
-        textAlign: 'center',
+        color: '#BBBBBB', // Lighter gray for remaining values
+        textAlign: 'left',
     },
     progressBarContainer: {
         height: 5,
