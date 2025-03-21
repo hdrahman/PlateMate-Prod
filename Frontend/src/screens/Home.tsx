@@ -70,22 +70,6 @@ const stepsHistory = [
   { date: '02/01', steps: 5000 }
 ];
 
-// Create a gradient card wrapper component
-const GradientCard = ({ children, style = {} }) => {
-  return (
-    <LinearGradient
-      colors={["rgba(0, 168, 255, 0.5)", "rgba(170, 0, 255, 0.5)", "rgba(255, 0, 245, 0.5)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.gradientBorder, style]}
-    >
-      <View style={styles.cardInner}>
-        {children}
-      </View>
-    </LinearGradient>
-  );
-};
-
 export default function Home() {
   const navigation = useNavigation();
   const { isDarkTheme } = useContext(ThemeContext);
@@ -130,7 +114,7 @@ export default function Home() {
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={['rgba(255, 0, 245, 0.7)', 'rgba(155, 0, 255, 0.7)', 'rgba(0, 207, 255, 0.7)']}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
                 style={[styles.cheatDayBarFill, { width: `${cheatProgress}%` }]}
               />
             </View>
@@ -294,13 +278,13 @@ export default function Home() {
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={['rgba(0, 100, 0, 0.7)', 'rgba(0, 100, 0, 0.7)', 'rgba(0, 255, 0, 0.7)']}
-                style={[styles.burnBarFill, { width: `${Math.min((WeightLost / 10) * 100, 100)}%` }]}
+                colors={['#006400', '#006400', '#00FF00']} // smoother gradient, first half dark green
+                style={[styles.burnBarFill, { width: `${Math.min((WeightLost / 10) * 100, 100)}%` }]} // dynamically adjust width
               />
             </View>
             <View style={styles.weightLabelsContainer}>
               <Text style={styles.weightLabel}>104 kg</Text>
-              <Text style={styles.burnDetails}>{WeightLost} Kilograms Lost!</Text>
+              <Text style={styles.burnDetails}>{WeightLost} Kilograms Lost!</Text> {/* Centered text */}
               <Text style={styles.weightLabel}>96 kg</Text>
             </View>
           </View>
@@ -364,7 +348,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
   const minWeight = Math.min(...yValues);
   const maxWeight = Math.max(...yValues);
 
-  // Add a small top buffer (+1) so final dot isn't at the very top
+  // Add a small top buffer (+1) so final dot isn’t at the very top
   const scaleY = d3Scale
     .scaleLinear()
     .domain([minWeight, maxWeight + 1])
@@ -1073,16 +1057,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  gradientBorder: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    padding: 2,
-    marginBottom: 16,
-  },
-  cardInner: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: 'black',
   },
 });

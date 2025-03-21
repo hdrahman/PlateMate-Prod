@@ -104,21 +104,6 @@ type FoodLogRouteParams = {
     refresh?: number;
 };
 
-const GradientCard = ({ children, style = {} }) => {
-    return (
-        <LinearGradient
-            colors={["rgba(0, 168, 255, 0.5)", "rgba(170, 0, 255, 0.5)", "rgba(255, 0, 245, 0.5)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.gradientBorder, style]}
-        >
-            <View style={styles.cardInner}>
-                {children}
-            </View>
-        </LinearGradient>
-    );
-};
-
 const DiaryScreen: React.FC = () => {
     const [mealData, setMealData] = useState<Meal[]>([]);
     const [breakfastEntries, setBreakfastEntries] = useState([]);
@@ -951,174 +936,166 @@ const DiaryScreen: React.FC = () => {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* 2) Calories Remaining */}
-                            <GradientCard>
-                                <View style={styles.summaryCard}>
-                                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
-                                    <View style={styles.equationRow}>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
-                                                {goal}
-                                            </Text>
-                                            <Text style={styles.equationLabel}>Base</Text>
-                                        </View>
-                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
-                                                {foodTotal}
-                                            </Text>
-                                            <Text style={styles.equationLabel}>Food</Text>
-                                        </View>
-                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
-                                                {totalExerciseCalories}
-                                            </Text>
-                                            <Text style={styles.equationLabel}>Exercise</Text>
-                                        </View>
-                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
-                                        <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
-                                            <Text style={styles.equationLabel}>Remaining</Text>
-                                        </View>
+                            <View style={styles.summaryCard}>
+                                <Text style={styles.summaryTitle}>Calories Remaining</Text>
+                                <View style={styles.equationRow}>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                                            {goal}
+                                        </Text>
+                                        <Text style={styles.equationLabel}>Base</Text>
+                                    </View>
+                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                                            {foodTotal}
+                                        </Text>
+                                        <Text style={styles.equationLabel}>Food</Text>
+                                    </View>
+                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                                            {totalExerciseCalories}
+                                        </Text>
+                                        <Text style={styles.equationLabel}>Exercise</Text>
+                                    </View>
+                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
+                                    <View style={styles.equationColumn}>
+                                        <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
+                                        <Text style={styles.equationLabel}>Remaining</Text>
                                     </View>
                                 </View>
-                            </GradientCard>
+                            </View>
 
                             {/* 3) Meals */}
                             {mealData.map((meal, idx) => (
-                                <GradientCard key={idx}>
-                                    <View style={styles.mealSection}>
-                                        {/* Always show meal title and calories */}
-                                        <View style={styles.mealHeader}>
-                                            <Text style={styles.mealTitle}>{meal.title}</Text>
-                                            <Text style={styles.mealCal}>{meal.total}</Text>
-                                        </View>
+                                <View key={idx} style={styles.mealSection}>
+                                    {/* Always show meal title and calories */}
+                                    <View style={styles.mealHeader}>
+                                        <Text style={styles.mealTitle}>{meal.title}</Text>
+                                        <Text style={styles.mealCal}>{meal.total}</Text>
+                                    </View>
 
-                                        {/* Always show macros, even if they're all zero */}
-                                        <TouchableOpacity onPress={toggleMacrosDisplay}>
-                                            <Text style={styles.macrosText}>
-                                                {showMacrosAsPercent
-                                                    ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
-                                                    : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
-                                            </Text>
-                                        </TouchableOpacity>
+                                    {/* Always show macros, even if they're all zero */}
+                                    <TouchableOpacity onPress={toggleMacrosDisplay}>
+                                        <Text style={styles.macrosText}>
+                                            {showMacrosAsPercent
+                                                ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
+                                                : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
+                                        </Text>
+                                    </TouchableOpacity>
 
-                                        <View style={styles.dividerLine} />
+                                    <View style={styles.dividerLine} />
 
-                                        {/* Only show items if there are any */}
-                                        {meal.items.length > 0 ? (
-                                            <>
-                                                {meal.items
-                                                    .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
-                                                    .map((item, i) => {
-                                                        // First extract food name without the weight info
-                                                        const foodName = item.name.split('\n')[0];
-                                                        // Try to find the ID from localMealDataRef
-                                                        let foodId = undefined;
+                                    {/* Only show items if there are any */}
+                                    {meal.items.length > 0 ? (
+                                        <>
+                                            {meal.items
+                                                .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
+                                                .map((item, i) => {
+                                                    // First extract food name without the weight info
+                                                    const foodName = item.name.split('\n')[0];
+                                                    // Try to find the ID from localMealDataRef
+                                                    let foodId = undefined;
 
-                                                        if (localMealDataRef.current) {
-                                                            // Try exact match first
-                                                            const exactMatch = localMealDataRef.current.find(entry =>
-                                                                entry.food_name === foodName &&
-                                                                entry.meal_type.toLowerCase() === meal.title.toLowerCase()
+                                                    if (localMealDataRef.current) {
+                                                        // Try exact match first
+                                                        const exactMatch = localMealDataRef.current.find(entry =>
+                                                            entry.food_name === foodName &&
+                                                            entry.meal_type.toLowerCase() === meal.title.toLowerCase()
+                                                        );
+
+                                                        if (exactMatch) {
+                                                            foodId = exactMatch.id;
+                                                        } else {
+                                                            // If no exact match, try just by food name
+                                                            const nameMatch = localMealDataRef.current.find(entry =>
+                                                                entry.food_name === foodName
                                                             );
 
-                                                            if (exactMatch) {
-                                                                foodId = exactMatch.id;
-                                                            } else {
-                                                                // If no exact match, try just by food name
-                                                                const nameMatch = localMealDataRef.current.find(entry =>
-                                                                    entry.food_name === foodName
-                                                                );
-
-                                                                if (nameMatch) {
-                                                                    foodId = nameMatch.id;
-                                                                }
+                                                            if (nameMatch) {
+                                                                foodId = nameMatch.id;
                                                             }
                                                         }
+                                                    }
 
-                                                        return (
-                                                            <TouchableHighlight
-                                                                key={i}
-                                                                underlayColor="#333"
-                                                                onLongPress={() => {
-                                                                    handleFoodItemLongPress(foodId, foodName, meal.title, i);
-                                                                }}
-                                                                delayLongPress={500}
-                                                            >
-                                                                <View>
-                                                                    <View style={styles.logRow}>
-                                                                        <View style={{ flex: 1 }}>
-                                                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                                                                                <Text style={styles.logItemText}>{foodName}</Text>
-                                                                                <View style={[
-                                                                                    styles.healthinessCircle,
-                                                                                    { borderColor: getHealthinessColor(item.healthiness || 5), marginLeft: 4 }
-                                                                                ]}>
-                                                                                    <Text style={[styles.healthinessText, { color: getHealthinessColor(item.healthiness || 5) }]}>
-                                                                                        {Math.round(item.healthiness || 5)}
-                                                                                    </Text>
-                                                                                </View>
+                                                    return (
+                                                        <TouchableHighlight
+                                                            key={i}
+                                                            underlayColor="#333"
+                                                            onLongPress={() => {
+                                                                handleFoodItemLongPress(foodId, foodName, meal.title, i);
+                                                            }}
+                                                            delayLongPress={500}
+                                                        >
+                                                            <View>
+                                                                <View style={styles.logRow}>
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                            <Text style={styles.logItemText}>{foodName}</Text>
+                                                                            <View style={[
+                                                                                styles.healthinessCircle,
+                                                                                { borderColor: getHealthinessColor(item.healthiness || 5), marginLeft: 4 }
+                                                                            ]}>
+                                                                                <Text style={[styles.healthinessText, { color: getHealthinessColor(item.healthiness || 5) }]}>
+                                                                                    {Math.round(item.healthiness || 5)}
+                                                                                </Text>
                                                                             </View>
-                                                                            <Text style={styles.weightText}>{item.name.split('\n').slice(1).join('\n')}</Text>
                                                                         </View>
-                                                                        <Text style={styles.logCalText}>{item.calories}</Text>
+                                                                        <Text style={styles.weightText}>{item.name.split('\n').slice(1).join('\n')}</Text>
                                                                     </View>
-                                                                    {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
+                                                                    <Text style={styles.logCalText}>{item.calories}</Text>
                                                                 </View>
-                                                            </TouchableHighlight>
-                                                        );
-                                                    })}
-                                                <View style={styles.dividerLine} />
-                                            </>
-                                        ) : null}
+                                                                {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
+                                                            </View>
+                                                        </TouchableHighlight>
+                                                    );
+                                                })}
+                                            <View style={styles.dividerLine} />
+                                        </>
+                                    ) : null}
 
-                                        <TouchableOpacity
-                                            style={styles.addBtn}
-                                            onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title })}
-                                        >
-                                            <Text style={styles.addBtnText}>ADD FOOD</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </GradientCard>
+                                    <TouchableOpacity
+                                        style={styles.addBtn}
+                                        onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title })}
+                                    >
+                                        <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ))}
 
                             {/* 4) Exercise */}
-                            <GradientCard>
-                                <View style={styles.mealSection}>
-                                    <View style={styles.mealHeader}>
-                                        <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
-                                        <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
-                                    </View>
-
-                                    {/* Divider line under heading */}
-                                    <View style={styles.dividerLine} />
-
-                                    {renderExerciseList()}
-
-                                    {/* Only show divider line if there are exercises already */}
-                                    {exerciseList.length > 0 && <View style={styles.dividerLine} />}
-
-                                    <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
-                                        <Text style={styles.addBtnText}>ADD EXERCISE</Text>
-                                    </TouchableOpacity>
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
+                                    <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
                                 </View>
-                            </GradientCard>
+
+                                {/* Divider line under heading */}
+                                <View style={styles.dividerLine} />
+
+                                {renderExerciseList()}
+
+                                {/* Only show divider line if there are exercises already */}
+                                {exerciseList.length > 0 && <View style={styles.dividerLine} />}
+
+                                <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
+                                    <Text style={styles.addBtnText}>ADD EXERCISE</Text>
+                                </TouchableOpacity>
+                            </View>
 
                             {/* 5) Water */}
-                            <GradientCard>
-                                <View style={styles.mealSection}>
-                                    <View style={styles.mealHeader}>
-                                        <Text style={styles.mealTitle}>Water</Text>
-                                    </View>
-                                    {/* Divider line under heading */}
-                                    <View style={styles.dividerLine} />
-
-                                    <TouchableOpacity style={styles.addBtn}>
-                                        <Text style={styles.addBtnText}>ADD WATER</Text>
-                                    </TouchableOpacity>
+                            <View style={styles.mealSection}>
+                                <View style={styles.mealHeader}>
+                                    <Text style={styles.mealTitle}>Water</Text>
                                 </View>
-                            </GradientCard>
+                                {/* Divider line under heading */}
+                                <View style={styles.dividerLine} />
+
+                                <TouchableOpacity style={styles.addBtn}>
+                                    <Text style={styles.addBtnText}>ADD WATER</Text>
+                                </TouchableOpacity>
+                            </View>
 
                             {/* 7) Bottom action row */}
                             <View style={styles.bottomActions}>
@@ -1674,16 +1651,5 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#999999',
         marginTop: 2,
-    },
-    gradientBorder: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        padding: 2,
-        marginBottom: 12,
-    },
-    cardInner: {
-        borderRadius: 14,
-        overflow: 'hidden',
-        backgroundColor: PRIMARY_BG,
     },
 });

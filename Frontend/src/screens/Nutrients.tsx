@@ -64,7 +64,7 @@ const GradientText = ({ text, colors, style }) => {
 
 const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation();
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const [activeTab, setActiveTab] = useState('NUTRIENTS');
 
     // Calculate the remaining amount for each nutrient
     const calculateRemaining = (current: number, goal: number) => {
@@ -86,45 +86,6 @@ const NutrientsScreen: React.FC = () => {
         } else {
             return ['#9C27B0', '#673AB7']; // Purple gradient for others
         }
-    };
-
-    // Format date display
-    const formatDate = (date: Date): string => {
-        const today = new Date();
-        const yesterday = new Date();
-        yesterday.setDate(today.getDate() - 1);
-        const tomorrow = new Date();
-        tomorrow.setDate(today.getDate() + 1);
-
-        // Remove time for comparison
-        const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        const t = stripTime(today);
-        const d = stripTime(date);
-        const diff = d.getTime() - t.getTime();
-
-        if (diff === 0) return "Today";
-        if (diff === -86400000) return "Yesterday";
-        if (diff === 86400000) return "Tomorrow";
-
-        // Fallback: e.g., Sunday, Feb 02
-        const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: '2-digit' };
-        return date.toLocaleDateString(undefined, options);
-    };
-
-    const gotoPrevDay = () => {
-        setCurrentDate(prev => {
-            const newDate = new Date(prev);
-            newDate.setDate(newDate.getDate() - 1);
-            return newDate;
-        });
-    };
-
-    const gotoNextDay = () => {
-        setCurrentDate(prev => {
-            const newDate = new Date(prev);
-            newDate.setDate(newDate.getDate() + 1);
-            return newDate;
-        });
     };
 
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
@@ -167,49 +128,83 @@ const NutrientsScreen: React.FC = () => {
                 <View style={{ width: 28 }} />
             </View>
 
+            {/* Tabs */}
+            <View style={styles.tabContainer}>
+                {['OVERVIEW', 'CALORIES', 'NUTRIENTS', 'MACROS'].map((tab) => (
+                    <TouchableOpacity
+                        key={tab}
+                        style={[styles.tab, activeTab === tab && styles.activeTab]}
+                        onPress={() => setActiveTab(tab)}
+                    >
+                        <Text
+                            style={[
+                                styles.tabText,
+                                activeTab === tab ? styles.activeTabText : null
+                            ]}
+                        >
+                            {tab}
+                        </Text>
+                        {activeTab === tab && (
+                            <LinearGradient
+                                colors={["#5A60EA", "#FF00F5"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.activeTabIndicator}
+                            />
+                        )}
+                    </TouchableOpacity>
+                ))}
+            </View>
+
             {/* Day Navigation */}
             <View style={styles.dayNavContainer}>
-                <TouchableOpacity style={styles.dayNavButton} onPress={gotoPrevDay}>
+                <TouchableOpacity style={styles.dayNavButton}>
                     <Ionicons name="chevron-back" size={20} color={WHITE} />
                 </TouchableOpacity>
-                <Text style={styles.todayText}>{formatDate(currentDate)}</Text>
-                <TouchableOpacity style={styles.dayNavButton} onPress={gotoNextDay}>
+                <View>
+                    <Text style={styles.dayViewText}>Day View</Text>
+                    <Text style={styles.todayText}>Today</Text>
+                </View>
+                <TouchableOpacity style={styles.dayNavButton}>
                     <Ionicons name="chevron-forward" size={20} color={WHITE} />
                 </TouchableOpacity>
             </View>
 
-            {/* Nutrients Card */}
-            <LinearGradient
-                colors={["#00A8FF", "#AA00FF", "#FF00F5"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gradientBorder}
+            {/* Column Headers */}
+            <View style={styles.columnHeaders}>
+                <Text style={[styles.columnHeader, { flex: 2 }]}>Total</Text>
+                <Text style={[styles.columnHeader, { flex: 1 }]}>Goal</Text>
+                <Text style={[styles.columnHeader, { flex: 1 }]}>Left</Text>
+            </View>
+
+            {/* Nutrients List */}
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
             >
-                <View style={styles.nutrientsCardContainer}>
-                    {/* Column Headers */}
-                    <View style={styles.columnHeaders}>
-                        <Text style={styles.columnHeader}>Total</Text>
-                        <Text style={styles.columnHeader}>Goal</Text>
-                        <Text style={styles.columnHeader}>Left</Text>
-                    </View>
+                {Object.entries(macroGoals).map(([key, value]) => {
+                    // Convert key from camelCase to Title Case for display
+                    const label = key.replace(/([A-Z])/g, ' $1')
+                        .replace(/^./, str => str.toUpperCase());
 
-                    {/* Nutrients List */}
-                    <ScrollView
-                        style={styles.scrollView}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {Object.entries(macroGoals).map(([key, value]) => {
-                            // Convert key from camelCase to Title Case for display
-                            const label = key.replace(/([A-Z])/g, ' $1')
-                                .replace(/^./, str => str.toUpperCase());
+                    return renderNutrientItem(label, value.current, value.goal, value.unit);
+                })}
 
-                            return renderNutrientItem(label, value.current, value.goal, value.unit);
-                        })}
+                <View style={styles.spacer} />
+            </ScrollView>
 
-                        <View style={styles.spacer} />
-                    </ScrollView>
-                </View>
-            </LinearGradient>
+            {/* Navigation Bar */}
+            <View style={styles.navBar}>
+                <TouchableOpacity style={styles.navButton}>
+                    <Ionicons name="chevron-back" size={24} color={WHITE} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navButton}>
+                    <Ionicons name="square-outline" size={24} color={WHITE} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navButton}>
+                    <Ionicons name="apps" size={24} color={WHITE} />
+                </TouchableOpacity>
+            </View>
         </SafeAreaView>
     );
 };
@@ -234,111 +229,138 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: WHITE,
     },
+    tabContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        marginBottom: 8,
+    },
+    tab: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+        position: 'relative',
+    },
+    activeTab: {},
+    activeTabIndicator: {
+        position: 'absolute',
+        bottom: 0,
+        left: 10,
+        right: 10,
+        height: 3,
+        borderRadius: 1.5,
+    },
+    tabText: {
+        fontSize: 14,
+        color: SUBDUED,
+        fontWeight: '500',
+    },
+    activeTabText: {
+        color: WHITE,
+        fontWeight: 'bold',
+    },
     dayNavContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 30,
-        paddingVertical: 10,
+        paddingVertical: 8,
         backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
-        borderRadius: 10,
-        marginHorizontal: 16,
-        marginTop: 8,
-        marginBottom: 8,
+        borderRadius: 6,
+        marginHorizontal: 10,
     },
     dayNavButton: {
         padding: 10,
     },
+    dayViewText: {
+        fontSize: 14,
+        color: SUBDUED,
+        textAlign: 'center',
+    },
     todayText: {
-        fontSize: 20,
+        fontSize: 18,
         color: WHITE,
         textAlign: 'center',
-        fontWeight: '600',
-    },
-    nutrientsCardContainer: {
-        flex: 1,
-        borderRadius: 10,
-        overflow: 'hidden',
-        margin: 2,
-        backgroundColor: CARD_BG,
-    },
-    scrollView: {
-        flex: 1,
-        backgroundColor: CARD_BG,
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
     },
     columnHeaders: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 14,
         backgroundColor: CARD_BG,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
+        marginTop: 14,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        marginHorizontal: 10,
     },
     columnHeader: {
-        flex: 1,
         fontSize: 16,
         color: WHITE,
         textAlign: 'center',
         fontWeight: '600',
     },
+    scrollView: {
+        flex: 1,
+        marginHorizontal: 10,
+        backgroundColor: CARD_BG,
+    },
     nutrientRow: {
         flexDirection: 'column',
         paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: '#333',
     },
     nutrientLabel: {
-        fontSize: 15,
+        fontSize: 16,
         color: WHITE,
-        marginBottom: 6,
+        marginBottom: 8,
         fontWeight: '500',
     },
     nutrientValues: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 6,
+        marginBottom: 10,
     },
     currentValue: {
-        flex: 1,
-        fontSize: 15,
+        flex: 2,
+        fontSize: 16,
         color: WHITE,
         textAlign: 'center',
     },
     goalValue: {
         flex: 1,
-        fontSize: 15,
+        fontSize: 16,
         color: SUBDUED,
         textAlign: 'center',
     },
     remainingValue: {
         flex: 1,
-        fontSize: 15,
+        fontSize: 16,
         color: SUBDUED,
         textAlign: 'center',
     },
     progressBarContainer: {
-        height: 4,
+        height: 5,
         backgroundColor: '#333',
-        borderRadius: 2,
+        borderRadius: 2.5,
         overflow: 'hidden',
     },
     progressBar: {
         height: '100%',
-        borderRadius: 2,
+        borderRadius: 2.5,
+    },
+    navBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingVertical: 12,
+        backgroundColor: CARD_BG,
+        borderTopWidth: 1,
+        borderTopColor: '#333',
+    },
+    navButton: {
+        padding: 8,
     },
     spacer: {
         height: 20,
-    },
-    gradientBorder: {
-        flex: 1,
-        marginHorizontal: 16,
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginTop: 8,
     },
 });
 
