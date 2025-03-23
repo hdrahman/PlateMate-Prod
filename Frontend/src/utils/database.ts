@@ -5,6 +5,14 @@ import { updateDatabaseSchema } from './updateDatabase';
 // Open the database
 let db: SQLite.SQLiteDatabase;
 
+// Add a global flag for database initialization
+declare global {
+    var dbInitialized: boolean;
+}
+
+// Set initial value
+global.dbInitialized = false;
+
 // Initialize the database
 export const initDatabase = async () => {
     try {
@@ -99,11 +107,21 @@ export const initDatabase = async () => {
             await addSampleExerciseData();
         }
 
+        // Set the global flag to indicate database is initialized
+        global.dbInitialized = true;
+        console.log('✅ Database initialized flag set to true');
+
         return db;
     } catch (error) {
         console.error('❌ Error initializing database:', error);
+        global.dbInitialized = false;
         throw error;
     }
+};
+
+// Export a function to check if the database is ready
+export const isDatabaseReady = () => {
+    return global.dbInitialized && !!db;
 };
 
 // Helper function to add sample food log data
@@ -274,7 +292,8 @@ export const getCurrentDate = (): string => {
 
 // Add a food log entry
 export const addFoodLog = async (foodLog: any) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to add food log before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -302,35 +321,21 @@ export const addFoodLog = async (foodLog: any) => {
         image_url,
         file_key = 'default_file_key',
         healthiness_rating,
-        date = getCurrentDate(),
+        date,
         meal_type,
         brand_name = '',
         quantity = '',
         notes = ''
     } = foodLog;
 
-    // Ensure date is in the correct format (YYYY-MM-DD)
-    let formattedDate = date;
-    if (date) {
-        // If date is already in YYYY-MM-DD format, use it as is
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            formattedDate = date;
-        } else {
-            // Otherwise, try to extract the date part
-            try {
-                const dateObj = new Date(date);
-                formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-            } catch (error) {
-                console.error('❌ Error formatting date:', error);
-                // Fall back to current date if parsing fails
-                formattedDate = getCurrentDate().split('T')[0];
-            }
-        }
-    }
+    const formattedDate = date; // Use the provided date directly
 
     console.log(`📝 Adding food log with date: ${formattedDate}`);
 
     try {
+        // Begin transaction to ensure data integrity
+        await db.runAsync('BEGIN TRANSACTION');
+
         const result = await db.runAsync(
             `INSERT INTO food_logs (
                 meal_id, user_id, food_name, calories, proteins, carbs, fats,
@@ -373,9 +378,28 @@ export const addFoodLog = async (foodLog: any) => {
                 getCurrentDate()
             ]
         );
+
+        // Commit transaction
+        await db.runAsync('COMMIT');
+
+        // Verify the insert worked by querying for the new row
+        const inserted = await db.getFirstAsync(
+            'SELECT * FROM food_logs WHERE id = ?',
+            [result.lastInsertRowId]
+        );
+
         console.log('✅ Food log added successfully', result.lastInsertRowId);
+        console.log('✅ Verified food log in database:', inserted ? (inserted as any).food_name : 'Not found');
+
         return result.lastInsertRowId;
     } catch (error) {
+        // Rollback on error
+        try {
+            await db.runAsync('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('Error during rollback:', rollbackError);
+        }
+
         console.error('❌ Error adding food log:', error);
         throw error;
     }
@@ -383,7 +407,8 @@ export const addFoodLog = async (foodLog: any) => {
 
 // Get food logs by date
 export const getFoodLogsByDate = async (date: string) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to access database before initialization');
         throw new Error('Database not initialized');
     }
 
@@ -451,7 +476,8 @@ export const getFoodLogsByDate = async (date: string) => {
 
 // Update a food log entry
 export const updateFoodLog = async (id: number, updates: any) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to update food log before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -493,7 +519,8 @@ export const updateFoodLog = async (id: number, updates: any) => {
 
 // Delete a food log entry
 export const deleteFoodLog = async (id: number) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to delete food log before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -510,7 +537,8 @@ export const deleteFoodLog = async (id: number) => {
 
 // Get all unsynced food logs
 export const getUnsyncedFoodLogs = async () => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get unsynced food logs before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -527,7 +555,8 @@ export const getUnsyncedFoodLogs = async () => {
 
 // Mark a food log as synced
 export const markFoodLogAsSynced = async (id: number, serverId: number) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to mark food log as synced before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -545,7 +574,8 @@ export const markFoodLogAsSynced = async (id: number, serverId: number) => {
 
 // Update last sync time
 export const updateLastSyncTime = async (status: string = 'success') => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to update last sync time before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -623,7 +653,8 @@ export const purgeOldData = async () => {
 
 // Get exercises by date
 export const getExercisesByDate = async (date: string) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get exercises before database initialization');
         throw new Error('Database not initialized');
     }
 
@@ -660,7 +691,8 @@ export const getExercisesByDate = async (date: string) => {
 
 // Add an exercise entry
 export const addExercise = async (exercise: any) => {
-    if (!db) {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to add exercise before database initialization');
         throw new Error('Database not initialized');
     }
 

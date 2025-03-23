@@ -395,15 +395,24 @@ const ImageCapture: React.FC = () => {
             Alert.alert('Success', 'Food added successfully', [
                 {
                     text: 'OK',
-                    onPress: () => {
+                    onPress: async () => {
+                        // Add a small delay to ensure database operations complete
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Go back to previous screen
                         navigation.goBack();
-                        try {
-                            const refreshTime = Date.now().toString();
-                            AsyncStorage.setItem('FOOD_LOG_REFRESH_TRIGGER', refreshTime)
-                                .then(() => console.log('Set refresh trigger:', refreshTime));
-                        } catch (err) {
-                            console.error('Failed to set refresh trigger:', err);
-                        }
+
+                        // Wait a moment before setting refresh param for FoodLog
+                        setTimeout(() => {
+                            const refreshTimestamp = Date.now();
+                            console.log('Sending refresh param to FoodLog:', refreshTimestamp);
+
+                            // Access the FoodLog route and pass refresh param separately
+                            // This avoids replacing the current screen
+                            navigation.dispatch(
+                                StackActions.replace('FoodLog', { refresh: refreshTimestamp })
+                            );
+                        }, 100);
                     }
                 }
             ]);

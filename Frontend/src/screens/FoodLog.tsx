@@ -13,6 +13,7 @@ import {
     Modal,
     TouchableHighlight,
     Alert,
+    AppState,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -21,7 +22,7 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog } from '../utils/database';
+import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -126,12 +127,18 @@ const DiaryScreen: React.FC = () => {
         return '#4CAF50'; // Green for healthy (8-10)
     };
 
-    // Check for navigation params that should trigger a refresh
+    // Update the route.params effect to properly refresh the data
     useEffect(() => {
         const params = route.params as FoodLogRouteParams;
         if (params?.refresh) {
-            console.log('Received refresh parameter from navigation:', params.refresh);
-            refreshMealData();
+            console.log('Detected refresh parameter in route.params:', params.refresh);
+
+            // Use a timer to ensure SQLite has time to complete its operations
+            // before we trigger a refresh
+            setTimeout(() => {
+                console.log('Executing delayed refresh from route params');
+                refreshMealData();
+            }, 500);
         }
     }, [route.params]);
 
@@ -170,16 +177,23 @@ const DiaryScreen: React.FC = () => {
 
     // Add a function to trigger refresh
     const refreshMealData = () => {
+        console.log('refreshMealData called - incrementing refreshTrigger');
         setRefreshTrigger(prev => prev + 1);
     };
 
-    // Subscribe to navigation focus events to refresh data when returning to this screen
+    // Add a special useEffect for handling focus events with a slight delay
+    // This ensures database operations complete before refreshing
     useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
-            console.log('Screen focused, refreshing data...');
-            refreshMealData();
-        });
+        const handleFocus = () => {
+            console.log('Screen focused, setting up delayed refresh...');
+            // Use a short timeout to ensure any database operations complete
+            setTimeout(() => {
+                console.log('Executing delayed refresh after screen focus');
+                refreshMealData();
+            }, 300);
+        };
 
+        const unsubscribe = navigation.addListener('focus', handleFocus);
         return unsubscribe;
     }, [navigation]);
 
@@ -190,17 +204,95 @@ const DiaryScreen: React.FC = () => {
         }));
     };
 
+    // Add processLocalData function before the fetchMeals useEffect
+    const processLocalData = async (localData: FoodLogEntry[], mealTypes: string[]): Promise<Meal[]> => {
+        // Get current meal data to merge with
+        const mealDict: Record<string, Meal> = {};
+
+        // Initialize with default meal types
+        mealTypes.forEach(type => {
+            mealDict[type] = {
+                title: type,
+                total: 0, // Reset totals as we'll recalculate
+                macros: { carbs: 0, fat: 0, protein: 0 },
+                items: []
+            };
+        });
+
+        // Group by meal type
+        localData.forEach(entry => {
+            if (!entry.meal_type) return; // Skip entries without meal type
+
+            // Normalize meal_type - capitalize first letter to match our mealTypes
+            let normalizedMealType = entry.meal_type.charAt(0).toUpperCase() + entry.meal_type.slice(1).toLowerCase();
+
+            // Check if the meal type exists in our predefined types
+            const validMealType = mealTypes.includes(normalizedMealType) ?
+                normalizedMealType :
+                'Snacks'; // Default to Snacks if unknown type
+
+            // Add food entry to respective meal
+            mealDict[validMealType].total += entry.calories || 0;
+            mealDict[validMealType].macros.carbs += entry.carbs || 0;
+            mealDict[validMealType].macros.fat += entry.fats || 0;
+            mealDict[validMealType].macros.protein += entry.proteins || 0;
+
+            // Format the item name with appropriate nutritional info
+            const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';
+            const proteinInfo = `Protein: ${entry.proteins}g`;
+            const itemDescription = weightInfo ? `${proteinInfo}\n${weightInfo}` : proteinInfo;
+
+            mealDict[validMealType].items.push({
+                name: `${entry.food_name}\n${itemDescription}`,
+                calories: entry.calories || 0,
+                healthiness: entry.healthiness_rating || 5
+            });
+        });
+
+        // Convert back to array and ensure all meal types are present
+        const updatedMeals = Object.values(mealDict);
+
+        // Sort meals in the correct order
+        updatedMeals.sort((a, b) => {
+            const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
+            return (order[a.title] || 99) - (order[b.title] || 99);
+        });
+
+        return updatedMeals;
+    };
+
     useEffect(() => {
         const fetchMeals = async () => {
             try {
-                // Don't set loading true right away, we want to show existing data immediately
-                processedMealData.current = false; // Reset before fetching new data
+                console.log('fetchMeals triggered by refreshTrigger:', refreshTrigger);
+
+                // Keep any existing data if we have it
+                let existingMealData = [...mealData];
+                let hasExistingData = existingMealData.some(meal => meal.items.length > 0);
+
+                // Store if we already have data to prevent flashing
+                if (hasExistingData) {
+                    console.log('Keeping existing meal data during refresh');
+                } else {
+                    setLoading(true);
+                }
 
                 // Format the current date to match the database format (YYYY-MM-DD)
                 const formattedDate = formatDateToString(currentDate);
                 console.log('Fetching meals for date:', formattedDate);
 
-                // Setup default meals
+                // Check if database is ready
+                if (!isDatabaseReady()) {
+                    console.log('🔄 Database not yet initialized, waiting...');
+                    // Wait a bit and try again
+                    setTimeout(() => {
+                        console.log('🔄 Retrying fetch after waiting for DB initialization');
+                        refreshMealData();
+                    }, 1000);
+                    return;
+                }
+
+                // Setup default meals (for initializing if needed)
                 const defaultMeals: Meal[] = [
                     {
                         title: 'Breakfast',
@@ -230,153 +322,54 @@ const DiaryScreen: React.FC = () => {
 
                 // First try to get data from local SQLite database
                 console.log('Fetching from local SQLite database...');
-                const localData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
-                console.log('Local meal data:', localData);
+                try {
+                    const localData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
+                    console.log('Local meal data found:', localData.length, 'entries');
 
-                // Store local data in a ref for later use
-                localMealDataRef.current = localData;
+                    // Store local data in a ref for later use
+                    localMealDataRef.current = localData;
 
-                // Process local data into the format needed for display
-                if (localData && localData.length > 0) {
-                    // Get current meal data to merge with
-                    const mealDict: Record<string, Meal> = {};
+                    if (localData && localData.length > 0) {
+                        // Create a deep copy of the data to prevent any reference issues
+                        const updatedMeals = await processLocalData(localData, mealTypes);
+                        console.log('Processed local data into meal format with',
+                            updatedMeals.reduce((count, meal) => count + meal.items.length, 0),
+                            'total items');
 
-                    // Initialize with default meal types
-                    mealTypes.forEach(type => {
-                        mealDict[type] = {
-                            title: type,
-                            total: 0, // Reset totals as we'll recalculate
-                            macros: { carbs: 0, fat: 0, protein: 0 },
-                            items: []
-                        };
-                    });
-
-                    // Group by meal type
-                    localData.forEach(entry => {
-                        if (!entry.meal_type) return; // Skip entries without meal type
-
-                        // Normalize meal_type - capitalize first letter to match our mealTypes
-                        let normalizedMealType = entry.meal_type.charAt(0).toUpperCase() + entry.meal_type.slice(1).toLowerCase();
-
-                        // Check if the meal type exists in our predefined types
-                        const validMealType = mealTypes.includes(normalizedMealType) ?
-                            normalizedMealType :
-                            'Snacks'; // Default to Snacks if unknown type
-
-                        // Add food entry to respective meal
-                        mealDict[validMealType].total += entry.calories || 0;
-                        mealDict[validMealType].macros.carbs += entry.carbs || 0;
-                        mealDict[validMealType].macros.fat += entry.fats || 0;
-                        mealDict[validMealType].macros.protein += entry.proteins || 0;
-
-                        // Format the item name with appropriate nutritional info
-                        const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';
-                        const proteinInfo = `Protein: ${entry.proteins}g`;
-                        const itemDescription = weightInfo ? `${proteinInfo}\n${weightInfo}` : proteinInfo;
-
-                        mealDict[validMealType].items.push({
-                            name: `${entry.food_name}\n${itemDescription}`,
-                            calories: entry.calories || 0,
-                            healthiness: entry.healthiness_rating || 5
-                        });
-                    });
-
-                    // Convert back to array and ensure all meal types are present
-                    const updatedMeals = Object.values(mealDict);
-
-                    // Sort meals in the correct order
-                    updatedMeals.sort((a, b) => {
-                        const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
-                        return (order[a.title] || 99) - (order[b.title] || 99);
-                    });
-
-                    // Set meal data immediately from local database
-                    setMealData(updatedMeals);
-                    console.log('Updated meal data from local database:', updatedMeals);
-                } else {
-                    // If no local data, just set the defaults
-                    setMealData(defaultMeals);
-                }
-
-                // After showing local data, try to fetch from backend in the background
-                setLoading(false); // Ensure we're not showing loading state anymore
-
-                // Fetch from backend if online
-                const online = await isOnline();
-                if (online) {
-                    try {
-                        console.log('Fetching from backend API...');
-                        // Get data by date from the backend
-                        const dateResponse = await fetch(`${BACKEND_URL}/meal_entries/by-date/${formattedDate}`);
-
-                        if (dateResponse.ok) {
-                            const backendDateData = await dateResponse.json();
-                            console.log('Backend data by date:', backendDateData);
-
-                            if (backendDateData && backendDateData.length > 0) {
-                                // Process backend data by date
-                                const mealDict: Record<string, Meal> = {};
-
-                                // Initialize with default meal types
-                                mealTypes.forEach(type => {
-                                    mealDict[type] = {
-                                        title: type,
-                                        total: 0,
-                                        macros: { carbs: 0, fat: 0, protein: 0 },
-                                        items: []
-                                    };
-                                });
-
-                                // Group by meal type
-                                backendDateData.forEach(entry => {
-                                    if (!entry.meal_type) return; // Skip entries without meal type
-
-                                    // Normalize meal_type - capitalize first letter to match our mealTypes
-                                    let normalizedMealType = entry.meal_type.charAt(0).toUpperCase() + entry.meal_type.slice(1).toLowerCase();
-
-                                    // Check if the meal type exists in our predefined types
-                                    const validMealType = mealTypes.includes(normalizedMealType) ?
-                                        normalizedMealType :
-                                        'Snacks'; // Default to Snacks if unknown type
-
-                                    // Add food entry to respective meal
-                                    mealDict[validMealType].total += entry.calories || 0;
-                                    mealDict[validMealType].macros.carbs += entry.carbs || 0;
-                                    mealDict[validMealType].macros.fat += entry.fats || 0;
-                                    mealDict[validMealType].macros.protein += entry.proteins || 0;
-
-                                    // Format the item name with appropriate nutritional info
-                                    const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';
-                                    const proteinInfo = `Protein: ${entry.proteins}g`;
-                                    const itemDescription = weightInfo ? `${proteinInfo}\n${weightInfo}` : proteinInfo;
-
-                                    mealDict[validMealType].items.push({
-                                        name: `${entry.food_name}\n${itemDescription}`,
-                                        calories: entry.calories || 0,
-                                        healthiness: entry.healthiness_rating || 5
-                                    });
-                                });
-
-                                // Convert back to array
-                                const updatedMeals = Object.values(mealDict);
-
-                                // Sort meals in the correct order
-                                updatedMeals.sort((a, b) => {
-                                    const order = { 'Breakfast': 1, 'Lunch': 2, 'Dinner': 3, 'Snacks': 4 };
-                                    return (order[a.title] || 99) - (order[b.title] || 99);
-                                });
-
-                                setMealData(updatedMeals);
-                                console.log('Updated meal data from backend by date:', updatedMeals);
-                            }
+                        // Only update state if we actually have items
+                        if (updatedMeals.some(meal => meal.items.length > 0)) {
+                            setMealData(updatedMeals);
+                            console.log('Updated meal data from local database');
                         }
-                    } catch (backendError) {
-                        console.error('Error fetching meal data from backend:', backendError);
-                        // Continue with local data if backend fetch fails
+                    } else if (!hasExistingData) {
+                        // Only set default meals if we don't already have data
+                        setMealData(defaultMeals);
                     }
-                } else {
-                    console.log('Device is offline, using only local data');
+                } catch (error) {
+                    console.error('Error fetching meals from local database:', error);
+
+                    // If we have existing data, keep it rather than showing an error
+                    if (!hasExistingData) {
+                        setMealData(defaultMeals);
+                    }
                 }
+
+                setLoading(false);
+
+                // Try to fetch exercises as well
+                try {
+                    if (isDatabaseReady()) {
+                        const exercises = await getExercisesByDate(formattedDate) as Exercise[];
+                        console.log(`Found ${exercises.length} exercises for date ${formattedDate}`);
+                        setExerciseList(exercises);
+                    }
+                } catch (error) {
+                    console.error('Error fetching exercises:', error);
+                }
+
+                // After loading local data, set processed flag to true
+                processedMealData.current = true;
+
             } catch (error) {
                 console.error('Error fetching meals:', error);
                 setLoading(false);
@@ -650,33 +643,6 @@ const DiaryScreen: React.FC = () => {
             console.error('Error adding test exercise:', error);
         }
     };
-
-    // Add effect to check for AsyncStorage refresh trigger
-    useEffect(() => {
-        const checkAsyncStorageTrigger = async () => {
-            try {
-                const trigger = await AsyncStorage.getItem('FOOD_LOG_REFRESH_TRIGGER');
-                if (trigger) {
-                    console.log('Found refresh trigger in AsyncStorage:', trigger);
-                    // Clear the trigger and refresh
-                    await AsyncStorage.removeItem('FOOD_LOG_REFRESH_TRIGGER');
-                    refreshMealData();
-                }
-            } catch (error) {
-                console.error('Error checking AsyncStorage trigger:', error);
-            }
-        };
-
-        // Check on initial load
-        checkAsyncStorageTrigger();
-
-        // Set up a listener to check periodically
-        const interval = setInterval(checkAsyncStorageTrigger, 1000);
-
-        return () => {
-            clearInterval(interval);
-        };
-    }, []);
 
     // Function to handle long press on a food item
     const handleFoodItemLongPress = (foodId: number | undefined, foodName: string, mealType: string, index: number) => {
