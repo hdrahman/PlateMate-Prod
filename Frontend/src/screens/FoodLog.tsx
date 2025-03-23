@@ -624,13 +624,12 @@ const DiaryScreen: React.FC = () => {
     };
 
     // Render activity item for the flat list
-    const renderActivityItem = ({ item, isPopular }: { item: METActivity, isPopular?: boolean }) => {
+    const renderActivityItem = ({ item }: { item: METActivity }) => {
         const isSelected = selectedActivity?.name === item.name;
         return (
             <TouchableOpacity
                 style={[
                     styles.activityItem,
-                    isPopular && styles.popularActivityItem,
                     isSelected && styles.selectedActivityItem
                 ]}
                 onPress={() => setSelectedActivity(item)}
@@ -1952,9 +1951,15 @@ const DiaryScreen: React.FC = () => {
                     animationType="fade"
                     transparent={true}
                     visible={exerciseModalVisible}
-                    onRequestClose={() => setExerciseModalVisible(false)}
+                    onRequestClose={() => {
+                        setExerciseModalVisible(false);
+                        setSelectedActivity(null);
+                    }}
                 >
-                    <TouchableWithoutFeedback onPress={() => setExerciseModalVisible(false)}>
+                    <TouchableWithoutFeedback onPress={() => {
+                        setExerciseModalVisible(false);
+                        setSelectedActivity(null);
+                    }}>
                         <View style={styles.modalOverlay}>
                             <TouchableWithoutFeedback onPress={() => { }}>
                                 <View style={styles.exerciseModalContent}>
@@ -1992,10 +1997,6 @@ const DiaryScreen: React.FC = () => {
                                                         end={{ x: 1, y: 0 }}
                                                     />
                                                     <View style={styles.popularActivitiesContainer}>
-                                                        <View style={styles.popularActivitiesHeader}>
-                                                            <Ionicons name="star" size={16} color="#0074dd" />
-                                                            <Text style={styles.popularActivitiesTitle}>Activities</Text>
-                                                        </View>
                                                         <ScrollView
                                                             nestedScrollEnabled={true}
                                                             style={styles.popularActivitiesScroll}
@@ -2009,7 +2010,7 @@ const DiaryScreen: React.FC = () => {
                                                                 paddingTop: 0
                                                             }]}>Popular</Text>
                                                             {groupedActivities.popular.map((activity, index) =>
-                                                                renderActivityItem({ item: activity, isPopular: true })
+                                                                renderActivityItem({ item: activity })
                                                             )}
 
                                                             <Text style={styles.sectionHeader}>Light Activities ({'<'} 3 METs)</Text>
@@ -2116,7 +2117,10 @@ const DiaryScreen: React.FC = () => {
                                     <View style={styles.buttonRow}>
                                         <TouchableOpacity
                                             style={styles.modalCancelButton}
-                                            onPress={() => setExerciseModalVisible(false)}
+                                            onPress={() => {
+                                                setExerciseModalVisible(false);
+                                                setSelectedActivity(null);
+                                            }}
                                         >
                                             <Text style={styles.modalButtonText}>Cancel</Text>
                                         </TouchableOpacity>
