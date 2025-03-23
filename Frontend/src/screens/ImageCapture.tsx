@@ -307,50 +307,89 @@ const ImageCapture: React.FC = () => {
             const result = await uploadMultipleImages(imageUris);
             console.log('Multiple images uploaded successfully');
 
-            // Extract nutrition data
-            const nutritionData = result.nutrition_data[0] || {};
-
             // Format current date as ISO string (YYYY-MM-DD)
             const today = new Date();
             const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-            console.log(`Saving food log with date: ${formattedDate}`);
+            console.log(`Saving food logs with date: ${formattedDate}`);
 
-            // Create a food log entry with all required fields
-            const foodLog = {
-                meal_id: result.meal_id,
-                food_name: nutritionData.food_name || 'Unknown Food',
-                calories: nutritionData.calories || 0,
-                proteins: nutritionData.proteins || 0,
-                carbs: nutritionData.carbs || 0,
-                fats: nutritionData.fats || 0,
-                fiber: nutritionData.fiber || 0,
-                sugar: nutritionData.sugar || 0,
-                saturated_fat: nutritionData.saturated_fat || 0,
-                polyunsaturated_fat: nutritionData.polyunsaturated_fat || 0,
-                monounsaturated_fat: nutritionData.monounsaturated_fat || 0,
-                trans_fat: nutritionData.trans_fat || 0,
-                cholesterol: nutritionData.cholesterol || 0,
-                sodium: nutritionData.sodium || 0,
-                potassium: nutritionData.potassium || 0,
-                vitamin_a: nutritionData.vitamin_a || 0,
-                vitamin_c: nutritionData.vitamin_c || 0,
-                calcium: nutritionData.calcium || 0,
-                iron: nutritionData.iron || 0,
-                image_url: imageUris[0],
-                file_key: 'default_key',
-                healthiness_rating: nutritionData.healthiness_rating || 5,
-                date: formattedDate,
-                meal_type: mealType,
-                brand_name: brandName,
-                quantity: quantity,
-                notes: notes
-            };
+            // Check if we have an array of nutrition data
+            if (Array.isArray(result.nutrition_data) && result.nutrition_data.length > 0) {
+                // Process each food item in the array
+                for (const nutritionData of result.nutrition_data) {
+                    // Create a food log entry with all required fields
+                    const foodLog = {
+                        meal_id: result.meal_id,
+                        food_name: nutritionData.food_name || 'Unknown Food',
+                        calories: nutritionData.calories || 0,
+                        proteins: nutritionData.proteins || 0,
+                        carbs: nutritionData.carbs || 0,
+                        fats: nutritionData.fats || 0,
+                        fiber: nutritionData.fiber || 0,
+                        sugar: nutritionData.sugar || 0,
+                        saturated_fat: nutritionData.saturated_fat || 0,
+                        polyunsaturated_fat: nutritionData.polyunsaturated_fat || 0,
+                        monounsaturated_fat: nutritionData.monounsaturated_fat || 0,
+                        trans_fat: nutritionData.trans_fat || 0,
+                        cholesterol: nutritionData.cholesterol || 0,
+                        sodium: nutritionData.sodium || 0,
+                        potassium: nutritionData.potassium || 0,
+                        vitamin_a: nutritionData.vitamin_a || 0,
+                        vitamin_c: nutritionData.vitamin_c || 0,
+                        calcium: nutritionData.calcium || 0,
+                        iron: nutritionData.iron || 0,
+                        image_url: imageUris[0],
+                        file_key: 'default_key',
+                        healthiness_rating: nutritionData.healthiness_rating || 5,
+                        date: formattedDate,
+                        meal_type: mealType,
+                        brand_name: brandName,
+                        quantity: quantity,
+                        notes: notes
+                    };
 
-            console.log('Saving food log to local database:', foodLog);
+                    console.log(`Saving food log for ${nutritionData.food_name} to local database`);
+                    await addFoodLog(foodLog);
+                }
 
-            // Add to local database
-            await addFoodLog(foodLog);
-            console.log('Food log saved to local database successfully');
+                console.log(`Saved ${result.nutrition_data.length} food items to database`);
+            } else {
+                // Fallback to old behavior if not an array or empty
+                const nutritionData = result.nutrition_data[0] || {};
+
+                // Create a food log entry with all required fields
+                const foodLog = {
+                    meal_id: result.meal_id,
+                    food_name: nutritionData.food_name || 'Unknown Food',
+                    calories: nutritionData.calories || 0,
+                    proteins: nutritionData.proteins || 0,
+                    carbs: nutritionData.carbs || 0,
+                    fats: nutritionData.fats || 0,
+                    fiber: nutritionData.fiber || 0,
+                    sugar: nutritionData.sugar || 0,
+                    saturated_fat: nutritionData.saturated_fat || 0,
+                    polyunsaturated_fat: nutritionData.polyunsaturated_fat || 0,
+                    monounsaturated_fat: nutritionData.monounsaturated_fat || 0,
+                    trans_fat: nutritionData.trans_fat || 0,
+                    cholesterol: nutritionData.cholesterol || 0,
+                    sodium: nutritionData.sodium || 0,
+                    potassium: nutritionData.potassium || 0,
+                    vitamin_a: nutritionData.vitamin_a || 0,
+                    vitamin_c: nutritionData.vitamin_c || 0,
+                    calcium: nutritionData.calcium || 0,
+                    iron: nutritionData.iron || 0,
+                    image_url: imageUris[0],
+                    file_key: 'default_key',
+                    healthiness_rating: nutritionData.healthiness_rating || 5,
+                    date: formattedDate,
+                    meal_type: mealType,
+                    brand_name: brandName,
+                    quantity: quantity,
+                    notes: notes
+                };
+
+                console.log('Saving food log to local database:', foodLog);
+                await addFoodLog(foodLog);
+            }
 
             // Navigate back to the food log screen with refresh parameter
             Alert.alert('Success', 'Food added successfully', [
@@ -368,6 +407,7 @@ const ImageCapture: React.FC = () => {
                     }
                 }
             ]);
+
         } catch (error) {
             console.error('Error submitting food:', error);
             Alert.alert('Error', 'Failed to submit food. Please try again.');
