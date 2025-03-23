@@ -70,6 +70,42 @@ const stepsHistory = [
   { date: '02/01', steps: 5000 }
 ];
 
+// GradientBorderCard component for consistent card styling
+interface GradientBorderCardProps {
+  children: React.ReactNode;
+  style?: any;
+}
+
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+  return (
+    <View style={styles.gradientBorderContainer}>
+      <LinearGradient
+        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          borderRadius: 10,
+        }}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      />
+      <View
+        style={{
+          margin: 1,
+          borderRadius: 9,
+          backgroundColor: '#121212', // Fixed dark background for all cards
+          padding: 16,
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+};
+
 export default function Home() {
   const navigation = useNavigation();
   const { isDarkTheme } = useContext(ThemeContext);
@@ -105,7 +141,7 @@ export default function Home() {
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* CHEAT DAY CARD */}
-        <View style={styles.card}>
+        <GradientBorderCard>
           <View style={styles.cheatDayContainer}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={styles.cheatDayLabel}>Days until cheat day</Text>
@@ -122,138 +158,140 @@ export default function Home() {
               {cheatDaysCompleted} / {cheatDaysTotal} days
             </Text>
           </View>
-        </View>
+        </GradientBorderCard>
 
         {/* Add space between the cards */}
-        <View style={{ height: 6 }} />
+        <View style={{ height: 4 }} />
 
         {/* GOAL CARD (Unified circular bar + stats overlay) */}
-        <View style={styles.goalCard}>
-          <View style={styles.ringContainer}>
-            <View style={styles.ringGlow} />
-            <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
-              <Defs>
-                <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#2E0854" />
-                  <Stop offset="50%" stopColor="#9B00FF" />
-                  <Stop offset="100%" stopColor="#00CFFF" />
-                </SvgLinearGradient>
-                <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#8B0000" />
-                  <Stop offset="100%" stopColor="#FFD700" />
-                </SvgLinearGradient>
-                <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#4B0082" />
-                  <Stop offset="100%" stopColor="#8A2BE2" />
-                </SvgLinearGradient>
-              </Defs>
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="rgba(255, 255, 255, 0.12)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-              />
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="url(#ringGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="butt"
-                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
-              />
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="url(#ringGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="round"
-                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
-              />
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="url(#exerciseGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
-                strokeLinecap="butt"
-                transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
-              />
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="url(#exerciseGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
-                strokeLinecap="round"
-                transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
-              />
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="url(#eatenGradient)" // Gradient for calories eaten bar
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="butt"
-                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
-              />
-              <Circle
-                cx={CIRCLE_SIZE / 2}
-                cy={CIRCLE_SIZE / 2}
-                r={radius}
-                stroke="url(#eatenGradient)" // Gradient for calories eaten bar
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="round"
-                transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
-              />
-            </Svg>
-            <View style={styles.centerTextContainer}>
-              <Text style={styles.remainingValue}>{remainingCalories}</Text>
-              <Text style={styles.remainingLabel}>REMAINING</Text>
+        <GradientBorderCard>
+          <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
+            <View style={styles.ringContainer}>
+              <View style={styles.ringGlow} />
+              <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
+                <Defs>
+                  <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#2E0854" />
+                    <Stop offset="50%" stopColor="#9B00FF" />
+                    <Stop offset="100%" stopColor="#00CFFF" />
+                  </SvgLinearGradient>
+                  <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#8B0000" />
+                    <Stop offset="100%" stopColor="#FFD700" />
+                  </SvgLinearGradient>
+                  <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#4B0082" />
+                    <Stop offset="100%" stopColor="#8A2BE2" />
+                  </SvgLinearGradient>
+                </Defs>
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="rgba(255, 255, 255, 0.12)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                />
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="url(#ringGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="butt"
+                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                />
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="url(#ringGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="round"
+                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                />
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="url(#exerciseGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
+                  strokeLinecap="butt"
+                  transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+                />
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="url(#exerciseGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
+                  strokeLinecap="round"
+                  transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+                />
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="url(#eatenGradient)" // Gradient for calories eaten bar
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="butt"
+                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                />
+                <Circle
+                  cx={CIRCLE_SIZE / 2}
+                  cy={CIRCLE_SIZE / 2}
+                  r={radius}
+                  stroke="url(#eatenGradient)" // Gradient for calories eaten bar
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="round"
+                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                />
+              </Svg>
+              <View style={styles.centerTextContainer}>
+                <Text style={styles.remainingValue}>{remainingCalories}</Text>
+                <Text style={styles.remainingLabel}>REMAINING</Text>
+              </View>
+            </View>
+            <View style={[styles.rightCardVertical, { marginTop: 13 }]}>
+              {rightStats.map((item) => {
+                const IconComponent = item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
+                return (
+                  <View key={item.label} style={styles.statRowVertical}>
+                    <IconComponent name={item.icon as any} size={20} color={item.color} />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
+                      <Text style={styles.statValue}>{item.value}</Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </View>
-          <View style={[styles.rightCardVertical, { marginTop: 13 }]}>
-            {rightStats.map((item) => {
-              const IconComponent = item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
-              return (
-                <View key={item.label} style={styles.statRowVertical}>
-                  <IconComponent name={item.icon as any} size={20} color={item.color} />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
-                    <Text style={styles.statValue}>{item.value}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+        </GradientBorderCard>
 
         {/* Add space between the cards */}
-        <View style={{ height: 5 }} />
+        <View style={{ height: 3 }} />
 
         {/* MACROS CARD */}
-        <View style={styles.card}>
+        <GradientBorderCard>
           <View style={styles.macrosRow}>
             <MacroRing label="PROTEIN" percent={proteinPercent} current={proteinPercent} />
             <MacroRing label="CARBS" percent={carbsPercent} current={carbsPercent} />
@@ -265,13 +303,13 @@ export default function Home() {
               onPress={() => navigation.navigate('Nutrients' as never)}
             />
           </View>
-        </View>
+        </GradientBorderCard>
 
         {/* Add space between the cards */}
-        <View style={{ height: 5 }} />
+        <View style={{ height: 3 }} />
 
         {/* WEIGHT LOST CARD */}
-        <View style={styles.card}>
+        <GradientBorderCard>
           <View style={styles.burnContainer}>
             <Text style={styles.burnTitle}>Weight Lost</Text>
             <View style={styles.burnBarBackground}>
@@ -288,10 +326,10 @@ export default function Home() {
               <Text style={styles.weightLabel}>96 kg</Text>
             </View>
           </View>
-        </View>
+        </GradientBorderCard>
 
         {/* Add space between the cards */}
-        <View style={{ height: 6 }} />
+        <View style={{ height: 4 }} />
 
         {/* -- TREND CARDS WRAPPED IN A HORIZONTAL SCROLL -- */}
         <ScrollView
@@ -300,23 +338,24 @@ export default function Home() {
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={onScrollEnd}
           style={{ width: '100%' }}
+          contentContainerStyle={{ alignItems: 'center' }}
         >
           {/* WEIGHT TREND CARD (1st page) */}
-          <View style={{ width }}>
-            <View style={[styles.card, { width: '95%', marginLeft: '2.5%' }]}>
+          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            <GradientBorderCard>
               <View style={styles.trendContainer}>
                 <WeightGraph data={weightHistory} />
               </View>
-            </View>
+            </GradientBorderCard>
           </View>
 
           {/* STEPS TREND CARD (2nd page) */}
-          <View style={{ width }}>
-            <View style={[styles.card, { width: '95%', marginLeft: '2.5%' }]}>
+          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            <GradientBorderCard>
               <View style={styles.trendContainer}>
                 <StepsGraph data={stepsHistory} />
               </View>
-            </View>
+            </GradientBorderCard>
           </View>
         </ScrollView>
 
@@ -348,7 +387,7 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
   const minWeight = Math.min(...yValues);
   const maxWeight = Math.max(...yValues);
 
-  // Add a small top buffer (+1) so final dot isn’t at the very top
+  // Add a small top buffer (+1) so final dot isn't at the very top
   const scaleY = d3Scale
     .scaleLinear()
     .domain([minWeight, maxWeight + 1])
@@ -1057,5 +1096,20 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  gradientBorderContainer: {
+    marginBottom: 8,
+    borderRadius: 10,
+    width: '95%',
+    overflow: 'hidden',
+  },
+  goalCardContent: {
+    padding: 10,
+    marginBottom: 4,
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    height: 235
   },
 });
