@@ -14,6 +14,10 @@ import {
     TouchableHighlight,
     Alert,
     AppState,
+    TextInput,
+    FlatList,
+    ViewStyle,
+    TextStyle
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -98,6 +102,13 @@ interface Exercise {
     duration: number;
     date?: string;
     notes?: string;
+}
+
+// Add MET activity interface
+interface METActivity {
+    name: string;
+    met: number;
+    category: 'light' | 'moderate' | 'vigorous';
 }
 
 // Add interface for route params
@@ -407,433 +418,246 @@ const DiaryScreen: React.FC = () => {
     const [selectedFoodItem, setSelectedFoodItem] = useState<{ id?: number, name: string, meal: string, index: number } | null>(null);
     const [moveModalVisible, setMoveModalVisible] = useState(false);
 
-    const toggleStreakInfo = () => {
-        setShowStreakInfo(!showStreakInfo);
-    };
+    // Add state for exercise modal
+    const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
+    const [selectedActivity, setSelectedActivity] = useState<METActivity | null>(null);
+    const [exerciseDuration, setExerciseDuration] = useState('30');
+    const [exerciseIntensity, setExerciseIntensity] = useState('moderate');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [userWeight, setUserWeight] = useState(70); // Default 70kg (around 150lbs)
 
-    const toggleMacrosDisplay = () => {
-        setShowMacrosAsPercent(!showMacrosAsPercent);
-    };
+    // MET activities data based on the provided charts
+    const metActivities: METActivity[] = [
+        // Popular/Common activities at the top
+        { name: 'Weight lifting, moderate', met: 5.0, category: 'moderate' },
+        { name: 'Weight lifting, vigorous', met: 6.0, category: 'vigorous' },
+        { name: 'Walking, 3 mph', met: 3.3, category: 'moderate' },
+        { name: 'Walking, 4 mph', met: 5.0, category: 'moderate' },
+        { name: 'Running, 6 min/mile', met: 16.0, category: 'vigorous' },
+        { name: 'Running, 10 min/mile', met: 10.0, category: 'vigorous' },
+        { name: 'Bicycling, 12-13 mph', met: 8.0, category: 'vigorous' },
+        { name: 'Swimming, moderate pace', met: 4.5, category: 'moderate' },
+        { name: 'Basketball game', met: 8.0, category: 'vigorous' },
+        { name: 'Soccer, casual', met: 7.0, category: 'vigorous' },
 
-    const handleOutsidePress = () => {
-        if (showStreakInfo) {
-            setShowStreakInfo(false);
+        // Light activities
+        { name: 'Walking, slowly (stroll)', met: 2.0, category: 'light' },
+        { name: 'Walking, 2 mph', met: 2.5, category: 'light' },
+        { name: 'Stretching, yoga', met: 2.5, category: 'light' },
+        { name: 'Fishing, standing', met: 2.5, category: 'light' },
+        { name: 'Golf with a cart', met: 2.5, category: 'light' },
+        { name: 'Housework, light', met: 2.5, category: 'light' },
+        { name: 'Playing catch', met: 2.5, category: 'light' },
+        { name: 'Playing piano', met: 2.5, category: 'light' },
+        { name: 'Canoeing leisurely', met: 2.5, category: 'light' },
+        { name: 'Croquet', met: 2.5, category: 'light' },
+        { name: 'Dancing, ballroom, slow', met: 2.9, category: 'light' },
+        { name: 'Sitting quietly', met: 1.0, category: 'light' },
+
+        // Moderate activities
+        { name: 'Aerobic dance, low impact', met: 5.0, category: 'moderate' },
+        { name: 'Archery', met: 3.5, category: 'moderate' },
+        { name: 'Badminton', met: 4.5, category: 'moderate' },
+        { name: 'Baseball or softball', met: 5.0, category: 'moderate' },
+        { name: 'Basketball, shooting baskets', met: 4.5, category: 'moderate' },
+        { name: 'Bicycling, leisurely', met: 3.5, category: 'moderate' },
+        { name: 'Bowling', met: 3.0, category: 'moderate' },
+        { name: 'Calisthenics, light to moderate', met: 3.5, category: 'moderate' },
+        { name: 'Canoeing, 3 mph', met: 3.0, category: 'moderate' },
+        { name: 'Dancing, modern, fast', met: 4.8, category: 'moderate' },
+        { name: 'Fishing, walking and standing', met: 3.5, category: 'moderate' },
+        { name: 'Foot bag, hacky sack', met: 4.0, category: 'moderate' },
+        { name: 'Gardening, active', met: 4.0, category: 'moderate' },
+        { name: 'Golf, walking', met: 4.4, category: 'moderate' },
+        { name: 'Gymnastics', met: 4.0, category: 'moderate' },
+        { name: 'Horseback riding', met: 4.0, category: 'moderate' },
+        { name: 'Ice skating', met: 5.5, category: 'moderate' },
+        { name: 'Jumping on mini tramp', met: 4.5, category: 'moderate' },
+        { name: 'Kayaking', met: 5.0, category: 'moderate' },
+        { name: 'Raking the lawn', met: 4.0, category: 'moderate' },
+        { name: 'Skateboarding', met: 5.0, category: 'moderate' },
+        { name: 'Snowmobiling', met: 3.5, category: 'moderate' },
+        { name: 'Swimming recreational', met: 6.0, category: 'moderate' },
+        { name: 'Table tennis', met: 4.0, category: 'moderate' },
+        { name: 'Tai chi', met: 4.0, category: 'moderate' },
+        { name: 'Tennis, doubles', met: 5.0, category: 'moderate' },
+        { name: 'Trampoline', met: 3.5, category: 'moderate' },
+        { name: 'Volleyball, noncompetitive', met: 3.0, category: 'moderate' },
+        { name: 'Mowing lawn, walking', met: 5.5, category: 'moderate' },
+
+        // Vigorous activities
+        { name: 'Aerobic dance', met: 6.5, category: 'vigorous' },
+        { name: 'Aerobic dance, high impact', met: 7.0, category: 'vigorous' },
+        { name: 'Aerobic stepping, 6-8 inches', met: 8.5, category: 'vigorous' },
+        { name: 'Backpacking', met: 7.0, category: 'vigorous' },
+        { name: 'Bicycling, 14-15 mph', met: 10.0, category: 'vigorous' },
+        { name: 'Bicycling, 16-19 mph', met: 12.0, category: 'vigorous' },
+        { name: 'Bicycling, 20+ mph', met: 16.0, category: 'vigorous' },
+        { name: 'Calisthenics, heavy, vigorous', met: 8.0, category: 'vigorous' },
+        { name: 'Canoeing, 5 mph or portaging', met: 7.0, category: 'vigorous' },
+        { name: 'Chopping wood', met: 6.0, category: 'vigorous' },
+        { name: 'Dancing, aerobic or ballet', met: 6.0, category: 'vigorous' },
+        { name: 'Fencing', met: 6.0, category: 'vigorous' },
+        { name: 'Fishing in stream with waders', met: 6.5, category: 'vigorous' },
+        { name: 'Football, competitive', met: 9.0, category: 'vigorous' },
+        { name: 'Football, touch/flag', met: 8.0, category: 'vigorous' },
+        { name: 'Frisbee, ultimate', met: 8.0, category: 'vigorous' },
+        { name: 'Hockey, field or ice', met: 8.0, category: 'vigorous' },
+        { name: 'Ice skating, social', met: 7.0, category: 'vigorous' },
+        { name: 'Jogging, 12 min/mile', met: 8.0, category: 'vigorous' },
+        { name: 'Judo/karate/tae kwan do', met: 10.0, category: 'vigorous' },
+        { name: 'Lacrosse', met: 8.0, category: 'vigorous' },
+        { name: 'Logging/felling trees', met: 8.0, category: 'vigorous' },
+        { name: 'Mountain climbing', met: 8.0, category: 'vigorous' },
+        { name: 'Race walking, moderate pace', met: 6.5, category: 'vigorous' },
+        { name: 'Racquetball', met: 10.0, category: 'vigorous' },
+        { name: 'Racquetball, team', met: 8.0, category: 'vigorous' },
+        { name: 'Roller skating', met: 7.0, category: 'vigorous' },
+        { name: 'Rollerblading, fast', met: 12.0, category: 'vigorous' },
+        { name: 'Rope skipping, slow', met: 8.0, category: 'vigorous' },
+        { name: 'Rope skipping, fast', met: 12.0, category: 'vigorous' },
+        { name: 'Running, 7 min/mile', met: 14.0, category: 'vigorous' },
+        { name: 'Running, 8 min/mile', met: 12.5, category: 'vigorous' },
+        { name: 'Running, 9 min/mile', met: 11.0, category: 'vigorous' },
+        { name: 'Shoveling snow', met: 6.0, category: 'vigorous' },
+        { name: 'Skiing downhill, moderate', met: 6.0, category: 'vigorous' },
+        { name: 'Skiing downhill, vigorous', met: 8.0, category: 'vigorous' },
+        { name: 'Skiing cross country, slow', met: 7.0, category: 'vigorous' },
+        { name: 'Skiing cross country, moderate', met: 8.0, category: 'vigorous' },
+        { name: 'Skiing cross country, vigorous', met: 9.0, category: 'vigorous' },
+        { name: 'Skiing cross country, racing uphill', met: 16.5, category: 'vigorous' },
+        { name: 'Skin diving', met: 12.5, category: 'vigorous' },
+        { name: 'Snow shoeing', met: 8.0, category: 'vigorous' },
+        { name: 'Soccer, competitive', met: 10.0, category: 'vigorous' },
+        { name: 'Surfing', met: 6.0, category: 'vigorous' },
+        { name: 'Swimming laps, moderate pace', met: 7.0, category: 'vigorous' },
+        { name: 'Swimming laps, fast', met: 10.0, category: 'vigorous' },
+        { name: 'Swimming laps, sidestroke', met: 8.0, category: 'vigorous' },
+        { name: 'Tennis', met: 7.0, category: 'vigorous' },
+        { name: 'Volleyball, competitive/beach', met: 8.0, category: 'vigorous' },
+        { name: 'Walking, 11 min/mile', met: 11.0, category: 'vigorous' },
+        { name: 'Walking up stairs', met: 8.0, category: 'vigorous' },
+        { name: 'Water jogging', met: 8.0, category: 'vigorous' },
+        { name: 'Water polo', met: 10.0, category: 'vigorous' },
+        { name: 'Wrestling', met: 6.0, category: 'vigorous' },
+        { name: 'Hiking up hills', met: 6.9, category: 'vigorous' },
+        { name: 'Hiking hills, 12 lb pack', met: 7.5, category: 'vigorous' },
+    ];
+
+    // Function to calculate calories burned using MET formula
+    const calculateCaloriesBurned = (activity: METActivity, duration: number, weight: number) => {
+        // Apply intensity modifier
+        let intensityMultiplier = 1.0; // default (moderate)
+
+        if (exerciseIntensity === 'light') {
+            intensityMultiplier = 0.8; // 20% reduction for light intensity
+        } else if (exerciseIntensity === 'vigorous') {
+            intensityMultiplier = 1.2; // 20% increase for vigorous intensity
         }
+
+        // Adjusted MET value based on personal intensity
+        const adjustedMET = activity.met * intensityMultiplier;
+
+        // Formula: Exercise calories = (MET level of activity x 3.5 x Weight (kg) x minutes of activity) / 200
+        return Math.round((adjustedMET * 3.5 * weight * duration) / 200);
     };
 
-    const animateSwipe = (direction: number, updateDate: () => void) => {
-        Animated.sequence([
-            Animated.timing(slideAnim, {
-                toValue: direction * 50,
-                duration: 100,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start();
-        updateDate();
+    // Filter activities based on search query
+    const filteredActivities = searchQuery.trim() === ''
+        ? metActivities
+        : metActivities.filter(activity =>
+            activity.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Group activities by category for display
+    const groupedActivities = {
+        popular: filteredActivities.slice(0, 10), // First 10 are popular activities
+        light: filteredActivities.filter(a => a.category === 'light'),
+        moderate: filteredActivities.filter(a => a.category === 'moderate'),
+        vigorous: filteredActivities.filter(a => a.category === 'vigorous')
     };
 
-    const gotoPrevDay = () => {
-        processedMealData.current = false; // Reset when date changes
-        animateSwipe(1, () => {
-            setCurrentDate(prev => {
-                const newDate = new Date(prev);
-                newDate.setDate(newDate.getDate() - 1);
-                return newDate;
-            });
-        });
-    };
-
-    const gotoNextDay = () => {
-        processedMealData.current = false; // Reset when date changes
-        animateSwipe(-1, () => {
-            setCurrentDate(prev => {
-                const newDate = new Date(prev);
-                newDate.setDate(newDate.getDate() + 1);
-                return newDate;
-            });
-        });
-    };
-
-    const formatDate = (date: Date): string => {
-        const today = new Date();
-        const yesterday = new Date();
-        yesterday.setDate(today.getDate() - 1);
-        const tomorrow = new Date();
-        tomorrow.setDate(today.getDate() + 1);
-
-        // Remove time
-        const stripTime = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        const t = stripTime(today);
-        const d = stripTime(date);
-        const diff = d.getTime() - t.getTime();
-
-        if (diff === 0) return "Today";
-        if (diff === -86400000) return "Yesterday";
-        if (diff === 86400000) return "Tomorrow";
-
-        // Fallback: e.g., Sunday, Feb 02
-        const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: '2-digit' };
-        return date.toLocaleDateString(undefined, options);
-    };
-
-    const onGestureEvent = Animated.event(
-        [{ nativeEvent: { translationX: swipeAnim } }],
-        { useNativeDriver: true }
-    );
-
-    const handleSwipeRelease = (translationX: number) => {
-        const threshold = 100;
-        if (translationX <= -threshold) {
-            // swipe left -> next day
-            processedMealData.current = false; // Reset when date changes
-            Animated.timing(swipeAnim, {
-                toValue: -screenWidth,
-                duration: 200,
-                useNativeDriver: true,
-            }).start(() => {
-                setCurrentDate(prev => {
-                    const newDate = new Date(prev);
-                    newDate.setDate(newDate.getDate() + 1);
-                    return newDate;
-                });
-                swipeAnim.setValue(0); // Set to 0 directly instead of screenWidth
-                // No need for another animation, this prevents the "half-screen" issue
-            });
-        } else if (translationX >= threshold) {
-            // swipe right -> previous day
-            processedMealData.current = false; // Reset when date changes
-            Animated.timing(swipeAnim, {
-                toValue: screenWidth,
-                duration: 200,
-                useNativeDriver: true,
-            }).start(() => {
-                setCurrentDate(prev => {
-                    const newDate = new Date(prev);
-                    newDate.setDate(newDate.getDate() - 1);
-                    return newDate;
-                });
-                swipeAnim.setValue(0); // Set to 0 directly instead of -screenWidth
-                // No need for another animation, this prevents the "half-screen" issue
-            });
-        } else {
-            // not enough swipe; snap back
-            Animated.timing(swipeAnim, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }).start();
+    // Add a real exercise function
+    const addNewExercise = async () => {
+        if (!selectedActivity) {
+            Alert.alert('Select Activity', 'Please select an activity from the list');
+            return;
         }
-    };
 
-    const onHandlerStateChange = (event: any) => {
-        if (event.nativeEvent.state === GestureState.END) {
-            const { translationX } = event.nativeEvent;
-            handleSwipeRelease(translationX);
-        }
-    };
-
-    const fetchExercises = async () => {
         try {
             const formattedDate = formatDateToString(currentDate);
-            console.log('Fetching exercises for date:', formattedDate);
 
-            // Fetch exercises from local database
-            const localExerciseData = await getExercisesByDate(formattedDate);
-            console.log('Local exercise data:', localExerciseData);
+            // Calculate calories burned
+            const duration = parseInt(exerciseDuration) || 30;
+            const caloriesBurned = calculateCaloriesBurned(selectedActivity, duration, userWeight);
 
-            if (localExerciseData && localExerciseData.length > 0) {
-                // Transform the data to match the Exercise interface
-                const transformedData = localExerciseData.map((exercise: any) => ({
-                    id: exercise.id,
-                    exercise_name: exercise.exercise_name,
-                    calories_burned: exercise.calories_burned,
-                    duration: exercise.duration,
-                    date: exercise.date,
-                    notes: exercise.notes || ''
-                }));
-                setExerciseList(transformedData);
-            } else {
-                setExerciseList([]);
-            }
-
-            // Fetch from backend if online
-            const online = await isOnline();
-            if (online) {
-                try {
-                    const response = await fetch(`${BACKEND_URL}/exercises/by-date/${formattedDate}`);
-                    if (response.ok) {
-                        const backendExerciseData = await response.json();
-                        console.log('Backend exercise data:', backendExerciseData);
-
-                        // Transform the data to match the Exercise interface
-                        const transformedData = backendExerciseData.map((exercise: any) => ({
-                            id: exercise.id,
-                            exercise_name: exercise.exercise_name,
-                            calories_burned: exercise.calories_burned,
-                            duration: exercise.duration,
-                            date: exercise.date,
-                            notes: exercise.notes || ''
-                        }));
-                        setExerciseList(transformedData);
-                    }
-                } catch (error) {
-                    console.error('Error fetching from backend:', error);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching exercises:', error);
-        }
-    };
-
-    useEffect(() => {
-        fetchExercises();
-    }, [currentDate]); // Fetch exercises when the date changes
-
-    // Update the exercise card to use the new data structure
-    const renderExerciseList = () => {
-        // If there are no exercises, return null instead of an empty row
-        if (exerciseList.length === 0) {
-            return null;
-        }
-
-        return exerciseList.map((exercise, index) => (
-            <View key={index}>
-                <View style={styles.logRow}>
-                    <View style={{ flexDirection: 'column' }}>
-                        <Text style={[styles.logItemText, { fontSize: 16 }]} numberOfLines={1} ellipsizeMode="tail">
-                            {exercise.exercise_name}
-                        </Text>
-                        <Text style={styles.logItemDuration}>{exercise.duration} min</Text>
-                    </View>
-                    <Text style={styles.logCalText}>{exercise.calories_burned}</Text>
-                </View>
-                {/* Divider line under each entry */}
-                {index < exerciseList.length - 1 && (
-                    <View style={styles.entryDividerLine} />
-                )}
-            </View>
-        ));
-    };
-
-    // Add a test exercise function
-    const addTestExercise = async () => {
-        try {
-            const formattedDate = formatDateToString(currentDate);
-            console.log('Adding test exercise for date:', formattedDate);
+            // Get intensity multiplier for notes
+            let intensityMultiplier = "1.0";
+            if (exerciseIntensity === 'light') intensityMultiplier = "0.8";
+            if (exerciseIntensity === 'vigorous') intensityMultiplier = "1.2";
 
             const exerciseData = {
-                exercise_name: 'Test Exercise',
-                calories_burned: 150,
-                duration: 30,
+                exercise_name: selectedActivity.name,
+                calories_burned: caloriesBurned,
+                duration: duration,
                 date: formattedDate,
-                notes: 'Added for testing'
+                notes: `MET: ${selectedActivity.met}, Intensity: ${exerciseIntensity} (${intensityMultiplier}x multiplier)`
             };
 
             const result = await addExercise(exerciseData);
-            console.log('Test exercise added with ID:', result);
+            console.log('Exercise added with ID:', result);
+
+            // Reset form fields
+            setSelectedActivity(null);
+            setExerciseDuration('30');
+            setExerciseIntensity('moderate');
+            setSearchQuery('');
+
+            // Close modal
+            setExerciseModalVisible(false);
 
             // Refresh exercise list
-            fetchExercises();
-        } catch (error) {
-            console.error('Error adding test exercise:', error);
-        }
-    };
-
-    // Function to handle long press on a food item
-    const handleFoodItemLongPress = (foodId: number | undefined, foodName: string, mealType: string, index: number) => {
-        console.log('Long press detected:', { foodId, foodName, mealType, index });
-
-        if (!foodId) {
-            console.log('Warning: No food ID found for', foodName);
-
-            // Try to find the item in localMealDataRef.current
-            if (localMealDataRef.current) {
-                const matchingItem = localMealDataRef.current.find(entry =>
-                    entry.food_name === foodName &&
-                    entry.meal_type.toLowerCase() === mealType.toLowerCase()
-                );
-
-                if (matchingItem) {
-                    console.log('Found matching item with ID:', matchingItem.id);
-                    foodId = matchingItem.id;
-                } else {
-                    console.log('No matching item found in local data for:', foodName);
-                }
-            }
-        }
-
-        setSelectedFoodItem({
-            id: foodId,
-            name: foodName,
-            meal: mealType,
-            index: index
-        });
-
-        console.log('Selected food item set to:', {
-            id: foodId,
-            name: foodName,
-            meal: mealType,
-            index: index
-        });
-
-        setActionModalVisible(true);
-    };
-
-    // Function to move food item to different meal type
-    const moveFood = async (foodId: number | undefined, newMealType: string) => {
-        if (!foodId) return;
-
-        setLoading(true);
-
-        try {
-            // Update the food log entry with the new meal type
-            await updateFoodLog(foodId, { meal_type: newMealType });
-            console.log(`Food item moved to ${newMealType}`);
-
-            // Close modals
-            setMoveModalVisible(false);
-            setActionModalVisible(false);
-
-            // Reset selected food item
-            setSelectedFoodItem(null);
-
-            // Refresh the meal data
-            refreshMealData();
-
-            // Show success message
-            Alert.alert('Success', `Food item moved to ${newMealType}`);
-        } catch (error) {
-            console.error('Error moving food item:', error);
-            Alert.alert('Error', 'Failed to move food item');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Function to handle moving a food item to a different meal
-    const handleMoveFoodItem = async (newMealType: string) => {
-        if (!selectedFoodItem || !selectedFoodItem.id) {
-            console.error('No food item selected for moving');
-            return;
-        }
-
-        try {
-            // Update the meal type in local database
-            await updateFoodLog(selectedFoodItem.id, { meal_type: newMealType });
-            console.log(`Food item moved to ${newMealType} in local database`);
-
-            // Try to update in backend if online
-            const online = await isOnline();
-            if (online) {
-                try {
-                    const response = await fetch(`${BACKEND_URL}/meal_entries/${selectedFoodItem.id}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ meal_type: newMealType }),
-                    });
-
-                    if (response.ok) {
-                        console.log(`Food item moved to ${newMealType} in backend`);
-                    } else {
-                        console.error('Failed to update meal type in backend');
-                    }
-                } catch (error) {
-                    console.error('Error updating meal type in backend:', error);
-                }
-            }
-
-            // Refresh the food log
             refreshMealData();
         } catch (error) {
-            console.error('Error moving food item:', error);
-            Alert.alert('Error', 'Failed to move food item');
-        } finally {
-            setMoveModalVisible(false);
-            setActionModalVisible(false);
-            setSelectedFoodItem(null);
+            console.error('Error adding exercise:', error);
+            Alert.alert('Error', 'Failed to add exercise. Please try again.');
         }
     };
 
-    // Function to handle deleting a food item
-    const handleDeleteFoodItem = async () => {
-        if (!selectedFoodItem || !selectedFoodItem.id) {
-            console.error('No food item selected for deletion');
-            return;
-        }
-
-        // Show confirmation dialog
-        Alert.alert(
-            "Delete Food Item",
-            `Are you sure you want to delete "${selectedFoodItem.name}"?`,
-            [
-                {
-                    text: "Cancel",
-                    style: "cancel",
-                    onPress: () => setActionModalVisible(false)
-                },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            setActionModalVisible(false);
-
-                            let backendError = false;
-
-                            // Try to delete from backend first if online
-                            const online = await isOnline();
-                            if (online) {
-                                try {
-                                    console.log(`Attempting to delete item ${selectedFoodItem.id} from backend...`);
-                                    const response = await fetch(`${BACKEND_URL}/meal_entries/delete/${selectedFoodItem.id}`, {
-                                        method: 'DELETE',
-                                    });
-
-                                    if (!response.ok) {
-                                        console.error(`Backend delete failed with status: ${response.status}`);
-                                        backendError = true;
-                                    } else {
-                                        console.log('Food item deleted from backend successfully');
-                                    }
-                                } catch (error) {
-                                    console.error('Network error deleting food item from backend:', error);
-                                    backendError = true;
-                                }
-                            }
-
-                            // Always try to delete from local database, even if backend deletion failed
-                            try {
-                                await deleteFoodLog(selectedFoodItem.id);
-                                console.log('Food item deleted from local database');
-
-                                // Refresh the food log
-                                refreshMealData();
-
-                                if (backendError) {
-                                    // Show a non-blocking toast or console message
-                                    console.warn('Note: Item deleted locally but failed to sync with server');
-                                }
-                            } catch (localError) {
-                                console.error('Error deleting food item from local database:', localError);
-                                Alert.alert('Error', 'Failed to delete food item from local database');
-                            }
-                        } catch (error) {
-                            console.error('Unexpected error in delete process:', error);
-                            Alert.alert('Error', 'An unexpected error occurred while deleting the food item');
-                        } finally {
-                            setSelectedFoodItem(null);
-                        }
-                    }
-                }
-            ]
+    // Render activity item for the flat list
+    const renderActivityItem = ({ item, isPopular }: { item: METActivity, isPopular?: boolean }) => {
+        const isSelected = selectedActivity?.name === item.name;
+        return (
+            <TouchableOpacity
+                style={[
+                    styles.activityItem,
+                    isPopular && styles.popularActivityItem,
+                    isSelected && styles.selectedActivityItem
+                ]}
+                onPress={() => setSelectedActivity(item)}
+            >
+                <View style={styles.activityInfo}>
+                    <Text style={[
+                        styles.activityName,
+                        isSelected && { color: '#0074dd' }
+                    ]}>
+                        {item.name}
+                    </Text>
+                    <Text style={styles.activityMet}>
+                        MET: {item.met} ({item.category})
+                    </Text>
+                </View>
+                {selectedActivity?.name === item.name && (
+                    <View style={styles.checkmarkContainer}>
+                        <Ionicons name="checkmark-circle" size={24} color="#0074dd" />
+                    </View>
+                )}
+            </TouchableOpacity>
         );
+    };
+
+    // Replace the original addTestExercise function with the new modal-opening function
+    const openExerciseModal = () => {
+        setExerciseModalVisible(true);
     };
 
     // Gradient border card wrapper component
@@ -874,74 +698,113 @@ const DiaryScreen: React.FC = () => {
 
     // Create a type for our styles
     type StylesType = {
-        container: any;
-        header: any;
-        headerTitle: any;
-        headerSub: any;
-        streakNumber: any;
-        streakInfo: any;
-        streakInfoArrow: any;
-        streakInfoText: any;
-        headerRight: any;
-        streakButton: any;
-        iconButton: any;
-        dayNavCard: any;
-        arrowButton: any;
-        arrowSymbol: any;
-        summaryCard: any;
-        summaryTitle: any;
-        equationRow: any;
-        equationColumn: any;
-        equationValue: any;
-        equationSign: any;
-        equationResult: any;
-        equationLabel: any;
-        mealSection: any;
-        mealHeader: any;
-        mealTitle: any;
-        mealCal: any;
-        macrosText: any;
-        dividerLine: any;
-        entryDividerLine: any;
-        logRow: any;
-        logItemText: any;
-        logItemDuration: any;
-        logCalText: any;
-        addBtn: any;
-        addBtnText: any;
-        bottomActions: any;
-        topActionsRow: any;
-        bottomAnalyzeRow: any;
-        tabBtn: any;
-        tabBtnText: any;
-        analyzeBtn: any;
-        analyzeBtnText: any;
-        loadingContainer: any;
-        loadingText: any;
-        animatedContent: any;
-        scrollInner: any;
-        healthinessCircle: any;
-        healthinessText: any;
-        modalOverlay: any;
-        actionModalContent: any;
-        actionModalTitle: any;
-        actionButton: any;
-        actionButtonText: any;
-        deleteButton: any;
-        deleteButtonText: any;
-        cancelButton: any;
-        cancelButtonText: any;
-        moveModalContent: any;
-        moveModalTitle: any;
-        mealTypeButton: any;
-        currentMealType: any;
-        mealTypeButtonText: any;
-        currentMealTypeText: any;
-        buttonText: any;
-        weightText: any;
+        container: ViewStyle;
+        header: ViewStyle;
+        headerTitle: TextStyle;
+        headerSub: TextStyle;
+        streakNumber: TextStyle;
+        streakInfo: ViewStyle;
+        streakInfoArrow: ViewStyle;
+        streakInfoText: TextStyle;
+        headerRight: ViewStyle;
+        streakButton: ViewStyle;
+        iconButton: ViewStyle;
+        dayNavCard: ViewStyle;
+        arrowButton: ViewStyle;
+        arrowSymbol: TextStyle;
+        summaryCard: ViewStyle;
+        summaryTitle: TextStyle;
+        equationRow: ViewStyle;
+        equationColumn: ViewStyle;
+        equationValue: TextStyle;
+        equationSign: TextStyle;
+        equationResult: TextStyle;
+        equationLabel: TextStyle;
+        mealSection: ViewStyle;
+        mealHeader: ViewStyle;
+        mealTitle: TextStyle;
+        mealCal: TextStyle;
+        macrosText: TextStyle;
+        dividerLine: ViewStyle;
+        entryDividerLine: ViewStyle;
+        logRow: ViewStyle;
+        logItemText: TextStyle;
+        logItemDuration: TextStyle;
+        logCalText: TextStyle;
+        addBtn: ViewStyle;
+        addBtnText: TextStyle;
+        bottomActions: ViewStyle;
+        topActionsRow: ViewStyle;
+        bottomAnalyzeRow: ViewStyle;
+        tabBtn: ViewStyle;
+        tabBtnText: TextStyle;
+        analyzeBtn: ViewStyle;
+        analyzeBtnText: TextStyle;
+        loadingContainer: ViewStyle;
+        loadingText: TextStyle;
+        animatedContent: ViewStyle;
+        scrollInner: ViewStyle;
+        healthinessCircle: ViewStyle;
+        healthinessText: TextStyle;
+        modalOverlay: ViewStyle;
+        actionModalContent: ViewStyle;
+        actionModalTitle: TextStyle;
+        actionButton: ViewStyle;
+        actionButtonText: TextStyle;
+        deleteButton: ViewStyle;
+        deleteButtonText: TextStyle;
+        cancelButton: ViewStyle;
+        cancelButtonText: TextStyle;
+        moveModalContent: ViewStyle;
+        moveModalTitle: TextStyle;
+        mealTypeButton: ViewStyle;
+        currentMealType: ViewStyle;
+        mealTypeButtonText: TextStyle;
+        currentMealTypeText: TextStyle;
+        buttonText: TextStyle;
+        weightText: TextStyle;
 
         // New gradient border styles
-        gradientBorderContainer: any;
+        gradientBorderContainer: ViewStyle;
+
+        // Exercise modal styles
+        exerciseModalContent: ViewStyle;
+        exerciseModalScrollContent: ViewStyle;
+        exerciseModalTitle: TextStyle;
+        searchInputContainer: ViewStyle;
+        searchInput: TextStyle;
+        sectionHeader: TextStyle;
+        activitiesContainer: ViewStyle;
+        activityItem: ViewStyle;
+        selectedActivityItem: ViewStyle;
+        activityInfo: ViewStyle;
+        activityName: TextStyle;
+        activityMet: TextStyle;
+        checkmarkContainer: ViewStyle;
+        inputLabel: TextStyle;
+        inputContainer: ViewStyle;
+        intensityContainer: ViewStyle;
+        intensityButton: ViewStyle;
+        intensityButtonSelected: ViewStyle;
+        intensityButtonText: TextStyle;
+        caloriesResult: ViewStyle;
+        caloriesResultText: TextStyle;
+        caloriesFormula: TextStyle;
+        buttonRow: ViewStyle;
+        modalCancelButton: ViewStyle;
+        modalAddButton: ViewStyle;
+        modalButtonText: TextStyle;
+        input: TextStyle;
+        inputRow: ViewStyle;
+        durationInputContainer: ViewStyle;
+        popularActivitiesCard: ViewStyle;
+        popularActivitiesCardInner: ViewStyle;
+        popularActivitiesHeader: ViewStyle;
+        popularActivitiesTitle: TextStyle;
+        popularActivityItem: ViewStyle;
+        popularActivitiesWrapper: ViewStyle;
+        popularActivitiesContainer: ViewStyle;
+        popularActivitiesScroll: ViewStyle;
     };
 
     const styles = StyleSheet.create<StylesType>({
@@ -966,9 +829,9 @@ const DiaryScreen: React.FC = () => {
             fontWeight: '400',
         },
         dayNavCard: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
+            justifyContent: 'space-between' as const,
             backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
             borderRadius: 6,
             paddingVertical: 6,
@@ -1011,14 +874,14 @@ const DiaryScreen: React.FC = () => {
             marginBottom: 8,
         },
         equationRow: {
-            flexDirection: 'row',
-            flexWrap: 'nowrap', // ensure one line
-            alignItems: 'center',
-            justifyContent: 'center', // Center align row
+            flexDirection: 'row' as const,
+            flexWrap: 'nowrap' as const,
+            alignItems: 'center' as const,
+            justifyContent: 'center' as const,
         },
         equationColumn: {
-            alignItems: 'center',
-            marginHorizontal: 10, // Add space between columns
+            alignItems: 'center' as const,
+            marginHorizontal: 10,
         },
         equationValue: {
             fontSize: 18, // Increase font size for better readability
@@ -1060,10 +923,10 @@ const DiaryScreen: React.FC = () => {
             width: '100%', // Ensure full width matches summary card
         },
         mealHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
+            flexDirection: 'row' as const,
+            justifyContent: 'space-between' as const,
             marginBottom: 4,
-            width: '100%', // Ensure full width
+            width: '100%',
         },
         mealTitle: {
             fontSize: 16,
@@ -1098,8 +961,8 @@ const DiaryScreen: React.FC = () => {
 
         // Items
         logRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
+            flexDirection: 'row' as const,
+            justifyContent: 'space-between' as const,
             marginVertical: 2,
         },
         logItemText: {
@@ -1125,7 +988,7 @@ const DiaryScreen: React.FC = () => {
             borderWidth: 1,
             borderColor: PURPLE_ACCENT,
             paddingVertical: 6,
-            alignItems: 'center',
+            alignItems: 'center' as const,
         },
         addBtnText: {
             color: PURPLE_ACCENT,
@@ -1135,13 +998,13 @@ const DiaryScreen: React.FC = () => {
 
         // Bottom actions
         bottomActions: {
-            flexDirection: 'column',
+            flexDirection: 'column' as const,
             marginTop: 8,
-            paddingHorizontal: 0, // Remove extra padding
+            paddingHorizontal: 0,
             width: '100%',
         },
         topActionsRow: {
-            flexDirection: 'row',
+            flexDirection: 'row' as const,
         },
         bottomAnalyzeRow: {
             marginTop: 8,
@@ -1152,8 +1015,8 @@ const DiaryScreen: React.FC = () => {
             borderColor: PURPLE_ACCENT,
             borderRadius: 6,
             marginRight: 8,
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: 'center' as const,
+            justifyContent: 'center' as const,
             paddingVertical: 10,
         },
         tabBtnText: {
@@ -1165,8 +1028,8 @@ const DiaryScreen: React.FC = () => {
             flex: 1,
             backgroundColor: PURPLE_ACCENT,
             borderRadius: 6,
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: 'center' as const,
+            justifyContent: 'center' as const,
             paddingVertical: 10,
             marginRight: 8,
             transform: [{ translateY: -2 }],
@@ -1182,12 +1045,12 @@ const DiaryScreen: React.FC = () => {
             fontSize: 14,
         },
         headerRight: {
-            flexDirection: 'row',
-            alignItems: 'center'
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const
         },
         streakButton: {
-            flexDirection: 'row',
-            alignItems: 'center',
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
         },
         iconButton: {
             marginLeft: 8 // Reduced margin
@@ -1233,8 +1096,8 @@ const DiaryScreen: React.FC = () => {
         },
         loadingContainer: {
             flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
+            justifyContent: 'center' as const,
+            alignItems: 'center' as const,
             backgroundColor: '#121212',
         },
         loadingText: {
@@ -1247,18 +1110,18 @@ const DiaryScreen: React.FC = () => {
             width: '100%',
         },
         scrollInner: {
-            paddingHorizontal: 10, // Reduced from 16 to 10 to make cards wider
+            paddingHorizontal: 10,
             paddingBottom: 100,
             width: '100%',
-            alignItems: 'center',
+            alignItems: 'center' as const,
         },
         healthinessCircle: {
             width: 24,
             height: 24,
             borderRadius: 12,
             borderWidth: 2,
-            justifyContent: 'center',
-            alignItems: 'center',
+            justifyContent: 'center' as const,
+            alignItems: 'center' as const,
             backgroundColor: 'transparent',
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 1 },
@@ -1273,8 +1136,8 @@ const DiaryScreen: React.FC = () => {
         },
         modalOverlay: {
             flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
+            justifyContent: 'center' as const,
+            alignItems: 'center' as const,
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
         },
         actionModalContent: {
@@ -1291,8 +1154,8 @@ const DiaryScreen: React.FC = () => {
             textAlign: 'center',
         },
         actionButton: {
-            flexDirection: 'row',
-            alignItems: 'center',
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
             backgroundColor: '#252525',
             padding: 15,
             borderRadius: 8,
@@ -1315,7 +1178,7 @@ const DiaryScreen: React.FC = () => {
             padding: 15,
             borderRadius: 8,
             width: '100%',
-            alignItems: 'center',
+            alignItems: 'center' as const,
             marginTop: 5,
         },
         cancelButtonText: {
@@ -1363,7 +1226,363 @@ const DiaryScreen: React.FC = () => {
             color: '#999999',
             marginTop: 2,
         },
+
+        // Exercise modal styles
+        exerciseModalContent: {
+            width: '95%',
+            maxHeight: '90%',
+            backgroundColor: '#1e1e1e',
+            borderRadius: 10,
+            padding: 20,
+            elevation: 5,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            flexDirection: 'column' as const,
+            justifyContent: 'space-between' as const,
+            flex: 1,
+        },
+        exerciseModalScrollContent: {
+            flexGrow: 1,
+        },
+        exerciseModalTitle: {
+            fontSize: 20,
+            fontWeight: 'bold',
+            color: '#ffffff',
+            marginBottom: 15,
+            textAlign: 'center'
+        },
+        searchInputContainer: {
+            marginBottom: 15,
+            backgroundColor: '#333',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const
+        },
+        searchInput: {
+            flex: 1,
+            color: 'white',
+            marginLeft: 8,
+            fontSize: 16
+        },
+        sectionHeader: {
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#0074dd',
+            marginTop: 10,
+            marginBottom: 5,
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(0, 116, 221, 0.2)',
+            paddingTop: 8
+        },
+        activitiesContainer: {
+            // Use flex instead of fixed height to allow content to adapt
+            flex: 1,
+            marginBottom: 10
+        },
+        activityItem: {
+            flexDirection: 'row' as const,
+            justifyContent: 'space-between' as const,
+            alignItems: 'center' as const,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: '#333'
+        },
+        selectedActivityItem: {
+            backgroundColor: 'rgba(0, 116, 221, 0.1)'
+        },
+        activityInfo: {
+            flex: 1
+        },
+        activityName: {
+            color: 'white',
+            fontSize: 16
+        },
+        activityMet: {
+            color: '#aaa',
+            fontSize: 14,
+            marginTop: 3
+        },
+        checkmarkContainer: {
+            marginLeft: 10
+        },
+        inputLabel: {
+            color: 'white',
+            fontSize: 16,
+            marginTop: 0, // Removed top margin since we'll use row margins instead
+            marginBottom: 0, // Removed bottom margin since we'll use row margins instead
+            flex: 1
+        },
+        inputContainer: {
+            backgroundColor: '#333',
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            marginBottom: 10
+        },
+        input: {
+            color: 'white',
+            fontSize: 16
+        },
+        intensityContainer: {
+            flexDirection: 'row' as const,
+            justifyContent: 'space-between' as const,
+            marginVertical: 15
+        },
+        intensityButton: {
+            paddingVertical: 8,
+            paddingHorizontal: 15,
+            borderRadius: 20,
+            backgroundColor: '#333',
+            alignItems: 'center' as const,
+            justifyContent: 'center' as const
+        },
+        intensityButtonSelected: {
+            backgroundColor: '#0074dd'
+        },
+        intensityButtonText: {
+            color: 'white',
+            fontSize: 14
+        },
+        caloriesResult: {
+            alignItems: 'center' as const,
+            marginVertical: 8,
+            padding: 10,
+            backgroundColor: 'rgba(0, 116, 221, 0.1)',
+            borderRadius: 8
+        },
+        caloriesResultText: {
+            color: 'white',
+            fontSize: 18,
+            fontWeight: 'bold'
+        },
+        caloriesFormula: {
+            color: '#aaa',
+            fontSize: 14,
+            marginBottom: 8,
+            textAlign: 'center'
+        },
+        buttonRow: {
+            flexDirection: 'row' as const,
+            justifyContent: 'space-between' as const,
+            marginTop: 10,
+            width: '100%',
+            paddingBottom: 0
+        },
+        modalCancelButton: {
+            flex: 0.48,
+            marginRight: 5,
+            paddingVertical: 12,
+            alignItems: 'center' as const,
+            justifyContent: 'center' as const,
+            borderRadius: 8,
+            backgroundColor: '#444'
+        },
+        modalAddButton: {
+            flex: 0.48,
+            marginLeft: 5,
+            paddingVertical: 12,
+            alignItems: 'center' as const,
+            justifyContent: 'center' as const,
+            borderRadius: 8,
+            backgroundColor: '#0074dd',
+            shadowColor: '#0074dd',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.6,
+            shadowRadius: 3,
+            elevation: 4
+        },
+        modalButtonText: {
+            color: 'white',
+            fontSize: 16,
+            fontWeight: 'bold',
+            textAlign: 'center'
+        },
+        inputRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 15,
+            marginBottom: 10
+        },
+        durationInputContainer: {
+            backgroundColor: '#333',
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            width: 80,
+            marginLeft: 5 // Reduced from 10 to 5 to move closer to the text
+        },
+        popularActivitiesCard: {
+            backgroundColor: '#181818',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: 'rgba(0, 116, 221, 0.3)',
+            padding: 8,
+            marginBottom: 15,
+            shadowColor: '#0074dd',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2
+        },
+        popularActivitiesCardInner: {
+            marginTop: 0,
+            marginBottom: 15,
+            padding: 8,
+            backgroundColor: 'transparent'
+        },
+        popularActivitiesHeader: {
+            flexDirection: 'row' as const,
+            alignItems: 'center' as const,
+            marginBottom: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(0, 116, 221, 0.3)',
+            paddingBottom: 6
+        },
+        popularActivitiesTitle: {
+            color: '#0074dd',
+            fontSize: 15,
+            fontWeight: 'bold',
+            marginLeft: 8
+        },
+        popularActivityItem: {
+            backgroundColor: 'rgba(0, 116, 221, 0.05)',
+            borderBottomColor: 'rgba(0, 116, 221, 0.2)',
+            borderRadius: 4,
+            marginBottom: 6,
+            borderLeftWidth: 2,
+            borderLeftColor: 'rgba(0, 116, 221, 0.5)',
+        },
+        popularActivitiesWrapper: {
+            position: 'relative',
+            borderRadius: 10,
+            marginBottom: 15,
+            overflow: 'hidden',
+            shadowColor: '#0074dd',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.15,
+            shadowRadius: 5,
+            elevation: 3
+        },
+        popularActivitiesContainer: {
+            margin: 1,
+            borderRadius: 9,
+            backgroundColor: '#181818',
+            padding: 12,
+        },
+        popularActivitiesScroll: {
+            maxHeight: 400, // Taller to fit all activities
+        },
     });
+
+    // Add dummy handlers for functions called in JSX
+    const handleOutsidePress = () => {
+        // Close any open dropdowns, tooltips, etc.
+    };
+
+    const toggleStreakInfo = () => {
+        // Toggle streak info visibility
+    };
+
+    const gotoPrevDay = () => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() - 1);
+        setCurrentDate(newDate);
+    };
+
+    const gotoNextDay = () => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + 1);
+        setCurrentDate(newDate);
+    };
+
+    const formatDate = (date: Date): string => {
+        const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
+    };
+
+    const onGestureEvent = Animated.event(
+        [{ nativeEvent: { translationX: swipeAnim } }],
+        { useNativeDriver: true }
+    );
+
+    const onHandlerStateChange = (event: any) => {
+        if (event.nativeEvent.state === GestureState.END) {
+            const { translationX } = event.nativeEvent;
+            handleSwipeRelease(translationX);
+        }
+    };
+
+    const handleSwipeRelease = (translationX: number) => {
+        const threshold = 100; // Minimum swipe distance to trigger day change
+
+        if (translationX <= -threshold) {
+            // Swipe left -> next day
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + 1);
+            setCurrentDate(newDate);
+            swipeAnim.setValue(0);
+        } else if (translationX >= threshold) {
+            // Swipe right -> previous day
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() - 1);
+            setCurrentDate(newDate);
+            swipeAnim.setValue(0);
+        } else {
+            // Not enough swipe; snap back
+            Animated.timing(swipeAnim, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            }).start();
+        }
+    };
+
+    const toggleMacrosDisplay = () => {
+        // Toggle between percent and grams for macros display
+    };
+
+    const handleFoodItemLongPress = (foodId: number | undefined, foodName: string, mealType: string, index: number) => {
+        // Handle long press on food item
+    };
+
+    const handleDeleteFoodItem = () => {
+        // Handle food item deletion
+    };
+
+    const moveFood = (id: number | undefined, mealType: string) => {
+        // Move food to a different meal
+    };
+
+    // Make sure renderExerciseList function is properly defined
+    const renderExerciseList = () => {
+        // If there are no exercises, return null instead of an empty row
+        if (exerciseList.length === 0) {
+            return null;
+        }
+
+        return exerciseList.map((exercise, index) => (
+            <View key={index}>
+                <View style={styles.logRow}>
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={[styles.logItemText, { fontSize: 16 }]} numberOfLines={1} ellipsizeMode="tail">
+                            {exercise.exercise_name}
+                        </Text>
+                        <Text style={styles.logItemDuration}>{exercise.duration} min</Text>
+                    </View>
+                    <Text style={styles.logCalText}>{exercise.calories_burned}</Text>
+                </View>
+                {/* Divider line under each entry */}
+                {index < exerciseList.length - 1 && (
+                    <View style={styles.entryDividerLine} />
+                )}
+            </View>
+        ));
+    };
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -1587,8 +1806,8 @@ const DiaryScreen: React.FC = () => {
                                 {/* Only show divider line if there are exercises already */}
                                 {exerciseList.length > 0 && <View style={styles.dividerLine} />}
 
-                                <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
-                                    <Text style={styles.addBtnText}>ADD EXERCISE</Text>
+                                <TouchableOpacity style={styles.addBtn} onPress={openExerciseModal}>
+                                    <Text style={styles.addBtnText}>Add Exercise</Text>
                                 </TouchableOpacity>
                             </GradientBorderCard>
 
@@ -1722,6 +1941,199 @@ const DiaryScreen: React.FC = () => {
                                     >
                                         <Text style={styles.cancelButtonText}>Cancel</Text>
                                     </TouchableOpacity>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+
+                {/* Exercise Modal */}
+                <Modal
+                    animationType="fade"
+                    transparent={true}
+                    visible={exerciseModalVisible}
+                    onRequestClose={() => setExerciseModalVisible(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setExerciseModalVisible(false)}>
+                        <View style={styles.modalOverlay}>
+                            <TouchableWithoutFeedback onPress={() => { }}>
+                                <View style={styles.exerciseModalContent}>
+                                    <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
+
+                                    {/* Make the content scrollable */}
+                                    <ScrollView contentContainerStyle={styles.exerciseModalScrollContent}>
+                                        {/* Search Input */}
+                                        <View style={styles.searchInputContainer}>
+                                            <Ionicons name="search" size={20} color="#999" />
+                                            <TextInput
+                                                style={styles.searchInput}
+                                                placeholder="Search activities..."
+                                                placeholderTextColor="#999"
+                                                value={searchQuery}
+                                                onChangeText={setSearchQuery}
+                                            />
+                                        </View>
+
+                                        {/* Activities List */}
+                                        <View style={styles.activitiesContainer}>
+                                            {searchQuery === '' ? (
+                                                <View style={styles.popularActivitiesWrapper}>
+                                                    <LinearGradient
+                                                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            left: 0,
+                                                            right: 0,
+                                                            top: 0,
+                                                            bottom: 0,
+                                                            borderRadius: 10,
+                                                        }}
+                                                        start={{ x: 0, y: 0 }}
+                                                        end={{ x: 1, y: 0 }}
+                                                    />
+                                                    <View style={styles.popularActivitiesContainer}>
+                                                        <View style={styles.popularActivitiesHeader}>
+                                                            <Ionicons name="star" size={16} color="#0074dd" />
+                                                            <Text style={styles.popularActivitiesTitle}>Activities</Text>
+                                                        </View>
+                                                        <ScrollView
+                                                            nestedScrollEnabled={true}
+                                                            style={styles.popularActivitiesScroll}
+                                                            contentContainerStyle={{
+                                                                paddingBottom: 15
+                                                            }}
+                                                        >
+                                                            <Text style={[styles.sectionHeader, {
+                                                                marginTop: 0,
+                                                                borderTopWidth: 0,
+                                                                paddingTop: 0
+                                                            }]}>Popular</Text>
+                                                            {groupedActivities.popular.map((activity, index) =>
+                                                                renderActivityItem({ item: activity, isPopular: true })
+                                                            )}
+
+                                                            <Text style={styles.sectionHeader}>Light Activities ({'<'} 3 METs)</Text>
+                                                            {groupedActivities.light.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+
+                                                            <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
+                                                            {groupedActivities.moderate.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+
+                                                            <Text style={styles.sectionHeader}>Vigorous Activities ({'>'} 6 METs)</Text>
+                                                            {groupedActivities.vigorous.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+                                                        </ScrollView>
+                                                    </View>
+                                                </View>
+                                            ) : (
+                                                <FlatList
+                                                    data={filteredActivities}
+                                                    renderItem={renderActivityItem}
+                                                    keyExtractor={(item) => item.name}
+                                                    nestedScrollEnabled={true}
+                                                />
+                                            )}
+                                        </View>
+
+                                        {selectedActivity && (
+                                            <>
+                                                {/* Duration Input - changed to horizontal layout */}
+                                                <View style={styles.inputRow}>
+                                                    <Text style={styles.inputLabel}>Duration (minutes):</Text>
+                                                    <View style={styles.durationInputContainer}>
+                                                        <TextInput
+                                                            style={styles.input}
+                                                            keyboardType="number-pad"
+                                                            value={exerciseDuration}
+                                                            onChangeText={setExerciseDuration}
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                                {/* Intensity Selection */}
+                                                <Text style={styles.inputLabel}>Personal Intensity Level:</Text>
+                                                <View style={styles.intensityContainer}>
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.intensityButton,
+                                                            exerciseIntensity === 'light' && styles.intensityButtonSelected
+                                                        ]}
+                                                        onPress={() => setExerciseIntensity('light')}
+                                                    >
+                                                        <Text style={styles.intensityButtonText}>Light</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.intensityButton,
+                                                            exerciseIntensity === 'moderate' && styles.intensityButtonSelected
+                                                        ]}
+                                                        onPress={() => setExerciseIntensity('moderate')}
+                                                    >
+                                                        <Text style={styles.intensityButtonText}>Moderate</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.intensityButton,
+                                                            exerciseIntensity === 'vigorous' && styles.intensityButtonSelected
+                                                        ]}
+                                                        onPress={() => setExerciseIntensity('vigorous')}
+                                                    >
+                                                        <Text style={styles.intensityButtonText}>Vigorous</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                {/* Calories Result */}
+                                                <View style={styles.caloriesResult}>
+                                                    <Text style={styles.caloriesFormula}>
+                                                        {exerciseIntensity === 'moderate' ? (
+                                                            `MET: ${selectedActivity.met} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                        ) : exerciseIntensity === 'light' ? (
+                                                            `MET: ${selectedActivity.met} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                        ) : (
+                                                            `MET: ${selectedActivity.met} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                        )}
+                                                    </Text>
+                                                    <Text style={styles.caloriesResultText}>
+                                                        = {calculateCaloriesBurned(
+                                                            selectedActivity,
+                                                            parseInt(exerciseDuration) || 30,
+                                                            userWeight
+                                                        )} calories
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
+
+                                        {/* Add margin at bottom to ensure space for buttons */}
+                                        <View style={{ marginBottom: 20 }} />
+                                    </ScrollView>
+
+                                    {/* Buttons - fixed at bottom */}
+                                    <View style={styles.buttonRow}>
+                                        <TouchableOpacity
+                                            style={styles.modalCancelButton}
+                                            onPress={() => setExerciseModalVisible(false)}
+                                        >
+                                            <Text style={styles.modalButtonText}>Cancel</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.modalAddButton,
+                                                !selectedActivity && { opacity: 0.5 }
+                                            ]}
+                                            onPress={addNewExercise}
+                                            disabled={!selectedActivity}
+                                        >
+                                            <Text style={styles.modalButtonText}>ADD EXERCISE</Text>
+                                            <Text style={{ color: 'white', fontSize: 12, marginTop: 2 }}>
+                                                Tap to submit
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </TouchableWithoutFeedback>
                         </View>
