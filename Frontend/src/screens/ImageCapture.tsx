@@ -73,6 +73,7 @@ const ImageCapture: React.FC = () => {
     const [brandName, setBrandName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [notes, setNotes] = useState('');
+    const [foodName, setFoodName] = useState('');
     const [loading, setLoading] = useState(false);
 
     // Add state for GPT-generated description
@@ -320,7 +321,7 @@ const ImageCapture: React.FC = () => {
                     // Create a food log entry with all required fields
                     const foodLog = {
                         meal_id: result.meal_id,
-                        food_name: nutritionData.food_name || 'Unknown Food',
+                        food_name: foodName || nutritionData.food_name || 'Unknown Food',
                         calories: nutritionData.calories || 0,
                         proteins: nutritionData.proteins || 0,
                         carbs: nutritionData.carbs || 0,
@@ -360,7 +361,7 @@ const ImageCapture: React.FC = () => {
                 // Create a food log entry with all required fields
                 const foodLog = {
                     meal_id: result.meal_id,
-                    food_name: nutritionData.food_name || 'Unknown Food',
+                    food_name: foodName || nutritionData.food_name || 'Unknown Food',
                     calories: nutritionData.calories || 0,
                     proteins: nutritionData.proteins || 0,
                     carbs: nutritionData.carbs || 0,
@@ -484,6 +485,7 @@ const ImageCapture: React.FC = () => {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.imagePlaceholderGradient}
+                    locations={[0, 0.5, 1]}
                 >
                     <View style={styles.imagePlaceholder}>
                         {image.uri ? (
@@ -536,26 +538,27 @@ const ImageCapture: React.FC = () => {
                 {/* Meal Type with Gradient */}
                 <View style={styles.headerTitleContainer}>
                     <TouchableOpacity
-                        style={[styles.mealTypeSelector, { width: mealType.length * 14 + 60 }]}
+                        style={styles.mealTypeSelector}
                         onPress={toggleMealTypeDropdown}
                     >
-                        <MaskedView
-                            maskElement={
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 20 }}>
+                        <View style={{ position: 'relative', paddingRight: 20 }}>
+                            <MaskedView
+                                maskElement={
                                     <Text style={styles.headerTitle}>{mealType}</Text>
-                                    <View style={styles.dropdownIconContainer}>
-                                        <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={20} color="#FFF" />
-                                    </View>
-                                </View>
-                            }
-                        >
-                            <LinearGradient
-                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={{ height: 35, width: mealType.length * 14 + 80 }}
-                            />
-                        </MaskedView>
+                                }
+                            >
+                                <LinearGradient
+                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ height: 35, width: mealType.length * 16 }}
+                                />
+                            </MaskedView>
+
+                            <View style={styles.dropdownIconContainer}>
+                                <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={22} color="#FFF" />
+                            </View>
+                        </View>
                     </TouchableOpacity>
                 </View>
 
@@ -602,11 +605,25 @@ const ImageCapture: React.FC = () => {
                 </Modal>
             </View>
 
+            <LinearGradient
+                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                start={{ x: 1, y: 0 }}
+                end={{ x: 0, y: 0 }}
+                style={[styles.headerBar, { width: mealType.length * 16 + 20 }]}
+                locations={[0, 0.5, 1]}
+            />
+
             <ScrollView style={styles.content}>
-                <Text style={styles.sectionTitle}>Food Images</Text>
                 <Text style={styles.instructions}>
-                    Please take at least 2 images of your food. The first should be a top view, and the second a side view.
+                    Please take at least 2 images of your food. The first should be a top view, and the second a side view. You can take additional pictures to show food that wasn't visible in the first two, or to scan a nutritional label.
                 </Text>
+                <LinearGradient
+                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 0 }}
+                    style={styles.descriptionBar}
+                    locations={[0, 0.5, 1]}
+                />
 
                 <View style={styles.imagesContainer}>
                     {renderImagePlaceholder(0)}
@@ -621,17 +638,32 @@ const ImageCapture: React.FC = () => {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={[styles.gradientWrapper, { borderRadius: 8 }]}
+                        locations={[0, 0.5, 1]}
                     >
                         <View style={styles.foodDetailsContainer}>
-                            <Text style={styles.sectionTitle}>Food Details <Text style={styles.optionalText}>(Optional)</Text></Text>
+                            <View style={{ flexDirection: 'row' }}>
+                                <Text style={[styles.sectionTitle, styles.underlinedTitle]}>Food Details</Text>
+                                <Text style={[styles.sectionTitle, styles.optionalText]}> (Optional)</Text>
+                            </View>
 
                             <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Brand Name</Text>
+                                <Text style={styles.label}>Brand/Restaurant Name</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={brandName}
                                     onChangeText={setBrandName}
-                                    placeholder="Enter brand name"
+                                    placeholder="Enter brand or restaurant name"
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Food Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={foodName}
+                                    onChangeText={setFoodName}
+                                    placeholder="Enter food name"
                                     placeholderTextColor="#888"
                                 />
                             </View>
@@ -670,6 +702,7 @@ const ImageCapture: React.FC = () => {
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.gradientWrapper}
+                            locations={[0, 0.5, 1]}
                         >
                             <View style={styles.gptAnalysisContainer}>
                                 <Text style={styles.gptAnalysisTitle}>AI Analysis</Text>
@@ -690,6 +723,7 @@ const ImageCapture: React.FC = () => {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={[styles.gradientWrapper, { borderRadius: 8 }]}
+                        locations={[0, 0.5, 1]}
                     >
                         <TouchableOpacity
                             style={styles.submitButton}
@@ -718,7 +752,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingTop: 15,
-        paddingBottom: 10,
+        paddingBottom: 15,
         paddingHorizontal: 20,
         justifyContent: 'space-between',
         backgroundColor: '#000',
@@ -735,13 +769,15 @@ const styles = StyleSheet.create({
         right: 0,
     },
     dropdownIconContainer: {
-        backgroundColor: 'rgba(30, 30, 30, 0.7)',
-        borderRadius: 12,
-        marginLeft: 8,
-        width: 24,
-        height: 24,
+        backgroundColor: '#161618',
+        borderRadius: 15,
+        width: 30,
+        height: 30,
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'absolute',
+        right: -15,
+        top: 2,
     },
     headerTitle: {
         fontSize: 24,
@@ -750,7 +786,9 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 20,
     },
     sectionTitle: {
         fontSize: 20,
@@ -762,12 +800,13 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#aaa',
         marginBottom: 20,
+        marginTop: -8,
     },
     imagesContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 15,
+        marginBottom: 8,
     },
     imagePlaceholderWrapper: {
         width: (width - 50) / 2,
@@ -778,7 +817,7 @@ const styles = StyleSheet.create({
     },
     imagePlaceholderGradient: {
         flex: 1,
-        padding: 2, // This creates the border effect
+        padding: 1.5, // Reduced from 2px to be slightly thinner
     },
     imagePlaceholder: {
         flex: 1,
@@ -847,14 +886,14 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
     },
     submitButtonWrapper: {
-        marginTop: 10,
-        marginBottom: 30,
+        marginTop: 6,
+        marginBottom: 20,
         borderRadius: 8,
         overflow: 'hidden',
     },
     gradientWrapper: {
         flex: 1,
-        padding: 2, // This creates the border effect
+        padding: 1.5, // Reduced from 2px to be slightly thinner
     },
     submitButton: {
         backgroundColor: '#1e1e1e',
@@ -869,9 +908,9 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     mealTypeSelector: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        alignSelf: 'center',
     },
     modalOverlay: {
         flex: 1,
@@ -908,8 +947,8 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     gptAnalysisWrapper: {
-        marginTop: 10,
-        marginBottom: 10,
+        marginTop: 6,
+        marginBottom: 6,
         borderRadius: 8,
         overflow: 'hidden',
     },
@@ -953,7 +992,7 @@ const styles = StyleSheet.create({
         color: '#777',
     },
     foodDetailsWrapper: {
-        marginBottom: 10,
+        marginBottom: 6,
         borderRadius: 8,
         overflow: 'hidden',
     },
@@ -961,6 +1000,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#0A0A0A',
         borderRadius: 6,
         padding: 15,
+    },
+    underlinedTitle: {
+        textDecorationLine: 'underline',
+    },
+    descriptionBar: {
+        height: 2,
+        width: '100%',
+        marginBottom: 15,
+        marginTop: -5,
+    },
+    headerBar: {
+        height: 2,
+        marginBottom: 15,
+        alignSelf: 'center',
     },
 });
 
