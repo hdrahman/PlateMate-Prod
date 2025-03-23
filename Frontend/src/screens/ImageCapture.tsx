@@ -615,41 +615,52 @@ const ImageCapture: React.FC = () => {
                     {renderImagePlaceholder(3)}
                 </View>
 
-                <Text style={styles.sectionTitle}>Food Details <Text style={styles.optionalText}>(Optional)</Text></Text>
+                <View style={styles.foodDetailsWrapper}>
+                    <LinearGradient
+                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.gradientWrapper, { borderRadius: 8 }]}
+                    >
+                        <View style={styles.foodDetailsContainer}>
+                            <Text style={styles.sectionTitle}>Food Details <Text style={styles.optionalText}>(Optional)</Text></Text>
 
-                <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Brand Name</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={brandName}
-                        onChangeText={setBrandName}
-                        placeholder="Enter brand name"
-                        placeholderTextColor="#888"
-                    />
-                </View>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Brand Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={brandName}
+                                    onChangeText={setBrandName}
+                                    placeholder="Enter brand name"
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
 
-                <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Quantity</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={quantity}
-                        onChangeText={setQuantity}
-                        placeholder="Enter quantity (e.g., 1 serving, 200g)"
-                        placeholderTextColor="#888"
-                    />
-                </View>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Quantity</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={quantity}
+                                    onChangeText={setQuantity}
+                                    placeholder="Enter quantity (e.g., 1 serving, 200g)"
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
 
-                <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Additional Notes</Text>
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        value={notes}
-                        onChangeText={setNotes}
-                        placeholder="Enter any additional notes"
-                        placeholderTextColor="#888"
-                        multiline
-                        numberOfLines={4}
-                    />
+                            <View style={[styles.inputContainer, { marginBottom: 0 }]}>
+                                <Text style={styles.label}>Additional Notes</Text>
+                                <TextInput
+                                    style={[styles.input, styles.textArea]}
+                                    value={notes}
+                                    onChangeText={setNotes}
+                                    placeholder="Enter any additional notes"
+                                    placeholderTextColor="#888"
+                                    multiline
+                                    numberOfLines={4}
+                                />
+                            </View>
+                        </View>
+                    </LinearGradient>
                 </View>
 
                 {gptDescription ? (
@@ -678,7 +689,7 @@ const ImageCapture: React.FC = () => {
                         colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={styles.gradientWrapper}
+                        style={[styles.gradientWrapper, { borderRadius: 8 }]}
                     >
                         <TouchableOpacity
                             style={styles.submitButton}
@@ -756,7 +767,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 30,
+        marginBottom: 15,
     },
     imagePlaceholderWrapper: {
         width: (width - 50) / 2,
@@ -836,16 +847,21 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
     },
     submitButtonWrapper: {
-        marginTop: 20,
-        marginBottom: 40,
+        marginTop: 10,
+        marginBottom: 30,
         borderRadius: 8,
         overflow: 'hidden',
+    },
+    gradientWrapper: {
+        flex: 1,
+        padding: 2, // This creates the border effect
     },
     submitButton: {
         backgroundColor: '#1e1e1e',
         padding: 15,
         alignItems: 'center',
         width: '100%',
+        borderRadius: 6,
     },
     submitButtonText: {
         color: '#fff',
@@ -891,11 +907,6 @@ const styles = StyleSheet.create({
         color: '#8A2BE2',
         fontWeight: 'bold',
     },
-    gradientWrapper: {
-        flex: 1,
-        padding: 2, // This creates the border effect
-        borderRadius: 8,
-    },
     gptAnalysisWrapper: {
         marginTop: 10,
         marginBottom: 10,
@@ -940,6 +951,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'normal',
         color: '#777',
+    },
+    foodDetailsWrapper: {
+        marginBottom: 10,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    foodDetailsContainer: {
+        backgroundColor: '#0A0A0A',
+        borderRadius: 6,
+        padding: 15,
     },
 });
 
