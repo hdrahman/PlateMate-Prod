@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { addFoodLog } from '../utils/database';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -477,65 +478,84 @@ const ImageCapture: React.FC = () => {
         };
 
         return (
-            <View style={styles.imagePlaceholder}>
-                {image.uri ? (
-                    // Image is present - show the image with an X button
-                    <View style={styles.imageContainer}>
-                        <Image source={{ uri: image.uri }} style={styles.image} />
-                        <TouchableOpacity
-                            style={styles.removeImageButton}
-                            onPress={handleRemoveImage}
-                        >
-                            <Ionicons name="close" size={16} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    // No image - make the entire box clickable for camera
-                    <TouchableOpacity
-                        style={styles.placeholderContent}
-                        onPress={() => handleTakePhoto(index)}
-                    >
-                        <Ionicons name="camera" size={40} color="#8A2BE2" />
-                        <Text style={styles.placeholderText}>
-                            {index === 0 ? 'Top View' : index === 1 ? 'Side View' : 'Additional'}
-                        </Text>
-                        {isRequired && <Text style={styles.requiredText}>Required</Text>}
-                    </TouchableOpacity>
-                )}
+            <View style={styles.imagePlaceholderWrapper}>
+                <LinearGradient
+                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.imagePlaceholderGradient}
+                >
+                    <View style={styles.imagePlaceholder}>
+                        {image.uri ? (
+                            // Image is present - show the image with an X button
+                            <View style={styles.imageContainer}>
+                                <Image source={{ uri: image.uri }} style={styles.image} />
+                                <TouchableOpacity
+                                    style={styles.removeImageButton}
+                                    onPress={handleRemoveImage}
+                                >
+                                    <Ionicons name="close" size={16} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            // No image - make the entire box clickable for camera
+                            <TouchableOpacity
+                                style={styles.placeholderContent}
+                                onPress={() => handleTakePhoto(index)}
+                            >
+                                <Ionicons name="camera" size={40} color="#8A2BE2" />
+                                <Text style={styles.placeholderText}>
+                                    {index === 0 ? 'Top View' : index === 1 ? 'Side View' : 'Additional'}
+                                </Text>
+                                {isRequired && <Text style={styles.requiredText}>Required</Text>}
+                            </TouchableOpacity>
+                        )}
 
-                {/* Keep only the gallery button at the bottom */}
-                <View style={styles.imageActions}>
-                    <TouchableOpacity
-                        style={[styles.imageButton, styles.galleryButton]}
-                        onPress={() => handlePickImage(index)}
-                    >
-                        <Ionicons name="images" size={20} color="#fff" />
-                    </TouchableOpacity>
-                </View>
+                        {/* Keep only the gallery button at the bottom */}
+                        <View style={styles.imageActions}>
+                            <TouchableOpacity
+                                style={[styles.imageButton, styles.galleryButton]}
+                                onPress={() => handlePickImage(index)}
+                            >
+                                <Ionicons name="images" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </LinearGradient>
             </View>
         );
     };
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#1a1a1a', '#2d1a3c']}
-                style={styles.header}
-            >
+            <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
 
-                {/* Meal Type Dropdown */}
+                {/* Meal Type with Gradient */}
                 <View style={styles.headerTitleContainer}>
                     <TouchableOpacity
-                        style={[styles.mealTypeSelector, { width: mealType.length * 14 + 40 }]}
+                        style={[styles.mealTypeSelector, { width: mealType.length * 14 + 60 }]}
                         onPress={toggleMealTypeDropdown}
                     >
-                        <Text style={styles.headerTitle}>{mealType}</Text>
-                        <View style={styles.dropdownIcon}>
-                            <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={20} color="#FFF" />
-                        </View>
+                        <MaskedView
+                            maskElement={
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 20 }}>
+                                    <Text style={styles.headerTitle}>{mealType}</Text>
+                                    <View style={styles.dropdownIconContainer}>
+                                        <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={20} color="#FFF" />
+                                    </View>
+                                </View>
+                            }
+                        >
+                            <LinearGradient
+                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ height: 35, width: mealType.length * 14 + 80 }}
+                            />
+                        </MaskedView>
                     </TouchableOpacity>
                 </View>
 
@@ -580,7 +600,7 @@ const ImageCapture: React.FC = () => {
                         </View>
                     </TouchableOpacity>
                 </Modal>
-            </LinearGradient>
+            </View>
 
             <ScrollView style={styles.content}>
                 <Text style={styles.sectionTitle}>Food Images</Text>
@@ -595,7 +615,7 @@ const ImageCapture: React.FC = () => {
                     {renderImagePlaceholder(3)}
                 </View>
 
-                <Text style={styles.sectionTitle}>Food Details</Text>
+                <Text style={styles.sectionTitle}>Food Details <Text style={styles.optionalText}>(Optional)</Text></Text>
 
                 <View style={styles.inputContainer}>
                     <Text style={styles.label}>Brand Name</Text>
@@ -633,9 +653,18 @@ const ImageCapture: React.FC = () => {
                 </View>
 
                 {gptDescription ? (
-                    <View style={styles.gptAnalysisContainer}>
-                        <Text style={styles.gptAnalysisTitle}>AI Analysis</Text>
-                        <Text style={styles.gptAnalysisText}>{gptDescription}</Text>
+                    <View style={styles.gptAnalysisWrapper}>
+                        <LinearGradient
+                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.gradientWrapper}
+                        >
+                            <View style={styles.gptAnalysisContainer}>
+                                <Text style={styles.gptAnalysisTitle}>AI Analysis</Text>
+                                <Text style={styles.gptAnalysisText}>{gptDescription}</Text>
+                            </View>
+                        </LinearGradient>
                     </View>
                 ) : isAnalyzing ? (
                     <View style={styles.gptAnalysisContainer}>
@@ -644,17 +673,26 @@ const ImageCapture: React.FC = () => {
                     </View>
                 ) : null}
 
-                <TouchableOpacity
-                    style={styles.submitButton}
-                    onPress={handleSubmit}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={styles.submitButtonText}>Submit</Text>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.submitButtonWrapper}>
+                    <LinearGradient
+                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.gradientWrapper}
+                    >
+                        <TouchableOpacity
+                            style={styles.submitButton}
+                            onPress={handleSubmit}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.submitButtonText}>Submit</Text>
+                            )}
+                        </TouchableOpacity>
+                    </LinearGradient>
+                </View>
             </ScrollView>
         </View>
     );
@@ -672,6 +710,7 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
         paddingHorizontal: 20,
         justifyContent: 'space-between',
+        backgroundColor: '#000',
     },
     backButton: {
         width: 28,
@@ -684,11 +723,19 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
     },
+    dropdownIconContainer: {
+        backgroundColor: 'rgba(30, 30, 30, 0.7)',
+        borderRadius: 12,
+        marginLeft: 8,
+        width: 24,
+        height: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
         color: '#fff',
-        marginRight: 8,
     },
     content: {
         flex: 1,
@@ -711,12 +758,21 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 30,
     },
-    imagePlaceholder: {
+    imagePlaceholderWrapper: {
         width: (width - 50) / 2,
         height: (width - 50) / 2,
-        backgroundColor: '#1e1e1e',
-        borderRadius: 10,
         marginBottom: 10,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    imagePlaceholderGradient: {
+        flex: 1,
+        padding: 2, // This creates the border effect
+    },
+    imagePlaceholder: {
+        flex: 1,
+        backgroundColor: '#1e1e1e',
+        borderRadius: 8,
         overflow: 'hidden',
         position: 'relative',
     },
@@ -779,13 +835,17 @@ const styles = StyleSheet.create({
         height: 100,
         textAlignVertical: 'top',
     },
-    submitButton: {
-        backgroundColor: '#8A2BE2',
-        borderRadius: 8,
-        padding: 15,
-        alignItems: 'center',
+    submitButtonWrapper: {
         marginTop: 20,
         marginBottom: 40,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    submitButton: {
+        backgroundColor: '#1e1e1e',
+        padding: 15,
+        alignItems: 'center',
+        width: '100%',
     },
     submitButtonText: {
         color: '#fff',
@@ -793,21 +853,9 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     mealTypeSelector: {
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 6,
-        borderBottomWidth: 0,
-        borderBottomColor: 'rgba(138, 43, 226, 0.7)',
         alignSelf: 'center',
-    },
-    dropdownIcon: {
-        backgroundColor: 'rgba(138, 43, 226, 0.5)',
-        borderRadius: 12,
-        width: 24,
-        height: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     modalOverlay: {
         flex: 1,
@@ -843,14 +891,22 @@ const styles = StyleSheet.create({
         color: '#8A2BE2',
         fontWeight: 'bold',
     },
-    gptAnalysisContainer: {
-        backgroundColor: 'rgba(138, 43, 226, 0.1)',
+    gradientWrapper: {
+        flex: 1,
+        padding: 2, // This creates the border effect
         borderRadius: 8,
-        padding: 15,
+    },
+    gptAnalysisWrapper: {
         marginTop: 10,
         marginBottom: 10,
-        borderLeftWidth: 3,
-        borderLeftColor: '#8A2BE2',
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    gptAnalysisContainer: {
+        backgroundColor: '#1e1e1e',
+        borderRadius: 6,
+        padding: 15,
+        width: '100%',
     },
     gptAnalysisTitle: {
         fontSize: 16,
@@ -879,6 +935,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 10,
+    },
+    optionalText: {
+        fontSize: 16,
+        fontWeight: 'normal',
+        color: '#777',
     },
 });
 

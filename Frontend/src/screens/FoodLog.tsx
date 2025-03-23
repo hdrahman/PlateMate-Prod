@@ -836,6 +836,535 @@ const DiaryScreen: React.FC = () => {
         );
     };
 
+    // Gradient border card wrapper component
+    interface GradientBorderCardProps {
+        children: React.ReactNode;
+        style?: any;
+    }
+
+    const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+        return (
+            <View style={styles.gradientBorderContainer}>
+                <LinearGradient
+                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        borderRadius: 10,
+                    }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                />
+                <View
+                    style={{
+                        margin: 1,
+                        borderRadius: 9,
+                        backgroundColor: style?.backgroundColor || '#121212',
+                        padding: 16,
+                    }}
+                >
+                    {children}
+                </View>
+            </View>
+        );
+    };
+
+    // Create a type for our styles
+    type StylesType = {
+        container: any;
+        header: any;
+        headerTitle: any;
+        headerSub: any;
+        streakNumber: any;
+        streakInfo: any;
+        streakInfoArrow: any;
+        streakInfoText: any;
+        headerRight: any;
+        streakButton: any;
+        iconButton: any;
+        dayNavCard: any;
+        arrowButton: any;
+        arrowSymbol: any;
+        summaryCard: any;
+        summaryTitle: any;
+        equationRow: any;
+        equationColumn: any;
+        equationValue: any;
+        equationSign: any;
+        equationResult: any;
+        equationLabel: any;
+        mealSection: any;
+        mealHeader: any;
+        mealTitle: any;
+        mealCal: any;
+        macrosText: any;
+        dividerLine: any;
+        entryDividerLine: any;
+        logRow: any;
+        logItemText: any;
+        logItemDuration: any;
+        logCalText: any;
+        addBtn: any;
+        addBtnText: any;
+        bottomActions: any;
+        topActionsRow: any;
+        bottomAnalyzeRow: any;
+        tabBtn: any;
+        tabBtnText: any;
+        analyzeBtn: any;
+        analyzeBtnText: any;
+        loadingContainer: any;
+        loadingText: any;
+        animatedContent: any;
+        scrollInner: any;
+        healthinessCircle: any;
+        healthinessText: any;
+        modalOverlay: any;
+        actionModalContent: any;
+        actionModalTitle: any;
+        actionButton: any;
+        actionButtonText: any;
+        deleteButton: any;
+        deleteButtonText: any;
+        cancelButton: any;
+        cancelButtonText: any;
+        moveModalContent: any;
+        moveModalTitle: any;
+        mealTypeButton: any;
+        currentMealType: any;
+        mealTypeButtonText: any;
+        currentMealTypeText: any;
+        buttonText: any;
+        weightText: any;
+
+        // New gradient border styles
+        gradientBorderContainer: any;
+    };
+
+    const styles = StyleSheet.create<StylesType>({
+        container: {
+            flex: 1,
+            backgroundColor: PRIMARY_BG,
+        },
+        header: {
+            paddingVertical: 10,
+            paddingHorizontal: 16,
+            backgroundColor: PRIMARY_BG,
+        },
+        headerTitle: {
+            fontSize: 26,
+            color: PURPLE_ACCENT,
+            fontWeight: '700',
+            marginBottom: 4,
+        },
+        headerSub: {
+            fontSize: 16,
+            color: WHITE,
+            fontWeight: '400',
+        },
+        dayNavCard: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
+            borderRadius: 6,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            marginHorizontal: 10, // Match with scrollInner paddingHorizontal
+            marginTop: -5,
+            marginBottom: 3, // Reduced to minimize space between day and calories card
+        },
+        arrowButton: {
+            paddingHorizontal: 12,
+            paddingVertical: 4
+        },
+        arrowSymbol: {
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#FFF'
+        },
+
+        // Gradient border components
+        gradientBorderContainer: {
+            marginBottom: 12,
+            borderRadius: 10,
+            width: '100%',
+            overflow: 'hidden',
+        },
+
+        // Calories Remaining Card
+        summaryCard: {
+            backgroundColor: '#121212',
+            marginTop: 3, // Reduced from 8 to 3 to minimize space
+            marginBottom: 0, // Removed margin as it's handled by gradientBorderContainer
+            borderRadius: 8,
+            padding: 16,
+            width: '100%', // Consistent width
+        },
+        summaryTitle: {
+            fontSize: 16,
+            color: WHITE,
+            fontWeight: '600',
+            marginBottom: 8,
+        },
+        equationRow: {
+            flexDirection: 'row',
+            flexWrap: 'nowrap', // ensure one line
+            alignItems: 'center',
+            justifyContent: 'center', // Center align row
+        },
+        equationColumn: {
+            alignItems: 'center',
+            marginHorizontal: 10, // Add space between columns
+        },
+        equationValue: {
+            fontSize: 18, // Increase font size for better readability
+            fontWeight: '500',
+            marginRight: 10, // Shift slightly to the right
+            textAlign: 'center', // Center align text
+        },
+        equationSign: {
+            color: WHITE,
+            fontSize: 18, // Increase font size for better readability
+            fontWeight: '300',
+            marginRight: 10, // Shift slightly to the right
+            marginTop: -10, // Align with numbers
+            textAlign: 'center', // Center align text
+        },
+        equationResult: {
+            color: PURPLE_ACCENT,
+            fontSize: 20, // Increase font size for better readability
+            fontWeight: '700',
+            marginRight: 10, // Shift slightly to the right
+            marginLeft: 10, // Shift slightly to the right
+            textAlign: 'center', // Center align text
+        },
+        equationLabel: {
+            color: SUBDUED,
+            fontSize: 12,
+            marginTop: 4,
+            marginRight: 10, // Shift slightly to the right
+            textAlign: 'center', // Center align text
+        },
+
+        // Meal/Exercise/Water Sections
+        mealSection: {
+            backgroundColor: '#181818',
+            marginHorizontal: 0,
+            marginBottom: 0, // Removed margin as it's handled by gradientBorderContainer
+            borderRadius: 8,
+            padding: 16,
+            width: '100%', // Ensure full width matches summary card
+        },
+        mealHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginBottom: 4,
+            width: '100%', // Ensure full width
+        },
+        mealTitle: {
+            fontSize: 16,
+            color: WHITE,
+            fontWeight: '600',
+        },
+        mealCal: {
+            fontSize: 16,
+            color: WHITE,
+            fontWeight: '600',
+        },
+        macrosText: {
+            fontSize: 13,
+            color: SUBDUED,
+            marginBottom: 8,
+        },
+
+        // Dividers
+        dividerLine: {
+            borderBottomWidth: 1,
+            borderBottomColor: '#333',
+            marginVertical: 8,
+            marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
+        },
+        entryDividerLine: {
+            borderBottomWidth: 1,
+            borderBottomColor: '#333',
+            marginTop: 6,
+            marginBottom: 6,
+            marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
+        },
+
+        // Items
+        logRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginVertical: 2,
+        },
+        logItemText: {
+            fontSize: 14,
+            color: WHITE,
+            lineHeight: 18,
+            flexShrink: 1,
+        },
+        logItemDuration: {
+            fontSize: 12,
+            color: SUBDUED,
+        },
+        logCalText: {
+            fontSize: 14,
+            color: WHITE,
+            fontWeight: '500',
+        },
+
+        // Buttons
+        addBtn: {
+            marginTop: 8,
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: PURPLE_ACCENT,
+            paddingVertical: 6,
+            alignItems: 'center',
+        },
+        addBtnText: {
+            color: PURPLE_ACCENT,
+            fontSize: 14,
+            fontWeight: '600',
+        },
+
+        // Bottom actions
+        bottomActions: {
+            flexDirection: 'column',
+            marginTop: 8,
+            paddingHorizontal: 0, // Remove extra padding
+            width: '100%',
+        },
+        topActionsRow: {
+            flexDirection: 'row',
+        },
+        bottomAnalyzeRow: {
+            marginTop: 8,
+        },
+        tabBtn: {
+            flex: 1,
+            borderWidth: 1,
+            borderColor: PURPLE_ACCENT,
+            borderRadius: 6,
+            marginRight: 8,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 10,
+        },
+        tabBtnText: {
+            color: PURPLE_ACCENT,
+            fontWeight: '600',
+            fontSize: 14,
+        },
+        analyzeBtn: {
+            flex: 1,
+            backgroundColor: PURPLE_ACCENT,
+            borderRadius: 6,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 10,
+            marginRight: 8,
+            transform: [{ translateY: -2 }],
+            shadowColor: PURPLE_ACCENT,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.6,
+            shadowRadius: 10,
+            elevation: 5,
+        },
+        analyzeBtnText: {
+            color: WHITE,
+            fontWeight: '700',
+            fontSize: 14,
+        },
+        headerRight: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+        streakButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        iconButton: {
+            marginLeft: 8 // Reduced margin
+        },
+        streakNumber: {
+            fontSize: 20, // Increased font size
+            fontWeight: 'bold',
+            textAlign: 'center', // Center align text
+            lineHeight: 25, // Align with icon height
+            marginRight: -10, // Reduced margin
+        },
+        streakInfo: {
+            position: 'absolute',
+            top: 35,
+            left: -150, // Shift to the left
+            right: 10,
+            backgroundColor: '#333',
+            padding: 20, // Increase padding for better readability
+            borderRadius: 10,
+            zIndex: 1,
+            overflow: 'hidden',
+            width: 250, // Make the dropdown text a lot wider
+        },
+        streakInfoArrow: {
+            position: 'absolute',
+            top: -10,
+            left: '50%',
+            marginLeft: -10,
+            width: 0,
+            height: 0,
+            borderLeftWidth: 10,
+            borderRightWidth: 10,
+            borderBottomWidth: 10,
+            borderStyle: 'solid',
+            backgroundColor: 'transparent',
+            borderLeftColor: 'transparent',
+            borderRightColor: 'transparent',
+            borderBottomColor: '#333',
+        },
+        streakInfoText: {
+            color: '#FFF',
+            fontSize: 12,
+        },
+        loadingContainer: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#121212',
+        },
+        loadingText: {
+            color: '#fff',
+            marginTop: 10,
+            fontSize: 16,
+        },
+        animatedContent: {
+            flex: 1,
+            width: '100%',
+        },
+        scrollInner: {
+            paddingHorizontal: 10, // Reduced from 16 to 10 to make cards wider
+            paddingBottom: 100,
+            width: '100%',
+            alignItems: 'center',
+        },
+        healthinessCircle: {
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            borderWidth: 2,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'transparent',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.3,
+            shadowRadius: 2,
+            elevation: 3,
+        },
+        healthinessText: {
+            fontSize: 10,
+            fontWeight: 'bold',
+            textAlign: 'center',
+        },
+        modalOverlay: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        },
+        actionModalContent: {
+            backgroundColor: '#1C1C1E',
+            padding: 20,
+            borderRadius: 10,
+            width: '80%',
+        },
+        actionModalTitle: {
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: WHITE,
+            marginBottom: 15,
+            textAlign: 'center',
+        },
+        actionButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#252525',
+            padding: 15,
+            borderRadius: 8,
+            marginBottom: 10,
+            width: '100%',
+        },
+        actionButtonText: {
+            color: WHITE,
+            fontSize: 16,
+            marginLeft: 10,
+        },
+        deleteButton: {
+            backgroundColor: '#3A0505',
+        },
+        deleteButtonText: {
+            color: '#FF5252',
+        },
+        cancelButton: {
+            backgroundColor: '#333',
+            padding: 15,
+            borderRadius: 8,
+            width: '100%',
+            alignItems: 'center',
+            marginTop: 5,
+        },
+        cancelButtonText: {
+            color: '#AAA',
+            fontSize: 16,
+        },
+        moveModalContent: {
+            backgroundColor: '#1C1C1E',
+            padding: 20,
+            borderRadius: 10,
+            width: '80%',
+        },
+        moveModalTitle: {
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: WHITE,
+            marginBottom: 15,
+            textAlign: 'center',
+        },
+        mealTypeButton: {
+            padding: 15,
+            borderWidth: 1,
+            borderColor: PURPLE_ACCENT,
+            borderRadius: 8,
+            marginBottom: 10,
+            width: '100%',
+            alignItems: 'center',
+        },
+        currentMealType: {
+            backgroundColor: '#2D1640',
+        },
+        mealTypeButtonText: {
+            color: PURPLE_ACCENT,
+            fontSize: 16,
+        },
+        currentMealTypeText: {
+            color: WHITE,
+        },
+        buttonText: {
+            color: PURPLE_ACCENT,
+            fontSize: 16,
+        },
+        weightText: {
+            fontSize: 12,
+            color: '#999999',
+            marginTop: 2,
+        },
+    });
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={styles.container}>
@@ -850,19 +1379,19 @@ const DiaryScreen: React.FC = () => {
                                         maskElement={<Text style={styles.streakNumber}>7</Text>}
                                     >
                                         <LinearGradient
-                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
                                             start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                            style={{ width: 27, height: 27 }} // Adjusted size to align with other icons
+                                            end={{ x: 1, y: 0 }}
+                                            style={{ width: 27, height: 27 }}
                                         />
                                     </MaskedView>
                                     <MaskedView
                                         maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
                                     >
                                         <LinearGradient
-                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
                                             start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
+                                            end={{ x: 1, y: 0 }}
                                             style={{ width: 27, height: 27 }}
                                         />
                                     </MaskedView>
@@ -915,7 +1444,7 @@ const DiaryScreen: React.FC = () => {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* 2) Calories Remaining */}
-                            <View style={styles.summaryCard}>
+                            <GradientBorderCard style={styles.summaryCard}>
                                 <Text style={styles.summaryTitle}>Calories Remaining</Text>
                                 <View style={styles.equationRow}>
                                     <View style={styles.equationColumn}>
@@ -944,11 +1473,11 @@ const DiaryScreen: React.FC = () => {
                                         <Text style={styles.equationLabel}>Remaining</Text>
                                     </View>
                                 </View>
-                            </View>
+                            </GradientBorderCard>
 
                             {/* 3) Meals */}
                             {mealData.map((meal, idx) => (
-                                <View key={idx} style={styles.mealSection}>
+                                <GradientBorderCard key={idx} style={styles.mealSection}>
                                     {/* Always show meal title and calories */}
                                     <View style={styles.mealHeader}>
                                         <Text style={styles.mealTitle}>{meal.title}</Text>
@@ -1040,11 +1569,11 @@ const DiaryScreen: React.FC = () => {
                                     >
                                         <Text style={styles.addBtnText}>ADD FOOD</Text>
                                     </TouchableOpacity>
-                                </View>
+                                </GradientBorderCard>
                             ))}
 
                             {/* 4) Exercise */}
-                            <View style={styles.mealSection}>
+                            <GradientBorderCard style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
                                     <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
                                     <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
@@ -1061,10 +1590,10 @@ const DiaryScreen: React.FC = () => {
                                 <TouchableOpacity style={styles.addBtn} onPress={addTestExercise}>
                                     <Text style={styles.addBtnText}>ADD EXERCISE</Text>
                                 </TouchableOpacity>
-                            </View>
+                            </GradientBorderCard>
 
                             {/* 5) Water */}
-                            <View style={styles.mealSection}>
+                            <GradientBorderCard style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
                                     <Text style={styles.mealTitle}>Water</Text>
                                 </View>
@@ -1074,7 +1603,7 @@ const DiaryScreen: React.FC = () => {
                                 <TouchableOpacity style={styles.addBtn}>
                                     <Text style={styles.addBtnText}>ADD WATER</Text>
                                 </TouchableOpacity>
-                            </View>
+                            </GradientBorderCard>
 
                             {/* 7) Bottom action row */}
                             <View style={styles.bottomActions}>
@@ -1219,416 +1748,3 @@ const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const PURPLE_ACCENT = '#AA00FF';
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: PRIMARY_BG,
-    },
-    header: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        backgroundColor: PRIMARY_BG,
-    },
-    headerTitle: {
-        fontSize: 26,
-        color: PURPLE_ACCENT,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    headerSub: {
-        fontSize: 16,
-        color: WHITE,
-        fontWeight: '400',
-    },
-    dayNavCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
-        borderRadius: 6,
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        marginHorizontal: 10, // Match with scrollInner paddingHorizontal
-        marginTop: -5,
-        marginBottom: 3, // Reduced to minimize space between day and calories card
-    },
-    arrowButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 4
-    },
-    arrowSymbol: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#FFF'
-    },
-
-    // Calories Remaining Card
-    summaryCard: {
-        backgroundColor: '#121212',
-        marginTop: 3, // Reduced from 8 to 3 to minimize space
-        marginBottom: 12, // Added margin bottom to match spacing between other cards
-        borderRadius: 8,
-        padding: 16,
-        width: '100%', // Consistent width
-    },
-    summaryTitle: {
-        fontSize: 16,
-        color: WHITE,
-        fontWeight: '600',
-        marginBottom: 8,
-    },
-    equationRow: {
-        flexDirection: 'row',
-        flexWrap: 'nowrap', // ensure one line
-        alignItems: 'center',
-        justifyContent: 'center', // Center align row
-    },
-    equationColumn: {
-        alignItems: 'center',
-        marginHorizontal: 10, // Add space between columns
-    },
-    equationValue: {
-        fontSize: 18, // Increase font size for better readability
-        fontWeight: '500',
-        marginRight: 10, // Shift slightly to the right
-        textAlign: 'center', // Center align text
-    },
-    equationSign: {
-        color: WHITE,
-        fontSize: 18, // Increase font size for better readability
-        fontWeight: '300',
-        marginRight: 10, // Shift slightly to the right
-        marginTop: -10, // Align with numbers
-        textAlign: 'center', // Center align text
-    },
-    equationResult: {
-        color: PURPLE_ACCENT,
-        fontSize: 20, // Increase font size for better readability
-        fontWeight: '700',
-        marginRight: 10, // Shift slightly to the right
-        marginLeft: 10, // Shift slightly to the right
-        textAlign: 'center', // Center align text
-    },
-    equationLabel: {
-        color: SUBDUED,
-        fontSize: 12,
-        marginTop: 4,
-        marginRight: 10, // Shift slightly to the right
-        textAlign: 'center', // Center align text
-    },
-
-    // Meal/Exercise/Water Sections
-    mealSection: {
-        backgroundColor: '#181818',
-        marginHorizontal: 0,
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 12,
-        width: '100%', // Ensure full width matches summary card
-    },
-    mealHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 4,
-        width: '100%', // Ensure full width
-    },
-    mealTitle: {
-        fontSize: 16,
-        color: WHITE,
-        fontWeight: '600',
-    },
-    mealCal: {
-        fontSize: 16,
-        color: WHITE,
-        fontWeight: '600',
-    },
-    macrosText: {
-        fontSize: 13,
-        color: SUBDUED,
-        marginBottom: 8,
-    },
-
-    // Dividers
-    dividerLine: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#333',
-        marginVertical: 8,
-        marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
-    },
-    entryDividerLine: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#333',
-        marginTop: 6,
-        marginBottom: 6,
-        marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
-    },
-
-    // Items
-    logRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginVertical: 2,
-    },
-    logItemText: {
-        fontSize: 14,
-        color: WHITE,
-        lineHeight: 18,
-        flexShrink: 1,
-    },
-    logItemDuration: {
-        fontSize: 12,
-        color: SUBDUED,
-    },
-    logCalText: {
-        fontSize: 14,
-        color: WHITE,
-        fontWeight: '500',
-    },
-
-    // Buttons
-    addBtn: {
-        marginTop: 8,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: PURPLE_ACCENT,
-        paddingVertical: 6,
-        alignItems: 'center',
-    },
-    addBtnText: {
-        color: PURPLE_ACCENT,
-        fontSize: 14,
-        fontWeight: '600',
-    },
-
-    // Bottom actions
-    bottomActions: {
-        flexDirection: 'column',
-        marginTop: 8,
-        paddingHorizontal: 0, // Remove extra padding
-        width: '100%',
-    },
-    topActionsRow: {
-        flexDirection: 'row',
-    },
-    bottomAnalyzeRow: {
-        marginTop: 8,
-    },
-    tabBtn: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: PURPLE_ACCENT,
-        borderRadius: 6,
-        marginRight: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
-    },
-    tabBtnText: {
-        color: PURPLE_ACCENT,
-        fontWeight: '600',
-        fontSize: 14,
-    },
-    analyzeBtn: {
-        flex: 1,
-        backgroundColor: PURPLE_ACCENT,
-        borderRadius: 6,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
-        marginRight: 8,
-        transform: [{ translateY: -2 }],
-        shadowColor: PURPLE_ACCENT,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.6,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    analyzeBtnText: {
-        color: WHITE,
-        fontWeight: '700',
-        fontSize: 14,
-    },
-    headerRight: {
-        flexDirection: 'row',
-        alignItems: 'center'
-    },
-    streakButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    iconButton: {
-        marginLeft: 8 // Reduced margin
-    },
-    streakNumber: {
-        fontSize: 20, // Increased font size
-        fontWeight: 'bold',
-        textAlign: 'center', // Center align text
-        lineHeight: 25, // Align with icon height
-        marginRight: -10, // Reduced margin
-    },
-    streakInfo: {
-        position: 'absolute',
-        top: 35,
-        left: -150, // Shift to the left
-        right: 10,
-        backgroundColor: '#333',
-        padding: 20, // Increase padding for better readability
-        borderRadius: 10,
-        zIndex: 1,
-        overflow: 'hidden',
-        width: 250, // Make the dropdown text a lot wider
-    },
-    streakInfoArrow: {
-        position: 'absolute',
-        top: -10,
-        left: '50%',
-        marginLeft: -10,
-        width: 0,
-        height: 0,
-        borderLeftWidth: 10,
-        borderRightWidth: 10,
-        borderBottomWidth: 10,
-        borderStyle: 'solid',
-        backgroundColor: 'transparent',
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        borderBottomColor: '#333',
-    },
-    streakInfoText: {
-        color: '#FFF',
-        fontSize: 12,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#121212',
-    },
-    loadingText: {
-        color: '#fff',
-        marginTop: 10,
-        fontSize: 16,
-    },
-    animatedContent: {
-        flex: 1,
-        width: '100%',
-    },
-    scrollInner: {
-        paddingHorizontal: 10, // Reduced from 16 to 10 to make cards wider
-        paddingBottom: 100,
-        width: '100%',
-        alignItems: 'center',
-    },
-    healthinessCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 2,
-        elevation: 3,
-    },
-    healthinessText: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        textAlign: 'center',
-    },
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    actionModalContent: {
-        backgroundColor: '#1C1C1E',
-        padding: 20,
-        borderRadius: 10,
-        width: '80%',
-    },
-    actionModalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: WHITE,
-        marginBottom: 15,
-        textAlign: 'center',
-    },
-    actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#252525',
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 10,
-        width: '100%',
-    },
-    actionButtonText: {
-        color: WHITE,
-        fontSize: 16,
-        marginLeft: 10,
-    },
-    deleteButton: {
-        backgroundColor: '#3A0505',
-    },
-    deleteButtonText: {
-        color: '#FF5252',
-    },
-    cancelButton: {
-        backgroundColor: '#333',
-        padding: 15,
-        borderRadius: 8,
-        width: '100%',
-        alignItems: 'center',
-        marginTop: 5,
-    },
-    cancelButtonText: {
-        color: '#AAA',
-        fontSize: 16,
-    },
-    moveModalContent: {
-        backgroundColor: '#1C1C1E',
-        padding: 20,
-        borderRadius: 10,
-        width: '80%',
-    },
-    moveModalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: WHITE,
-        marginBottom: 15,
-        textAlign: 'center',
-    },
-    mealTypeButton: {
-        padding: 15,
-        borderWidth: 1,
-        borderColor: PURPLE_ACCENT,
-        borderRadius: 8,
-        marginBottom: 10,
-        width: '100%',
-        alignItems: 'center',
-    },
-    currentMealType: {
-        backgroundColor: '#2D1640',
-    },
-    mealTypeButtonText: {
-        color: PURPLE_ACCENT,
-        fontSize: 16,
-    },
-    currentMealTypeText: {
-        color: WHITE,
-    },
-    buttonText: {
-        color: PURPLE_ACCENT,
-        fontSize: 16,
-    },
-    weightText: {
-        fontSize: 12,
-        color: '#999999',
-        marginTop: 2,
-    },
-});
