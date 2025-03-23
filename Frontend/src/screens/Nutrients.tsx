@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -68,6 +68,69 @@ const GradientText = ({ text, style, colors }) => {
 
 const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation();
+    const [nutrientData, setNutrientData] = useState(macroGoals);
+
+    useEffect(() => {
+        // Fetch nutrient data from the backend
+        const fetchNutrientData = async () => {
+            try {
+                const response = await fetch('/api/meal-data');
+                const data = await response.json();
+
+                // Calculate the total for each nutrient
+                const totals = {
+                    protein: 0,
+                    carbs: 0,
+                    fiber: 0,
+                    sugar: 0,
+                    fat: 0,
+                    saturatedFat: 0,
+                    polyunsaturatedFat: 0,
+                    monounsaturatedFat: 0,
+                    transFat: 0,
+                    cholesterol: 0,
+                    sodium: 0,
+                    potassium: 0,
+                    vitaminA: 0,
+                    vitaminC: 0,
+                    calcium: 0,
+                    iron: 0
+                };
+
+                data.forEach(entry => {
+                    totals.protein += entry.proteins;
+                    totals.carbs += entry.carbs;
+                    totals.fiber += entry.fiber;
+                    totals.sugar += entry.sugar;
+                    totals.fat += entry.fats;
+                    totals.saturatedFat += entry.saturated_fat;
+                    totals.polyunsaturatedFat += entry.polyunsaturated_fat;
+                    totals.monounsaturatedFat += entry.monounsaturated_fat;
+                    totals.transFat += entry.trans_fat;
+                    totals.cholesterol += entry.cholesterol;
+                    totals.sodium += entry.sodium;
+                    totals.potassium += entry.potassium;
+                    totals.vitaminA += entry.vitamin_a;
+                    totals.vitaminC += entry.vitamin_c;
+                    totals.calcium += entry.calcium;
+                    totals.iron += entry.iron;
+                });
+
+                // Update state with totals
+                setNutrientData(prevData => {
+                    const updatedData = { ...prevData };
+                    Object.keys(totals).forEach(key => {
+                        updatedData[key].current = totals[key];
+                    });
+                    return updatedData;
+                });
+            } catch (error) {
+                console.error('Failed to fetch nutrient data:', error);
+            }
+        };
+
+        fetchNutrientData();
+    }, []);
 
     // Calculate the remaining amount for each nutrient
     const calculateRemaining = (current: number, goal: number) => {
@@ -164,7 +227,7 @@ const NutrientsScreen: React.FC = () => {
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
             >
-                {Object.entries(macroGoals).map(([key, value]) => {
+                {Object.entries(nutrientData).map(([key, value]) => {
                     // Convert key from camelCase to Title Case for display
                     const label = key.replace(/([A-Z])/g, ' $1')
                         .replace(/^./, str => str.toUpperCase());

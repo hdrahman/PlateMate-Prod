@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateDatabaseSchema } from './updateDatabase';
 
 // Open the database
 let db: SQLite.SQLiteDatabase;
@@ -13,7 +14,7 @@ export const initDatabase = async () => {
         db = await SQLite.openDatabaseAsync('platemate.db');
         console.log('✅ Database opened successfully');
 
-        // Create tables
+        // Create tables with basic schema
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS food_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +40,10 @@ export const initDatabase = async () => {
     `);
         console.log('✅ food_logs table created successfully');
 
+        // Run database migrations
+        await updateDatabaseSchema(db);
+
+        // Create other tables
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS exercises (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -281,6 +286,19 @@ export const addFoodLog = async (foodLog: any) => {
         proteins,
         carbs,
         fats,
+        fiber = 0,
+        sugar = 0,
+        saturated_fat = 0,
+        polyunsaturated_fat = 0,
+        monounsaturated_fat = 0,
+        trans_fat = 0,
+        cholesterol = 0,
+        sodium = 0,
+        potassium = 0,
+        vitamin_a = 0,
+        vitamin_c = 0,
+        calcium = 0,
+        iron = 0,
         image_url,
         file_key = 'default_file_key',
         healthiness_rating,
@@ -315,10 +333,12 @@ export const addFoodLog = async (foodLog: any) => {
     try {
         const result = await db.runAsync(
             `INSERT INTO food_logs (
-        meal_id, user_id, food_name, calories, proteins, carbs, fats, 
-        image_url, file_key, healthiness_rating, date, meal_type, 
-        brand_name, quantity, notes, synced, sync_action, last_modified
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                meal_id, user_id, food_name, calories, proteins, carbs, fats,
+                fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
+                trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
+                calcium, iron, image_url, file_key, healthiness_rating, date,
+                meal_type, brand_name, quantity, notes, synced, sync_action, last_modified
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 meal_id,
                 user_id,
@@ -327,6 +347,19 @@ export const addFoodLog = async (foodLog: any) => {
                 proteins,
                 carbs,
                 fats,
+                fiber,
+                sugar,
+                saturated_fat,
+                polyunsaturated_fat,
+                monounsaturated_fat,
+                trans_fat,
+                cholesterol,
+                sodium,
+                potassium,
+                vitamin_a,
+                vitamin_c,
+                calcium,
+                iron,
                 image_url,
                 file_key,
                 healthiness_rating,

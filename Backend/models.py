@@ -13,6 +13,19 @@ class FoodLog(Base):
     proteins = Column(Integer, nullable=False)
     carbs = Column(Integer, nullable=False)
     fats = Column(Integer, nullable=False)
+    fiber = Column(Integer, nullable=False)  # New nutrient
+    sugar = Column(Integer, nullable=False)  # New nutrient
+    saturated_fat = Column(Integer, nullable=False)  # New nutrient
+    polyunsaturated_fat = Column(Integer, nullable=False)  # New nutrient
+    monounsaturated_fat = Column(Integer, nullable=False)  # New nutrient
+    trans_fat = Column(Integer, nullable=False)  # New nutrient
+    cholesterol = Column(Integer, nullable=False)  # New nutrient
+    sodium = Column(Integer, nullable=False)  # New nutrient
+    potassium = Column(Integer, nullable=False)  # New nutrient
+    vitamin_a = Column(Integer, nullable=False)  # New nutrient
+    vitamin_c = Column(Integer, nullable=False)  # New nutrient
+    calcium = Column(Integer, nullable=False)  # New nutrient
+    iron = Column(Integer, nullable=False)  # New nutrient
     weight = Column(Float, nullable=True)  # Weight of the food item
     weight_unit = Column(String, nullable=True, default='g')  # Unit of measurement (g, oz, etc.)
     image_url = Column(String, nullable=False)  # Store cloud storage URL

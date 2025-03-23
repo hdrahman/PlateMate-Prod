@@ -99,15 +99,58 @@ async def analyze_food(request: FoodAnalysisRequest):
         
         if USE_MOCK_API:
             # Mock response instead of making the API request to OpenAI
-            mock_response_text = """Food Name: Fried Chicken Sandwich with Fries and Pickles
+            mock_response_text = """Meal Analysis:
 
-Calories: 920
-Protein: 30g
-Carbs: 88g
-Fats: 50g
-Healthiness Rating: 4/10
+This meal consists of 4 distinct food items:
 
-This meal consists of a fried chicken sandwich, crinkle-cut fries, and pickles. The high calorie and fat content, primarily from frying, affect the healthiness rating."""
+1. Grilled Chicken Breast (100g)
+   - Calories: 165
+   - Protein: 31g
+   - Carbs: 0g
+   - Fat: 3g
+   - Healthiness Rating: 8/10
+   This lean protein is high in essential nutrients with minimal fat.
+
+2. Grilled Sausages (100g)
+   - Calories: 229
+   - Protein: 12g
+   - Carbs: 1g
+   - Fat: 19g
+   - Healthiness Rating: 4/10
+   Higher in fat and sodium, moderate consumption recommended.
+
+3. Steamed Brown Rice (100g)
+   - Calories: 112
+   - Protein: 2g
+   - Carbs: 24g
+   - Fat: 1g
+   - Healthiness Rating: 7/10
+   Whole grain carbohydrate providing fiber and sustained energy.
+
+4. Steamed Mixed Vegetables (100g)
+   - Calories: 55
+   - Protein: 2g
+   - Carbs: 11g
+   - Fat: 0g
+   - Healthiness Rating: 10/10
+   Rich in vitamins, minerals, fiber, and antioxidants.
+
+Combined Nutritional Information:
+- Total Calories: 561
+- Total Protein: 47g
+- Total Carbs: 36g
+- Total Fat: 23g
+- Overall Healthiness Rating: 7/10
+
+Health Benefits:
+- Balanced meal with protein, complex carbs, and vegetables
+- Good source of essential vitamins and minerals
+- Provides sustained energy and supports muscle maintenance
+
+Suggestions:
+- Consider reducing portion of sausages to lower saturated fat intake
+- Add more vegetables for additional fiber and micronutrients
+- Consider adding a healthy fat source like avocado or olive oil"""
             
             # Create a mock response object
             class MockResponse:

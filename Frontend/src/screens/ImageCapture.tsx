@@ -10,7 +10,8 @@ import {
     Alert,
     ActivityIndicator,
     Dimensions,
-    Modal
+    Modal,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, StackActions } from '@react-navigation/native';
@@ -241,14 +242,17 @@ const ImageCapture: React.FC = () => {
             // Add all images to the form data
             for (let i = 0; i < imageUris.length; i++) {
                 const uri = imageUris[i];
-                const fileInfo = await FileSystem.getInfoAsync(uri);
+                const filename = uri.split('/').pop() || `image${i}.jpg`;
 
+                // Convert file:// URI to blob or base64 if needed
                 formData.append('images', {
-                    uri,
+                    uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
                     type: 'image/jpeg',
-                    name: fileInfo.uri.split('/').pop(),
+                    name: filename,
                 } as any);
             }
+
+            console.log('📤 Uploading images to:', `${BACKEND_URL}/images/upload-multiple-images`);
 
             const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
                 method: 'POST',
@@ -260,6 +264,9 @@ const ImageCapture: React.FC = () => {
             });
 
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Upload failed with status:', response.status);
+                console.error('❌ Error details:', errorText);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -305,11 +312,10 @@ const ImageCapture: React.FC = () => {
 
             // Format current date as ISO string (YYYY-MM-DD)
             const today = new Date();
-            // Ensure consistent date format (YYYY-MM-DD) without time component
             const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             console.log(`Saving food log with date: ${formattedDate}`);
 
-            // Create a food log entry
+            // Create a food log entry with all required fields
             const foodLog = {
                 meal_id: result.meal_id,
                 food_name: nutritionData.food_name || 'Unknown Food',
@@ -317,10 +323,23 @@ const ImageCapture: React.FC = () => {
                 proteins: nutritionData.proteins || 0,
                 carbs: nutritionData.carbs || 0,
                 fats: nutritionData.fats || 0,
-                image_url: imageUris[0] || '', // Use the first image as the main image
+                fiber: nutritionData.fiber || 0,
+                sugar: nutritionData.sugar || 0,
+                saturated_fat: nutritionData.saturated_fat || 0,
+                polyunsaturated_fat: nutritionData.polyunsaturated_fat || 0,
+                monounsaturated_fat: nutritionData.monounsaturated_fat || 0,
+                trans_fat: nutritionData.trans_fat || 0,
+                cholesterol: nutritionData.cholesterol || 0,
+                sodium: nutritionData.sodium || 0,
+                potassium: nutritionData.potassium || 0,
+                vitamin_a: nutritionData.vitamin_a || 0,
+                vitamin_c: nutritionData.vitamin_c || 0,
+                calcium: nutritionData.calcium || 0,
+                iron: nutritionData.iron || 0,
+                image_url: imageUris[0],
                 file_key: 'default_key',
                 healthiness_rating: nutritionData.healthiness_rating || 5,
-                date: formattedDate, // Add formatted date
+                date: formattedDate,
                 meal_type: mealType,
                 brand_name: brandName,
                 quantity: quantity,
@@ -338,9 +357,7 @@ const ImageCapture: React.FC = () => {
                 {
                     text: 'OK',
                     onPress: () => {
-                        // Fix navigation by using goBack and not passing complex params
                         navigation.goBack();
-                        // Use AsyncStorage to trigger refresh on FoodLog screen
                         try {
                             const refreshTime = Date.now().toString();
                             AsyncStorage.setItem('FOOD_LOG_REFRESH_TRIGGER', refreshTime)
@@ -353,7 +370,7 @@ const ImageCapture: React.FC = () => {
             ]);
         } catch (error) {
             console.error('Error submitting food:', error);
-            Alert.alert('Error', 'Failed to submit food');
+            Alert.alert('Error', 'Failed to submit food. Please try again.');
         } finally {
             setLoading(false);
             setIsAnalyzing(false);

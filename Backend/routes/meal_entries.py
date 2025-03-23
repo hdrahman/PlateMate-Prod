@@ -16,6 +16,19 @@ class FoodLogCreate(BaseModel):
     proteins: int
     carbs: float
     fats: int
+    fiber: int
+    sugar: int
+    saturated_fat: int
+    polyunsaturated_fat: int
+    monounsaturated_fat: int
+    trans_fat: int
+    cholesterol: int
+    sodium: int
+    potassium: int
+    vitamin_a: int
+    vitamin_c: int
+    calcium: int
+    iron: int
     image_url: str
     file_key: Optional[str] = "default_file_key"
     healthiness_rating: Optional[int] = None
@@ -42,7 +55,24 @@ def get_meal_data(db: Session = Depends(get_db)):
             meal_dict[entry.meal_type] = {
                 "title": entry.meal_type,
                 "total": 0,
-                "macros": {"carbs": 0, "fat": 0, "protein": 0},
+                "macros": {
+                    "carbs": 0,
+                    "fat": 0,
+                    "protein": 0,
+                    "fiber": 0,
+                    "sugar": 0,
+                    "saturated_fat": 0,
+                    "polyunsaturated_fat": 0,
+                    "monounsaturated_fat": 0,
+                    "trans_fat": 0,
+                    "cholesterol": 0,
+                    "sodium": 0,
+                    "potassium": 0,
+                    "vitamin_a": 0,
+                    "vitamin_c": 0,
+                    "calcium": 0,
+                    "iron": 0
+                },
                 "items": []
             }
         
@@ -51,6 +81,19 @@ def get_meal_data(db: Session = Depends(get_db)):
         meal_dict[entry.meal_type]["macros"]["carbs"] += entry.carbs
         meal_dict[entry.meal_type]["macros"]["fat"] += entry.fats
         meal_dict[entry.meal_type]["macros"]["protein"] += entry.proteins
+        meal_dict[entry.meal_type]["macros"]["fiber"] += entry.fiber
+        meal_dict[entry.meal_type]["macros"]["sugar"] += entry.sugar
+        meal_dict[entry.meal_type]["macros"]["saturated_fat"] += entry.saturated_fat
+        meal_dict[entry.meal_type]["macros"]["polyunsaturated_fat"] += entry.polyunsaturated_fat
+        meal_dict[entry.meal_type]["macros"]["monounsaturated_fat"] += entry.monounsaturated_fat
+        meal_dict[entry.meal_type]["macros"]["trans_fat"] += entry.trans_fat
+        meal_dict[entry.meal_type]["macros"]["cholesterol"] += entry.cholesterol
+        meal_dict[entry.meal_type]["macros"]["sodium"] += entry.sodium
+        meal_dict[entry.meal_type]["macros"]["potassium"] += entry.potassium
+        meal_dict[entry.meal_type]["macros"]["vitamin_a"] += entry.vitamin_a
+        meal_dict[entry.meal_type]["macros"]["vitamin_c"] += entry.vitamin_c
+        meal_dict[entry.meal_type]["macros"]["calcium"] += entry.calcium
+        meal_dict[entry.meal_type]["macros"]["iron"] += entry.iron
         meal_dict[entry.meal_type]["items"].append({
             "name": f"{entry.food_name}\nProtein {entry.proteins}g",
             "calories": entry.calories
@@ -80,6 +123,19 @@ def create_food_log(food_log: FoodLogCreate, db: Session = Depends(get_db)):
             proteins=food_log.proteins,
             carbs=food_log.carbs,
             fats=food_log.fats,
+            fiber=food_log.fiber,
+            sugar=food_log.sugar,
+            saturated_fat=food_log.saturated_fat,
+            polyunsaturated_fat=food_log.polyunsaturated_fat,
+            monounsaturated_fat=food_log.monounsaturated_fat,
+            trans_fat=food_log.trans_fat,
+            cholesterol=food_log.cholesterol,
+            sodium=food_log.sodium,
+            potassium=food_log.potassium,
+            vitamin_a=food_log.vitamin_a,
+            vitamin_c=food_log.vitamin_c,
+            calcium=food_log.calcium,
+            iron=food_log.iron,
             image_url=food_log.image_url,
             file_key=food_log.file_key,
             healthiness_rating=food_log.healthiness_rating,
@@ -126,6 +182,19 @@ def update_food_log(food_log_id: int, food_log: FoodLogUpdate, db: Session = Dep
         db_food_log.proteins = food_log.proteins
         db_food_log.carbs = food_log.carbs
         db_food_log.fats = food_log.fats
+        db_food_log.fiber = food_log.fiber
+        db_food_log.sugar = food_log.sugar
+        db_food_log.saturated_fat = food_log.saturated_fat
+        db_food_log.polyunsaturated_fat = food_log.polyunsaturated_fat
+        db_food_log.monounsaturated_fat = food_log.monounsaturated_fat
+        db_food_log.trans_fat = food_log.trans_fat
+        db_food_log.cholesterol = food_log.cholesterol
+        db_food_log.sodium = food_log.sodium
+        db_food_log.potassium = food_log.potassium
+        db_food_log.vitamin_a = food_log.vitamin_a
+        db_food_log.vitamin_c = food_log.vitamin_c
+        db_food_log.calcium = food_log.calcium
+        db_food_log.iron = food_log.iron
         db_food_log.image_url = food_log.image_url
         db_food_log.file_key = food_log.file_key
         db_food_log.healthiness_rating = food_log.healthiness_rating
@@ -200,6 +269,19 @@ def get_food_logs_by_date(date: str, db: Session = Depends(get_db)):
                 "proteins": log.proteins,
                 "carbs": log.carbs,
                 "fats": log.fats,
+                "fiber": log.fiber,
+                "sugar": log.sugar,
+                "saturated_fat": log.saturated_fat,
+                "polyunsaturated_fat": log.polyunsaturated_fat,
+                "monounsaturated_fat": log.monounsaturated_fat,
+                "trans_fat": log.trans_fat,
+                "cholesterol": log.cholesterol,
+                "sodium": log.sodium,
+                "potassium": log.potassium,
+                "vitamin_a": log.vitamin_a,
+                "vitamin_c": log.vitamin_c,
+                "calcium": log.calcium,
+                "iron": log.iron,
                 "image_url": log.image_url,
                 "file_key": log.file_key,
                 "healthiness_rating": log.healthiness_rating,

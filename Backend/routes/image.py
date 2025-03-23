@@ -1,5 +1,4 @@
 import openai
-import boto3
 import os
 import base64
 import re
@@ -26,19 +25,6 @@ try:
 except Exception as e:
     print(f"❌ Failed to initialize OpenAI client: {e}")
 
-# AWS S3 client
-try:
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-        region_name=os.getenv('AWS_REGION')
-    )
-    print("✅ AWS S3 client initialized successfully")
-except Exception as e:
-    print(f"❌ Failed to initialize AWS S3 client: {e}")
-
-bucket_name = os.getenv('AWS_BUCKET_NAME')
 router = APIRouter()
 
 
@@ -51,177 +37,78 @@ def encode_image(image_file):
         raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
 
 
-def analyze_food_image(image_data):
-    """Send image to GPT-4o Vision for food analysis."""
-    try:
-        print("📤 Sending image to OpenAI for analysis...")
-        
-        if USE_MOCK_API:
-            # Mock response instead of calling OpenAI API
-            mock_response = """[
-                {
-                    "food_name": "Fried Chicken Sandwich",
-                    "calories": 550,
-                    "protein": 25,
-                    "carbs": 45,
-                    "fats": 30,
-                    "weight": 220,
-                    "weight_unit": "g",
-                    "healthiness_rating": 4
-                },
-                {
-                    "food_name": "French Fries",
-                    "calories": 320,
-                    "protein": 4,
-                    "carbs": 40,
-                    "fats": 17,
-                    "weight": 120,
-                    "weight_unit": "g",
-                    "healthiness_rating": 3
-                },
-                {
-                    "food_name": "Pickles",
-                    "calories": 5,
-                    "protein": 0,
-                    "carbs": 1,
-                    "fats": 0,
-                    "weight": 20,
-                    "weight_unit": "g",
-                    "healthiness_rating": 7
-                }
-            ]"""
-            
-            print(f"📝 GPT-4o Raw Response (MOCK): {mock_response}")
-            return mock_response
-        else:
-            # Real API call
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a nutrition assistant. Analyze the food in this image and identify EACH individual food item separately.
-
-For EACH distinct food item in the image, provide its nutritional information in the following format:
-
-```json
-[
-  {
-    "food_name": "Food Item 1",
-    "calories": 000,
-    "protein": 00,
-    "carbs": 00,
-    "fats": 00,
-    "weight": 000,
-    "weight_unit": "g",
-    "healthiness_rating": 0
-  },
-  {
-    "food_name": "Food Item 2",
-    "calories": 000,
-    "protein": 00,
-    "carbs": 00,
-    "fats": 00,
-    "weight": 000,
-    "weight_unit": "g",
-    "healthiness_rating": 0
-  }
-]
-```
-
-Important:
-1. Return your response ONLY in valid JSON format as shown above
-2. Create a separate entry for each distinct food item (burger, fries, side salad, etc.)
-3. Provide an estimated weight in grams for each food item
-4. Healthiness rating should be on a scale of 1-10
-5. Ensure all nutritional values are realistic estimates
-6. Use only integers for all numerical values""",
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "Analyze this food and provide nutritional information for each item separately."},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
-                        ]
-                    }
-                ]
-            )
-            
-            gpt_response = response.choices[0].message.content.strip()
-            print(f"📝 GPT-4o Raw Response (REAL API): {gpt_response}")
-            return gpt_response
-    except Exception as e:
-        print(f"❌ OpenAI API Error: {e}")
-        raise HTTPException(status_code=500, detail=f"OpenAI API Error: {str(e)}")
-
-
-def parse_gpt4_response(response_text):
-    """Extracts individual food components and their nutritional values from GPT-4o response."""
-    try:
-        if not response_text or "error" in response_text.lower():
-            raise ValueError("GPT-4o returned an empty or invalid response.")
-
-        # Find JSON array in the response (may be surrounded by other text)
-        json_pattern = r'\[.*?\]'
-        json_match = re.search(json_pattern, response_text, re.DOTALL)
-        
-        if json_match:
-            json_str = json_match.group(0)
-            try:
-                food_items = json.loads(json_str)
-            except json.JSONDecodeError:
-                # Try to clean up the JSON string
-                cleaned_json = re.sub(r'(\w+):', r'"\1":', json_str)  # Add quotes to keys
-                cleaned_json = re.sub(r'\'', r'"', cleaned_json)  # Replace single quotes with double quotes
-                food_items = json.loads(cleaned_json)
-        else:
-            # If no JSON found, try to parse the old format
-            food_info = {}
-            
-            food_name_match = re.search(r'Food Name:\s*(.*)', response_text)
-            food_info["food_name"] = food_name_match.group(1).strip() if food_name_match else "Unknown"
-
-            calories_match = re.search(r'Calories:\s*(\d+)', response_text)
-            food_info["calories"] = int(calories_match.group(1)) if calories_match else 0
-
-            protein_match = re.search(r'Protein:\s*(\d+)g', response_text)
-            food_info["proteins"] = int(protein_match.group(1)) if protein_match else 0
-
-            carbs_match = re.search(r'Carbs:\s*(\d+(\.\d+)?)g', response_text)
-            food_info["carbs"] = float(carbs_match.group(1)) if carbs_match else 0
-
-            fats_match = re.search(r'Fats:\s*(\d+)g', response_text)
-            food_info["fats"] = int(fats_match.group(1)) if fats_match else 0
-
-            healthiness_match = re.search(r'Healthiness Rating:\s*(\d+)/10', response_text)
-            food_info["healthiness_rating"] = int(healthiness_match.group(1)) if healthiness_match else None
-            
-            # Assign default weight and unit
-            food_info["weight"] = 100
-            food_info["weight_unit"] = "g"
-
-            food_items = [food_info]
-
-        # Standardize the keys across all food items
-        standardized_items = []
-        for item in food_items:
-            # Convert keys to match our database schema
-            standardized_item = {
-                "food_name": item.get("food_name", "Unknown"),
-                "calories": int(item.get("calories", 0)),
-                "proteins": int(item.get("protein", 0)),
-                "carbs": float(item.get("carbs", 0)),
-                "fats": int(item.get("fats", 0)),
-                "weight": float(item.get("weight", 100)),
-                "weight_unit": item.get("weight_unit", "g"),
-                "healthiness_rating": int(item.get("healthiness_rating", 5))
-            }
-            standardized_items.append(standardized_item)
-
-        return standardized_items
-    except Exception as e:
-        print(f"❌ Error parsing GPT-4o response: {e}")
-        raise HTTPException(status_code=500, detail=f"GPT-4o Parsing Error: {str(e)}")
+# Mock response with complete nutritional information
+MOCK_RESPONSE = """[
+    {
+        "food_name": "Grilled Chicken Breast",
+        "calories": 165,
+        "proteins": 31,
+        "carbs": 0,
+        "fats": 3,
+        "fiber": 0,
+        "sugar": 0,
+        "saturated_fat": 1,
+        "polyunsaturated_fat": 1,
+        "monounsaturated_fat": 1,
+        "trans_fat": 0,
+        "cholesterol": 85,
+        "sodium": 74,
+        "potassium": 255,
+        "vitamin_a": 0,
+        "vitamin_c": 0,
+        "calcium": 15,
+        "iron": 1,
+        "weight": 100,
+        "weight_unit": "g",
+        "healthiness_rating": 8
+    },
+    {
+        "food_name": "Steamed Brown Rice",
+        "calories": 112,
+        "proteins": 2,
+        "carbs": 24,
+        "fats": 1,
+        "fiber": 2,
+        "sugar": 0,
+        "saturated_fat": 0,
+        "polyunsaturated_fat": 0,
+        "monounsaturated_fat": 0,
+        "trans_fat": 0,
+        "cholesterol": 0,
+        "sodium": 5,
+        "potassium": 43,
+        "vitamin_a": 0,
+        "vitamin_c": 0,
+        "calcium": 2,
+        "iron": 0,
+        "weight": 100,
+        "weight_unit": "g",
+        "healthiness_rating": 7
+    },
+    {
+        "food_name": "Steamed Mixed Vegetables",
+        "calories": 55,
+        "proteins": 2,
+        "carbs": 11,
+        "fats": 0,
+        "fiber": 4,
+        "sugar": 3,
+        "saturated_fat": 0,
+        "polyunsaturated_fat": 0,
+        "monounsaturated_fat": 0,
+        "trans_fat": 0,
+        "cholesterol": 0,
+        "sodium": 45,
+        "potassium": 225,
+        "vitamin_a": 5000,
+        "vitamin_c": 45,
+        "calcium": 30,
+        "iron": 1,
+        "weight": 100,
+        "weight_unit": "g",
+        "healthiness_rating": 10
+    }
+]"""
 
 
 @router.post("/upload-image")
@@ -296,6 +183,7 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
         encoded_images = []
         for image in images:
             try:
+                await image.seek(0)
                 image_data = encode_image(image.file)
                 encoded_images.append(image_data)
                 print("✅ Image encoded successfully")
@@ -313,51 +201,16 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
                 "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
             })
         
-        # Send all images to OpenAI in a single request
         try:
             print("📤 Sending multiple images to OpenAI for analysis...")
             
             if USE_MOCK_API:
-                # Mock response instead of calling OpenAI API
-                mock_response = """[
-                    {
-                        "food_name": "Grilled Chicken Breast",
-                        "calories": 165,
-                        "protein": 31,
-                        "carbs": 0,
-                        "fats": 3,
-                        "weight": 100,
-                        "weight_unit": "g",
-                        "healthiness_rating": 1
-                    },
-                    {
-                        "food_name": "Steamed Brown Rice",
-                        "calories": 112,
-                        "protein": 2,
-                        "carbs": 24,
-                        "fats": 1,
-                        "weight": 100,
-                        "weight_unit": "g",
-                        "healthiness_rating": 5
-                    },
-                    {
-                        "food_name": "Steamed Vegetables",
-                        "calories": 55,
-                        "protein": 2,
-                        "carbs": 11,
-                        "fats": 0,
-                        "weight": 100,
-                        "weight_unit": "g",
-                        "healthiness_rating": 10
-                    }
-                ]"""
-                
-                gpt_response = mock_response
-                print(f"📝 GPT-4o Raw Response (MOCK): {gpt_response}")
+                gpt_response = MOCK_RESPONSE
+                print(f"📝 Mock Response: {gpt_response}")
             else:
                 # Real API call
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4-vision-preview",
                     messages=[
                         {
                             "role": "system",
@@ -370,19 +223,22 @@ For EACH distinct food item in the images, provide its nutritional information i
   {
     "food_name": "Food Item 1",
     "calories": 000,
-    "protein": 00,
+    "proteins": 00,
     "carbs": 00,
     "fats": 00,
-    "weight": 000,
-    "weight_unit": "g",
-    "healthiness_rating": 0
-  },
-  {
-    "food_name": "Food Item 2",
-    "calories": 000,
-    "protein": 00,
-    "carbs": 00,
-    "fats": 00,
+    "fiber": 00,
+    "sugar": 00,
+    "saturated_fat": 00,
+    "polyunsaturated_fat": 00,
+    "monounsaturated_fat": 00,
+    "trans_fat": 00,
+    "cholesterol": 00,
+    "sodium": 00,
+    "potassium": 00,
+    "vitamin_a": 00,
+    "vitamin_c": 00,
+    "calcium": 00,
+    "iron": 00,
     "weight": 000,
     "weight_unit": "g",
     "healthiness_rating": 0
@@ -392,7 +248,7 @@ For EACH distinct food item in the images, provide its nutritional information i
 
 Important:
 1. Return your response ONLY in valid JSON format as shown above
-2. Create a separate entry for each distinct food item (burger, fries, side salad, etc.)
+2. Create a separate entry for each distinct food item
 3. Provide an estimated weight in grams for each food item
 4. Healthiness rating should be on a scale of 1-10
 5. Ensure all nutritional values are realistic estimates
@@ -406,46 +262,82 @@ Important:
                 )
                 
                 gpt_response = response.choices[0].message.content.strip()
-                print(f"📝 GPT-4o Raw Response (REAL API): {gpt_response}")
+                print(f"📝 GPT-4 Vision Response: {gpt_response}")
+
+            # Parse the response
+            try:
+                extracted_foods = json.loads(gpt_response)
+                if not isinstance(extracted_foods, list):
+                    raise ValueError("Response is not a list")
+                print("✅ Successfully parsed GPT response")
+            except json.JSONDecodeError as e:
+                print(f"❌ Error parsing GPT response: {e}")
+                raise HTTPException(status_code=500, detail="Invalid response format from GPT")
+
+            # Create meal_id
+            meal_id = int(datetime.utcnow().timestamp())
+
+            # Return the response without saving to database in mock mode
+            if USE_MOCK_API:
+                return {
+                    "message": "✅ Multiple images processed successfully (MOCK)", 
+                    "meal_id": meal_id, 
+                    "nutrition_data": extracted_foods
+                }
+
+            # Database operations for real mode
+            try:
+                db = SessionLocal()
+                for food in extracted_foods:
+                    food_log = FoodLog(
+                        meal_id=meal_id,
+                        user_id=user_id,
+                        food_name=food["food_name"],
+                        calories=food["calories"],
+                        proteins=food.get("proteins", 0),
+                        carbs=food.get("carbs", 0),
+                        fats=food.get("fats", 0),
+                        fiber=food.get("fiber", 0),
+                        sugar=food.get("sugar", 0),
+                        saturated_fat=food.get("saturated_fat", 0),
+                        polyunsaturated_fat=food.get("polyunsaturated_fat", 0),
+                        monounsaturated_fat=food.get("monounsaturated_fat", 0),
+                        trans_fat=food.get("trans_fat", 0),
+                        cholesterol=food.get("cholesterol", 0),
+                        sodium=food.get("sodium", 0),
+                        potassium=food.get("potassium", 0),
+                        vitamin_a=food.get("vitamin_a", 0),
+                        vitamin_c=food.get("vitamin_c", 0),
+                        calcium=food.get("calcium", 0),
+                        iron=food.get("iron", 0),
+                        image_url=images[0].filename,
+                        file_key="default_file_key",
+                        healthiness_rating=food.get("healthiness_rating", 5),
+                        meal_type="lunch"
+                    )
+                    db.add(food_log)
+                db.commit()
+                print("✅ Saved data to the database successfully")
+            except Exception as e:
+                print(f"❌ Database Error: {e}")
+                if 'db' in locals():
+                    db.rollback()
+                raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+            finally:
+                if 'db' in locals():
+                    db.close()
+
+            return {
+                "message": "✅ Multiple images uploaded and analyzed successfully", 
+                "meal_id": meal_id, 
+                "nutrition_data": extracted_foods
+            }
+
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
-
-        try:
-            extracted_foods = parse_gpt4_response(gpt_response)
-        except Exception as e:
-            print(f"❌ Error parsing GPT-4o response: {e}")
-            raise HTTPException(status_code=500, detail=f"Parsing GPT-4o response failed: {str(e)}")
-
-        try:
-            db: Session = SessionLocal()
-            meal_id = int(datetime.utcnow().timestamp())
-            for food in extracted_foods:
-                food_log = FoodLog(
-                    meal_id=meal_id,
-                    user_id=user_id,
-                    food_name=food["food_name"],
-                    calories=food["calories"],
-                    proteins=food["proteins"],
-                    carbs=food["carbs"],
-                    fats=food["fats"],
-                    weight=food["weight"],
-                    weight_unit=food["weight_unit"],
-                    image_url=images[0].filename,  # Use the first image as the main image
-                    file_key="default_file_key",
-                    healthiness_rating=food.get("healthiness_rating"),
-                    meal_type="lunch"
-                )
-                db.add(food_log)
-            db.commit()
-            db.close()
-            print("✅ Saved data to the database successfully")
-        except Exception as e:
-            print(f"❌ Database Error: {e}")
-            db.rollback()
-            raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
-
-        return {"message": "✅ Multiple images uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": extracted_foods}
 
     except Exception as e:
         error_trace = traceback.format_exc()

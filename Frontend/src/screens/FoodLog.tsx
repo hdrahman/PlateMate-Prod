@@ -820,27 +820,28 @@ const DiaryScreen: React.FC = () => {
                             setActionModalVisible(false);
                             setLoading(true);
 
-                            // Delete from local database
-                            await deleteFoodLog(selectedFoodItem.id);
-                            console.log('Food item deleted from local database');
-
-                            // Try to delete from backend if online
+                            // Try to delete from backend first if online
                             const online = await isOnline();
                             if (online) {
                                 try {
-                                    const response = await fetch(`${BACKEND_URL}/meal_entries/${selectedFoodItem.id}`, {
+                                    const response = await fetch(`${BACKEND_URL}/meal_entries/delete/${selectedFoodItem.id}`, {
                                         method: 'DELETE',
                                     });
 
-                                    if (response.ok) {
-                                        console.log('Food item deleted from backend');
-                                    } else {
-                                        console.error('Failed to delete food item from backend');
+                                    if (!response.ok) {
+                                        throw new Error('Failed to delete from backend');
                                     }
+                                    console.log('Food item deleted from backend');
                                 } catch (error) {
                                     console.error('Error deleting food item from backend:', error);
+                                    Alert.alert('Error', 'Failed to delete from server. Please try again later.');
+                                    return;
                                 }
                             }
+
+                            // If backend delete was successful or we're offline, delete from local database
+                            await deleteFoodLog(selectedFoodItem.id);
+                            console.log('Food item deleted from local database');
 
                             // Refresh the food log
                             refreshMealData();
