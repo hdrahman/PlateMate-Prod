@@ -784,38 +784,50 @@ const DiaryScreen: React.FC = () => {
                     onPress: async () => {
                         try {
                             setActionModalVisible(false);
-                            setLoading(true);
+
+                            let backendError = false;
 
                             // Try to delete from backend first if online
                             const online = await isOnline();
                             if (online) {
                                 try {
+                                    console.log(`Attempting to delete item ${selectedFoodItem.id} from backend...`);
                                     const response = await fetch(`${BACKEND_URL}/meal_entries/delete/${selectedFoodItem.id}`, {
                                         method: 'DELETE',
                                     });
 
                                     if (!response.ok) {
-                                        throw new Error('Failed to delete from backend');
+                                        console.error(`Backend delete failed with status: ${response.status}`);
+                                        backendError = true;
+                                    } else {
+                                        console.log('Food item deleted from backend successfully');
                                     }
-                                    console.log('Food item deleted from backend');
                                 } catch (error) {
-                                    console.error('Error deleting food item from backend:', error);
-                                    Alert.alert('Error', 'Failed to delete from server. Please try again later.');
-                                    return;
+                                    console.error('Network error deleting food item from backend:', error);
+                                    backendError = true;
                                 }
                             }
 
-                            // If backend delete was successful or we're offline, delete from local database
-                            await deleteFoodLog(selectedFoodItem.id);
-                            console.log('Food item deleted from local database');
+                            // Always try to delete from local database, even if backend deletion failed
+                            try {
+                                await deleteFoodLog(selectedFoodItem.id);
+                                console.log('Food item deleted from local database');
 
-                            // Refresh the food log
-                            refreshMealData();
+                                // Refresh the food log
+                                refreshMealData();
+
+                                if (backendError) {
+                                    // Show a non-blocking toast or console message
+                                    console.warn('Note: Item deleted locally but failed to sync with server');
+                                }
+                            } catch (localError) {
+                                console.error('Error deleting food item from local database:', localError);
+                                Alert.alert('Error', 'Failed to delete food item from local database');
+                            }
                         } catch (error) {
-                            console.error('Error deleting food item:', error);
-                            Alert.alert('Error', 'Failed to delete food item');
+                            console.error('Unexpected error in delete process:', error);
+                            Alert.alert('Error', 'An unexpected error occurred while deleting the food item');
                         } finally {
-                            setLoading(false);
                             setSelectedFoodItem(null);
                         }
                     }
