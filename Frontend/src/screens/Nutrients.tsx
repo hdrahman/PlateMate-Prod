@@ -70,6 +70,12 @@ const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation();
     const [nutrientData, setNutrientData] = useState(macroGoals);
 
+    // Add this to ensure consistent black background during transitions
+    const containerStyle = {
+        flex: 1,
+        backgroundColor: PRIMARY_BG, // PRIMARY_BG is '#000000'
+    };
+
     useEffect(() => {
         // Fetch nutrient data from the backend
         const fetchNutrientData = async () => {
@@ -185,7 +191,7 @@ const NutrientsScreen: React.FC = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, containerStyle]}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>

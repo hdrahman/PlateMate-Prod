@@ -15,7 +15,7 @@ const DeleteAccountScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f0f0f0',
+        backgroundColor: '#000000',
     },
     content: {
         flex: 1,
@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         marginBottom: 20,
+        color: '#FFFFFF',
     },
     warning: {
         color: 'red',

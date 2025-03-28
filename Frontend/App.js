@@ -304,92 +304,118 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <NavigationContainer
-        theme={{
-          ...DefaultTheme,
-          colors: {
-            ...DefaultTheme.colors,
-            background: "#000",
-            card: "#111",
-            primary: "#8A2BE2",
-            text: "#fff",
-            border: "#333",
-            notification: "#8A2BE2",
-            cardOverlay: 'rgba(0,0,0,0.8)',
-          },
-        }}
-      >
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            animation: "slide_from_right",
-            animationDuration: 200,
-            cardStyle: { backgroundColor: "#000" },
-            contentStyle: { backgroundColor: "#000" },
-            presentation: 'card',
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <NavigationContainer
+          theme={{
+            ...DefaultTheme,
+            colors: {
+              ...DefaultTheme.colors,
+              background: "#000",
+              card: "#000",
+              primary: "#8A2BE2",
+              text: "#fff",
+              border: "#333",
+              notification: "#8A2BE2",
+              cardOverlay: 'rgba(0,0,0,1)', // Fully opaque black
+            },
           }}
         >
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen
-            name="EditProfile"
-            component={EditProfile}
-            options={({ route }) => ({
-              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              animation: "slide_from_right",
               animationDuration: 200,
-            })}
-          />
-          <Stack.Screen
-            name="EditGoals"
-            component={EditGoals}
-            options={({ route }) => ({
-              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-              animationDuration: 200,
-            })}
-          />
-          <Stack.Screen
-            name="DeleteAccount"
-            component={DeleteAccount}
-            options={({ route }) => ({
-              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-              animationDuration: 200,
-            })}
-          />
-          <Stack.Screen
-            name="ChangePassword"
-            component={ChangePassword}
-            options={({ route }) => ({
-              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-              animationDuration: 200,
-            })}
-          />
-          <Stack.Screen
-            name="AboutUs"
-            component={AboutUs}
-            options={({ route }) => ({
-              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-              animationDuration: 200,
-            })}
-          />
-          <Stack.Screen
-            name="Settings"
-            component={Settings}
-            options={({ route }) => ({
-              animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-              animationDuration: 200,
-            })}
-          />
-          <Stack.Screen
-            name="ImageCapture"
-            component={ImageCaptureScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Nutrients"
-            component={Nutrients}
-            options={{ headerShown: false }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+              cardStyle: { backgroundColor: "#000" },
+              contentStyle: { backgroundColor: "#000" },
+              presentation: 'card',
+              detachPreviousScreen: false,
+              animationTypeForReplace: 'push',
+              cardStyleInterpolator: ({ current, next, layouts }) => {
+                return {
+                  cardStyle: {
+                    backgroundColor: '#000',
+                    transform: [
+                      {
+                        translateX: current.progress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [layouts.screen.width, 0],
+                        }),
+                      },
+                    ],
+                  },
+                  overlayStyle: {
+                    backgroundColor: '#000',
+                    opacity: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 0.5],
+                    }),
+                  },
+                };
+              },
+            }}
+          >
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen
+              name="EditProfile"
+              component={EditProfile}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+              })}
+            />
+            <Stack.Screen
+              name="EditGoals"
+              component={EditGoals}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+              })}
+            />
+            <Stack.Screen
+              name="DeleteAccount"
+              component={DeleteAccount}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+              })}
+            />
+            <Stack.Screen
+              name="ChangePassword"
+              component={ChangePassword}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+              })}
+            />
+            <Stack.Screen
+              name="AboutUs"
+              component={AboutUs}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+              })}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={Settings}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+              })}
+            />
+            <Stack.Screen
+              name="ImageCapture"
+              component={ImageCaptureScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Nutrients"
+              component={Nutrients}
+              options={{ headerShown: false }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </View>
     </>
   );
 }

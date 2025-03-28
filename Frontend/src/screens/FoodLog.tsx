@@ -153,6 +153,12 @@ const DiaryScreen: React.FC = () => {
         }
     }, [route.params]);
 
+    // Additional style to ensure black background during transitions
+    const containerStyle = {
+        flex: 1,
+        backgroundColor: PRIMARY_BG, // PRIMARY_BG is '#000000'
+    };
+
     // Initialize with default meal types on component mount
     useEffect(() => {
         // Create default meal structure with all required types
@@ -426,6 +432,11 @@ const DiaryScreen: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [userWeight, setUserWeight] = useState(70); // Default 70kg (around 150lbs)
 
+    // Add state for manual entry
+    const [manualMET, setManualMET] = useState('5.0');
+    const [manualActivityName, setManualActivityName] = useState('');
+    const [isManualEntry, setIsManualEntry] = useState(false);
+
     // MET activities data based on the provided charts
     const metActivities: METActivity[] = [
         // Popular/Common activities at the top
@@ -514,8 +525,8 @@ const DiaryScreen: React.FC = () => {
         { name: 'Racquetball, team', met: 8.0, category: 'vigorous' },
         { name: 'Roller skating', met: 7.0, category: 'vigorous' },
         { name: 'Rollerblading, fast', met: 12.0, category: 'vigorous' },
-        { name: 'Rope skipping, slow', met: 8.0, category: 'vigorous' },
-        { name: 'Rope skipping, fast', met: 12.0, category: 'vigorous' },
+        { name: 'Jump Rope, slow', met: 8.0, category: 'vigorous' },
+        { name: 'Jump Rope, fast', met: 12.0, category: 'vigorous' },
         { name: 'Running, 7 min/mile', met: 14.0, category: 'vigorous' },
         { name: 'Running, 8 min/mile', met: 12.5, category: 'vigorous' },
         { name: 'Running, 9 min/mile', met: 11.0, category: 'vigorous' },
@@ -578,8 +589,13 @@ const DiaryScreen: React.FC = () => {
 
     // Add a real exercise function
     const addNewExercise = async () => {
-        if (!selectedActivity) {
-            Alert.alert('Select Activity', 'Please select an activity from the list');
+        if (!selectedActivity && !isManualEntry) {
+            Alert.alert('Select Activity', 'Please select an activity from the list or use manual entry');
+            return;
+        }
+
+        if (isManualEntry && !manualActivityName.trim()) {
+            Alert.alert('Activity Name Required', 'Please enter a name for your activity');
             return;
         }
 
@@ -588,7 +604,27 @@ const DiaryScreen: React.FC = () => {
 
             // Calculate calories burned
             const duration = parseInt(exerciseDuration) || 30;
-            const caloriesBurned = calculateCaloriesBurned(selectedActivity, duration, userWeight);
+
+            let caloriesBurned = 0;
+            let activityName = '';
+            let metValue = 0;
+
+            if (isManualEntry) {
+                metValue = parseFloat(manualMET) || 5.0;
+                activityName = manualActivityName.trim();
+
+                // Apply intensity modifier for manual entry
+                let intensityMultiplier = 1.0;
+                if (exerciseIntensity === 'light') intensityMultiplier = 0.8;
+                if (exerciseIntensity === 'vigorous') intensityMultiplier = 1.2;
+
+                // Formula: Exercise calories = (MET level of activity x 3.5 x Weight (kg) x minutes of activity) / 200
+                caloriesBurned = Math.round((metValue * intensityMultiplier * 3.5 * userWeight * duration) / 200);
+            } else {
+                caloriesBurned = calculateCaloriesBurned(selectedActivity!, duration, userWeight);
+                activityName = selectedActivity!.name;
+                metValue = selectedActivity!.met;
+            }
 
             // Get intensity multiplier for notes
             let intensityMultiplier = "1.0";
@@ -596,11 +632,11 @@ const DiaryScreen: React.FC = () => {
             if (exerciseIntensity === 'vigorous') intensityMultiplier = "1.2";
 
             const exerciseData = {
-                exercise_name: selectedActivity.name,
+                exercise_name: activityName,
                 calories_burned: caloriesBurned,
                 duration: duration,
                 date: formattedDate,
-                notes: `MET: ${selectedActivity.met}, Intensity: ${exerciseIntensity} (${intensityMultiplier}x multiplier)`
+                notes: `MET: ${metValue}, Intensity: ${exerciseIntensity} (${intensityMultiplier}x multiplier)`
             };
 
             const result = await addExercise(exerciseData);
@@ -611,6 +647,9 @@ const DiaryScreen: React.FC = () => {
             setExerciseDuration('30');
             setExerciseIntensity('moderate');
             setSearchQuery('');
+            setManualMET('5.0');
+            setManualActivityName('');
+            setIsManualEntry(false);
 
             // Close modal
             setExerciseModalVisible(false);
@@ -754,6 +793,7 @@ const DiaryScreen: React.FC = () => {
         deleteButtonText: TextStyle;
         cancelButton: ViewStyle;
         cancelButtonText: TextStyle;
+        exitButton: ViewStyle;
         moveModalContent: ViewStyle;
         moveModalTitle: TextStyle;
         mealTypeButton: ViewStyle;
@@ -786,6 +826,7 @@ const DiaryScreen: React.FC = () => {
         intensityButton: ViewStyle;
         intensityButtonSelected: ViewStyle;
         intensityButtonText: TextStyle;
+        intensityButtonTextSelected: TextStyle;
         caloriesResult: ViewStyle;
         caloriesResultText: TextStyle;
         caloriesFormula: TextStyle;
@@ -804,6 +845,9 @@ const DiaryScreen: React.FC = () => {
         popularActivitiesWrapper: ViewStyle;
         popularActivitiesContainer: ViewStyle;
         popularActivitiesScroll: ViewStyle;
+        orDivider: ViewStyle;
+        orText: TextStyle;
+        exerciseModalDivider: ViewStyle;
     };
 
     const styles = StyleSheet.create<StylesType>({
@@ -947,15 +991,26 @@ const DiaryScreen: React.FC = () => {
         dividerLine: {
             borderBottomWidth: 1,
             borderBottomColor: '#333',
-            marginVertical: 8,
-            marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
+            marginVertical: 5, // Reduced margin for tighter sections
+            marginHorizontal: -20, // Extend beyond parent container padding
+            width: '120%', // Ensure full width coverage
         },
         entryDividerLine: {
             borderBottomWidth: 1,
             borderBottomColor: '#333',
             marginTop: 6,
             marginBottom: 6,
-            marginHorizontal: 0, // Change from -16 to 0 to prevent overflow
+            marginHorizontal: -20, // Extend beyond parent container padding
+            width: '120%', // Ensure full width coverage
+        },
+
+        // Exercise modal specific divider
+        exerciseModalDivider: {
+            borderBottomWidth: 1,
+            borderBottomColor: '#333',
+            marginVertical: 5,
+            marginHorizontal: -20, // Extend beyond container padding
+            width: '130%', // Even wider coverage to ensure full stretch
         },
 
         // Items
@@ -1184,6 +1239,18 @@ const DiaryScreen: React.FC = () => {
             color: '#AAA',
             fontSize: 16,
         },
+        exitButton: {
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            width: 30,
+            height: 30,
+            borderRadius: 15,
+            backgroundColor: 'transparent', // Change from purple to transparent
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10,
+        },
         moveModalContent: {
             backgroundColor: '#1C1C1E',
             padding: 20,
@@ -1244,13 +1311,16 @@ const DiaryScreen: React.FC = () => {
         },
         exerciseModalScrollContent: {
             flexGrow: 1,
+            paddingTop: 10,
         },
         exerciseModalTitle: {
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: 'bold',
-            color: '#ffffff',
-            marginBottom: 15,
-            textAlign: 'center'
+            color: '#fff', // Default color for when the gradient isn't loaded
+            marginBottom: 0,
+            textAlign: 'center',
+            paddingHorizontal: 10,
+            width: '100%'
         },
         searchInputContainer: {
             marginBottom: 15,
@@ -1270,7 +1340,7 @@ const DiaryScreen: React.FC = () => {
         sectionHeader: {
             fontSize: 16,
             fontWeight: 'bold',
-            color: '#0074dd',
+            color: PURPLE_ACCENT,
             marginTop: 10,
             marginBottom: 5,
             borderTopWidth: 1,
@@ -1329,22 +1399,26 @@ const DiaryScreen: React.FC = () => {
         intensityContainer: {
             flexDirection: 'row' as const,
             justifyContent: 'space-between' as const,
-            marginVertical: 15
+            marginVertical: 5 // Reduced from 15 to 5 to make sections more compact
         },
         intensityButton: {
-            paddingVertical: 8,
-            paddingHorizontal: 15,
-            borderRadius: 20,
-            backgroundColor: '#333',
+            paddingVertical: 6, // Reduced from 8 to 6
+            paddingHorizontal: 8, // Reduced from 10 to 8
             alignItems: 'center' as const,
-            justifyContent: 'center' as const
+            justifyContent: 'center' as const,
+            backgroundColor: 'transparent',
         },
         intensityButtonSelected: {
-            backgroundColor: '#0074dd'
+            backgroundColor: '#0074dd',
         },
         intensityButtonText: {
-            color: 'white',
-            fontSize: 14
+            color: '#888',
+            fontSize: 14,
+            fontWeight: '500',
+        },
+        intensityButtonTextSelected: {
+            color: '#fff',
+            fontWeight: 'bold',
         },
         caloriesResult: {
             alignItems: 'center' as const,
@@ -1443,7 +1517,7 @@ const DiaryScreen: React.FC = () => {
             paddingBottom: 6
         },
         popularActivitiesTitle: {
-            color: '#0074dd',
+            color: PURPLE_ACCENT,
             fontSize: 15,
             fontWeight: 'bold',
             marginLeft: 8
@@ -1475,6 +1549,16 @@ const DiaryScreen: React.FC = () => {
         },
         popularActivitiesScroll: {
             maxHeight: 400, // Taller to fit all activities
+        },
+        orDivider: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginVertical: 15,
+        },
+        orText: {
+            color: '#aaa',
+            fontSize: 14,
+            paddingHorizontal: 10,
         },
     });
 
@@ -1584,8 +1668,8 @@ const DiaryScreen: React.FC = () => {
     };
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaView style={styles.container}>
+        <GestureHandlerRootView style={containerStyle}>
+            <SafeAreaView style={[styles.container, containerStyle]}>
                 {/* Fixed header & day bar */}
                 <TouchableWithoutFeedback onPress={handleOutsidePress}>
                     <>
@@ -1882,10 +1966,10 @@ const DiaryScreen: React.FC = () => {
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
-                                        style={styles.cancelButton}
+                                        style={styles.exitButton}
                                         onPress={() => setActionModalVisible(false)}
                                     >
-                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                        <Ionicons name="close" size={28} color="#8A2BE2" />
                                     </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
@@ -1905,6 +1989,13 @@ const DiaryScreen: React.FC = () => {
                             <TouchableWithoutFeedback>
                                 <View style={styles.moveModalContent}>
                                     <Text style={styles.moveModalTitle}>Move to Meal</Text>
+
+                                    <TouchableOpacity
+                                        style={styles.exitButton}
+                                        onPress={() => setMoveModalVisible(false)}
+                                    >
+                                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                                    </TouchableOpacity>
 
                                     {mealTypes.map((type) => (
                                         <TouchableOpacity
@@ -1963,26 +2054,41 @@ const DiaryScreen: React.FC = () => {
                         <View style={styles.modalOverlay}>
                             <TouchableWithoutFeedback onPress={() => { }}>
                                 <View style={styles.exerciseModalContent}>
-                                    <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
+                                    <MaskedView
+                                        maskElement={
+                                            <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
+                                        }
+                                    >
+                                        <LinearGradient
+                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={{ height: 30, width: '100%' }}
+                                        />
+                                    </MaskedView>
+
+                                    <TouchableOpacity
+                                        style={styles.exitButton}
+                                        onPress={() => {
+                                            setExerciseModalVisible(false);
+                                            setSelectedActivity(null);
+                                            setIsManualEntry(false);
+                                        }}
+                                    >
+                                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                                    </TouchableOpacity>
+
+                                    <View style={{ height: 15 }} />
 
                                     {/* Make the content scrollable */}
                                     <ScrollView contentContainerStyle={styles.exerciseModalScrollContent}>
-                                        {/* Search Input */}
-                                        <View style={styles.searchInputContainer}>
-                                            <Ionicons name="search" size={20} color="#999" />
-                                            <TextInput
-                                                style={styles.searchInput}
-                                                placeholder="Search activities..."
-                                                placeholderTextColor="#999"
-                                                value={searchQuery}
-                                                onChangeText={setSearchQuery}
-                                            />
-                                        </View>
-
-                                        {/* Activities List */}
-                                        <View style={styles.activitiesContainer}>
-                                            {searchQuery === '' ? (
-                                                <View style={styles.popularActivitiesWrapper}>
+                                        {!selectedActivity && !isManualEntry ? (
+                                            <>
+                                                {/* Manual Entry Card */}
+                                                <TouchableOpacity
+                                                    style={[styles.popularActivitiesWrapper, { marginBottom: 8 }]} // Reduced from default marginBottom: 15 to 8
+                                                    onPress={() => setIsManualEntry(true)}
+                                                >
                                                     <LinearGradient
                                                         colors={["#0074dd", "#5c00dd", "#dd0095"]}
                                                         style={{
@@ -1997,51 +2103,230 @@ const DiaryScreen: React.FC = () => {
                                                         end={{ x: 1, y: 0 }}
                                                     />
                                                     <View style={styles.popularActivitiesContainer}>
-                                                        <ScrollView
-                                                            nestedScrollEnabled={true}
-                                                            style={styles.popularActivitiesScroll}
-                                                            contentContainerStyle={{
-                                                                paddingBottom: 15
-                                                            }}
+                                                        <View style={styles.popularActivitiesHeader}>
+                                                            <Ionicons name="create-outline" size={20} color="#0074dd" />
+                                                            <Text style={styles.popularActivitiesTitle}>Manual Entry</Text>
+                                                        </View>
+                                                        <Text style={[styles.activityMet, { marginBottom: 5 }]}>
+                                                            Enter your own activity name and MET value
+                                                        </Text>
+                                                        <TouchableOpacity
+                                                            style={[styles.intensityButton, {
+                                                                backgroundColor: 'transparent',
+                                                                width: '100%',
+                                                                marginTop: 10,
+                                                                borderWidth: 1,
+                                                                borderColor: '#8A2BE2'
+                                                            }]}
+                                                            onPress={() => setIsManualEntry(true)}
                                                         >
-                                                            <Text style={[styles.sectionHeader, {
-                                                                marginTop: 0,
-                                                                borderTopWidth: 0,
-                                                                paddingTop: 0
-                                                            }]}>Popular</Text>
-                                                            {groupedActivities.popular.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
-                                                            )}
+                                                            <Text style={[styles.intensityButtonText, { color: '#AA00FF', fontWeight: 'bold' }]}>Enter Manually</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </TouchableOpacity>
 
-                                                            <Text style={styles.sectionHeader}>Light Activities ({'<'} 3 METs)</Text>
-                                                            {groupedActivities.light.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
-                                                            )}
+                                                {/* Or divider */}
+                                                <View style={[styles.orDivider, { marginVertical: 8 }]}> // Reduced from marginVertical: 15 to 8
+                                                    <View style={styles.dividerLine} />
+                                                    <Text style={styles.orText}>OR</Text>
+                                                    <View style={styles.dividerLine} />
+                                                </View>
 
-                                                            <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
-                                                            {groupedActivities.moderate.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
-                                                            )}
+                                                {/* Search Input */}
+                                                <View style={styles.searchInputContainer}>
+                                                    <Ionicons name="search" size={20} color="#999" />
+                                                    <TextInput
+                                                        style={styles.searchInput}
+                                                        placeholder="Search activities..."
+                                                        placeholderTextColor="#999"
+                                                        value={searchQuery}
+                                                        onChangeText={setSearchQuery}
+                                                    />
+                                                </View>
 
-                                                            <Text style={styles.sectionHeader}>Vigorous Activities ({'>'} 6 METs)</Text>
-                                                            {groupedActivities.vigorous.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
-                                                            )}
-                                                        </ScrollView>
+                                                {/* Activities List */}
+                                                <View style={styles.activitiesContainer}>
+                                                    {searchQuery === '' ? (
+                                                        <View style={styles.popularActivitiesWrapper}>
+                                                            <LinearGradient
+                                                                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    left: 0,
+                                                                    right: 0,
+                                                                    top: 0,
+                                                                    bottom: 0,
+                                                                    borderRadius: 10,
+                                                                }}
+                                                                start={{ x: 0, y: 0 }}
+                                                                end={{ x: 1, y: 0 }}
+                                                            />
+                                                            <View style={styles.popularActivitiesContainer}>
+                                                                <ScrollView
+                                                                    nestedScrollEnabled={true}
+                                                                    style={styles.popularActivitiesScroll}
+                                                                    contentContainerStyle={{
+                                                                        paddingBottom: 15
+                                                                    }}
+                                                                >
+                                                                    <Text style={[styles.sectionHeader, {
+                                                                        marginTop: 0,
+                                                                        borderTopWidth: 0,
+                                                                        paddingTop: 0
+                                                                    }]}>Popular Activities</Text>
+                                                                    {groupedActivities.popular.map((activity, index) =>
+                                                                        renderActivityItem({ item: activity })
+                                                                    )}
+
+                                                                    <Text style={styles.sectionHeader}>Light Activities ({'<'} 3 METs)</Text>
+                                                                    {groupedActivities.light.map((activity, index) =>
+                                                                        renderActivityItem({ item: activity })
+                                                                    )}
+
+                                                                    <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
+                                                                    {groupedActivities.moderate.map((activity, index) =>
+                                                                        renderActivityItem({ item: activity })
+                                                                    )}
+
+                                                                    <Text style={styles.sectionHeader}>Vigorous Activities ({'>'} 6 METs)</Text>
+                                                                    {groupedActivities.vigorous.map((activity, index) =>
+                                                                        renderActivityItem({ item: activity })
+                                                                    )}
+                                                                </ScrollView>
+                                                            </View>
+                                                        </View>
+                                                    ) : (
+                                                        <FlatList
+                                                            data={filteredActivities}
+                                                            renderItem={renderActivityItem}
+                                                            keyExtractor={(item) => item.name}
+                                                            nestedScrollEnabled={true}
+                                                        />
+                                                    )}
+                                                </View>
+                                            </>
+                                        ) : isManualEntry ? (
+                                            /* Manual Entry Form */
+                                            <View style={{ marginTop: 10 }}>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        marginBottom: 15
+                                                    }}
+                                                    onPress={() => setIsManualEntry(false)}
+                                                >
+                                                    <Ionicons name="arrow-back" size={20} color="#0074dd" />
+                                                    <Text style={{ color: '#0074dd', marginLeft: 5 }}>Back to activity list</Text>
+                                                </TouchableOpacity>
+
+                                                <Text style={styles.inputLabel}>Activity Name:</Text>
+                                                <View style={styles.inputContainer}>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        value={manualActivityName}
+                                                        onChangeText={setManualActivityName}
+                                                        placeholder="e.g., Tennis with friends"
+                                                        placeholderTextColor="#777"
+                                                    />
+                                                </View>
+
+                                                <View style={styles.inputRow}>
+                                                    <Text style={styles.inputLabel}>MET Value:</Text>
+                                                    <View style={styles.durationInputContainer}>
+                                                        <TextInput
+                                                            style={styles.input}
+                                                            keyboardType="numeric"
+                                                            value={manualMET}
+                                                            onChangeText={setManualMET}
+                                                        />
                                                     </View>
                                                 </View>
-                                            ) : (
-                                                <FlatList
-                                                    data={filteredActivities}
-                                                    renderItem={renderActivityItem}
-                                                    keyExtractor={(item) => item.name}
-                                                    nestedScrollEnabled={true}
-                                                />
-                                            )}
-                                        </View>
 
-                                        {selectedActivity && (
+                                                {/* Divider before Duration */}
+                                                <View style={styles.exerciseModalDivider} />
+
+                                                <View style={styles.inputRow}>
+                                                    <Text style={styles.inputLabel}>Duration (minutes):</Text>
+                                                    <View style={styles.durationInputContainer}>
+                                                        <TextInput
+                                                            style={styles.input}
+                                                            keyboardType="number-pad"
+                                                            value={exerciseDuration}
+                                                            onChangeText={setExerciseDuration}
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                                {/* Divider before Intensity */}
+                                                <View style={styles.exerciseModalDivider} />
+
+                                                {/* Intensity Selection - First instance */}
+                                                <View style={styles.inputRow}>
+                                                    <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.intensityButton,
+                                                            { marginRight: 3 }
+                                                        ]}
+                                                        onPress={() => setExerciseIntensity('light')}
+                                                    >
+                                                        <Text style={[
+                                                            styles.intensityButtonText,
+                                                            exerciseIntensity === 'light' && styles.intensityButtonTextSelected
+                                                        ]}>Light</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.intensityButton,
+                                                            { marginRight: 3 }
+                                                        ]}
+                                                        onPress={() => setExerciseIntensity('moderate')}
+                                                    >
+                                                        <Text style={[
+                                                            styles.intensityButtonText,
+                                                            exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
+                                                        ]}>Moderate</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.intensityButton
+                                                        ]}
+                                                        onPress={() => setExerciseIntensity('vigorous')}
+                                                    >
+                                                        <Text style={[
+                                                            styles.intensityButtonText,
+                                                            exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
+                                                        ]}>Vigorous</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                {/* Divider after Intensity */}
+                                                <View style={styles.exerciseModalDivider} />
+
+                                                {/* Calories Result */}
+                                                <View style={styles.caloriesResult}>
+                                                    <Text style={styles.caloriesFormula}>
+                                                        {exerciseIntensity === 'moderate' ? (
+                                                            `MET: ${manualMET} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                        ) : exerciseIntensity === 'light' ? (
+                                                            `MET: ${manualMET} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                        ) : (
+                                                            `MET: ${manualMET} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                        )}
+                                                    </Text>
+                                                    <Text style={styles.caloriesResultText}>
+                                                        = {Math.round((parseFloat(manualMET) || 5.0) *
+                                                            (exerciseIntensity === 'light' ? 0.8 : exerciseIntensity === 'vigorous' ? 1.2 : 1.0) *
+                                                            3.5 * userWeight * (parseInt(exerciseDuration) || 30) / 200)} calories
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        ) : selectedActivity && (
                                             <>
+                                                {/* Divider before Duration section */}
+                                                <View style={styles.exerciseModalDivider} />
+
                                                 {/* Duration Input - changed to horizontal layout */}
                                                 <View style={styles.inputRow}>
                                                     <Text style={styles.inputLabel}>Duration (minutes):</Text>
@@ -2055,37 +2340,51 @@ const DiaryScreen: React.FC = () => {
                                                     </View>
                                                 </View>
 
-                                                {/* Intensity Selection */}
-                                                <Text style={styles.inputLabel}>Personal Intensity Level:</Text>
-                                                <View style={styles.intensityContainer}>
+                                                {/* Divider before Intensity */}
+                                                <View style={styles.exerciseModalDivider} />
+
+                                                {/* Intensity Selection - Second instance */}
+                                                <View style={styles.inputRow}>
+                                                    <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
                                                     <TouchableOpacity
                                                         style={[
                                                             styles.intensityButton,
-                                                            exerciseIntensity === 'light' && styles.intensityButtonSelected
+                                                            { marginRight: 3 }
                                                         ]}
                                                         onPress={() => setExerciseIntensity('light')}
                                                     >
-                                                        <Text style={styles.intensityButtonText}>Light</Text>
+                                                        <Text style={[
+                                                            styles.intensityButtonText,
+                                                            exerciseIntensity === 'light' && styles.intensityButtonTextSelected
+                                                        ]}>Light</Text>
                                                     </TouchableOpacity>
                                                     <TouchableOpacity
                                                         style={[
                                                             styles.intensityButton,
-                                                            exerciseIntensity === 'moderate' && styles.intensityButtonSelected
+                                                            { marginRight: 3 }
                                                         ]}
                                                         onPress={() => setExerciseIntensity('moderate')}
                                                     >
-                                                        <Text style={styles.intensityButtonText}>Moderate</Text>
+                                                        <Text style={[
+                                                            styles.intensityButtonText,
+                                                            exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
+                                                        ]}>Moderate</Text>
                                                     </TouchableOpacity>
                                                     <TouchableOpacity
                                                         style={[
-                                                            styles.intensityButton,
-                                                            exerciseIntensity === 'vigorous' && styles.intensityButtonSelected
+                                                            styles.intensityButton
                                                         ]}
                                                         onPress={() => setExerciseIntensity('vigorous')}
                                                     >
-                                                        <Text style={styles.intensityButtonText}>Vigorous</Text>
+                                                        <Text style={[
+                                                            styles.intensityButtonText,
+                                                            exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
+                                                        ]}>Vigorous</Text>
                                                     </TouchableOpacity>
                                                 </View>
+
+                                                {/* Divider after Intensity */}
+                                                <View style={styles.exerciseModalDivider} />
 
                                                 {/* Calories Result */}
                                                 <View style={styles.caloriesResult}>
@@ -2116,26 +2415,27 @@ const DiaryScreen: React.FC = () => {
                                     {/* Buttons - fixed at bottom */}
                                     <View style={styles.buttonRow}>
                                         <TouchableOpacity
-                                            style={styles.modalCancelButton}
-                                            onPress={() => {
-                                                setExerciseModalVisible(false);
-                                                setSelectedActivity(null);
-                                            }}
-                                        >
-                                            <Text style={styles.modalButtonText}>Cancel</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
                                             style={[
                                                 styles.modalAddButton,
-                                                !selectedActivity && { opacity: 0.5 }
+                                                {
+                                                    flex: 1,
+                                                    backgroundColor: 'transparent',
+                                                    width: '100%',
+                                                    borderWidth: 1,
+                                                    borderColor: '#C050FF', // Brighter purple for border
+                                                    shadowColor: 'transparent',
+                                                    shadowOffset: { width: 0, height: 0 },
+                                                    shadowOpacity: 0,
+                                                    shadowRadius: 0,
+                                                    elevation: 0
+                                                },
+                                                (!selectedActivity && !isManualEntry) && { opacity: 0.5 },
+                                                (isManualEntry && !manualActivityName.trim()) && { opacity: 0.5 }
                                             ]}
                                             onPress={addNewExercise}
-                                            disabled={!selectedActivity}
+                                            disabled={(!selectedActivity && !isManualEntry) || (isManualEntry && !manualActivityName.trim())}
                                         >
-                                            <Text style={styles.modalButtonText}>ADD EXERCISE</Text>
-                                            <Text style={{ color: 'white', fontSize: 12, marginTop: 2 }}>
-                                                Tap to submit
-                                            </Text>
+                                            <Text style={[styles.modalButtonText, { color: '#D020FF', fontWeight: 'bold' }]}>ADD EXERCISE</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>

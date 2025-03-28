@@ -1056,7 +1056,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 5
   },
   dotActive: {
-    backgroundColor: '#FFF'
+    backgroundColor: '#9B00FF'
   },
   // New style for positioning the trend elements (StepsTrend and WeightTrend)
   trendContainer: {
