@@ -752,4 +752,22 @@ export const addExercise = async (exercise: any) => {
     }
 };
 
+// Delete an exercise entry
+export const deleteExercise = async (id: number) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to delete exercise before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        console.log(`🗑️ Deleting exercise with ID ${id}`);
+        const result = await db.runAsync('DELETE FROM exercises WHERE id = ?', [id]);
+        console.log('✅ Exercise deleted successfully', result.changes);
+        return result.changes;
+    } catch (error) {
+        console.error('❌ Error deleting exercise:', error);
+        throw error;
+    }
+};
+
 export { db }; 

@@ -67,7 +67,7 @@ const GradientText = ({ text, style, colors }) => {
 };
 
 const NutrientsScreen: React.FC = () => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
     const [nutrientData, setNutrientData] = useState(macroGoals);
 
     // Add this to ensure consistent black background during transitions
@@ -194,7 +194,10 @@ const NutrientsScreen: React.FC = () => {
         <SafeAreaView style={[styles.container, containerStyle]}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.backButton}
+                >
                     <Ionicons name="chevron-back" size={28} color={WHITE} />
                 </TouchableOpacity>
                 <View style={styles.titleContainer}>

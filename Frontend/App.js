@@ -304,19 +304,29 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
         <NavigationContainer
           theme={{
             ...DefaultTheme,
             colors: {
               ...DefaultTheme.colors,
-              background: "#000",
-              card: "#000",
+              background: "transparent",
+              card: "transparent",
               primary: "#8A2BE2",
               text: "#fff",
               border: "#333",
               notification: "#8A2BE2",
-              cardOverlay: 'rgba(0,0,0,1)', // Fully opaque black
+              cardOverlay: 'transparent', // Change from rgba(0,0,0,1) to transparent
+            },
+            transitionSpec: {
+              open: {
+                animation: 'timing',
+                config: { duration: 200 },
+              },
+              close: {
+                animation: 'timing',
+                config: { duration: 200 },
+              },
             },
           }}
         >
@@ -325,30 +335,26 @@ export default function App() {
               headerShown: false,
               animation: "slide_from_right",
               animationDuration: 200,
-              cardStyle: { backgroundColor: "#000" },
-              contentStyle: { backgroundColor: "#000" },
+              cardStyle: { backgroundColor: "transparent" },
+              contentStyle: { backgroundColor: "transparent" },
               presentation: 'card',
               detachPreviousScreen: false,
               animationTypeForReplace: 'push',
-              cardStyleInterpolator: ({ current, next, layouts }) => {
+              cardStyleInterpolator: ({ current, next, layouts, closing }) => {
                 return {
                   cardStyle: {
-                    backgroundColor: '#000',
+                    backgroundColor: 'transparent',
                     transform: [
                       {
                         translateX: current.progress.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [layouts.screen.width, 0],
+                          outputRange: [layouts.screen.width * (closing ? -1 : 1), 0],
                         }),
                       },
                     ],
                   },
                   overlayStyle: {
-                    backgroundColor: '#000',
-                    opacity: current.progress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 0.5],
-                    }),
+                    opacity: 0,
                   },
                 };
               },
@@ -361,6 +367,7 @@ export default function App() {
               options={({ route }) => ({
                 animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
                 animationDuration: 200,
+                presentation: 'transparentModal',
               })}
             />
             <Stack.Screen
@@ -369,6 +376,7 @@ export default function App() {
               options={({ route }) => ({
                 animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
                 animationDuration: 200,
+                presentation: 'transparentModal',
               })}
             />
             <Stack.Screen
@@ -377,6 +385,7 @@ export default function App() {
               options={({ route }) => ({
                 animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
                 animationDuration: 200,
+                presentation: 'transparentModal',
               })}
             />
             <Stack.Screen
@@ -385,6 +394,7 @@ export default function App() {
               options={({ route }) => ({
                 animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
                 animationDuration: 200,
+                presentation: 'transparentModal',
               })}
             />
             <Stack.Screen
@@ -393,6 +403,7 @@ export default function App() {
               options={({ route }) => ({
                 animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
                 animationDuration: 200,
+                presentation: 'transparentModal',
               })}
             />
             <Stack.Screen
@@ -401,17 +412,24 @@ export default function App() {
               options={({ route }) => ({
                 animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
                 animationDuration: 200,
+                presentation: 'transparentModal',
               })}
             />
             <Stack.Screen
               name="ImageCapture"
               component={ImageCaptureScreen}
-              options={{ headerShown: false }}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
             />
             <Stack.Screen
               name="Nutrients"
               component={Nutrients}
-              options={{ headerShown: false }}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
             />
           </Stack.Navigator>
         </NavigationContainer>

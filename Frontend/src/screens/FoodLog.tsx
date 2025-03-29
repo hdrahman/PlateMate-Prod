@@ -26,7 +26,7 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady } from '../utils/database';
+import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -436,6 +436,10 @@ const DiaryScreen: React.FC = () => {
     const [manualMET, setManualMET] = useState('5.0');
     const [manualActivityName, setManualActivityName] = useState('');
     const [isManualEntry, setIsManualEntry] = useState(false);
+
+    // Add state for exercise action modal
+    const [exerciseActionModalVisible, setExerciseActionModalVisible] = useState(false);
+    const [selectedExerciseItem, setSelectedExerciseItem] = useState<{ id?: number, name: string, index: number } | null>(null);
 
     // MET activities data based on the provided charts
     const metActivities: METActivity[] = [
@@ -1641,6 +1645,33 @@ const DiaryScreen: React.FC = () => {
         // Move food to a different meal
     };
 
+    // Handle long press on exercise item
+    const handleExerciseItemLongPress = (exerciseId: number | undefined, exerciseName: string, index: number) => {
+        setSelectedExerciseItem({ id: exerciseId, name: exerciseName, index: index });
+        setExerciseActionModalVisible(true);
+    };
+
+    // Handle delete exercise item
+    const handleDeleteExerciseItem = async () => {
+        if (selectedExerciseItem && selectedExerciseItem.id) {
+            try {
+                setLoading(true);
+                await deleteExercise(selectedExerciseItem.id);
+                setExerciseActionModalVisible(false);
+                // Refresh data after deletion
+                refreshMealData();
+            } catch (error) {
+                console.error('Error deleting exercise:', error);
+                Alert.alert('Error', 'Failed to delete exercise. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            setExerciseActionModalVisible(false);
+            Alert.alert('Error', 'Unable to delete this exercise. Try again later.');
+        }
+    };
+
     // Make sure renderExerciseList function is properly defined
     const renderExerciseList = () => {
         // If there are no exercises, return null instead of an empty row
@@ -1650,15 +1681,23 @@ const DiaryScreen: React.FC = () => {
 
         return exerciseList.map((exercise, index) => (
             <View key={index}>
-                <View style={styles.logRow}>
-                    <View style={{ flexDirection: 'column' }}>
-                        <Text style={[styles.logItemText, { fontSize: 16 }]} numberOfLines={1} ellipsizeMode="tail">
-                            {exercise.exercise_name}
-                        </Text>
-                        <Text style={styles.logItemDuration}>{exercise.duration} min</Text>
+                <TouchableHighlight
+                    underlayColor="#333"
+                    onLongPress={() => {
+                        handleExerciseItemLongPress(exercise.id, exercise.exercise_name, index);
+                    }}
+                    delayLongPress={500}
+                >
+                    <View style={styles.logRow}>
+                        <View style={{ flexDirection: 'column' }}>
+                            <Text style={[styles.logItemText, { fontSize: 16 }]} numberOfLines={1} ellipsizeMode="tail">
+                                {exercise.exercise_name}
+                            </Text>
+                            <Text style={styles.logItemDuration}>{exercise.duration} min</Text>
+                        </View>
+                        <Text style={styles.logCalText}>{exercise.calories_burned}</Text>
                     </View>
-                    <Text style={styles.logCalText}>{exercise.calories_burned}</Text>
-                </View>
+                </TouchableHighlight>
                 {/* Divider line under each entry */}
                 {index < exerciseList.length - 1 && (
                     <View style={styles.entryDividerLine} />
@@ -2438,6 +2477,41 @@ const DiaryScreen: React.FC = () => {
                                             <Text style={[styles.modalButtonText, { color: '#D020FF', fontWeight: 'bold' }]}>ADD EXERCISE</Text>
                                         </TouchableOpacity>
                                     </View>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+
+                {/* Exercise Action Modal */}
+                <Modal
+                    animationType="fade"
+                    transparent={true}
+                    visible={exerciseActionModalVisible}
+                    onRequestClose={() => setExerciseActionModalVisible(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setExerciseActionModalVisible(false)}>
+                        <View style={styles.modalOverlay}>
+                            <TouchableWithoutFeedback>
+                                <View style={styles.actionModalContent}>
+                                    <Text style={styles.actionModalTitle}>
+                                        {selectedExerciseItem?.name || 'Exercise Item'}
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, styles.deleteButton]}
+                                        onPress={handleDeleteExerciseItem}
+                                    >
+                                        <Ionicons name="trash-outline" size={22} color="#FF5252" />
+                                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.exitButton}
+                                        onPress={() => setExerciseActionModalVisible(false)}
+                                    >
+                                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                                    </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
                         </View>

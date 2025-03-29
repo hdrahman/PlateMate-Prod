@@ -1,26 +1,12 @@
 import React, { useContext } from "react";
 import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
-
-    useFocusEffect(
-        React.useCallback(() => {
-            navigation.setOptions({
-                cardStyle: { backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" },
-            });
-
-            return () => {
-                navigation.setOptions({
-                    cardStyle: { backgroundColor: "#000" }, // Ensure it resets properly
-                });
-            };
-        }, [navigation, isDarkTheme])
-    );
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
