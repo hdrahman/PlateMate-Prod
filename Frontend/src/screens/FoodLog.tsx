@@ -438,6 +438,7 @@ const DiaryScreen: React.FC = () => {
     const [showMacrosAsPercent, setShowMacrosAsPercent] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current; // new animated value
     const swipeAnim = useRef(new Animated.Value(0)).current; // new animated value for full page swiping
+    const swipeValueRef = useRef(0); // Add ref to track current swipe value
 
     // Add state for action modal
     const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -1100,112 +1101,141 @@ const DiaryScreen: React.FC = () => {
         return date.toLocaleDateString('en-US', options);
     };
 
+    // Update the gesture handling for smoother animations
     const onGestureEvent = Animated.event(
         [{ nativeEvent: { translationX: swipeAnim } }],
-        { useNativeDriver: true }
+        {
+            useNativeDriver: true,
+            listener: (event: any) => {
+                // Keep track of the current value for use in scrollEnabled
+                if (event.nativeEvent && typeof event.nativeEvent.translationX === 'number') {
+                    swipeValueRef.current = event.nativeEvent.translationX;
+                }
+            }
+        }
     );
 
     const onHandlerStateChange = (event: any) => {
         if (event.nativeEvent.state === GestureState.END) {
-            const { translationX } = event.nativeEvent;
-            handleSwipeRelease(translationX);
+            const { translationX, velocityX } = event.nativeEvent;
+            handleSwipeRelease(translationX, velocityX);
         }
     };
 
-    const handleSwipeRelease = (translationX: number) => {
-        const threshold = 100; // Minimum swipe distance to trigger day change
+    const handleSwipeRelease = (translationX: number, velocityX: number) => {
+        const threshold = 80; // Lower threshold to make swiping more responsive
+        const velocity = 0.5; // Velocity threshold
 
-        if (translationX <= -threshold) {
-            // Swipe left -> next day
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() + 1);
+        // Determine if we should switch days based on translation and velocity
+        const shouldSwitchDay =
+            Math.abs(translationX) > threshold ||
+            Math.abs(velocityX) > velocity * 1000;
 
-            // Force an immediate clear of data
-            console.log('Swiping to next day, clearing data');
+        if (shouldSwitchDay) {
+            if (translationX < 0 || velocityX < -velocity * 1000) {
+                // Swipe left or fast left flick -> next day
+                // Animate to the left first to make it smooth
+                Animated.timing(swipeAnim, {
+                    toValue: -screenWidth,
+                    duration: 200,
+                    useNativeDriver: true,
+                }).start(() => {
+                    // When animation completes, set new date and reset animation
+                    const newDate = new Date(currentDate);
+                    newDate.setDate(newDate.getDate() + 1);
 
-            // Reset meal data to empty state
-            const emptyMeals: Meal[] = [
-                {
-                    title: 'Breakfast',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                },
-                {
-                    title: 'Lunch',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                },
-                {
-                    title: 'Dinner',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                },
-                {
-                    title: 'Snacks',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                }
-            ];
+                    // Reset meal data to empty state
+                    const emptyMeals: Meal[] = [
+                        {
+                            title: 'Breakfast',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        },
+                        {
+                            title: 'Lunch',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        },
+                        {
+                            title: 'Dinner',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        },
+                        {
+                            title: 'Snacks',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        }
+                    ];
 
-            setMealData(emptyMeals);
-            setExerciseList([]);
-            localMealDataRef.current = null;
+                    setMealData(emptyMeals);
+                    setExerciseList([]);
+                    localMealDataRef.current = null;
+                    setCurrentDate(newDate);
 
-            // Change the date (which will trigger the effects)
-            setCurrentDate(newDate);
-            swipeAnim.setValue(0);
-        } else if (translationX >= threshold) {
-            // Swipe right -> previous day
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() - 1);
+                    // Reset animation value immediately
+                    swipeAnim.setValue(0);
+                });
+            } else if (translationX > 0 || velocityX > velocity * 1000) {
+                // Swipe right or fast right flick -> previous day
+                // Animate to the right first to make it smooth
+                Animated.timing(swipeAnim, {
+                    toValue: screenWidth,
+                    duration: 200,
+                    useNativeDriver: true,
+                }).start(() => {
+                    // When animation completes, set new date and reset animation
+                    const newDate = new Date(currentDate);
+                    newDate.setDate(newDate.getDate() - 1);
 
-            // Force an immediate clear of data
-            console.log('Swiping to previous day, clearing data');
+                    // Reset meal data to empty state
+                    const emptyMeals: Meal[] = [
+                        {
+                            title: 'Breakfast',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        },
+                        {
+                            title: 'Lunch',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        },
+                        {
+                            title: 'Dinner',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        },
+                        {
+                            title: 'Snacks',
+                            total: 0,
+                            macros: { carbs: 0, fat: 0, protein: 0 },
+                            items: []
+                        }
+                    ];
 
-            // Reset meal data to empty state
-            const emptyMeals: Meal[] = [
-                {
-                    title: 'Breakfast',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                },
-                {
-                    title: 'Lunch',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                },
-                {
-                    title: 'Dinner',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                },
-                {
-                    title: 'Snacks',
-                    total: 0,
-                    macros: { carbs: 0, fat: 0, protein: 0 },
-                    items: []
-                }
-            ];
+                    setMealData(emptyMeals);
+                    setExerciseList([]);
+                    localMealDataRef.current = null;
+                    setCurrentDate(newDate);
 
-            setMealData(emptyMeals);
-            setExerciseList([]);
-            localMealDataRef.current = null;
-
-            // Change the date (which will trigger the effects)
-            setCurrentDate(newDate);
-            swipeAnim.setValue(0);
+                    // Reset animation value immediately
+                    swipeAnim.setValue(0);
+                });
+            }
         } else {
-            // Not enough swipe; snap back
-            Animated.timing(swipeAnim, {
+            // Not enough swipe; snap back with spring animation for more natural feel
+            Animated.spring(swipeAnim, {
                 toValue: 0,
-                duration: 200,
+                velocity: velocityX,
+                tension: 40,
+                friction: 7,
                 useNativeDriver: true,
             }).start();
         }
@@ -1288,6 +1318,26 @@ const DiaryScreen: React.FC = () => {
         ));
     };
 
+    // Add opacity and scale effects for better visual feedback during swipe
+    const opacityInterpolation = swipeAnim.interpolate({
+        inputRange: [-screenWidth / 2, 0, screenWidth / 2],
+        outputRange: [0.8, 1, 0.8],
+        extrapolate: 'clamp'
+    });
+
+    const scaleInterpolation = swipeAnim.interpolate({
+        inputRange: [-screenWidth / 2, 0, screenWidth / 2],
+        outputRange: [0.95, 1, 0.95],
+        extrapolate: 'clamp'
+    });
+
+    // Apply interpolation to date text in header
+    const dateSlideInterpolation = swipeAnim.interpolate({
+        inputRange: [-screenWidth, 0, screenWidth],
+        outputRange: [-50, 0, 50],
+        extrapolate: 'clamp'
+    });
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={containerStyle}>
@@ -1342,7 +1392,7 @@ const DiaryScreen: React.FC = () => {
                             <TouchableOpacity onPress={gotoPrevDay} style={styles.arrowButton}>
                                 <Ionicons name="chevron-back" size={16} color="#FFF" />
                             </TouchableOpacity>
-                            <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
+                            <Animated.View style={{ transform: [{ translateX: dateSlideInterpolation }] }}>
                                 <Text style={[styles.headerSub, { fontSize: 14 }]}>
                                     {formatDate(currentDate)}
                                 </Text>
@@ -1359,12 +1409,23 @@ const DiaryScreen: React.FC = () => {
                 <PanGestureHandler
                     onGestureEvent={onGestureEvent}
                     onHandlerStateChange={onHandlerStateChange}
-                    activeOffsetX={[-20, 20]} // increased offset to reduce sensitivity
+                    activeOffsetX={[-10, 10]} // more responsive swipe detection
                 >
-                    <Animated.View style={[styles.animatedContent, { transform: [{ translateX: swipeAnim }] }]}>
+                    <Animated.View style={[
+                        styles.animatedContent,
+                        {
+                            transform: [
+                                { translateX: swipeAnim },
+                                { scale: scaleInterpolation }
+                            ],
+                            opacity: opacityInterpolation
+                        }
+                    ]}>
                         <ScrollView
                             contentContainerStyle={styles.scrollInner}
                             showsVerticalScrollIndicator={false}
+                            // Disable scrolling during active horizontal swipe to prevent conflicts
+                            scrollEnabled={Math.abs(swipeValueRef.current) < 10}
                         >
                             {/* 2) Calories Remaining */}
                             <GradientBorderCard style={styles.summaryCard}>
