@@ -287,10 +287,14 @@ const addSampleExerciseData = async () => {
 
 // Helper function to get current timestamp
 export const getCurrentDate = (): string => {
-    return new Date().toISOString();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
-// Add a food log entry
+// Add a new food log entry
 export const addFoodLog = async (foodLog: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to add food log before database initialization');
@@ -298,73 +302,66 @@ export const addFoodLog = async (foodLog: any) => {
     }
 
     const {
-        meal_id,
         user_id = 1,
         food_name,
+        meal_id = 0,
         calories,
-        proteins,
-        carbs,
-        fats,
-        fiber = 0,
-        sugar = 0,
-        saturated_fat = 0,
-        polyunsaturated_fat = 0,
-        monounsaturated_fat = 0,
-        trans_fat = 0,
-        cholesterol = 0,
-        sodium = 0,
-        potassium = 0,
-        vitamin_a = 0,
-        vitamin_c = 0,
-        calcium = 0,
-        iron = 0,
-        image_url,
-        file_key = 'default_file_key',
-        healthiness_rating,
-        date,
-        meal_type,
+        proteins = 0,
+        carbs = 0,
+        fats = 0,
+        weight = null,
+        weight_unit = 'g',
+        image_url = '',
+        file_key = '',
+        healthiness_rating = 5,
+        date = getCurrentDate(),
+        meal_type = 'Snacks',
         brand_name = '',
         quantity = '',
         notes = ''
     } = foodLog;
 
-    const formattedDate = date; // Use the provided date directly
+    // Ensure date is in the correct format (YYYY-MM-DD)
+    let formattedDate = date;
+    if (date) {
+        // If date is already in YYYY-MM-DD format, use it as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            formattedDate = date;
+        } else {
+            // Otherwise, try to extract the date part
+            try {
+                const dateObj = new Date(date);
+                formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+            } catch (error) {
+                console.error('❌ Error formatting date:', error);
+                // Fall back to current date if parsing fails
+                formattedDate = getCurrentDate().split('T')[0];
+            }
+        }
+    }
 
     console.log(`📝 Adding food log with date: ${formattedDate}`);
 
     try {
-        // Begin transaction to ensure data integrity
+        // Start a transaction for better error handling
         await db.runAsync('BEGIN TRANSACTION');
 
         const result = await db.runAsync(
             `INSERT INTO food_logs (
-                meal_id, user_id, food_name, calories, proteins, carbs, fats,
-                fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
-                trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
-                calcium, iron, image_url, file_key, healthiness_rating, date,
-                meal_type, brand_name, quantity, notes, synced, sync_action, last_modified
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                user_id, meal_id, food_name, calories, proteins, carbs, fats,
+                weight, weight_unit, image_url, file_key, healthiness_rating,
+                date, meal_type, brand_name, quantity, notes, synced, sync_action, last_modified
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                meal_id,
                 user_id,
+                meal_id,
                 food_name,
                 calories,
                 proteins,
                 carbs,
                 fats,
-                fiber,
-                sugar,
-                saturated_fat,
-                polyunsaturated_fat,
-                monounsaturated_fat,
-                trans_fat,
-                cholesterol,
-                sodium,
-                potassium,
-                vitamin_a,
-                vitamin_c,
-                calcium,
-                iron,
+                weight,
+                weight_unit,
                 image_url,
                 file_key,
                 healthiness_rating,
@@ -373,27 +370,19 @@ export const addFoodLog = async (foodLog: any) => {
                 brand_name,
                 quantity,
                 notes,
-                0, // not synced
-                'create', // sync action
+                0, // Not synced
+                'create', // Sync action
                 getCurrentDate()
             ]
         );
 
-        // Commit transaction
+        // Commit the transaction
         await db.runAsync('COMMIT');
 
-        // Verify the insert worked by querying for the new row
-        const inserted = await db.getFirstAsync(
-            'SELECT * FROM food_logs WHERE id = ?',
-            [result.lastInsertRowId]
-        );
-
         console.log('✅ Food log added successfully', result.lastInsertRowId);
-        console.log('✅ Verified food log in database:', inserted ? (inserted as any).food_name : 'Not found');
-
         return result.lastInsertRowId;
     } catch (error) {
-        // Rollback on error
+        // Rollback the transaction in case of error
         try {
             await db.runAsync('ROLLBACK');
         } catch (rollbackError) {
@@ -419,54 +408,14 @@ export const getFoodLogsByDate = async (date: string) => {
         const normalizedDate = date.split('T')[0]; // Remove any time component
         console.log(`Normalized date for query: ${normalizedDate}`);
 
-        // First try exact date match with normalized date
-        let result = await db.getAllAsync(
+        // Use a more strict date comparison to ensure we only get logs for the exact date
+        // This uses the SQLite date() function to compare only the date part
+        const result = await db.getAllAsync(
             `SELECT * FROM food_logs WHERE date(date) = date(?)`,
             [normalizedDate]
         );
-        console.log(`Found ${result.length} records with exact date match`);
 
-        // If no results, try with LIKE for partial matching
-        if (result.length === 0) {
-            console.log(`No exact matches found, trying with LIKE for date: ${normalizedDate}`);
-            result = await db.getAllAsync(
-                `SELECT * FROM food_logs WHERE date LIKE ?`,
-                [`%${normalizedDate}%`]
-            );
-            console.log(`Found ${result.length} records with LIKE match`);
-        }
-
-        // If still no results, try getting all and filter in JS
-        if (result.length === 0) {
-            console.log(`No LIKE matches found, getting all food logs and filtering in JS`);
-            const allLogs = await db.getAllAsync(`SELECT * FROM food_logs`);
-            console.log(`Total food logs in database: ${allLogs.length}`);
-
-            // Log all dates for debugging
-            if (allLogs.length > 0) {
-                console.log('Available dates in database:');
-                allLogs.forEach(log => {
-                    if (log && typeof log === 'object' && 'date' in log) {
-                        console.log(`- ${(log as { date: string }).date}`);
-                    }
-                });
-            }
-
-            // Try to match the date part only
-            result = allLogs.filter(log => {
-                if (!log || typeof log !== 'object' || !('date' in log)) return false;
-
-                // Extract date part from the log date
-                const logDateStr = (log as { date: string }).date;
-                const logDatePart = logDateStr.split('T')[0].split(' ')[0]; // Handle both ISO and space-separated formats
-
-                console.log(`Comparing log date ${logDatePart} with target date ${normalizedDate}`);
-                return logDatePart === normalizedDate;
-            });
-            console.log(`Found ${result.length} records after JS filtering`);
-        }
-
-        console.log(`✅ Final result: Found ${result.length} food logs for date ${date}`);
+        console.log(`✅ Found ${result.length} food logs for date ${normalizedDate}`);
         return result;
     } catch (error) {
         console.error('❌ Error getting food logs by date:', error);
@@ -665,22 +614,12 @@ export const getExercisesByDate = async (date: string) => {
         const normalizedDate = date.split('T')[0]; // Remove any time component
         console.log(`Normalized date for query: ${normalizedDate}`);
 
-        // First try exact date match with normalized date
-        let result = await db.getAllAsync(
+        // Use a strict date comparison to ensure we only get exercises for the exact date
+        const result = await db.getAllAsync(
             `SELECT * FROM exercises WHERE date(date) = date(?)`,
             [normalizedDate]
         );
-        console.log(`Found ${result.length} exercise records with exact date match`);
-
-        // If no results, try with LIKE for partial matching
-        if (result.length === 0) {
-            console.log(`No exact matches found, trying with LIKE for date: ${normalizedDate}`);
-            result = await db.getAllAsync(
-                `SELECT * FROM exercises WHERE date LIKE ?`,
-                [`%${normalizedDate}%`]
-            );
-            console.log(`Found ${result.length} exercise records with LIKE match`);
-        }
+        console.log(`Found ${result.length} exercise records for date: ${normalizedDate}`);
 
         return result;
     } catch (error) {

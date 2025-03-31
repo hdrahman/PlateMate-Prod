@@ -1,0 +1,985 @@
+import React, { useState } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Modal,
+    TouchableWithoutFeedback,
+    TextInput,
+    Alert,
+    FlatList,
+    ViewStyle,
+    TextStyle
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
+import { formatDateToString } from '../utils/dateUtils';
+import { addExercise } from '../utils/database';
+
+// Define the Exercise interface
+interface Exercise {
+    id?: number;
+    exercise_name: string;
+    calories_burned: number;
+    duration: number;
+    date?: string;
+    notes?: string;
+}
+
+// Add MET activity interface
+interface METActivity {
+    name: string;
+    met: number;
+    category: 'light' | 'moderate' | 'vigorous';
+}
+
+interface ExerciseModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onExerciseAdded: () => void;
+    currentDate: Date;
+}
+
+// Constants for colors
+const PRIMARY_BG = '#000000';
+const WHITE = '#FFFFFF';
+const PURPLE_ACCENT = '#AA00FF';
+
+const ExerciseModal: React.FC<ExerciseModalProps> = ({
+    visible,
+    onClose,
+    onExerciseAdded,
+    currentDate
+}) => {
+    // State variables for exercise modal
+    const [selectedActivity, setSelectedActivity] = useState<METActivity | null>(null);
+    const [exerciseDuration, setExerciseDuration] = useState('30');
+    const [exerciseIntensity, setExerciseIntensity] = useState('moderate');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [userWeight, setUserWeight] = useState(70); // Default 70kg (around 150lbs)
+    const [manualMET, setManualMET] = useState('5.0');
+    const [manualActivityName, setManualActivityName] = useState('');
+    const [isManualEntry, setIsManualEntry] = useState(false);
+
+    // Function to reset form
+    const resetForm = () => {
+        setSelectedActivity(null);
+        setExerciseDuration('30');
+        setExerciseIntensity('moderate');
+        setSearchQuery('');
+        setManualMET('5.0');
+        setManualActivityName('');
+        setIsManualEntry(false);
+    };
+
+    // Function to handle modal close
+    const handleClose = () => {
+        resetForm();
+        onClose();
+    };
+
+    // MET activities data based on the provided charts
+    const metActivities: METActivity[] = [
+        // Popular/Common activities at the top
+        { name: 'Weight lifting, moderate', met: 5.0, category: 'moderate' },
+        { name: 'Weight lifting, vigorous', met: 6.0, category: 'vigorous' },
+        { name: 'Walking, 3 mph', met: 3.3, category: 'moderate' },
+        { name: 'Walking, 4 mph', met: 5.0, category: 'moderate' },
+        { name: 'Running, 6 min/mile', met: 16.0, category: 'vigorous' },
+        { name: 'Running, 10 min/mile', met: 10.0, category: 'vigorous' },
+        { name: 'Bicycling, 12-13 mph', met: 8.0, category: 'vigorous' },
+        { name: 'Swimming, moderate pace', met: 4.5, category: 'moderate' },
+        { name: 'Basketball game', met: 8.0, category: 'vigorous' },
+        { name: 'Soccer, casual', met: 7.0, category: 'vigorous' },
+
+        // Light activities
+        { name: 'Walking, slowly (stroll)', met: 2.0, category: 'light' },
+        { name: 'Walking, 2 mph', met: 2.5, category: 'light' },
+        { name: 'Stretching, yoga', met: 2.5, category: 'light' },
+        { name: 'Fishing, standing', met: 2.5, category: 'light' },
+        { name: 'Golf with a cart', met: 2.5, category: 'light' },
+        { name: 'Housework, light', met: 2.5, category: 'light' },
+        { name: 'Playing catch', met: 2.5, category: 'light' },
+        { name: 'Playing piano', met: 2.5, category: 'light' },
+        { name: 'Canoeing leisurely', met: 2.5, category: 'light' },
+        { name: 'Croquet', met: 2.5, category: 'light' },
+        { name: 'Dancing, ballroom, slow', met: 2.9, category: 'light' },
+        { name: 'Sitting quietly', met: 1.0, category: 'light' },
+
+        // Moderate activities
+        { name: 'Aerobic dance, low impact', met: 5.0, category: 'moderate' },
+        { name: 'Archery', met: 3.5, category: 'moderate' },
+        { name: 'Badminton', met: 4.5, category: 'moderate' },
+        { name: 'Baseball or softball', met: 5.0, category: 'moderate' },
+        { name: 'Basketball, shooting baskets', met: 4.5, category: 'moderate' },
+        { name: 'Bicycling, leisurely', met: 3.5, category: 'moderate' },
+        { name: 'Bowling', met: 3.0, category: 'moderate' },
+        { name: 'Calisthenics, light to moderate', met: 3.5, category: 'moderate' },
+        { name: 'Canoeing, 3 mph', met: 3.0, category: 'moderate' },
+        { name: 'Dancing, modern, fast', met: 4.8, category: 'moderate' },
+        { name: 'Fishing, walking and standing', met: 3.5, category: 'moderate' },
+        { name: 'Foot bag, hacky sack', met: 4.0, category: 'moderate' },
+        { name: 'Gardening, active', met: 4.0, category: 'moderate' },
+        { name: 'Golf, walking', met: 4.4, category: 'moderate' },
+        { name: 'Gymnastics', met: 4.0, category: 'moderate' },
+        { name: 'Horseback riding', met: 4.0, category: 'moderate' },
+        { name: 'Ice skating', met: 5.5, category: 'moderate' },
+        { name: 'Jumping on mini tramp', met: 4.5, category: 'moderate' },
+        { name: 'Kayaking', met: 5.0, category: 'moderate' },
+        { name: 'Raking the lawn', met: 4.0, category: 'moderate' },
+        { name: 'Skateboarding', met: 5.0, category: 'moderate' },
+        { name: 'Snowmobiling', met: 3.5, category: 'moderate' },
+        { name: 'Swimming recreational', met: 6.0, category: 'moderate' },
+        { name: 'Table tennis', met: 4.0, category: 'moderate' },
+        { name: 'Tai chi', met: 4.0, category: 'moderate' },
+        { name: 'Tennis, doubles', met: 5.0, category: 'moderate' },
+        { name: 'Trampoline', met: 3.5, category: 'moderate' },
+        { name: 'Volleyball, noncompetitive', met: 3.0, category: 'moderate' },
+        { name: 'Mowing lawn, walking', met: 5.5, category: 'moderate' },
+
+        // Vigorous activities
+        { name: 'Aerobic dance', met: 6.5, category: 'vigorous' },
+        { name: 'Aerobic dance, high impact', met: 7.0, category: 'vigorous' },
+        { name: 'Aerobic stepping, 6-8 inches', met: 8.5, category: 'vigorous' },
+        { name: 'Backpacking', met: 7.0, category: 'vigorous' },
+        { name: 'Bicycling, 14-15 mph', met: 10.0, category: 'vigorous' },
+        { name: 'Bicycling, 16-19 mph', met: 12.0, category: 'vigorous' },
+        { name: 'Bicycling, 20+ mph', met: 16.0, category: 'vigorous' },
+        { name: 'Calisthenics, heavy, vigorous', met: 8.0, category: 'vigorous' },
+        { name: 'Canoeing, 5 mph or portaging', met: 7.0, category: 'vigorous' },
+        { name: 'Chopping wood', met: 6.0, category: 'vigorous' },
+        { name: 'Dancing, aerobic or ballet', met: 6.0, category: 'vigorous' },
+        { name: 'Fencing', met: 6.0, category: 'vigorous' },
+        { name: 'Fishing in stream with waders', met: 6.5, category: 'vigorous' },
+        { name: 'Football, competitive', met: 9.0, category: 'vigorous' },
+        { name: 'Football, touch/flag', met: 8.0, category: 'vigorous' },
+        { name: 'Frisbee, ultimate', met: 8.0, category: 'vigorous' },
+        { name: 'Hockey, field or ice', met: 8.0, category: 'vigorous' },
+        { name: 'Ice skating, social', met: 7.0, category: 'vigorous' },
+        { name: 'Jogging, 12 min/mile', met: 8.0, category: 'vigorous' },
+        { name: 'Judo/karate/tae kwan do', met: 10.0, category: 'vigorous' },
+        { name: 'Lacrosse', met: 8.0, category: 'vigorous' },
+        { name: 'Logging/felling trees', met: 8.0, category: 'vigorous' },
+        { name: 'Mountain climbing', met: 8.0, category: 'vigorous' },
+        { name: 'Race walking, moderate pace', met: 6.5, category: 'vigorous' },
+        { name: 'Racquetball', met: 10.0, category: 'vigorous' },
+        { name: 'Racquetball, team', met: 8.0, category: 'vigorous' },
+        { name: 'Roller skating', met: 7.0, category: 'vigorous' },
+        { name: 'Rollerblading, fast', met: 12.0, category: 'vigorous' },
+        { name: 'Jump Rope, slow', met: 8.0, category: 'vigorous' },
+        { name: 'Jump Rope, fast', met: 12.0, category: 'vigorous' },
+        { name: 'Running, 7 min/mile', met: 14.0, category: 'vigorous' },
+        { name: 'Running, 8 min/mile', met: 12.5, category: 'vigorous' },
+        { name: 'Running, 9 min/mile', met: 11.0, category: 'vigorous' },
+        { name: 'Shoveling snow', met: 6.0, category: 'vigorous' },
+        { name: 'Skiing downhill, moderate', met: 6.0, category: 'vigorous' },
+        { name: 'Skiing downhill, vigorous', met: 8.0, category: 'vigorous' },
+        { name: 'Skiing cross country, slow', met: 7.0, category: 'vigorous' },
+        { name: 'Skiing cross country, moderate', met: 8.0, category: 'vigorous' },
+        { name: 'Skiing cross country, vigorous', met: 9.0, category: 'vigorous' },
+        { name: 'Skiing cross country, racing uphill', met: 16.5, category: 'vigorous' },
+        { name: 'Skin diving', met: 12.5, category: 'vigorous' },
+        { name: 'Snow shoeing', met: 8.0, category: 'vigorous' },
+        { name: 'Soccer, competitive', met: 10.0, category: 'vigorous' },
+        { name: 'Surfing', met: 6.0, category: 'vigorous' },
+        { name: 'Swimming laps, moderate pace', met: 7.0, category: 'vigorous' },
+        { name: 'Swimming laps, fast', met: 10.0, category: 'vigorous' },
+        { name: 'Swimming laps, sidestroke', met: 8.0, category: 'vigorous' },
+        { name: 'Tennis', met: 7.0, category: 'vigorous' },
+        { name: 'Volleyball, competitive/beach', met: 8.0, category: 'vigorous' },
+        { name: 'Walking, 11 min/mile', met: 11.0, category: 'vigorous' },
+        { name: 'Walking up stairs', met: 8.0, category: 'vigorous' },
+        { name: 'Water jogging', met: 8.0, category: 'vigorous' },
+        { name: 'Water polo', met: 10.0, category: 'vigorous' },
+        { name: 'Wrestling', met: 6.0, category: 'vigorous' },
+        { name: 'Hiking up hills', met: 6.9, category: 'vigorous' },
+        { name: 'Hiking hills, 12 lb pack', met: 7.5, category: 'vigorous' },
+    ];
+
+    // Function to calculate calories burned using MET formula
+    const calculateCaloriesBurned = (activity: METActivity, duration: number, weight: number) => {
+        // Apply intensity modifier
+        let intensityMultiplier = 1.0; // default (moderate)
+
+        if (exerciseIntensity === 'light') {
+            intensityMultiplier = 0.8; // 20% reduction for light intensity
+        } else if (exerciseIntensity === 'vigorous') {
+            intensityMultiplier = 1.2; // 20% increase for vigorous intensity
+        }
+
+        // Adjusted MET value based on personal intensity
+        const adjustedMET = activity.met * intensityMultiplier;
+
+        // Formula: Exercise calories = (MET level of activity x 3.5 x Weight (kg) x minutes of activity) / 200
+        return Math.round((adjustedMET * 3.5 * weight * duration) / 200);
+    };
+
+    // Filter activities based on search query
+    const filteredActivities = searchQuery.trim() === ''
+        ? metActivities
+        : metActivities.filter(activity =>
+            activity.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Group activities by category for display
+    const groupedActivities = {
+        popular: filteredActivities.slice(0, 10), // First 10 are popular activities
+        light: filteredActivities.filter(a => a.category === 'light'),
+        moderate: filteredActivities.filter(a => a.category === 'moderate'),
+        vigorous: filteredActivities.filter(a => a.category === 'vigorous')
+    };
+
+    // Add a new exercise
+    const addNewExercise = async () => {
+        if (!selectedActivity && !isManualEntry) {
+            Alert.alert('Select Activity', 'Please select an activity from the list or use manual entry');
+            return;
+        }
+
+        if (isManualEntry && !manualActivityName.trim()) {
+            Alert.alert('Activity Name Required', 'Please enter a name for your activity');
+            return;
+        }
+
+        try {
+            const formattedDate = formatDateToString(currentDate);
+
+            // Calculate calories burned
+            const duration = parseInt(exerciseDuration) || 30;
+
+            let caloriesBurned = 0;
+            let activityName = '';
+            let metValue = 0;
+
+            if (isManualEntry) {
+                metValue = parseFloat(manualMET) || 5.0;
+                activityName = manualActivityName.trim();
+
+                // Apply intensity modifier for manual entry
+                let intensityMultiplier = 1.0;
+                if (exerciseIntensity === 'light') intensityMultiplier = 0.8;
+                if (exerciseIntensity === 'vigorous') intensityMultiplier = 1.2;
+
+                // Formula: Exercise calories = (MET level of activity x 3.5 x Weight (kg) x minutes of activity) / 200
+                caloriesBurned = Math.round((metValue * intensityMultiplier * 3.5 * userWeight * duration) / 200);
+            } else {
+                caloriesBurned = calculateCaloriesBurned(selectedActivity!, duration, userWeight);
+                activityName = selectedActivity!.name;
+                metValue = selectedActivity!.met;
+            }
+
+            // Get intensity multiplier for notes
+            let intensityMultiplier = "1.0";
+            if (exerciseIntensity === 'light') intensityMultiplier = "0.8";
+            if (exerciseIntensity === 'vigorous') intensityMultiplier = "1.2";
+
+            const exerciseData = {
+                exercise_name: activityName,
+                calories_burned: caloriesBurned,
+                duration: duration,
+                date: formattedDate,
+                notes: `MET: ${metValue}, Intensity: ${exerciseIntensity} (${intensityMultiplier}x multiplier)`
+            };
+
+            const result = await addExercise(exerciseData);
+            console.log('Exercise added with ID:', result);
+
+            // Reset form fields
+            resetForm();
+
+            // Close modal
+            onClose();
+
+            // Notify parent component
+            onExerciseAdded();
+        } catch (error) {
+            console.error('Error adding exercise:', error);
+            Alert.alert('Error', 'Failed to add exercise. Please try again.');
+        }
+    };
+
+    // Render activity item for the flat list
+    const renderActivityItem = ({ item }: { item: METActivity }) => {
+        const isSelected = selectedActivity?.name === item.name;
+        return (
+            <TouchableOpacity
+                style={[
+                    styles.activityItem,
+                    isSelected && styles.selectedActivityItem
+                ]}
+                onPress={() => setSelectedActivity(item)}
+            >
+                <View style={styles.activityInfo}>
+                    <Text style={[
+                        styles.activityName,
+                        isSelected && { color: '#0074dd' }
+                    ]}>
+                        {item.name}
+                    </Text>
+                    <Text style={styles.activityMet}>
+                        MET: {item.met} ({item.category})
+                    </Text>
+                </View>
+                {selectedActivity?.name === item.name && (
+                    <View style={styles.checkmarkContainer}>
+                        <Ionicons name="checkmark-circle" size={24} color="#0074dd" />
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    };
+
+    return (
+        <Modal
+            animationType="fade"
+            transparent={true}
+            visible={visible}
+            onRequestClose={handleClose}
+        >
+            <TouchableWithoutFeedback onPress={handleClose}>
+                <View style={styles.modalOverlay}>
+                    <TouchableWithoutFeedback onPress={() => { }}>
+                        <View style={styles.exerciseModalContent}>
+                            <MaskedView
+                                maskElement={
+                                    <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
+                                }
+                            >
+                                <LinearGradient
+                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ height: 30, width: '100%' }}
+                                />
+                            </MaskedView>
+
+                            <TouchableOpacity
+                                style={styles.exitButton}
+                                onPress={handleClose}
+                            >
+                                <Ionicons name="close" size={28} color="#8A2BE2" />
+                            </TouchableOpacity>
+
+                            <View style={{ height: 15 }} />
+
+                            {/* Make the content scrollable */}
+                            <ScrollView contentContainerStyle={styles.exerciseModalScrollContent}>
+                                {!selectedActivity && !isManualEntry ? (
+                                    <>
+                                        {/* Manual Entry Card */}
+                                        <TouchableOpacity
+                                            style={[styles.popularActivitiesWrapper, { marginBottom: 8 }]}
+                                            onPress={() => setIsManualEntry(true)}
+                                        >
+                                            <LinearGradient
+                                                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    right: 0,
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    borderRadius: 10,
+                                                }}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                            />
+                                            <View style={styles.popularActivitiesContainer}>
+                                                <View style={styles.popularActivitiesHeader}>
+                                                    <Ionicons name="create-outline" size={20} color="#0074dd" />
+                                                    <Text style={styles.popularActivitiesTitle}>Manual Entry</Text>
+                                                </View>
+                                                <Text style={[styles.activityMet, { marginBottom: 5 }]}>
+                                                    Enter your own activity name and MET value
+                                                </Text>
+                                                <TouchableOpacity
+                                                    style={[styles.intensityButton, {
+                                                        backgroundColor: 'transparent',
+                                                        width: '100%',
+                                                        marginTop: 10,
+                                                        borderWidth: 1,
+                                                        borderColor: '#8A2BE2'
+                                                    }]}
+                                                    onPress={() => setIsManualEntry(true)}
+                                                >
+                                                    <Text style={[styles.intensityButtonText, { color: '#AA00FF', fontWeight: 'bold' }]}>Enter Manually</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </TouchableOpacity>
+
+                                        {/* Or divider */}
+                                        <View style={[styles.orDivider, { marginVertical: 8 }]}>
+                                            <View style={styles.dividerLine} />
+                                            <Text style={styles.orText}>OR</Text>
+                                            <View style={styles.dividerLine} />
+                                        </View>
+
+                                        {/* Search Input */}
+                                        <View style={styles.searchInputContainer}>
+                                            <Ionicons name="search" size={20} color="#999" />
+                                            <TextInput
+                                                style={styles.searchInput}
+                                                placeholder="Search activities..."
+                                                placeholderTextColor="#999"
+                                                value={searchQuery}
+                                                onChangeText={setSearchQuery}
+                                            />
+                                        </View>
+
+                                        {/* Activities List */}
+                                        <View style={styles.activitiesContainer}>
+                                            {searchQuery === '' ? (
+                                                <View style={styles.popularActivitiesWrapper}>
+                                                    <LinearGradient
+                                                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            left: 0,
+                                                            right: 0,
+                                                            top: 0,
+                                                            bottom: 0,
+                                                            borderRadius: 10,
+                                                        }}
+                                                        start={{ x: 0, y: 0 }}
+                                                        end={{ x: 1, y: 0 }}
+                                                    />
+                                                    <View style={styles.popularActivitiesContainer}>
+                                                        <ScrollView
+                                                            nestedScrollEnabled={true}
+                                                            style={styles.popularActivitiesScroll}
+                                                            contentContainerStyle={{
+                                                                paddingBottom: 15
+                                                            }}
+                                                        >
+                                                            <Text style={[styles.sectionHeader, {
+                                                                marginTop: 0,
+                                                                borderTopWidth: 0,
+                                                                paddingTop: 0
+                                                            }]}>Popular Activities</Text>
+                                                            {groupedActivities.popular.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+
+                                                            <Text style={styles.sectionHeader}>Light Activities ({'<'} 3 METs)</Text>
+                                                            {groupedActivities.light.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+
+                                                            <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
+                                                            {groupedActivities.moderate.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+
+                                                            <Text style={styles.sectionHeader}>Vigorous Activities ({'>'} 6 METs)</Text>
+                                                            {groupedActivities.vigorous.map((activity, index) =>
+                                                                renderActivityItem({ item: activity })
+                                                            )}
+                                                        </ScrollView>
+                                                    </View>
+                                                </View>
+                                            ) : (
+                                                <FlatList
+                                                    data={filteredActivities}
+                                                    renderItem={renderActivityItem}
+                                                    keyExtractor={(item) => item.name}
+                                                    nestedScrollEnabled={true}
+                                                />
+                                            )}
+                                        </View>
+                                    </>
+                                ) : isManualEntry ? (
+                                    /* Manual Entry Form */
+                                    <View style={{ marginTop: 10 }}>
+                                        <TouchableOpacity
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                marginBottom: 15
+                                            }}
+                                            onPress={() => setIsManualEntry(false)}
+                                        >
+                                            <Ionicons name="arrow-back" size={20} color="#0074dd" />
+                                            <Text style={{ color: '#0074dd', marginLeft: 5 }}>Back to activity list</Text>
+                                        </TouchableOpacity>
+
+                                        <Text style={styles.inputLabel}>Activity Name:</Text>
+                                        <View style={styles.inputContainer}>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={manualActivityName}
+                                                onChangeText={setManualActivityName}
+                                                placeholder="e.g., Tennis with friends"
+                                                placeholderTextColor="#777"
+                                            />
+                                        </View>
+
+                                        <View style={styles.inputRow}>
+                                            <Text style={styles.inputLabel}>MET Value:</Text>
+                                            <View style={styles.durationInputContainer}>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    keyboardType="numeric"
+                                                    value={manualMET}
+                                                    onChangeText={setManualMET}
+                                                />
+                                            </View>
+                                        </View>
+
+                                        {/* Divider before Duration */}
+                                        <View style={styles.exerciseModalDivider} />
+
+                                        <View style={styles.inputRow}>
+                                            <Text style={styles.inputLabel}>Duration (minutes):</Text>
+                                            <View style={styles.durationInputContainer}>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    keyboardType="number-pad"
+                                                    value={exerciseDuration}
+                                                    onChangeText={setExerciseDuration}
+                                                />
+                                            </View>
+                                        </View>
+
+                                        {/* Divider before Intensity */}
+                                        <View style={styles.exerciseModalDivider} />
+
+                                        {/* Intensity Selection - For manual entry */}
+                                        <View style={styles.inputRow}>
+                                            <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.intensityButton,
+                                                    { marginRight: 3 }
+                                                ]}
+                                                onPress={() => setExerciseIntensity('light')}
+                                            >
+                                                <Text style={[
+                                                    styles.intensityButtonText,
+                                                    exerciseIntensity === 'light' && styles.intensityButtonTextSelected
+                                                ]}>Light</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.intensityButton,
+                                                    { marginRight: 3 }
+                                                ]}
+                                                onPress={() => setExerciseIntensity('moderate')}
+                                            >
+                                                <Text style={[
+                                                    styles.intensityButtonText,
+                                                    exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
+                                                ]}>Moderate</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.intensityButton
+                                                ]}
+                                                onPress={() => setExerciseIntensity('vigorous')}
+                                            >
+                                                <Text style={[
+                                                    styles.intensityButtonText,
+                                                    exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
+                                                ]}>Vigorous</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Divider after Intensity */}
+                                        <View style={styles.exerciseModalDivider} />
+
+                                        {/* Calories Result */}
+                                        <View style={styles.caloriesResult}>
+                                            <Text style={styles.caloriesFormula}>
+                                                {exerciseIntensity === 'moderate' ? (
+                                                    `MET: ${manualMET} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                ) : exerciseIntensity === 'light' ? (
+                                                    `MET: ${manualMET} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                ) : (
+                                                    `MET: ${manualMET} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                )}
+                                            </Text>
+                                            <Text style={styles.caloriesResultText}>
+                                                = {Math.round((parseFloat(manualMET) || 5.0) *
+                                                    (exerciseIntensity === 'light' ? 0.8 : exerciseIntensity === 'vigorous' ? 1.2 : 1.0) *
+                                                    3.5 * userWeight * (parseInt(exerciseDuration) || 30) / 200)} calories
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ) : selectedActivity && (
+                                    <>
+                                        {/* Selected Activity Display */}
+                                        <View style={{ marginTop: 10 }}>
+                                            <TouchableOpacity
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    marginBottom: 15
+                                                }}
+                                                onPress={() => setSelectedActivity(null)}
+                                            >
+                                                <Ionicons name="arrow-back" size={20} color="#0074dd" />
+                                                <Text style={{ color: '#0074dd', marginLeft: 5 }}>Back to activity list</Text>
+                                            </TouchableOpacity>
+
+                                            <View style={styles.selectedActivityItem}>
+                                                <Text style={[styles.activityName, { color: '#0074dd', fontSize: 18, fontWeight: 'bold' }]}>
+                                                    {selectedActivity.name}
+                                                </Text>
+                                                <Text style={[styles.activityMet, { marginBottom: 10 }]}>
+                                                    MET: {selectedActivity.met} ({selectedActivity.category})
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Divider before Duration section */}
+                                        <View style={styles.exerciseModalDivider} />
+
+                                        {/* Duration Input */}
+                                        <View style={styles.inputRow}>
+                                            <Text style={styles.inputLabel}>Duration (minutes):</Text>
+                                            <View style={styles.durationInputContainer}>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    keyboardType="number-pad"
+                                                    value={exerciseDuration}
+                                                    onChangeText={setExerciseDuration}
+                                                />
+                                            </View>
+                                        </View>
+
+                                        {/* Divider before Intensity */}
+                                        <View style={styles.exerciseModalDivider} />
+
+                                        {/* Intensity Selection */}
+                                        <View style={styles.inputRow}>
+                                            <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.intensityButton,
+                                                    { marginRight: 3 }
+                                                ]}
+                                                onPress={() => setExerciseIntensity('light')}
+                                            >
+                                                <Text style={[
+                                                    styles.intensityButtonText,
+                                                    exerciseIntensity === 'light' && styles.intensityButtonTextSelected
+                                                ]}>Light</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.intensityButton,
+                                                    { marginRight: 3 }
+                                                ]}
+                                                onPress={() => setExerciseIntensity('moderate')}
+                                            >
+                                                <Text style={[
+                                                    styles.intensityButtonText,
+                                                    exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
+                                                ]}>Moderate</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.intensityButton
+                                                ]}
+                                                onPress={() => setExerciseIntensity('vigorous')}
+                                            >
+                                                <Text style={[
+                                                    styles.intensityButtonText,
+                                                    exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
+                                                ]}>Vigorous</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Divider after Intensity */}
+                                        <View style={styles.exerciseModalDivider} />
+
+                                        {/* Calories Result */}
+                                        <View style={styles.caloriesResult}>
+                                            <Text style={styles.caloriesFormula}>
+                                                {exerciseIntensity === 'moderate' ? (
+                                                    `MET: ${selectedActivity.met} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                ) : exerciseIntensity === 'light' ? (
+                                                    `MET: ${selectedActivity.met} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                ) : (
+                                                    `MET: ${selectedActivity.met} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                                )}
+                                            </Text>
+                                            <Text style={styles.caloriesResultText}>
+                                                = {calculateCaloriesBurned(
+                                                    selectedActivity,
+                                                    parseInt(exerciseDuration) || 30,
+                                                    userWeight
+                                                )} calories
+                                            </Text>
+                                        </View>
+                                    </>
+                                )}
+
+                                {/* Add margin at bottom to ensure space for buttons */}
+                                <View style={{ marginBottom: 20 }} />
+                            </ScrollView>
+
+                            {/* Buttons - fixed at bottom */}
+                            <View style={styles.buttonRow}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.modalAddButton,
+                                        {
+                                            flex: 1,
+                                            backgroundColor: 'transparent',
+                                            width: '100%',
+                                            borderWidth: 1,
+                                            borderColor: '#C050FF', // Brighter purple for border
+                                            shadowColor: 'transparent',
+                                            shadowOffset: { width: 0, height: 0 },
+                                            shadowOpacity: 0,
+                                            shadowRadius: 0,
+                                            elevation: 0
+                                        },
+                                        (!selectedActivity && !isManualEntry) && { opacity: 0.5 },
+                                        (isManualEntry && !manualActivityName.trim()) && { opacity: 0.5 }
+                                    ]}
+                                    onPress={addNewExercise}
+                                    disabled={(!selectedActivity && !isManualEntry) || (isManualEntry && !manualActivityName.trim())}
+                                >
+                                    <Text style={[styles.modalButtonText, { color: '#D020FF', fontWeight: 'bold' }]}>ADD EXERCISE</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </View>
+            </TouchableWithoutFeedback>
+        </Modal>
+    );
+};
+
+const styles = StyleSheet.create({
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    exerciseModalContent: {
+        width: '95%',
+        maxHeight: '90%',
+        backgroundColor: '#1e1e1e',
+        borderRadius: 10,
+        padding: 20,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        flexDirection: 'column' as const,
+        justifyContent: 'space-between' as const,
+        flex: 1,
+    },
+    exerciseModalScrollContent: {
+        flexGrow: 1,
+        paddingTop: 10,
+    },
+    exerciseModalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#fff', // Default color for when the gradient isn't loaded
+        marginBottom: 0,
+        textAlign: 'center',
+        paddingHorizontal: 10,
+        width: '100%'
+    },
+    exitButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        padding: 5,
+        zIndex: 10
+    },
+    popularActivitiesWrapper: {
+        borderRadius: 10,
+        overflow: 'hidden',
+        marginBottom: 15,
+        width: '100%',
+    },
+    popularActivitiesContainer: {
+        margin: 1,
+        borderRadius: 9,
+        backgroundColor: '#121212',
+        padding: 12,
+    },
+    popularActivitiesHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    popularActivitiesTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginLeft: 8,
+    },
+    popularActivitiesScroll: {
+        maxHeight: 400,
+    },
+    sectionHeader: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: PURPLE_ACCENT,
+        marginTop: 10,
+        marginBottom: 5,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0, 116, 221, 0.2)',
+        paddingTop: 8
+    },
+    orDivider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 15,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    orText: {
+        marginHorizontal: 10,
+        color: '#888',
+        fontSize: 14,
+    },
+    searchInputContainer: {
+        marginBottom: 15,
+        backgroundColor: '#333',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const
+    },
+    searchInput: {
+        flex: 1,
+        color: 'white',
+        marginLeft: 8,
+        fontSize: 16
+    },
+    activitiesContainer: {
+        flex: 1,
+        marginBottom: 10
+    },
+    activityItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    selectedActivityItem: {
+        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+        borderRadius: 6,
+    },
+    activityInfo: {
+        flex: 1,
+    },
+    activityName: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#fff',
+        marginBottom: 2,
+    },
+    activityMet: {
+        fontSize: 14,
+        color: '#aaa',
+    },
+    checkmarkContainer: {
+        paddingHorizontal: 10,
+    },
+    inputLabel: {
+        fontSize: 16,
+        color: '#fff',
+        marginBottom: 8,
+    },
+    inputContainer: {
+        backgroundColor: '#333',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginBottom: 15,
+    },
+    input: {
+        color: 'white',
+        fontSize: 16,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    durationInputContainer: {
+        flex: 1,
+        backgroundColor: '#333',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    exerciseModalDivider: {
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        marginVertical: 15,
+    },
+    intensityButton: {
+        flex: 1,
+        backgroundColor: '#333',
+        borderRadius: 6,
+        paddingVertical: 8,
+        alignItems: 'center',
+    },
+    intensityButtonText: {
+        color: '#888',
+        fontWeight: '500',
+    },
+    intensityButtonTextSelected: {
+        color: '#0074dd',
+    },
+    caloriesResult: {
+        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+        padding: 15,
+        borderRadius: 8,
+        marginTop: 5,
+    },
+    caloriesFormula: {
+        color: '#888',
+        marginBottom: 10,
+        fontSize: 14,
+    },
+    caloriesResultText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 15,
+    },
+    modalAddButton: {
+        backgroundColor: '#AA00FF',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    modalButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+});
+
+export default ExerciseModal; 
