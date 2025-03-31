@@ -121,6 +121,7 @@ const DiaryScreen: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const localMealDataRef = useRef<FoodLogEntry[] | null>(null);
+    const scrollRef = useRef(null); // added scroll ref for simultaneous gesture handling
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -1101,24 +1102,89 @@ const DiaryScreen: React.FC = () => {
         return date.toLocaleDateString('en-US', options);
     };
 
-    // Update the gesture handling for smoother animations
+    // Replace the current isSwipeActive approach with a more refined solution
+    const [swipeDirection, setSwipeDirection] = useState<'none' | 'horizontal' | 'vertical'>('none');
+    const initialGestureRef = useRef({ x: 0, y: 0 });
+    const gestureStateRef = useRef('idle');
+
+    // Update the gesture handler to better detect scroll direction
     const onGestureEvent = Animated.event(
         [{ nativeEvent: { translationX: swipeAnim } }],
         {
             useNativeDriver: true,
             listener: (event: any) => {
-                // Keep track of the current value for use in scrollEnabled
                 if (event.nativeEvent && typeof event.nativeEvent.translationX === 'number') {
                     swipeValueRef.current = event.nativeEvent.translationX;
+
+                    // Only update the translation value if we've determined this is a horizontal swipe
+                    if (swipeDirection === 'horizontal') {
+                        // Allow the animation to update
+                    } else if (swipeDirection === 'none' && Math.abs(event.nativeEvent.translationX) > 10) {
+                        // If we've moved horizontally more than 10px and haven't determined direction yet
+                        const { translationX, translationY } = event.nativeEvent;
+                        determineDirection(translationX, translationY);
+                    }
                 }
             }
         }
     );
 
+    // Create a function to determine direction based on the initial movement
+    const determineDirection = (x: number, y: number) => {
+        // If movement is obviously horizontal (2:1 ratio), use horizontal swipe
+        if (Math.abs(x) > Math.abs(y) * 2 && Math.abs(x) > 15) {
+            console.log("Setting horizontal swipe direction");
+            setSwipeDirection('horizontal');
+            // Disable scroll when swiping horizontally
+            if (scrollRef.current) {
+                scrollRef.current.setNativeProps({ scrollEnabled: false });
+            }
+        }
+        // If movement is obviously vertical (1.5:1 ratio), use vertical scroll
+        else if (Math.abs(y) > Math.abs(x) * 1.5) {
+            console.log("Setting vertical swipe direction");
+            setSwipeDirection('vertical');
+        }
+        // Otherwise wait for more movement to decide
+    };
+
+    // Better gesture state tracking for scrolling
     const onHandlerStateChange = (event: any) => {
-        if (event.nativeEvent.state === GestureState.END) {
-            const { translationX, velocityX } = event.nativeEvent;
-            handleSwipeRelease(translationX, velocityX);
+        if (event.nativeEvent.state === GestureState.BEGAN) {
+            // Reset direction detection at the start of a gesture
+            gestureStateRef.current = 'began';
+            setSwipeDirection('none');
+            initialGestureRef.current = { x: 0, y: 0 };
+        }
+        else if (event.nativeEvent.state === GestureState.ACTIVE) {
+            // During the gesture, determine direction if not already set
+            gestureStateRef.current = 'active';
+            if (swipeDirection === 'none') {
+                const { translationX, translationY } = event.nativeEvent;
+                initialGestureRef.current = { x: translationX, y: translationY };
+                determineDirection(translationX, translationY);
+            }
+        }
+        else if (event.nativeEvent.state === GestureState.END ||
+            event.nativeEvent.state === GestureState.CANCELLED ||
+            event.nativeEvent.state === GestureState.FAILED) {
+
+            gestureStateRef.current = 'ended';
+            // Only process swipe if we determined it was a horizontal gesture
+            if (swipeDirection === 'horizontal') {
+                const { translationX, velocityX } = event.nativeEvent;
+                handleSwipeRelease(translationX, velocityX);
+            }
+
+            // Re-enable scrolling
+            if (scrollRef.current) {
+                scrollRef.current.setNativeProps({ scrollEnabled: true });
+            }
+
+            // Reset after a short delay
+            setTimeout(() => {
+                setSwipeDirection('none');
+            }, 100);
         }
     };
 
@@ -1409,23 +1475,17 @@ const DiaryScreen: React.FC = () => {
                 <PanGestureHandler
                     onGestureEvent={onGestureEvent}
                     onHandlerStateChange={onHandlerStateChange}
-                    activeOffsetX={[-10, 10]} // more responsive swipe detection
+                    simultaneousHandlers={scrollRef} // Allow simultaneous handling with ScrollView
+                    failOffsetY={[-5, 5]} // If movement starts vertical, fail the gesture
+                    activeOffsetX={[-20, 20]} // Decreased horizontal threshold to make it more responsive
                 >
-                    <Animated.View style={[
-                        styles.animatedContent,
-                        {
-                            transform: [
-                                { translateX: swipeAnim },
-                                { scale: scaleInterpolation }
-                            ],
-                            opacity: opacityInterpolation
-                        }
-                    ]}>
+                    <Animated.View style={[styles.animatedContent, { transform: [{ translateX: swipeAnim }, { scale: scaleInterpolation }], opacity: opacityInterpolation }]}>
                         <ScrollView
+                            ref={scrollRef}
                             contentContainerStyle={styles.scrollInner}
-                            showsVerticalScrollIndicator={false}
-                            // Disable scrolling during active horizontal swipe to prevent conflicts
-                            scrollEnabled={Math.abs(swipeValueRef.current) < 10}
+                            showsVerticalScrollIndicator={true}
+                            scrollEnabled={true}
+                            bounces={true}
                         >
                             {/* 2) Calories Remaining */}
                             <GradientBorderCard style={styles.summaryCard}>
