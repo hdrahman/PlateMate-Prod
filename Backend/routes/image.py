@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import List
 
 # Toggle between mock and real API
-USE_MOCK_API = True  # Set to False to use the real OpenAI API
+USE_MOCK_API = False  # Set to False to use the real OpenAI API
 
 # Load environment variables
 load_dotenv()
@@ -148,21 +148,106 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
             raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
 
         try:
+            # Define analyze_food_image function inline since it's missing
+            def analyze_food_image(image_data):
+                """Analyzes a food image using OpenAI's GPT-4o model."""
+                if USE_MOCK_API:
+                    return MOCK_RESPONSE
+                
+                content = [
+                    {"type": "text", "text": "Analyze this food image. Identify EACH food item separately."},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                ]
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o",  # Using gpt-4o which supports vision
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """You are a nutrition assistant. Analyze the food in this image and identify EACH individual food item separately.
+
+For EACH distinct food item in the image, provide its nutritional information in the following format:
+
+```json
+[
+  {
+    "food_name": "Food Item 1",
+    "calories": 000,
+    "proteins": 00,
+    "carbs": 00,
+    "fats": 00,
+    "fiber": 00,
+    "sugar": 00,
+    "saturated_fat": 00,
+    "polyunsaturated_fat": 00,
+    "monounsaturated_fat": 00,
+    "trans_fat": 00,
+    "cholesterol": 00,
+    "sodium": 00,
+    "potassium": 00,
+    "vitamin_a": 00,
+    "vitamin_c": 00,
+    "calcium": 00,
+    "iron": 00,
+    "weight": 000,
+    "weight_unit": "g",
+    "healthiness_rating": 0
+  }
+]
+```
+
+Important:
+1. Return your response ONLY in valid JSON format as shown above
+2. Create a separate entry for each distinct food item
+3. Provide an estimated weight in grams for each food item
+4. Healthiness rating should be on a scale of 1-10
+5. Ensure all nutritional values are realistic estimates
+6. Use only integers for all numerical values"""
+                        },
+                        {
+                            "role": "user",
+                            "content": content
+                        }
+                    ]
+                )
+                
+                return response.choices[0].message.content.strip()
+                
+            # Define parse_gpt4_response function inline since it's missing
+            def parse_gpt4_response(response_text):
+                """Parses the response from GPT-4 into a structured format."""
+                try:
+                    # Basic sanity checks
+                    if not response_text or len(response_text) < 10:
+                        raise ValueError("Response text is too short")
+                        
+                    # Try to extract JSON if it's enclosed in a code block
+                    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
+                    if json_match:
+                        json_str = json_match.group(1).strip()
+                    else:
+                        json_str = response_text.strip()
+                    
+                    extracted_foods = json.loads(json_str)
+                    
+                    if not isinstance(extracted_foods, list):
+                        raise ValueError("Response is not a list")
+                        
+                    return extracted_foods
+                    
+                except Exception as e:
+                    print(f"❌ Error parsing GPT response: {e}")
+                    raise
+            
             gpt_response = analyze_food_image(image_data)
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
 
         try:
-            extracted_foods = parse_gpt4_response(gpt_response)
-        except Exception as e:
-            print(f"❌ Error parsing GPT-4o response: {e}")
-            raise HTTPException(status_code=500, detail=f"Parsing GPT-4o response failed: {str(e)}")
-
-        try:
             db: Session = SessionLocal()
             meal_id = int(datetime.utcnow().timestamp())
-            for food in extracted_foods:
+            for food in parse_gpt4_response(gpt_response):
                 food_log = FoodLog(
                     meal_id=meal_id,
                     user_id=user_id,
@@ -187,7 +272,7 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
-        return {"message": "✅ Image uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": extracted_foods}
+        return {"message": "✅ Image uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": parse_gpt4_response(gpt_response)}
 
     except Exception as e:
         error_trace = traceback.format_exc()
@@ -233,7 +318,7 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
             else:
                 # Real API call
                 response = client.chat.completions.create(
-                    model="gpt-4-vision-preview",
+                    model="gpt-4o",  # Changed from "gpt-4-vision-preview" to "gpt-4o"
                     messages=[
                         {
                             "role": "system",
@@ -289,11 +374,40 @@ Important:
 
             # Parse the response
             try:
-                extracted_foods = json.loads(gpt_response)
+                extracted_foods = parse_gpt4_response(gpt_response)
                 if not isinstance(extracted_foods, list):
                     raise ValueError("Response is not a list")
                 print("✅ Successfully parsed GPT response")
-            except json.JSONDecodeError as e:
+            except NameError:
+                # Define parse_gpt4_response function if it's not available
+                def parse_gpt4_response(response_text):
+                    """Parses the response from GPT-4 into a structured format."""
+                    try:
+                        # Basic sanity checks
+                        if not response_text or len(response_text) < 10:
+                            raise ValueError("Response text is too short")
+                            
+                        # Try to extract JSON if it's enclosed in a code block
+                        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
+                        if json_match:
+                            json_str = json_match.group(1).strip()
+                        else:
+                            json_str = response_text.strip()
+                        
+                        extracted_foods = json.loads(json_str)
+                        
+                        if not isinstance(extracted_foods, list):
+                            raise ValueError("Response is not a list")
+                            
+                        return extracted_foods
+                        
+                    except Exception as e:
+                        print(f"❌ Error parsing GPT response: {e}")
+                        raise
+                
+                extracted_foods = parse_gpt4_response(gpt_response)
+                print("✅ Successfully parsed GPT response")
+            except Exception as e:
                 print(f"❌ Error parsing GPT response: {e}")
                 raise HTTPException(status_code=500, detail="Invalid response format from GPT")
 

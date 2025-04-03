@@ -1,1 +1,1 @@
-python -m uvicorn main:app --host 192.168.0.169 --reload
+python -m uvicorn main:app --host 172.31.151.145 --reload

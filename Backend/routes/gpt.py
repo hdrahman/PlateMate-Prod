@@ -10,7 +10,7 @@ import logging
 from dotenv import load_dotenv
 
 # Toggle between mock and real API
-USE_MOCK_API = True  # Set to False to use the real OpenAI API
+USE_MOCK_API = False  # Set to False to use the real OpenAI API
 
 # Load environment variables
 load_dotenv()

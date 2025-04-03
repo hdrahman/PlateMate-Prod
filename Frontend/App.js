@@ -245,7 +245,7 @@ function MainTabs() {
         name="Chatbot"
         component={Chatbot}
         options={{
-          tabBarLabel: "Advisor",
+          tabBarLabel: "Nutrition Advisor",
           tabBarIcon: ({ color, size }) => (
             <Ionicons
               name="chatbubble-ellipses-outline"
