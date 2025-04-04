@@ -56,7 +56,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hi Alex! I'm your PlateMate Nutrition Advisor. Based on your recent food logs, I see you're making progress toward your muscle-building goals. How can I help today?",
+      text: "Hi Alex! I'm Emily, your nutritionist. Based on your recent food logs, I see you're making progress toward your muscle-building goals. How can I help today?",
       sender: "bot",
       timestamp: new Date()
     },
@@ -143,7 +143,7 @@ export default function Chatbot() {
           <MaskedView
             style={{ alignItems: "center", justifyContent: "center" }}
             maskElement={
-              <Text style={styles.headerTitle}>Nutrition Advisor</Text>
+              <Text style={styles.headerTitle}>Doctor Rodriguez</Text>
             }
           >
             <LinearGradient
