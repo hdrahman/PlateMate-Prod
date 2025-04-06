@@ -1312,15 +1312,67 @@ const DiaryScreen: React.FC = () => {
     };
 
     const handleFoodItemLongPress = (foodId: number | undefined, foodName: string, mealType: string, index: number) => {
-        // Handle long press on food item
+        // Set the selected food item and show the action modal
+        setSelectedFoodItem({ id: foodId, name: foodName, meal: mealType, index: index });
+        setActionModalVisible(true);
     };
 
-    const handleDeleteFoodItem = () => {
-        // Handle food item deletion
+    const handleDeleteFoodItem = async () => {
+        if (selectedFoodItem && selectedFoodItem.id) {
+            try {
+                setLoading(true);
+                await deleteFoodLog(selectedFoodItem.id);
+                setActionModalVisible(false);
+                // Refresh data after deletion
+                refreshMealData();
+            } catch (error) {
+                console.error('Error deleting food item:', error);
+                Alert.alert('Error', 'Failed to delete food item. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            setActionModalVisible(false);
+            Alert.alert('Error', 'Unable to delete this food item. Try again later.');
+        }
     };
 
-    const moveFood = (id: number | undefined, mealType: string) => {
-        // Move food to a different meal
+    const moveFood = async (id: number | undefined, newMealType: string) => {
+        if (!id) {
+            setMoveModalVisible(false);
+            Alert.alert('Error', 'Cannot move this food item. ID not found.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            // Find the current food log entry
+            if (localMealDataRef.current) {
+                const foodEntry = localMealDataRef.current.find(entry => entry.id === id);
+
+                if (foodEntry) {
+                    // Update the meal type
+                    await updateFoodLog(id, {
+                        ...foodEntry,
+                        meal_type: newMealType,
+                        sync_action: 'UPDATE'
+                    });
+
+                    // Close the modal and refresh data
+                    setMoveModalVisible(false);
+                    refreshMealData();
+                } else {
+                    throw new Error('Food entry not found');
+                }
+            } else {
+                throw new Error('Local meal data not available');
+            }
+        } catch (error) {
+            console.error('Error moving food item:', error);
+            Alert.alert('Error', 'Failed to move food item. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Handle long press on exercise item

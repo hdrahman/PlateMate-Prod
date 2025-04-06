@@ -71,18 +71,28 @@ async def analyze_food(request: FoodAnalysisRequest):
             logger.info(f"Multiple images detected ({len(valid_urls)}). Analyzing them together as part of the same meal.")
         
         # Prepare the prompt for GPT-4o
+        # Prepare the prompt for GPT-4o
         prompt = f"""
         Analyze these food images together as they are all part of the same {request.meal_type} meal.
         The meal appears to be {request.food_name}.
-        
-        Please provide a combined analysis of all images including:
-        1. A detailed description of all food items present
-        2. Combined estimated nutritional information for the entire meal
-        3. Health benefits and concerns for the complete meal
-        4. Suggestions for making the overall meal healthier (if applicable)
-        
-        Consider all images as one complete meal and provide a unified analysis.
-        Keep your response concise but informative, around 150-200 words.
+
+        Food Item Recognition Guidelines:
+        - GROUP components that form a single dish (e.g., identify a "cheese sandwich" as one item, not separate bread and cheese)
+        - SEPARATE distinct food items that are clearly served independently (e.g., "grilled chicken", "steamed rice", and "mixed vegetables" should be listed separately)
+        - Use common culinary names for dishes rather than listing all ingredients
+
+        Please provide a combined analysis including:
+        1. A structured list of the distinct food items present (grouped appropriately as explained above)
+        2. For each identified food item:
+        - Estimated portion size (in grams or standard servings)
+        - Estimated calories
+        - Macronutrient breakdown (protein, carbs, fat)
+        3. Health benefits and concerns for each food item
+        4. Suggestions for making the overall meal healthier
+
+        For complex dishes like sandwiches, stir-fries, or casseroles, report the complete dish as one item, not its individual components.
+
+        Keep your response concise but informative, around 200-250 words.
         """
         
         # Create content array with text and all images
