@@ -245,6 +245,7 @@ function MainTabs() {
         name="Chatbot"
         component={Chatbot}
         options={{
+          headerShown: false,
           tabBarLabel: "Nutrition Advisor",
           tabBarIcon: ({ color, size }) => (
             <Ionicons
