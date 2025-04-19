@@ -6,6 +6,7 @@ from typing import List, Optional
 import requests
 import os
 import logging
+import re
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -49,6 +50,37 @@ NUTRITION_RESPONSES = [
     "Don't neglect carbohydrates when building muscle. They're essential for energy during workouts and recovery afterward."
 ]
 
+def clean_formatting(text):
+    """Clean up markdown-style formatting for better display in the app"""
+    # Replace markdown headers with plain text
+    text = re.sub(r'#{1,6}\s+(.+?)(?:\n|$)', r'\1:\n', text)
+    
+    # Replace markdown bold/italic with plain text
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text)  # Bold italic
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)      # Bold
+    text = re.sub(r'\*(.+?)\*', r'\1', text)          # Italic
+    
+    # Replace markdown bullet points with plain text bullets
+    text = re.sub(r'^\s*[\*\-\+]\s+', '• ', text, flags=re.MULTILINE)
+    
+    # Replace numbered lists
+    text = re.sub(r'^\s*(\d+)\.\s+', r'\1. ', text, flags=re.MULTILINE)
+    
+    # Clean up any multiple consecutive newlines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text
+
+def format_as_system_message(text):
+    """Add a system-style formatting for responses"""
+    if not text.strip():
+        return "I'm sorry, I didn't get a proper response. Please try again."
+    
+    # Clean any markdown formatting
+    cleaned_text = clean_formatting(text)
+    
+    return cleaned_text
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_arli(request: ChatRequest):
     """
@@ -60,8 +92,16 @@ async def chat_with_arli(request: ChatRequest):
     try:
         logger.info(f"Sending chat request to Arli AI with conversation ID: {request.conversation_id}")
         
-        # Format messages for Arli AI API - using OpenAI format
+        # Add a system message asking for plain text responses if not already present
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        
+        # Add system message if there isn't one already
+        has_system_message = any(msg["role"] == "system" for msg in messages)
+        if not has_system_message:
+            messages.insert(0, {
+                "role": "system", 
+                "content": "You are Dr. Rodriguez, a nutrition specialist. Keep your responses focused on nutrition advice. Avoid using markdown formatting like asterisks for bold or italic. Use plain text formatting."
+            })
         
         headers = {
             "Content-Type": "application/json",
@@ -126,8 +166,12 @@ async def chat_with_arli(request: ChatRequest):
                     detail="Received an empty message from Arli AI"
                 )
             
+            # Get the content and clean up any markdown formatting
+            content = result["choices"][0]["message"]["content"]
+            cleaned_content = clean_formatting(content)
+            
             return {
-                "response": result["choices"][0]["message"]["content"],
+                "response": cleaned_content,
                 "conversation_id": result.get("conversation_id", "")
             }
             
