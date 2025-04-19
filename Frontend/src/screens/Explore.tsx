@@ -70,7 +70,9 @@ export default function Explore() {
         <SafeAreaView style={styles.container}>
             <View style={styles.headerSection}>
                 <Text style={styles.headerText}>Explore</Text>
-                <Text style={styles.subHeaderText}>Discover new content to improve your lifestyle</Text>
+                {!selectedTopic && (
+                    <Text style={styles.subHeaderText}>Discover new content to improve your lifestyle</Text>
+                )}
             </View>
 
             {selectedTopic ? (
@@ -81,6 +83,11 @@ export default function Explore() {
                         </TouchableOpacity>
                         <Text style={styles.selectedTopicText}>{selectedTopic.description}</Text>
                     </View>
+
+                    <View style={styles.categoryHeaderContainer}>
+                        <Text style={styles.categoryHeaderText}>{selectedTopic.title}</Text>
+                    </View>
+
                     <View style={styles.categoryContainer}>
                         <CategoryYouTubers
                             category={selectedTopic.title}
@@ -133,7 +140,7 @@ const styles = StyleSheet.create({
     },
     headerSection: {
         paddingTop: 10,
-        paddingBottom: 15,
+        paddingBottom: 10,
     },
     contentSection: {
         flex: 1,
@@ -148,7 +155,16 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         marginHorizontal: 20,
+        marginBottom: 5,
+    },
+    categoryHeaderContainer: {
+        paddingHorizontal: 20,
         marginBottom: 10,
+    },
+    categoryHeaderText: {
+        fontSize: 24,
+        fontWeight: "bold",
+        color: "white",
     },
     backButton: {
         marginRight: 10,

@@ -44,33 +44,35 @@ const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
                 <Text style={styles.youtuberDescription}>{youtuber.description}</Text>
             </View>
 
-            {loading ? (
-                <ActivityIndicator size="large" color="#FF9500" style={styles.loader} />
-            ) : error ? (
-                <Text style={styles.errorText}>{error}</Text>
-            ) : videos.length === 0 ? (
-                <Text style={styles.emptyText}>No videos available</Text>
-            ) : (
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.videosContainer}
-                >
-                    {videos.map((video) => (
-                        <YouTubeVideoCard key={video.id} video={video} />
-                    ))}
-                </ScrollView>
-            )}
+            <View style={styles.contentContainer}>
+                {loading ? (
+                    <ActivityIndicator size="large" color="#FF9500" style={styles.loader} />
+                ) : error ? (
+                    <Text style={styles.errorText}>{error}</Text>
+                ) : videos.length === 0 ? (
+                    <Text style={styles.emptyText}>No videos available</Text>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.videosContainer}
+                    >
+                        {videos.map((video) => (
+                            <YouTubeVideoCard key={video.id} video={video} />
+                        ))}
+                    </ScrollView>
+                )}
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        padding: 15,
+        padding: 10,
     },
     header: {
-        marginBottom: 15,
+        marginBottom: 12,
     },
     titleRow: {
         flexDirection: 'row',
@@ -79,20 +81,23 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     youtuberName: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: 'bold',
         color: 'white',
         marginRight: 10,
     },
     youtuberDescription: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#BBBBBB',
-        marginBottom: 10,
+        marginBottom: 5,
+    },
+    contentContainer: {
+        minHeight: 180,
     },
     subcategoryBadge: {
         backgroundColor: '#333333',
-        paddingHorizontal: 12,
-        paddingVertical: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
         borderRadius: 20,
         marginBottom: 5,
     },
@@ -102,22 +107,22 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     videosContainer: {
-        paddingRight: 15,
+        paddingRight: 10,
     },
     loader: {
-        marginTop: 30,
+        marginTop: 20,
     },
     errorText: {
         color: '#FF5E3A',
         textAlign: 'center',
-        marginTop: 30,
-        fontSize: 16,
+        marginTop: 20,
+        fontSize: 14,
     },
     emptyText: {
         color: '#BBBBBB',
         textAlign: 'center',
-        marginTop: 30,
-        fontSize: 16,
+        marginTop: 20,
+        fontSize: 14,
     },
 });
 
