@@ -77,17 +77,13 @@ export default function Explore() {
                         </TouchableOpacity>
                         <Text style={styles.subHeaderText}>{selectedTopic.description}</Text>
                     </View>
-                    <ScrollView
-                        style={styles.scrollView}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                    >
+                    <View style={styles.categoryContainer}>
                         <CategoryYouTubers
                             category={selectedTopic.title}
                             youtubers={getYouTubersByCategory(selectedTopic.title)}
                             subcategories={selectedTopic.subcategories}
                         />
-                    </ScrollView>
+                    </View>
                 </>
             ) : (
                 <>
@@ -158,6 +154,9 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginTop: 5,
         marginBottom: 20,
+        flex: 1,
+    },
+    categoryContainer: {
         flex: 1,
     },
     scrollView: {

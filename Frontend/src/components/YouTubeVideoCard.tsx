@@ -7,7 +7,7 @@ interface YouTubeVideoCardProps {
 }
 
 const { width } = Dimensions.get('window');
-const VIDEO_CARD_WIDTH = width * 0.8;
+const VIDEO_CARD_WIDTH = width * 0.75;  // Slightly narrower for better fit
 
 const YouTubeVideoCard: React.FC<YouTubeVideoCardProps> = ({ video }) => {
     const openYouTubeVideo = () => {
@@ -28,14 +28,14 @@ const YouTubeVideoCard: React.FC<YouTubeVideoCardProps> = ({ video }) => {
     };
 
     return (
-        <TouchableOpacity style={styles.container} onPress={openYouTubeVideo}>
+        <TouchableOpacity style={styles.container} onPress={openYouTubeVideo} activeOpacity={0.8}>
             <Image
                 source={{ uri: video.thumbnailUrl }}
                 style={styles.thumbnail}
                 resizeMode="cover"
             />
             <View style={styles.infoContainer}>
-                <Text style={styles.title}>{truncateText(video.title, 50)}</Text>
+                <Text style={styles.title}>{truncateText(video.title, 40)}</Text>
                 <Text style={styles.channelTitle}>{video.channelTitle}</Text>
                 <Text style={styles.publishedDate}>Published: {formatDate(video.publishedAt)}</Text>
             </View>
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     },
     thumbnail: {
         width: '100%',
-        height: 180,
+        height: 150,
         borderTopLeftRadius: 12,
         borderTopRightRadius: 12,
     },
@@ -69,18 +69,18 @@ const styles = StyleSheet.create({
         padding: 12,
     },
     title: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
         color: 'white',
         marginBottom: 6,
     },
     channelTitle: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#BBBBBB',
         marginBottom: 4,
     },
     publishedDate: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#888888',
     },
 });

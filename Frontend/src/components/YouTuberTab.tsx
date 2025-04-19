@@ -33,13 +33,15 @@ const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.youtuberName}>{youtuber.name}</Text>
+                <View style={styles.titleRow}>
+                    <Text style={styles.youtuberName}>{youtuber.name}</Text>
+                    {youtuber.subcategory && (
+                        <View style={styles.subcategoryBadge}>
+                            <Text style={styles.subcategoryText}>{youtuber.subcategory}</Text>
+                        </View>
+                    )}
+                </View>
                 <Text style={styles.youtuberDescription}>{youtuber.description}</Text>
-                {youtuber.subcategory && (
-                    <View style={styles.subcategoryBadge}>
-                        <Text style={styles.subcategoryText}>{youtuber.subcategory}</Text>
-                    </View>
-                )}
             </View>
 
             {loading ? (
@@ -65,17 +67,22 @@ const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
         padding: 15,
     },
     header: {
         marginBottom: 15,
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 5,
+    },
     youtuberName: {
         fontSize: 22,
         fontWeight: 'bold',
         color: 'white',
-        marginBottom: 5,
+        marginRight: 10,
     },
     youtuberDescription: {
         fontSize: 16,
@@ -87,8 +94,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 5,
         borderRadius: 20,
-        alignSelf: 'flex-start',
-        marginBottom: 10,
+        marginBottom: 5,
     },
     subcategoryText: {
         color: '#FF9500',

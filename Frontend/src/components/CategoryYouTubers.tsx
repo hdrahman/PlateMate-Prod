@@ -31,6 +31,9 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
         }
     };
 
+    // Determine if we're filtering (not showing "All")
+    const isFiltering = selectedSubcategory !== 'All';
+
     return (
         <View style={styles.container}>
             <Text style={styles.categoryTitle}>{category}</Text>
@@ -84,8 +87,8 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                 <View style={styles.noResultsContainer}>
                     <Text style={styles.noResultsText}>No youtubers found in this subcategory</Text>
                 </View>
-            ) : (
-                /* YouTuber Tabs */
+            ) : isFiltering ? (
+                /* When filtering (not 'All'), show horizontal paging view */
                 <ScrollView
                     horizontal
                     pagingEnabled
@@ -101,6 +104,18 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                         </View>
                     ))}
                 </ScrollView>
+            ) : (
+                /* When showing 'All', display vertical list of all YouTubers */
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.allYoutubersContainer}
+                >
+                    {youtubers.map((youtuber) => (
+                        <View key={youtuber.id} style={styles.youtuberVerticalItem}>
+                            <YouTuberTab youtuber={youtuber} />
+                        </View>
+                    ))}
+                </ScrollView>
             )}
         </View>
     );
@@ -109,6 +124,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
 const styles = StyleSheet.create({
     container: {
         marginBottom: 30,
+        flex: 1,
     },
     categoryTitle: {
         fontSize: 24,
@@ -145,6 +161,15 @@ const styles = StyleSheet.create({
     },
     youtuberTabWrapper: {
         flex: 1,
+    },
+    allYoutubersContainer: {
+        paddingBottom: 30,
+    },
+    youtuberVerticalItem: {
+        marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+        paddingBottom: 20,
     },
     noResultsContainer: {
         height: 200,
