@@ -13,7 +13,7 @@ import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
-import Workout from "./src/screens/Workout";
+import Explore from "./src/screens/Explore";
 import Chatbot from "./src/screens/Chatbot";
 import EditProfile from './src/screens/EditProfile';
 import EditGoals from './src/screens/EditGoals';
@@ -232,12 +232,12 @@ function MainTabs() {
 
 
       <Tab.Screen
-        name="Workouts"
-        component={Workout}
+        name="Explore"
+        component={Explore}
         options={{
-          tabBarLabel: "Workouts",
+          tabBarLabel: "Explore",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="barbell-outline" color={color} size={size} />
+            <Ionicons name="compass-outline" color={color} size={size} />
           ),
         }}
       />
