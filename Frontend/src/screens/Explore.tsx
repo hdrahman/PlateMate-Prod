@@ -68,14 +68,18 @@ export default function Explore() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <Text style={styles.headerText}>Explore</Text>
+            <View style={styles.headerSection}>
+                <Text style={styles.headerText}>Explore</Text>
+                <Text style={styles.subHeaderText}>Discover new content to improve your lifestyle</Text>
+            </View>
+
             {selectedTopic ? (
-                <>
+                <View style={styles.contentSection}>
                     <View style={styles.topicHeaderContainer}>
                         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
                             <Ionicons name="arrow-back" size={24} color="white" />
                         </TouchableOpacity>
-                        <Text style={styles.subHeaderText}>{selectedTopic.description}</Text>
+                        <Text style={styles.selectedTopicText}>{selectedTopic.description}</Text>
                     </View>
                     <View style={styles.categoryContainer}>
                         <CategoryYouTubers
@@ -84,42 +88,39 @@ export default function Explore() {
                             subcategories={selectedTopic.subcategories}
                         />
                     </View>
-                </>
+                </View>
             ) : (
-                <>
-                    <Text style={styles.subHeaderText}>Discover new content to improve your lifestyle</Text>
-                    <ScrollView
-                        style={styles.scrollView}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                    >
-                        {topics.map((topic, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.cardContainer}
-                                onPress={() => handleTopicPress(topic)}
+                <ScrollView
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
+                >
+                    {topics.map((topic, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.cardContainer}
+                            onPress={() => handleTopicPress(topic)}
+                        >
+                            <LinearGradient
+                                colors={topic.colors}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.card}
                             >
-                                <LinearGradient
-                                    colors={topic.colors}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.card}
-                                >
-                                    <View style={styles.iconContainer}>
-                                        <Ionicons name={topic.icon} size={40} color="white" />
-                                    </View>
-                                    <View style={styles.textContainer}>
-                                        <Text style={styles.cardTitle}>{topic.title}</Text>
-                                        <Text style={styles.cardDescription}>{topic.description}</Text>
-                                    </View>
-                                    <View style={styles.arrowContainer}>
-                                        <Ionicons name="chevron-forward" size={24} color="white" />
-                                    </View>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </>
+                                <View style={styles.iconContainer}>
+                                    <Ionicons name={topic.icon} size={40} color="white" />
+                                </View>
+                                <View style={styles.textContainer}>
+                                    <Text style={styles.cardTitle}>{topic.title}</Text>
+                                    <Text style={styles.cardDescription}>{topic.description}</Text>
+                                </View>
+                                <View style={styles.arrowContainer}>
+                                    <Ionicons name="chevron-forward" size={24} color="white" />
+                                </View>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
             )}
         </SafeAreaView>
     );
@@ -129,20 +130,24 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#000",
-        paddingTop: 0,
+    },
+    headerSection: {
+        paddingTop: 10,
+        paddingBottom: 15,
+    },
+    contentSection: {
+        flex: 1,
     },
     headerText: {
         fontSize: 28,
         fontWeight: "bold",
         color: "white",
         marginHorizontal: 20,
-        marginTop: 10,
     },
     topicHeaderContainer: {
         flexDirection: "row",
         alignItems: "center",
         marginHorizontal: 20,
-        marginTop: 5,
         marginBottom: 10,
     },
     backButton: {
@@ -153,7 +158,10 @@ const styles = StyleSheet.create({
         color: "#999",
         marginHorizontal: 20,
         marginTop: 5,
-        marginBottom: 20,
+    },
+    selectedTopicText: {
+        fontSize: 16,
+        color: "#999",
         flex: 1,
     },
     categoryContainer: {
@@ -161,18 +169,16 @@ const styles = StyleSheet.create({
     },
     scrollView: {
         flex: 1,
-        marginTop: 0,
     },
     scrollContent: {
-        paddingHorizontal: 0,
+        paddingTop: 10,
         paddingBottom: 30,
-        paddingTop: 0,
     },
     cardContainer: {
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
         borderRadius: 15,
-        marginBottom: 20,
+        marginBottom: 15,
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
