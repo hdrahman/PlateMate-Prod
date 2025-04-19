@@ -45,9 +45,10 @@ yarn-error.*
 # ✅ Local Environment Files (Hides Secrets)
 # =======================
 .env
-.env*.local
-.env*.production
-.env*.development
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # =======================
 # ✅ TypeScript Build Info
