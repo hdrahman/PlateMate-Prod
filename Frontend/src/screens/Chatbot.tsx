@@ -12,13 +12,19 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
-  Animated
+  Animated,
+  Alert
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { ThemeContext } from "../ThemeContext";
+import axios from "axios";
+import { BACKEND_URL } from '../utils/config';
+
+// Get IP and port from the BACKEND_URL
+const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
 
 const { width } = Dimensions.get("window");
 
@@ -43,35 +49,6 @@ interface Message {
   isTyping?: boolean;
 }
 
-// Mock function for AI calls - replace with actual API call when backend is ready
-const callAdvisorAI = async (message: string): Promise<string> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-
-  // Sample personalized responses based on common nutrition questions
-  if (message.toLowerCase().includes('protein')) {
-    return `Based on your recent logs, you're averaging 85g of protein daily which is below your target of 140g for your weight (${userProfile.weight}kg) and ${userProfile.goals} goals. I noticed you tend to skip protein at breakfast.\n\nRecommendations for you specifically:\n• Add 2 scoops of protein to your morning smoothie (+40g protein)\n• Replace the turkey wraps (12g protein) you had Tuesday/Thursday with grilled chicken breast (28g protein)\n• Consider Greek yogurt as your evening snack instead of the crackers you've been logging`;
-  } else if (message.toLowerCase().includes('carb') || message.toLowerCase().includes('carbohydrate')) {
-    return `Looking at your meal logs, you're consuming about 220g of carbs daily, which aligns with your needs. However, I notice your energy crashes around 3pm according to your activity data.\n\nTry these adjustments:\n• Shift some carbs from dinner to your pre-workout meal\n• Your breakfast bagel is causing glucose spikes - switch to steel-cut oats\n• Your training days (${userProfile.recentWorkouts[0]} and ${userProfile.recentWorkouts[2]}) should have 60g more carbs than rest days, but your logs show the opposite pattern`;
-  } else if (message.toLowerCase().includes('meal plan') || message.toLowerCase().includes('diet plan')) {
-    return `Based on your logged meals, workout schedule, and '${userProfile.goals}' goal, here's a customized plan:\n\nBreakfast: Upgrade your current toast to 3 eggs, 1 slice whole grain toast, and 1/2 avocado (+250 calories from your usual)\n\nLunch: Keep your chicken salad but double the protein to 8oz and add 1/4 cup walnuts\n\nPre-workout: Your banana is good, but add 1 scoop protein\n\nDinner: Your current salmon dinner is perfect! Keep that in rotation\n\nEvening: Add a casein protein shake before bed (you're in a fasting state too long based on your recovery metrics)`;
-  } else if (message.toLowerCase().includes('weight loss')) {
-    return "Looking at your logs, you're actually in maintenance right now at 2300 calories despite your weight loss goal. Your high-calorie weekends (avg. 2800 cal) are offsetting your disciplined weekdays (avg. 1950 cal).\n\nPersonalized suggestions based on your metabolism and food preferences:\n• Keep your weekend social meals but substitute the beer (your logs show 3-4 per weekend) with vodka soda to save 450 calories\n• Your lunch salads are good but the dressing adds 220 calories - try the oil and vinegar option\n• Based on your sleep data, your late night snacking is affecting recovery - try going to bed 30 minutes earlier";
-  } else if (message.toLowerCase().includes('supplement')) {
-    return "Based on your logs and fitness profile, here are the supplements that would benefit you specifically:\n\n1. Creatine: Since you're not currently taking it and you do high-intensity training 4x weekly, start with 5g daily\n\n2. Vitamin D: Your blood work shows you're at 22ng/mL which is low. Supplement with 4000IU daily\n\n3. Magnesium: Your logged muscle cramps and evening restlessness suggest a deficiency. Try 300mg before bed\n\nYou don't need a pre-workout based on your heart rate variability data, and your protein timing is more important than adding BCAAs to your regimen.";
-  } else {
-    return `I've analyzed your recent meal logs, workout data (${userProfile.recentWorkouts.join(', ')}), and progress metrics. You're making good progress, but a few tweaks could help you reach your ${userProfile.goals} goals faster. Your protein intake is about 75% of what's optimal for your body composition, and your pre/post workout nutrition timing could be improved. What specific aspect of your nutrition would you like me to analyze more deeply?`;
-  }
-};
-
-// Get time-based greeting
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-};
-
 export default function Chatbot() {
   const { isDarkTheme } = useContext(ThemeContext);
   const navigation = useNavigation();
@@ -79,25 +56,14 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: `${getGreeting()}, ${userProfile.name}! I'm Emily, your nutrition advisor. I see you've been focused on ${userProfile.goals}. Your ${userProfile.recentWorkouts[0]} workout yesterday looked intense! How can I help with your nutrition today?`,
+      text: "Hello! I'm Dr. Rodriguez, your nutrition specialist. How can I help you today?",
       sender: "bot",
       timestamp: new Date()
-    },
-    {
-      id: "2",
-      text: "I'm trying to build muscle, what foods should I eat?",
-      sender: "user",
-      timestamp: new Date(Date.now() - 60000)
-    },
-    {
-      id: "3",
-      text: `Looking at your logged meals from the past week, I noticed you're currently getting about 85g of protein daily, which is only about 60% of your target based on your weight (${userProfile.weight}kg).\n\nRecommendations specifically for you:\n\n1. Increase protein: Your breakfast (usually just coffee) is a missed opportunity. Try adding Greek yogurt with 20g protein or 3 eggs (~18g protein).\n\n2. I see you're eating a lot of white rice. Switch to quinoa - your body responds better to complex carbs based on your glucose readings.\n\n3. Add healthy fats: Your logged meals show very little healthy fat. Add avocado to your lunch salads or a handful of almonds as a snack.\n\n4. Post-workout: Your Monday and Thursday workout logs show great intensity, but you're waiting 2+ hours to eat after. Have your chicken and sweet potato meal within 45 minutes for better muscle recovery.\n\nYour recent salmon dinner was perfect! More meals like that would be ideal for your goals.`,
-      sender: "bot",
-      timestamp: new Date(Date.now() - 30000)
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const dot1Opacity = useRef(new Animated.Value(0.4)).current;
   const dot2Opacity = useRef(new Animated.Value(0.4)).current;
@@ -165,6 +131,45 @@ export default function Chatbot() {
     }
   }, [isTyping, dot1Opacity, dot2Opacity, dot3Opacity]);
 
+  const chatWithArliAI = async (userMessage: string) => {
+    try {
+      // Format messages for Arli AI API
+      const messageHistory = messages
+        .filter(msg => !msg.isTyping)
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+
+      // Add the new user message
+      messageHistory.push({
+        role: 'user',
+        content: userMessage
+      });
+
+      const payload = {
+        messages: messageHistory,
+        conversation_id: conversationId
+      };
+
+      // Call the backend API
+      const response = await axios.post(
+        `${BACKEND_BASE_URL}/arli/chat`,
+        payload
+      );
+
+      // Save the conversation ID for future messages
+      if (response.data.conversation_id) {
+        setConversationId(response.data.conversation_id);
+      }
+
+      return response.data.response;
+    } catch (error) {
+      console.error("Error calling Arli AI:", error);
+      throw new Error("Failed to get response from Dr. Rodriguez. Please try again.");
+    }
+  };
+
   const handleSend = async () => {
     if (input.trim() === "") return;
 
@@ -193,7 +198,7 @@ export default function Chatbot() {
 
     try {
       // Get AI response
-      const response = await callAdvisorAI(userMessage.text);
+      const response = await chatWithArliAI(userMessage.text);
 
       // Remove typing indicator and add bot response
       setMessages(prev => prev.filter(msg => !msg.isTyping));
@@ -212,12 +217,15 @@ export default function Chatbot() {
 
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Sorry ${userProfile.name}, I couldn't process your request. Please try again.`,
+        text: "Sorry, I couldn't process your request. Please try again.",
         sender: "bot",
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, errorMessage]);
+
+      // Show alert with error
+      Alert.alert("Error", error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setIsLoading(false);
       setIsTyping(false);
@@ -334,7 +342,7 @@ export default function Chatbot() {
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder={`Ask Dr. Rodriguez about ${userProfile.dietaryPreferences[0].toLowerCase()}, ${userProfile.goals.toLowerCase()}, etc...`}
+            placeholder="Ask Dr. Rodriguez about your nutrition concerns..."
             placeholderTextColor="#777"
             multiline
           />
