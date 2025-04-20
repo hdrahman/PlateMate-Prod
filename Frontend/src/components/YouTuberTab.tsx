@@ -14,11 +14,23 @@ const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
 
     useEffect(() => {
         const fetchVideos = async () => {
+            if (!youtuber || !youtuber.channelId) {
+                setError('Invalid YouTuber data');
+                setLoading(false);
+                return;
+            }
+
             try {
                 setLoading(true);
-                const fetchedVideos = await getChannelVideos(youtuber.channelId);
-                setVideos(fetchedVideos);
                 setError(null);
+
+                const fetchedVideos = await getChannelVideos(youtuber.channelId);
+
+                if (fetchedVideos && Array.isArray(fetchedVideos) && fetchedVideos.length > 0) {
+                    setVideos(fetchedVideos);
+                } else {
+                    setError(`No videos found for ${youtuber.name}. Please try again later.`);
+                }
             } catch (err) {
                 console.error(`Error fetching videos for ${youtuber.name}:`, err);
                 setError(`Couldn't load videos for ${youtuber.name}. Please try again later.`);
@@ -28,20 +40,20 @@ const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
         };
 
         fetchVideos();
-    }, [youtuber.channelId]);
+    }, [youtuber?.channelId]);
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.titleRow}>
-                    <Text style={styles.youtuberName}>{youtuber.name}</Text>
-                    {youtuber.subcategory && (
+                    <Text style={styles.youtuberName}>{youtuber?.name || 'Unknown YouTuber'}</Text>
+                    {youtuber?.subcategory && (
                         <View style={styles.subcategoryBadge}>
                             <Text style={styles.subcategoryText}>{youtuber.subcategory}</Text>
                         </View>
                     )}
                 </View>
-                <Text style={styles.youtuberDescription}>{youtuber.description}</Text>
+                <Text style={styles.youtuberDescription}>{youtuber?.description || 'No description available'}</Text>
             </View>
 
             <View style={styles.contentContainer}>

@@ -6,34 +6,6 @@ import { YOUTUBE_API_KEY } from '@env';
 const API_KEY = YOUTUBE_API_KEY;
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
-// Add mock data for development
-const MOCK_VIDEOS = [
-    {
-        id: 'video1',
-        title: 'How to Build Muscle - The TRUTH About Muscle Building',
-        thumbnailUrl: 'https://i.ytimg.com/vi/uuMck3jOWWQ/hqdefault.jpg',
-        channelTitle: 'Example Channel',
-        publishedAt: new Date().toISOString(),
-        description: 'Learn the fundamentals of muscle building in this comprehensive guide.',
-    },
-    {
-        id: 'video2',
-        title: '10-Minute Home Workout That Actually Works',
-        thumbnailUrl: 'https://i.ytimg.com/vi/CBWQGb4LyAM/hqdefault.jpg',
-        channelTitle: 'Example Channel',
-        publishedAt: new Date().toISOString(),
-        description: 'A quick workout you can do at home with no equipment.',
-    },
-    {
-        id: 'video3',
-        title: 'What I Eat in a Day for Optimal Health',
-        thumbnailUrl: 'https://i.ytimg.com/vi/qH__o17xHls/hqdefault.jpg',
-        channelTitle: 'Example Channel',
-        publishedAt: new Date().toISOString(),
-        description: 'A full day of healthy, balanced eating explained.',
-    }
-];
-
 export interface YouTuber {
     id: string;
     name: string;
@@ -63,7 +35,10 @@ export const getChannelDetails = async (channelId: string) => {
             },
         });
 
-        return response.data.items[0];
+        if (response.data?.items?.length > 0) {
+            return response.data.items[0];
+        }
+        throw new Error("Channel not found");
     } catch (error) {
         console.error('Error fetching channel details:', error);
         throw error;
@@ -72,10 +47,14 @@ export const getChannelDetails = async (channelId: string) => {
 
 // Function to get channel videos
 export const getChannelVideos = async (channelId: string, maxResults = 5) => {
-    // Return mock data if no API key is provided
-    if (!API_KEY || API_KEY === 'YOUR_YOUTUBE_API_KEY_HERE') {
-        console.log('Using mock video data - please set a valid YouTube API key in .env');
-        return MOCK_VIDEOS;
+    if (!channelId) {
+        console.error('Invalid channel ID provided');
+        return [];
+    }
+
+    if (!API_KEY) {
+        console.error('No YouTube API key provided in environment variables');
+        return [];
     }
 
     try {
@@ -87,6 +66,12 @@ export const getChannelVideos = async (channelId: string, maxResults = 5) => {
                 key: API_KEY,
             },
         });
+
+        // Check if channel data exists and has the expected structure
+        if (!channelResponse.data?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads) {
+            console.error('Channel data is missing uploads playlist ID');
+            return [];
+        }
 
         const uploadsPlaylistId = channelResponse.data.items[0].contentDetails.relatedPlaylists.uploads;
 
@@ -100,24 +85,52 @@ export const getChannelVideos = async (channelId: string, maxResults = 5) => {
             },
         });
 
-        return videosResponse.data.items.map((item: any) => ({
-            id: item.contentDetails.videoId,
-            title: item.snippet.title,
-            thumbnailUrl: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url,
-            channelTitle: item.snippet.channelTitle,
-            publishedAt: item.snippet.publishedAt,
-            description: item.snippet.description,
-        }));
+        // Check if video data exists and has the expected structure
+        if (!videosResponse.data?.items) {
+            console.error('No videos found in playlist');
+            return [];
+        }
+
+        // Map the video data to our interface format with proper null/undefined checks
+        return videosResponse.data.items.map((item: any) => {
+            // Ensure all properties exist before accessing them
+            if (!item?.snippet || !item?.contentDetails?.videoId) {
+                return null;
+            }
+
+            // Get the best available thumbnail or fallback to a placeholder
+            let thumbnailUrl = 'https://via.placeholder.com/480x360?text=No+Thumbnail';
+            if (item.snippet.thumbnails) {
+                if (item.snippet.thumbnails.high?.url) {
+                    thumbnailUrl = item.snippet.thumbnails.high.url;
+                } else if (item.snippet.thumbnails.medium?.url) {
+                    thumbnailUrl = item.snippet.thumbnails.medium.url;
+                } else if (item.snippet.thumbnails.default?.url) {
+                    thumbnailUrl = item.snippet.thumbnails.default.url;
+                }
+            }
+
+            return {
+                id: item.contentDetails.videoId,
+                title: item.snippet.title || 'Untitled Video',
+                thumbnailUrl,
+                channelTitle: item.snippet.channelTitle || 'Unknown Channel',
+                publishedAt: item.snippet.publishedAt || new Date().toISOString(),
+                description: item.snippet.description || 'No description available',
+            };
+        }).filter(Boolean); // Remove any null items
     } catch (error) {
         console.error('Error fetching channel videos:', error);
-        // Fall back to mock data if there's an error
-        console.log('Falling back to mock video data due to API error');
-        return MOCK_VIDEOS;
+        return [];
     }
 };
 
 // Function to search for a channel by name
 export const searchChannel = async (channelName: string) => {
+    if (!channelName || !API_KEY) {
+        return null;
+    }
+
     try {
         const response = await axios.get(`${BASE_URL}/search`, {
             params: {
@@ -129,12 +142,12 @@ export const searchChannel = async (channelName: string) => {
             },
         });
 
-        if (response.data.items.length > 0) {
+        if (response.data?.items?.length > 0 && response.data.items[0]?.snippet?.channelId) {
             return response.data.items[0].snippet.channelId;
         }
         return null;
     } catch (error) {
         console.error('Error searching for channel:', error);
-        throw error;
+        return null;
     }
 }; 
