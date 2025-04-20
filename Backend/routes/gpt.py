@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from db import get_db
+from DB import get_db
 from models import FoodLog
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional, Union

@@ -7,7 +7,7 @@ import traceback  # Added to capture full error logs
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
-from db import SessionLocal, get_db
+from DB import SessionLocal, get_db
 from models import FoodLog
 from datetime import datetime
 from typing import List

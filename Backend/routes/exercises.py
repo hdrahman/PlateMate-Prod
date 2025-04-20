@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
 
-from db import get_db
+from DB import get_db
 from models import Exercise
 
 router = APIRouter()
