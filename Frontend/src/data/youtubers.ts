@@ -21,7 +21,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '3',
         name: 'Fraser Wilson',
-        channelId: 'UCIuJbjQSm0t1t9-iNSKUzPg',
+        channelId: 'UCyiNCEHLyKbSUrrncVr9KvQ',
         description: 'Short aesthetic-focused home workouts',
         category: 'Workouts & Training',
         subcategory: 'Home'
@@ -37,7 +37,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '6',
         name: 'Will Tennyson',
-        channelId: 'UCURxVdvsbGgYmrK1BjNfZ5A',
+        channelId: 'UCB2wtYpfbCpYDc5TeTwuqFA',
         description: 'Tries celeb routines, fun gym content',
         category: 'Workouts & Training',
         subcategory: 'Beginner'
@@ -53,7 +53,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '8',
         name: 'Koboko Fitness',
-        channelId: 'UCX32D3gKG7LCo6tYV0Oc8sg',
+        channelId: 'UCKO8zrU3WTo_L-QZw3VQ1aQ',
         description: 'Beginner-friendly home programs',
         category: 'Workouts & Training',
         subcategory: 'Beginner'
@@ -79,7 +79,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '11',
         name: 'Abbey Sharp',
-        channelId: 'UCKidUuKNlM-kaPNF8-JaUdQ',
+        channelId: 'UCKLz-9xkpPNjK26PqbjHn7Q',
         description: 'Dietitian reactions, myth-busting',
         category: 'Nutrition & Diet',
         subcategory: 'Myths'
@@ -95,7 +95,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '14',
         name: 'Greg Doucette',
-        channelId: 'UC5dQx9jM8fGWJnTSWQhgv3A',
+        channelId: 'UCLqH-U2TXzj1h7lyYQZLNQQ',
         description: 'Calls out fake diets + coaches',
         category: 'Nutrition & Diet',
         subcategory: 'Myths'
@@ -103,7 +103,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '15',
         name: 'Simnett Nutrition',
-        channelId: 'UCpyhJZhJQWKDdJCRr8JszzQ',
+        channelId: 'UCpyhJZhJQWKDdJCR07jPY-Q',
         description: 'Vegan nutrition & muscle-building',
         category: 'Nutrition & Diet',
         subcategory: 'Vegan'
@@ -135,7 +135,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '19',
         name: 'Remi Cruz',
-        channelId: 'UCRnPB_OmAXn-QyQ8hYPWzXg',
+        channelId: 'UCKN9PT9mTOnUHqUnEE0gfyw',
         description: 'Budget-friendly & realistic',
         category: 'Nutrition & Diet',
         subcategory: 'Budget'
@@ -143,7 +143,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '20',
         name: 'The Whole Happy Life',
-        channelId: 'UC446-QEPfoGd0MvGGBYuFQw',
+        channelId: 'UCc-R6TgALk6BjHtigecKedw',
         description: 'Simple, science-based wellness',
         category: 'Nutrition & Diet',
         subcategory: 'Evidence-Based'
@@ -153,7 +153,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '21',
         name: 'José Zuniga',
-        channelId: 'UCkbGDaDf2DAjxAx1hUKEjOg',
+        channelId: 'UChNN7VBxPTiNrqjUaQd9bxA',
         description: 'Style, grooming, confidence',
         category: 'Style & Grooming',
         subcategory: 'Casual'
@@ -161,7 +161,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '22',
         name: 'Alex Costa',
-        channelId: 'UCeJLsQyd0p29f-UwG7aKDWA',
+        channelId: 'UCZyCposXwcyopaACep44maQ',
         description: 'Modern men\'s fashion & grooming',
         category: 'Style & Grooming',
         subcategory: 'Casual'
@@ -169,7 +169,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '23',
         name: 'Real Men Real Style',
-        channelId: 'UCLtBi4QH-KvQcj3Tzd3g_vg',
+        channelId: 'UCmRfQHc3U4fV1-i8Ry1HmtA',
         description: 'Classic, mature approach',
         category: 'Style & Grooming',
         subcategory: 'Business'
@@ -177,7 +177,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '24',
         name: 'He Spoke Style',
-        channelId: 'UC2GbOL2Oj7NQDnMH-ZgxABw',
+        channelId: 'UC4A7_ROn-bKRIHaRxfWVaOw',
         description: 'Sophisticated, businesswear focus',
         category: 'Style & Grooming',
         subcategory: 'Business'
@@ -185,37 +185,21 @@ export const youtubers: YouTuber[] = [
     {
         id: '25',
         name: 'BluMaan',
-        channelId: 'UCP-9aGDX9QTM3Mz5oJEUbcA',
+        channelId: 'UCbq8_4_mFAx_rzDF5VT7MJw',
         description: 'Hairstyling and men\'s haircare',
         category: 'Style & Grooming',
         subcategory: 'Haircare'
     },
     {
         id: '26',
-        name: 'TheGentlemansCove',
-        channelId: 'UCmdtTHQzYFKu-lNtMu-JAOw',
+        name: 'Jordan O\'Brien',
+        channelId: 'UCSNtgLG8S073khvrXtoZbog',
         description: 'Classic grooming, lifestyle',
         category: 'Style & Grooming',
         subcategory: 'Grooming'
     },
     {
         id: '27',
-        name: 'Jordan O\'Brien',
-        channelId: 'UCOt0sVY78xdcX_p6C15bydg',
-        description: 'Casual fashion & grooming',
-        category: 'Style & Grooming',
-        subcategory: 'Casual'
-    },
-    {
-        id: '28',
-        name: 'TMF Style',
-        channelId: 'UCMJlLp-MVG-XpRjSC_AU8aA',
-        description: 'Simplified grooming, style hacks',
-        category: 'Style & Grooming',
-        subcategory: 'Grooming'
-    },
-    {
-        id: '29',
         name: 'Alpha M.',
         channelId: 'UC1KbedtKa3d5dleFR6OjQMg',
         description: 'Loud, bold fashion and life tips',
@@ -224,8 +208,8 @@ export const youtubers: YouTuber[] = [
     },
     {
         id: '30',
-        name: 'ScentedGent',
-        channelId: 'UCKDOJ2UdS5-GNg1-TqGAD9g',
+        name: 'Jeremy Fragrance',
+        channelId: 'UCzKrJ5NSA9o7RHYRG12kHZw',
         description: 'Fragrance reviews & recommendations',
         category: 'Style & Grooming',
         subcategory: 'Fragrance'
@@ -267,7 +251,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '35',
         name: 'Rowena Tsai',
-        channelId: 'UCK9h6wbMXgGnU5aLCGLAlUQ',
+        channelId: 'UCaYF1G_L5J7sqJzEeBVUDzw',
         description: 'Self-care, intentional living',
         category: 'Mindset & Motivation',
         subcategory: 'Habits'
@@ -283,7 +267,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '37',
         name: 'Lavendaire',
-        channelId: 'UCtERNEb-oWp4snIh4BrkmMQ',
+        channelId: 'UC-ga3onzHSJFAGsIebtVeBg',
         description: 'Dreamy but practical self-improvement',
         category: 'Mindset & Motivation',
         subcategory: 'Habits'
@@ -291,7 +275,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '38',
         name: 'Kharma Medic',
-        channelId: 'UCJ8eNlKSTHZtEuniSWk45YQ',
+        channelId: 'UCeoU2maQX8JiQ9DTuhOVz5g',
         description: 'Focused, high-performance lifestyle',
         category: 'Mindset & Motivation',
         subcategory: 'Discipline'
@@ -307,7 +291,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '40',
         name: 'Project Better Self',
-        channelId: 'UC0XuPD3aMkVAzhbRs8vIIcA',
+        channelId: 'UCugmVpDxOg-nmyLDdHcu04A',
         description: 'Stoicism, deep philosophy made simple',
         category: 'Mindset & Motivation',
         subcategory: 'Discipline'
@@ -325,7 +309,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '42',
         name: 'Dr. Jen Fraboni',
-        channelId: 'UCrYliHSl6GiU2FngyJpK1hg',
+        channelId: 'UCknKMzugCaPXD4AI6rq3wiQ',
         description: 'PT-level mobility advice',
         category: 'Recovery & Wellness',
         subcategory: 'Stretching'
@@ -333,7 +317,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '43',
         name: 'Caroline Jordan',
-        channelId: 'UCG8AxMVa6eutIGxVLm0wZOQ',
+        channelId: 'UCkadh1ZnrCDOF8awC9NbAbA',
         description: 'Recovery workouts, low-impact fitness',
         category: 'Recovery & Wellness',
         subcategory: 'Stretching'
@@ -341,7 +325,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '44',
         name: 'Breathe and Flow',
-        channelId: 'UCbfPq-uRqonJQli-LLc4wpw',
+        channelId: 'UCbfPq-uRqonJQli41muSLeQ',
         description: 'Yoga, breathwork, wellness',
         category: 'Recovery & Wellness',
         subcategory: 'Mental Health'
@@ -357,7 +341,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '47',
         name: 'The Sleep Doctor',
-        channelId: 'UC693aDDKfKgwCywJWgT-QCg',
+        channelId: 'UCe0fHWjFLX6DecThdT_CZyw',
         description: 'Sleep science made practical',
         category: 'Recovery & Wellness',
         subcategory: 'Sleep'
@@ -365,7 +349,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '48',
         name: 'Huberman Lab',
-        channelId: 'UC2D2CMWXmOVdUx-Bgs0pfGw',
+        channelId: 'UCkZjTZNvuxq1CYMS3cwZa1Q',
         description: 'Deep dives on supplements, sleep, hormones',
         category: 'Recovery & Wellness',
         subcategory: 'Supplements'
@@ -373,7 +357,7 @@ export const youtubers: YouTuber[] = [
     {
         id: '49',
         name: 'Psych Hub',
-        channelId: 'UCRg7YmQVL5aGsNUYXWZAJTg',
+        channelId: 'UC_zQoiPtBDvsThGroagm3ww',
         description: 'Mental health education in digestible formats',
         category: 'Recovery & Wellness',
         subcategory: 'Mental Health'
