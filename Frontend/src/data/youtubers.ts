@@ -27,14 +27,6 @@ export const youtubers: YouTuber[] = [
         subcategory: 'Home'
     },
     {
-        id: '4',
-        name: 'MadFit',
-        channelId: 'UCpQ34afVgk8cRQBjSJ1xuJQ',
-        description: 'Apartment-friendly workouts to music',
-        category: 'Workouts & Training',
-        subcategory: 'Home'
-    },
-    {
         id: '5',
         name: 'Pamela Reif',
         channelId: 'UChVRfsT_ASBZk10o0An7Ucg',
@@ -97,14 +89,6 @@ export const youtubers: YouTuber[] = [
         name: 'Thomas DeLauer',
         channelId: 'UC70SrI3VkT1MXALRtf0pcHg',
         description: 'Keto, fasting, science-backed nutrition',
-        category: 'Nutrition & Diet',
-        subcategory: 'Evidence-Based'
-    },
-    {
-        id: '13',
-        name: 'Stephanie Buttermore',
-        channelId: 'UC4gDYbCEIb69uvFmCX5Lyuw',
-        description: 'Balanced, intuitive eating + fitness',
         category: 'Nutrition & Diet',
         subcategory: 'Evidence-Based'
     },
@@ -361,14 +345,6 @@ export const youtubers: YouTuber[] = [
         description: 'Yoga, breathwork, wellness',
         category: 'Recovery & Wellness',
         subcategory: 'Mental Health'
-    },
-    {
-        id: '45',
-        name: 'Chloe Ting',
-        channelId: 'UCCgLoMYIyP0U56dEhEL1wXQ',
-        description: 'Light workouts & mobility (great for beginners)',
-        category: 'Recovery & Wellness',
-        subcategory: 'Stretching'
     },
     {
         id: '46',
