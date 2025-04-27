@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         paddingBottom: 32, // Extra padding at bottom for better UX
         position: 'absolute',
-        bottom: 0,
+        bottom: 70, // Moved up from bottom: 0
         left: 0,
         right: 0,
     },
