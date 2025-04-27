@@ -183,6 +183,14 @@ export default function CameraScreen() {
                             {renderCorner('bottomRight')}
                             {renderCorner('bottomLeft')}
                         </View>
+
+                        {/* Capture Button */}
+                        <TouchableOpacity
+                            style={styles.captureButton}
+                            onPress={handleCapturePhoto}
+                        >
+                            <View style={styles.captureButtonInner} />
+                        </TouchableOpacity>
                     </View>
                 </CameraView>
             </View>
@@ -194,7 +202,7 @@ export default function CameraScreen() {
                     <Text style={styles.buttonLabel}>Gallery</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.controlButton} onPress={handleCapturePhoto}>
+                <TouchableOpacity style={styles.controlButton}>
                     <Ionicons name="camera-outline" size={32} color="#FFFFFF" />
                     <Text style={styles.buttonLabel}>Camera</Text>
                 </TouchableOpacity>
@@ -378,6 +386,23 @@ const styles = StyleSheet.create({
         marginTop: 4,
         textShadowColor: 'rgba(0, 0, 0, 0.75)',
         textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        textShadowRadius: 2,
+    },
+    captureButton: {
+        position: 'absolute',
+        bottom: 120,
+        alignSelf: 'center',
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: 'rgba(155, 0, 255, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    captureButtonInner: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#FFFFFF',
     },
 });

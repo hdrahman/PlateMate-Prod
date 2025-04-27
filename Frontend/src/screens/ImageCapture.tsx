@@ -70,16 +70,12 @@ const ImageCapture: React.FC = () => {
         if (initialPhotoUri) {
             return [
                 { uri: initialPhotoUri, type: 'top', uploaded: false },
-                { uri: '', type: 'side', uploaded: false },
-                { uri: '', type: 'additional', uploaded: false },
-                { uri: '', type: 'additional', uploaded: false }
+                { uri: '', type: 'side', uploaded: false }
             ];
         }
         return [
             { uri: '', type: 'top', uploaded: false },
-            { uri: '', type: 'side', uploaded: false },
-            { uri: '', type: 'additional', uploaded: false },
-            { uri: '', type: 'additional', uploaded: false }
+            { uri: '', type: 'side', uploaded: false }
         ];
     });
 
@@ -384,14 +380,14 @@ const ImageCapture: React.FC = () => {
 
         // Check if at least 2 images are taken when not using barcode data
         const filledImages = images.filter(img => img.uri !== '');
-        if (filledImages.length < 2) {
-            Alert.alert('Error', 'Please take at least 2 images (top view and side view)');
+        if (filledImages.length < 1) {
+            Alert.alert('Error', 'Please take at least 1 image (top view)');
             return;
         }
 
-        // Check if the first two required images are taken
-        if (!images[0].uri || !images[1].uri) {
-            Alert.alert('Error', 'Please take both the top view and side view images');
+        // Check if the first required image is taken
+        if (!images[0].uri) {
+            Alert.alert('Error', 'Please take a top view image');
             return;
         }
 
@@ -571,7 +567,7 @@ const ImageCapture: React.FC = () => {
 
     const renderImagePlaceholder = (index: number) => {
         const image = images[index];
-        const isRequired = index < 2;
+        const isRequired = index === 0;
 
         // Function to remove an image
         const handleRemoveImage = () => {
@@ -724,7 +720,7 @@ const ImageCapture: React.FC = () => {
 
             <ScrollView style={styles.content}>
                 <Text style={styles.instructions}>
-                    Please take at least 2 images of your food. The first should be a top view, and the second a side view. You can take additional pictures to show food that wasn't visible in the first two, or to scan a nutritional label.
+                    Please take at least 1 image of your food. The first image (top view) is required. You can also take a second image (side view) to provide additional detail about your meal.
                 </Text>
                 <LinearGradient
                     colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
@@ -737,8 +733,6 @@ const ImageCapture: React.FC = () => {
                 <View style={styles.imagesContainer}>
                     {renderImagePlaceholder(0)}
                     {renderImagePlaceholder(1)}
-                    {renderImagePlaceholder(2)}
-                    {renderImagePlaceholder(3)}
                 </View>
 
                 <View style={styles.foodDetailsWrapper}>
