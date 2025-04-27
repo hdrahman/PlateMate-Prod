@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, ActivityIndicator, Alert, TextInput } from 'react-native';
-import { CameraView, BarcodeScanningResult } from 'expo-camera';
+import { CameraView, BarcodeScanningResult, useCameraPermissions } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,17 +21,41 @@ type RootStackParamList = {
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function BarcodeScannerScreen() {
-    const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+    const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
     const [loading, setLoading] = useState(false);
     const [torchOn, setTorchOn] = useState(false);
     const [barcodeText, setBarcodeText] = useState('');
+    const [isCameraReady, setIsCameraReady] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const navigation = useNavigation<NavigationProp>();
 
+    // Request camera permissions when component mounts
     useEffect(() => {
-        // Permission is now handled by CameraView component
+        (async () => {
+            if (!permission?.granted) {
+                await requestPermission();
+            }
+        })();
     }, []);
+
+    // Handle screen focus events
+    useFocusEffect(
+        React.useCallback(() => {
+            // Reset camera state when screen is focused
+            setIsCameraReady(false);
+            setScanned(false);
+
+            // Small delay to ensure camera initializes properly
+            const timer = setTimeout(() => {
+                setIsCameraReady(true);
+            }, 300);
+
+            return () => {
+                clearTimeout(timer);
+            };
+        }, [])
+    );
 
     const handleBarCodeScanned = (result: BarcodeScanningResult) => {
         if (scanned) return;
@@ -185,24 +209,50 @@ export default function BarcodeScannerScreen() {
         navigation.navigate('Food Log');
     };
 
+    // If user denies camera permission
+    if (permission?.granted === false) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <StatusBar barStyle="light-content" />
+                <View style={styles.permissionContainer}>
+                    <Text style={styles.permissionText}>Camera permission is required to scan barcodes</Text>
+                    <TouchableOpacity
+                        style={styles.permissionButton}
+                        onPress={requestPermission}
+                    >
+                        <Text style={styles.permissionButtonText}>Grant Permission</Text>
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.controlBar}>
+                    <TouchableOpacity style={styles.controlButton} onPress={openGallery}>
+                        <Ionicons name="images-outline" size={26} color="#FFFFFF" />
+                        <Text style={styles.buttonLabel}>Gallery</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton} onPress={handleCapturePhoto}>
+                        <Ionicons name="camera-outline" size={32} color="#FFFFFF" />
+                        <Text style={styles.buttonLabel}>Camera</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton} onPress={() => { }}>
+                        <MaterialCommunityIcons name="barcode-scan" size={26} color="#FFFFFF" />
+                        <Text style={styles.buttonLabel}>Barcode</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
+                        <Ionicons name="document-text-outline" size={26} color="#FFFFFF" />
+                        <Text style={styles.buttonLabel}>Food Log</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Scanner</Text>
-                <TouchableOpacity onPress={toggleTorch} style={styles.flashButton}>
-                    <Ionicons
-                        name={torchOn ? "flash" : "flash-off"}
-                        size={24}
-                        color="#FFF"
-                    />
-                </TouchableOpacity>
-            </View>
 
-            <View style={styles.cameraContainer}>
+            {isCameraReady && (
                 <CameraView
                     style={styles.camera}
                     ref={cameraRef}
@@ -217,6 +267,8 @@ export default function BarcodeScannerScreen() {
                         ]
                     }}
                     onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                    onCameraReady={() => console.log('Camera is ready')}
+                    onMountError={(error) => console.error('Camera mount error:', error)}
                 >
                     {!loading && (
                         <View style={styles.cameraOverlay}>
@@ -244,6 +296,28 @@ export default function BarcodeScannerScreen() {
                         </View>
                     )}
                 </CameraView>
+            )}
+
+            {!isCameraReady && (
+                <View style={styles.loadingCamera}>
+                    <ActivityIndicator size="large" color="#FF00F5" />
+                    <Text style={styles.loadingText}>Initializing camera...</Text>
+                </View>
+            )}
+
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Scanner</Text>
+                <TouchableOpacity onPress={toggleTorch} style={styles.flashButton}>
+                    <Ionicons
+                        name={torchOn ? "flash" : "flash-off"}
+                        size={24}
+                        color="#FFF"
+                    />
+                </TouchableOpacity>
             </View>
 
             {loading && (
@@ -297,7 +371,7 @@ export default function BarcodeScannerScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000',
+        backgroundColor: '#000', // Set to black as fallback
     },
     header: {
         flexDirection: 'row',
@@ -324,16 +398,16 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
     },
-    cameraContainer: {
-        flex: 1,
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
     camera: {
         flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    loadingCamera: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000',
     },
     cameraOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -450,4 +524,27 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 3,
     },
-}); 
+    permissionContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    permissionText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    permissionButton: {
+        backgroundColor: '#FF00F5',
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8,
+    },
+    permissionButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+});
