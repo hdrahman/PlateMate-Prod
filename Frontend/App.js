@@ -65,7 +65,7 @@ function CustomTabBarButton({ children }) {
           borderWidth: 0.7,          // reduced from 1 to 0.5
           borderColor: '#FF00F520', // semi-transparent pink border
         }}
-        onPress={() => navigation.navigate('ImageCapture', { mealType: 'Snacks' })}
+        onPress={() => navigation.navigate('Camera')}
       >
         {children}
       </TouchableOpacity>

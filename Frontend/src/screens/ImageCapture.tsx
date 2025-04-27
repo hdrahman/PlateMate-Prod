@@ -30,7 +30,7 @@ const { width } = Dimensions.get('window');
 // Define navigation types
 type RootStackParamList = {
     FoodLog: { refresh?: number };
-    ImageCapture: { mealType: string };
+    ImageCapture: { mealType: string; photoUri?: string };
     // Add other screens as needed
 };
 
@@ -57,18 +57,29 @@ type NutritionData = {
 const ImageCapture: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
-    const { mealType: initialMealType } = route.params as { mealType: string };
+    const { mealType: initialMealType, photoUri: initialPhotoUri } = route.params as { mealType: string; photoUri?: string };
 
     const [mealType, setMealType] = useState(initialMealType);
     const [showMealTypeDropdown, setShowMealTypeDropdown] = useState(false);
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
-    const [images, setImages] = useState<ImageInfo[]>([
-        { uri: '', type: 'top', uploaded: false },
-        { uri: '', type: 'side', uploaded: false },
-        { uri: '', type: 'additional', uploaded: false },
-        { uri: '', type: 'additional', uploaded: false }
-    ]);
+    // Initialize images array based on whether we received a photoUri
+    const [images, setImages] = useState<ImageInfo[]>(() => {
+        if (initialPhotoUri) {
+            return [
+                { uri: initialPhotoUri, type: 'top', uploaded: false },
+                { uri: '', type: 'side', uploaded: false },
+                { uri: '', type: 'additional', uploaded: false },
+                { uri: '', type: 'additional', uploaded: false }
+            ];
+        }
+        return [
+            { uri: '', type: 'top', uploaded: false },
+            { uri: '', type: 'side', uploaded: false },
+            { uri: '', type: 'additional', uploaded: false },
+            { uri: '', type: 'additional', uploaded: false }
+        ];
+    });
 
     const [brandName, setBrandName] = useState('');
     const [quantity, setQuantity] = useState('');
