@@ -1,9 +1,10 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
+import { useSteps } from '../context/StepContext';
 
 import {
   View,
@@ -14,7 +15,8 @@ import {
   ScrollView,
   TouchableOpacity,
   NativeSyntheticEvent,
-  NativeScrollEvent
+  NativeScrollEvent,
+  ActivityIndicator
 } from 'react-native';
 import Svg, {
   Circle,
@@ -111,6 +113,15 @@ export default function Home() {
   const { isDarkTheme } = useContext(ThemeContext);
   // Keep track of which "page" (card) we are on in the horizontal scroll
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Use the step context instead of the hook directly
+  const {
+    todaySteps,
+    stepHistory,
+    isAvailable,
+    loading: stepsLoading
+  } = useSteps();
+
   // Handler: updates activeIndex when user scrolls horizontally
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
@@ -130,12 +141,18 @@ export default function Home() {
     { label: 'Exercise', value: totalBurned, icon: 'barbell-outline', color: '#66BB6A' }, // updated green
     {
       label: 'Steps',
-      value: stepsCount,
+      value: stepsLoading ? '-' : todaySteps,
       icon: 'walk',
       iconSet: 'MaterialCommunityIcons',
       color: '#E040FB' // updated purple
     }
   ];
+
+  // Use actual step history from the context
+  const formattedStepHistory = stepsLoading ? [] : stepHistory.map(item => ({
+    date: new Date(item.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }),
+    steps: item.steps
+  }));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
@@ -278,7 +295,13 @@ export default function Home() {
                     <IconComponent name={item.icon as any} size={20} color={item.color} />
                     <View style={{ flex: 1, marginLeft: 10 }}>
                       <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
-                      <Text style={styles.statValue}>{item.value}</Text>
+                      <Text style={styles.statValue}>
+                        {item.label === 'Steps' && stepsLoading ? (
+                          <ActivityIndicator size="small" color="#E040FB" />
+                        ) : (
+                          item.value
+                        )}
+                      </Text>
                     </View>
                   </View>
                 );
@@ -353,7 +376,14 @@ export default function Home() {
           <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
             <GradientBorderCard>
               <View style={styles.trendContainer}>
-                <StepsGraph data={stepsHistory} />
+                {stepsLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#E040FB" />
+                    <Text style={styles.loadingText}>Loading step data...</Text>
+                  </View>
+                ) : (
+                  <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
+                )}
               </View>
             </GradientBorderCard>
           </View>
@@ -1111,5 +1141,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     height: 235
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#FFF',
+    marginTop: 10,
+    fontSize: 16,
   },
 });

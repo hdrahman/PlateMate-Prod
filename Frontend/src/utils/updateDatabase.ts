@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 2; // Increment this when making schema changes
+const CURRENT_VERSION = 3; // Increment this to version 3
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -54,18 +54,34 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             }
                         }
                     }
+                },
+                // Migration to version 3 - Add steps table
+                async () => {
+                    if (currentVersion < 3) {
+                        console.log('Migrating to version 3: Creating steps table');
+                        await db.execAsync(`
+                            CREATE TABLE IF NOT EXISTS steps (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id INTEGER DEFAULT 1,
+                                date TEXT NOT NULL,
+                                count INTEGER NOT NULL DEFAULT 0,
+                                synced INTEGER DEFAULT 0,
+                                sync_action TEXT DEFAULT 'create',
+                                last_modified TEXT NOT NULL
+                            )
+                        `);
+                    }
                 }
-                // Add more migrations here as needed
             ];
 
-            // Run migrations sequentially
+            // Run migrations in order
             for (const migration of migrations) {
                 await migration();
             }
 
             // Update stored version
             await AsyncStorage.setItem(DB_VERSION_KEY, CURRENT_VERSION.toString());
-            console.log('✅ Database migration completed successfully');
+            console.log(`✅ Database successfully migrated to version ${CURRENT_VERSION}`);
         } else {
             console.log('✅ Database schema is up to date');
         }

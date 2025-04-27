@@ -285,13 +285,10 @@ const addSampleExerciseData = async () => {
     }
 };
 
-// Helper function to get current timestamp
-export const getCurrentDate = (): string => {
+// Helper function to get current date in YYYY-MM-DD format
+export const getCurrentDate = () => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return now.toISOString();
 };
 
 // Add a new food log entry
@@ -705,6 +702,161 @@ export const deleteExercise = async (id: number) => {
         return result.changes;
     } catch (error) {
         console.error('❌ Error deleting exercise:', error);
+        throw error;
+    }
+};
+
+// Step tracking functions
+export const saveSteps = async (count: number, date: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to save steps before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const lastModified = getCurrentDate();
+
+    try {
+        // Check if we already have an entry for this date
+        const existingEntry = await db.getFirstAsync<{ id: number, count: number }>(
+            `SELECT id, count FROM steps WHERE date = ?`,
+            [date]
+        );
+
+        if (existingEntry) {
+            // Update existing entry
+            await db.runAsync(
+                `UPDATE steps SET count = ?, last_modified = ?, synced = 0, sync_action = 'update' WHERE id = ?`,
+                [count, lastModified, existingEntry.id]
+            );
+            console.log(`✅ Updated steps for ${date} to ${count}`);
+            return existingEntry.id;
+        } else {
+            // Insert new entry
+            const result = await db.runAsync(
+                `INSERT INTO steps (date, count, last_modified) VALUES (?, ?, ?)`,
+                [date, count, lastModified]
+            );
+            console.log(`✅ Saved ${count} steps for ${date}`);
+            return result.lastInsertRowId;
+        }
+    } catch (error) {
+        console.error('❌ Error saving steps:', error);
+        throw error;
+    }
+};
+
+// Get steps for a specific date
+export const getStepsForDate = async (date: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get steps before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const result = await db.getFirstAsync<{ count: number }>(
+            `SELECT count FROM steps WHERE date = ?`,
+            [date]
+        );
+
+        if (result) {
+            return result.count;
+        }
+
+        return 0; // Return 0 if no steps recorded for that date
+    } catch (error) {
+        console.error('❌ Error getting steps for date:', error);
+        throw error;
+    }
+};
+
+// Get step history for last n days
+export const getStepsHistory = async (days: number = 7) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get steps history before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get the current date
+        const today = new Date();
+
+        // Create an array to store each day's date in YYYY-MM-DD format
+        const dateRange = [];
+        for (let i = 0; i < days; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+            dateRange.push(formattedDate);
+        }
+
+        // Prepare placeholder for SQL query with correct number of parameters
+        const placeholders = dateRange.map(() => '?').join(',');
+
+        // Get steps data for these dates
+        const results = await db.getAllAsync<{ date: string, count: number }>(
+            `SELECT date, count FROM steps WHERE date IN (${placeholders}) ORDER BY date ASC`,
+            dateRange
+        );
+
+        // Create a map for quick lookup
+        const stepsMap = new Map();
+        results.forEach(record => {
+            stepsMap.set(record.date, record.count);
+        });
+
+        // Format the output, including dates with 0 steps
+        return dateRange.reverse().map(date => ({
+            date: date,
+            steps: stepsMap.get(date) || 0
+        }));
+    } catch (error) {
+        console.error('❌ Error getting steps history:', error);
+        throw error;
+    }
+};
+
+// Update steps for today
+export const updateTodaySteps = async (count: number) => {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    return saveSteps(count, today);
+};
+
+// Get unsynced steps for syncing to server
+export const getUnsyncedSteps = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get unsynced steps before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const result = await db.getAllAsync(
+            `SELECT * FROM steps WHERE synced = 0`
+        );
+        return result;
+    } catch (error) {
+        console.error('❌ Error getting unsynced steps:', error);
+        throw error;
+    }
+};
+
+// Mark steps as synced
+export const markStepsSynced = async (ids: number[]) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to mark steps as synced before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    if (ids.length === 0) return;
+
+    try {
+        const placeholders = ids.map(() => '?').join(',');
+        await db.runAsync(
+            `UPDATE steps SET synced = 1, sync_action = NULL WHERE id IN (${placeholders})`,
+            ids
+        );
+        console.log(`✅ Marked ${ids.length} step records as synced`);
+    } catch (error) {
+        console.error('❌ Error marking steps as synced:', error);
         throw error;
     }
 };

@@ -25,6 +25,7 @@
     "expo-camera": "~16.0.16",
     "expo-image-picker": "~16.0.6",
     "expo-linear-gradient": "~14.0.2",
+    "expo-sensors": "^14.0.2",
     "expo-sqlite": "^15.1.2",
     "expo-status-bar": "~2.0.1",
     "googleapis": "^148.0.0",
