@@ -30,7 +30,9 @@ const { width } = Dimensions.get('window');
 // Define navigation types
 type RootStackParamList = {
     FoodLog: { refresh?: number };
-    ImageCapture: { mealType: string; photoUri?: string; foodData?: any };
+    ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
+    Camera: undefined;
+    BarcodeScanner: undefined;
     // Add other screens as needed
 };
 
@@ -346,19 +348,28 @@ const ImageCapture: React.FC = () => {
                             // Add a small delay to ensure database operations complete
                             await new Promise(resolve => setTimeout(resolve, 500));
 
-                            // Go back to previous screen
-                            navigation.goBack();
-
-                            // Wait a moment before setting refresh param for FoodLog
-                            setTimeout(() => {
+                            try {
+                                // Get the route information to check where we came from
+                                const params = route.params as { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
+                                const routeName = params.sourcePage || 'FoodLog';
                                 const refreshTimestamp = Date.now();
-                                console.log('Sending refresh param to FoodLog:', refreshTimestamp);
 
-                                // Access the FoodLog route and pass refresh param separately
-                                navigation.dispatch(
-                                    StackActions.replace('FoodLog', { refresh: refreshTimestamp })
-                                );
-                            }, 100);
+                                // First go back to clear the navigation stack
+                                navigation.goBack();
+
+                                // Wait a moment before updating the FoodLog screen
+                                setTimeout(() => {
+                                    // Only update FoodLog if we're not returning to Camera or BarcodeScanner
+                                    if (routeName === 'FoodLog') {
+                                        console.log('Sending refresh param to FoodLog:', refreshTimestamp);
+                                        navigation.dispatch(
+                                            StackActions.replace('FoodLog', { refresh: refreshTimestamp })
+                                        );
+                                    }
+                                }, 100);
+                            } catch (error) {
+                                console.error('Navigation error:', error);
+                            }
                         }
                     }
                 ]);
@@ -488,19 +499,28 @@ const ImageCapture: React.FC = () => {
                         // Add a small delay to ensure database operations complete
                         await new Promise(resolve => setTimeout(resolve, 500));
 
-                        // Go back to previous screen
-                        navigation.goBack();
-
-                        // Wait a moment before setting refresh param for FoodLog
-                        setTimeout(() => {
+                        try {
+                            // Get the route information to check where we came from
+                            const params = route.params as { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
+                            const routeName = params.sourcePage || 'FoodLog';
                             const refreshTimestamp = Date.now();
-                            console.log('Sending refresh param to FoodLog:', refreshTimestamp);
 
-                            // Access the FoodLog route and pass refresh param separately
-                            navigation.dispatch(
-                                StackActions.replace('FoodLog', { refresh: refreshTimestamp })
-                            );
-                        }, 100);
+                            // First go back to clear the navigation stack
+                            navigation.goBack();
+
+                            // Wait a moment before updating the FoodLog screen
+                            setTimeout(() => {
+                                // Only update FoodLog if we're not returning to Camera or BarcodeScanner
+                                if (routeName === 'FoodLog') {
+                                    console.log('Sending refresh param to FoodLog:', refreshTimestamp);
+                                    navigation.dispatch(
+                                        StackActions.replace('FoodLog', { refresh: refreshTimestamp })
+                                    );
+                                }
+                            }, 100);
+                        } catch (error) {
+                            console.error('Navigation error:', error);
+                        }
                     }
                 }
             ]);

@@ -27,6 +27,7 @@ import CameraScreen from './src/screens/Camera';
 import ImageCaptureScreen from './src/screens/ImageCapture';
 import Nutrients from './src/screens/Nutrients';
 import BarcodeScannerScreen from './src/screens/BarcodeScanner';
+import Manual from './src/screens/Manual';
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -440,6 +441,14 @@ export default function App() {
                 <Stack.Screen
                   name="BarcodeScanner"
                   component={BarcodeScannerScreen}
+                  options={{
+                    headerShown: false,
+                    presentation: 'transparentModal'
+                  }}
+                />
+                <Stack.Screen
+                  name="Manual"
+                  component={Manual}
                   options={{
                     headerShown: false,
                     presentation: 'transparentModal'

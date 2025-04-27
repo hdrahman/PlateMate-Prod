@@ -12,10 +12,12 @@ import * as ImagePicker from 'expo-image-picker';
 
 // Define navigation types
 type RootStackParamList = {
-    ImageCapture: { mealType: string; foodData?: any; photoUri?: string };
+    ImageCapture: { mealType: string; foodData?: any; photoUri?: string; sourcePage?: string };
     'Food Log': { refresh?: number };
     Camera: undefined;
     BarcodeScanner: undefined;
+    MainTabs: { screen: string };
+    Manual: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -79,10 +81,11 @@ export default function BarcodeScannerScreen() {
             const foodData = await fetchFoodByBarcode(data);
 
             if (foodData) {
-                // Navigate to ImageCapture with the nutrition data
+                // Navigate to ImageCapture with the nutrition data with sourcePage parameter
                 navigation.navigate('ImageCapture', {
                     mealType: 'Snacks',
-                    foodData
+                    foodData,
+                    sourcePage: 'BarcodeScanner'
                 });
             } else {
                 Alert.alert(
@@ -193,7 +196,8 @@ export default function BarcodeScannerScreen() {
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 navigation.navigate('ImageCapture', {
                     mealType: 'Snacks',
-                    photoUri: result.assets[0].uri
+                    photoUri: result.assets[0].uri,
+                    sourcePage: 'BarcodeScanner'
                 });
             }
         } catch (error) {
@@ -202,11 +206,11 @@ export default function BarcodeScannerScreen() {
     };
 
     const handleCapturePhoto = () => {
-        navigation.navigate('Camera');
+        navigation.navigate('MainTabs', { screen: 'Camera' });
     };
 
     const openFoodLog = () => {
-        navigation.navigate('Food Log');
+        navigation.navigate('Manual');
     };
 
     // If user denies camera permission
@@ -241,7 +245,7 @@ export default function BarcodeScannerScreen() {
 
                     <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
                         <Ionicons name="document-text-outline" size={26} color="#FFFFFF" />
-                        <Text style={styles.buttonLabel}>Food Log</Text>
+                        <Text style={styles.buttonLabel}>Manual</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -361,7 +365,7 @@ export default function BarcodeScannerScreen() {
 
                 <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
                     <Ionicons name="document-text-outline" size={26} color="#FFFFFF" />
-                    <Text style={styles.buttonLabel}>Food Log</Text>
+                    <Text style={styles.buttonLabel}>Manual</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

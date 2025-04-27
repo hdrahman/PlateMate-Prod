@@ -44,7 +44,7 @@ const formatDateToString = (date: Date): string => {
 
 // Define the navigation type
 type RootStackParamList = {
-    ImageCapture: { mealType: string };
+    ImageCapture: { mealType: string; sourcePage?: string };
     // Add other screens as needed
 };
 
@@ -1661,7 +1661,7 @@ const DiaryScreen: React.FC = () => {
 
                                     <TouchableOpacity
                                         style={styles.addBtn}
-                                        onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title })}
+                                        onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title, sourcePage: 'FoodLog' })}
                                     >
                                         <Text style={styles.addBtnText}>ADD FOOD</Text>
                                     </TouchableOpacity>

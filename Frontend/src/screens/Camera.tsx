@@ -9,10 +9,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 // Define navigation types
 type RootStackParamList = {
-    ImageCapture: { mealType: string; photoUri?: string };
+    ImageCapture: { mealType: string; photoUri?: string; sourcePage?: string };
     'Food Log': undefined;
     Camera: undefined;
     BarcodeScanner: undefined;
+    MainTabs: { screen: string };
+    Manual: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -53,7 +55,8 @@ export default function CameraScreen() {
             // Navigate to ImageCapture with the photo URI
             navigation.navigate('ImageCapture', {
                 mealType: 'Snacks',
-                photoUri: photo.uri
+                photoUri: photo.uri,
+                sourcePage: 'Camera'
             });
         } catch (error) {
             console.error('Error taking photo:', error);
@@ -71,7 +74,8 @@ export default function CameraScreen() {
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 navigation.navigate('ImageCapture', {
                     mealType: 'Snacks',
-                    photoUri: result.assets[0].uri
+                    photoUri: result.assets[0].uri,
+                    sourcePage: 'Camera'
                 });
             }
         } catch (error) {
@@ -85,7 +89,7 @@ export default function CameraScreen() {
     };
 
     const openFoodLog = () => {
-        navigation.navigate('Food Log');
+        navigation.navigate('Manual');
     };
 
     const toggleFlashMode = () => {
@@ -202,7 +206,7 @@ export default function CameraScreen() {
 
                 <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
                     <Ionicons name="document-text-outline" size={26} color="#FFFFFF" />
-                    <Text style={styles.buttonLabel}>Food Log</Text>
+                    <Text style={styles.buttonLabel}>Manual</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
