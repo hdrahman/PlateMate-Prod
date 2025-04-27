@@ -12,6 +12,7 @@ type RootStackParamList = {
     ImageCapture: { mealType: string; photoUri?: string };
     'Food Log': undefined;
     Camera: undefined;
+    BarcodeScanner: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -79,8 +80,8 @@ export default function CameraScreen() {
     };
 
     const openBarcode = () => {
-        // TODO: Implement barcode scanning
-        console.log('Barcode scanning to be implemented');
+        // Navigate to the barcode scanner screen
+        navigation.navigate('BarcodeScanner');
     };
 
     const openFoodLog = () => {
@@ -99,6 +100,51 @@ export default function CameraScreen() {
         );
     };
 
+    // Render a corner with gradient
+    const renderCorner = (position) => {
+        return (
+            <View style={[
+                styles.corner,
+                position === 'topLeft' && styles.topLeft,
+                position === 'topRight' && styles.topRight,
+                position === 'bottomRight' && styles.bottomRight,
+                position === 'bottomLeft' && styles.bottomLeft,
+            ]}>
+                {/* Vertical part */}
+                <View style={[
+                    styles.cornerVertical,
+                    position === 'topLeft' && styles.cornerVerticalTopLeft,
+                    position === 'topRight' && styles.cornerVerticalTopRight,
+                    position === 'bottomRight' && styles.cornerVerticalBottomRight,
+                    position === 'bottomLeft' && styles.cornerVerticalBottomLeft,
+                ]}>
+                    <LinearGradient
+                        colors={['#9B00FF', '#FF00F5']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.cornerGradient}
+                    />
+                </View>
+
+                {/* Horizontal part */}
+                <View style={[
+                    styles.cornerHorizontal,
+                    position === 'topLeft' && styles.cornerHorizontalTopLeft,
+                    position === 'topRight' && styles.cornerHorizontalTopRight,
+                    position === 'bottomRight' && styles.cornerHorizontalBottomRight,
+                    position === 'bottomLeft' && styles.cornerHorizontalBottomLeft,
+                ]}>
+                    <LinearGradient
+                        colors={['#9B00FF', '#FF00F5']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.cornerGradient}
+                    />
+                </View>
+            </View>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
@@ -106,7 +152,7 @@ export default function CameraScreen() {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Camera</Text>
+                <Text style={styles.headerTitle}>Scanner</Text>
                 <TouchableOpacity onPress={toggleFlashMode} style={styles.flashButton}>
                     <Ionicons
                         name={flashMode === 'on' ? "flash" : "flash-off"}
@@ -126,7 +172,13 @@ export default function CameraScreen() {
                     onCameraReady={() => console.log('Camera ready')}
                 >
                     <View style={styles.cameraOverlay}>
-                        {/* Camera overlay UI */}
+                        {/* Camera frame with corners */}
+                        <View style={styles.scanFrame}>
+                            {renderCorner('topLeft')}
+                            {renderCorner('topRight')}
+                            {renderCorner('bottomRight')}
+                            {renderCorner('bottomLeft')}
+                        </View>
                     </View>
                 </CameraView>
             </View>
@@ -138,15 +190,9 @@ export default function CameraScreen() {
                     <Text style={styles.buttonLabel}>Gallery</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.captureButton} onPress={handleCapturePhoto}>
-                    <LinearGradient
-                        colors={['#5A60EA', '#FF00F5']}
-                        style={styles.captureButtonGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
-                        <Ionicons name="camera-outline" size={32} color="#FFFFFF" />
-                    </LinearGradient>
+                <TouchableOpacity style={styles.controlButton} onPress={handleCapturePhoto}>
+                    <Ionicons name="camera-outline" size={32} color="#FFFFFF" />
+                    <Text style={styles.buttonLabel}>Camera</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.controlButton} onPress={openBarcode}>
@@ -159,14 +205,6 @@ export default function CameraScreen() {
                     <Text style={styles.buttonLabel}>Food Log</Text>
                 </TouchableOpacity>
             </View>
-
-            {/* Camera flip button */}
-            <TouchableOpacity
-                style={styles.flipButton}
-                onPress={toggleCameraFacing}
-            >
-                <Ionicons name="camera-reverse-outline" size={30} color="#FFFFFF" />
-            </TouchableOpacity>
         </SafeAreaView>
     );
 }
@@ -236,6 +274,79 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    // Scanner frame styles
+    scanFrame: {
+        width: 280,
+        height: 380,
+        position: 'relative',
+    },
+    corner: {
+        position: 'absolute',
+        width: 30,
+        height: 30,
+    },
+    cornerVertical: {
+        position: 'absolute',
+        width: 3,
+        height: 25,
+    },
+    cornerHorizontal: {
+        position: 'absolute',
+        height: 3,
+        width: 25,
+    },
+    cornerVerticalTopLeft: {
+        top: 0,
+        left: 0,
+    },
+    cornerHorizontalTopLeft: {
+        top: 0,
+        left: 0,
+    },
+    cornerVerticalTopRight: {
+        top: 0,
+        right: 0,
+    },
+    cornerHorizontalTopRight: {
+        top: 0,
+        right: 0,
+    },
+    cornerVerticalBottomRight: {
+        bottom: 0,
+        right: 0,
+    },
+    cornerHorizontalBottomRight: {
+        bottom: 0,
+        right: 0,
+    },
+    cornerVerticalBottomLeft: {
+        bottom: 0,
+        left: 0,
+    },
+    cornerHorizontalBottomLeft: {
+        bottom: 0,
+        left: 0,
+    },
+    cornerGradient: {
+        width: '100%',
+        height: '100%',
+    },
+    topLeft: {
+        top: 0,
+        left: 0,
+    },
+    topRight: {
+        top: 0,
+        right: 0,
+    },
+    bottomRight: {
+        bottom: 0,
+        right: 0,
+    },
+    bottomLeft: {
+        bottom: 0,
+        left: 0,
+    },
     controlBar: {
         flexDirection: 'row',
         justifyContent: 'space-evenly',
@@ -257,23 +368,6 @@ const styles = StyleSheet.create({
         height: 70,
         justifyContent: 'center',
     },
-    captureButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'transparent',
-    },
-    captureButtonGradient: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: "#FF00F5",
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 10,
-        elevation: 8,
-    },
     buttonLabel: {
         color: '#FFFFFF',
         fontSize: 12,
@@ -281,17 +375,5 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0, 0, 0, 0.75)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 3,
-    },
-    flipButton: {
-        position: 'absolute',
-        top: 90,
-        right: 20,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        borderRadius: 30,
-        width: 50,
-        height: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10,
     },
 });

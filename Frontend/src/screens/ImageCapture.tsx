@@ -30,7 +30,7 @@ const { width } = Dimensions.get('window');
 // Define navigation types
 type RootStackParamList = {
     FoodLog: { refresh?: number };
-    ImageCapture: { mealType: string; photoUri?: string };
+    ImageCapture: { mealType: string; photoUri?: string; foodData?: any };
     // Add other screens as needed
 };
 
@@ -57,7 +57,7 @@ type NutritionData = {
 const ImageCapture: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
-    const { mealType: initialMealType, photoUri: initialPhotoUri } = route.params as { mealType: string; photoUri?: string };
+    const { mealType: initialMealType, photoUri: initialPhotoUri, foodData } = route.params as { mealType: string; photoUri?: string; foodData?: any };
 
     const [mealType, setMealType] = useState(initialMealType);
     const [showMealTypeDropdown, setShowMealTypeDropdown] = useState(false);
@@ -81,10 +81,10 @@ const ImageCapture: React.FC = () => {
         ];
     });
 
-    const [brandName, setBrandName] = useState('');
-    const [quantity, setQuantity] = useState('');
+    const [brandName, setBrandName] = useState(foodData?.brand_name || '');
+    const [quantity, setQuantity] = useState(foodData?.serving_qty ? `${foodData.serving_qty} ${foodData.serving_unit || ''}` : '');
     const [notes, setNotes] = useState('');
-    const [foodName, setFoodName] = useState('');
+    const [foodName, setFoodName] = useState(foodData?.food_name || '');
     const [loading, setLoading] = useState(false);
 
     // Add state for GPT-generated description
@@ -295,7 +295,83 @@ const ImageCapture: React.FC = () => {
     };
 
     const handleSubmit = async () => {
-        // Check if at least 2 images are taken
+        // If we have barcode data, we don't necessarily need images
+        if (foodData) {
+            setLoading(true);
+            try {
+                // Format current date as ISO string (YYYY-MM-DD)
+                const today = new Date();
+                const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                console.log(`Saving food log from barcode with date: ${formattedDate}`);
+
+                // Create a food log entry from barcode data
+                const foodLog = {
+                    meal_id: Date.now(), // Generate a unique meal ID
+                    food_name: foodName || foodData.food_name || 'Unknown Food',
+                    calories: foodData.calories || 0,
+                    proteins: foodData.proteins || 0,
+                    carbs: foodData.carbs || 0,
+                    fats: foodData.fats || 0,
+                    fiber: foodData.fiber || 0,
+                    sugar: foodData.sugar || 0,
+                    saturated_fat: foodData.saturated_fat || 0,
+                    polyunsaturated_fat: foodData.polyunsaturated_fat || 0,
+                    monounsaturated_fat: foodData.monounsaturated_fat || 0,
+                    trans_fat: foodData.trans_fat || 0,
+                    cholesterol: foodData.cholesterol || 0,
+                    sodium: foodData.sodium || 0,
+                    potassium: foodData.potassium || 0,
+                    vitamin_a: foodData.vitamin_a || 0,
+                    vitamin_c: foodData.vitamin_c || 0,
+                    calcium: foodData.calcium || 0,
+                    iron: foodData.iron || 0,
+                    image_url: foodData.image || '',
+                    file_key: 'default_key',
+                    healthiness_rating: foodData.healthiness_rating || 5,
+                    date: formattedDate,
+                    meal_type: mealType,
+                    brand_name: brandName,
+                    quantity: quantity,
+                    notes: notes
+                };
+
+                console.log('Saving barcode food log to local database:', foodLog);
+                await addFoodLog(foodLog);
+
+                // Navigate back to the food log screen with refresh parameter
+                Alert.alert('Success', 'Food added successfully', [
+                    {
+                        text: 'OK',
+                        onPress: async () => {
+                            // Add a small delay to ensure database operations complete
+                            await new Promise(resolve => setTimeout(resolve, 500));
+
+                            // Go back to previous screen
+                            navigation.goBack();
+
+                            // Wait a moment before setting refresh param for FoodLog
+                            setTimeout(() => {
+                                const refreshTimestamp = Date.now();
+                                console.log('Sending refresh param to FoodLog:', refreshTimestamp);
+
+                                // Access the FoodLog route and pass refresh param separately
+                                navigation.dispatch(
+                                    StackActions.replace('FoodLog', { refresh: refreshTimestamp })
+                                );
+                            }, 100);
+                        }
+                    }
+                ]);
+                return;
+            } catch (error) {
+                console.error('Error submitting barcode food:', error);
+                Alert.alert('Error', 'Failed to submit food. Please try again.');
+                setLoading(false);
+                return;
+            }
+        }
+
+        // Check if at least 2 images are taken when not using barcode data
         const filledImages = images.filter(img => img.uri !== '');
         if (filledImages.length < 2) {
             Alert.alert('Error', 'Please take at least 2 images (top view and side view)');
@@ -421,7 +497,6 @@ const ImageCapture: React.FC = () => {
                             console.log('Sending refresh param to FoodLog:', refreshTimestamp);
 
                             // Access the FoodLog route and pass refresh param separately
-                            // This avoids replacing the current screen
                             navigation.dispatch(
                                 StackActions.replace('FoodLog', { refresh: refreshTimestamp })
                             );
