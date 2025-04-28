@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
+import { getTodayCalories, getTodayExerciseCalories } from '../utils/database';
 
 import {
   View,
@@ -42,14 +43,12 @@ const MACRO_RING_SIZE = 60;
 // DUMMY DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const dailyCalorieGoal = 2500;
-const consumedCalories = 1022;
-const remainingCalories = dailyCalorieGoal - consumedCalories;
-const percentConsumed = (consumedCalories / dailyCalorieGoal) * 100;
+const remainingCalories = dailyCalorieGoal; // We'll update this later
+const percentConsumed = 0; // We'll update this later
 
 const fatPercent = 30;
 const carbsPercent = 70;
 const proteinPercent = 40;
-const totalBurned = 500;
 const stepsCount = 4500;
 const WeightLost = 8;
 
@@ -113,6 +112,14 @@ export default function Home() {
   const { isDarkTheme } = useContext(ThemeContext);
   // Keep track of which "page" (card) we are on in the horizontal scroll
   const [activeIndex, setActiveIndex] = useState(0);
+  // Add state for consumed calories and loading
+  const [consumedCalories, setConsumedCalories] = useState(0);
+  const [remainingCals, setRemainingCals] = useState(dailyCalorieGoal);
+  const [percentCons, setPercentCons] = useState(0);
+  const [foodLoading, setFoodLoading] = useState(true);
+  // Add state for exercise calories and loading
+  const [exerciseCalories, setExerciseCalories] = useState(0);
+  const [exerciseLoading, setExerciseLoading] = useState(true);
 
   // Use the step context instead of the hook directly
   const {
@@ -121,6 +128,48 @@ export default function Home() {
     isAvailable,
     loading: stepsLoading
   } = useSteps();
+
+  // Fetch food calories from the database
+  useEffect(() => {
+    const fetchCalories = async () => {
+      try {
+        setFoodLoading(true);
+        const calories = await getTodayCalories();
+        setConsumedCalories(calories);
+
+        // We'll update remainingCals after we get exercise calories
+        setPercentCons((calories / dailyCalorieGoal) * 100);
+      } catch (error) {
+        console.error('Error fetching calories:', error);
+        // Keep default values if there's an error
+      } finally {
+        setFoodLoading(false);
+      }
+    };
+
+    fetchCalories();
+  }, []);
+
+  // Fetch exercise calories from the database
+  useEffect(() => {
+    const fetchExerciseCalories = async () => {
+      try {
+        setExerciseLoading(true);
+        const calories = await getTodayExerciseCalories();
+        setExerciseCalories(calories);
+
+        // Now that we have both food and exercise calories, calculate remaining calories
+        setRemainingCals(dailyCalorieGoal - consumedCalories + calories);
+      } catch (error) {
+        console.error('Error fetching exercise calories:', error);
+        // Keep default values if there's an error
+      } finally {
+        setExerciseLoading(false);
+      }
+    };
+
+    fetchExerciseCalories();
+  }, [consumedCalories]); // Re-run when consumedCalories changes
 
   // Handler: updates activeIndex when user scrolls horizontally
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -132,13 +181,23 @@ export default function Home() {
   // Calculate values for the main ring.
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
-  const consumedStroke = (percentConsumed / 100) * circumference;
+  const consumedStroke = (percentCons / 100) * circumference;
 
   // Data for the right card with updated colors.
   const rightStats = [
     { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline', color: '#FFB74D' }, // warm orange hue
-    { label: 'Food', value: consumedCalories, icon: 'restaurant-outline', color: '#FF8A65' }, // soft red hue
-    { label: 'Exercise', value: totalBurned, icon: 'barbell-outline', color: '#66BB6A' }, // updated green
+    {
+      label: 'Food',
+      value: foodLoading ? '-' : consumedCalories,
+      icon: 'restaurant-outline',
+      color: '#FF8A65'
+    }, // soft red hue
+    {
+      label: 'Exercise',
+      value: exerciseLoading ? '-' : exerciseCalories,
+      icon: 'barbell-outline',
+      color: '#66BB6A'
+    }, // updated green
     {
       label: 'Steps',
       value: stepsLoading ? '-' : todaySteps,
@@ -241,9 +300,9 @@ export default function Home() {
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                   strokeDasharray={`${circumference} ${circumference}`}
-                  strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
+                  strokeDashoffset={circumference + (exerciseCalories / dailyCalorieGoal) * circumference}
                   strokeLinecap="butt"
-                  transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // 12 o'clock counterclockwise
                 />
                 <Circle
                   cx={CIRCLE_SIZE / 2}
@@ -253,9 +312,9 @@ export default function Home() {
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                   strokeDasharray={`${circumference} ${circumference}`}
-                  strokeDashoffset={circumference - (totalBurned / dailyCalorieGoal) * circumference}
+                  strokeDashoffset={circumference + (exerciseCalories / dailyCalorieGoal) * circumference}
                   strokeLinecap="round"
-                  transform={`rotate(198, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // Counter-clockwise from 12 o'clock
+                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // 12 o'clock counterclockwise
                 />
                 <Circle
                   cx={CIRCLE_SIZE / 2}
@@ -283,7 +342,7 @@ export default function Home() {
                 />
               </Svg>
               <View style={styles.centerTextContainer}>
-                <Text style={styles.remainingValue}>{remainingCalories}</Text>
+                <Text style={styles.remainingValue}>{remainingCals}</Text>
                 <Text style={styles.remainingLabel}>REMAINING</Text>
               </View>
             </View>

@@ -861,4 +861,64 @@ export const markStepsSynced = async (ids: number[]) => {
     }
 };
 
+// Get total calories for today
+export const getTodayCalories = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to access database before initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date();
+        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        console.log(`🔍 Getting total calories for today: ${todayFormatted}`);
+
+        // Use SQLite's SUM function to get the total calories
+        const result = await db.getFirstAsync<{ total: number }>(
+            `SELECT SUM(calories) as total FROM food_logs WHERE date(date) = date(?)`,
+            [todayFormatted]
+        );
+
+        const totalCalories = result?.total || 0;
+        console.log(`✅ Found total calories for today: ${totalCalories}`);
+        return totalCalories;
+    } catch (error) {
+        console.error('❌ Error getting total calories for today:', error);
+        // Return 0 instead of throwing to provide a default value
+        return 0;
+    }
+};
+
+// Get total exercise calories for today
+export const getTodayExerciseCalories = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to access database before initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date();
+        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        console.log(`🔍 Getting total exercise calories for today: ${todayFormatted}`);
+
+        // Use SQLite's SUM function to get the total calories burned from exercises
+        const result = await db.getFirstAsync<{ total: number }>(
+            `SELECT SUM(calories_burned) as total FROM exercises WHERE date(date) = date(?)`,
+            [todayFormatted]
+        );
+
+        const totalCalories = result?.total || 0;
+        console.log(`✅ Found total exercise calories for today: ${totalCalories}`);
+        return totalCalories;
+    } catch (error) {
+        console.error('❌ Error getting total exercise calories for today:', error);
+        // Return 0 instead of throwing to provide a default value
+        return 0;
+    }
+};
+
 export { db }; 
