@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
-import { getTodayCalories, getTodayExerciseCalories } from '../utils/database';
+import { getTodayCalories, getTodayExerciseCalories, getTodayProtein, getTodayCarbs, getTodayFats } from '../utils/database';
 
 import {
   View,
@@ -49,9 +49,6 @@ const dailyCalorieGoal = 2500;
 const remainingCalories = dailyCalorieGoal; // We'll update this later
 const percentConsumed = 0; // We'll update this later
 
-const fatPercent = 30;
-const carbsPercent = 70;
-const proteinPercent = 40;
 const stepsCount = 4500;
 const WeightLost = 8;
 
@@ -123,6 +120,12 @@ export default function Home() {
   // Add state for exercise calories and loading
   const [exerciseCalories, setExerciseCalories] = useState(0);
   const [exerciseLoading, setExerciseLoading] = useState(true);
+  // Macro state
+  const [protein, setProtein] = useState(0);
+  const [carbs, setCarbs] = useState(0);
+  const [fats, setFats] = useState(0);
+  const [macrosLoading, setMacrosLoading] = useState(true);
+  const macroGoal = 100; // grams
 
   // Use the step context instead of the hook directly
   const {
@@ -173,6 +176,31 @@ export default function Home() {
 
     fetchExerciseCalories();
   }, [consumedCalories]); // Re-run when consumedCalories changes
+
+  // Fetch macros from the database
+  useEffect(() => {
+    const fetchMacros = async () => {
+      try {
+        setMacrosLoading(true);
+        const [proteinVal, carbsVal, fatsVal] = await Promise.all([
+          getTodayProtein(),
+          getTodayCarbs(),
+          getTodayFats(),
+        ]);
+        setProtein(proteinVal);
+        setCarbs(carbsVal);
+        setFats(fatsVal);
+      } catch (error) {
+        console.error('Error fetching macros:', error);
+        setProtein(0);
+        setCarbs(0);
+        setFats(0);
+      } finally {
+        setMacrosLoading(false);
+      }
+    };
+    fetchMacros();
+  }, []);
 
   // Handler: updates activeIndex when user scrolls horizontally
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -396,9 +424,9 @@ export default function Home() {
         {/* MACROS CARD */}
         <GradientBorderCard>
           <View style={styles.macrosRow}>
-            <MacroRing label="PROTEIN" percent={proteinPercent} current={proteinPercent} />
-            <MacroRing label="CARBS" percent={carbsPercent} current={carbsPercent} />
-            <MacroRing label="FATS" percent={fatPercent} current={fatPercent} />
+            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : Math.min(100, (protein / macroGoal) * 100)} current={macrosLoading ? 0 : protein} />
+            <MacroRing label="CARBS" percent={macrosLoading ? 0 : Math.min(100, (carbs / macroGoal) * 100)} current={macrosLoading ? 0 : carbs} />
+            <MacroRing label="FATS" percent={macrosLoading ? 0 : Math.min(100, (fats / macroGoal) * 100)} current={macrosLoading ? 0 : fats} />
             <MacroRing
               label="OTHER"
               percent={100}
