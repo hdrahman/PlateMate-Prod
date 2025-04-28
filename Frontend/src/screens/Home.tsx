@@ -36,6 +36,9 @@ const BASE_WIDTH = 375; // base width for scaling
 const scaleFactor = Math.min(width / BASE_WIDTH, 1);
 const CIRCLE_SIZE = width * 0.50 * scaleFactor; // scales proportionally
 const STROKE_WIDTH = 20;
+const OUTLINE_WIDTH = 2; // Width of the purple outline
+const SVG_PADDING = OUTLINE_WIDTH * 3; // Extra padding for the SVG
+const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2); // Total SVG size including padding
 
 const MACRO_RING_SIZE = 60;
 
@@ -244,7 +247,7 @@ export default function Home() {
           <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
             <View style={styles.ringContainer}>
               <View style={styles.ringGlow} />
-              <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
+              <Svg width={SVG_SIZE} height={SVG_SIZE}>
                 <Defs>
                   <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <Stop offset="0%" stopColor="#2E0854" />
@@ -260,17 +263,35 @@ export default function Home() {
                     <Stop offset="100%" stopColor="#8A2BE2" />
                   </SvgLinearGradient>
                 </Defs>
+                {/* Outer dark grey outline */}
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius + STROKE_WIDTH / 2 + OUTLINE_WIDTH / 2}
+                  stroke="#444444"
+                  strokeWidth={OUTLINE_WIDTH}
+                  fill="none"
+                />
+                {/* Inner dark grey outline */}
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius - STROKE_WIDTH / 2 - OUTLINE_WIDTH / 2}
+                  stroke="#444444"
+                  strokeWidth={OUTLINE_WIDTH}
+                  fill="none"
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="rgba(255, 255, 255, 0.12)"
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                 />
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="url(#ringGradient)"
                   strokeWidth={STROKE_WIDTH}
@@ -278,11 +299,11 @@ export default function Home() {
                   strokeDasharray={`${circumference} ${circumference}`}
                   strokeDashoffset={circumference - consumedStroke}
                   strokeLinecap="butt"
-                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
                 />
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="url(#ringGradient)"
                   strokeWidth={STROKE_WIDTH}
@@ -290,11 +311,11 @@ export default function Home() {
                   strokeDasharray={`${circumference} ${circumference}`}
                   strokeDashoffset={circumference - consumedStroke}
                   strokeLinecap="round"
-                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
                 />
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="url(#exerciseGradient)"
                   strokeWidth={STROKE_WIDTH}
@@ -302,11 +323,11 @@ export default function Home() {
                   strokeDasharray={`${circumference} ${circumference}`}
                   strokeDashoffset={circumference + (exerciseCalories / dailyCalorieGoal) * circumference}
                   strokeLinecap="butt"
-                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // 12 o'clock counterclockwise
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
                 />
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="url(#exerciseGradient)"
                   strokeWidth={STROKE_WIDTH}
@@ -314,11 +335,11 @@ export default function Home() {
                   strokeDasharray={`${circumference} ${circumference}`}
                   strokeDashoffset={circumference + (exerciseCalories / dailyCalorieGoal) * circumference}
                   strokeLinecap="round"
-                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`} // 12 o'clock counterclockwise
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
                 />
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="url(#eatenGradient)" // Gradient for calories eaten bar
                   strokeWidth={STROKE_WIDTH}
@@ -326,11 +347,11 @@ export default function Home() {
                   strokeDasharray={`${circumference} ${circumference}`}
                   strokeDashoffset={circumference - consumedStroke}
                   strokeLinecap="butt"
-                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
                 />
                 <Circle
-                  cx={CIRCLE_SIZE / 2}
-                  cy={CIRCLE_SIZE / 2}
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
                   r={radius}
                   stroke="url(#eatenGradient)" // Gradient for calories eaten bar
                   strokeWidth={STROKE_WIDTH}
@@ -338,7 +359,7 @@ export default function Home() {
                   strokeDasharray={`${circumference} ${circumference}`}
                   strokeDashoffset={circumference - consumedStroke}
                   strokeLinecap="round"
-                  transform={`rotate(-90, ${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2})`}
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
                 />
               </Svg>
               <View style={styles.centerTextContainer}>
@@ -1000,8 +1021,8 @@ const styles = StyleSheet.create({
   },
   ringContainer: {
     position: 'relative',
-    marginRight: 22, // Add space between the circle and the stack
-    marginLeft: 18 // Add space between the circle and the left edge
+    marginRight: 22, // spacing between circle and stats column
+    marginLeft: 0, // removed extra left margin
   },
   ringGlow: {
     position: 'absolute',
@@ -1010,15 +1031,17 @@ const styles = StyleSheet.create({
     borderRadius: CIRCLE_SIZE,
     backgroundColor: '#9B00FF',
     opacity: 0.2,
-    top: STROKE_WIDTH,
-    left: STROKE_WIDTH
+    top: STROKE_WIDTH + SVG_PADDING,
+    left: STROKE_WIDTH + SVG_PADDING
   },
   centerTextContainer: {
     position: 'absolute',
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
+    width: SVG_SIZE,
+    height: SVG_SIZE,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    left: 0,
+    top: 0
   },
   remainingValue: {
     color: '#FFF',
@@ -1108,7 +1131,6 @@ const styles = StyleSheet.create({
   burnBarFill: {
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#FF00F5'
   },
   burnDetails: {
     color: '#FFF',
@@ -1167,7 +1189,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between', // Align with top and bottom of the ring
     alignItems: 'flex-start',
-    paddingLeft: 10, // Adjust padding to ensure the stack is next to the circle
+    paddingLeft: 0, // removed extra padding on left
     marginTop: 10 // Move the stack slightly lower
   },
   statRowVertical: {
@@ -1199,7 +1221,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    height: 235
+    height: 250 // Increased height to accommodate the larger SVG size
   },
   loadingContainer: {
     flex: 1,
