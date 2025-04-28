@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { getFoodLogsByDate, initDatabase, isDatabaseReady } from '../utils/database';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +41,8 @@ const macroGoals = {
     vitaminA: { current: 0, goal: 100, unit: '%' },
     vitaminC: { current: 0, goal: 100, unit: '%' },
     calcium: { current: 0, goal: 100, unit: '%' },
-    iron: { current: 0, goal: 100, unit: '%' }
+    iron: { current: 0, goal: 100, unit: '%' },
+    calories: { current: 0, goal: 2000, unit: 'kcal' },
 };
 
 // Add a GradientText component for text with gradient
@@ -77,52 +79,29 @@ const NutrientsScreen: React.FC = () => {
     };
 
     useEffect(() => {
-        // Fetch nutrient data from the backend
         const fetchNutrientData = async () => {
             try {
-                const response = await fetch('/api/meal-data');
-                const data = await response.json();
-
-                // Calculate the total for each nutrient
+                // Ensure DB is initialized
+                if (!isDatabaseReady()) {
+                    await initDatabase();
+                }
+                // Get today's date in YYYY-MM-DD
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                const logs: any[] = await getFoodLogsByDate(todayStr);
+                // Aggregate nutrients
                 const totals = {
                     protein: 0,
                     carbs: 0,
-                    fiber: 0,
-                    sugar: 0,
                     fat: 0,
-                    saturatedFat: 0,
-                    polyunsaturatedFat: 0,
-                    monounsaturatedFat: 0,
-                    transFat: 0,
-                    cholesterol: 0,
-                    sodium: 0,
-                    potassium: 0,
-                    vitaminA: 0,
-                    vitaminC: 0,
-                    calcium: 0,
-                    iron: 0
+                    calories: 0,
                 };
-
-                data.forEach(entry => {
-                    totals.protein += entry.proteins;
-                    totals.carbs += entry.carbs;
-                    totals.fiber += entry.fiber;
-                    totals.sugar += entry.sugar;
-                    totals.fat += entry.fats;
-                    totals.saturatedFat += entry.saturated_fat;
-                    totals.polyunsaturatedFat += entry.polyunsaturated_fat;
-                    totals.monounsaturatedFat += entry.monounsaturated_fat;
-                    totals.transFat += entry.trans_fat;
-                    totals.cholesterol += entry.cholesterol;
-                    totals.sodium += entry.sodium;
-                    totals.potassium += entry.potassium;
-                    totals.vitaminA += entry.vitamin_a;
-                    totals.vitaminC += entry.vitamin_c;
-                    totals.calcium += entry.calcium;
-                    totals.iron += entry.iron;
+                logs.forEach(entry => {
+                    totals.protein += entry.proteins || 0;
+                    totals.carbs += entry.carbs || 0;
+                    totals.fat += entry.fats || 0;
+                    totals.calories += entry.calories || 0;
                 });
-
-                // Update state with totals
                 setNutrientData(prevData => {
                     const updatedData = { ...prevData };
                     Object.keys(totals).forEach(key => {
@@ -131,10 +110,9 @@ const NutrientsScreen: React.FC = () => {
                     return updatedData;
                 });
             } catch (error) {
-                console.error('Failed to fetch nutrient data:', error);
+                console.error('Failed to fetch nutrient data from local DB:', error);
             }
         };
-
         fetchNutrientData();
     }, []);
 
@@ -164,8 +142,8 @@ const NutrientsScreen: React.FC = () => {
 
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
         const remaining = calculateRemaining(current, goal);
-        // Set all progress bars to 100% temporarily
-        const progressPercent = 100;
+        // Calculate progress as a percentage of the goal, clamped between 0 and 100
+        const progressPercent = Math.max(0, Math.min(100, (goal > 0 ? (current / goal) * 100 : 0)));
         const gradientColors = getNutrientColors(label);
 
         return (
@@ -236,13 +214,14 @@ const NutrientsScreen: React.FC = () => {
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
             >
-                {Object.entries(nutrientData).map(([key, value]) => {
-                    // Convert key from camelCase to Title Case for display
-                    const label = key.replace(/([A-Z])/g, ' $1')
-                        .replace(/^./, str => str.toUpperCase());
-
-                    return renderNutrientItem(label, value.current, value.goal, value.unit);
-                })}
+                {Object.entries(nutrientData)
+                    .filter(([key]) => key !== 'calories')
+                    .map(([key, value]) => {
+                        // Convert key from camelCase to Title Case for display
+                        const label = key.replace(/([A-Z])/g, ' $1')
+                            .replace(/^./, str => str.toUpperCase());
+                        return renderNutrientItem(label, value.current, value.goal, value.unit);
+                    })}
 
                 <View style={styles.spacer} />
             </ScrollView>

@@ -873,7 +873,7 @@ const DiaryScreen: React.FC = () => {
         },
         scrollInner: {
             paddingHorizontal: 10,
-            paddingBottom: 100,
+            paddingBottom: 40,
             width: '100%',
             alignItems: 'center' as const,
         },
@@ -1720,7 +1720,7 @@ const DiaryScreen: React.FC = () => {
                                     </TouchableOpacity>
                                 </View>
                             </View>
-                            <View style={{ height: 10 }} />
+                            <View style={{ height: 2 }} />
                         </ScrollView>
                     </Animated.View>
                 </PanGestureHandler>

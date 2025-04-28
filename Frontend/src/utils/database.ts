@@ -891,6 +891,96 @@ export const getTodayCalories = async () => {
     }
 };
 
+// Get total protein consumed today
+export const getTodayProtein = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to access database before initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date();
+        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        console.log(`🔍 Getting total protein for today: ${todayFormatted}`);
+
+        // Use SQLite's SUM function to get the total protein
+        const result = await db.getFirstAsync<{ total: number }>(
+            `SELECT SUM(proteins) as total FROM food_logs WHERE date(date) = date(?)`,
+            [todayFormatted]
+        );
+
+        const totalProtein = result?.total || 0;
+        console.log(`✅ Found total protein for today: ${totalProtein}`);
+        return totalProtein;
+    } catch (error) {
+        console.error('❌ Error getting total protein for today:', error);
+        // Return 0 instead of throwing to provide a default value
+        return 0;
+    }
+};
+
+// Get total carbs consumed today
+export const getTodayCarbs = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to access database before initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date();
+        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        console.log(`🔍 Getting total carbs for today: ${todayFormatted}`);
+
+        // Use SQLite's SUM function to get the total carbs
+        const result = await db.getFirstAsync<{ total: number }>(
+            `SELECT SUM(carbs) as total FROM food_logs WHERE date(date) = date(?)`,
+            [todayFormatted]
+        );
+
+        const totalCarbs = result?.total || 0;
+        console.log(`✅ Found total carbs for today: ${totalCarbs}`);
+        return totalCarbs;
+    } catch (error) {
+        console.error('❌ Error getting total carbs for today:', error);
+        // Return 0 instead of throwing to provide a default value
+        return 0;
+    }
+};
+
+// Get total fats consumed today
+export const getTodayFats = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to access database before initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date();
+        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        console.log(`🔍 Getting total fats for today: ${todayFormatted}`);
+
+        // Use SQLite's SUM function to get the total fats
+        const result = await db.getFirstAsync<{ total: number }>(
+            `SELECT SUM(fats) as total FROM food_logs WHERE date(date) = date(?)`,
+            [todayFormatted]
+        );
+
+        const totalFats = result?.total || 0;
+        console.log(`✅ Found total fats for today: ${totalFats}`);
+        return totalFats;
+    } catch (error) {
+        console.error('❌ Error getting total fats for today:', error);
+        // Return 0 instead of throwing to provide a default value
+        return 0;
+    }
+};
+
 // Get total exercise calories for today
 export const getTodayExerciseCalories = async () => {
     if (!db || !global.dbInitialized) {
