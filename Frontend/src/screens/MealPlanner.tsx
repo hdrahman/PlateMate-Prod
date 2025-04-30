@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+
+// Define types for the component props
+interface GradientBorderCardProps {
+    children: React.ReactNode;
+    style?: any;
+}
+
+// Define color constants for consistent theming
+const PRIMARY_BG = '#000000';
+const CARD_BG = '#121212';
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
+const PURPLE_ACCENT = '#AA00FF';
 
 export default function MealPlanner() {
     const navigation = useNavigation();
@@ -13,11 +26,43 @@ export default function MealPlanner() {
         navigation.navigate('MealPlannerCamera' as never);
     };
 
+    // GradientBorderCard component for consistent card styling
+    const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+        return (
+            <View style={styles.gradientBorderContainer}>
+                <LinearGradient
+                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        borderRadius: 10,
+                    }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                />
+                <View
+                    style={{
+                        margin: 1,
+                        borderRadius: 9,
+                        backgroundColor: CARD_BG,
+                        padding: 16,
+                        ...(style || {})
+                    }}
+                >
+                    {children}
+                </View>
+            </View>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.headerSection}>
-                <Text style={styles.headerText}>Meal Planner</Text>
-                <Text style={styles.subHeaderText}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Meal Planner</Text>
+                <Text style={styles.headerSub}>
                     Get personalized meal plans based on your pantry items
                 </Text>
             </View>
@@ -25,42 +70,42 @@ export default function MealPlanner() {
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={styles.scrollInner}
             >
                 {/* Scan Pantry Card */}
-                <TouchableOpacity style={styles.cardContainer} onPress={handleScanPantry}>
-                    <LinearGradient
-                        colors={['#5A60EA', '#FF00F5']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.card}
+                <GradientBorderCard>
+                    <TouchableOpacity
+                        style={styles.scanButton}
+                        onPress={handleScanPantry}
                     >
                         <View style={styles.iconContainer}>
-                            <Ionicons name="camera-outline" size={40} color="white" />
+                            <Ionicons name="camera-outline" size={40} color={WHITE} />
                         </View>
                         <View style={styles.textContainer}>
-                            <Text style={styles.cardTitle}>Scan Your Pantry</Text>
-                            <Text style={styles.cardDescription}>
+                            <Text style={styles.scanTitle}>Scan Your Pantry</Text>
+                            <Text style={styles.scanDescription}>
                                 Take a photo of your pantry items to generate meal suggestions
                             </Text>
                         </View>
                         <View style={styles.arrowContainer}>
-                            <Ionicons name="chevron-forward" size={24} color="white" />
+                            <Ionicons name="chevron-forward" size={24} color={WHITE} />
                         </View>
-                    </LinearGradient>
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                </GradientBorderCard>
 
-                {/* Recent Meal Plans Card - Will be populated with actual data later */}
-                <View style={styles.sectionContainer}>
+                {/* Recent Meal Plans Card */}
+                <GradientBorderCard>
                     <Text style={styles.sectionTitle}>Recent Meal Plans</Text>
+                    <View style={styles.dividerLine} />
                     <Text style={styles.emptyStateText}>
                         Your recent meal plans will appear here after you scan your pantry
                     </Text>
-                </View>
+                </GradientBorderCard>
 
-                {/* Nutrition Summary Section - Placeholder for future functionality */}
-                <View style={styles.sectionContainer}>
+                {/* Nutrition Summary Section */}
+                <GradientBorderCard>
                     <Text style={styles.sectionTitle}>Today's Nutrition</Text>
+                    <View style={styles.dividerLine} />
                     <View style={styles.nutritionInfoContainer}>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Remaining Calories</Text>
@@ -71,67 +116,91 @@ export default function MealPlanner() {
                             <Text style={styles.nutritionValue}>2</Text>
                         </View>
                     </View>
-                </View>
+                </GradientBorderCard>
+
+                {/* Add a button to explore meal ideas */}
+                <GradientBorderCard>
+                    <TouchableOpacity style={styles.analyzeBtn}>
+                        <Text style={styles.analyzeBtnText}>Explore Meal Ideas</Text>
+                    </TouchableOpacity>
+                </GradientBorderCard>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
+// Create a type for our styles
+type StylesType = {
+    container: ViewStyle;
+    header: ViewStyle;
+    headerTitle: TextStyle;
+    headerSub: TextStyle;
+    scrollView: ViewStyle;
+    scrollInner: ViewStyle;
+    scanButton: ViewStyle;
+    iconContainer: ViewStyle;
+    textContainer: ViewStyle;
+    scanTitle: TextStyle;
+    scanDescription: TextStyle;
+    arrowContainer: ViewStyle;
+    sectionTitle: TextStyle;
+    emptyStateText: TextStyle;
+    nutritionInfoContainer: ViewStyle;
+    nutritionItem: ViewStyle;
+    nutritionLabel: TextStyle;
+    nutritionValue: TextStyle;
+    gradientBorderContainer: ViewStyle;
+    dividerLine: ViewStyle;
+    analyzeBtn: ViewStyle;
+    analyzeBtnText: TextStyle;
+};
+
+const styles = StyleSheet.create<StylesType>({
     container: {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: PRIMARY_BG,
     },
-    headerSection: {
-        paddingTop: 10,
-        paddingBottom: 10,
+    header: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        backgroundColor: PRIMARY_BG,
     },
-    headerText: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: 'white',
-        marginHorizontal: 20,
+    headerTitle: {
+        fontSize: 26,
+        color: PURPLE_ACCENT,
+        fontWeight: '700',
+        marginBottom: 4,
     },
-    subHeaderText: {
+    headerSub: {
         fontSize: 16,
-        color: '#999',
-        marginHorizontal: 20,
-        marginTop: 5,
+        color: WHITE,
+        fontWeight: '400',
     },
     scrollView: {
         flex: 1,
     },
-    scrollContent: {
-        paddingTop: 10,
-        paddingBottom: 30,
+    scrollInner: {
+        paddingHorizontal: 10,
+        paddingBottom: 40,
+        width: '100%',
+        alignItems: 'center',
     },
-    cardContainer: {
-        width: '90%',
-        height: 120,
-        borderRadius: 15,
-        marginBottom: 15,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 4.65,
-        elevation: 8,
-        alignSelf: 'center',
+    // Gradient border components
+    gradientBorderContainer: {
+        marginBottom: 12,
+        borderRadius: 10,
+        width: '100%',
+        overflow: 'hidden',
     },
-    card: {
-        flex: 1,
-        borderRadius: 15,
+    scanButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 20,
     },
     iconContainer: {
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -139,55 +208,76 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 15,
     },
-    cardTitle: {
+    scanTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: 'white',
+        color: WHITE,
         marginBottom: 5,
     },
-    cardDescription: {
+    scanDescription: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: SUBDUED,
     },
     arrowContainer: {
         width: 30,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    sectionContainer: {
-        marginTop: 20,
-        marginHorizontal: 20,
-    },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: 'white',
-        marginBottom: 10,
+        color: WHITE,
+        marginBottom: 6,
+    },
+    // Dividers
+    dividerLine: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+        marginVertical: 8,
+        marginHorizontal: -20,
+        width: '120%',
     },
     emptyStateText: {
-        color: '#999',
+        color: SUBDUED,
         fontSize: 14,
         textAlign: 'center',
         padding: 20,
     },
     nutritionInfoContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        backgroundColor: '#1E1E1E',
-        borderRadius: 10,
-        padding: 15,
+        justifyContent: 'space-around',
+        padding: 10,
     },
     nutritionItem: {
         alignItems: 'center',
     },
     nutritionLabel: {
-        color: '#999',
+        color: SUBDUED,
         fontSize: 14,
         marginBottom: 5,
     },
     nutritionValue: {
-        color: 'white',
-        fontSize: 20,
+        color: WHITE,
+        fontSize: 22,
         fontWeight: 'bold',
+    },
+    // Button styles
+    analyzeBtn: {
+        backgroundColor: PURPLE_ACCENT,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        transform: [{ translateY: -2 }],
+        shadowColor: PURPLE_ACCENT,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    analyzeBtnText: {
+        color: WHITE,
+        fontWeight: '700',
+        fontSize: 16,
     },
 }); 
