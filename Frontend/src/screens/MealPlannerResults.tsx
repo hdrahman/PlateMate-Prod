@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, ViewStyle, TextStyle, ActivityIndicator, ImageStyle } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase } from '@react-navigation/native';
+import { Recipe } from '../api/recipes';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -11,71 +12,54 @@ const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const PURPLE_ACCENT = '#AA00FF';
 
-type MealType = {
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-    ingredients: string[];
-    imageUrl?: string;
-};
-
 // Define types for the component props
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
 }
 
-export default function MealPlannerResults() {
-    const navigation = useNavigation();
-    const route = useRoute();
-    const [loading, setLoading] = useState(true);
-    const [mealPlan, setMealPlan] = useState<MealType[]>([]);
+// Define nutrients interface
+interface Nutrients {
+    calories: number;
+    protein: number;
+    fat: number;
+    carbohydrates: number;
+}
 
-    // Mock data for demonstration - in a real app, this would come from API
-    const mockMealPlan = [
-        {
-            name: "Spinach and Feta Omelette",
-            calories: 320,
-            protein: 22,
-            carbs: 5,
-            fats: 24,
-            ingredients: ["Eggs", "Spinach", "Feta cheese", "Olive oil", "Salt", "Pepper"],
-            imageUrl: "https://images.unsplash.com/photo-1612240498936-65f5101365d2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
-        },
-        {
-            name: "Grilled Chicken Salad",
-            calories: 450,
-            protein: 35,
-            carbs: 15,
-            fats: 28,
-            ingredients: ["Chicken breast", "Mixed greens", "Cherry tomatoes", "Cucumber", "Avocado", "Olive oil", "Lemon juice"],
-            imageUrl: "https://images.unsplash.com/photo-1546793665-c74683f339c1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
-        },
-        {
-            name: "Baked Salmon with Roasted Vegetables",
-            calories: 520,
-            protein: 40,
-            carbs: 25,
-            fats: 30,
-            ingredients: ["Salmon fillet", "Broccoli", "Bell peppers", "Red onion", "Olive oil", "Garlic", "Lemon", "Herbs"],
-            imageUrl: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
-        }
-    ];
+// Define route params interface
+interface MealPlannerResultsParams {
+    mealPlan: Recipe[];
+    nutrients: Nutrients;
+}
+
+export default function MealPlannerResults() {
+    const navigation = useNavigation<NavigationProp<ParamListBase>>();
+    const route = useRoute<RouteProp<Record<string, MealPlannerResultsParams>, string>>();
+    const [loading, setLoading] = useState(true);
+    const [mealPlan, setMealPlan] = useState<Recipe[]>([]);
+    const [nutrients, setNutrients] = useState<Nutrients>({
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbohydrates: 0
+    });
 
     useEffect(() => {
-        // Simulate API call to generate meal plan based on image
-        setTimeout(() => {
-            setMealPlan(mockMealPlan);
-            setLoading(false);
-        }, 2000);
-    }, []);
+        // Get meal plan data from navigation params
+        if (route.params) {
+            const { mealPlan: mealPlanData, nutrients: nutrientsData } = route.params;
 
-    const totalCalories = mealPlan.reduce((sum, meal) => sum + meal.calories, 0);
-    const totalProtein = mealPlan.reduce((sum, meal) => sum + meal.protein, 0);
-    const totalCarbs = mealPlan.reduce((sum, meal) => sum + meal.carbs, 0);
-    const totalFats = mealPlan.reduce((sum, meal) => sum + meal.fats, 0);
+            if (mealPlanData) {
+                setMealPlan(mealPlanData);
+            }
+
+            if (nutrientsData) {
+                setNutrients(nutrientsData);
+            }
+
+            setLoading(false);
+        }
+    }, [route.params]);
 
     // GradientBorderCard component for consistent card styling
     const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
@@ -109,12 +93,17 @@ export default function MealPlannerResults() {
         );
     };
 
+    // Navigate to recipe details
+    const handleRecipePress = (recipe: Recipe) => {
+        navigation.navigate('RecipeDetails', { recipeId: recipe.id });
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
-                    onPress={() => navigation.navigate('MealPlanner' as never)}
+                    onPress={() => navigation.navigate('MealPlanner')}
                 >
                     <Ionicons name="arrow-back" size={24} color={WHITE} />
                 </TouchableOpacity>
@@ -137,19 +126,19 @@ export default function MealPlannerResults() {
                         <View style={styles.dividerLine} />
                         <View style={styles.macrosContainer}>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{totalCalories}</Text>
+                                <Text style={styles.macroValue}>{Math.round(nutrients.calories)}</Text>
                                 <Text style={styles.macroLabel}>Calories</Text>
                             </View>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{totalProtein}g</Text>
+                                <Text style={styles.macroValue}>{Math.round(nutrients.protein)}g</Text>
                                 <Text style={styles.macroLabel}>Protein</Text>
                             </View>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{totalCarbs}g</Text>
+                                <Text style={styles.macroValue}>{Math.round(nutrients.carbohydrates)}g</Text>
                                 <Text style={styles.macroLabel}>Carbs</Text>
                             </View>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{totalFats}g</Text>
+                                <Text style={styles.macroValue}>{Math.round(nutrients.fat)}g</Text>
                                 <Text style={styles.macroLabel}>Fats</Text>
                             </View>
                         </View>
@@ -157,94 +146,207 @@ export default function MealPlannerResults() {
 
                     <Text style={styles.mealsTitle}>Your Meals</Text>
 
-                    {mealPlan.map((meal, index) => (
-                        <GradientBorderCard key={index}>
-                            {meal.imageUrl && (
-                                <Image
-                                    source={{ uri: meal.imageUrl }}
-                                    style={styles.mealImage}
-                                    resizeMode="cover"
-                                />
-                            )}
-                            <View style={styles.mealInfo}>
-                                <Text style={styles.mealName}>{meal.name}</Text>
+                    {mealPlan.length > 0 ? (
+                        mealPlan.map((recipe, index) => (
+                            <GradientBorderCard key={recipe.id || index}>
+                                {recipe.image && (
+                                    <Image
+                                        source={{ uri: recipe.image }}
+                                        style={styles.mealImage}
+                                        resizeMode="cover"
+                                    />
+                                )}
+                                <View style={styles.mealInfo}>
+                                    <Text style={styles.mealName}>{recipe.title}</Text>
 
-                                <View style={styles.dividerLine} />
+                                    <View style={styles.dividerLine} />
 
-                                <View style={styles.mealMacros}>
-                                    <Text style={styles.mealMacro}>{meal.calories} cal</Text>
-                                    <Text style={styles.mealMacro}>{meal.protein}g protein</Text>
-                                    <Text style={styles.mealMacro}>{meal.carbs}g carbs</Text>
-                                    <Text style={styles.mealMacro}>{meal.fats}g fats</Text>
+                                    <View style={styles.mealMacros}>
+                                        <Text style={styles.mealMacro}>{recipe.readyInMinutes} min</Text>
+                                        <Text style={styles.mealMacro}>{recipe.servings} servings</Text>
+                                        <Text style={styles.mealMacro}>{recipe.healthScore}/100 health</Text>
+                                    </View>
+
+                                    {recipe.diets && recipe.diets.length > 0 && (
+                                        <View style={styles.dietTags}>
+                                            {recipe.diets.map((diet, i) => (
+                                                <View key={i} style={styles.dietTag}>
+                                                    <Text style={styles.dietTagText}>{diet}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
+
+                                    <Text style={styles.ingredientsTitle}>Ingredients:</Text>
+                                    <Text style={styles.ingredients}>
+                                        {recipe.ingredients.join(", ")}
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={styles.viewButton}
+                                        onPress={() => handleRecipePress(recipe)}
+                                    >
+                                        <Text style={styles.viewButtonText}>View Full Recipe</Text>
+                                    </TouchableOpacity>
                                 </View>
-
-                                <Text style={styles.ingredientsTitle}>Ingredients:</Text>
-                                <Text style={styles.ingredients}>{meal.ingredients.join(", ")}</Text>
-
-                                <TouchableOpacity style={styles.logButton}>
-                                    <Text style={styles.logButtonText}>Log This Meal</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </GradientBorderCard>
-                    ))}
+                            </GradientBorderCard>
+                        ))
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="restaurant-outline" size={50} color={SUBDUED} />
+                            <Text style={styles.emptyStateText}>No meal plan generated yet</Text>
+                            <TouchableOpacity
+                                style={styles.generateButton}
+                                onPress={() => navigation.navigate('MealPlanner')}
+                            >
+                                <Text style={styles.generateButtonText}>Create Meal Plan</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </ScrollView>
             )}
         </SafeAreaView>
     );
 }
 
-// Create a type for our styles
-type StylesType = {
-    container: ViewStyle;
-    header: ViewStyle;
-    headerTitle: TextStyle;
-    backButton: ViewStyle;
-    placeholderButton: ViewStyle;
-    loadingContainer: ViewStyle;
-    loadingText: TextStyle;
-    scrollView: ViewStyle;
-    scrollInner: ViewStyle;
-    gradientBorderContainer: ViewStyle;
-    summaryTitle: TextStyle;
-    dividerLine: ViewStyle;
-    macrosContainer: ViewStyle;
-    macroItem: ViewStyle;
-    macroValue: TextStyle;
-    macroLabel: TextStyle;
-    mealsTitle: TextStyle;
-    mealImage: ImageStyle;
-    mealInfo: ViewStyle;
-    mealName: TextStyle;
-    mealMacros: ViewStyle;
-    mealMacro: TextStyle;
-    ingredientsTitle: TextStyle;
-    ingredients: TextStyle;
-    logButton: ViewStyle;
-    logButtonText: TextStyle;
-};
-
-const styles = StyleSheet.create<StylesType>({
+const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 15,
-        paddingVertical: 10,
-    },
-    headerTitle: {
-        color: PURPLE_ACCENT,
-        fontSize: 22,
-        fontWeight: 'bold',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 10,
     },
     backButton: {
-        padding: 8,
+        padding: 4,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: WHITE,
     },
     placeholderButton: {
-        width: 40,
+        width: 32,
+        height: 32,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollInner: {
+        padding: 16,
+        paddingBottom: 40,
+    },
+    gradientBorderContainer: {
+        borderRadius: 10,
+        marginVertical: 8,
+    },
+    summaryTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 4,
+    },
+    dividerLine: {
+        height: 1,
+        backgroundColor: 'rgba(170, 0, 255, 0.3)',
+        marginVertical: 12,
+    },
+    macrosContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    macroItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    macroValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+    },
+    macroLabel: {
+        fontSize: 12,
+        color: SUBDUED,
+        marginTop: 4,
+    },
+    mealsTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginTop: 20,
+        marginBottom: 8,
+    },
+    mealImage: {
+        width: '100%',
+        height: 180,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    mealInfo: {
+        flex: 1,
+    },
+    mealName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 4,
+    },
+    mealMacros: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: 12,
+    },
+    mealMacro: {
+        fontSize: 14,
+        color: SUBDUED,
+        marginRight: 16,
+    },
+    dietTags: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: 12,
+    },
+    dietTag: {
+        backgroundColor: 'rgba(170, 0, 255, 0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 4,
+        marginRight: 8,
+        marginBottom: 8,
+    },
+    dietTagText: {
+        color: PURPLE_ACCENT,
+        fontSize: 12,
+        textTransform: 'capitalize',
+    },
+    ingredientsTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 8,
+    },
+    ingredients: {
+        fontSize: 14,
+        color: SUBDUED,
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    viewButton: {
+        backgroundColor: PURPLE_ACCENT,
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    viewButtonText: {
+        color: WHITE,
+        fontWeight: '600',
+        fontSize: 14,
     },
     loadingContainer: {
         flex: 1,
@@ -254,125 +356,30 @@ const styles = StyleSheet.create<StylesType>({
     },
     loadingText: {
         color: WHITE,
-        fontSize: 18,
-        textAlign: 'center',
-        marginTop: 15,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollInner: {
-        paddingHorizontal: 10,
-        paddingBottom: 40,
-        width: '100%',
-        alignItems: 'center',
-    },
-    // Gradient border components
-    gradientBorderContainer: {
-        marginBottom: 12,
-        borderRadius: 10,
-        width: '100%',
-        overflow: 'hidden',
-    },
-    summaryTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: WHITE,
-        marginBottom: 6,
-    },
-    // Dividers
-    dividerLine: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#333',
-        marginVertical: 8,
-        marginHorizontal: -20,
-        width: '120%',
-    },
-    macrosContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginTop: 5,
-    },
-    macroItem: {
-        alignItems: 'center',
-    },
-    macroValue: {
-        color: PURPLE_ACCENT,
-        fontSize: 22,
-        fontWeight: 'bold',
-    },
-    macroLabel: {
-        color: SUBDUED,
-        fontSize: 14,
-        marginTop: 4,
-    },
-    mealsTitle: {
-        color: WHITE,
-        fontSize: 22,
-        fontWeight: 'bold',
-        alignSelf: 'flex-start',
-        marginLeft: 5,
-        marginTop: 5,
-        marginBottom: 5,
-    },
-    mealImage: {
-        width: '100%',
-        height: 180,
-        borderTopLeftRadius: 9,
-        borderTopRightRadius: 9,
-        marginBottom: 10,
-        marginTop: -16, // To counter the padding of the parent
-        marginHorizontal: -16, // To counter the padding of the parent
-    },
-    mealInfo: {
-        padding: 5,
-    },
-    mealName: {
-        color: WHITE,
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 8,
-    },
-    mealMacros: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginBottom: 12,
-        justifyContent: 'space-around',
-    },
-    mealMacro: {
-        color: SUBDUED,
-        fontSize: 14,
-        marginRight: 8,
-        marginBottom: 4,
-    },
-    ingredientsTitle: {
-        color: WHITE,
+        marginTop: 16,
         fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 4,
+        textAlign: 'center',
     },
-    ingredients: {
-        color: SUBDUED,
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    logButton: {
-        backgroundColor: PURPLE_ACCENT,
-        borderRadius: 6,
+    emptyState: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        marginTop: 15,
-        transform: [{ translateY: -2 }],
-        shadowColor: PURPLE_ACCENT,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.6,
-        shadowRadius: 10,
-        elevation: 5,
+        paddingVertical: 40,
     },
-    logButtonText: {
-        color: WHITE,
-        fontWeight: '700',
+    emptyStateText: {
+        color: SUBDUED,
         fontSize: 16,
+        marginTop: 16,
+        marginBottom: 24,
+    },
+    generateButton: {
+        backgroundColor: PURPLE_ACCENT,
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+    },
+    generateButtonText: {
+        color: WHITE,
+        fontWeight: 'bold',
+        fontSize: 14,
     },
 }); 

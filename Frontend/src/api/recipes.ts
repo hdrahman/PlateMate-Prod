@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { SPOONACULAR_API_KEY } from '../utils/config';
 
 // Types for Recipe Data
 export interface Recipe {
@@ -58,7 +59,10 @@ export const cuisineCategories = [
     { id: 'chinese', name: 'Chinese' },
 ];
 
-// Fallbacks for no API key or when API is unavailable
+// Base URL for Spoonacular API
+const BASE_URL = 'https://api.spoonacular.com';
+
+// Fallbacks for when API is unavailable or rate limited
 const MOCK_RECIPES = [
     {
         id: '1',
@@ -132,13 +136,35 @@ const MOCK_RECIPES = [
     }
 ];
 
+// Check if API key is configured
+const isConfigured = !!SPOONACULAR_API_KEY;
+
+// Function to map Spoonacular recipe to our Recipe interface
+const mapSpoonacularRecipe = (spoonRecipe: any): Recipe => {
+    return {
+        id: spoonRecipe.id.toString(),
+        title: spoonRecipe.title,
+        image: spoonRecipe.image?.startsWith('http')
+            ? spoonRecipe.image
+            : `https://spoonacular.com/recipeImages/${spoonRecipe.image}`,
+        readyInMinutes: spoonRecipe.readyInMinutes || 0,
+        servings: spoonRecipe.servings || 1,
+        sourceUrl: spoonRecipe.sourceUrl || '',
+        summary: spoonRecipe.summary?.replace(/<[^>]*>/g, '') || '',
+        healthScore: spoonRecipe.healthScore || 0,
+        ingredients: spoonRecipe.extendedIngredients?.map((ing: any) => ing.original) || [],
+        instructions: spoonRecipe.instructions?.replace(/<[^>]*>/g, '') || '',
+        diets: spoonRecipe.diets || [],
+        cuisines: spoonRecipe.cuisines || [],
+    };
+};
+
 // Function to search for recipes by query
 export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[]> => {
-    try {
-        // In a real implementation, this would call a recipe API like Spoonacular or Edamam
-        // For demo purposes, we'll use mock data
+    if (!isConfigured) {
+        console.warn('Spoonacular API key not configured. Using mock data.');
 
-        // Simulate filtering by ingredients if provided
+        // Filter mock data based on params
         let filteredRecipes = [...MOCK_RECIPES];
 
         if (params.query) {
@@ -149,111 +175,234 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[
             );
         }
 
+        // Apply other filters as needed
+        return filteredRecipes.slice(0, params.number || 10);
+    }
+
+    try {
+        const apiParams: any = {
+            apiKey: SPOONACULAR_API_KEY,
+            number: params.number || 10,
+            offset: params.offset || 0,
+            addRecipeInformation: true,
+            fillIngredients: true,
+        };
+
+        if (params.query) apiParams.query = params.query;
+        if (params.cuisine) apiParams.cuisine = params.cuisine;
+        if (params.diet) apiParams.diet = params.diet;
+        if (params.intolerances) apiParams.intolerances = params.intolerances;
+        if (params.maxReadyTime) apiParams.maxReadyTime = params.maxReadyTime;
+        if (params.sort) apiParams.sort = params.sort;
+        if (params.sortDirection) apiParams.sortDirection = params.sortDirection;
+
         if (params.includeIngredients && params.includeIngredients.length > 0) {
-            filteredRecipes = filteredRecipes.filter(recipe =>
-                params.includeIngredients!.every(ingredient =>
-                    recipe.ingredients.some(ing =>
-                        ing.toLowerCase().includes(ingredient.toLowerCase())
-                    )
-                )
-            );
+            apiParams.includeIngredients = params.includeIngredients.join(',');
         }
 
-        if (params.cuisine) {
-            const cuisine = params.cuisine.toLowerCase();
-            filteredRecipes = filteredRecipes.filter(recipe =>
-                recipe.cuisines.some(c => c.toLowerCase() === cuisine)
-            );
-        }
+        const response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+            params: apiParams
+        });
 
-        if (params.diet) {
-            const diet = params.diet.toLowerCase();
-            filteredRecipes = filteredRecipes.filter(recipe =>
-                recipe.diets.some(d => d.toLowerCase() === diet)
-            );
-        }
-
-        if (params.maxReadyTime) {
-            filteredRecipes = filteredRecipes.filter(recipe =>
-                recipe.readyInMinutes <= params.maxReadyTime!
-            );
-        }
-
-        // Simulate pagination
-        const offset = params.offset || 0;
-        const number = params.number || 10;
-
-        return filteredRecipes.slice(offset, offset + number);
+        return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
-        console.error('Error searching for recipes:', error);
-        return [];
+        console.error('Error searching recipes:', error);
+        return MOCK_RECIPES.slice(0, params.number || 10);
     }
 };
 
 // Function to get recipe details by ID
 export const getRecipeById = async (id: string): Promise<Recipe | null> => {
+    if (!isConfigured) {
+        console.warn('Spoonacular API key not configured. Using mock data.');
+        return MOCK_RECIPES.find(r => r.id === id) || null;
+    }
+
     try {
-        // In a real implementation, this would call a recipe API
-        // For demo purposes, we'll use mock data
-        const recipe = MOCK_RECIPES.find(r => r.id === id);
-        return recipe || null;
+        const response = await axios.get(`${BASE_URL}/recipes/${id}/information`, {
+            params: {
+                apiKey: SPOONACULAR_API_KEY,
+                includeNutrition: false
+            }
+        });
+
+        return mapSpoonacularRecipe(response.data);
     } catch (error) {
         console.error('Error getting recipe details:', error);
-        return null;
+        return MOCK_RECIPES.find(r => r.id === id) || null;
     }
 };
 
 // Function to get random recipes
 export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => {
-    try {
-        // In a real implementation, this would call a recipe API
-        // For demo purposes, we'll shuffle and return mock data
+    if (!isConfigured) {
+        console.warn('Spoonacular API key not configured. Using mock data.');
         return shuffleArray([...MOCK_RECIPES]).slice(0, count);
+    }
+
+    try {
+        const response = await axios.get(`${BASE_URL}/recipes/random`, {
+            params: {
+                apiKey: SPOONACULAR_API_KEY,
+                number: count,
+                addRecipeInformation: true,
+                fillIngredients: true
+            }
+        });
+
+        return response.data.recipes.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error('Error getting random recipes:', error);
-        return [];
+        return shuffleArray([...MOCK_RECIPES]).slice(0, count);
     }
 };
 
 // Function to get recipes by meal type
 export const getRecipesByMealType = async (mealType: string, count: number = 3): Promise<Recipe[]> => {
-    try {
-        // In a real implementation, this would call a recipe API
-        // For demo purposes, we'll use mock data
+    if (!isConfigured) {
+        console.warn('Spoonacular API key not configured. Using mock data.');
 
         // Map meal types to diets or cuisines for filtering
         let recipes = [...MOCK_RECIPES];
 
         switch (mealType.toLowerCase()) {
             case 'breakfast':
-                // For demo, just return the first items
                 return recipes.slice(0, count);
             case 'lunch':
-                // For demo, offset by a bit
                 return recipes.slice(1, 1 + count);
             case 'dinner':
-                // For demo, get from end
                 return recipes.slice(Math.max(0, recipes.length - count));
-            case 'vegetarian':
-            case 'vegan':
-            case 'glutenfree':
-            case 'dairyfree':
-                // Filter by diet
-                recipes = recipes.filter(recipe =>
-                    recipe.diets.some(diet =>
-                        diet.toLowerCase().replace('-', '') === mealType.toLowerCase()
-                    )
-                );
-                break;
             default:
-                // No filtering
                 break;
         }
 
-        return recipes.slice(0, count);
+        return shuffleArray(recipes).slice(0, count);
+    }
+
+    try {
+        let apiParams: any = {
+            apiKey: SPOONACULAR_API_KEY,
+            number: count,
+            addRecipeInformation: true,
+            fillIngredients: true
+        };
+
+        // Different query parameters based on meal type
+        switch (mealType.toLowerCase()) {
+            case 'breakfast':
+                apiParams.type = 'breakfast';
+                break;
+            case 'lunch':
+                apiParams.type = 'main course';
+                apiParams.maxReadyTime = 30; // Quick lunch
+                break;
+            case 'dinner':
+                apiParams.type = 'main course';
+                break;
+            case 'snack':
+                apiParams.type = 'snack';
+                break;
+            case 'dessert':
+                apiParams.type = 'dessert';
+                break;
+            case 'vegetarian':
+                apiParams.diet = 'vegetarian';
+                break;
+            case 'vegan':
+                apiParams.diet = 'vegan';
+                break;
+            case 'glutenfree':
+                apiParams.diet = 'gluten free';
+                break;
+            case 'dairyfree':
+                apiParams.intolerances = 'dairy';
+                break;
+            case 'healthy':
+                apiParams.sort = 'healthiness';
+                apiParams.sortDirection = 'desc';
+                break;
+            case 'quick':
+                apiParams.maxReadyTime = 20;
+                break;
+            default:
+                // No specific filtering
+                break;
+        }
+
+        const response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+            params: apiParams
+        });
+
+        return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error(`Error getting ${mealType} recipes:`, error);
-        return [];
+        return shuffleArray([...MOCK_RECIPES]).slice(0, count);
+    }
+};
+
+// Generate a meal plan using Spoonacular API
+export const generateMealPlan = async (params: {
+    timeFrame?: 'day' | 'week',
+    targetCalories?: number,
+    diet?: string,
+    exclude?: string[]
+}): Promise<any> => {
+    if (!isConfigured) {
+        console.warn('Spoonacular API key not configured. Using mock data.');
+        return {
+            meals: shuffleArray([...MOCK_RECIPES]).slice(0, 3),
+            nutrients: {
+                calories: 2000,
+                protein: 100,
+                fat: 70,
+                carbohydrates: 250
+            }
+        };
+    }
+
+    try {
+        const apiParams: any = {
+            apiKey: SPOONACULAR_API_KEY,
+            timeFrame: params.timeFrame || 'day',
+        };
+
+        if (params.targetCalories) apiParams.targetCalories = params.targetCalories;
+        if (params.diet) apiParams.diet = params.diet;
+        if (params.exclude && params.exclude.length > 0) {
+            apiParams.exclude = params.exclude.join(',');
+        }
+
+        const response = await axios.get(`${BASE_URL}/mealplanner/generate`, {
+            params: apiParams
+        });
+
+        // For day meal plan
+        if (response.data.meals) {
+            // Fetch full recipe details for each meal
+            const mealPromises = response.data.meals.map((meal: any) =>
+                getRecipeById(meal.id.toString())
+            );
+
+            const mealDetails = await Promise.all(mealPromises);
+
+            return {
+                meals: mealDetails.filter(Boolean), // Filter out any null results
+                nutrients: response.data.nutrients
+            };
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error('Error generating meal plan:', error);
+        return {
+            meals: shuffleArray([...MOCK_RECIPES]).slice(0, 3),
+            nutrients: {
+                calories: 2000,
+                protein: 100,
+                fat: 70,
+                carbohydrates: 250
+            }
+        };
     }
 };
 

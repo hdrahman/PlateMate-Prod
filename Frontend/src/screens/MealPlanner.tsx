@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-    ScrollView, ViewStyle, TextStyle, ActivityIndicator,
-    TextInput
+    ScrollView, TextInput, Modal, Platform, Alert,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
-import { Recipe, foodCategories, getRandomRecipes } from '../api/recipes';
+import { Recipe, foodCategories, getRandomRecipes, generateMealPlan } from '../api/recipes';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -24,45 +24,121 @@ interface GradientBorderCardProps {
     style?: any;
 }
 
+// Define diet options
+const dietOptions = [
+    { label: 'No Restrictions', value: undefined },
+    { label: 'Vegetarian', value: 'vegetarian' },
+    { label: 'Vegan', value: 'vegan' },
+    { label: 'Gluten Free', value: 'gluten-free' },
+    { label: 'Ketogenic', value: 'ketogenic' },
+    { label: 'Paleo', value: 'paleo' },
+    { label: 'Pescetarian', value: 'pescetarian' },
+    { label: 'Whole30', value: 'whole30' },
+];
+
 export default function MealPlanner() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [isLoading, setIsLoading] = useState<boolean>(false);
     const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
-    const [loading, setLoading] = useState(true);
 
+    // Meal plan preferences
+    const [showPreferences, setShowPreferences] = useState<boolean>(false);
+    const [targetCalories, setTargetCalories] = useState<string>('2000');
+    const [selectedDiet, setSelectedDiet] = useState<string | undefined>(undefined);
+    const [excludeIngredients, setExcludeIngredients] = useState<string>('');
+
+    // Daily nutrition stats
+    const [dailyNutrition, setDailyNutrition] = useState({
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbs: 0,
+        remainingCalories: 2000,
+        mealsLeft: 3
+    });
+
+    // Load random recipes on component mount
     useEffect(() => {
-        const loadInitialData = async () => {
-            try {
-                setLoading(true);
-                const recipes = await getRandomRecipes(3);
-                setFeaturedRecipes(recipes);
-            } catch (error) {
-                console.error('Error loading featured recipes:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadInitialData();
+        loadRandomRecipes();
     }, []);
 
-    // Handle the pantry scan button press
-    const handleScanPantry = () => {
-        // Navigate to a custom camera screen for pantry scanning
-        navigation.navigate('MealPlannerCamera');
+    // Function to load random recipes
+    const loadRandomRecipes = async () => {
+        try {
+            setIsLoading(true);
+            const recipes = await getRandomRecipes(5);
+            setFeaturedRecipes(recipes);
+        } catch (error) {
+            console.error('Error loading random recipes:', error);
+            Alert.alert('Error', 'Failed to load recipes. Please try again later.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handle search submission
+    const handleSearch = () => {
+        if (searchQuery.trim()) {
+            navigation.navigate('RecipeResults', { query: searchQuery });
+        }
     };
 
     // Handle recipe press
     const handleRecipePress = (recipe: Recipe) => {
-        navigation.navigate('RecipeDetails', { recipe });
+        navigation.navigate('RecipeDetails', { recipeId: recipe.id });
     };
 
-    // Handle search submit
-    const handleSearch = () => {
-        if (searchQuery.trim()) {
-            // Navigate to search results with the query
-            navigation.navigate('SearchResults', { query: searchQuery });
+    // Generate a personalized meal plan
+    const handleGenerateMealPlan = async () => {
+        try {
+            setIsLoading(true);
+
+            // Prepare exclude ingredients list if any
+            const excludeList = excludeIngredients
+                .split(',')
+                .map(item => item.trim())
+                .filter(item => item.length > 0);
+
+            // Call API to generate meal plan
+            const mealPlanData = await generateMealPlan({
+                timeFrame: 'day',
+                targetCalories: parseInt(targetCalories) || 2000,
+                diet: selectedDiet,
+                exclude: excludeList.length > 0 ? excludeList : undefined
+            });
+
+            // Update daily nutrition with the meal plan data
+            if (mealPlanData.nutrients) {
+                setDailyNutrition({
+                    calories: Math.round(mealPlanData.nutrients.calories),
+                    protein: Math.round(mealPlanData.nutrients.protein),
+                    fat: Math.round(mealPlanData.nutrients.fat),
+                    carbs: Math.round(mealPlanData.nutrients.carbohydrates),
+                    remainingCalories: Math.round(parseInt(targetCalories) - mealPlanData.nutrients.calories),
+                    mealsLeft: 3 - mealPlanData.meals.length
+                });
+            }
+
+            // Close preferences modal
+            setShowPreferences(false);
+
+            // Navigate to meal plan results
+            navigation.navigate('MealPlannerResults', {
+                mealPlan: mealPlanData.meals,
+                nutrients: mealPlanData.nutrients
+            });
+        } catch (error) {
+            console.error('Error generating meal plan:', error);
+            Alert.alert('Error', 'Failed to generate meal plan. Please try again later.');
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    // Handle scanning pantry (placeholder for future feature)
+    const handleScanPantry = () => {
+        Alert.alert('Coming Soon', 'Pantry scanning feature is coming soon!');
     };
 
     // GradientBorderCard component for consistent card styling
@@ -97,6 +173,84 @@ export default function MealPlanner() {
         );
     };
 
+    // Preferences Modal component
+    const PreferencesModal = () => (
+        <Modal
+            visible={showPreferences}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowPreferences(false)}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Meal Plan Preferences</Text>
+                        <TouchableOpacity
+                            onPress={() => setShowPreferences(false)}
+                            style={styles.closeButton}
+                        >
+                            <Ionicons name="close" size={24} color={WHITE} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.modalScrollView}>
+                        {/* Calories Input */}
+                        <Text style={styles.preferenceLabel}>Target Calories</Text>
+                        <TextInput
+                            style={styles.preferenceInput}
+                            value={targetCalories}
+                            onChangeText={setTargetCalories}
+                            keyboardType="numeric"
+                            placeholder="Enter target calories"
+                            placeholderTextColor={SUBDUED}
+                        />
+
+                        {/* Diet Selection */}
+                        <Text style={styles.preferenceLabel}>Diet</Text>
+                        {dietOptions.map((option, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={styles.dietOption}
+                                onPress={() => setSelectedDiet(option.value)}
+                            >
+                                <Text style={styles.dietOptionText}>{option.label}</Text>
+                                <View style={styles.radioOuterCircle}>
+                                    {selectedDiet === option.value && (
+                                        <View style={styles.radioInnerCircle} />
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+
+                        {/* Exclude Ingredients */}
+                        <Text style={styles.preferenceLabel}>Exclude Ingredients</Text>
+                        <TextInput
+                            style={styles.preferenceInput}
+                            value={excludeIngredients}
+                            onChangeText={setExcludeIngredients}
+                            placeholder="Enter ingredients to exclude (comma separated)"
+                            placeholderTextColor={SUBDUED}
+                            multiline
+                        />
+
+                        {/* Generate Button */}
+                        <TouchableOpacity
+                            style={styles.generateButton}
+                            onPress={handleGenerateMealPlan}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <ActivityIndicator size="small" color={WHITE} />
+                            ) : (
+                                <Text style={styles.generateButtonText}>Generate Meal Plan</Text>
+                            )}
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -105,6 +259,9 @@ export default function MealPlanner() {
                     Get personalized meal plans and recipe ideas
                 </Text>
             </View>
+
+            {/* Preferences Modal */}
+            <PreferencesModal />
 
             <ScrollView
                 style={styles.scrollView}
@@ -130,45 +287,56 @@ export default function MealPlanner() {
                 {/* Scan Pantry Card */}
                 <GradientBorderCard>
                     <TouchableOpacity
-                        style={styles.scanButton}
+                        style={styles.actionCardContent}
                         onPress={handleScanPantry}
                     >
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="camera-outline" size={40} color={WHITE} />
+                        <View style={styles.actionIconContainer}>
+                            <Ionicons name="camera-outline" size={24} color={WHITE} />
                         </View>
-                        <View style={styles.textContainer}>
-                            <Text style={styles.scanTitle}>Scan Your Pantry</Text>
-                            <Text style={styles.scanDescription}>
-                                Take a photo of your pantry items to generate meal suggestions
+                        <View style={styles.actionTextContainer}>
+                            <Text style={styles.actionTitle}>Scan Your Pantry</Text>
+                            <Text style={styles.actionSubtitle}>
+                                Get recipe ideas based on what you have
                             </Text>
                         </View>
-                        <View style={styles.arrowContainer}>
-                            <Ionicons name="chevron-forward" size={24} color={WHITE} />
+                        <Ionicons name="chevron-forward" size={22} color={SUBDUED} />
+                    </TouchableOpacity>
+                </GradientBorderCard>
+
+                {/* Generate Meal Plan Card */}
+                <GradientBorderCard>
+                    <TouchableOpacity
+                        style={styles.actionCardContent}
+                        onPress={() => setShowPreferences(true)}
+                    >
+                        <View style={styles.actionIconContainer}>
+                            <Ionicons name="restaurant-outline" size={24} color={WHITE} />
                         </View>
+                        <View style={styles.actionTextContainer}>
+                            <Text style={styles.actionTitle}>Generate Meal Plan</Text>
+                            <Text style={styles.actionSubtitle}>
+                                Personalized meals based on your preferences
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={22} color={SUBDUED} />
                     </TouchableOpacity>
                 </GradientBorderCard>
 
                 {/* Featured Recipes Section */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionHeaderTitle}>Featured Recipes</Text>
-                </View>
-
-                {loading ? (
+                <Text style={styles.sectionTitle}>Featured Recipes</Text>
+                {isLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={PURPLE_ACCENT} />
                     </View>
                 ) : (
-                    featuredRecipes.map(recipe => (
-                        <View key={recipe.id} style={styles.recipeCardContainer}>
-                            <RecipeCard recipe={recipe} onPress={handleRecipePress} />
-                        </View>
+                    featuredRecipes.map((recipe) => (
+                        <RecipeCard
+                            key={recipe.id}
+                            recipe={recipe}
+                            onPress={handleRecipePress}
+                        />
                     ))
                 )}
-
-                {/* Recipe Categories */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionHeaderTitle}>Browse by Category</Text>
-                </View>
 
                 {/* Display selected meal categories */}
                 {foodCategories.slice(0, 5).map(category => (
@@ -188,11 +356,25 @@ export default function MealPlanner() {
                     <View style={styles.nutritionInfoContainer}>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Remaining Calories</Text>
-                            <Text style={styles.nutritionValue}>1200</Text>
+                            <Text style={styles.nutritionValue}>{dailyNutrition.remainingCalories}</Text>
                         </View>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Meals Left</Text>
-                            <Text style={styles.nutritionValue}>2</Text>
+                            <Text style={styles.nutritionValue}>{dailyNutrition.mealsLeft}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.macrosContainer}>
+                        <View style={styles.macroItem}>
+                            <Text style={styles.macroValue}>{dailyNutrition.carbs}g</Text>
+                            <Text style={styles.macroLabel}>Carbs</Text>
+                        </View>
+                        <View style={styles.macroItem}>
+                            <Text style={styles.macroValue}>{dailyNutrition.protein}g</Text>
+                            <Text style={styles.macroLabel}>Protein</Text>
+                        </View>
+                        <View style={styles.macroItem}>
+                            <Text style={styles.macroValue}>{dailyNutrition.fat}g</Text>
+                            <Text style={styles.macroLabel}>Fat</Text>
                         </View>
                     </View>
                 </GradientBorderCard>
@@ -201,206 +383,215 @@ export default function MealPlanner() {
     );
 }
 
-// Create a type for our styles
-type StylesType = {
-    container: ViewStyle;
-    header: ViewStyle;
-    headerTitle: TextStyle;
-    headerSub: TextStyle;
-    scrollView: ViewStyle;
-    scrollInner: ViewStyle;
-    scanButton: ViewStyle;
-    iconContainer: ViewStyle;
-    textContainer: ViewStyle;
-    scanTitle: TextStyle;
-    scanDescription: TextStyle;
-    arrowContainer: ViewStyle;
-    sectionTitle: TextStyle;
-    emptyStateText: TextStyle;
-    nutritionInfoContainer: ViewStyle;
-    nutritionItem: ViewStyle;
-    nutritionLabel: TextStyle;
-    nutritionValue: TextStyle;
-    gradientBorderContainer: ViewStyle;
-    dividerLine: ViewStyle;
-    analyzeBtn: ViewStyle;
-    analyzeBtnText: TextStyle;
-    searchContainer: ViewStyle;
-    searchInput: TextStyle;
-    searchIcon: ViewStyle;
-    sectionHeader: ViewStyle;
-    sectionHeaderTitle: TextStyle;
-    recipeCardContainer: ViewStyle;
-    loadingContainer: ViewStyle;
-};
-
-const styles = StyleSheet.create<StylesType>({
+const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: PRIMARY_BG,
     },
     header: {
-        paddingVertical: 10,
         paddingHorizontal: 16,
-        backgroundColor: PRIMARY_BG,
+        paddingTop: Platform.OS === 'android' ? 50 : 10,
+        paddingBottom: 10,
     },
     headerTitle: {
-        fontSize: 26,
-        color: PURPLE_ACCENT,
-        fontWeight: '700',
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: WHITE,
         marginBottom: 4,
     },
     headerSub: {
-        fontSize: 16,
-        color: WHITE,
-        fontWeight: '400',
+        fontSize: 14,
+        color: SUBDUED,
     },
     scrollView: {
         flex: 1,
     },
     scrollInner: {
-        paddingHorizontal: 10,
-        paddingBottom: 40,
-        width: '100%',
-        alignItems: 'center',
+        padding: 16,
+        paddingBottom: 80,
     },
-    // Gradient border components
     gradientBorderContainer: {
-        marginBottom: 12,
         borderRadius: 10,
-        width: '100%',
-        overflow: 'hidden',
+        marginVertical: 8,
     },
-    scanButton: {
+    searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    iconContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
+    searchIcon: {
+        marginRight: 10,
     },
-    textContainer: {
+    searchInput: {
         flex: 1,
-        marginLeft: 15,
-    },
-    scanTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        height: 40,
         color: WHITE,
-        marginBottom: 5,
+        fontSize: 16,
     },
-    scanDescription: {
-        fontSize: 14,
-        color: SUBDUED,
+    actionCardContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
-    arrowContainer: {
-        width: 30,
+    actionIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(170, 0, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
+        marginRight: 12,
+    },
+    actionTextContainer: {
+        flex: 1,
+    },
+    actionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: WHITE,
+        marginBottom: 2,
+    },
+    actionSubtitle: {
+        fontSize: 12,
+        color: SUBDUED,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         color: WHITE,
-        marginBottom: 6,
+        marginTop: 24,
+        marginBottom: 12,
     },
-    // Dividers
     dividerLine: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#333',
-        marginVertical: 8,
-        marginHorizontal: -20,
-        width: '120%',
-    },
-    emptyStateText: {
-        color: SUBDUED,
-        fontSize: 14,
-        textAlign: 'center',
-        padding: 20,
+        height: 1,
+        backgroundColor: 'rgba(170, 0, 255, 0.3)',
+        marginVertical: 12,
     },
     nutritionInfoContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        padding: 10,
+        justifyContent: 'space-between',
+        marginBottom: 12,
     },
     nutritionItem: {
         alignItems: 'center',
     },
     nutritionLabel: {
+        fontSize: 12,
         color: SUBDUED,
-        fontSize: 14,
-        marginBottom: 5,
-    },
-    nutritionValue: {
-        color: WHITE,
-        fontSize: 22,
-        fontWeight: 'bold',
-    },
-    // Button styles
-    analyzeBtn: {
-        backgroundColor: PURPLE_ACCENT,
-        borderRadius: 6,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        transform: [{ translateY: -2 }],
-        shadowColor: PURPLE_ACCENT,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.6,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    analyzeBtnText: {
-        color: WHITE,
-        fontWeight: '700',
-        fontSize: 16,
-    },
-    // Search styles
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    searchInput: {
-        flex: 1,
-        height: 36,
-        color: WHITE,
-        fontSize: 16,
-        marginLeft: 8,
-    },
-    searchIcon: {
-        marginRight: 4,
-    },
-    // Section header styles
-    sectionHeader: {
-        width: '100%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginTop: 10,
-        marginBottom: 6,
-        paddingHorizontal: 5,
-    },
-    sectionHeaderTitle: {
-        color: WHITE,
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    recipeCardContainer: {
-        width: '100%',
         marginBottom: 4,
     },
+    nutritionValue: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: WHITE,
+    },
+    macrosContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 12,
+    },
+    macroItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    macroValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: WHITE,
+    },
+    macroLabel: {
+        fontSize: 12,
+        color: SUBDUED,
+    },
     loadingContainer: {
-        height: 200,
-        width: '100%',
+        padding: 20,
+        alignItems: 'center',
+    },
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    modalContent: {
+        width: '90%',
+        maxHeight: '80%',
+        backgroundColor: CARD_BG,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: PURPLE_ACCENT,
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(170, 0, 255, 0.3)',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+    },
+    closeButton: {
+        padding: 4,
+    },
+    modalScrollView: {
+        padding: 16,
+    },
+    preferenceLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: WHITE,
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    preferenceInput: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 8,
+        padding: 12,
+        color: WHITE,
+        marginBottom: 16,
+    },
+    dietOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    dietOptionText: {
+        fontSize: 16,
+        color: WHITE,
+    },
+    radioOuterCircle: {
+        height: 20,
+        width: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: PURPLE_ACCENT,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    radioInnerCircle: {
+        height: 10,
+        width: 10,
+        borderRadius: 5,
+        backgroundColor: PURPLE_ACCENT,
+    },
+    generateButton: {
+        backgroundColor: PURPLE_ACCENT,
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        marginTop: 24,
+        marginBottom: 32,
+    },
+    generateButtonText: {
+        color: WHITE,
+        fontWeight: 'bold',
+        fontSize: 16,
     },
 });
