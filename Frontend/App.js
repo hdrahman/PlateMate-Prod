@@ -31,6 +31,8 @@ import Manual from './src/screens/Manual';
 import MealPlanner from "./src/screens/MealPlanner";
 import MealPlannerCamera from "./src/screens/MealPlannerCamera";
 import MealPlannerResults from "./src/screens/MealPlannerResults";
+import RecipeDetails from "./src/screens/RecipeDetails";
+import SearchResults from "./src/screens/SearchResults";
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -476,6 +478,22 @@ export default function App() {
                 <Stack.Screen
                   name="MealPlannerResults"
                   component={MealPlannerResults}
+                  options={{
+                    headerShown: false,
+                    presentation: 'transparentModal'
+                  }}
+                />
+                <Stack.Screen
+                  name="RecipeDetails"
+                  component={RecipeDetails}
+                  options={{
+                    headerShown: false,
+                    presentation: 'transparentModal'
+                  }}
+                />
+                <Stack.Screen
+                  name="SearchResults"
+                  component={SearchResults}
                   options={{
                     headerShown: false,
                     presentation: 'transparentModal'

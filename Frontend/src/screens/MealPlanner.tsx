@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ViewStyle, TextStyle } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+    View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
+    ScrollView, ViewStyle, TextStyle, ActivityIndicator,
+    TextInput
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-
-// Define types for the component props
-interface GradientBorderCardProps {
-    children: React.ReactNode;
-    style?: any;
-}
+import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
+import RecipeCategory from '../components/RecipeCategory';
+import RecipeCard from '../components/RecipeCard';
+import { Recipe, foodCategories, getRandomRecipes } from '../api/recipes';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -17,13 +18,51 @@ const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const PURPLE_ACCENT = '#AA00FF';
 
+// Define types for the component props
+interface GradientBorderCardProps {
+    children: React.ReactNode;
+    style?: any;
+}
+
 export default function MealPlanner() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<NavigationProp<ParamListBase>>();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadInitialData = async () => {
+            try {
+                setLoading(true);
+                const recipes = await getRandomRecipes(3);
+                setFeaturedRecipes(recipes);
+            } catch (error) {
+                console.error('Error loading featured recipes:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadInitialData();
+    }, []);
 
     // Handle the pantry scan button press
     const handleScanPantry = () => {
         // Navigate to a custom camera screen for pantry scanning
-        navigation.navigate('MealPlannerCamera' as never);
+        navigation.navigate('MealPlannerCamera');
+    };
+
+    // Handle recipe press
+    const handleRecipePress = (recipe: Recipe) => {
+        navigation.navigate('RecipeDetails', { recipe });
+    };
+
+    // Handle search submit
+    const handleSearch = () => {
+        if (searchQuery.trim()) {
+            // Navigate to search results with the query
+            navigation.navigate('SearchResults', { query: searchQuery });
+        }
     };
 
     // GradientBorderCard component for consistent card styling
@@ -63,7 +102,7 @@ export default function MealPlanner() {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Meal Planner</Text>
                 <Text style={styles.headerSub}>
-                    Get personalized meal plans based on your pantry items
+                    Get personalized meal plans and recipe ideas
                 </Text>
             </View>
 
@@ -72,6 +111,22 @@ export default function MealPlanner() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollInner}
             >
+                {/* Search Box */}
+                <GradientBorderCard>
+                    <View style={styles.searchContainer}>
+                        <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search recipes, ingredients..."
+                            placeholderTextColor={SUBDUED}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                            returnKeyType="search"
+                        />
+                    </View>
+                </GradientBorderCard>
+
                 {/* Scan Pantry Card */}
                 <GradientBorderCard>
                     <TouchableOpacity
@@ -93,14 +148,38 @@ export default function MealPlanner() {
                     </TouchableOpacity>
                 </GradientBorderCard>
 
-                {/* Recent Meal Plans Card */}
-                <GradientBorderCard>
-                    <Text style={styles.sectionTitle}>Recent Meal Plans</Text>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.emptyStateText}>
-                        Your recent meal plans will appear here after you scan your pantry
-                    </Text>
-                </GradientBorderCard>
+                {/* Featured Recipes Section */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionHeaderTitle}>Featured Recipes</Text>
+                </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                    </View>
+                ) : (
+                    featuredRecipes.map(recipe => (
+                        <View key={recipe.id} style={styles.recipeCardContainer}>
+                            <RecipeCard recipe={recipe} onPress={handleRecipePress} />
+                        </View>
+                    ))
+                )}
+
+                {/* Recipe Categories */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionHeaderTitle}>Browse by Category</Text>
+                </View>
+
+                {/* Display selected meal categories */}
+                {foodCategories.slice(0, 5).map(category => (
+                    <RecipeCategory
+                        key={category.id}
+                        title={category.name}
+                        categoryId={category.id}
+                        icon={category.icon}
+                        onRecipePress={handleRecipePress}
+                    />
+                ))}
 
                 {/* Nutrition Summary Section */}
                 <GradientBorderCard>
@@ -116,13 +195,6 @@ export default function MealPlanner() {
                             <Text style={styles.nutritionValue}>2</Text>
                         </View>
                     </View>
-                </GradientBorderCard>
-
-                {/* Add a button to explore meal ideas */}
-                <GradientBorderCard>
-                    <TouchableOpacity style={styles.analyzeBtn}>
-                        <Text style={styles.analyzeBtnText}>Explore Meal Ideas</Text>
-                    </TouchableOpacity>
                 </GradientBorderCard>
             </ScrollView>
         </SafeAreaView>
@@ -153,6 +225,13 @@ type StylesType = {
     dividerLine: ViewStyle;
     analyzeBtn: ViewStyle;
     analyzeBtnText: TextStyle;
+    searchContainer: ViewStyle;
+    searchInput: TextStyle;
+    searchIcon: ViewStyle;
+    sectionHeader: ViewStyle;
+    sectionHeaderTitle: TextStyle;
+    recipeCardContainer: ViewStyle;
+    loadingContainer: ViewStyle;
 };
 
 const styles = StyleSheet.create<StylesType>({
@@ -280,4 +359,48 @@ const styles = StyleSheet.create<StylesType>({
         fontWeight: '700',
         fontSize: 16,
     },
-}); 
+    // Search styles
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    searchInput: {
+        flex: 1,
+        height: 36,
+        color: WHITE,
+        fontSize: 16,
+        marginLeft: 8,
+    },
+    searchIcon: {
+        marginRight: 4,
+    },
+    // Section header styles
+    sectionHeader: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 10,
+        marginBottom: 6,
+        paddingHorizontal: 5,
+    },
+    sectionHeaderTitle: {
+        color: WHITE,
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
+    recipeCardContainer: {
+        width: '100%',
+        marginBottom: 4,
+    },
+    loadingContainer: {
+        height: 200,
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+});
