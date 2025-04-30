@@ -297,7 +297,7 @@ export default function Home() {
                   cy={SVG_SIZE / 2}
                   r={radius + STROKE_WIDTH / 2 + OUTLINE_WIDTH / 2}
                   stroke="#444444"
-                  strokeWidth={OUTLINE_WIDTH}
+                  strokeWidth={0}
                   fill="none"
                 />
                 {/* Inner dark grey outline */}
@@ -306,7 +306,7 @@ export default function Home() {
                   cy={SVG_SIZE / 2}
                   r={radius - STROKE_WIDTH / 2 - OUTLINE_WIDTH / 2}
                   stroke="#444444"
-                  strokeWidth={OUTLINE_WIDTH}
+                  strokeWidth={0}
                   fill="none"
                 />
                 <Circle
@@ -502,6 +502,31 @@ export default function Home() {
           <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
           <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
+
+        {/* EXPLORE BUTTON */}
+        <GradientBorderCard>
+          <TouchableOpacity
+            style={styles.exploreButtonInner}
+            onPress={() => navigation.navigate('Explore' as never)}
+          >
+            <MaskedView
+              style={{ height: 30, width: '100%' }}
+              maskElement={
+                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Ionicons name="compass" size={22} color="black" style={{ marginRight: 8 }} />
+                  <Text style={[styles.exploreButtonText, { color: 'black' }]}>Explore Content</Text>
+                </View>
+              }
+            >
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={{ flex: 1 }}
+              />
+            </MaskedView>
+          </TouchableOpacity>
+        </GradientBorderCard>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1057,8 +1082,8 @@ const styles = StyleSheet.create({
     width: CIRCLE_SIZE - STROKE_WIDTH * 2,
     height: CIRCLE_SIZE - STROKE_WIDTH * 2,
     borderRadius: CIRCLE_SIZE,
-    backgroundColor: '#9B00FF',
-    opacity: 0.2,
+    backgroundColor: 'transparent',
+    opacity: 0,
     top: STROKE_WIDTH + SVG_PADDING,
     left: STROKE_WIDTH + SVG_PADDING
   },
@@ -1261,5 +1286,33 @@ const styles = StyleSheet.create({
     color: '#FFF',
     marginTop: 10,
     fontSize: 16,
+  },
+  // Explore button styles
+  exploreButton: {
+    width: '90%',
+    height: 50,
+    marginBottom: 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  exploreButtonInner: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  exploreButtonGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exploreButtonIcon: {
+    marginRight: 8,
+  },
+  exploreButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

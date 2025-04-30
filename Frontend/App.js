@@ -28,6 +28,9 @@ import ImageCaptureScreen from './src/screens/ImageCapture';
 import Nutrients from './src/screens/Nutrients';
 import BarcodeScannerScreen from './src/screens/BarcodeScanner';
 import Manual from './src/screens/Manual';
+import MealPlanner from "./src/screens/MealPlanner";
+import MealPlannerCamera from "./src/screens/MealPlannerCamera";
+import MealPlannerResults from "./src/screens/MealPlannerResults";
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -236,12 +239,12 @@ function MainTabs() {
 
 
       <Tab.Screen
-        name="Explore"
-        component={Explore}
+        name="MealPlanner"
+        component={MealPlanner}
         options={{
-          tabBarLabel: "Explore",
+          tabBarLabel: "Meal Planner",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="compass-outline" color={color} size={size} />
+            <Ionicons name="nutrition-outline" color={color} size={size} />
           ),
         }}
       />
@@ -449,6 +452,30 @@ export default function App() {
                 <Stack.Screen
                   name="Manual"
                   component={Manual}
+                  options={{
+                    headerShown: false,
+                    presentation: 'transparentModal'
+                  }}
+                />
+                <Stack.Screen
+                  name="Explore"
+                  component={Explore}
+                  options={{
+                    headerShown: false,
+                    presentation: 'transparentModal'
+                  }}
+                />
+                <Stack.Screen
+                  name="MealPlannerCamera"
+                  component={MealPlannerCamera}
+                  options={{
+                    headerShown: false,
+                    presentation: 'transparentModal'
+                  }}
+                />
+                <Stack.Screen
+                  name="MealPlannerResults"
+                  component={MealPlannerResults}
                   options={{
                     headerShown: false,
                     presentation: 'transparentModal'
