@@ -345,7 +345,12 @@ export const generateMealPlan = async (params: {
     timeFrame?: 'day' | 'week',
     targetCalories?: number,
     diet?: string,
-    exclude?: string[]
+    exclude?: string[],
+    type?: string,
+    cuisine?: string,
+    maxReadyTime?: number,
+    minProtein?: number,
+    maxCarbs?: number
 }): Promise<any> => {
     if (!isConfigured) {
         console.warn('Spoonacular API key not configured. Using mock data.');
@@ -371,6 +376,13 @@ export const generateMealPlan = async (params: {
         if (params.exclude && params.exclude.length > 0) {
             apiParams.exclude = params.exclude.join(',');
         }
+
+        // Add new filtering parameters if provided
+        if (params.type) apiParams.type = params.type;
+        if (params.cuisine) apiParams.cuisine = params.cuisine;
+        if (params.maxReadyTime) apiParams.maxReadyTime = params.maxReadyTime;
+        if (params.minProtein) apiParams.minProtein = params.minProtein;
+        if (params.maxCarbs) apiParams.maxCarbs = params.maxCarbs;
 
         const response = await axios.get(`${BASE_URL}/mealplanner/generate`, {
             params: apiParams

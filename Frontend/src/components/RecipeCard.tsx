@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, GestureResponderEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../api/recipes';
+import { useFavorites } from '../context/FavoritesContext';
 
 // Define color constants for consistent theming
 const CARD_BG = '#121212';
@@ -16,17 +17,41 @@ interface RecipeCardProps {
 }
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = false }) => {
+    const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+    const isFav = isFavorite(recipe.id);
+
+    const handleFavoritePress = async (e: GestureResponderEvent) => {
+        e.stopPropagation();
+        if (isFav) {
+            await removeFavorite(recipe.id);
+        } else {
+            await addFavorite(recipe);
+        }
+    };
+
     return (
         <TouchableOpacity
             style={[styles.card, compact && styles.compactCard]}
             onPress={() => onPress && onPress(recipe)}
             activeOpacity={0.7}
         >
-            <Image
-                source={{ uri: recipe.image }}
-                style={[styles.image, compact && styles.compactImage]}
-                resizeMode="cover"
-            />
+            <View style={styles.imageContainer}>
+                <Image
+                    source={{ uri: recipe.image }}
+                    style={[styles.image, compact && styles.compactImage]}
+                    resizeMode="cover"
+                />
+                <TouchableOpacity
+                    style={styles.favoriteButton}
+                    onPress={handleFavoritePress}
+                >
+                    <Ionicons
+                        name={isFav ? "heart" : "heart-outline"}
+                        size={22}
+                        color={isFav ? "#FF4081" : WHITE}
+                    />
+                </TouchableOpacity>
+            </View>
 
             <View style={styles.infoContainer}>
                 <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
@@ -91,6 +116,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         height: 100,
     },
+    imageContainer: {
+        position: 'relative',
+    },
     image: {
         width: '100%',
         height: 160,
@@ -98,6 +126,17 @@ const styles = StyleSheet.create({
     compactImage: {
         width: 80,
         height: '100%',
+    },
+    favoriteButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        borderRadius: 15,
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     infoContainer: {
         padding: 12,

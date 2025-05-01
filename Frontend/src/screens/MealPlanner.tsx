@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
     ScrollView, TextInput, Modal, Platform, Alert,
-    ActivityIndicator
+    ActivityIndicator, Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +10,7 @@ import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
 import { Recipe, foodCategories, getRandomRecipes, generateMealPlan } from '../api/recipes';
+import { useFavorites } from '../context/FavoritesContext';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -36,17 +37,48 @@ const dietOptions = [
     { label: 'Whole30', value: 'whole30' },
 ];
 
+// Define meal type options
+const mealTypeOptions = [
+    { label: 'All', value: undefined },
+    { label: 'Breakfast', value: 'breakfast' },
+    { label: 'Lunch', value: 'lunch' },
+    { label: 'Dinner', value: 'dinner' },
+    { label: 'Snack', value: 'snack' },
+    { label: 'Dessert', value: 'dessert' },
+];
+
+// Define cuisine options
+const cuisineOptions = [
+    { label: 'All', value: undefined },
+    { label: 'Italian', value: 'italian' },
+    { label: 'Mexican', value: 'mexican' },
+    { label: 'Asian', value: 'asian' },
+    { label: 'Mediterranean', value: 'mediterranean' },
+    { label: 'American', value: 'american' },
+    { label: 'Indian', value: 'indian' },
+    { label: 'French', value: 'french' },
+    { label: 'Thai', value: 'thai' },
+    { label: 'Greek', value: 'greek' },
+];
+
 export default function MealPlanner() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
+    const { favorites } = useFavorites();
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
+    const [showFavorites, setShowFavorites] = useState<boolean>(true);
 
     // Meal plan preferences
     const [showPreferences, setShowPreferences] = useState<boolean>(false);
     const [targetCalories, setTargetCalories] = useState<string>('2000');
     const [selectedDiet, setSelectedDiet] = useState<string | undefined>(undefined);
+    const [selectedMealType, setSelectedMealType] = useState<string | undefined>(undefined);
+    const [selectedCuisine, setSelectedCuisine] = useState<string | undefined>(undefined);
     const [excludeIngredients, setExcludeIngredients] = useState<string>('');
+    const [maxReadyTime, setMaxReadyTime] = useState<string>('');
+    const [highProtein, setHighProtein] = useState<boolean>(false);
+    const [lowCarb, setLowCarb] = useState<boolean>(false);
 
     // Daily nutrition stats
     const [dailyNutrition, setDailyNutrition] = useState({
@@ -100,13 +132,37 @@ export default function MealPlanner() {
                 .map(item => item.trim())
                 .filter(item => item.length > 0);
 
-            // Call API to generate meal plan
-            const mealPlanData = await generateMealPlan({
-                timeFrame: 'day',
+            // Build parameters for meal plan generation
+            const mealPlanParams: any = {
+                timeFrame: 'day' as 'day' | 'week',
                 targetCalories: parseInt(targetCalories) || 2000,
                 diet: selectedDiet,
                 exclude: excludeList.length > 0 ? excludeList : undefined
-            });
+            };
+
+            // Add additional filters
+            if (selectedMealType) {
+                mealPlanParams.type = selectedMealType;
+            }
+
+            if (selectedCuisine) {
+                mealPlanParams.cuisine = selectedCuisine;
+            }
+
+            if (maxReadyTime && parseInt(maxReadyTime) > 0) {
+                mealPlanParams.maxReadyTime = parseInt(maxReadyTime);
+            }
+
+            if (highProtein) {
+                mealPlanParams.minProtein = 25; // Set minimum protein in grams
+            }
+
+            if (lowCarb) {
+                mealPlanParams.maxCarbs = 50; // Set maximum carbs in grams
+            }
+
+            // Call API to generate meal plan
+            const mealPlanData = await generateMealPlan(mealPlanParams);
 
             // Update daily nutrition with the meal plan data
             if (mealPlanData.nutrients) {
@@ -222,6 +278,72 @@ export default function MealPlanner() {
                             </TouchableOpacity>
                         ))}
 
+                        {/* Meal Type Selection */}
+                        <Text style={styles.preferenceLabel}>Meal Type</Text>
+                        {mealTypeOptions.map((option, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={styles.dietOption}
+                                onPress={() => setSelectedMealType(option.value)}
+                            >
+                                <Text style={styles.dietOptionText}>{option.label}</Text>
+                                <View style={styles.radioOuterCircle}>
+                                    {selectedMealType === option.value && (
+                                        <View style={styles.radioInnerCircle} />
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+
+                        {/* Cuisine Selection */}
+                        <Text style={styles.preferenceLabel}>Cuisine</Text>
+                        {cuisineOptions.map((option, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={styles.dietOption}
+                                onPress={() => setSelectedCuisine(option.value)}
+                            >
+                                <Text style={styles.dietOptionText}>{option.label}</Text>
+                                <View style={styles.radioOuterCircle}>
+                                    {selectedCuisine === option.value && (
+                                        <View style={styles.radioInnerCircle} />
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+
+                        {/* Max Ready Time */}
+                        <Text style={styles.preferenceLabel}>Max Ready Time (minutes)</Text>
+                        <TextInput
+                            style={styles.preferenceInput}
+                            value={maxReadyTime}
+                            onChangeText={setMaxReadyTime}
+                            keyboardType="numeric"
+                            placeholder="Enter maximum preparation time"
+                            placeholderTextColor={SUBDUED}
+                        />
+
+                        {/* Nutrition Preferences */}
+                        <Text style={styles.preferenceLabel}>Nutrition Preferences</Text>
+                        <View style={styles.switchOption}>
+                            <Text style={styles.switchOptionText}>High Protein</Text>
+                            <Switch
+                                value={highProtein}
+                                onValueChange={setHighProtein}
+                                trackColor={{ false: '#3e3e3e', true: 'rgba(170, 0, 255, 0.4)' }}
+                                thumbColor={highProtein ? PURPLE_ACCENT : '#f4f3f4'}
+                            />
+                        </View>
+                        <View style={styles.switchOption}>
+                            <Text style={styles.switchOptionText}>Low Carb</Text>
+                            <Switch
+                                value={lowCarb}
+                                onValueChange={setLowCarb}
+                                trackColor={{ false: '#3e3e3e', true: 'rgba(170, 0, 255, 0.4)' }}
+                                thumbColor={lowCarb ? PURPLE_ACCENT : '#f4f3f4'}
+                            />
+                        </View>
+
                         {/* Exclude Ingredients */}
                         <Text style={styles.preferenceLabel}>Exclude Ingredients</Text>
                         <TextInput
@@ -321,6 +443,43 @@ export default function MealPlanner() {
                         <Ionicons name="chevron-forward" size={22} color={SUBDUED} />
                     </TouchableOpacity>
                 </GradientBorderCard>
+
+                {/* Favorite Recipes Section */}
+                {favorites.length > 0 && (
+                    <>
+                        <View style={styles.sectionHeaderContainer}>
+                            <Text style={styles.sectionTitle}>Favorite Recipes</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowFavorites(!showFavorites)}
+                                style={styles.toggleButton}
+                            >
+                                <Ionicons
+                                    name={showFavorites ? "chevron-up" : "chevron-down"}
+                                    size={24}
+                                    color={WHITE}
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        {showFavorites && (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.horizontalScrollContainer}
+                            >
+                                {favorites.map((recipe) => (
+                                    <View key={recipe.id} style={styles.favoriteCardContainer}>
+                                        <RecipeCard
+                                            recipe={recipe}
+                                            onPress={handleRecipePress}
+                                            compact={true}
+                                        />
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        )}
+                    </>
+                )}
 
                 {/* Featured Recipes Section */}
                 <Text style={styles.sectionTitle}>Featured Recipes</Text>
@@ -593,5 +752,36 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    sectionHeaderContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 24,
+        marginBottom: 12,
+    },
+    toggleButton: {
+        padding: 8,
+    },
+    horizontalScrollContainer: {
+        paddingVertical: 8,
+        paddingLeft: 0,
+        paddingRight: 16,
+    },
+    favoriteCardContainer: {
+        width: 250,
+        marginRight: 16,
+    },
+    switchOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    switchOptionText: {
+        fontSize: 16,
+        color: WHITE,
     },
 });
