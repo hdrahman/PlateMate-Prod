@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
-import { searchFood, FoodItem as FoodItemType, getFoodDetails } from '../api/nutritionix';
+import { searchFood, FoodItem as FoodItemType, getFoodDetails, enhanceFoodImage } from '../api/nutritionix';
 import { getRecentFoodEntries, addFoodEntry, FoodLogEntry } from '../api/foodLog';
 import { debounce } from 'lodash';
 
@@ -80,7 +80,17 @@ export default function Manual() {
     const debouncedSearch = useCallback(
         debounce(async (query: string) => {
             try {
-                const results = await searchFood(query);
+                // Set minimum healthiness rating to 8.5 to only show very healthy foods
+                let results = await searchFood(query, 8.5);
+
+                // Enhance images for all search results
+                if (results.length > 0) {
+                    const enhancedResults = await Promise.all(
+                        results.map(async (food) => await enhanceFoodImage(food))
+                    );
+                    results = enhancedResults;
+                }
+
                 setSearchResults(results);
             } catch (error) {
                 console.error('Error searching for food:', error);
@@ -104,11 +114,19 @@ export default function Manual() {
             setIsLoading(true);
             // Get more detailed information if available
             const detailedFood = await getFoodDetails(food.food_name);
-            setSelectedFood(detailedFood || food);
+
+            // Try to enhance the food image with a better quality one
+            const enhancedFood = detailedFood || food;
+            const foodWithBetterImage = await enhanceFoodImage(enhancedFood);
+
+            setSelectedFood(foodWithBetterImage);
             setShowFoodDetails(true);
         } catch (error) {
             console.error('Error getting food details:', error);
-            setSelectedFood(food);
+
+            // Fallback to original food if enhancement fails
+            const foodWithBetterImage = await enhanceFoodImage(food);
+            setSelectedFood(foodWithBetterImage);
             setShowFoodDetails(true);
         } finally {
             setIsLoading(false);
@@ -298,12 +316,12 @@ export default function Manual() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Popular Foods</Text>
                         <View style={styles.popularFoodsGrid}>
-                            {['Apple', 'Banana', 'Chicken Breast', 'Eggs'].map((food, index) => (
+                            {['Spinach', 'Broccoli', 'Salmon', 'Kale'].map((food, index) => (
                                 <TouchableOpacity
                                     key={`popular-${index}`}
                                     style={styles.popularFoodItem}
                                     onPress={async () => {
-                                        const results = await searchFood(food);
+                                        const results = await searchFood(food, 8.5);
                                         if (results.length > 0) {
                                             handleFoodSelect(results[0]);
                                         }

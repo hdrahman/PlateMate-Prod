@@ -87,9 +87,9 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
     // Get color based on healthiness rating
     const getHealthinessColor = (rating?: number) => {
         if (!rating) return GRAY;
-        if (rating >= 7) return GREEN;
-        if (rating >= 4) return YELLOW;
-        return RED;
+        if (rating >= 8.5) return GREEN; // Only truly healthy foods get green
+        if (rating >= 7) return YELLOW;  // Moderately healthy foods get yellow
+        return RED;                      // Everything else is red
     };
 
     // Check if a value is present
