@@ -22,6 +22,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { ThemeContext } from "../ThemeContext";
 import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Get IP and port from the BACKEND_URL
 const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
@@ -52,6 +53,7 @@ interface Message {
 export default function Chatbot() {
   const { isDarkTheme } = useContext(ThemeContext);
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -239,7 +241,7 @@ export default function Chatbot() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={28} color="#FFF" />
         </TouchableOpacity>
@@ -379,10 +381,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    height: 70,
     borderBottomWidth: 1,
     borderBottomColor: "#444",
     paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   backButton: {
     padding: 5,
@@ -391,22 +393,27 @@ const styles = StyleSheet.create({
   headerTitleContainer: {
     flex: 1,
     alignItems: "center",
-    marginLeft: -40, // Offset to compensate for the back button and avatar
+    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
     color: "white",
+    textAlign: "center",
+    alignSelf: "center",
+    marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 12,
     color: "#CCC",
-    marginTop: 2,
+    marginTop: 0,
+    marginBottom: 0,
   },
   onlineStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    justifyContent: 'center',
+    marginTop: 0,
   },
   dot: {
     color: '#CCC',
@@ -444,6 +451,7 @@ const styles = StyleSheet.create({
   messagesContainer: {
     flex: 1,
     padding: 10,
+    paddingTop: 2,
   },
   messagesContent: {
     paddingBottom: 10,
