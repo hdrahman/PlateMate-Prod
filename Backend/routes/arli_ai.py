@@ -8,6 +8,7 @@ import os
 import logging
 import re
 from dotenv import load_dotenv
+import httpx
 
 # Load environment variables
 load_dotenv()
@@ -124,12 +125,13 @@ async def chat_with_arli(request: ChatRequest):
         logger.info(f"Sending request to Arli AI: {ARLI_API_BASE_URL}/chat/completions")
         
         # Make the API request to Arli AI
-        response = requests.post(
-            f"{ARLI_API_BASE_URL}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30  # Add timeout to prevent hanging
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{ARLI_API_BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30  # Add timeout to prevent hanging
+            )
         
         logger.info(f"Arli AI response status code: {response.status_code}")
         

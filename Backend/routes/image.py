@@ -11,6 +11,7 @@ from DB import SessionLocal, get_db
 from models import FoodLog
 from datetime import datetime
 from typing import List
+from openai import AsyncOpenAI
 
 # Toggle between mock and real API
 USE_MOCK_API = False  # Set to False to use the real OpenAI API
@@ -20,10 +21,10 @@ load_dotenv()
 
 # Initialize OpenAI Client
 try:
-    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    print("✅ OpenAI API client initialized successfully")
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    print("✅ OpenAI Async API client initialized successfully")
 except Exception as e:
-    print(f"❌ Failed to initialize OpenAI client: {e}")
+    print(f"❌ Failed to initialize OpenAI Async client: {e}")
 
 router = APIRouter()
 
@@ -135,7 +136,7 @@ MOCK_RESPONSE = """[
 
 
 @router.post("/upload-image")
-def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
+async def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
     """Accepts a single image and processes it with OpenAI."""
     try:
         print(f"📸 Received image upload from user {user_id}")
@@ -149,7 +150,7 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
 
         try:
             # Define analyze_food_image function inline since it's missing
-            def analyze_food_image(image_data):
+            async def analyze_food_image(image_data):
                 """Analyzes a food image using OpenAI's GPT-4o model."""
                 if USE_MOCK_API:
                     return MOCK_RESPONSE
@@ -159,7 +160,7 @@ def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
                 ]
                 
-                response = client.chat.completions.create(
+                response = await client.chat.completions.create(
                     model="gpt-4o",  # Using gpt-4o which supports vision
                     messages=[
                         {
@@ -213,33 +214,7 @@ Important:
                 
                 return response.choices[0].message.content.strip()
                 
-            # Define parse_gpt4_response function inline since it's missing
-            def parse_gpt4_response(response_text):
-                """Parses the response from GPT-4 into a structured format."""
-                try:
-                    # Basic sanity checks
-                    if not response_text or len(response_text) < 10:
-                        raise ValueError("Response text is too short")
-                        
-                    # Try to extract JSON if it's enclosed in a code block
-                    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
-                    if json_match:
-                        json_str = json_match.group(1).strip()
-                    else:
-                        json_str = response_text.strip()
-                    
-                    extracted_foods = json.loads(json_str)
-                    
-                    if not isinstance(extracted_foods, list):
-                        raise ValueError("Response is not a list")
-                        
-                    return extracted_foods
-                    
-                except Exception as e:
-                    print(f"❌ Error parsing GPT response: {e}")
-                    raise
-            
-            gpt_response = analyze_food_image(image_data)
+            gpt_response = await analyze_food_image(image_data)
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
@@ -317,7 +292,7 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
                 print(f"📝 Mock Response: {gpt_response}")
             else:
                 # Real API call
-                response = client.chat.completions.create(
+                response = await client.chat.completions.create(
                     model="gpt-4o",  # Changed from "gpt-4-vision-preview" to "gpt-4o"
                     messages=[
                         {

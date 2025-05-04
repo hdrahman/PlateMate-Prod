@@ -8,6 +8,7 @@ import requests
 import os
 import logging
 from dotenv import load_dotenv
+import httpx
 
 # Toggle between mock and real API
 USE_MOCK_API = False  # Set to False to use the real OpenAI API
@@ -182,24 +183,25 @@ Suggestions:
             response = MockResponse(mock_response_text)
             logger.info("Using mock response for OpenAI API")
         else:
-            # Make the real API request to OpenAI
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {OPENAI_API_KEY}"
-                },
-                json={
-                    "model": "gpt-4o",
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": content
-                        }
-                    ],
-                    "max_tokens": 500
-                }
-            )
+            # Make the real API request to OpenAI using httpx.AsyncClient
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {OPENAI_API_KEY}"
+                    },
+                    json={
+                        "model": "gpt-4o",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": content
+                            }
+                        ],
+                        "max_tokens": 500
+                    }
+                )
             logger.info("Using real OpenAI API")
         
         # Check if the request was successful
