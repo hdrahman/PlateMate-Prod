@@ -864,7 +864,9 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
 
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
-  const fillStroke = (percent / 100) * circumference;
+  // Ensure percent doesn't exceed 100
+  const cappedPercent = Math.min(percent, 100);
+  const fillStroke = (cappedPercent / 100) * circumference;
 
   // More saturated, vibrant gradient colors for each macro.
   let gradientColors = ['#FF00F5', '#9B00FF', '#00CFFF']; // default
@@ -1000,7 +1002,7 @@ function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
               </View>
             </>
           ) : (
-            <Text style={styles.macroRingText}>{percent}%</Text>
+            <Text style={styles.macroRingText}>{Math.round(percent)}%</Text>
           )}
         </View>
       </View>
