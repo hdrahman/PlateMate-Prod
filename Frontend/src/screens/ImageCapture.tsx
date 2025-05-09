@@ -15,17 +15,19 @@ import {
     SafeAreaView,
     StatusBar
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, StackActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { addFoodLog } from '../utils/database';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import AnalysisModal from '../components/AnalysisModal';
 
 const { width } = Dimensions.get('window');
 
@@ -90,6 +92,9 @@ const ImageCapture: React.FC = () => {
     // Add state for GPT-generated description
     const [gptDescription, setGptDescription] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisStage, setAnalysisStage] = useState<'uploading' | 'analyzing' | 'processing'>('uploading');
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    const [analysisStartTime, setAnalysisStartTime] = useState(0);
 
     useEffect(() => {
         (async () => {
@@ -100,6 +105,29 @@ const ImageCapture: React.FC = () => {
         })();
     }, []);
 
+    const compressImage = async (uri: string): Promise<string> => {
+        try {
+            console.log('Compressing image...');
+            // Compress image while maintaining good quality for AI analysis
+            // 1200px width is sufficient for AI analysis while keeping file size manageable
+            const manipResult = await ImageManipulator.manipulateAsync(
+                uri,
+                [{ resize: { width: 1200 } }],
+                { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+            );
+
+            console.log('Image compressed successfully');
+            console.log(`Original URI: ${uri}`);
+            console.log(`Compressed URI: ${manipResult.uri}`);
+
+            return manipResult.uri;
+        } catch (error) {
+            console.error('Error compressing image:', error);
+            // Fall back to original image if compression fails
+            return uri;
+        }
+    };
+
     const handleTakePhoto = async (index: number) => {
         try {
             const result = await launchCameraAsync({
@@ -109,10 +137,13 @@ const ImageCapture: React.FC = () => {
             });
 
             if (!result.canceled) {
+                // Compress image before storing it
+                const compressedUri = await compressImage(result.assets[0].uri);
+
                 const newImages = [...images];
                 newImages[index] = {
                     ...newImages[index],
-                    uri: result.assets[0].uri,
+                    uri: compressedUri,
                     uploaded: false
                 };
                 setImages(newImages);
@@ -132,10 +163,13 @@ const ImageCapture: React.FC = () => {
             });
 
             if (!result.canceled) {
+                // Compress image before storing it
+                const compressedUri = await compressImage(result.assets[0].uri);
+
                 const newImages = [...images];
                 newImages[index] = {
                     ...newImages[index],
-                    uri: result.assets[0].uri,
+                    uri: compressedUri,
                     uploaded: false
                 };
                 setImages(newImages);
@@ -148,7 +182,14 @@ const ImageCapture: React.FC = () => {
 
     const uploadImage = async (uri: string): Promise<{ url: string, key: string, data: any }> => {
         try {
+            console.log('Starting image upload...');
+            const startTime = Date.now();
+
             const fileInfo = await FileSystem.getInfoAsync(uri);
+            console.log(`Image file info: ${fileInfo.exists ? 'File exists' : 'File does not exist'}`);
+            if (fileInfo.exists && 'size' in fileInfo) {
+                console.log(`Image file size: ${fileInfo.size} bytes`);
+            }
 
             const formData = new FormData();
             formData.append('user_id', '1');
@@ -158,6 +199,7 @@ const ImageCapture: React.FC = () => {
                 name: fileInfo.uri.split('/').pop(),
             } as any);
 
+            console.log('Sending request to backend...');
             const response = await fetch(`${BACKEND_URL}/images/upload-image`, {
                 method: 'POST',
                 headers: {
@@ -166,6 +208,9 @@ const ImageCapture: React.FC = () => {
                 },
                 body: formData,
             });
+
+            const endTime = Date.now();
+            console.log(`Upload + Analysis time: ${(endTime - startTime) / 1000} seconds`);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -249,6 +294,10 @@ const ImageCapture: React.FC = () => {
 
     const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any }> => {
         try {
+            console.log('Starting multiple image upload...');
+            const startTime = Date.now();
+            setAnalysisStage('uploading');
+
             const formData = new FormData();
             formData.append('user_id', '1');
 
@@ -256,6 +305,12 @@ const ImageCapture: React.FC = () => {
             for (let i = 0; i < imageUris.length; i++) {
                 const uri = imageUris[i];
                 const filename = uri.split('/').pop() || `image${i}.jpg`;
+
+                const fileInfo = await FileSystem.getInfoAsync(uri);
+                console.log(`Image ${i + 1} file info: ${fileInfo.exists ? 'File exists' : 'File does not exist'}`);
+                if (fileInfo.exists && 'size' in fileInfo) {
+                    console.log(`Image ${i + 1} file size: ${fileInfo.size} bytes`);
+                }
 
                 // Convert file:// URI to blob or base64 if needed
                 formData.append('images', {
@@ -267,6 +322,9 @@ const ImageCapture: React.FC = () => {
 
             console.log('📤 Uploading images to:', `${BACKEND_URL}/images/upload-multiple-images`);
 
+            // Update modal stage after images are prepared 
+            setAnalysisStage('analyzing');
+
             const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
                 method: 'POST',
                 headers: {
@@ -275,6 +333,12 @@ const ImageCapture: React.FC = () => {
                 },
                 body: formData,
             });
+
+            // Update stage once we get response
+            setAnalysisStage('processing');
+
+            const endTime = Date.now();
+            console.log(`Multiple uploads + Analysis time: ${(endTime - startTime) / 1000} seconds`);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -393,8 +457,12 @@ const ImageCapture: React.FC = () => {
             return;
         }
 
+        // Start the loading and analysis processes
         setLoading(true);
         setIsAnalyzing(true);
+        setShowAnalysisModal(true);
+        setAnalysisStage('uploading');
+        setAnalysisStartTime(0);
 
         try {
             // Get all image URIs
@@ -489,6 +557,9 @@ const ImageCapture: React.FC = () => {
                 await addFoodLog(foodLog);
             }
 
+            // Hide the analysis modal
+            setShowAnalysisModal(false);
+
             // Navigate back to the food log screen with refresh parameter
             Alert.alert('Success', 'Food added successfully', [
                 {
@@ -524,6 +595,7 @@ const ImageCapture: React.FC = () => {
             ]);
 
         } catch (error) {
+            setShowAnalysisModal(false);
             console.error('Error submitting food:', error);
             Alert.alert('Error', 'Failed to submit food. Please try again.');
         } finally {
@@ -638,6 +710,16 @@ const ImageCapture: React.FC = () => {
         backgroundColor: '#000',
         // Ensure padding for status bar if needed
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+    };
+
+    // If user cancels the analysis
+    const handleAnalysisCancel = () => {
+        // Implement any cancellation logic here
+        // This might include aborting the network request if possible
+        setShowAnalysisModal(false);
+        setLoading(false);
+        setIsAnalyzing(false);
+        Alert.alert('Cancelled', 'Image analysis has been cancelled.');
     };
 
     return (
@@ -807,28 +889,6 @@ const ImageCapture: React.FC = () => {
                     </LinearGradient>
                 </View>
 
-                {gptDescription ? (
-                    <View style={styles.gptAnalysisWrapper}>
-                        <LinearGradient
-                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.gradientWrapper}
-                            locations={[0, 0.5, 1]}
-                        >
-                            <View style={styles.gptAnalysisContainer}>
-                                <Text style={styles.gptAnalysisTitle}>AI Analysis</Text>
-                                <Text style={styles.gptAnalysisText}>{gptDescription}</Text>
-                            </View>
-                        </LinearGradient>
-                    </View>
-                ) : isAnalyzing ? (
-                    <View style={styles.gptAnalysisContainer}>
-                        <Text style={styles.gptAnalysisTitle}>Analyzing with AI...</Text>
-                        <ActivityIndicator color="#8A2BE2" style={{ marginTop: 10 }} />
-                    </View>
-                ) : null}
-
                 <View style={styles.submitButtonWrapper}>
                     <LinearGradient
                         colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
@@ -851,6 +911,15 @@ const ImageCapture: React.FC = () => {
                     </LinearGradient>
                 </View>
             </ScrollView>
+
+            {/* Analysis Modal */}
+            <AnalysisModal
+                visible={showAnalysisModal}
+                onCancel={handleAnalysisCancel}
+                stage={analysisStage}
+                imageUri={images.find(img => img.uri !== '')?.uri}
+            />
+
         </SafeAreaView>
     );
 };

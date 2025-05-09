@@ -3,6 +3,7 @@ import os
 import base64
 import re
 import json
+import time
 import traceback  # Added to capture full error logs
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
@@ -32,7 +33,10 @@ router = APIRouter()
 def encode_image(image_file):
     """Encodes image file to base64"""
     try:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+        start_time = time.time()
+        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        print(f"✅ Image encoding took {time.time() - start_time:.2f} seconds")
+        return encoded_string
     except Exception as e:
         print(f"❌ Error encoding image: {e}")
         raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
@@ -139,6 +143,7 @@ MOCK_RESPONSE = """[
 async def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
     """Accepts a single image and processes it with OpenAI."""
     try:
+        overall_start_time = time.time()
         print(f"📸 Received image upload from user {user_id}")
         
         try:
@@ -155,11 +160,13 @@ async def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
                 if USE_MOCK_API:
                     return MOCK_RESPONSE
                 
+                api_start_time = time.time()
                 content = [
                     {"type": "text", "text": "Analyze this food image. Identify EACH food item separately."},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
                 ]
                 
+                print(f"📤 Sending request to OpenAI API")
                 response = await client.chat.completions.create(
                     model="gpt-4o",  # Using gpt-4o which supports vision
                     messages=[
@@ -209,9 +216,13 @@ Important:
                             "role": "user",
                             "content": content
                         }
-                    ]
+                    ],
+                    max_tokens=4000,
+                    temperature=0.5
                 )
                 
+                api_time = time.time() - api_start_time
+                print(f"✅ OpenAI API response received in {api_time:.2f} seconds")
                 return response.choices[0].message.content.strip()
                 
             gpt_response = await analyze_food_image(image_data)
@@ -247,6 +258,8 @@ Important:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
+        overall_time = time.time() - overall_start_time
+        print(f"✅ Total processing time: {overall_time:.2f} seconds")
         return {"message": "✅ Image uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": parse_gpt4_response(gpt_response)}
 
     except Exception as e:
@@ -259,10 +272,12 @@ Important:
 async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFile] = File(...)):
     """Accepts multiple images and processes them together with OpenAI."""
     try:
+        overall_start_time = time.time()
         print(f"📸 Received multiple image upload from user {user_id}")
         print(f"Number of images: {len(images)}")
         
         # Encode all images
+        encoding_start_time = time.time()
         encoded_images = []
         for image in images:
             try:
@@ -273,6 +288,9 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
             except Exception as e:
                 print(f"❌ Error encoding image: {e}")
                 raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
+        
+        encoding_time = time.time() - encoding_start_time
+        print(f"✅ All images encoded in {encoding_time:.2f} seconds")
         
         # Create content array with all images
         content = [{"type": "text", "text": "Analyze these food images together as they are part of the same meal. Identify EACH food item separately."}]
@@ -292,6 +310,7 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
                 print(f"📝 Mock Response: {gpt_response}")
             else:
                 # Real API call
+                api_start_time = time.time()
                 response = await client.chat.completions.create(
                     model="gpt-4o",  # Changed from "gpt-4-vision-preview" to "gpt-4o"
                     messages=[
@@ -341,8 +360,13 @@ Important:
                             "role": "user",
                             "content": content
                         }
-                    ]
+                    ],
+                    max_tokens=4000,
+                    temperature=0.5
                 )
+                
+                api_time = time.time() - api_start_time
+                print(f"✅ OpenAI API response received in {api_time:.2f} seconds")
                 
                 gpt_response = response.choices[0].message.content.strip()
                 print(f"📝 GPT-4 Vision Response: {gpt_response}")
@@ -369,16 +393,44 @@ Important:
                         else:
                             json_str = response_text.strip()
                         
+                        # If the response is clearly not JSON (doesn't start with [ or {)
+                        if not (json_str.startswith('[') or json_str.startswith('{')):
+                            print("❌ Response is not in JSON format")
+                            # Return a fallback empty array with a message about the non-JSON response
+                            return [{
+                                "food_name": "Could not identify food",
+                                "calories": 0,
+                                "proteins": 0,
+                                "carbs": 0,
+                                "fats": 0,
+                                "weight": 0,
+                                "weight_unit": "g",
+                                "healthiness_rating": 0,
+                                "error_message": f"AI response: {response_text[:100]}..." # First 100 chars of the response
+                            }]
+                        
                         extracted_foods = json.loads(json_str)
                         
                         if not isinstance(extracted_foods, list):
-                            raise ValueError("Response is not a list")
+                            print("❌ JSON response is not a list, wrapping in list")
+                            extracted_foods = [extracted_foods]
                             
                         return extracted_foods
                         
                     except Exception as e:
                         print(f"❌ Error parsing GPT response: {e}")
-                        raise
+                        # Return a fallback empty array instead of raising an exception
+                        return [{
+                            "food_name": "Error analyzing food",
+                            "calories": 0,
+                            "proteins": 0,
+                            "carbs": 0,
+                            "fats": 0,
+                            "weight": 0,
+                            "weight_unit": "g",
+                            "healthiness_rating": 0,
+                            "error_message": str(e)
+                        }]
                 
                 extracted_foods = parse_gpt4_response(gpt_response)
                 print("✅ Successfully parsed GPT response")
@@ -439,6 +491,9 @@ Important:
                 if 'db' in locals():
                     db.close()
 
+            overall_time = time.time() - overall_start_time
+            print(f"✅ Total processing time: {overall_time:.2f} seconds")
+            
             return {
                 "message": "✅ Multiple images uploaded and analyzed successfully", 
                 "meal_id": meal_id, 
