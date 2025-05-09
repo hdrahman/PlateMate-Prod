@@ -12,7 +12,8 @@ import {
     Dimensions,
     Modal,
     Platform,
-    SafeAreaView
+    SafeAreaView,
+    StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, StackActions } from '@react-navigation/native';
@@ -631,229 +632,230 @@ const ImageCapture: React.FC = () => {
         );
     };
 
+    // Add a container style to ensure consistent background and proper spacing
+    const containerStyle = {
+        flex: 1,
+        backgroundColor: '#000',
+        // Ensure padding for status bar if needed
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+    };
+
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <View style={styles.container}>
-                <View style={styles.header}>
+        <SafeAreaView style={[styles.container, containerStyle]}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
+
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.backButton}
+                >
+                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+
+                <View style={styles.titleContainer}>
                     <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
+                        style={styles.mealTypeSelector}
+                        onPress={toggleMealTypeDropdown}
                     >
-                        <Ionicons name="arrow-back" size={28} color="#FFF" />
-                    </TouchableOpacity>
-
-                    {/* Meal Type with Gradient */}
-                    <View style={styles.headerTitleContainer}>
-                        <TouchableOpacity
-                            style={styles.mealTypeSelector}
-                            onPress={toggleMealTypeDropdown}
+                        <MaskedView
+                            maskElement={
+                                <Text style={styles.headerTitle}>{mealType}</Text>
+                            }
                         >
-                            <View style={{ position: 'relative', paddingRight: 20 }}>
-                                <MaskedView
-                                    maskElement={
-                                        <Text style={styles.headerTitle}>{mealType}</Text>
-                                    }
-                                >
-                                    <LinearGradient
-                                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={{ height: 35, width: mealType.length * 16 }}
-                                    />
-                                </MaskedView>
-
-                                <View style={styles.dropdownIconContainer}>
-                                    <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={22} color="#FFF" />
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Empty view for balance */}
-                    <View style={styles.backButton} />
-
-                    {/* Meal Type Dropdown Modal */}
-                    <Modal
-                        visible={showMealTypeDropdown}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={toggleMealTypeDropdown}
-                    >
-                        <TouchableOpacity
-                            style={styles.modalOverlay}
-                            activeOpacity={1}
-                            onPress={toggleMealTypeDropdown}
-                        >
-                            <View style={styles.dropdownContainer}>
-                                {mealTypes.map((type) => (
-                                    <TouchableOpacity
-                                        key={type}
-                                        style={[
-                                            styles.dropdownItem,
-                                            mealType === type && styles.selectedDropdownItem
-                                        ]}
-                                        onPress={() => selectMealType(type)}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.dropdownItemText,
-                                                mealType === type && styles.selectedDropdownItemText
-                                            ]}
-                                        >
-                                            {type}
-                                        </Text>
-                                        {mealType === type && (
-                                            <Ionicons name="checkmark" size={20} color="#8A2BE2" />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </TouchableOpacity>
-                    </Modal>
-                </View>
-
-                <LinearGradient
-                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                    start={{ x: 1, y: 0 }}
-                    end={{ x: 0, y: 0 }}
-                    style={[styles.headerBar, { width: mealType.length * 16 + 20 }]}
-                    locations={[0, 0.5, 1]}
-                />
-
-                <ScrollView style={styles.content}>
-                    <Text style={styles.instructions}>
-                        Please take at least 1 image of your food. The first image (top view) is required. You can also take a second image (side view) to provide additional detail about your meal.
-                    </Text>
-                    <LinearGradient
-                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                        start={{ x: 1, y: 0 }}
-                        end={{ x: 0, y: 0 }}
-                        style={styles.descriptionBar}
-                        locations={[0, 0.5, 1]}
-                    />
-
-                    <View style={styles.imagesContainer}>
-                        {renderImagePlaceholder(0)}
-                        {renderImagePlaceholder(1)}
-                    </View>
-
-                    <View style={styles.foodDetailsWrapper}>
-                        <LinearGradient
-                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={[styles.gradientWrapper, { borderRadius: 8 }]}
-                            locations={[0, 0.5, 1]}
-                        >
-                            <View style={styles.foodDetailsContainer}>
-                                <View style={{ flexDirection: 'row' }}>
-                                    <Text style={[styles.sectionTitle, styles.underlinedTitle]}>Food Details</Text>
-                                    <Text style={[styles.sectionTitle, styles.optionalText]}> (Optional)</Text>
-                                </View>
-
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Brand/Restaurant Name</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={brandName}
-                                        onChangeText={setBrandName}
-                                        placeholder="Enter brand or restaurant name"
-                                        placeholderTextColor="#888"
-                                    />
-                                </View>
-
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Food Name</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={foodName}
-                                        onChangeText={setFoodName}
-                                        placeholder="Enter food name"
-                                        placeholderTextColor="#888"
-                                    />
-                                </View>
-
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Quantity</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={quantity}
-                                        onChangeText={setQuantity}
-                                        placeholder="Enter quantity (e.g., 1 serving, 200g)"
-                                        placeholderTextColor="#888"
-                                    />
-                                </View>
-
-                                <View style={[styles.inputContainer, { marginBottom: 0 }]}>
-                                    <Text style={styles.label}>Additional Notes</Text>
-                                    <TextInput
-                                        style={[styles.input, styles.textArea]}
-                                        value={notes}
-                                        onChangeText={setNotes}
-                                        placeholder="Enter any additional notes"
-                                        placeholderTextColor="#888"
-                                        multiline
-                                        numberOfLines={4}
-                                    />
-                                </View>
-                            </View>
-                        </LinearGradient>
-                    </View>
-
-                    {gptDescription ? (
-                        <View style={styles.gptAnalysisWrapper}>
                             <LinearGradient
                                 colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
-                                style={styles.gradientWrapper}
-                                locations={[0, 0.5, 1]}
-                            >
-                                <View style={styles.gptAnalysisContainer}>
-                                    <Text style={styles.gptAnalysisTitle}>AI Analysis</Text>
-                                    <Text style={styles.gptAnalysisText}>{gptDescription}</Text>
-                                </View>
-                            </LinearGradient>
-                        </View>
-                    ) : isAnalyzing ? (
-                        <View style={styles.gptAnalysisContainer}>
-                            <Text style={styles.gptAnalysisTitle}>Analyzing with AI...</Text>
-                            <ActivityIndicator color="#8A2BE2" style={{ marginTop: 10 }} />
-                        </View>
-                    ) : null}
+                                style={{ height: 35, width: mealType.length * 16 }}
+                            />
+                        </MaskedView>
 
-                    <View style={styles.submitButtonWrapper}>
+                        <View style={styles.dropdownIconContainer}>
+                            <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={22} color="#FFF" />
+                        </View>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Empty view for balance */}
+                <View style={{ width: 28 }} />
+
+                {/* Meal Type Dropdown Modal */}
+                <Modal
+                    visible={showMealTypeDropdown}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={toggleMealTypeDropdown}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={toggleMealTypeDropdown}
+                    >
+                        <View style={styles.dropdownContainer}>
+                            {mealTypes.map((type) => (
+                                <TouchableOpacity
+                                    key={type}
+                                    style={[
+                                        styles.dropdownItem,
+                                        mealType === type && styles.selectedDropdownItem
+                                    ]}
+                                    onPress={() => selectMealType(type)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.dropdownItemText,
+                                            mealType === type && styles.selectedDropdownItemText
+                                        ]}
+                                    >
+                                        {type}
+                                    </Text>
+                                    {mealType === type && (
+                                        <Ionicons name="checkmark" size={20} color="#8A2BE2" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+            </View>
+
+            <LinearGradient
+                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                start={{ x: 1, y: 0 }}
+                end={{ x: 0, y: 0 }}
+                style={[styles.headerBar, { width: mealType.length * 16 + 40 }]}
+                locations={[0, 0.5, 1]}
+            />
+
+            <ScrollView style={styles.content}>
+                <Text style={styles.instructions}>
+                    Please take at least 1 image of your food. The first image (top view) is required. You can also take a second image (side view) to provide additional detail about your meal.
+                </Text>
+                <LinearGradient
+                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 0 }}
+                    style={styles.descriptionBar}
+                    locations={[0, 0.5, 1]}
+                />
+
+                <View style={styles.imagesContainer}>
+                    {renderImagePlaceholder(0)}
+                    {renderImagePlaceholder(1)}
+                </View>
+
+                <View style={styles.foodDetailsWrapper}>
+                    <LinearGradient
+                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.gradientWrapper, { borderRadius: 8 }]}
+                        locations={[0, 0.5, 1]}
+                    >
+                        <View style={styles.foodDetailsContainer}>
+                            <View style={{ flexDirection: 'row' }}>
+                                <Text style={[styles.sectionTitle, styles.underlinedTitle]}>Food Details</Text>
+                                <Text style={[styles.sectionTitle, styles.optionalText]}> (Optional)</Text>
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Brand/Restaurant Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={brandName}
+                                    onChangeText={setBrandName}
+                                    placeholder="Enter brand or restaurant name"
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Food Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={foodName}
+                                    onChangeText={setFoodName}
+                                    placeholder="Enter food name"
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Quantity</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={quantity}
+                                    onChangeText={setQuantity}
+                                    placeholder="Enter quantity (e.g., 1 serving, 200g)"
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { marginBottom: 0 }]}>
+                                <Text style={styles.label}>Additional Notes</Text>
+                                <TextInput
+                                    style={[styles.input, styles.textArea]}
+                                    value={notes}
+                                    onChangeText={setNotes}
+                                    placeholder="Enter any additional notes"
+                                    placeholderTextColor="#888"
+                                    multiline
+                                    numberOfLines={4}
+                                />
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </View>
+
+                {gptDescription ? (
+                    <View style={styles.gptAnalysisWrapper}>
                         <LinearGradient
                             colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={[styles.gradientWrapper, { borderRadius: 8 }]}
+                            style={styles.gradientWrapper}
                             locations={[0, 0.5, 1]}
                         >
-                            <TouchableOpacity
-                                style={styles.submitButton}
-                                onPress={handleSubmit}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="#fff" />
-                                ) : (
-                                    <Text style={styles.submitButtonText}>Submit</Text>
-                                )}
-                            </TouchableOpacity>
+                            <View style={styles.gptAnalysisContainer}>
+                                <Text style={styles.gptAnalysisTitle}>AI Analysis</Text>
+                                <Text style={styles.gptAnalysisText}>{gptDescription}</Text>
+                            </View>
                         </LinearGradient>
                     </View>
-                </ScrollView>
-            </View>
+                ) : isAnalyzing ? (
+                    <View style={styles.gptAnalysisContainer}>
+                        <Text style={styles.gptAnalysisTitle}>Analyzing with AI...</Text>
+                        <ActivityIndicator color="#8A2BE2" style={{ marginTop: 10 }} />
+                    </View>
+                ) : null}
+
+                <View style={styles.submitButtonWrapper}>
+                    <LinearGradient
+                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.gradientWrapper, { borderRadius: 8 }]}
+                        locations={[0, 0.5, 1]}
+                    >
+                        <TouchableOpacity
+                            style={styles.submitButton}
+                            onPress={handleSubmit}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.submitButtonText}>Submit</Text>
+                            )}
+                        </TouchableOpacity>
+                    </LinearGradient>
+                </View>
+            </ScrollView>
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: '#000',
-    },
     container: {
         flex: 1,
         backgroundColor: '#000',
@@ -861,22 +863,23 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingTop: 15,
-        paddingBottom: 15,
-        paddingHorizontal: 20,
         justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         backgroundColor: '#000',
+        zIndex: 10, // Ensure header is above other content
     },
     backButton: {
+        padding: 4,
         width: 28,
     },
-    headerTitleContainer: {
+    titleContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'absolute',
-        left: 0,
-        right: 0,
+    },
+    headerTitleContainer: {
+        // Remove this style that had position: 'absolute'
     },
     dropdownIconContainer: {
         backgroundColor: '#161618',
@@ -886,7 +889,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         position: 'absolute',
-        right: -15,
+        right: 0,
         top: 2,
     },
     headerTitle: {
@@ -1021,6 +1024,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
+        paddingRight: 40,
     },
     modalOverlay: {
         flex: 1,
@@ -1124,6 +1129,7 @@ const styles = StyleSheet.create({
         height: 2,
         marginBottom: 15,
         alignSelf: 'center',
+        zIndex: 5,
     },
 });
 
