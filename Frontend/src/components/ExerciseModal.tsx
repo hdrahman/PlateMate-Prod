@@ -459,22 +459,30 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                                 paddingTop: 0
                                                             }]}>Popular Activities</Text>
                                                             {groupedActivities.popular.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
+                                                                <React.Fragment key={`popular-${activity.name}`}>
+                                                                    {renderActivityItem({ item: activity })}
+                                                                </React.Fragment>
                                                             )}
 
-                                                            <Text style={styles.sectionHeader}>Light Activities ({'<'} 3 METs)</Text>
+                                                            <Text style={styles.sectionHeader}>Light Activities ({"<"} 3 METs)</Text>
                                                             {groupedActivities.light.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
+                                                                <React.Fragment key={`light-${activity.name}`}>
+                                                                    {renderActivityItem({ item: activity })}
+                                                                </React.Fragment>
                                                             )}
 
                                                             <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
                                                             {groupedActivities.moderate.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
+                                                                <React.Fragment key={`moderate-${activity.name}`}>
+                                                                    {renderActivityItem({ item: activity })}
+                                                                </React.Fragment>
                                                             )}
 
-                                                            <Text style={styles.sectionHeader}>Vigorous Activities ({'>'} 6 METs)</Text>
+                                                            <Text style={styles.sectionHeader}>Vigorous Activities ({">"} 6 METs)</Text>
                                                             {groupedActivities.vigorous.map((activity, index) =>
-                                                                renderActivityItem({ item: activity })
+                                                                <React.Fragment key={`vigorous-${activity.name}`}>
+                                                                    {renderActivityItem({ item: activity })}
+                                                                </React.Fragment>
                                                             )}
                                                         </ScrollView>
                                                     </View>

@@ -1461,7 +1461,7 @@ const DiaryScreen: React.FC = () => {
             <SafeAreaView style={containerStyle}>
                 {/* Fixed header & day bar */}
                 <TouchableWithoutFeedback onPress={handleOutsidePress}>
-                    <>
+                    <View>
                         <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                             <Text style={styles.headerTitle}>Diary</Text>
                             <View style={styles.headerRight}>
@@ -1520,7 +1520,7 @@ const DiaryScreen: React.FC = () => {
                             </TouchableOpacity>
                         </View>
                         <View style={{ height: 5 }} /> {/* Reduced space below the Today bar */}
-                    </>
+                    </View>
                 </TouchableWithoutFeedback>
 
                 {/* Swipeable content below day bar */}
@@ -1593,7 +1593,7 @@ const DiaryScreen: React.FC = () => {
 
                                     {/* Only show items if there are any */}
                                     {meal.items.length > 0 ? (
-                                        <>
+                                        <View>
                                             {meal.items
                                                 .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
                                                 .map((item, i) => {
@@ -1656,7 +1656,7 @@ const DiaryScreen: React.FC = () => {
                                                     );
                                                 })}
                                             <View style={styles.dividerLine} />
-                                        </>
+                                        </View>
                                     ) : null}
 
                                     <TouchableOpacity
