@@ -10,7 +10,7 @@ node_modules/
 # =======================
 .cursor/rules/
 
-# =======================na
+# =======================
 # ✅ Expo
 # =======================
 .expo/
@@ -54,6 +54,19 @@ yarn-error.*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# =======================
+# ✅ Security-Critical Files
+# =======================
+service-account.json
+*-service-account.json
+*.keystore
+google-services.json
+GoogleService-Info.plist
+*credentials*.json
+*secrets*.json
+*auth*.json
+firebase-adminsdk-*.json
 
 # =======================
 # ✅ TypeScript Build Info
