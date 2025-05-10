@@ -1595,7 +1595,6 @@ const DiaryScreen: React.FC = () => {
                                     {meal.items.length > 0 ? (
                                         <View>
                                             {meal.items
-                                                .filter(item => item.calories !== 100) // <-- Remove 100 kcal items
                                                 .map((item, i) => {
                                                     // First extract food name without the weight info
                                                     const foodName = item.name.split('\n')[0];
