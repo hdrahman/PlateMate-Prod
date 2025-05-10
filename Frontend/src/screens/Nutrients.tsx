@@ -9,15 +9,14 @@ import {
     Dimensions,
     StatusBar,
     Platform,
-    Animated,
-    NativeSyntheticEvent
+    Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { getFoodLogsByDate, initDatabase, isDatabaseReady } from '../utils/database';
-import { PanGestureHandler, State as GestureState, PanGestureHandlerGestureEvent, PanGestureHandlerStateChangeEvent, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -93,13 +92,48 @@ const NutrientsScreen: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [loading, setLoading] = useState(false);
     const [dbReady, setDbReady] = useState(false);
+    const [isTransitioning, setIsTransitioning] = useState(false);
 
-    // Animation values for swipe
+    // Animation values
+    const translateX = useRef(new Animated.Value(0)).current;
     const swipeAnim = useRef(new Animated.Value(0)).current;
-    const isSwipingRef = useRef(false);
-    const scrollEnabled = useRef(true);
+    const rotateAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(1)).current;
     const scrollRef = useRef(null);
-    const nextDateRef = useRef<Date | null>(null);
+
+    // Transform interpolations for 3D effect
+    const rotate = swipeAnim.interpolate({
+        inputRange: [-screenWidth, 0, screenWidth],
+        outputRange: ['10deg', '0deg', '-10deg'],
+        extrapolate: 'clamp'
+    });
+
+    const scale = swipeAnim.interpolate({
+        inputRange: [-screenWidth, 0, screenWidth],
+        outputRange: [0.9, 1, 0.9],
+        extrapolate: 'clamp'
+    });
+
+    // Perspective effect for depth
+    const perspective = swipeAnim.interpolate({
+        inputRange: [-screenWidth, 0, screenWidth],
+        outputRange: [0.8, 1, 0.8],
+        extrapolate: 'clamp'
+    });
+
+    // Date text animation for sliding effect
+    const dateTextTranslate = swipeAnim.interpolate({
+        inputRange: [-screenWidth, 0, screenWidth],
+        outputRange: [screenWidth / 2, 0, -screenWidth / 2],
+        extrapolate: 'clamp'
+    });
+
+    // Animation for opacity to fade content in/out during transition
+    const contentOpacity = swipeAnim.interpolate({
+        inputRange: [-screenWidth / 2, -screenWidth / 4, 0, screenWidth / 4, screenWidth / 2],
+        outputRange: [0.7, 0.9, 1, 0.9, 0.7],
+        extrapolate: 'clamp'
+    });
 
     // Add this to ensure consistent black background during transitions
     const containerStyle = {
@@ -253,112 +287,66 @@ const NutrientsScreen: React.FC = () => {
 
     // Go to previous day
     const gotoPrevDay = () => {
-        if (isSwipingRef.current) return;
+        if (isTransitioning) return;
 
-        const newDate = new Date(currentDate);
-        newDate.setDate(newDate.getDate() - 1);
+        setIsTransitioning(true);
 
-        // Animate the swipe
-        isSwipingRef.current = true;
+        // Animate to the right with 3D effect
         Animated.timing(swipeAnim, {
             toValue: screenWidth,
             duration: 250,
             useNativeDriver: true,
         }).start(() => {
-            // When the animation completes, reset position and update date
+            // Update the date
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() - 1);
             setCurrentDate(newDate);
-            swipeAnim.setValue(0);
-            isSwipingRef.current = false;
+
+            // Reset the animation value (off-screen to the left)
+            swipeAnim.setValue(-screenWidth);
+
+            // Animate back in from the left with 3D effect
+            Animated.spring(swipeAnim, {
+                toValue: 0,
+                friction: 8,
+                tension: 70,
+                useNativeDriver: true,
+            }).start(() => {
+                setIsTransitioning(false);
+            });
         });
     };
 
     // Go to next day
     const gotoNextDay = () => {
-        if (isSwipingRef.current) return;
+        if (isTransitioning) return;
 
-        const newDate = new Date(currentDate);
-        newDate.setDate(newDate.getDate() + 1);
+        setIsTransitioning(true);
 
-        // Animate the swipe
-        isSwipingRef.current = true;
+        // Animate to the left with 3D effect
         Animated.timing(swipeAnim, {
             toValue: -screenWidth,
             duration: 250,
             useNativeDriver: true,
         }).start(() => {
-            // When the animation completes, reset position and update date
+            // Update the date
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + 1);
             setCurrentDate(newDate);
-            swipeAnim.setValue(0);
-            isSwipingRef.current = false;
+
+            // Reset the animation value (off-screen to the right)
+            swipeAnim.setValue(screenWidth);
+
+            // Animate back in from the right with 3D effect
+            Animated.spring(swipeAnim, {
+                toValue: 0,
+                friction: 8,
+                tension: 70,
+                useNativeDriver: true,
+            }).start(() => {
+                setIsTransitioning(false);
+            });
         });
-    };
-
-    // Handle gesture events
-    const onGestureEvent = (event: PanGestureHandlerGestureEvent) => {
-        // Only handle swipe if we're not already animating
-        if (isSwipingRef.current) return;
-
-        const { translationX, velocityX } = event.nativeEvent;
-
-        // If it's clearly a horizontal swipe and scrolling is enabled,
-        // disable scrolling temporarily
-        if (Math.abs(translationX) > 10 && Math.abs(velocityX) > 10 && scrollEnabled.current) {
-            if (scrollRef.current) {
-                scrollRef.current.setNativeProps({ scrollEnabled: false });
-                scrollEnabled.current = false;
-            }
-        }
-
-        // Update the animation value
-        swipeAnim.setValue(translationX);
-    };
-
-    // Handle gesture state changes
-    const onHandlerStateChange = (event: PanGestureHandlerStateChangeEvent) => {
-        // Only handle if not currently animating
-        if (isSwipingRef.current) return;
-
-        if (event.nativeEvent.state === GestureState.END) {
-            // Re-enable scrolling regardless of outcome
-            if (scrollRef.current) {
-                scrollRef.current.setNativeProps({ scrollEnabled: true });
-                scrollEnabled.current = true;
-            }
-
-            const { translationX, velocityX } = event.nativeEvent;
-
-            // If it's a very small movement, treat it as a tap/scroll
-            if (Math.abs(translationX) < 5 && Math.abs(velocityX) < 5) {
-                swipeAnim.setValue(0);
-                return;
-            }
-
-            const threshold = screenWidth * 0.25;
-            const velocity = 0.5;
-
-            // Determine if we should switch days based on translation and velocity
-            const shouldSwitchDay =
-                Math.abs(translationX) > threshold ||
-                Math.abs(velocityX) > velocity * 1000;
-
-            if (shouldSwitchDay) {
-                if (translationX < 0) {
-                    // Swipe left -> next day
-                    gotoNextDay();
-                } else {
-                    // Swipe right -> previous day
-                    gotoPrevDay();
-                }
-            } else {
-                // Not enough swipe, snap back to center
-                Animated.spring(swipeAnim, {
-                    toValue: 0,
-                    tension: 40,
-                    friction: 7,
-                    useNativeDriver: true,
-                }).start();
-            }
-        }
     };
 
     // Format date for display
@@ -385,6 +373,59 @@ const NutrientsScreen: React.FC = () => {
 
         // Otherwise return formatted date
         return formatDateForDisplay(date);
+    };
+
+    // Handle horizontal gesture
+    const onGestureEvent = Animated.event(
+        [{ nativeEvent: { translationX: translateX } }],
+        {
+            useNativeDriver: true,
+            listener: (event: any) => {
+                if (event.nativeEvent && !isTransitioning) {
+                    // Pass the swipe translation to our animation value
+                    swipeAnim.setValue(event.nativeEvent.translationX * 0.8); // Dampen the effect slightly
+                }
+            }
+        }
+    );
+
+    // Handle gesture end
+    const onHandlerStateChange = ({ nativeEvent }) => {
+        const { translationX, velocityX, state } = nativeEvent;
+
+        if (state === State.END) {
+            if (isTransitioning) {
+                resetSwipeState();
+                return;
+            }
+
+            // Threshold for swipe action
+            const swipeThreshold = screenWidth / 3;
+
+            // Check if swipe was significant enough
+            if (Math.abs(translationX) > swipeThreshold || Math.abs(velocityX) > 800) {
+                if (translationX > 0) {
+                    // Swipe right - go to previous day
+                    gotoPrevDay();
+                } else {
+                    // Swipe left - go to next day
+                    gotoNextDay();
+                }
+            } else {
+                // Not enough to trigger date change, animate back
+                resetSwipeState();
+            }
+        }
+    };
+
+    const resetSwipeState = () => {
+        // Spring back to center position
+        Animated.spring(swipeAnim, {
+            toValue: 0,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true
+        }).start();
     };
 
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
@@ -450,35 +491,48 @@ const NutrientsScreen: React.FC = () => {
                         <View style={{ width: 28 }} />
                     </View>
 
-                    {/* Day Navigation - Centered */}
+                    {/* Day Navigation Bar */}
                     <View style={styles.dayNavContainer}>
                         <TouchableOpacity
                             style={styles.dayNavButton}
                             onPress={gotoPrevDay}
-                            disabled={isSwipingRef.current}
+                            disabled={isTransitioning}
                         >
                             <Ionicons name="chevron-back" size={20} color={WHITE} />
                         </TouchableOpacity>
-                        <Text style={styles.todayText}>{formatDate(currentDate)}</Text>
+                        <Animated.Text style={[styles.todayText, {
+                            transform: [{ translateX: dateTextTranslate }]
+                        }]}>
+                            {formatDate(currentDate)}
+                        </Animated.Text>
                         <TouchableOpacity
                             style={styles.dayNavButton}
                             onPress={gotoNextDay}
-                            disabled={isSwipingRef.current}
+                            disabled={isTransitioning}
                         >
                             <Ionicons name="chevron-forward" size={20} color={WHITE} />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Swipeable Content */}
+                    {/* Content with Gesture Handler */}
                     <PanGestureHandler
                         onGestureEvent={onGestureEvent}
                         onHandlerStateChange={onHandlerStateChange}
+                        activeOffsetX={[-20, 20]}  // Only activate for horizontal movement > 20px
+                        failOffsetY={[-10, 10]}    // Fail if vertical movement exceeds 10px first
+                        enabled={!isTransitioning}
                     >
                         <Animated.View
                             style={[
                                 styles.animatedContent,
                                 {
-                                    transform: [{ translateX: swipeAnim }],
+                                    opacity: contentOpacity,
+                                    transform: [
+                                        { perspective: 1000 },
+                                        { translateX: swipeAnim },
+                                        { rotateY: rotate },
+                                        { scale: perspective }
+                                    ]
                                 }
                             ]}
                         >
@@ -497,6 +551,7 @@ const NutrientsScreen: React.FC = () => {
                                 ref={scrollRef}
                                 style={styles.scrollView}
                                 showsVerticalScrollIndicator={false}
+                                scrollEventThrottle={16}
                             >
                                 {!dbReady || loading ? (
                                     <View style={styles.loadingContainer}>
