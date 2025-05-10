@@ -94,19 +94,6 @@ export const initDatabase = async () => {
         // Enable WAL mode for better performance
         await db.execAsync('PRAGMA journal_mode = WAL');
 
-        // Add test data if the database is empty (for demo purposes)
-        const foodLogCount = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM food_logs');
-        if (foodLogCount && foodLogCount.count === 0) {
-            console.log('🔄 Adding sample food log data...');
-            await addSampleFoodLogData();
-        }
-
-        const exerciseCount = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM exercises');
-        if (exerciseCount && exerciseCount.count === 0) {
-            console.log('🔄 Adding sample exercise data...');
-            await addSampleExerciseData();
-        }
-
         // Set the global flag to indicate database is initialized
         global.dbInitialized = true;
         console.log('✅ Database initialized flag set to true');
@@ -122,167 +109,6 @@ export const initDatabase = async () => {
 // Export a function to check if the database is ready
 export const isDatabaseReady = () => {
     return global.dbInitialized && !!db;
-};
-
-// Helper function to add sample food log data
-const addSampleFoodLogData = async () => {
-    if (!db) return;
-
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const yesterdayFormatted = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-
-    const sampleFoods = [
-        {
-            meal_id: 1,
-            food_name: 'Oatmeal with Berries',
-            calories: 250,
-            proteins: 8,
-            carbs: 40,
-            fats: 6,
-            image_url: 'https://example.com/oatmeal.jpg',
-            date: todayFormatted,
-            meal_type: 'Breakfast'
-        },
-        {
-            meal_id: 2,
-            food_name: 'Grilled Chicken Salad',
-            calories: 350,
-            proteins: 30,
-            carbs: 15,
-            fats: 12,
-            image_url: 'https://example.com/chicken_salad.jpg',
-            date: todayFormatted,
-            meal_type: 'Lunch'
-        },
-        {
-            meal_id: 3,
-            food_name: 'Salmon with Vegetables',
-            calories: 420,
-            proteins: 35,
-            carbs: 20,
-            fats: 22,
-            image_url: 'https://example.com/salmon.jpg',
-            date: todayFormatted,
-            meal_type: 'Dinner'
-        },
-        {
-            meal_id: 4,
-            food_name: 'Greek Yogurt',
-            calories: 120,
-            proteins: 15,
-            carbs: 8,
-            fats: 0,
-            image_url: 'https://example.com/yogurt.jpg',
-            date: yesterdayFormatted,
-            meal_type: 'Breakfast'
-        },
-        {
-            meal_id: 5,
-            food_name: 'Turkey Sandwich',
-            calories: 380,
-            proteins: 25,
-            carbs: 40,
-            fats: 10,
-            image_url: 'https://example.com/sandwich.jpg',
-            date: yesterdayFormatted,
-            meal_type: 'Lunch'
-        }
-    ];
-
-    try {
-        for (const food of sampleFoods) {
-            await db.runAsync(
-                `INSERT INTO food_logs (
-                  meal_id, user_id, food_name, calories, proteins, carbs, fats, 
-                  image_url, file_key, date, meal_type, synced, sync_action, last_modified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    food.meal_id,
-                    1,
-                    food.food_name,
-                    food.calories,
-                    food.proteins,
-                    food.carbs,
-                    food.fats,
-                    food.image_url,
-                    'sample_file_key',
-                    food.date,
-                    food.meal_type,
-                    1, // synced
-                    'create',
-                    getCurrentDate()
-                ]
-            );
-        }
-        console.log('✅ Sample food log data added successfully');
-    } catch (error) {
-        console.error('❌ Error adding sample food log data:', error);
-    }
-};
-
-// Helper function to add sample exercise data
-const addSampleExerciseData = async () => {
-    if (!db) return;
-
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const yesterdayFormatted = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-
-    const sampleExercises = [
-        {
-            exercise_name: 'Running',
-            calories_burned: 350,
-            duration: 30,
-            date: todayFormatted,
-            notes: '5K morning run'
-        },
-        {
-            exercise_name: 'Weight Training',
-            calories_burned: 250,
-            duration: 45,
-            date: todayFormatted,
-            notes: 'Upper body workout'
-        },
-        {
-            exercise_name: 'Cycling',
-            calories_burned: 400,
-            duration: 60,
-            date: yesterdayFormatted,
-            notes: 'Evening bike ride'
-        }
-    ];
-
-    try {
-        for (const exercise of sampleExercises) {
-            await db.runAsync(
-                `INSERT INTO exercises (
-                  user_id, exercise_name, calories_burned, duration,
-                  date, notes, synced, sync_action, last_modified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    1,
-                    exercise.exercise_name,
-                    exercise.calories_burned,
-                    exercise.duration,
-                    exercise.date,
-                    exercise.notes,
-                    1, // synced
-                    'create',
-                    getCurrentDate()
-                ]
-            );
-        }
-        console.log('✅ Sample exercise data added successfully');
-    } catch (error) {
-        console.error('❌ Error adding sample exercise data:', error);
-    }
 };
 
 // Helper function to get current date in YYYY-MM-DD format
@@ -302,15 +128,28 @@ export const addFoodLog = async (foodLog: any) => {
         user_id = 1,
         food_name,
         meal_id = 0,
-        calories,
+        calories = 0,
         proteins = 0,
         carbs = 0,
         fats = 0,
+        fiber = 0,
+        sugar = 0,
+        saturated_fat = 0,
+        polyunsaturated_fat = 0,
+        monounsaturated_fat = 0,
+        trans_fat = 0,
+        cholesterol = 0,
+        sodium = 0,
+        potassium = 0,
+        vitamin_a = 0,
+        vitamin_c = 0,
+        calcium = 0,
+        iron = 0,
         weight = null,
         weight_unit = 'g',
         image_url = '',
         file_key = '',
-        healthiness_rating = 5,
+        healthiness_rating = 0,
         date = getCurrentDate(),
         meal_type = 'Snacks',
         brand_name = '',
@@ -346,9 +185,11 @@ export const addFoodLog = async (foodLog: any) => {
         const result = await db.runAsync(
             `INSERT INTO food_logs (
                 user_id, meal_id, food_name, calories, proteins, carbs, fats,
-                weight, weight_unit, image_url, file_key, healthiness_rating,
+                fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
+                trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
+                calcium, iron, weight, weight_unit, image_url, file_key, healthiness_rating,
                 date, meal_type, brand_name, quantity, notes, synced, sync_action, last_modified
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 user_id,
                 meal_id,
@@ -357,6 +198,19 @@ export const addFoodLog = async (foodLog: any) => {
                 proteins,
                 carbs,
                 fats,
+                fiber,
+                sugar,
+                saturated_fat,
+                polyunsaturated_fat,
+                monounsaturated_fat,
+                trans_fat,
+                cholesterol,
+                sodium,
+                potassium,
+                vitamin_a,
+                vitamin_c,
+                calcium,
+                iron,
                 weight,
                 weight_unit,
                 image_url,

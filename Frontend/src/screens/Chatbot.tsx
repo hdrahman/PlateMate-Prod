@@ -29,16 +29,16 @@ const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
 
 const { width } = Dimensions.get("window");
 
-// Mock user profile for personalization
+// User profile - initialized with empty values
 const userProfile = {
-  name: "Alex",
-  age: 28,
-  weight: 76, // kg
-  height: 180, // cm
-  goals: "Muscle building",
-  recentWorkouts: ["Upper body", "Cardio", "Legs"],
-  dietaryPreferences: ["High protein", "Low sugar"],
-  lastActive: "2 hours ago"
+  name: "",
+  age: 0,
+  weight: 0, // kg
+  height: 0, // cm
+  goals: "",
+  recentWorkouts: [],
+  dietaryPreferences: [],
+  lastActive: ""
 };
 
 // Types for the chat messages

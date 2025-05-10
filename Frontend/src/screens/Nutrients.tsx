@@ -6,7 +6,9 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
-    Dimensions
+    Dimensions,
+    StatusBar,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -89,19 +91,63 @@ const NutrientsScreen: React.FC = () => {
                 const today = new Date();
                 const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                 const logs: any[] = await getFoodLogsByDate(todayStr);
+
+                // Debug: Log the first food entry to see what fields are available
+                if (logs.length > 0) {
+                    console.log('First food log entry:', JSON.stringify(logs[0], null, 2));
+                }
+                console.log(`Found ${logs.length} food log entries for today`);
+
                 // Aggregate nutrients
                 const totals = {
                     protein: 0,
                     carbs: 0,
                     fat: 0,
                     calories: 0,
+                    fiber: 0,
+                    sugar: 0,
+                    saturatedFat: 0,
+                    polyunsaturatedFat: 0,
+                    monounsaturatedFat: 0,
+                    transFat: 0,
+                    cholesterol: 0,
+                    sodium: 0,
+                    potassium: 0,
+                    vitaminA: 0,
+                    vitaminC: 0,
+                    calcium: 0,
+                    iron: 0
                 };
                 logs.forEach(entry => {
+                    console.log(`Processing entry: ${entry.food_name}`);
+
+                    // Log available fields for nutrients
+                    console.log('Entry nutrient fields:',
+                        entry.proteins !== undefined ? 'proteins✓' : 'proteins✗',
+                        entry.fiber !== undefined ? 'fiber✓' : 'fiber✗',
+                        entry.saturated_fat !== undefined ? 'saturated_fat✓' : 'saturated_fat✗',
+                        entry.sodium !== undefined ? 'sodium✓' : 'sodium✗'
+                    );
+
                     totals.protein += entry.proteins || 0;
                     totals.carbs += entry.carbs || 0;
                     totals.fat += entry.fats || 0;
                     totals.calories += entry.calories || 0;
+                    totals.fiber += entry.fiber || 0;
+                    totals.sugar += entry.sugar || 0;
+                    totals.saturatedFat += entry.saturated_fat || 0;
+                    totals.polyunsaturatedFat += entry.polyunsaturated_fat || 0;
+                    totals.monounsaturatedFat += entry.monounsaturated_fat || 0;
+                    totals.transFat += entry.trans_fat || 0;
+                    totals.cholesterol += entry.cholesterol || 0;
+                    totals.sodium += entry.sodium || 0;
+                    totals.potassium += entry.potassium || 0;
+                    totals.vitaminA += entry.vitamin_a || 0;
+                    totals.vitaminC += entry.vitamin_c || 0;
+                    totals.calcium += entry.calcium || 0;
+                    totals.iron += entry.iron || 0;
                 });
+                console.log('Final nutrient totals:', totals);
                 setNutrientData(prevData => {
                     const updatedData = { ...prevData };
                     Object.keys(totals).forEach(key => {
@@ -169,63 +215,66 @@ const NutrientsScreen: React.FC = () => {
     };
 
     return (
-        <SafeAreaView style={[styles.container, containerStyle]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
+        <View style={[styles.container, containerStyle]}>
+            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+            <SafeAreaView style={{ flex: 1 }}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                    >
+                        <Ionicons name="chevron-back" size={28} color={WHITE} />
+                    </TouchableOpacity>
+                    <View style={styles.titleContainer}>
+                        <GradientText
+                            text="NUTRIENTS"
+                            colors={["#5A60EA", "#FF00F5"]}
+                            style={styles.headerTitle}
+                        />
+                    </View>
+                    <View style={{ width: 28 }} />
+                </View>
+
+                {/* Day Navigation - Centered */}
+                <View style={styles.dayNavContainer}>
+                    <TouchableOpacity style={styles.dayNavButton}>
+                        <Ionicons name="chevron-back" size={20} color={WHITE} />
+                    </TouchableOpacity>
+                    <Text style={styles.todayText}>Today</Text>
+                    <TouchableOpacity style={styles.dayNavButton}>
+                        <Ionicons name="chevron-forward" size={20} color={WHITE} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Column Headers */}
+                <View style={styles.columnHeadersContainer}>
+                    <View style={styles.columnHeaders}>
+                        <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left' }]}>Remaining</Text>
+                        <View style={{ flex: 2 }} />
+                        <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right' }]}>Total/Goal</Text>
+                    </View>
+                    <View style={styles.headerDivider} />
+                </View>
+
+                {/* Nutrients List */}
+                <ScrollView
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
                 >
-                    <Ionicons name="chevron-back" size={28} color={WHITE} />
-                </TouchableOpacity>
-                <View style={styles.titleContainer}>
-                    <GradientText
-                        text="NUTRIENTS"
-                        colors={["#5A60EA", "#FF00F5"]}
-                        style={styles.headerTitle}
-                    />
-                </View>
-                <View style={{ width: 28 }} />
-            </View>
+                    {Object.entries(nutrientData)
+                        .filter(([key]) => key !== 'calories')
+                        .map(([key, value]) => {
+                            // Convert key from camelCase to Title Case for display
+                            const label = key.replace(/([A-Z])/g, ' $1')
+                                .replace(/^./, str => str.toUpperCase());
+                            return renderNutrientItem(label, value.current, value.goal, value.unit);
+                        })}
 
-            {/* Day Navigation - Centered */}
-            <View style={styles.dayNavContainer}>
-                <TouchableOpacity style={styles.dayNavButton}>
-                    <Ionicons name="chevron-back" size={20} color={WHITE} />
-                </TouchableOpacity>
-                <Text style={styles.todayText}>Today</Text>
-                <TouchableOpacity style={styles.dayNavButton}>
-                    <Ionicons name="chevron-forward" size={20} color={WHITE} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Column Headers */}
-            <View style={styles.columnHeadersContainer}>
-                <View style={styles.columnHeaders}>
-                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left' }]}>Remaining</Text>
-                    <View style={{ flex: 2 }} />
-                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right' }]}>Total/Goal</Text>
-                </View>
-                <View style={styles.headerDivider} />
-            </View>
-
-            {/* Nutrients List */}
-            <ScrollView
-                style={styles.scrollView}
-                showsVerticalScrollIndicator={false}
-            >
-                {Object.entries(nutrientData)
-                    .filter(([key]) => key !== 'calories')
-                    .map(([key, value]) => {
-                        // Convert key from camelCase to Title Case for display
-                        const label = key.replace(/([A-Z])/g, ' $1')
-                            .replace(/^./, str => str.toUpperCase());
-                        return renderNutrientItem(label, value.current, value.goal, value.unit);
-                    })}
-
-                <View style={styles.spacer} />
-            </ScrollView>
-        </SafeAreaView>
+                    <View style={styles.spacer} />
+                </ScrollView>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -233,6 +282,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: PRIMARY_BG,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     header: {
         flexDirection: 'row',

@@ -62,80 +62,6 @@ export const cuisineCategories = [
 // Base URL for Spoonacular API
 const BASE_URL = 'https://api.spoonacular.com';
 
-// Fallbacks for when API is unavailable or rate limited
-const MOCK_RECIPES = [
-    {
-        id: '1',
-        title: 'Classic Omelet with Spinach and Cheese',
-        image: 'https://images.unsplash.com/photo-1612240498936-65f5101365d2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
-        readyInMinutes: 15,
-        servings: 1,
-        sourceUrl: 'https://example.com/recipe/omelet',
-        summary: 'A nutritious and protein-packed breakfast that combines fresh spinach with melted cheese in a fluffy egg base.',
-        healthScore: 80,
-        ingredients: ['Eggs', 'Spinach', 'Cheese', 'Salt', 'Pepper', 'Butter'],
-        instructions: 'Whisk eggs in a bowl. Heat butter in a pan. Add spinach until wilted. Pour eggs over and cook until set. Add cheese, fold, and serve.',
-        diets: ['vegetarian', 'gluten-free', 'keto'],
-        cuisines: ['american', 'french'],
-    },
-    {
-        id: '2',
-        title: 'Chicken & Vegetable Stir Fry',
-        image: 'https://images.unsplash.com/photo-1603436202677-80ca0ceb7cc2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
-        readyInMinutes: 25,
-        servings: 2,
-        sourceUrl: 'https://example.com/recipe/stir-fry',
-        summary: 'A quick and healthy stir fry with lean protein and plenty of colorful vegetables in a light sauce.',
-        healthScore: 90,
-        ingredients: ['Chicken breast', 'Broccoli', 'Bell peppers', 'Carrots', 'Soy sauce', 'Garlic', 'Ginger', 'Rice'],
-        instructions: 'Slice chicken and vegetables. Stir-fry chicken until cooked. Add vegetables and stir-fry until tender-crisp. Add sauce ingredients, toss to coat, and serve over rice.',
-        diets: ['dairy-free'],
-        cuisines: ['asian', 'chinese'],
-    },
-    {
-        id: '3',
-        title: 'Mediterranean Chickpea Salad',
-        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
-        readyInMinutes: 15,
-        servings: 2,
-        sourceUrl: 'https://example.com/recipe/chickpea-salad',
-        summary: 'A refreshing plant-based salad with protein-rich chickpeas, fresh vegetables, and zesty Mediterranean flavors.',
-        healthScore: 95,
-        ingredients: ['Chickpeas', 'Cucumber', 'Cherry tomatoes', 'Red onion', 'Feta cheese', 'Olive oil', 'Lemon juice', 'Herbs'],
-        instructions: 'Combine all ingredients in a bowl. Whisk together olive oil, lemon juice, and herbs. Pour over salad and toss to combine. Chill before serving.',
-        diets: ['vegetarian', 'gluten-free'],
-        cuisines: ['mediterranean', 'greek'],
-    },
-    {
-        id: '4',
-        title: 'Easy Beef and Vegetable Soup',
-        image: 'https://images.unsplash.com/photo-1547592180-85f173990554?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
-        readyInMinutes: 45,
-        servings: 4,
-        sourceUrl: 'https://example.com/recipe/beef-soup',
-        summary: 'A hearty and comforting soup featuring tender beef chunks, nutritious vegetables, and a flavorful broth.',
-        healthScore: 85,
-        ingredients: ['Beef chunks', 'Onions', 'Carrots', 'Celery', 'Potatoes', 'Garlic', 'Beef broth', 'Herbs'],
-        instructions: 'Brown beef in a pot. Add onions, carrots, celery, and garlic. Pour in broth and add potatoes and herbs. Simmer until meat is tender and vegetables are cooked.',
-        diets: ['dairy-free', 'gluten-free'],
-        cuisines: ['american', 'comfort'],
-    },
-    {
-        id: '5',
-        title: 'Quinoa Buddha Bowl',
-        image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
-        readyInMinutes: 30,
-        servings: 1,
-        sourceUrl: 'https://example.com/recipe/buddha-bowl',
-        summary: 'A nutritionally balanced meal with whole grains, plant proteins, and colorful vegetables.',
-        healthScore: 100,
-        ingredients: ['Quinoa', 'Avocado', 'Chickpeas', 'Sweet potato', 'Kale', 'Tahini', 'Lemon juice', 'Seeds'],
-        instructions: 'Cook quinoa according to package. Roast sweet potatoes and chickpeas. Massage kale with olive oil. Assemble bowl with quinoa base, vegetables, and protein. Top with tahini dressing and seeds.',
-        diets: ['vegan', 'vegetarian', 'gluten-free', 'dairy-free'],
-        cuisines: ['healthy', 'mediterranean'],
-    }
-];
-
 // Check if API key is configured
 const isConfigured = !!SPOONACULAR_API_KEY;
 
@@ -162,21 +88,8 @@ const mapSpoonacularRecipe = (spoonRecipe: any): Recipe => {
 // Function to search for recipes by query
 export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[]> => {
     if (!isConfigured) {
-        console.warn('Spoonacular API key not configured. Using mock data.');
-
-        // Filter mock data based on params
-        let filteredRecipes = [...MOCK_RECIPES];
-
-        if (params.query) {
-            const query = params.query.toLowerCase();
-            filteredRecipes = filteredRecipes.filter(recipe =>
-                recipe.title.toLowerCase().includes(query) ||
-                recipe.ingredients.some(ing => ing.toLowerCase().includes(query))
-            );
-        }
-
-        // Apply other filters as needed
-        return filteredRecipes.slice(0, params.number || 10);
+        console.warn('Spoonacular API key not configured.');
+        return [];
     }
 
     try {
@@ -207,15 +120,15 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[
         return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error('Error searching recipes:', error);
-        return MOCK_RECIPES.slice(0, params.number || 10);
+        return [];
     }
 };
 
 // Function to get recipe details by ID
 export const getRecipeById = async (id: string): Promise<Recipe | null> => {
     if (!isConfigured) {
-        console.warn('Spoonacular API key not configured. Using mock data.');
-        return MOCK_RECIPES.find(r => r.id === id) || null;
+        console.warn('Spoonacular API key not configured.');
+        return null;
     }
 
     try {
@@ -229,15 +142,15 @@ export const getRecipeById = async (id: string): Promise<Recipe | null> => {
         return mapSpoonacularRecipe(response.data);
     } catch (error) {
         console.error('Error getting recipe details:', error);
-        return MOCK_RECIPES.find(r => r.id === id) || null;
+        return null;
     }
 };
 
 // Function to get random recipes
 export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => {
     if (!isConfigured) {
-        console.warn('Spoonacular API key not configured. Using mock data.');
-        return shuffleArray([...MOCK_RECIPES]).slice(0, count);
+        console.warn('Spoonacular API key not configured.');
+        return [];
     }
 
     try {
@@ -253,7 +166,7 @@ export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => 
         return response.data.recipes.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error('Error getting random recipes:', error);
-        return shuffleArray([...MOCK_RECIPES]).slice(0, count);
+        return [];
     }
 };
 
@@ -263,7 +176,7 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
         console.warn('Spoonacular API key not configured. Using mock data.');
 
         // Map meal types to diets or cuisines for filtering
-        let recipes = [...MOCK_RECIPES];
+        let recipes = [];
 
         switch (mealType.toLowerCase()) {
             case 'breakfast':
@@ -336,7 +249,7 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
         return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error(`Error getting ${mealType} recipes:`, error);
-        return shuffleArray([...MOCK_RECIPES]).slice(0, count);
+        return [];
     }
 };
 
@@ -353,14 +266,14 @@ export const generateMealPlan = async (params: {
     maxCarbs?: number
 }): Promise<any> => {
     if (!isConfigured) {
-        console.warn('Spoonacular API key not configured. Using mock data.');
+        console.warn('Spoonacular API key not configured.');
         return {
-            meals: shuffleArray([...MOCK_RECIPES]).slice(0, 3),
+            meals: [],
             nutrients: {
-                calories: 2000,
-                protein: 100,
-                fat: 70,
-                carbohydrates: 250
+                calories: 0,
+                protein: 0,
+                fat: 0,
+                carbohydrates: 0
             }
         };
     }
@@ -407,12 +320,12 @@ export const generateMealPlan = async (params: {
     } catch (error) {
         console.error('Error generating meal plan:', error);
         return {
-            meals: shuffleArray([...MOCK_RECIPES]).slice(0, 3),
+            meals: [],
             nutrients: {
-                calories: 2000,
-                protein: 100,
-                fat: 70,
-                carbohydrates: 250
+                calories: 0,
+                protein: 0,
+                fat: 0,
+                carbohydrates: 0
             }
         };
     }

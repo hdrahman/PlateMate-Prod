@@ -10,9 +10,6 @@ import logging
 from dotenv import load_dotenv
 import httpx
 
-# Toggle between mock and real API
-USE_MOCK_API = False  # Set to False to use the real OpenAI API
-
 # Load environment variables
 load_dotenv()
 
@@ -72,14 +69,13 @@ async def analyze_food(request: FoodAnalysisRequest):
             logger.info(f"Multiple images detected ({len(valid_urls)}). Analyzing them together as part of the same meal.")
         
         # Prepare the prompt for GPT-4o
-        # Prepare the prompt for GPT-4o
         prompt = f"""
         Analyze these food images together as they are all part of the same {request.meal_type} meal.
         The meal appears to be {request.food_name}.
 
         Food Item Recognition Guidelines:
-        - GROUP components that form a single dish (e.g., identify a "cheese sandwich" as one item, not separate bread and cheese)
-        - SEPARATE distinct food items that are clearly served independently (e.g., "grilled chicken", "steamed rice", and "mixed vegetables" should be listed separately)
+        - GROUP as a SINGLE ITEM: Foods like sandwiches, wraps, burgers, pizzas, burritos, etc. (e.g., "Turkey Sandwich" not separate bread and turkey)
+        - SEPARATE as MULTIPLE ITEMS: Distinct foods on a plate (e.g., "Grilled Chicken", "Rice", and "Vegetables" as three separate entries)
         - Use common culinary names for dishes rather than listing all ingredients
 
         Please provide a combined analysis including:
@@ -108,120 +104,144 @@ async def analyze_food(request: FoodAnalysisRequest):
         
         logger.info(f"Sending request to OpenAI with {len(valid_urls)} images in a single message")
         
-        if USE_MOCK_API:
-            # Mock response instead of making the API request to OpenAI
-            mock_response_text = """Meal Analysis:
-
-This meal consists of 4 distinct food items:
-
-1. Grilled Chicken Breast (100g)
-   - Calories: 165
-   - Protein: 31g
-   - Carbs: 0g
-   - Fat: 3g
-   - Healthiness Rating: 8/10
-   This lean protein is high in essential nutrients with minimal fat.
-
-2. Grilled Sausages (100g)
-   - Calories: 229
-   - Protein: 12g
-   - Carbs: 1g
-   - Fat: 19g
-   - Healthiness Rating: 4/10
-   Higher in fat and sodium, moderate consumption recommended.
-
-3. Steamed Brown Rice (100g)
-   - Calories: 112
-   - Protein: 2g
-   - Carbs: 24g
-   - Fat: 1g
-   - Healthiness Rating: 7/10
-   Whole grain carbohydrate providing fiber and sustained energy.
-
-4. Steamed Mixed Vegetables (100g)
-   - Calories: 55
-   - Protein: 2g
-   - Carbs: 11g
-   - Fat: 0g
-   - Healthiness Rating: 10/10
-   Rich in vitamins, minerals, fiber, and antioxidants.
-
-Combined Nutritional Information:
-- Total Calories: 561
-- Total Protein: 47g
-- Total Carbs: 36g
-- Total Fat: 23g
-- Overall Healthiness Rating: 7/10
-
-Health Benefits:
-- Balanced meal with protein, complex carbs, and vegetables
-- Good source of essential vitamins and minerals
-- Provides sustained energy and supports muscle maintenance
-
-Suggestions:
-- Consider reducing portion of sausages to lower saturated fat intake
-- Add more vegetables for additional fiber and micronutrients
-- Consider adding a healthy fat source like avocado or olive oil"""
-            
-            # Create a mock response object
-            class MockResponse:
-                def __init__(self, text, status_code=200):
-                    self.text = text
-                    self.status_code = status_code
-                    
-                def json(self):
-                    return {
-                        "choices": [
-                            {
-                                "message": {
-                                    "content": self.text
-                                }
-                            }
-                        ]
-                    }
-            
-            response = MockResponse(mock_response_text)
-            logger.info("Using mock response for OpenAI API")
-        else:
-            # Make the real API request to OpenAI using httpx.AsyncClient
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {OPENAI_API_KEY}"
-                    },
-                    json={
-                        "model": "gpt-4o",
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": content
-                            }
-                        ],
-                        "max_tokens": 500
-                    }
-                )
-            logger.info("Using real OpenAI API")
-        
-        # Check if the request was successful
-        if response.status_code != 200:
-            logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"OpenAI API error: {response.text}"
+        # Make the real API request to OpenAI using httpx.AsyncClient
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {OPENAI_API_KEY}"
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": content
+                        }
+                    ],
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                },
+                timeout=60.0  # Increased timeout for image analysis
             )
         
-        # Extract the description from the response
-        result = response.json()
-        description = result["choices"][0]["message"]["content"].strip()
-        logger.info(f"Successfully analyzed food with GPT")
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=500, detail=f"OpenAI API error: {response.status_code}")
         
-        return {
-            "description": description,
-            "healthiness_rating": None  # Let the frontend calculate this
-        }
+        logger.info("Successfully received response from OpenAI API")
+        
+        response_data = response.json()
+        analysis_text = response_data["choices"][0]["message"]["content"]
+        
+        logger.info(f"Analysis text length: {len(analysis_text)} characters")
+        
+        # Extract healthiness rating if present
+        healthiness_rating = None
+        rating_lines = [line for line in analysis_text.split('\n') if 'healthiness rating' in line.lower()]
+        if rating_lines:
+            import re
+            rating_match = re.search(r'(\d+)/10', rating_lines[0], re.IGNORECASE)
+            if rating_match:
+                healthiness_rating = int(rating_match.group(1))
+                logger.info(f"Extracted healthiness rating: {healthiness_rating}/10")
+        
+        # Return the analysis
+        return FoodAnalysisResponse(
+            description=analysis_text,
+            healthiness_rating=healthiness_rating
+        )
         
     except Exception as e:
-        logger.error(f"Error analyzing food: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error analyzing food: {str(e)}") 
+        logger.error(f"Error analyzing food: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error analyzing food: {str(e)}")
+
+
+@router.get("/analyze-meal/{meal_id}")
+async def analyze_meal(meal_id: int, db: Session = Depends(get_db)):
+    """
+    Analyze a full meal by its meal_id and provide a comprehensive analysis
+    """
+    try:
+        # Query the database for all food items in this meal
+        food_items = db.query(FoodLog).filter(FoodLog.meal_id == meal_id).all()
+        
+        if not food_items:
+            raise HTTPException(status_code=404, detail=f"No food items found for meal_id {meal_id}")
+        
+        # Extract meal information
+        food_names = [item.food_name for item in food_items]
+        total_calories = sum(item.calories for item in food_items)
+        total_protein = sum(item.proteins for item in food_items)
+        total_carbs = sum(item.carbs for item in food_items)
+        total_fat = sum(item.fats for item in food_items)
+        
+        # Prepare prompt for GPT
+        prompt = f"""
+        Please analyze this meal consisting of: {', '.join(food_names)}.
+        
+        Total nutritional information:
+        - Calories: {total_calories}
+        - Protein: {total_protein}g
+        - Carbohydrates: {total_carbs}g
+        - Fat: {total_fat}g
+        
+        Provide a comprehensive analysis including:
+        1. The overall nutritional balance of the meal
+        2. Health benefits of the food combination
+        3. Any nutrition concerns or imbalances
+        4. Suggestions for improving the meal
+        5. How well this meal aligns with a balanced diet
+        
+        Keep your response concise and informative, around 200-250 words.
+        """
+        
+        # Request analysis from OpenAI
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {OPENAI_API_KEY}"
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                }
+            )
+        
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=500, detail=f"OpenAI API error: {response.status_code}")
+        
+        response_data = response.json()
+        analysis_text = response_data["choices"][0]["message"]["content"]
+        
+        # Return the meal analysis
+        return {
+            "meal_id": meal_id,
+            "food_items": food_names,
+            "total_calories": total_calories,
+            "total_protein": total_protein,
+            "total_carbs": total_carbs,
+            "total_fat": total_fat,
+            "analysis": analysis_text
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing meal: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error analyzing meal: {str(e)}") 

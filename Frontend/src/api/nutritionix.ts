@@ -69,6 +69,37 @@ export interface FoodItem {
 }
 
 /**
+ * Create an empty food item with all values set to zero
+ */
+const createEmptyFoodItem = (foodName: string = ''): FoodItem => {
+    return {
+        food_name: foodName,
+        calories: 0,
+        proteins: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+        sugar: 0,
+        saturated_fat: 0,
+        polyunsaturated_fat: 0,
+        monounsaturated_fat: 0,
+        trans_fat: 0,
+        cholesterol: 0,
+        sodium: 0,
+        potassium: 0,
+        vitamin_a: 0,
+        vitamin_c: 0,
+        calcium: 0,
+        iron: 0,
+        image: '',
+        serving_unit: 'serving',
+        serving_weight_grams: 0,
+        serving_qty: 1,
+        healthiness_rating: 0
+    };
+};
+
+/**
  * Search for foods using the Nutritionix API
  * @param query - The search query
  * @param minHealthiness - Minimum healthiness rating to include (1-10)
@@ -77,7 +108,7 @@ export interface FoodItem {
 export const searchFood = async (query: string, minHealthiness: number = 0): Promise<FoodItem[]> => {
     if (!isConfigured) {
         console.warn('Nutritionix API credentials not configured');
-        return mockSearchResults(query, minHealthiness);
+        return [];
     }
 
     try {
@@ -113,7 +144,7 @@ export const searchFood = async (query: string, minHealthiness: number = 0): Pro
         return sortedResults.slice(0, 20);
     } catch (error) {
         console.error('Error searching for food:', error);
-        return mockSearchResults(query, minHealthiness);
+        return [];
     }
 };
 
@@ -125,7 +156,7 @@ export const searchFood = async (query: string, minHealthiness: number = 0): Pro
 export const getFoodDetails = async (query: string): Promise<FoodItem | null> => {
     if (!isConfigured) {
         console.warn('Nutritionix API credentials not configured');
-        return mockFoodDetails(query);
+        return null;
     }
 
     try {
@@ -147,7 +178,7 @@ export const getFoodDetails = async (query: string): Promise<FoodItem | null> =>
         return null;
     } catch (error) {
         console.error('Error getting food details:', error);
-        return mockFoodDetails(query);
+        return null;
     }
 };
 
@@ -282,128 +313,6 @@ const calculateHealthinessRating = (food: NutritionixSearchResult): number => {
 
     // Clamp between 1 and 10
     return Math.max(1, Math.min(10, Math.round(score)));
-};
-
-// Mock data for when API is not configured
-const mockSearchResults = (query: string, minHealthiness: number = 0): FoodItem[] => {
-    const commonFoods = [
-        'Apple', 'Banana', 'Chicken Breast', 'Eggs', 'Greek Yogurt',
-        'Brown Rice', 'Salmon', 'Avocado', 'Spinach', 'Sweet Potato'
-    ];
-
-    // Return foods that match the query
-    return commonFoods
-        .filter(food => food.toLowerCase().includes(query.toLowerCase()))
-        .map(food => mockFoodDetails(food))
-        .filter(food => minHealthiness === 0 || (food.healthiness_rating || 0) >= minHealthiness)
-        .sort((a, b) => (b.healthiness_rating || 0) - (a.healthiness_rating || 0));
-};
-
-const mockFoodDetails = (foodName: string): FoodItem => {
-    // Sample data for common foods with updated healthiness ratings
-    const mockData: Record<string, Partial<FoodItem>> = {
-        'Apple': {
-            calories: 95, proteins: 0, carbs: 25, fats: 0,
-            fiber: 4, sugar: 19, serving_qty: 1, serving_unit: 'medium',
-            healthiness_rating: 8.5 // Updated rating
-        },
-        'Banana': {
-            calories: 105, proteins: 1, carbs: 27, fats: 0,
-            fiber: 3, sugar: 14, serving_qty: 1, serving_unit: 'medium',
-            healthiness_rating: 7.5 // Updated rating 
-        },
-        'Chicken Breast': {
-            calories: 165, proteins: 31, carbs: 0, fats: 3,
-            fiber: 0, sugar: 0, serving_qty: 100, serving_unit: 'g',
-            healthiness_rating: 9 // High protein, low fat
-        },
-        'Eggs': {
-            calories: 78, proteins: 6, carbs: 1, fats: 5,
-            fiber: 0, sugar: 0, serving_qty: 1, serving_unit: 'large',
-            healthiness_rating: 8 // Updated rating
-        },
-        'Greek Yogurt': {
-            calories: 100, proteins: 17, carbs: 6, fats: 0,
-            fiber: 0, sugar: 6, serving_qty: 170, serving_unit: 'g',
-            healthiness_rating: 8.5 // High protein, moderate sugar
-        },
-        'Brown Rice': {
-            calories: 216, proteins: 5, carbs: 45, fats: 2,
-            fiber: 4, sugar: 0, serving_qty: 1, serving_unit: 'cup',
-            healthiness_rating: 8 // Whole grain, good fiber
-        },
-        'Salmon': {
-            calories: 206, proteins: 22, carbs: 0, fats: 13,
-            fiber: 0, sugar: 0, serving_qty: 100, serving_unit: 'g',
-            healthiness_rating: 9.5 // Superfood with omega-3
-        },
-        'Avocado': {
-            calories: 240, proteins: 3, carbs: 12, fats: 22,
-            fiber: 10, sugar: 1, serving_qty: 1, serving_unit: 'medium',
-            healthiness_rating: 9 // High healthy fats and fiber
-        },
-        'Spinach': {
-            calories: 23, proteins: 3, carbs: 4, fats: 0,
-            fiber: 2, sugar: 0, serving_qty: 100, serving_unit: 'g',
-            healthiness_rating: 10 // Perfect superfood
-        },
-        'Sweet Potato': {
-            calories: 112, proteins: 2, carbs: 26, fats: 0,
-            fiber: 4, sugar: 5, serving_qty: 1, serving_unit: 'medium',
-            healthiness_rating: 9 // Superfood with good nutrients
-        },
-        'Kale': {
-            calories: 33, proteins: 3, carbs: 6, fats: 0,
-            fiber: 2, sugar: 0, serving_qty: 100, serving_unit: 'g',
-            healthiness_rating: 10 // Perfect superfood
-        },
-        'Blueberries': {
-            calories: 84, proteins: 1, carbs: 21, fats: 0,
-            fiber: 4, sugar: 15, serving_qty: 1, serving_unit: 'cup',
-            healthiness_rating: 9 // Antioxidant-rich superfood
-        },
-        'Quinoa': {
-            calories: 222, proteins: 8, carbs: 39, fats: 4,
-            fiber: 5, sugar: 0, serving_qty: 1, serving_unit: 'cup',
-            healthiness_rating: 9 // Complete protein grain
-        },
-        'Broccoli': {
-            calories: 55, proteins: 4, carbs: 11, fats: 0,
-            fiber: 5, sugar: 2, serving_qty: 1, serving_unit: 'cup',
-            healthiness_rating: 10 // Perfect cruciferous vegetable
-        }
-    };
-
-    // Default values with lower healthiness rating
-    const defaultFood: FoodItem = {
-        food_name: foodName,
-        calories: 100,
-        proteins: 5,
-        carbs: 15,
-        fats: 3,
-        fiber: 2,
-        sugar: 5,
-        saturated_fat: 1,
-        polyunsaturated_fat: 0,
-        monounsaturated_fat: 0,
-        trans_fat: 0,
-        cholesterol: 0,
-        sodium: 50,
-        potassium: 100,
-        vitamin_a: 0,
-        vitamin_c: 0,
-        calcium: 0,
-        iron: 0,
-        image: '',
-        serving_unit: 'serving',
-        serving_weight_grams: 100,
-        serving_qty: 1,
-        healthiness_rating: 4 // Default rating lowered to reflect stricter scale
-    };
-
-    // Find the food in our mock data, or use default
-    const foodData = mockData[foodName] || {};
-    return { ...defaultFood, ...foodData, food_name: foodName };
 };
 
 /**
