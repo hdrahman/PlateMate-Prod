@@ -1098,8 +1098,26 @@ const DiaryScreen: React.FC = () => {
     };
 
     const formatDate = (date: Date): string => {
-        const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-        return date.toLocaleDateString('en-US', options);
+        // Check if date is today, yesterday or tomorrow
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const targetDate = new Date(date);
+        targetDate.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+            return "Today";
+        } else if (diffDays === -1) {
+            return "Yesterday";
+        } else if (diffDays === 1) {
+            return "Tomorrow";
+        } else {
+            // Use the current format for all other dates
+            const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
     };
 
     // Replace the current isSwipeActive approach with a more refined solution
