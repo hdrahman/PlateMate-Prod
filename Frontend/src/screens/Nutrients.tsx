@@ -121,10 +121,10 @@ const NutrientsScreen: React.FC = () => {
         extrapolate: 'clamp'
     });
 
-    // Date text animation for sliding effect
+    // Date text animation - preventing the text from falling off by using a smaller range
     const dateTextTranslate = swipeAnim.interpolate({
         inputRange: [-screenWidth, 0, screenWidth],
-        outputRange: [screenWidth / 2, 0, -screenWidth / 2],
+        outputRange: [screenWidth / 4, 0, -screenWidth / 4], // Reduced range to prevent falling off
         extrapolate: 'clamp'
     });
 
@@ -285,7 +285,18 @@ const NutrientsScreen: React.FC = () => {
         }
     };
 
-    // Go to previous day
+    // Make sure animation completes in case it gets stuck
+    useEffect(() => {
+        const cleanup = () => {
+            // Reset animation state if component unmounts during transition
+            swipeAnim.setValue(0);
+            setIsTransitioning(false);
+        };
+
+        return cleanup;
+    }, []);
+
+    // Improved go to previous day to prevent sticking
     const gotoPrevDay = () => {
         if (isTransitioning) return;
 
@@ -296,28 +307,40 @@ const NutrientsScreen: React.FC = () => {
             toValue: screenWidth,
             duration: 250,
             useNativeDriver: true,
-        }).start(() => {
-            // Update the date
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() - 1);
-            setCurrentDate(newDate);
+        }).start(({ finished }) => {
+            if (finished) {
+                // Update the date
+                const newDate = new Date(currentDate);
+                newDate.setDate(newDate.getDate() - 1);
+                setCurrentDate(newDate);
 
-            // Reset the animation value (off-screen to the left)
-            swipeAnim.setValue(-screenWidth);
+                // Reset the animation value (off-screen to the left)
+                swipeAnim.setValue(-screenWidth);
 
-            // Animate back in from the left with 3D effect
-            Animated.spring(swipeAnim, {
-                toValue: 0,
-                friction: 8,
-                tension: 70,
-                useNativeDriver: true,
-            }).start(() => {
+                // Animate back in from the left with 3D effect
+                Animated.spring(swipeAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 70,
+                    useNativeDriver: true,
+                }).start(({ finished }) => {
+                    if (finished) {
+                        setIsTransitioning(false);
+                    } else {
+                        // Force it to complete if animation gets interrupted
+                        swipeAnim.setValue(0);
+                        setIsTransitioning(false);
+                    }
+                });
+            } else {
+                // Force it to complete if animation gets interrupted
+                swipeAnim.setValue(0);
                 setIsTransitioning(false);
-            });
+            }
         });
     };
 
-    // Go to next day
+    // Improved go to next day to prevent sticking
     const gotoNextDay = () => {
         if (isTransitioning) return;
 
@@ -328,24 +351,36 @@ const NutrientsScreen: React.FC = () => {
             toValue: -screenWidth,
             duration: 250,
             useNativeDriver: true,
-        }).start(() => {
-            // Update the date
-            const newDate = new Date(currentDate);
-            newDate.setDate(newDate.getDate() + 1);
-            setCurrentDate(newDate);
+        }).start(({ finished }) => {
+            if (finished) {
+                // Update the date
+                const newDate = new Date(currentDate);
+                newDate.setDate(newDate.getDate() + 1);
+                setCurrentDate(newDate);
 
-            // Reset the animation value (off-screen to the right)
-            swipeAnim.setValue(screenWidth);
+                // Reset the animation value (off-screen to the right)
+                swipeAnim.setValue(screenWidth);
 
-            // Animate back in from the right with 3D effect
-            Animated.spring(swipeAnim, {
-                toValue: 0,
-                friction: 8,
-                tension: 70,
-                useNativeDriver: true,
-            }).start(() => {
+                // Animate back in from the right with 3D effect
+                Animated.spring(swipeAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 70,
+                    useNativeDriver: true,
+                }).start(({ finished }) => {
+                    if (finished) {
+                        setIsTransitioning(false);
+                    } else {
+                        // Force it to complete if animation gets interrupted
+                        swipeAnim.setValue(0);
+                        setIsTransitioning(false);
+                    }
+                });
+            } else {
+                // Force it to complete if animation gets interrupted
+                swipeAnim.setValue(0);
                 setIsTransitioning(false);
-            });
+            }
         });
     };
 
@@ -500,11 +535,13 @@ const NutrientsScreen: React.FC = () => {
                         >
                             <Ionicons name="chevron-back" size={20} color={WHITE} />
                         </TouchableOpacity>
-                        <Animated.Text style={[styles.todayText, {
-                            transform: [{ translateX: dateTextTranslate }]
-                        }]}>
-                            {formatDate(currentDate)}
-                        </Animated.Text>
+                        <View style={styles.dateContainer}>
+                            <Animated.Text style={[styles.todayText, {
+                                transform: [{ translateX: dateTextTranslate }]
+                            }]}>
+                                {formatDate(currentDate)}
+                            </Animated.Text>
+                        </View>
                         <TouchableOpacity
                             style={styles.dayNavButton}
                             onPress={gotoNextDay}
@@ -711,6 +748,11 @@ const styles = StyleSheet.create({
     loadingText: {
         color: WHITE,
         fontSize: 16,
+    },
+    dateContainer: {
+        flex: 1,
+        overflow: 'hidden', // Prevents date text from visually overflowing
+        alignItems: 'center',
     },
 });
 
