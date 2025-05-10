@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,15 +8,18 @@ import {
     SafeAreaView,
     Dimensions,
     StatusBar,
-    Platform
+    Platform,
+    Animated,
+    NativeSyntheticEvent
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { getFoodLogsByDate, initDatabase, isDatabaseReady } from '../utils/database';
+import { PanGestureHandler, State as GestureState, PanGestureHandlerGestureEvent, PanGestureHandlerStateChangeEvent, GestureHandlerRootView } from 'react-native-gesture-handler';
 
-const { width } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 // App theme colors
 const PURPLE_ACCENT = '#AA00FF';
@@ -70,64 +73,114 @@ const GradientText = ({ text, style, colors }) => {
     );
 };
 
+// Helper function to format date as YYYY-MM-DD
+const formatDateToString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Format date for display (e.g., "Mon, Jan 1")
+const formatDateForDisplay = (date: Date): string => {
+    const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+};
+
 const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const [nutrientData, setNutrientData] = useState(macroGoals);
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [loading, setLoading] = useState(false);
+    const [dbReady, setDbReady] = useState(false);
+
+    // Animation values for swipe
+    const swipeAnim = useRef(new Animated.Value(0)).current;
+    const isSwipingRef = useRef(false);
+    const scrollEnabled = useRef(true);
+    const scrollRef = useRef(null);
+    const nextDateRef = useRef<Date | null>(null);
 
     // Add this to ensure consistent black background during transitions
     const containerStyle = {
         flex: 1,
-        backgroundColor: PRIMARY_BG, // PRIMARY_BG is '#000000'
+        backgroundColor: PRIMARY_BG,
     };
 
+    // Initialize the database when the component mounts
     useEffect(() => {
-        const fetchNutrientData = async () => {
+        const setupDatabase = async () => {
             try {
-                // Ensure DB is initialized
+                // Only initialize if not already initialized
                 if (!isDatabaseReady()) {
                     await initDatabase();
                 }
-                // Get today's date in YYYY-MM-DD
-                const today = new Date();
-                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                const logs: any[] = await getFoodLogsByDate(todayStr);
+                setDbReady(true);
+            } catch (error) {
+                console.error('Failed to initialize database:', error);
+                // Even if it fails, try proceeding anyway
+                setDbReady(true);
+            }
+        };
 
-                // Debug: Log the first food entry to see what fields are available
-                if (logs.length > 0) {
-                    console.log('First food log entry:', JSON.stringify(logs[0], null, 2));
-                }
-                console.log(`Found ${logs.length} food log entries for today`);
+        setupDatabase();
+    }, []);
 
-                // Aggregate nutrients
-                const totals = {
-                    protein: 0,
-                    carbs: 0,
-                    fat: 0,
-                    calories: 0,
-                    fiber: 0,
-                    sugar: 0,
-                    saturatedFat: 0,
-                    polyunsaturatedFat: 0,
-                    monounsaturatedFat: 0,
-                    transFat: 0,
-                    cholesterol: 0,
-                    sodium: 0,
-                    potassium: 0,
-                    vitaminA: 0,
-                    vitaminC: 0,
-                    calcium: 0,
-                    iron: 0
-                };
+    // Fetch data when date changes or database becomes ready
+    useEffect(() => {
+        if (dbReady) {
+            fetchNutrientData();
+        }
+    }, [currentDate, dbReady]);
+
+    const fetchNutrientData = async () => {
+        try {
+            setLoading(true);
+
+            // Ensure the date is a string in YYYY-MM-DD format
+            const dateStr = formatDateToString(currentDate);
+            console.log('Fetching nutrient data for date:', dateStr);
+
+            // Check database readiness again just to be safe
+            if (!isDatabaseReady()) {
+                console.log('Database not ready, initializing...');
+                await initDatabase();
+            }
+
+            // Get food logs for the date
+            const logs: any[] = await getFoodLogsByDate(dateStr);
+            console.log(`Found ${logs.length} food log entries for ${dateStr}`);
+
+            // Reset nutrient data to defaults
+            const resetData = { ...macroGoals };
+            Object.keys(resetData).forEach(key => {
+                resetData[key].current = 0;
+            });
+
+            // Aggregate nutrients
+            const totals = {
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                calories: 0,
+                fiber: 0,
+                sugar: 0,
+                saturatedFat: 0,
+                polyunsaturatedFat: 0,
+                monounsaturatedFat: 0,
+                transFat: 0,
+                cholesterol: 0,
+                sodium: 0,
+                potassium: 0,
+                vitaminA: 0,
+                vitaminC: 0,
+                calcium: 0,
+                iron: 0
+            };
+
+            if (logs && logs.length > 0) {
                 logs.forEach(entry => {
-                    console.log(`Processing entry: ${entry.food_name}`);
-
-                    // Log available fields for nutrients
-                    console.log('Entry nutrient fields:',
-                        entry.proteins !== undefined ? 'proteins✓' : 'proteins✗',
-                        entry.fiber !== undefined ? 'fiber✓' : 'fiber✗',
-                        entry.saturated_fat !== undefined ? 'saturated_fat✓' : 'saturated_fat✗',
-                        entry.sodium !== undefined ? 'sodium✓' : 'sodium✗'
-                    );
+                    if (!entry) return; // Skip undefined entries
 
                     totals.protein += entry.proteins || 0;
                     totals.carbs += entry.carbs || 0;
@@ -147,20 +200,32 @@ const NutrientsScreen: React.FC = () => {
                     totals.calcium += entry.calcium || 0;
                     totals.iron += entry.iron || 0;
                 });
-                console.log('Final nutrient totals:', totals);
-                setNutrientData(prevData => {
-                    const updatedData = { ...prevData };
-                    Object.keys(totals).forEach(key => {
-                        updatedData[key].current = totals[key];
-                    });
-                    return updatedData;
-                });
-            } catch (error) {
-                console.error('Failed to fetch nutrient data from local DB:', error);
             }
-        };
-        fetchNutrientData();
-    }, []);
+
+            console.log('Final nutrient totals:', totals);
+
+            setNutrientData(prevData => {
+                const updatedData = { ...prevData };
+                Object.keys(totals).forEach(key => {
+                    updatedData[key].current = totals[key];
+                });
+                return updatedData;
+            });
+        } catch (error) {
+            console.error('Failed to fetch nutrient data from local DB:', error);
+
+            // In case of error, make sure we at least show some data (zeros)
+            setNutrientData(prevData => {
+                const resetData = { ...prevData };
+                Object.keys(resetData).forEach(key => {
+                    resetData[key].current = 0;
+                });
+                return resetData;
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Calculate the remaining amount for each nutrient
     const calculateRemaining = (current: number, goal: number) => {
@@ -184,6 +249,142 @@ const NutrientsScreen: React.FC = () => {
         } else {
             return ['#4A148C', '#7B1FA2'] as const; // Default purple gradient
         }
+    };
+
+    // Go to previous day
+    const gotoPrevDay = () => {
+        if (isSwipingRef.current) return;
+
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() - 1);
+
+        // Animate the swipe
+        isSwipingRef.current = true;
+        Animated.timing(swipeAnim, {
+            toValue: screenWidth,
+            duration: 250,
+            useNativeDriver: true,
+        }).start(() => {
+            // When the animation completes, reset position and update date
+            setCurrentDate(newDate);
+            swipeAnim.setValue(0);
+            isSwipingRef.current = false;
+        });
+    };
+
+    // Go to next day
+    const gotoNextDay = () => {
+        if (isSwipingRef.current) return;
+
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + 1);
+
+        // Animate the swipe
+        isSwipingRef.current = true;
+        Animated.timing(swipeAnim, {
+            toValue: -screenWidth,
+            duration: 250,
+            useNativeDriver: true,
+        }).start(() => {
+            // When the animation completes, reset position and update date
+            setCurrentDate(newDate);
+            swipeAnim.setValue(0);
+            isSwipingRef.current = false;
+        });
+    };
+
+    // Handle gesture events
+    const onGestureEvent = (event: PanGestureHandlerGestureEvent) => {
+        // Only handle swipe if we're not already animating
+        if (isSwipingRef.current) return;
+
+        const { translationX, velocityX } = event.nativeEvent;
+
+        // If it's clearly a horizontal swipe and scrolling is enabled,
+        // disable scrolling temporarily
+        if (Math.abs(translationX) > 10 && Math.abs(velocityX) > 10 && scrollEnabled.current) {
+            if (scrollRef.current) {
+                scrollRef.current.setNativeProps({ scrollEnabled: false });
+                scrollEnabled.current = false;
+            }
+        }
+
+        // Update the animation value
+        swipeAnim.setValue(translationX);
+    };
+
+    // Handle gesture state changes
+    const onHandlerStateChange = (event: PanGestureHandlerStateChangeEvent) => {
+        // Only handle if not currently animating
+        if (isSwipingRef.current) return;
+
+        if (event.nativeEvent.state === GestureState.END) {
+            // Re-enable scrolling regardless of outcome
+            if (scrollRef.current) {
+                scrollRef.current.setNativeProps({ scrollEnabled: true });
+                scrollEnabled.current = true;
+            }
+
+            const { translationX, velocityX } = event.nativeEvent;
+
+            // If it's a very small movement, treat it as a tap/scroll
+            if (Math.abs(translationX) < 5 && Math.abs(velocityX) < 5) {
+                swipeAnim.setValue(0);
+                return;
+            }
+
+            const threshold = screenWidth * 0.25;
+            const velocity = 0.5;
+
+            // Determine if we should switch days based on translation and velocity
+            const shouldSwitchDay =
+                Math.abs(translationX) > threshold ||
+                Math.abs(velocityX) > velocity * 1000;
+
+            if (shouldSwitchDay) {
+                if (translationX < 0) {
+                    // Swipe left -> next day
+                    gotoNextDay();
+                } else {
+                    // Swipe right -> previous day
+                    gotoPrevDay();
+                }
+            } else {
+                // Not enough swipe, snap back to center
+                Animated.spring(swipeAnim, {
+                    toValue: 0,
+                    tension: 40,
+                    friction: 7,
+                    useNativeDriver: true,
+                }).start();
+            }
+        }
+    };
+
+    // Format date for display
+    const formatDate = (date: Date): string => {
+        // Check if date is today
+        const today = new Date();
+        if (date.toDateString() === today.toDateString()) {
+            return "Today";
+        }
+
+        // Check if date is yesterday
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (date.toDateString() === yesterday.toDateString()) {
+            return "Yesterday";
+        }
+
+        // Check if date is tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        if (date.toDateString() === tomorrow.toDateString()) {
+            return "Tomorrow";
+        }
+
+        // Otherwise return formatted date
+        return formatDateForDisplay(date);
     };
 
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
@@ -227,66 +428,98 @@ const NutrientsScreen: React.FC = () => {
     };
 
     return (
-        <View style={[styles.container, containerStyle]}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-            <SafeAreaView style={{ flex: 1 }}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <View style={[styles.container, containerStyle]}>
+                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+                <SafeAreaView style={{ flex: 1 }}>
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <TouchableOpacity
+                            onPress={() => navigation.goBack()}
+                            style={styles.backButton}
+                        >
+                            <Ionicons name="chevron-back" size={28} color={WHITE} />
+                        </TouchableOpacity>
+                        <View style={styles.titleContainer}>
+                            <GradientText
+                                text="NUTRIENTS"
+                                colors={["#5A60EA", "#FF00F5"]}
+                                style={styles.headerTitle}
+                            />
+                        </View>
+                        <View style={{ width: 28 }} />
+                    </View>
+
+                    {/* Day Navigation - Centered */}
+                    <View style={styles.dayNavContainer}>
+                        <TouchableOpacity
+                            style={styles.dayNavButton}
+                            onPress={gotoPrevDay}
+                            disabled={isSwipingRef.current}
+                        >
+                            <Ionicons name="chevron-back" size={20} color={WHITE} />
+                        </TouchableOpacity>
+                        <Text style={styles.todayText}>{formatDate(currentDate)}</Text>
+                        <TouchableOpacity
+                            style={styles.dayNavButton}
+                            onPress={gotoNextDay}
+                            disabled={isSwipingRef.current}
+                        >
+                            <Ionicons name="chevron-forward" size={20} color={WHITE} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Swipeable Content */}
+                    <PanGestureHandler
+                        onGestureEvent={onGestureEvent}
+                        onHandlerStateChange={onHandlerStateChange}
                     >
-                        <Ionicons name="chevron-back" size={28} color={WHITE} />
-                    </TouchableOpacity>
-                    <View style={styles.titleContainer}>
-                        <GradientText
-                            text="NUTRIENTS"
-                            colors={["#5A60EA", "#FF00F5"]}
-                            style={styles.headerTitle}
-                        />
-                    </View>
-                    <View style={{ width: 28 }} />
-                </View>
+                        <Animated.View
+                            style={[
+                                styles.animatedContent,
+                                {
+                                    transform: [{ translateX: swipeAnim }],
+                                }
+                            ]}
+                        >
+                            {/* Column Headers */}
+                            <View style={styles.columnHeadersContainer}>
+                                <View style={styles.columnHeaders}>
+                                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left' }]}>Remaining</Text>
+                                    <View style={{ flex: 2 }} />
+                                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right' }]}>Total/Goal</Text>
+                                </View>
+                                <View style={styles.headerDivider} />
+                            </View>
 
-                {/* Day Navigation - Centered */}
-                <View style={styles.dayNavContainer}>
-                    <TouchableOpacity style={styles.dayNavButton}>
-                        <Ionicons name="chevron-back" size={20} color={WHITE} />
-                    </TouchableOpacity>
-                    <Text style={styles.todayText}>Today</Text>
-                    <TouchableOpacity style={styles.dayNavButton}>
-                        <Ionicons name="chevron-forward" size={20} color={WHITE} />
-                    </TouchableOpacity>
-                </View>
+                            {/* Nutrients List */}
+                            <ScrollView
+                                ref={scrollRef}
+                                style={styles.scrollView}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {!dbReady || loading ? (
+                                    <View style={styles.loadingContainer}>
+                                        <Text style={styles.loadingText}>{!dbReady ? 'Initializing database...' : 'Loading nutrients...'}</Text>
+                                    </View>
+                                ) : (
+                                    Object.entries(nutrientData)
+                                        .filter(([key]) => key !== 'calories')
+                                        .map(([key, value]) => {
+                                            // Convert key from camelCase to Title Case for display
+                                            const label = key.replace(/([A-Z])/g, ' $1')
+                                                .replace(/^./, str => str.toUpperCase());
+                                            return renderNutrientItem(label, value.current, value.goal, value.unit);
+                                        })
+                                )}
 
-                {/* Column Headers */}
-                <View style={styles.columnHeadersContainer}>
-                    <View style={styles.columnHeaders}>
-                        <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left' }]}>Remaining</Text>
-                        <View style={{ flex: 2 }} />
-                        <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right' }]}>Total/Goal</Text>
-                    </View>
-                    <View style={styles.headerDivider} />
-                </View>
-
-                {/* Nutrients List */}
-                <ScrollView
-                    style={styles.scrollView}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {Object.entries(nutrientData)
-                        .filter(([key]) => key !== 'calories')
-                        .map(([key, value]) => {
-                            // Convert key from camelCase to Title Case for display
-                            const label = key.replace(/([A-Z])/g, ' $1')
-                                .replace(/^./, str => str.toUpperCase());
-                            return renderNutrientItem(label, value.current, value.goal, value.unit);
-                        })}
-
-                    <View style={styles.spacer} />
-                </ScrollView>
-            </SafeAreaView>
-        </View>
+                                <View style={styles.spacer} />
+                            </ScrollView>
+                        </Animated.View>
+                    </PanGestureHandler>
+                </SafeAreaView>
+            </View>
+        </GestureHandlerRootView>
     );
 };
 
@@ -411,6 +644,20 @@ const styles = StyleSheet.create({
     spacer: {
         height: 20,
     },
+    animatedContent: {
+        flex: 1,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 200,
+    },
+    loadingText: {
+        color: WHITE,
+        fontSize: 16,
+    },
 });
 
 export default NutrientsScreen;
+
