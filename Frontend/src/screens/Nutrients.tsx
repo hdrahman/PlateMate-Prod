@@ -189,14 +189,26 @@ const NutrientsScreen: React.FC = () => {
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
         const remaining = calculateRemaining(current, goal);
         // Calculate progress as a percentage of the goal, clamped between 0 and 100
-        const progressPercent = Math.max(0, Math.min(100, (goal > 0 ? (current / goal) * 100 : 0)));
+        let progressPercent = Math.max(0, Math.min(100, (goal > 0 ? (current / goal) * 100 : 0)));
+
+        // Special case for polyunsaturated and monounsaturated fats:
+        // If goal is 0 but current value is > 0, show full bar (100%)
+        if (goal === 0 && current > 0) {
+            progressPercent = 100;
+        }
+
         const gradientColors = getNutrientColors(label);
+
+        // Display unit correctly based on nutrient type
+        const displayUnit = (label.includes('Vitamin') || label.includes('Calcium') || label.includes('Iron'))
+            ? ''
+            : unit;
 
         return (
             <View key={label} style={styles.nutrientRow}>
                 <View style={styles.nutrientValues}>
                     <View style={styles.leftValues}>
-                        <Text style={styles.remainingValue}>{remaining}{unit}</Text>
+                        <Text style={styles.remainingValue}>{remaining}{displayUnit}</Text>
                     </View>
                     <Text style={styles.nutrientLabel}>{label}</Text>
                     <Text style={styles.rightValue}>{current}/{goal}</Text>
