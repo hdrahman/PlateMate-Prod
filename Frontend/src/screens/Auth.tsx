@@ -11,8 +11,14 @@ import {
     KeyboardAvoidingView,
     Platform,
     Image,
+    Dimensions,
+    StatusBar,
+    ImageBackground,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 // Import types from our type definitions
 import '../types/expo-apple-authentication.d.ts';
@@ -21,6 +27,8 @@ import '../types/expo-apple-authentication.d.ts';
 let AppleAuthentication: any = null;
 // We've removed the Apple Authentication module, so this will always be null
 console.log('Apple Authentication not available');
+
+const { width, height } = Dimensions.get('window');
 
 const Auth = ({ navigation }: any) => {
     const [email, setEmail] = useState('');
@@ -101,193 +109,305 @@ const Auth = ({ navigation }: any) => {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>PlateMate</Text>
-                    <Text style={styles.subtitle}>AI-Powered Nutrition & Fitness Tracker</Text>
-                </View>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" />
 
-                <View style={styles.form}>
-                    <Text style={styles.formTitle}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+            <LinearGradient
+                colors={['#000000', '#121212']}
+                style={styles.background}
+            />
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
+            <KeyboardAvoidingView
+                style={styles.keyboardAvoid}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView contentContainerStyle={styles.scrollContainer}>
+                    <View style={styles.logoContainer}>
+                        <LinearGradient
+                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.logoGradient}
+                        >
+                            <MaterialCommunityIcons name="silverware-fork-knife" size={40} color="white" />
+                        </LinearGradient>
+                        <Text style={styles.title}>PlateMate</Text>
+                        <Text style={styles.subtitle}>AI-Powered Nutrition & Fitness Tracker</Text>
+                    </View>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
-
-                    {!isLogin && (
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Confirm Password"
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            secureTextEntry
+                    <View style={styles.cardWrapper}>
+                        <LinearGradient
+                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.cardGradient}
                         />
-                    )}
-
-                    <TouchableOpacity
-                        style={styles.authButton}
-                        onPress={handleAuth}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <Text style={styles.authButtonText}>
-                                {isLogin ? 'Sign In' : 'Sign Up'}
+                        <View style={styles.card}>
+                            <Text style={styles.formTitle}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
+                            <Text style={styles.formSubtitle}>
+                                {isLogin
+                                    ? 'Sign in to continue tracking your nutrition journey'
+                                    : 'Join PlateMate to start your health transformation'}
                             </Text>
-                        )}
-                    </TouchableOpacity>
 
-                    <TouchableOpacity onPress={toggleAuthMode}>
-                        <Text style={styles.toggleAuthText}>
-                            {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="mail-outline" size={22} color="#999" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Email"
+                                    placeholderTextColor="#999"
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                />
+                            </View>
 
-                <View style={styles.socialContainer}>
-                    <Text style={styles.orText}>OR</Text>
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="lock-closed-outline" size={22} color="#999" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor="#999"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                            </View>
 
-                    <TouchableOpacity
-                        style={[styles.socialButton, styles.googleButton]}
-                        onPress={handleGoogleSignIn}
-                        disabled={isLoading}
-                    >
-                        <Text style={styles.socialButtonText}>Continue with Google</Text>
-                    </TouchableOpacity>
+                            {!isLogin && (
+                                <View style={styles.inputContainer}>
+                                    <Ionicons name="lock-closed-outline" size={22} color="#999" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Confirm Password"
+                                        placeholderTextColor="#999"
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        secureTextEntry
+                                    />
+                                </View>
+                            )}
 
-                    {/* Apple Authentication button removed */}
+                            <TouchableOpacity
+                                style={styles.authButton}
+                                onPress={handleAuth}
+                                disabled={isLoading}
+                            >
+                                <LinearGradient
+                                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: .75, y: 0 }}
+                                    style={styles.gradientButton}
+                                >
+                                    {isLoading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <Text style={styles.authButtonText}>
+                                            {isLogin ? 'Sign In' : 'Sign Up'}
+                                        </Text>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[styles.socialButton, styles.guestButton]}
-                        onPress={handleAnonymousSignIn}
-                        disabled={isLoading}
-                    >
-                        <Text style={styles.socialButtonText}>Continue as Guest</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                            <TouchableOpacity onPress={toggleAuthMode}>
+                                <Text style={styles.toggleAuthText}>
+                                    {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={styles.socialContainer}>
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.divider} />
+                            <Text style={styles.orText}>OR CONTINUE WITH</Text>
+                            <View style={styles.divider} />
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.socialButton}
+                            onPress={handleGoogleSignIn}
+                            disabled={isLoading}
+                        >
+                            <LinearGradient
+                                colors={["#DD4B39", "#EB5E56"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.gradientButton}
+                            >
+                                <Ionicons name="logo-google" size={18} color="white" />
+                                <Text style={styles.socialButtonText}>Continue with Google</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.socialButton}
+                            onPress={handleAnonymousSignIn}
+                            disabled={isLoading}
+                        >
+                            <LinearGradient
+                                colors={["#555", "#888"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.gradientButton}
+                            >
+                                <Ionicons name="person-outline" size={18} color="white" />
+                                <Text style={styles.socialButtonText}>Continue as Guest</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#000',
+    },
+    background: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+    },
+    keyboardAvoid: {
+        flex: 1,
     },
     scrollContainer: {
         flexGrow: 1,
-        paddingVertical: 40,
+        paddingTop: 50,
+        paddingBottom: 40,
         paddingHorizontal: 20,
-    },
-    header: {
         alignItems: 'center',
-        marginBottom: 40,
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginBottom: 30,
+    },
+    logoGradient: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     title: {
-        fontSize: 32,
+        fontSize: 36,
         fontWeight: 'bold',
-        color: '#4CAF50',
-        marginBottom: 10,
+        color: 'white',
+        marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#666',
+        color: '#999',
         textAlign: 'center',
+        maxWidth: '80%',
     },
-    form: {
-        backgroundColor: 'white',
-        borderRadius: 10,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+    cardWrapper: {
+        width: '100%',
         marginBottom: 30,
+        borderRadius: 16,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    cardGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 16,
+    },
+    card: {
+        margin: 1,
+        borderRadius: 15,
+        backgroundColor: '#121212',
+        padding: 24,
     },
     formTitle: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
-        marginBottom: 20,
+        marginBottom: 12,
         textAlign: 'center',
-        color: '#333',
+        color: 'white',
+    },
+    formSubtitle: {
+        fontSize: 14,
+        color: '#999',
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1e1e1e',
+        borderRadius: 12,
+        marginBottom: 16,
+        paddingHorizontal: 16,
+    },
+    inputIcon: {
+        marginRight: 12,
     },
     input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 5,
-        padding: 15,
-        marginBottom: 15,
+        flex: 1,
+        color: 'white',
+        paddingVertical: 16,
         fontSize: 16,
     },
     authButton: {
-        backgroundColor: '#4CAF50',
-        borderRadius: 5,
-        padding: 15,
+        borderRadius: 12,
+        marginTop: 8,
+        overflow: 'hidden',
+    },
+    gradientButton: {
+        flexDirection: 'row',
+        padding: 16,
         alignItems: 'center',
-        marginTop: 10,
+        justifyContent: 'center',
     },
     authButtonText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
     },
     toggleAuthText: {
         marginTop: 20,
         textAlign: 'center',
-        color: '#4CAF50',
-        fontSize: 14,
+        color: '#0074dd',
+        fontSize: 15,
     },
     socialContainer: {
+        width: '100%',
+    },
+    dividerContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: 20,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#333',
     },
     orText: {
-        marginVertical: 20,
-        fontSize: 16,
-        color: '#666',
+        fontSize: 12,
+        color: '#999',
+        marginHorizontal: 10,
     },
     socialButton: {
-        width: '100%',
-        padding: 15,
-        borderRadius: 5,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    googleButton: {
-        backgroundColor: '#DB4437',
-    },
-    appleButton: {
-        width: '100%',
-        height: 50,
-        marginBottom: 15,
-    },
-    guestButton: {
-        backgroundColor: '#666',
+        marginBottom: 14,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     socialButtonText: {
         color: 'white',
-        marginLeft: 10,
+        marginLeft: 12,
         fontSize: 16,
         fontWeight: '500',
     },
