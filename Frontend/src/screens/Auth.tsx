@@ -195,28 +195,36 @@ const Auth = ({ navigation }: any) => {
                                 onPress={handleAuth}
                                 disabled={isLoading}
                             >
+                                <LinearGradient
+                                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.authButtonGradient}
+                                />
                                 {isLoading ? (
                                     <View style={styles.loadingContainer}>
                                         <ActivityIndicator color="#5c00dd" />
                                     </View>
                                 ) : (
-                                    <MaskedView
-                                        style={{ flex: 1, height: 50 }}
-                                        maskElement={
-                                            <View style={styles.gradientTextContainer}>
-                                                <Text style={styles.authButtonText}>
-                                                    {isLogin ? 'Sign In' : 'Sign Up'}
-                                                </Text>
-                                            </View>
-                                        }
-                                    >
-                                        <LinearGradient
-                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={{ flex: 1 }}
-                                        />
-                                    </MaskedView>
+                                    <View style={styles.authButtonContent}>
+                                        <MaskedView
+                                            style={{ flex: 1, height: 50 }}
+                                            maskElement={
+                                                <View style={styles.gradientTextContainer}>
+                                                    <Text style={styles.authButtonText}>
+                                                        {isLogin ? 'Sign In' : 'Sign Up'}
+                                                    </Text>
+                                                </View>
+                                            }
+                                        >
+                                            <LinearGradient
+                                                colors={["#00ccff", "#ff00aa"]}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                                style={{ flex: 1 }}
+                                            />
+                                        </MaskedView>
+                                    </View>
                                 )}
                             </TouchableOpacity>
 
@@ -236,7 +244,7 @@ const Auth = ({ navigation }: any) => {
                         </View>
 
                         <TouchableOpacity
-                            style={styles.socialButton}
+                            style={styles.googleButton}
                             onPress={handleGoogleSignIn}
                             disabled={isLoading}
                         >
@@ -250,29 +258,6 @@ const Auth = ({ navigation }: any) => {
                                 >
                                     <LinearGradient
                                         colors={["#DD4B39", "#EB5E56"]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={{ flex: 1 }}
-                                    />
-                                </MaskedView>
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.socialButton}
-                            onPress={handleAnonymousSignIn}
-                            disabled={isLoading}
-                        >
-                            <View style={styles.socialButtonInner}>
-                                <Ionicons name="person-outline" size={20} color="#999" style={styles.socialIcon} />
-                                <MaskedView
-                                    style={{ flex: 1, height: 20 }}
-                                    maskElement={
-                                        <Text style={styles.socialButtonText}>Continue as Guest</Text>
-                                    }
-                                >
-                                    <LinearGradient
-                                        colors={["#555", "#999"]}
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
                                         style={{ flex: 1 }}
@@ -304,14 +289,15 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         flexGrow: 1,
-        paddingTop: 50,
-        paddingBottom: 40,
+        paddingTop: 80,
+        paddingBottom: 20,
         paddingHorizontal: 20,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 40,
     },
     logoGradient: {
         width: 80,
@@ -355,17 +341,19 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     formTitle: {
-        fontSize: 28,
+        fontSize: 30,
         fontWeight: 'bold',
         marginBottom: 12,
         textAlign: 'center',
         color: 'white',
+        letterSpacing: 0.5,
     },
     formSubtitle: {
-        fontSize: 14,
-        color: '#999',
-        marginBottom: 24,
+        fontSize: 15,
+        color: '#aaa',
+        marginBottom: 28,
         textAlign: 'center',
+        lineHeight: 20,
     },
     inputContainer: {
         flexDirection: 'row',
@@ -387,27 +375,49 @@ const styles = StyleSheet.create({
     authButton: {
         borderRadius: 12,
         marginTop: 8,
-        borderWidth: 1.5,
-        borderColor: '#2a2a2a',
-        backgroundColor: '#1a1a1a',
-        height: 50,
         overflow: 'hidden',
+        position: 'relative',
+        height: 50,
     },
-    gradientTextContainer: {
+    authButtonGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 12,
+    },
+    authButtonContent: {
         flex: 1,
-        backgroundColor: 'transparent',
-        alignItems: 'center',
+        margin: 1.5,
+        borderRadius: 10,
+        backgroundColor: '#1a1a1a',
+        position: 'relative',
         justifyContent: 'center',
-    },
-    authButtonText: {
-        fontSize: 18,
-        fontWeight: 'bold',
     },
     loadingContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         height: 50,
+        margin: 1.5,
+        borderRadius: 10,
+        backgroundColor: '#1a1a1a',
+    },
+    gradientTextContainer: {
+        flex: 1,
+        backgroundColor: 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 50,
+    },
+    authButtonText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        letterSpacing: 0.8,
+        textShadowColor: 'rgba(0,0,0,0.2)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 1,
     },
     toggleAuthText: {
         marginTop: 20,
@@ -433,14 +443,6 @@ const styles = StyleSheet.create({
         color: '#999',
         marginHorizontal: 10,
     },
-    socialButton: {
-        marginBottom: 14,
-        borderRadius: 12,
-        borderWidth: 1.5,
-        borderColor: '#2a2a2a',
-        backgroundColor: '#1a1a1a',
-        overflow: 'hidden',
-    },
     socialButtonInner: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -452,6 +454,14 @@ const styles = StyleSheet.create({
     socialButtonText: {
         fontSize: 16,
         fontWeight: '500',
+    },
+    googleButton: {
+        marginBottom: 14,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: '#DD4B39',
+        backgroundColor: '#1a1a1a',
+        overflow: 'hidden',
     },
 });
 
