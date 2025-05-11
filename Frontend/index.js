@@ -1,5 +1,7 @@
-import { registerRootComponent } from 'expo';
+// Initialize Firebase first - importing from our config file
+import './src/utils/firebase/index';
 
+import { registerRootComponent } from 'expo';
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

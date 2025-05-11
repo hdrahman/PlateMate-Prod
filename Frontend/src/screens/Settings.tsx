@@ -1,12 +1,23 @@
 import React, { useContext } from "react";
-import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
+    const { signOut } = useAuth();
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            // Navigation is handled automatically by the AppNavigator based on auth state
+        } catch (error) {
+            Alert.alert('Logout Error', 'Failed to log out. Please try again.');
+        }
+    };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
@@ -58,7 +69,10 @@ const SettingsScreen = () => {
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccountScreen")}>
                         <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => { navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] }) }}>
+                    <TouchableOpacity
+                        style={[styles.item, styles.fullWidthItem]}
+                        onPress={handleLogout}
+                    >
                         <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
                     </TouchableOpacity>
                 </View>

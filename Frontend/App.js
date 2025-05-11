@@ -13,6 +13,10 @@ import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
 import { StepProvider } from './src/context/StepContext';
 import { ThemeProvider } from './src/ThemeContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+
+// Import Firebase to ensure it's properly recognized
+import { app, auth } from './src/utils/firebase/index';
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
@@ -34,6 +38,7 @@ import MealPlannerCamera from "./src/screens/MealPlannerCamera";
 import MealPlannerResults from "./src/screens/MealPlannerResults";
 import RecipeDetails from "./src/screens/RecipeDetails";
 import SearchResults from "./src/screens/SearchResults";
+import Auth from "./src/screens/Auth";
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -270,9 +275,250 @@ function MainTabs() {
   );
 }
 
+function AppNavigator() {
+  const { user, isLoading: authLoading } = useAuth();
+
+  // If still checking authentication status, show loading
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
+        <ActivityIndicator size="large" color="#8A2BE2" />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer
+      theme={{
+        ...DefaultTheme,
+        colors: {
+          ...DefaultTheme.colors,
+          background: "transparent",
+          card: "transparent",
+          primary: "#8A2BE2",
+          text: "#fff",
+          border: "#333",
+          notification: "#8A2BE2",
+          cardOverlay: 'transparent',
+        },
+        transitionSpec: {
+          open: {
+            animation: 'timing',
+            config: { duration: 200 },
+          },
+          close: {
+            animation: 'timing',
+            config: { duration: 200 },
+          },
+        },
+      }}
+    >
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: "slide_from_right",
+          animationDuration: 200,
+          cardStyle: { backgroundColor: "transparent" },
+          contentStyle: { backgroundColor: "transparent" },
+          presentation: 'card',
+          detachPreviousScreen: false,
+          animationTypeForReplace: 'push',
+          cardStyleInterpolator: ({ current, next, layouts, closing }) => {
+            return {
+              cardStyle: {
+                backgroundColor: 'transparent',
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.width * (closing ? -1 : 1), 0],
+                    }),
+                  },
+                ],
+              },
+              overlayStyle: {
+                opacity: 0,
+              },
+            };
+          },
+        }}
+      >
+        {!user ? (
+          // Authentication flow
+          <Stack.Screen name="Auth" component={Auth} />
+        ) : (
+          // Main app flow
+          <>
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen
+              name="EditProfile"
+              component={EditProfile}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+                presentation: 'transparentModal',
+              })}
+            />
+            <Stack.Screen
+              name="EditGoals"
+              component={EditGoals}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+                presentation: 'transparentModal',
+              })}
+            />
+            <Stack.Screen
+              name="DeleteAccount"
+              component={DeleteAccount}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+                presentation: 'transparentModal',
+              })}
+            />
+            <Stack.Screen
+              name="ChangePassword"
+              component={ChangePassword}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+                presentation: 'transparentModal',
+              })}
+            />
+            <Stack.Screen
+              name="AboutUs"
+              component={AboutUs}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+                presentation: 'transparentModal',
+              })}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={Settings}
+              options={({ route }) => ({
+                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
+                animationDuration: 200,
+                presentation: 'transparentModal',
+              })}
+            />
+            <Stack.Screen
+              name="Camera"
+              component={CameraScreen}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="ImageCapture"
+              component={ImageCaptureScreen}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="Nutrients"
+              component={Nutrients}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="BarcodeScanner"
+              component={BarcodeScannerScreen}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="Manual"
+              component={Manual}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="MealPlanner"
+              component={MealPlanner}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="MealPlannerCamera"
+              component={MealPlannerCamera}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="MealPlannerResults"
+              component={MealPlannerResults}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="RecipeDetails"
+              component={RecipeDetails}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+            <Stack.Screen
+              name="SearchResults"
+              component={SearchResults}
+              options={{
+                headerShown: false,
+                presentation: 'transparentModal'
+              }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
-  const [theme, setTheme] = useState('dark');
   const [isLoading, setIsLoading] = useState(true);
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
+
+  // Initialize Firebase first
+  useEffect(() => {
+    const initFirebase = async () => {
+      try {
+        // Initialize Firebase if needed
+        console.log('✅ Ensuring Firebase is initialized');
+
+        // Check if Firebase is initialized - we use the web SDK for Expo Go compatibility
+        if (app && auth) {
+          console.log('✅ Firebase Auth is available');
+          // Force authentication module to initialize
+          auth.useDeviceLanguage();
+        }
+
+        setFirebaseInitialized(true);
+      } catch (error) {
+        console.error('❌ Error initializing Firebase:', error);
+        // We'll set it to true anyway so the app doesn't get stuck
+        setFirebaseInitialized(true);
+      }
+    };
+
+    initFirebase();
+  }, []);
 
   // Initialize database and sync service
   useEffect(() => {
@@ -301,10 +547,13 @@ export default function App() {
       }
     };
 
-    initApp();
-  }, []);
+    // Only initialize the app after Firebase is initialized
+    if (firebaseInitialized) {
+      initApp();
+    }
+  }, [firebaseInitialized]);
 
-  if (isLoading) {
+  if (isLoading || !firebaseInitialized) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
         <ActivityIndicator size="large" color="#8A2BE2" />
@@ -318,192 +567,11 @@ export default function App() {
       <ThemeProvider>
         <StepProvider>
           <FavoritesProvider>
-            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-              <NavigationContainer
-                theme={{
-                  ...DefaultTheme,
-                  colors: {
-                    ...DefaultTheme.colors,
-                    background: "transparent",
-                    card: "transparent",
-                    primary: "#8A2BE2",
-                    text: "#fff",
-                    border: "#333",
-                    notification: "#8A2BE2",
-                    cardOverlay: 'transparent', // Change from rgba(0,0,0,1) to transparent
-                  },
-                  transitionSpec: {
-                    open: {
-                      animation: 'timing',
-                      config: { duration: 200 },
-                    },
-                    close: {
-                      animation: 'timing',
-                      config: { duration: 200 },
-                    },
-                  },
-                }}
-              >
-                <Stack.Navigator
-                  screenOptions={{
-                    headerShown: false,
-                    animation: "slide_from_right",
-                    animationDuration: 200,
-                    cardStyle: { backgroundColor: "transparent" },
-                    contentStyle: { backgroundColor: "transparent" },
-                    presentation: 'card',
-                    detachPreviousScreen: false,
-                    animationTypeForReplace: 'push',
-                    cardStyleInterpolator: ({ current, next, layouts, closing }) => {
-                      return {
-                        cardStyle: {
-                          backgroundColor: 'transparent',
-                          transform: [
-                            {
-                              translateX: current.progress.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [layouts.screen.width * (closing ? -1 : 1), 0],
-                              }),
-                            },
-                          ],
-                        },
-                        overlayStyle: {
-                          opacity: 0,
-                        },
-                      };
-                    },
-                  }}
-                >
-                  <Stack.Screen name="MainTabs" component={MainTabs} />
-                  <Stack.Screen
-                    name="EditProfile"
-                    component={EditProfile}
-                    options={({ route }) => ({
-                      animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                      animationDuration: 200,
-                      presentation: 'transparentModal',
-                    })}
-                  />
-                  <Stack.Screen
-                    name="EditGoals"
-                    component={EditGoals}
-                    options={({ route }) => ({
-                      animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                      animationDuration: 200,
-                      presentation: 'transparentModal',
-                    })}
-                  />
-                  <Stack.Screen
-                    name="DeleteAccount"
-                    component={DeleteAccount}
-                    options={({ route }) => ({
-                      animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                      animationDuration: 200,
-                      presentation: 'transparentModal',
-                    })}
-                  />
-                  <Stack.Screen
-                    name="ChangePassword"
-                    component={ChangePassword}
-                    options={({ route }) => ({
-                      animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                      animationDuration: 200,
-                      presentation: 'transparentModal',
-                    })}
-                  />
-                  <Stack.Screen
-                    name="AboutUs"
-                    component={AboutUs}
-                    options={({ route }) => ({
-                      animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                      animationDuration: 200,
-                      presentation: 'transparentModal',
-                    })}
-                  />
-                  <Stack.Screen
-                    name="Settings"
-                    component={Settings}
-                    options={({ route }) => ({
-                      animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                      animationDuration: 200,
-                      presentation: 'transparentModal',
-                    })}
-                  />
-                  <Stack.Screen
-                    name="ImageCapture"
-                    component={ImageCaptureScreen}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="Nutrients"
-                    component={Nutrients}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="BarcodeScanner"
-                    component={BarcodeScannerScreen}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="Manual"
-                    component={Manual}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="Explore"
-                    component={Explore}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="MealPlannerCamera"
-                    component={MealPlannerCamera}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="MealPlannerResults"
-                    component={MealPlannerResults}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="RecipeDetails"
-                    component={RecipeDetails}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                  <Stack.Screen
-                    name="SearchResults"
-                    component={SearchResults}
-                    options={{
-                      headerShown: false,
-                      presentation: 'transparentModal'
-                    }}
-                  />
-                </Stack.Navigator>
-              </NavigationContainer>
-            </View>
+            <AuthProvider>
+              <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+                <AppNavigator />
+              </View>
+            </AuthProvider>
           </FavoritesProvider>
         </StepProvider>
       </ThemeProvider>

@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@types/firebase": "^3.2.3",
+    "babel-plugin-module-resolver": "^5.0.2"
+  },
+  "dependencies": {
+    "@firebase/auth": "^1.10.2",
+    "@react-native-firebase/auth": "^22.1.0"
+  }
+}
