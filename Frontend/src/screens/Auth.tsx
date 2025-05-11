@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaskedView from '@react-native-masked-view/masked-view';
 
 // Import types from our type definitions
 import '../types/expo-apple-authentication.d.ts';
@@ -194,20 +195,29 @@ const Auth = ({ navigation }: any) => {
                                 onPress={handleAuth}
                                 disabled={isLoading}
                             >
-                                <LinearGradient
-                                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: .75, y: 0 }}
-                                    style={styles.gradientButton}
-                                >
-                                    {isLoading ? (
-                                        <ActivityIndicator color="white" />
-                                    ) : (
-                                        <Text style={styles.authButtonText}>
-                                            {isLogin ? 'Sign In' : 'Sign Up'}
-                                        </Text>
-                                    )}
-                                </LinearGradient>
+                                {isLoading ? (
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator color="#5c00dd" />
+                                    </View>
+                                ) : (
+                                    <MaskedView
+                                        style={{ flex: 1, height: 50 }}
+                                        maskElement={
+                                            <View style={styles.gradientTextContainer}>
+                                                <Text style={styles.authButtonText}>
+                                                    {isLogin ? 'Sign In' : 'Sign Up'}
+                                                </Text>
+                                            </View>
+                                        }
+                                    >
+                                        <LinearGradient
+                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={{ flex: 1 }}
+                                        />
+                                    </MaskedView>
+                                )}
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={toggleAuthMode}>
@@ -230,15 +240,22 @@ const Auth = ({ navigation }: any) => {
                             onPress={handleGoogleSignIn}
                             disabled={isLoading}
                         >
-                            <LinearGradient
-                                colors={["#DD4B39", "#EB5E56"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.gradientButton}
-                            >
-                                <Ionicons name="logo-google" size={18} color="white" />
-                                <Text style={styles.socialButtonText}>Continue with Google</Text>
-                            </LinearGradient>
+                            <View style={styles.socialButtonInner}>
+                                <Ionicons name="logo-google" size={20} color="#DD4B39" style={styles.socialIcon} />
+                                <MaskedView
+                                    style={{ flex: 1, height: 20 }}
+                                    maskElement={
+                                        <Text style={styles.socialButtonText}>Continue with Google</Text>
+                                    }
+                                >
+                                    <LinearGradient
+                                        colors={["#DD4B39", "#EB5E56"]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={{ flex: 1 }}
+                                    />
+                                </MaskedView>
+                            </View>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -246,15 +263,22 @@ const Auth = ({ navigation }: any) => {
                             onPress={handleAnonymousSignIn}
                             disabled={isLoading}
                         >
-                            <LinearGradient
-                                colors={["#555", "#888"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.gradientButton}
-                            >
-                                <Ionicons name="person-outline" size={18} color="white" />
-                                <Text style={styles.socialButtonText}>Continue as Guest</Text>
-                            </LinearGradient>
+                            <View style={styles.socialButtonInner}>
+                                <Ionicons name="person-outline" size={20} color="#999" style={styles.socialIcon} />
+                                <MaskedView
+                                    style={{ flex: 1, height: 20 }}
+                                    maskElement={
+                                        <Text style={styles.socialButtonText}>Continue as Guest</Text>
+                                    }
+                                >
+                                    <LinearGradient
+                                        colors={["#555", "#999"]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={{ flex: 1 }}
+                                    />
+                                </MaskedView>
+                            </View>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -363,18 +387,27 @@ const styles = StyleSheet.create({
     authButton: {
         borderRadius: 12,
         marginTop: 8,
+        borderWidth: 1.5,
+        borderColor: '#2a2a2a',
+        backgroundColor: '#1a1a1a',
+        height: 50,
         overflow: 'hidden',
     },
-    gradientButton: {
-        flexDirection: 'row',
-        padding: 16,
+    gradientTextContainer: {
+        flex: 1,
+        backgroundColor: 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
     },
     authButtonText: {
-        color: 'white',
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 50,
     },
     toggleAuthText: {
         marginTop: 20,
@@ -403,11 +436,20 @@ const styles = StyleSheet.create({
     socialButton: {
         marginBottom: 14,
         borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: '#2a2a2a',
+        backgroundColor: '#1a1a1a',
         overflow: 'hidden',
     },
+    socialButtonInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+    },
+    socialIcon: {
+        marginRight: 12,
+    },
     socialButtonText: {
-        color: 'white',
-        marginLeft: 12,
         fontSize: 16,
         fontWeight: '500',
     },
