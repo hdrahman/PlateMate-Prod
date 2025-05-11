@@ -130,7 +130,11 @@ const Auth = ({ navigation }: any) => {
                             end={{ x: 1, y: 0 }}
                             style={styles.logoGradient}
                         >
-                            <MaterialCommunityIcons name="silverware-fork-knife" size={40} color="white" />
+                            <Image
+                                source={require('../../assets/Cropped2.jpg')}
+                                style={styles.logoImage}
+                                resizeMode="cover"
+                            />
                         </LinearGradient>
                         <Text style={styles.title}>PlateMate</Text>
                         <Text style={styles.subtitle}>AI-Powered Nutrition & Fitness Tracker</Text>
@@ -306,6 +310,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
+        overflow: 'hidden',
+    },
+    logoImage: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
     },
     title: {
         fontSize: 36,
