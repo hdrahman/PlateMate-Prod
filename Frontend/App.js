@@ -14,6 +14,7 @@ import { StepProvider } from './src/context/StepContext';
 import { ThemeProvider } from './src/ThemeContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { OnboardingProvider, useOnboarding } from './src/context/OnboardingContext';
 
 // Import Firebase to ensure it's properly recognized
 import { app, auth } from './src/utils/firebase/index';
@@ -39,6 +40,7 @@ import MealPlannerResults from "./src/screens/MealPlannerResults";
 import RecipeDetails from "./src/screens/RecipeDetails";
 import SearchResults from "./src/screens/SearchResults";
 import Auth from "./src/screens/Auth";
+import Onboarding from "./src/screens/Onboarding";
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -276,68 +278,39 @@ function MainTabs() {
 }
 
 function AppNavigator() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading } = useAuth();
+  const { onboardingComplete } = useOnboarding();
 
-  // If still checking authentication status, show loading
-  if (authLoading) {
+  // Show loading indicator while checking auth state
+  if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
-        <ActivityIndicator size="large" color="#8A2BE2" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#0074dd" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer
-      theme={{
-        ...DefaultTheme,
-        colors: {
-          ...DefaultTheme.colors,
-          background: "transparent",
-          card: "transparent",
-          primary: "#8A2BE2",
-          text: "#fff",
-          border: "#333",
-          notification: "#8A2BE2",
-          cardOverlay: 'transparent',
-        },
-        transitionSpec: {
-          open: {
-            animation: 'timing',
-            config: { duration: 200 },
-          },
-          close: {
-            animation: 'timing',
-            config: { duration: 200 },
-          },
-        },
-      }}
-    >
+    <NavigationContainer theme={DefaultTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          animation: "slide_from_right",
-          animationDuration: 200,
-          cardStyle: { backgroundColor: "transparent" },
-          contentStyle: { backgroundColor: "transparent" },
-          presentation: 'card',
-          detachPreviousScreen: false,
-          animationTypeForReplace: 'push',
-          cardStyleInterpolator: ({ current, next, layouts, closing }) => {
+          animation: 'fade',
+          // For slide animations from left/right
+          cardStyleInterpolator: ({ current, layouts, next, inverted, routeName, ...rest }) => {
+            const slideFrom = rest.route.params?.slideFrom;
+            if (!slideFrom) return { cardStyle: { opacity: current.progress } };
+
             return {
               cardStyle: {
-                backgroundColor: 'transparent',
                 transform: [
                   {
                     translateX: current.progress.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [layouts.screen.width * (closing ? -1 : 1), 0],
+                      outputRange: [slideFrom === 'right' ? layouts.screen.width : -layouts.screen.width, 0],
                     }),
                   },
                 ],
-              },
-              overlayStyle: {
-                opacity: 0,
               },
             };
           },
@@ -346,144 +319,28 @@ function AppNavigator() {
         {!user ? (
           // Authentication flow
           <Stack.Screen name="Auth" component={Auth} />
+        ) : !onboardingComplete ? (
+          // Onboarding flow
+          <Stack.Screen name="Onboarding" component={Onboarding} />
         ) : (
           // Main app flow
           <>
-            <Stack.Screen name="MainTabs" component={MainTabs} />
-            <Stack.Screen
-              name="EditProfile"
-              component={EditProfile}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-                presentation: 'transparentModal',
-              })}
-            />
-            <Stack.Screen
-              name="EditGoals"
-              component={EditGoals}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-                presentation: 'transparentModal',
-              })}
-            />
-            <Stack.Screen
-              name="DeleteAccount"
-              component={DeleteAccount}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-                presentation: 'transparentModal',
-              })}
-            />
-            <Stack.Screen
-              name="ChangePassword"
-              component={ChangePassword}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-                presentation: 'transparentModal',
-              })}
-            />
-            <Stack.Screen
-              name="AboutUs"
-              component={AboutUs}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-                presentation: 'transparentModal',
-              })}
-            />
-            <Stack.Screen
-              name="Settings"
-              component={Settings}
-              options={({ route }) => ({
-                animation: route.params?.slideFrom === "left" ? "slide_from_left" : "slide_from_right",
-                animationDuration: 200,
-                presentation: 'transparentModal',
-              })}
-            />
-            <Stack.Screen
-              name="Camera"
-              component={CameraScreen}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="ImageCapture"
-              component={ImageCaptureScreen}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="Nutrients"
-              component={Nutrients}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="BarcodeScanner"
-              component={BarcodeScannerScreen}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="Manual"
-              component={Manual}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="MealPlanner"
-              component={MealPlanner}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="MealPlannerCamera"
-              component={MealPlannerCamera}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="MealPlannerResults"
-              component={MealPlannerResults}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="RecipeDetails"
-              component={RecipeDetails}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen
-              name="SearchResults"
-              component={SearchResults}
-              options={{
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Camera" component={CameraScreen} />
+            <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
+            <Stack.Screen name="Nutrients" component={Nutrients} />
+            <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+            <Stack.Screen name="Manual" component={Manual} />
+            <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
+            <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
+            <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
+            <Stack.Screen name="SearchResults" component={SearchResults} />
+            <Stack.Screen name="EditProfile" component={EditProfile} />
+            <Stack.Screen name="EditGoals" component={EditGoals} />
+            <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
+            <Stack.Screen name="ChangePassword" component={ChangePassword} />
+            <Stack.Screen name="AboutUs" component={AboutUs} />
+            <Stack.Screen name="Settings" component={Settings} />
           </>
         )}
       </Stack.Navigator>
@@ -492,71 +349,51 @@ function AppNavigator() {
 }
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  // Initialize Firebase first
+  // Initialize Firebase and app data
   useEffect(() => {
-    const initFirebase = async () => {
-      try {
-        // Initialize Firebase if needed
-        console.log('✅ Ensuring Firebase is initialized');
-
-        // Check if Firebase is initialized - we use the web SDK for Expo Go compatibility
-        if (app && auth) {
-          console.log('✅ Firebase Auth is available');
-          // Force authentication module to initialize
-          auth.useDeviceLanguage();
-        }
-
-        setFirebaseInitialized(true);
-      } catch (error) {
-        console.error('❌ Error initializing Firebase:', error);
-        // We'll set it to true anyway so the app doesn't get stuck
-        setFirebaseInitialized(true);
-      }
-    };
-
     initFirebase();
+    initApp();
   }, []);
 
-  // Initialize database and sync service
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        console.log('🔄 Starting app initialization...');
-
-        // Initialize the SQLite database
-        const db = await initDatabase();
-        console.log('✅ Database initialized successfully', db ? 'Database connected' : 'Database not properly connected');
-
-        // Start periodic sync
-        await startPeriodicSync();
-        console.log('✅ Periodic sync started');
-
-        // Set up online sync
-        setupOnlineSync();
-        console.log('✅ Online sync set up');
-      } catch (error) {
-        console.error('❌ Error initializing app:', error);
-      } finally {
-        // Short delay to ensure database is fully initialized
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 500);
-      }
-    };
-
-    // Only initialize the app after Firebase is initialized
-    if (firebaseInitialized) {
-      initApp();
+  const initFirebase = async () => {
+    try {
+      // Firebase is already initialized in the import
+      console.log("Firebase initialized successfully");
+    } catch (error) {
+      console.error("Error initializing Firebase:", error);
     }
-  }, [firebaseInitialized]);
+  };
 
-  if (isLoading || !firebaseInitialized) {
+  const initApp = async () => {
+    try {
+      // Initialize the database
+      await initDatabase();
+      console.log("Database initialized successfully");
+
+      // Start periodic sync
+      startPeriodicSync();
+      console.log("Periodic sync started");
+
+      // Setup online sync
+      setupOnlineSync();
+      console.log("Online sync setup complete");
+
+      // App is ready
+      setIsReady(true);
+    } catch (error) {
+      console.error("Error initializing app:", error);
+      // Still mark as ready to avoid getting stuck
+      setIsReady(true);
+    }
+  };
+
+  if (!isReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
-        <ActivityIndicator size="large" color="#8A2BE2" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#0074dd" />
+        <Text style={{ color: '#fff', marginTop: 10 }}>Loading...</Text>
       </View>
     );
   }
@@ -564,17 +401,17 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <ThemeProvider>
-        <StepProvider>
-          <FavoritesProvider>
-            <AuthProvider>
-              <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <AuthProvider>
+        <OnboardingProvider>
+          <ThemeProvider>
+            <StepProvider>
+              <FavoritesProvider>
                 <AppNavigator />
-              </View>
-            </AuthProvider>
-          </FavoritesProvider>
-        </StepProvider>
-      </ThemeProvider>
+              </FavoritesProvider>
+            </StepProvider>
+          </ThemeProvider>
+        </OnboardingProvider>
+      </AuthProvider>
     </>
   );
 }

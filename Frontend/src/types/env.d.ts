@@ -1,4 +1,5 @@
 declare module '@env' {
+    export const API_URL: string;
     export const REACT_APP_MACHINE_IP: string;
     export const YOUTUBE_API_KEY: string;
     export const FIREBASE_API_KEY: string;

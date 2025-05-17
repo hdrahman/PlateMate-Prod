@@ -2,7 +2,7 @@
 import { auth, Auth } from '../utils/firebase/index';
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
 
@@ -20,15 +20,26 @@ const {
 // Type for user
 type UserType = Auth.User;
 
-// Safe import modules
-let GoogleSignin: any = null;
-// Apple Authentication has been removed
-let AppleAuthentication: any = null;
+// Import Google Sign In safely
+let GoogleSignin = null;
 
+// Initialize Google Sign-In
 try {
-    GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+    // Import properly with require
+    const GoogleSigninModule = require('@react-native-google-signin/google-signin');
+    GoogleSignin = GoogleSigninModule.GoogleSignin;
+
+    if (GoogleSignin) {
+        // Configure Google Sign In
+        GoogleSignin.configure({
+            webClientId: GOOGLE_WEB_CLIENT_ID,
+            offlineAccess: true,
+        });
+        console.log('Firebase Auth initialized successfully');
+        console.log('Google Sign-In configured successfully');
+    }
 } catch (error) {
-    console.log('Google Sign-In not available');
+    console.log('Google Sign-In not available', error);
 }
 
 // We've removed the Apple Authentication module
@@ -41,7 +52,7 @@ interface AuthContextType {
     signUp: (email: string, password: string) => Promise<void>;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
-    signInWithGoogle: () => Promise<void>;
+    signInWithGoogle: () => Promise<Auth.UserCredential | void>;
     signInWithApple: () => Promise<void>;
     signInAnonymously: () => Promise<void>;
 }
@@ -62,16 +73,6 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-
-    // Initialize Google Sign In
-    useEffect(() => {
-        if (GoogleSignin) {
-            GoogleSignin.configure({
-                // Get this from your Firebase console
-                webClientId: GOOGLE_WEB_CLIENT_ID,
-            });
-        }
-    }, []);
 
     // Listen for auth state changes
     useEffect(() => {
@@ -111,17 +112,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 throw new Error('Google Sign-In is not available');
             }
 
+            // Check if your device supports Google Play
+            await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
             // Get the user ID token
-            await GoogleSignin.hasPlayServices();
             const { idToken } = await GoogleSignin.signIn();
 
             // Create a Google credential with the token
             const googleCredential = GoogleAuthProvider.credential(idToken);
 
             // Sign in with the credential
-            await signInWithCredential(auth, googleCredential);
+            return await signInWithCredential(auth, googleCredential);
         } catch (error: any) {
-            Alert.alert('Google Sign In Error', error.message);
+            console.log('Google Sign In Error Details:', error);
+
+            // Handle specific error cases
+            if (error.code === 'SIGN_IN_CANCELLED') {
+                // User cancelled the login flow
+                Alert.alert('Sign In Cancelled', 'Sign-in was cancelled');
+            } else if (error.code === 'IN_PROGRESS') {
+                // Operation in progress already
+                Alert.alert('Sign In in Progress', 'Sign-in operation already in progress');
+            } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+                // Play services not available or outdated
+                Alert.alert('Play Services Error', 'Google Play Services is not available or outdated');
+            } else {
+                // Other errors
+                Alert.alert('Google Sign In Error', error.message || 'An error occurred during Google sign in');
+            }
+
             throw error;
         }
     };
@@ -150,15 +169,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign out
     const signOut = async () => {
         try {
-            await firebaseSignOut(auth);
             // Sign out from Google if available
             if (GoogleSignin) {
                 try {
                     await GoogleSignin.signOut();
+                    console.log('Google Sign-Out successful');
                 } catch (error) {
                     console.log('Google Sign-Out Error', error);
                 }
             }
+
+            // Sign out from Firebase
+            await firebaseSignOut(auth);
         } catch (error: any) {
             Alert.alert('Sign Out Error', error.message);
             throw error;

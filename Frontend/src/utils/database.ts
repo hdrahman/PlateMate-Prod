@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateDatabaseSchema } from './updateDatabase';
+import { auth } from './firebase/index';
 
 // Open the database
 let db: SQLite.SQLiteDatabase;
@@ -117,6 +118,15 @@ export const getCurrentDate = () => {
     return now.toISOString();
 };
 
+// Helper function to get current user ID
+export const getCurrentUserId = (): string => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+        return currentUser.uid;
+    }
+    return 'anonymous'; // Default if not signed in
+};
+
 // Add a new food log entry
 export const addFoodLog = async (foodLog: any) => {
     if (!db || !global.dbInitialized) {
@@ -124,8 +134,11 @@ export const addFoodLog = async (foodLog: any) => {
         throw new Error('Database not initialized');
     }
 
+    // Get current user ID from Firebase
+    const firebaseUserId = getCurrentUserId();
+
     const {
-        user_id = 1,
+        user_id = firebaseUserId, // Use Firebase user ID instead of default 1
         food_name,
         meal_id = 0,
         calories = 0,
@@ -248,25 +261,17 @@ export const addFoodLog = async (foodLog: any) => {
 // Get food logs by date
 export const getFoodLogsByDate = async (date: string) => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to access database before initialization');
+        console.error('⚠️ Attempting to get food logs before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
     try {
-        console.log(`🔍 Getting food logs for date: ${date}`);
-
-        // Normalize the input date to YYYY-MM-DD format
-        const normalizedDate = date.split('T')[0]; // Remove any time component
-        console.log(`Normalized date for query: ${normalizedDate}`);
-
-        // Use a more strict date comparison to ensure we only get logs for the exact date
-        // This uses the SQLite date() function to compare only the date part
         const result = await db.getAllAsync(
-            `SELECT * FROM food_logs WHERE date(date) = date(?)`,
-            [normalizedDate]
+            `SELECT * FROM food_logs WHERE date = ? AND user_id = ? ORDER BY id DESC`,
+            [date, firebaseUserId]
         );
-
-        console.log(`✅ Found ${result.length} food logs for date ${normalizedDate}`);
         return result;
     } catch (error) {
         console.error('❌ Error getting food logs by date:', error);
@@ -281,6 +286,20 @@ export const updateFoodLog = async (id: number, updates: any) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
+    // First verify that this log belongs to the current user
+    const logEntry = await db.getFirstAsync(
+        `SELECT * FROM food_logs WHERE id = ? AND user_id = ?`,
+        [id, firebaseUserId]
+    );
+
+    if (!logEntry) {
+        console.error('❌ Attempting to update food log that does not belong to current user');
+        throw new Error('Food log not found or unauthorized');
+    }
+
+    // Continue with update
     try {
         console.log(`📝 Updating food log with ID ${id}:`, updates);
 
@@ -324,28 +343,44 @@ export const deleteFoodLog = async (id: number) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
+    // First verify that this log belongs to the current user
+    const logEntry = await db.getFirstAsync(
+        `SELECT * FROM food_logs WHERE id = ? AND user_id = ?`,
+        [id, firebaseUserId]
+    );
+
+    if (!logEntry) {
+        console.error('❌ Attempting to delete food log that does not belong to current user');
+        throw new Error('Food log not found or unauthorized');
+    }
+
     try {
-        console.log(`🗑️ Deleting food log with ID ${id}`);
-        const result = await db.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
-        console.log('✅ Food log deleted successfully', result.changes);
-        return result.changes;
+        await db.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
+        console.log('✅ Food log deleted successfully');
+        return true;
     } catch (error) {
         console.error('❌ Error deleting food log:', error);
         throw error;
     }
 };
 
-// Get all unsynced food logs
+// Get unsynced food logs
 export const getUnsyncedFoodLogs = async () => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to get unsynced food logs before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
     try {
         const result = await db.getAllAsync(
-            `SELECT * FROM food_logs WHERE synced = 0`
+            `SELECT * FROM food_logs WHERE synced = 0 AND user_id = ?`,
+            [firebaseUserId]
         );
+        console.log(`📊 Found ${result.length} unsynced food logs`);
         return result;
     } catch (error) {
         console.error('❌ Error getting unsynced food logs:', error);
@@ -458,20 +493,14 @@ export const getExercisesByDate = async (date: string) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+    const normalizedDate = date.split('T')[0]; // Remove any time component
+
     try {
-        console.log(`🔍 Getting exercises for date: ${date}`);
-
-        // Normalize the input date to YYYY-MM-DD format
-        const normalizedDate = date.split('T')[0]; // Remove any time component
-        console.log(`Normalized date for query: ${normalizedDate}`);
-
-        // Use a strict date comparison to ensure we only get exercises for the exact date
         const result = await db.getAllAsync(
-            `SELECT * FROM exercises WHERE date(date) = date(?)`,
-            [normalizedDate]
+            `SELECT * FROM exercises WHERE date = ? AND user_id = ? ORDER BY id DESC`,
+            [normalizedDate, firebaseUserId]
         );
-        console.log(`Found ${result.length} exercise records for date: ${normalizedDate}`);
-
         return result;
     } catch (error) {
         console.error('❌ Error getting exercises:', error);
@@ -486,8 +515,10 @@ export const addExercise = async (exercise: any) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
     const {
-        user_id = 1,
+        user_id = firebaseUserId,
         exercise_name,
         calories_burned,
         duration,
@@ -514,8 +545,6 @@ export const addExercise = async (exercise: any) => {
         }
     }
 
-    console.log(`📝 Adding exercise with date: ${formattedDate}`);
-
     try {
         const result = await db.runAsync(
             `INSERT INTO exercises (
@@ -534,7 +563,6 @@ export const addExercise = async (exercise: any) => {
                 getCurrentDate()
             ]
         );
-        console.log('✅ Exercise added successfully', result.lastInsertRowId);
         return result.lastInsertRowId;
     } catch (error) {
         console.error('❌ Error adding exercise:', error);
@@ -549,11 +577,22 @@ export const deleteExercise = async (id: number) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
+    // First verify that this exercise belongs to the current user
+    const exerciseEntry = await db.getFirstAsync(
+        `SELECT * FROM exercises WHERE id = ? AND user_id = ?`,
+        [id, firebaseUserId]
+    );
+
+    if (!exerciseEntry) {
+        console.error('❌ Attempting to delete exercise that does not belong to current user');
+        throw new Error('Exercise not found or unauthorized');
+    }
+
     try {
-        console.log(`🗑️ Deleting exercise with ID ${id}`);
-        const result = await db.runAsync('DELETE FROM exercises WHERE id = ?', [id]);
-        console.log('✅ Exercise deleted successfully', result.changes);
-        return result.changes;
+        await db.runAsync('DELETE FROM exercises WHERE id = ?', [id]);
+        return true;
     } catch (error) {
         console.error('❌ Error deleting exercise:', error);
         throw error;
@@ -715,152 +754,112 @@ export const markStepsSynced = async (ids: number[]) => {
     }
 };
 
-// Get total calories for today
+// Get today's total calories
 export const getTodayCalories = async () => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to access database before initialization');
+        console.error('⚠️ Attempting to get today calories before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    const firebaseUserId = getCurrentUserId();
+
     try {
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date();
-        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        console.log(`🔍 Getting total calories for today: ${todayFormatted}`);
-
-        // Use SQLite's SUM function to get the total calories
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(calories) as total FROM food_logs WHERE date(date) = date(?)`,
-            [todayFormatted]
+            `SELECT SUM(calories) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            [today, firebaseUserId]
         );
-
-        const totalCalories = result?.total || 0;
-        console.log(`✅ Found total calories for today: ${totalCalories}`);
-        return totalCalories;
+        return result?.total || 0;
     } catch (error) {
-        console.error('❌ Error getting total calories for today:', error);
-        // Return 0 instead of throwing to provide a default value
+        console.error('❌ Error getting today calories:', error);
         return 0;
     }
 };
 
-// Get total protein consumed today
+// Get today's total protein
 export const getTodayProtein = async () => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to access database before initialization');
+        console.error('⚠️ Attempting to get today protein before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    const firebaseUserId = getCurrentUserId();
+
     try {
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date();
-        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        console.log(`🔍 Getting total protein for today: ${todayFormatted}`);
-
-        // Use SQLite's SUM function to get the total protein
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(proteins) as total FROM food_logs WHERE date(date) = date(?)`,
-            [todayFormatted]
+            `SELECT SUM(proteins) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            [today, firebaseUserId]
         );
-
-        const totalProtein = result?.total || 0;
-        console.log(`✅ Found total protein for today: ${totalProtein}`);
-        return totalProtein;
+        return result?.total || 0;
     } catch (error) {
-        console.error('❌ Error getting total protein for today:', error);
-        // Return 0 instead of throwing to provide a default value
+        console.error('❌ Error getting today protein:', error);
         return 0;
     }
 };
 
-// Get total carbs consumed today
+// Get today's total carbs
 export const getTodayCarbs = async () => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to access database before initialization');
+        console.error('⚠️ Attempting to get today carbs before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    const firebaseUserId = getCurrentUserId();
+
     try {
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date();
-        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        console.log(`🔍 Getting total carbs for today: ${todayFormatted}`);
-
-        // Use SQLite's SUM function to get the total carbs
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(carbs) as total FROM food_logs WHERE date(date) = date(?)`,
-            [todayFormatted]
+            `SELECT SUM(carbs) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            [today, firebaseUserId]
         );
-
-        const totalCarbs = result?.total || 0;
-        console.log(`✅ Found total carbs for today: ${totalCarbs}`);
-        return totalCarbs;
+        return result?.total || 0;
     } catch (error) {
-        console.error('❌ Error getting total carbs for today:', error);
-        // Return 0 instead of throwing to provide a default value
+        console.error('❌ Error getting today carbs:', error);
         return 0;
     }
 };
 
-// Get total fats consumed today
+// Get today's total fats
 export const getTodayFats = async () => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to access database before initialization');
+        console.error('⚠️ Attempting to get today fats before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    const firebaseUserId = getCurrentUserId();
+
     try {
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date();
-        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        console.log(`🔍 Getting total fats for today: ${todayFormatted}`);
-
-        // Use SQLite's SUM function to get the total fats
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(fats) as total FROM food_logs WHERE date(date) = date(?)`,
-            [todayFormatted]
+            `SELECT SUM(fats) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            [today, firebaseUserId]
         );
-
-        const totalFats = result?.total || 0;
-        console.log(`✅ Found total fats for today: ${totalFats}`);
-        return totalFats;
+        return result?.total || 0;
     } catch (error) {
-        console.error('❌ Error getting total fats for today:', error);
-        // Return 0 instead of throwing to provide a default value
+        console.error('❌ Error getting today fats:', error);
         return 0;
     }
 };
 
-// Get total exercise calories for today
+// Get today's total exercise calories
 export const getTodayExerciseCalories = async () => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to access database before initialization');
+        console.error('⚠️ Attempting to get today exercise calories before database initialization');
         throw new Error('Database not initialized');
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    const firebaseUserId = getCurrentUserId();
+
     try {
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date();
-        const todayFormatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        console.log(`🔍 Getting total exercise calories for today: ${todayFormatted}`);
-
-        // Use SQLite's SUM function to get the total calories burned from exercises
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(calories_burned) as total FROM exercises WHERE date(date) = date(?)`,
-            [todayFormatted]
+            `SELECT SUM(calories_burned) as total FROM exercises WHERE date = ? AND user_id = ?`,
+            [today, firebaseUserId]
         );
-
-        const totalCalories = result?.total || 0;
-        console.log(`✅ Found total exercise calories for today: ${totalCalories}`);
-        return totalCalories;
+        return result?.total || 0;
     } catch (error) {
-        console.error('❌ Error getting total exercise calories for today:', error);
-        // Return 0 instead of throwing to provide a default value
+        console.error('❌ Error getting today exercise calories:', error);
         return 0;
     }
 };

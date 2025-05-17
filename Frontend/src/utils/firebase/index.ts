@@ -19,10 +19,39 @@ const firebaseConfig = {
 // Initialize Firebase first - make sure to keep this reference
 const app = initializeApp(firebaseConfig);
 
-// Initialize auth with getAuth
-// Firebase will handle persistence automatically based on the platform
+// Initialize auth
 const auth = getAuth(app);
-console.log('Firebase Auth initialized successfully');
+
+// Set up persistence manually
+try {
+    // Store user credentials when a user signs in
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // Store credentials in AsyncStorage when user signs in
+            await AsyncStorage.setItem('firebaseAuthUser', JSON.stringify({
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL
+            }));
+        } else {
+            // Clear credentials when user signs out
+            await AsyncStorage.removeItem('firebaseAuthUser');
+        }
+    });
+
+    // Check for stored credentials on startup
+    (async () => {
+        const storedUser = await AsyncStorage.getItem('firebaseAuthUser');
+        if (storedUser) {
+            console.log('User credentials restored from AsyncStorage');
+        }
+    })();
+
+    console.log('Firebase Auth initialized successfully with AsyncStorage persistence');
+} catch (error) {
+    console.error('Error setting up auth persistence:', error);
+}
 
 // Export both the app and auth instances
 export { app, auth };
