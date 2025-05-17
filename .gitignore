@@ -112,3 +112,6 @@ pgdata/
 nosetests.xml
 coverage.xml
 pytest_cache/
+
+# Backend Python environment
+Backend/env/
