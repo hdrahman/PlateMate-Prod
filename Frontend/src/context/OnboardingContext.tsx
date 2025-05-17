@@ -217,6 +217,11 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                     };
 
                     setProfile(frontendProfile);
+
+                    // Set onboarding as complete if the backend indicates it's complete
+                    if (backendProfile.onboarding_complete) {
+                        setOnboardingComplete(true);
+                    }
                 } else {
                     console.log(`No backend profile found for user: ${user.uid}, checking local storage`);
                     // User doesn't exist in backend yet, check AsyncStorage
@@ -361,20 +366,30 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 const existingUser = await getUserProfile(user.uid);
 
                 if (existingUser) {
-                    // Update existing user
-                    const userData = convertProfileToBackendFormat(profile);
+                    // Update existing user with onboarding_complete flag
+                    const userData = {
+                        ...convertProfileToBackendFormat(profile),
+                        onboarding_complete: true
+                    };
                     await updateUserProfile(user.uid, userData);
                 } else {
-                    // Create new user
+                    // Create new user with onboarding_complete flag
                     const userData = {
                         firebase_uid: user.uid,
                         email: user.email || '',
                         first_name: profile.firstName,
                         last_name: profile.lastName,
                         phone_number: profile.phoneNumber,
-                        ...convertProfileToBackendFormat(profile)
+                        onboarding_complete: true
                     };
                     await createUser(userData);
+
+                    // Update with full profile data
+                    const fullUserData = {
+                        ...convertProfileToBackendFormat(profile),
+                        onboarding_complete: true
+                    };
+                    await updateUserProfile(user.uid, fullUserData);
                 }
 
                 console.log('User profile synchronized with backend successfully');

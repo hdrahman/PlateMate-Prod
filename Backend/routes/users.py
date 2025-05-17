@@ -68,6 +68,7 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone_number: Optional[str] = None
+    onboarding_complete: Optional[bool] = None
     physical_attributes: Optional[PhysicalAttributes] = None
     dietary_preferences: Optional[DietaryPreferences] = None
     health_goals: Optional[HealthGoals] = None
@@ -85,6 +86,7 @@ class UserResponse(BaseModel):
     phone_number: Optional[str] = None
     subscription_status: str
     subscription_expiry: Optional[datetime] = None
+    onboarding_complete: bool = False
     
     # Include all other profile fields
     height: Optional[float] = None
@@ -241,6 +243,8 @@ async def update_user_profile(
         update_data["last_name"] = user_update.last_name
     if user_update.phone_number is not None:
         update_data["phone_number"] = user_update.phone_number
+    if user_update.onboarding_complete is not None:
+        update_data["onboarding_complete"] = user_update.onboarding_complete
     
     # Physical attributes
     if user_update.physical_attributes:

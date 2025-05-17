@@ -13,6 +13,9 @@ class User(Base):
     last_name = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
     
+    # Onboarding status
+    onboarding_complete = Column(Boolean, default=False)
+    
     # Physical attributes
     height = Column(Float, nullable=True)
     weight = Column(Float, nullable=True)

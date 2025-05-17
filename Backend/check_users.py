@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 import psycopg2
 import json
 from datetime import datetime
+from DB import engine, Base, get_db
+from sqlalchemy import text, inspect
+from models import User
 
 # Load environment variables
 load_dotenv()
@@ -55,4 +58,32 @@ except Exception as e:
 finally:
     cursor.close()
     conn.close()
-    print("\nDatabase connection closed") 
+    print("\nDatabase connection closed")
+
+def check_users_table():
+    try:
+        # Get the column names from the users table
+        inspector = inspect(engine)
+        columns = inspector.get_columns('users')
+        print("Columns in users table:")
+        for column in columns:
+            print(f"  - {column['name']} ({column['type']})")
+        
+        # Check if there are any users in the table
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM users"))
+            count = result.scalar()
+            print(f"\nTotal users in the database: {count}")
+            
+            if count > 0:
+                # Get a sample user
+                result = conn.execute(text("SELECT * FROM users LIMIT 1"))
+                user = result.mappings().one()
+                print("\nSample user data:")
+                for key, value in user.items():
+                    print(f"  - {key}: {value}")
+    except Exception as e:
+        print(f"Error checking users table: {e}")
+
+if __name__ == "__main__":
+    check_users_table() 
