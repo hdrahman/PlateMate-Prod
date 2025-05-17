@@ -96,22 +96,52 @@ export const createUser = async (userData: CreateUserData) => {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const token = await getFirebaseToken();
-        const response = await fetch(`${API_URL}/users`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(userData)
-        });
+        // Add timeout to fetch request
+        const timeout = 8000; // 8 seconds timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to create user');
+        try {
+            const token = await getFirebaseToken();
+            console.log(`Creating user at ${API_URL}/users for ${userData.firebase_uid}`);
+
+            const response = await fetch(`${API_URL}/users`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(userData),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to create user');
+            }
+
+            return await response.json();
+        } catch (fetchError: any) {
+            // Handle specific network errors
+            if (fetchError.name === 'AbortError') {
+                console.warn(`Request timed out after ${timeout}ms`);
+                throw new Error('Connection to server timed out. Please try again later.');
+            }
+
+            console.warn('Network error creating user:', fetchError.message);
+            // Handle known network errors
+            if (fetchError.message && (
+                fetchError.message.includes('Network request failed') ||
+                fetchError.message.includes('Failed to fetch') ||
+                fetchError.message.includes('Network error')
+            )) {
+                throw new Error('Network connection failed. Please check your internet connection and try again.');
+            }
+
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
         console.error('Error creating user:', error);
         throw error;
@@ -133,25 +163,57 @@ export const getUserProfile = async (firebaseUid: string) => {
             firebaseUid = currentUser.uid; // Force to use the authenticated user's UID
         }
 
-        const token = await getFirebaseToken();
-        const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        // Add timeout to fetch request
+        const timeout = 8000; // 8 seconds timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            // If 404, user hasn't been created yet - return null
-            if (response.status === 404) {
-                return null;
+        try {
+            const token = await getFirebaseToken();
+            console.log(`Fetching profile from ${API_URL}/users/${firebaseUid}`);
+
+            const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                // If 404, user hasn't been created yet - return null
+                if (response.status === 404) {
+                    console.log('User not found in database (404 response)');
+                    return null;
+                }
+
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to get user profile');
             }
 
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to get user profile');
+            return await response.json();
+        } catch (fetchError: any) {
+            // Handle specific network errors
+            if (fetchError.name === 'AbortError') {
+                console.warn(`Request timed out after ${timeout}ms`);
+                return null; // Return null to allow local storage fallback
+            }
+
+            console.warn('Network error:', fetchError.message);
+            // Handle known network errors
+            if (fetchError.message && (
+                fetchError.message.includes('Network request failed') ||
+                fetchError.message.includes('Failed to fetch') ||
+                fetchError.message.includes('Network error')
+            )) {
+                console.warn('Network connection failed - backend may be unavailable');
+                return null; // Return null to allow local storage fallback
+            }
+
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
         console.error('Error getting user profile:', error);
         throw error;
@@ -172,22 +234,52 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
             throw new Error('Not authorized to update another user\'s profile.');
         }
 
-        const token = await getFirebaseToken();
-        const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(userData)
-        });
+        // Add timeout to fetch request
+        const timeout = 8000; // 8 seconds timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to update user profile');
+        try {
+            const token = await getFirebaseToken();
+            console.log(`Updating profile at ${API_URL}/users/${firebaseUid}`);
+
+            const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(userData),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to update user profile');
+            }
+
+            return await response.json();
+        } catch (fetchError: any) {
+            // Handle specific network errors
+            if (fetchError.name === 'AbortError') {
+                console.warn(`Request timed out after ${timeout}ms`);
+                throw new Error('Connection to server timed out. Please try again later.');
+            }
+
+            console.warn('Network error updating profile:', fetchError.message);
+            // Handle known network errors
+            if (fetchError.message && (
+                fetchError.message.includes('Network request failed') ||
+                fetchError.message.includes('Failed to fetch') ||
+                fetchError.message.includes('Network error')
+            )) {
+                throw new Error('Network connection failed. Please check your internet connection and try again.');
+            }
+
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
         console.error('Error updating user profile:', error);
         throw error;

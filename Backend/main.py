@@ -1,9 +1,13 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
 from dotenv import load_dotenv
+import time
+import asyncio
+from sqlalchemy.orm import Session
+from DB import get_db
 
 from routes.image import router as image_router
 from routes.meal_entries import router as meal_entries_router  # Include meal_entries
@@ -17,7 +21,33 @@ load_dotenv()
 
 app = FastAPI()
 
-# Startup event to ensure Firebase admin SDK is initialized
+# Background task for periodic database sync
+async def periodic_db_sync():
+    try:
+        # Import here to avoid import errors during startup
+        from db_sync import perform_sync
+        
+        # Set the sync interval (default to 30 minutes)
+        SYNC_INTERVAL = int(os.getenv("DB_SYNC_INTERVAL_MINUTES", "30")) * 60
+        
+        while True:
+            # Perform database sync
+            print("🔄 Running scheduled database synchronization...")
+            try:
+                sync_result = perform_sync()
+                if sync_result:
+                    print("✅ Scheduled database synchronization completed successfully")
+                else:
+                    print("⚠️ Scheduled database synchronization completed with issues")
+            except Exception as e:
+                print(f"❌ Error during scheduled database synchronization: {e}")
+            
+            # Sleep for the specified interval
+            await asyncio.sleep(SYNC_INTERVAL)
+    except Exception as e:
+        print(f"❌ Error in periodic_db_sync task: {e}")
+
+# Startup event to ensure Firebase admin SDK is initialized and setup periodic sync
 @app.on_event("startup")
 async def startup_event():
     try:
@@ -30,6 +60,24 @@ async def startup_event():
         else:
             print("⚠️ Firebase Admin SDK initialization failed. Authentication will not work properly.")
             print("   Please ensure firebase-admin-sdk.json is available or set FIREBASE_CREDENTIALS_JSON env variable.")
+            
+        # Run initial database sync on startup
+        try:
+            from db_sync import perform_sync
+            
+            print("🔄 Running initial database synchronization on startup...")
+            sync_result = perform_sync()
+            if sync_result:
+                print("✅ Initial database synchronization completed successfully")
+            else:
+                print("⚠️ Initial database synchronization completed with issues")
+        except Exception as e:
+            print(f"❌ Error during initial database synchronization: {e}")
+        
+        # Start periodic sync task
+        asyncio.create_task(periodic_db_sync())
+        print("🔄 Database synchronization background task started")
+        
     except Exception as e:
         print(f"❌ Failed to initialize Firebase Admin SDK: {e}")
         print("⚠️ The application will continue but Firebase authentication will not work")
@@ -64,3 +112,22 @@ app.include_router(users_router, prefix='/users', tags=['users'])  # Include use
 @app.get("/")
 def home():
     return {'message': "FastAPI connected to NEON successfully!"}
+
+@app.post("/sync", tags=["database"])
+async def manual_sync(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Manually trigger a synchronization between SQLite and PostgreSQL databases.
+    This operation runs in the background to avoid blocking the API request.
+    """
+    def run_sync():
+        try:
+            from db_sync import perform_sync
+            return perform_sync()
+        except Exception as e:
+            print(f"❌ Error during manual synchronization: {e}")
+            return False
+    
+    # Add the sync task to run in the background
+    background_tasks.add_task(run_sync)
+    
+    return {"message": "Database synchronization started in the background"}

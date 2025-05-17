@@ -79,8 +79,8 @@ async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depe
     
     token = credentials.credentials
     try:
-        # Verify the ID token
-        decoded_token = auth.verify_id_token(token)
+        # Verify the ID token with a clock tolerance of 5 seconds to handle minor time sync issues
+        decoded_token = auth.verify_id_token(token, check_revoked=True, clock_skew_seconds=5)
         # Return the decoded token for further use
         return decoded_token
     except Exception as e:
@@ -103,20 +103,42 @@ async def get_current_user(
                 detail="Firebase UID not found in token"
             )
             
-        # Check if user exists in database
+        # Check if user exists in primary database
         user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        
         if not user:
-            # User not found in database - this is a valid auth user but not in our database yet
-            # The frontend should handle creating the user record
-            raise HTTPException(
-                status_code=404,
-                detail=f"User with Firebase UID {firebase_uid} not found in database"
+            print(f"User with Firebase UID {firebase_uid} not found in primary database, checking alternative sources")
+            
+            # At this point, we have a valid Firebase authenticated user but they're not in our database yet
+            # Instead of throwing an error, we'll return a minimal user object for authenticated endpoints
+            # This allows API endpoints to work with Firebase-authenticated users even if they haven't completed onboarding
+            
+            # Create a minimal user object (not persisted to database)
+            from models import User as UserModel
+            
+            # Extract user info from Firebase token
+            name = token_data.get("name", "").split(" ", 1)
+            first_name = name[0] if name else ""
+            last_name = name[1] if len(name) > 1 else ""
+            
+            user = UserModel(
+                firebase_uid=firebase_uid,
+                email=token_data.get("email", ""),
+                first_name=first_name,
+                last_name=last_name,
+                onboarding_complete=False
             )
             
+            # Note: This user object is not saved to the database
+            # The frontend should handle properly creating the user record
+            
+            print(f"Created temporary user object for Firebase UID {firebase_uid}")
+        
         return user
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Error in get_current_user: {str(e)}")
         raise HTTPException(
             status_code=500, 
             detail=f"Error fetching user: {str(e)}"
@@ -139,8 +161,8 @@ async def get_optional_current_user(
     
     token = auth_header.replace("Bearer ", "")
     try:
-        # Verify the ID token
-        decoded_token = auth.verify_id_token(token)
+        # Verify the ID token with a clock tolerance of 5 seconds
+        decoded_token = auth.verify_id_token(token, check_revoked=True, clock_skew_seconds=5)
         firebase_uid = decoded_token.get("uid")
         if not firebase_uid:
             return None

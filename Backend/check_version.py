@@ -1,16 +1,29 @@
-from DB import engine
-from sqlalchemy import text
+import os
+from dotenv import load_dotenv
+import psycopg2
 
-def check_version():
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text('SELECT version_num FROM alembic_version'))
-            versions = result.all()
-            print(f"Current migrations in alembic_version table: {versions}")
-            return versions
-    except Exception as e:
-        print(f"Error checking version: {e}")
-        return None
+# Load environment variables
+load_dotenv()
 
-if __name__ == "__main__":
-    check_version() 
+# Get database connection string
+database_url = os.getenv('DATABASE_URL')
+
+if not database_url:
+    raise ValueError("DATABASE_URL is not set in environment variables")
+
+# Connect to the database
+print("Connecting to the database...")
+conn = psycopg2.connect(database_url)
+cursor = conn.cursor()
+
+# Check alembic_version table
+cursor.execute("SELECT version_num FROM alembic_version")
+rows = cursor.fetchall()
+
+print("Current alembic version(s):")
+for row in rows:
+    print(row[0])
+
+# Close connection
+cursor.close()
+conn.close() 
