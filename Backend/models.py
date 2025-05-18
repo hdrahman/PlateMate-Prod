@@ -16,9 +16,15 @@ class ActivityLevel(enum.Enum):
     very_active = "very_active"
 
 class WeightGoal(enum.Enum):
+    lose_extreme = "lose_extreme"
+    lose_heavy = "lose_heavy"
+    lose_moderate = "lose_moderate"
+    lose_light = "lose_light"
     lose = "lose"
     maintain = "maintain"
     gain = "gain"
+    gain_light = "gain_light"
+    gain_moderate = "gain_moderate"
 
 class User(Base):
     __tablename__ = "users"

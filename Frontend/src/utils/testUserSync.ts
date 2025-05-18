@@ -67,18 +67,18 @@ export const resetLocalProfile = async () => {
     }
 
     try {
-        // Create a minimal profile with test data
-        const testProfile = {
+        // Create a minimal profile with user's actual data
+        const minimalProfile = {
             firebase_uid: currentUser.uid,
-            email: currentUser.email || 'test@example.com',
-            first_name: 'Test',
-            last_name: 'User',
-            onboarding_complete: true,
+            email: currentUser.email || '',
+            first_name: '',
+            last_name: '',
+            onboarding_complete: false,
         };
 
         // Add to SQLite - this will replace any existing profile
-        await addUserProfile(testProfile);
-        console.log('✅ Local profile reset with test data');
+        await addUserProfile(minimalProfile);
+        console.log('✅ Local profile reset');
     } catch (error) {
         console.error('❌ Error resetting local profile:', error);
     }

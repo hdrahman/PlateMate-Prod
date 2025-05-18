@@ -136,12 +136,12 @@ export const runFullTestSequence = async () => {
         console.log('🧪 STEP 2: Reset all data');
         await resetAllProfileData();
 
-        // Step 3: Create test profile
-        console.log('🧪 STEP 3: Create test profile');
+        // Step 3: Reset local profile
+        console.log('🧪 STEP 3: Reset local profile');
         await resetLocalProfile();
 
         // Step 4: Check state again
-        console.log('🧪 STEP 4: Check state after creating test profile');
+        console.log('🧪 STEP 4: Check state after resetting profile');
         await checkAndPrintCurrentState();
 
         // Step 5: Run profile sync test

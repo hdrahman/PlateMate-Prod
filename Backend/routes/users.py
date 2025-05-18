@@ -26,9 +26,15 @@ class ActivityLevelEnum(str, Enum):
     very_active = "very_active"
 
 class WeightGoalEnum(str, Enum):
+    lose_extreme = "lose_extreme"
+    lose_heavy = "lose_heavy"
+    lose_moderate = "lose_moderate"
+    lose_light = "lose_light"
     lose = "lose"
     maintain = "maintain"
     gain = "gain"
+    gain_light = "gain_light"
+    gain_moderate = "gain_moderate"
 
 # Pydantic models for request validation
 class UserBase(BaseModel):
@@ -219,7 +225,8 @@ async def update_user_profile(
     if user_update.health_goals:
         hg = user_update.health_goals
         if hg.weight_goal is not None:
-            update_data["weight_goal"] = hg.weight_goal
+            # Use weight_goal value directly
+            update_data["weight_goal"] = hg.weight_goal.value
         if hg.target_weight is not None:
             update_data["target_weight"] = hg.target_weight
     
