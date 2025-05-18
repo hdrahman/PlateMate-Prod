@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { createUser, getUserProfile, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
-import { syncUserProfile } from '../utils/profileSyncService';
+import { syncUserProfile, syncProfileFromLocalToBackend } from '../utils/profileSyncService';
 import { getUserProfileByFirebaseUid, addUserProfile, updateUserProfile as updateLocalUserProfile } from '../utils/database';
 
 interface OnboardingContextType {
@@ -300,6 +300,17 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                     // User has a profile, use it
                     setOnboardingComplete(true);
                     setProfile(convertSQLiteProfileToFrontendFormat(syncedProfile));
+
+                    // Save to AsyncStorage for future fast loading
+                    await AsyncStorage.setItem(
+                        getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid),
+                        'true'
+                    );
+
+                    await AsyncStorage.setItem(
+                        getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
+                        JSON.stringify(convertSQLiteProfileToFrontendFormat(syncedProfile))
+                    );
                 } else {
                     console.log('⚠️ No synced profile found, checking AsyncStorage for onboarding progress');
                     // No synced profile, check AsyncStorage for any onboarding progress
@@ -418,6 +429,12 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 'true'
             );
 
+            // Save profile to AsyncStorage
+            await AsyncStorage.setItem(
+                getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
+                JSON.stringify(profile)
+            );
+
             // Convert frontend profile to SQLite format
             const sqliteProfile = convertFrontendProfileToSQLiteFormat(profile, user.uid, user.email);
             sqliteProfile.onboarding_complete = true;
@@ -427,7 +444,18 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
             console.log('✅ Profile saved to local SQLite database');
 
-            // The profile will be synced to the backend automatically through the sync mechanism
+            // Sync the profile to backend
+            try {
+                const result = await syncProfileFromLocalToBackend(user.uid);
+                if (result) {
+                    console.log('✅ Profile successfully synced to backend');
+                } else {
+                    console.warn('⚠️ Profile sync to backend failed, but local profile is saved');
+                }
+            } catch (syncError) {
+                console.error('❌ Error syncing profile to backend:', syncError);
+                // We continue even if the sync fails, as local profile is now saved
+            }
 
         } catch (error) {
             console.error('Error completing onboarding:', error);

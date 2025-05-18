@@ -7,6 +7,10 @@ import {
 } from './database';
 import { isOnline } from './syncService';
 import { auth } from './firebase';
+import { API_URL } from '@env';
+
+// Use API_URL as BACKEND_URL for consistency with other modules
+const BACKEND_URL = API_URL;
 
 // Convert backend profile format to SQLite format
 const convertBackendProfileToSQLiteFormat = (backendProfile: any) => {
@@ -80,6 +84,27 @@ const convertSQLiteProfileToBackendFormat = (sqliteProfile: any) => {
     };
 };
 
+// Convert SQLite profile to backend update format that matches the backend UserUpdate model
+const convertToBackendUpdateFormat = (sqliteProfile: any) => {
+    // Directly extract only the fields that the backend UserUpdate model handles
+    return {
+        first_name: sqliteProfile.first_name,
+        last_name: sqliteProfile.last_name,
+        onboarding_complete: sqliteProfile.onboarding_complete,
+        physical_attributes: {
+            height: sqliteProfile.height,
+            weight: sqliteProfile.weight,
+            age: sqliteProfile.age,
+            gender: sqliteProfile.gender,
+            activity_level: sqliteProfile.activity_level
+        },
+        health_goals: {
+            weight_goal: sqliteProfile.weight_goal,
+            target_weight: sqliteProfile.target_weight
+        }
+    };
+};
+
 // Check if user has profile in local SQLite database
 export const hasLocalProfile = async (firebaseUid: string): Promise<boolean> => {
     try {
@@ -141,6 +166,7 @@ export const syncProfileFromBackendToLocal = async (firebaseUid: string): Promis
 
         try {
             // Get profile from backend
+            console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
             const backendProfile = await getUserProfile(firebaseUid);
 
             // Check if it's an error response
@@ -154,11 +180,55 @@ export const syncProfileFromBackendToLocal = async (firebaseUid: string): Promis
                 return false;
             }
 
-            // Convert to SQLite format
-            const sqliteProfile = convertBackendProfileToSQLiteFormat(backendProfile);
+            console.log('Backend profile:', JSON.stringify(backendProfile));
 
-            // Save to local SQLite
-            await addUserProfile(sqliteProfile);
+            // Convert to SQLite format - make sure all backend fields are properly mapped
+            const sqliteProfile = {
+                firebase_uid: backendProfile.firebase_uid,
+                email: backendProfile.email,
+                first_name: backendProfile.first_name,
+                last_name: backendProfile.last_name || null,
+                height: backendProfile.height,
+                weight: backendProfile.weight,
+                age: backendProfile.age,
+                gender: backendProfile.gender,
+                activity_level: backendProfile.activity_level,
+                weight_goal: backendProfile.weight_goal,
+                target_weight: backendProfile.target_weight,
+                onboarding_complete: backendProfile.onboarding_complete || false,
+                // Add default values for fields not in the backend
+                dietary_restrictions: [],
+                food_allergies: [],
+                cuisine_preferences: [],
+                spice_tolerance: null,
+                health_conditions: [],
+                daily_calorie_target: null,
+                nutrient_focus: null,
+                unit_preference: 'metric',
+                push_notifications_enabled: true,
+                email_notifications_enabled: true,
+                sms_notifications_enabled: false,
+                marketing_emails_enabled: true,
+                preferred_language: 'en',
+                timezone: 'UTC',
+                dark_mode: false,
+                sync_data_offline: true
+            };
+
+            // Check if profile already exists locally
+            const existingProfile = await getUserProfileByFirebaseUid(firebaseUid);
+            if (existingProfile) {
+                console.log('Updating existing local profile');
+                // Update existing profile
+                await updateLocalUserProfile(firebaseUid, sqliteProfile);
+            } else {
+                console.log('Creating new local profile');
+                // Save to local SQLite as a new profile
+                await addUserProfile(sqliteProfile);
+            }
+
+            // Mark as synced
+            await markUserProfileSynced(firebaseUid);
             console.log('✅ Successfully synced profile from backend to local');
 
             return true;
@@ -191,33 +261,42 @@ export const syncProfileFromLocalToBackend = async (firebaseUid: string): Promis
             return false;
         }
 
-        // Convert to backend format
-        const backendProfile = convertSQLiteProfileToBackendFormat(localProfile);
+        try {
+            // First check if user exists in backend
+            console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
+            const existingProfile = await getUserProfile(firebaseUid);
 
-        // Check if user exists in backend
-        const existingProfile = await getUserProfile(firebaseUid);
+            // Convert to the format that matches exactly what the backend expects
+            const backendUpdateData = convertToBackendUpdateFormat(localProfile);
+            console.log('Backend update data:', JSON.stringify(backendUpdateData));
 
-        if (existingProfile) {
-            // Update existing profile
-            await updateUserProfile(firebaseUid, convertProfileToBackendFormat(backendProfile));
-        } else {
-            // Create new profile
-            await createUser({
-                firebase_uid: firebaseUid,
-                email: backendProfile.email,
-                first_name: backendProfile.first_name,
-                last_name: backendProfile.last_name
-            });
+            if (existingProfile) {
+                // Update existing profile
+                console.log(`Updating existing profile for ${firebaseUid}`);
+                await updateUserProfile(firebaseUid, backendUpdateData);
+            } else {
+                // Create new profile - first create basic user
+                console.log(`Creating user at ${BACKEND_URL}/users for ${firebaseUid}`);
+                await createUser({
+                    firebase_uid: firebaseUid,
+                    email: localProfile.email,
+                    first_name: localProfile.first_name,
+                    last_name: localProfile.last_name || ""
+                });
 
-            // Then update with all profile details
-            await updateUserProfile(firebaseUid, convertProfileToBackendFormat(backendProfile));
+                // Then update with all profile details
+                console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
+                await updateUserProfile(firebaseUid, backendUpdateData);
+            }
+
+            // Mark profile as synced in local SQLite
+            await markUserProfileSynced(firebaseUid);
+            console.log('✅ User profile marked as synced');
+            return true;
+        } catch (error) {
+            console.error('❌ Error syncing to backend:', error);
+            return false;
         }
-
-        // Mark profile as synced in local SQLite
-        await markUserProfileSynced(firebaseUid);
-        console.log('✅ Successfully synced profile from local to backend');
-
-        return true;
     } catch (error) {
         console.error('❌ Error syncing profile from local to backend:', error);
         return false;
@@ -246,22 +325,22 @@ export const syncUserProfile = async (firebaseUid: string): Promise<{
         const hasLocal = await hasLocalProfile(firebaseUid);
         console.log(`Local profile exists: ${hasLocal}`);
 
-        // If local profile exists, use it and return immediately
+        // If local profile exists, use it and sync to backend if needed
         if (hasLocal) {
             console.log('✅ Local profile found, using it');
             const localProfile = await getUserProfileByFirebaseUid(firebaseUid);
 
-            // If we're online, try to sync to backend in the background
+            // Only try to sync to backend if we're online
             const online = await isOnline();
             if (online) {
-                // Don't await this - let it happen in the background
-                syncProfileFromLocalToBackend(firebaseUid)
-                    .then(success => {
-                        if (success) console.log('✅ Background sync to backend successful');
-                    })
-                    .catch(error => {
-                        console.error('❌ Background sync error:', error);
-                    });
+                console.log('🔄 Syncing profile from local to backend for user:', firebaseUid);
+                try {
+                    await syncProfileFromLocalToBackend(firebaseUid);
+                    console.log('✅ Successfully synced profile from local to backend');
+                } catch (error) {
+                    console.error('❌ Error syncing to backend:', error);
+                    // Continue with local profile even if sync fails
+                }
             }
 
             return {
@@ -270,41 +349,69 @@ export const syncUserProfile = async (firebaseUid: string): Promise<{
             };
         }
 
-        // No local profile, check backend
-        const hasBackend = await hasBackendProfile(firebaseUid);
-        console.log(`Backend profile exists: ${hasBackend}`);
+        // No local profile - check if backend has a profile
+        console.log('⚠️ No local profile found, checking backend');
+        const online = await isOnline();
 
-        // Case 1: Both empty - show onboarding
-        if (!hasLocal && !hasBackend) {
-            console.log('📝 No profiles found - user needs onboarding');
+        if (!online) {
+            console.log('📡 Device is offline, cannot check backend');
+            // No local profile and offline - need onboarding
             return { shouldShowOnboarding: true, profile: null };
         }
 
-        // Case 2: Local empty but backend has data - pull from backend
-        if (!hasLocal && hasBackend) {
-            console.log('🔄 Syncing from backend to local');
-            const syncResult = await syncProfileFromBackendToLocal(firebaseUid);
+        // Check for profile in backend
+        const hasBackendProfile = await hasRemoteProfile(firebaseUid);
+        console.log(`Backend profile exists: ${hasBackendProfile}`);
 
-            if (syncResult) {
+        // If backend has a profile, pull it to local
+        if (hasBackendProfile) {
+            console.log('✅ Backend profile found, syncing to local');
+            const syncSuccess = await syncProfileFromBackendToLocal(firebaseUid);
+
+            if (syncSuccess) {
+                console.log('✅ Successfully synced profile from backend to local');
                 const localProfile = await getUserProfileByFirebaseUid(firebaseUid);
                 return {
                     shouldShowOnboarding: false,
                     profile: localProfile
                 };
             } else {
-                // If sync failed but we know backend has a profile,
-                // we should show onboarding to rebuild the profile
-                // rather than getting stuck in a loop
-                console.log('⚠️ Sync from backend failed, but backend has profile');
+                console.error('❌ Failed to sync profile from backend to local');
+                // Backend sync failed, show onboarding
                 return { shouldShowOnboarding: true, profile: null };
             }
         }
 
-        // This is a fallback - shouldn't reach here
-        console.log('⚠️ Unhandled profile sync case, showing onboarding');
+        // No local profile, no backend profile - show onboarding
+        console.log('📝 No profiles found anywhere - user needs onboarding');
         return { shouldShowOnboarding: true, profile: null };
     } catch (error) {
         console.error('❌ Error during profile sync:', error);
         return { shouldShowOnboarding: true, profile: null };
     }
-}; 
+};
+
+// Improved function to check if user has a profile in the backend
+const hasRemoteProfile = async (firebaseUid: string): Promise<boolean> => {
+    try {
+        console.log(`Checking backend profile existence for: ${firebaseUid}`);
+        const profile = await getUserProfile(firebaseUid);
+
+        if (profile === null) {
+            console.log('Backend profile not found (null response)');
+            return false;
+        }
+
+        if (profile && profile.error) {
+            console.log(`Backend check error: ${profile.error}`);
+            return false;
+        }
+
+        const exists = !!profile;
+        console.log(`Backend profile exists: ${exists}`);
+        return exists;
+    } catch (error) {
+        console.error('Error checking remote profile:', error);
+        return false;
+    }
+} 

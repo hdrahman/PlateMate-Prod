@@ -240,13 +240,16 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
         }
 
         // Add timeout to fetch request
-        const timeout = 8000; // 8 seconds timeout
+        const timeout = 15000; // 15 seconds timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
             const token = await getFirebaseToken();
             console.log(`Updating profile at ${API_URL}/users/${firebaseUid}`);
+
+            // Log the update data for debugging
+            console.log(`Update data: ${JSON.stringify(userData)}`);
 
             const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
                 method: 'PUT',
@@ -261,11 +264,19 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to update user profile');
+                // Try to parse response body for error details
+                try {
+                    const errorData = await response.json();
+                    console.error('API error response:', errorData);
+                    throw new Error(errorData.detail || `Failed to update user profile: ${response.status}`);
+                } catch (jsonError) {
+                    throw new Error(`Failed to update user profile: ${response.status} ${response.statusText}`);
+                }
             }
 
-            return await response.json();
+            const responseData = await response.json();
+            console.log('Profile update response:', JSON.stringify(responseData));
+            return responseData;
         } catch (fetchError: any) {
             // Handle specific network errors
             if (fetchError.name === 'AbortError') {
