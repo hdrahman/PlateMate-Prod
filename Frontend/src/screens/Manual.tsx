@@ -150,12 +150,6 @@ export default function Manual() {
         }
     };
 
-    // Navigate to create custom food
-    const handleCreateCustomFood = () => {
-        // This would navigate to a custom food creation screen
-        Alert.alert('Coming Soon', 'Custom food creation feature is coming soon!');
-    };
-
     // Render food category item
     const renderFoodCategory = ({ item }) => (
         <TouchableOpacity style={styles.categoryItem}>
@@ -266,17 +260,7 @@ export default function Manual() {
                 <View style={styles.emptySearchContainer}>
                     <Ionicons name="search-outline" size={48} color={GRAY} />
                     <Text style={styles.emptySearchText}>No results found for "{searchQuery}"</Text>
-                    <Text style={styles.emptySearchSubtext}>Try a different search term or create a custom food</Text>
-                    <TouchableOpacity style={styles.customButton} onPress={handleCreateCustomFood}>
-                        <LinearGradient
-                            colors={["#5A60EA", "#FF00F5"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.customButtonGradient}
-                        >
-                            <Text style={styles.customButtonText}>CREATE CUSTOM FOOD</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
+                    <Text style={styles.emptySearchSubtext}>Try a different search term</Text>
                 </View>
             ) : searchResults.length > 0 ? (
                 // Search Results
@@ -326,21 +310,6 @@ export default function Manual() {
                                 <Text style={styles.emptyStateText}>Your recent entries will appear here</Text>
                             </View>
                         )}
-                    </View>
-
-                    {/* Create Custom Food */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Create Custom Food</Text>
-                        <TouchableOpacity style={styles.customButton} onPress={handleCreateCustomFood}>
-                            <LinearGradient
-                                colors={["#5A60EA", "#FF00F5"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.customButtonGradient}
-                            >
-                                <Text style={styles.customButtonText}>CREATE CUSTOM FOOD</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
                     </View>
 
                     {/* Quick-Add Meals */}
