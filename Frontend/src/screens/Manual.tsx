@@ -82,9 +82,11 @@ export default function Manual() {
             try {
                 // Use FatSecret API for all searches
                 const results = await searchFatSecretFood(query);
+                console.log("Search results:", results.length);
                 setSearchResults(results);
             } catch (error) {
                 console.error('Error searching for food:', error);
+                setSearchResults([]);
             } finally {
                 setIsSearching(false);
             }
@@ -258,6 +260,23 @@ export default function Manual() {
                 <View style={styles.searchingContainer}>
                     <ActivityIndicator size="small" color={BLUE_ACCENT} />
                     <Text style={styles.searchingText}>Searching...</Text>
+                </View>
+            ) : searchQuery.length > 2 && searchResults.length === 0 ? (
+                // No results found
+                <View style={styles.emptySearchContainer}>
+                    <Ionicons name="search-outline" size={48} color={GRAY} />
+                    <Text style={styles.emptySearchText}>No results found for "{searchQuery}"</Text>
+                    <Text style={styles.emptySearchSubtext}>Try a different search term or create a custom food</Text>
+                    <TouchableOpacity style={styles.customButton} onPress={handleCreateCustomFood}>
+                        <LinearGradient
+                            colors={["#5A60EA", "#FF00F5"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.customButtonGradient}
+                        >
+                            <Text style={styles.customButtonText}>CREATE CUSTOM FOOD</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
                 </View>
             ) : searchResults.length > 0 ? (
                 // Search Results
@@ -565,5 +584,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
+    },
+    emptySearchContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+    },
+    emptySearchText: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginTop: 16,
+    },
+    emptySearchSubtext: {
+        color: GRAY,
+        fontSize: 14,
+        textAlign: 'center',
+        marginTop: 8,
+        marginBottom: 24,
     },
 }); 

@@ -33,15 +33,22 @@ export const searchFatSecretFood = async (
         // FatSecret response structure is different from Nutritionix
         const responseData = response.data;
 
-        // Check if foods array exists in the response
-        if (!responseData.foods || !responseData.foods.food) {
+        // If no foods property in the response or it explicitly states no foods found
+        if (!responseData.foods || responseData.no_results === true) {
+            console.log('No foods found for query:', query);
             return [];
         }
 
         // FatSecret can return a single object or an array
         const foodsData = Array.isArray(responseData.foods.food)
             ? responseData.foods.food
-            : [responseData.foods.food];
+            : (responseData.foods.food ? [responseData.foods.food] : []);
+
+        // If the array is empty, return empty array
+        if (foodsData.length === 0) {
+            console.log('Empty foods array for query:', query);
+            return [];
+        }
 
         // Transform the FatSecret food data into our app's FoodItem format
         return foodsData.map((food: any) => {
