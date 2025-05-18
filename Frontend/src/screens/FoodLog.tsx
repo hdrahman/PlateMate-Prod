@@ -31,6 +31,9 @@ import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ExerciseModal from '../components/ExerciseModal';
+import { useAuth } from '../context/AuthContext';
+import { getUserProfileByFirebaseUid } from '../utils/database';
+import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -52,6 +55,7 @@ const formatDateToString = (date: Date): string => {
 // Define the navigation type
 type RootStackParamList = {
     ImageCapture: { mealType: string; sourcePage?: string };
+    Manual: { mealType: string; sourcePage?: string };
     // Add other screens as needed
 };
 
@@ -129,6 +133,9 @@ const DiaryScreen: React.FC = () => {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const localMealDataRef = useRef<FoodLogEntry[] | null>(null);
     const scrollRef = useRef(null); // added scroll ref for simultaneous gesture handling
+    const { user } = useAuth();
+    const [nutritionGoals, setNutritionGoals] = useState(getDefaultNutritionGoals());
+    const [profileLoading, setProfileLoading] = useState(true);
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -432,7 +439,67 @@ const DiaryScreen: React.FC = () => {
         // The fetchMeals effect will run after this since it also depends on currentDate
     }, [currentDate]);
 
-    const goal = 1800;
+    // Load user profile and calculate nutrition goals
+    useEffect(() => {
+        const loadUserProfile = async () => {
+            if (!user) return;
+
+            try {
+                setProfileLoading(true);
+                // Get user profile from local database
+                const profile = await getUserProfileByFirebaseUid(user.uid);
+
+                if (profile) {
+                    // Calculate nutrition goals based on user profile
+                    const goals = calculateNutritionGoals({
+                        firstName: profile.first_name,
+                        lastName: profile.last_name,
+                        phoneNumber: '',
+                        height: profile.height,
+                        weight: profile.weight,
+                        age: profile.age,
+                        gender: profile.gender,
+                        activityLevel: profile.activity_level,
+                        dietaryRestrictions: profile.dietary_restrictions || [],
+                        foodAllergies: profile.food_allergies || [],
+                        cuisinePreferences: profile.cuisine_preferences || [],
+                        spiceTolerance: profile.spice_tolerance,
+                        weightGoal: profile.weight_goal,
+                        healthConditions: profile.health_conditions || [],
+                        dailyCalorieTarget: profile.daily_calorie_target,
+                        nutrientFocus: profile.nutrient_focus,
+                        defaultAddress: null,
+                        preferredDeliveryTimes: [],
+                        deliveryInstructions: null,
+                        pushNotificationsEnabled: profile.push_notifications_enabled,
+                        emailNotificationsEnabled: profile.email_notifications_enabled,
+                        smsNotificationsEnabled: profile.sms_notifications_enabled,
+                        marketingEmailsEnabled: profile.marketing_emails_enabled,
+                        paymentMethods: [],
+                        billingAddress: null,
+                        defaultPaymentMethodId: null,
+                        preferredLanguage: profile.preferred_language || 'en',
+                        timezone: profile.timezone || 'UTC',
+                        unitPreference: profile.unit_preference || 'metric',
+                        darkMode: profile.dark_mode,
+                        syncDataOffline: profile.sync_data_offline
+                    });
+
+                    setNutritionGoals(goals);
+                }
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+            } finally {
+                setProfileLoading(false);
+            }
+        };
+
+        loadUserProfile();
+    }, [user]);
+
+    // Replace the hardcoded goal with the dynamic one from user profile
+    const goal = nutritionGoals.calories;
+
     // Calculate total exercise calories based on exerciseList instead of hardcoded value
     const totalExerciseCalories = exerciseList.reduce((total, exercise) => total + exercise.calories_burned, 0);
 
@@ -572,6 +639,12 @@ const DiaryScreen: React.FC = () => {
 
         // New gradient border styles
         gradientBorderContainer: ViewStyle;
+        macroGoalsContainer: ViewStyle;
+        macroGoalsTitle: TextStyle;
+        macroGoalsRow: ViewStyle;
+        macroGoalItem: ViewStyle;
+        macroGoalValue: TextStyle;
+        macroGoalLabel: TextStyle;
     };
 
     const styles = StyleSheet.create<StylesType>({
@@ -1005,6 +1078,35 @@ const DiaryScreen: React.FC = () => {
         weightText: {
             fontSize: 12,
             color: '#999999',
+            marginTop: 2,
+        },
+        macroGoalsContainer: {
+            marginTop: 15,
+            paddingTop: 15,
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(255, 255, 255, 0.1)',
+        },
+        macroGoalsTitle: {
+            color: '#FFFFFF',
+            fontSize: 14,
+            fontWeight: '600',
+            marginBottom: 10,
+            textAlign: 'center',
+        },
+        macroGoalsRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-around',
+        },
+        macroGoalItem: {
+            alignItems: 'center',
+        },
+        macroGoalValue: {
+            fontSize: 16,
+            fontWeight: '700',
+        },
+        macroGoalLabel: {
+            color: '#AAAAAA',
+            fontSize: 12,
             marginTop: 2,
         },
     });
@@ -1690,6 +1792,23 @@ const DiaryScreen: React.FC = () => {
                                         <Text style={styles.equationLabel}>Remaining</Text>
                                     </View>
                                 </View>
+                                <View style={styles.macroGoalsContainer}>
+                                    <Text style={styles.macroGoalsTitle}>Macro Goals</Text>
+                                    <View style={styles.macroGoalsRow}>
+                                        <View style={styles.macroGoalItem}>
+                                            <Text style={[styles.macroGoalValue, { color: '#4CAF50' }]}>{nutritionGoals.protein}g</Text>
+                                            <Text style={styles.macroGoalLabel}>Protein</Text>
+                                        </View>
+                                        <View style={styles.macroGoalItem}>
+                                            <Text style={[styles.macroGoalValue, { color: '#2196F3' }]}>{nutritionGoals.carbs}g</Text>
+                                            <Text style={styles.macroGoalLabel}>Carbs</Text>
+                                        </View>
+                                        <View style={styles.macroGoalItem}>
+                                            <Text style={[styles.macroGoalValue, { color: '#FFC107' }]}>{nutritionGoals.fat}g</Text>
+                                            <Text style={styles.macroGoalLabel}>Fat</Text>
+                                        </View>
+                                    </View>
+                                </View>
                             </GradientBorderCard>
 
                             {/* 3) Meals */}
@@ -1781,7 +1900,7 @@ const DiaryScreen: React.FC = () => {
 
                                     <TouchableOpacity
                                         style={styles.addBtn}
-                                        onPress={() => navigation.navigate('ImageCapture', { mealType: meal.title, sourcePage: 'FoodLog' })}
+                                        onPress={() => navigation.navigate('Manual', { mealType: meal.title, sourcePage: 'FoodLog' })}
                                     >
                                         <Text style={styles.addBtnText}>ADD FOOD</Text>
                                     </TouchableOpacity>

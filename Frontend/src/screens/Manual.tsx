@@ -16,7 +16,7 @@ import {
     Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,7 @@ import { debounce } from 'lodash';
 // Define navigation type
 type RootStackParamList = {
     FoodLog: { refresh?: number };
-    Manual: undefined;
+    Manual: { mealType?: string; sourcePage?: string };
 };
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -45,6 +45,9 @@ const BLUE_ACCENT = '#2196F3';
 
 export default function Manual() {
     const navigation = useNavigation<NavigationProp>();
+    const route = useRoute();
+    const params = route.params as { mealType?: string; sourcePage?: string };
+    const defaultMealType = params?.mealType || 'Breakfast';
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -149,9 +152,12 @@ export default function Manual() {
     // Handle adding food to log
     const handleAddFood = async (food, mealType, quantity) => {
         try {
+            // If no meal type was specified, use the default from route params
+            const finalMealType = mealType || defaultMealType;
+
             setIsLoading(true);
-            await addFoodEntry(food, mealType, quantity);
-            Alert.alert('Success', `Added ${food.food_name} to your ${mealType} log`, [
+            await addFoodEntry(food, finalMealType, quantity);
+            Alert.alert('Success', `Added ${food.food_name} to your ${finalMealType} log`, [
                 {
                     text: 'OK',
                     onPress: async () => {

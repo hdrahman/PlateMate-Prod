@@ -6,6 +6,9 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
 import { getTodayCalories, getTodayExerciseCalories, getTodayProtein, getTodayCarbs, getTodayFats } from '../utils/database';
+import { useAuth } from '../context/AuthContext';
+import { getUserProfileByFirebaseUid } from '../utils/database';
+import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 
 import {
   View,
@@ -43,13 +46,9 @@ const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2); // Total SVG size including pa
 const MACRO_RING_SIZE = 60;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DUMMY DATA
+// Default data until we load from user profile
 // ─────────────────────────────────────────────────────────────────────────────
-const dailyCalorieGoal = 2500;
-const remainingCalories = dailyCalorieGoal; // We'll update this later
-const percentConsumed = 0; // We'll update this later
-
-const stepsCount = 4500;
+const defaultGoals = getDefaultNutritionGoals();
 const WeightLost = 8;
 
 // Cheat day data
@@ -110,22 +109,35 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 export default function Home() {
   const navigation = useNavigation();
   const { isDarkTheme } = useContext(ThemeContext);
+  const { user } = useAuth();
+
   // Keep track of which "page" (card) we are on in the horizontal scroll
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Add state for user goals from profile
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(defaultGoals.calories);
+  const [macroGoals, setMacroGoals] = useState({
+    protein: defaultGoals.protein,
+    carbs: defaultGoals.carbs,
+    fat: defaultGoals.fat
+  });
+  const [profileLoading, setProfileLoading] = useState(true);
+
   // Add state for consumed calories and loading
   const [consumedCalories, setConsumedCalories] = useState(0);
   const [remainingCals, setRemainingCals] = useState(dailyCalorieGoal);
   const [percentCons, setPercentCons] = useState(0);
   const [foodLoading, setFoodLoading] = useState(true);
+
   // Add state for exercise calories and loading
   const [exerciseCalories, setExerciseCalories] = useState(0);
   const [exerciseLoading, setExerciseLoading] = useState(true);
+
   // Macro state
   const [protein, setProtein] = useState(0);
   const [carbs, setCarbs] = useState(0);
   const [fats, setFats] = useState(0);
   const [macrosLoading, setMacrosLoading] = useState(true);
-  const macroGoal = 100; // grams
 
   // Use the step context instead of the hook directly
   const {
@@ -135,6 +147,69 @@ export default function Home() {
     loading: stepsLoading
   } = useSteps();
 
+  // Load user profile and calculate nutrition goals
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user) return;
+
+      try {
+        setProfileLoading(true);
+        // Get user profile from local database
+        const profile = await getUserProfileByFirebaseUid(user.uid);
+
+        if (profile) {
+          // Calculate nutrition goals based on user profile
+          const goals = calculateNutritionGoals({
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            phoneNumber: '',
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            activityLevel: profile.activity_level,
+            dietaryRestrictions: profile.dietary_restrictions || [],
+            foodAllergies: profile.food_allergies || [],
+            cuisinePreferences: profile.cuisine_preferences || [],
+            spiceTolerance: profile.spice_tolerance,
+            weightGoal: profile.weight_goal,
+            healthConditions: profile.health_conditions || [],
+            dailyCalorieTarget: profile.daily_calorie_target,
+            nutrientFocus: profile.nutrient_focus,
+            defaultAddress: null,
+            preferredDeliveryTimes: [],
+            deliveryInstructions: null,
+            pushNotificationsEnabled: profile.push_notifications_enabled,
+            emailNotificationsEnabled: profile.email_notifications_enabled,
+            smsNotificationsEnabled: profile.sms_notifications_enabled,
+            marketingEmailsEnabled: profile.marketing_emails_enabled,
+            paymentMethods: [],
+            billingAddress: null,
+            defaultPaymentMethodId: null,
+            preferredLanguage: profile.preferred_language || 'en',
+            timezone: profile.timezone || 'UTC',
+            unitPreference: profile.unit_preference || 'metric',
+            darkMode: profile.dark_mode,
+            syncDataOffline: profile.sync_data_offline
+          });
+
+          setDailyCalorieGoal(goals.calories);
+          setMacroGoals({
+            protein: goals.protein,
+            carbs: goals.carbs,
+            fat: goals.fat
+          });
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, [user]);
+
   // Fetch food calories from the database
   useEffect(() => {
     const fetchCalories = async () => {
@@ -143,7 +218,7 @@ export default function Home() {
         const calories = await getTodayCalories();
         setConsumedCalories(calories);
 
-        // We'll update remainingCals after we get exercise calories
+        // Calculate percentage based on current goal
         setPercentCons((calories / dailyCalorieGoal) * 100);
       } catch (error) {
         console.error('Error fetching calories:', error);
@@ -153,8 +228,11 @@ export default function Home() {
       }
     };
 
-    fetchCalories();
-  }, []);
+    // Only fetch if profile is loaded
+    if (!profileLoading) {
+      fetchCalories();
+    }
+  }, [dailyCalorieGoal, profileLoading]);
 
   // Fetch exercise calories from the database
   useEffect(() => {
@@ -174,8 +252,11 @@ export default function Home() {
       }
     };
 
-    fetchExerciseCalories();
-  }, [consumedCalories]); // Re-run when consumedCalories changes
+    // Only fetch if food calories are loaded
+    if (!foodLoading) {
+      fetchExerciseCalories();
+    }
+  }, [consumedCalories, dailyCalorieGoal, foodLoading]);
 
   // Fetch macros from the database
   useEffect(() => {
@@ -424,9 +505,9 @@ export default function Home() {
         {/* MACROS CARD */}
         <GradientBorderCard>
           <View style={styles.macrosRow}>
-            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : Math.min(100, (protein / macroGoal) * 100)} current={macrosLoading ? 0 : protein} />
-            <MacroRing label="CARBS" percent={macrosLoading ? 0 : Math.min(100, (carbs / macroGoal) * 100)} current={macrosLoading ? 0 : carbs} />
-            <MacroRing label="FATS" percent={macrosLoading ? 0 : Math.min(100, (fats / macroGoal) * 100)} current={macrosLoading ? 0 : fats} />
+            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : Math.min(100, (protein / macroGoals.protein) * 100)} current={macrosLoading ? 0 : protein} />
+            <MacroRing label="CARBS" percent={macrosLoading ? 0 : Math.min(100, (carbs / macroGoals.carbs) * 100)} current={macrosLoading ? 0 : carbs} />
+            <MacroRing label="FATS" percent={macrosLoading ? 0 : Math.min(100, (fats / macroGoals.fat) * 100)} current={macrosLoading ? 0 : fats} />
             <MacroRing
               label="OTHER"
               percent={100}
