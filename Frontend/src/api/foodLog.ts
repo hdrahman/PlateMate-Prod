@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
 import { FoodItem } from './nutritionix';
+import { addFoodLog, getFoodLogsByDate as getLocalFoodLogsByDate } from '../utils/database';
+import { getCurrentDate, formatDateToYYYYMMDD } from '../utils/helpers';
 
 // Interface for a food log entry
 export interface FoodLogEntry {
@@ -33,6 +35,9 @@ export interface FoodLogEntry {
     brand_name?: string;
     quantity?: string;
     notes?: string;
+    synced?: number;
+    sync_action?: string;
+    last_modified?: string;
 }
 
 /**
@@ -78,12 +83,14 @@ export const addFoodEntry = async (
             notes: foodItem.notes
         };
 
-        const response = await axios.post(
-            `${BACKEND_URL}/meal_entries/create`,
-            foodLogEntry
-        );
+        // Skip backend API call and only save locally
+        console.log('Saving food entry locally only');
+        const localId = await addFoodLog({
+            ...foodLogEntry,
+            synced: 0  // Mark as not synced with server
+        });
 
-        return { ...foodLogEntry, id: response.data.id };
+        return { ...foodLogEntry, id: localId };
     } catch (error) {
         console.error('Error adding food entry:', error);
         throw new Error('Failed to add food to log');
@@ -95,9 +102,13 @@ export const addFoodEntry = async (
  */
 export const getFoodLogsByDate = async (date: Date): Promise<FoodLogEntry[]> => {
     try {
-        const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-        const response = await axios.get(`${BACKEND_URL}/meal_entries/by-date/${formattedDate}`);
-        return response.data;
+        // Format as YYYY-MM-DD
+        const formattedDate = formatDateToYYYYMMDD(date);
+
+        console.log('Fetching from local SQLite database...');
+        // Get data from local database only
+        const localEntries = await getLocalFoodLogsByDate(formattedDate) as unknown as FoodLogEntry[];
+        return localEntries || [];
     } catch (error) {
         console.error('Error fetching food logs:', error);
         return [];
@@ -111,12 +122,21 @@ export const getRecentFoodEntries = async (limit: number = 10): Promise<FoodLogE
     try {
         // Since there's no direct endpoint for recent entries, we'll get today's entries
         const today = new Date();
-        const entries = await getFoodLogsByDate(today);
+        const formattedDate = formatDateToYYYYMMDD(today);
 
-        // Sort by most recent first and limit the number of results
-        return entries
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, limit);
+        // Get from local database only
+        try {
+            const localEntries = await getLocalFoodLogsByDate(formattedDate) as unknown as FoodLogEntry[];
+            console.log('Found local entries:', localEntries?.length || 0);
+
+            // Sort by most recent first and limit the number of results
+            return (localEntries || [])
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, limit);
+        } catch (localError) {
+            console.error('Error fetching local entries:', localError);
+            return [];
+        }
     } catch (error) {
         console.error('Error fetching recent food entries:', error);
         return [];

@@ -169,15 +169,25 @@ export const getCurrentUserId = (): string => {
 export const addFoodLog = async (foodLog: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to add food log before database initialization');
-        throw new Error('Database not initialized');
+        console.log('🔄 Attempting to initialize database automatically');
+        try {
+            await initDatabase();
+            if (!global.dbInitialized) {
+                throw new Error('Failed to initialize database');
+            }
+        } catch (initError) {
+            console.error('❌ Failed to auto-initialize database:', initError);
+            throw new Error('Database not initialized and auto-init failed');
+        }
     }
 
     // Get current user ID from Firebase
     const firebaseUserId = getCurrentUserId();
+    console.log('📝 Adding food log for user:', firebaseUserId);
 
     const {
         user_id = firebaseUserId, // Use Firebase user ID instead of default 1
-        food_name,
+        food_name = 'Unnamed Food',
         meal_id = 0,
         calories = 0,
         proteins = 0,
@@ -199,10 +209,10 @@ export const addFoodLog = async (foodLog: any) => {
         weight = null,
         weight_unit = 'g',
         image_url = '',
-        file_key = '',
-        healthiness_rating = 0,
+        file_key = 'default_file_key',
+        healthiness_rating = 5,
         date = getCurrentDate(),
-        meal_type = 'Snacks',
+        meal_type = 'Breakfast',
         brand_name = '',
         quantity = '',
         notes = ''
@@ -222,12 +232,15 @@ export const addFoodLog = async (foodLog: any) => {
             } catch (error) {
                 console.error('❌ Error formatting date:', error);
                 // Fall back to current date if parsing fails
-                formattedDate = getCurrentDate().split('T')[0];
+                formattedDate = new Date().toISOString().split('T')[0];
             }
         }
+    } else {
+        // If no date provided, use today's date
+        formattedDate = new Date().toISOString().split('T')[0];
     }
 
-    console.log(`📝 Adding food log with date: ${formattedDate}`);
+    console.log(`📝 Adding food log with date: ${formattedDate}, name: ${food_name}, meal_type: ${meal_type}`);
 
     try {
         // Start a transaction for better error handling
@@ -281,7 +294,14 @@ export const addFoodLog = async (foodLog: any) => {
         // Commit the transaction
         await db.runAsync('COMMIT');
 
-        console.log('✅ Food log added successfully', result.lastInsertRowId);
+        // Debug: Verify the entry was added by fetching it
+        const addedEntry = await db.getFirstAsync(
+            `SELECT * FROM food_logs WHERE id = ?`,
+            [result.lastInsertRowId]
+        );
+        console.log('✅ Food log added and verified:', addedEntry ? 'Success' : 'Failed to verify');
+
+        console.log('✅ Food log added successfully with ID', result.lastInsertRowId);
         return result.lastInsertRowId;
     } catch (error) {
         // Rollback the transaction in case of error
@@ -304,12 +324,29 @@ export const getFoodLogsByDate = async (date: string) => {
     }
 
     const firebaseUserId = getCurrentUserId();
+    console.log(`🔍 Looking for food logs with date=${date} and user_id=${firebaseUserId}`);
 
     try {
+        // First check if there are any logs for this date
+        const countResult = await db.getFirstAsync(
+            `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
+            [date, firebaseUserId]
+        );
+        console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${date}`);
+
+        // Get all logs for this date
         const result = await db.getAllAsync(
             `SELECT * FROM food_logs WHERE date = ? AND user_id = ? ORDER BY id DESC`,
             [date, firebaseUserId]
         );
+
+        // Log the first record for debugging
+        if (result && result.length > 0) {
+            console.log(`📋 First food log: ${JSON.stringify(result[0])}`);
+        } else {
+            console.log(`📋 No food logs found for date: ${date}`);
+        }
+
         return result;
     } catch (error) {
         console.error('❌ Error getting food logs by date:', error);
@@ -1094,8 +1131,7 @@ export const updateUserProfile = async (firebaseUid: string, updates: any) => {
         // Add firebase_uid to values for the WHERE clause
         values.push(firebaseUid);
 
-        const query = `
-            UPDATE user_profiles
+        const query = `            UPDATE user_profiles
             SET ${columns.join(', ')}
             WHERE firebase_uid = ?
         `;

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
@@ -25,6 +26,13 @@ import ManualFoodEntry from '../components/ManualFoodEntry';
 import { searchFatSecretFood, getFatSecretFoodDetails } from '../api';
 import { getRecentFoodEntries, addFoodEntry, FoodLogEntry } from '../api/foodLog';
 import { debounce } from 'lodash';
+
+// Define navigation type
+type RootStackParamList = {
+    FoodLog: { refresh?: number };
+    Manual: undefined;
+};
+type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 // Define theme colors
 const PRIMARY_BG = '#000000';
@@ -36,7 +44,7 @@ const PURPLE_ACCENT = '#AA00FF';
 const BLUE_ACCENT = '#2196F3';
 
 export default function Manual() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<NavigationProp>();
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -143,10 +151,24 @@ export default function Manual() {
         try {
             setIsLoading(true);
             await addFoodEntry(food, mealType, quantity);
-            Alert.alert('Success', `Added ${food.food_name} to your ${mealType} log`);
-            setShowFoodDetails(false);
-            // Refresh recent entries
-            await loadRecentEntries();
+            Alert.alert('Success', `Added ${food.food_name} to your ${mealType} log`, [
+                {
+                    text: 'OK',
+                    onPress: async () => {
+                        // Add a small delay to ensure database operations complete
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Refresh recent entries
+                        await loadRecentEntries();
+
+                        // Hide food details modal
+                        setShowFoodDetails(false);
+
+                        // Navigate back to FoodLog with refresh parameter
+                        navigation.navigate('FoodLog', { refresh: Date.now() });
+                    }
+                }
+            ]);
         } catch (error) {
             console.error('Error adding food to log:', error);
             Alert.alert('Error', 'Failed to add food to log. Please try again.');

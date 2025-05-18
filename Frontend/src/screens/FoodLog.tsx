@@ -34,6 +34,13 @@ import ExerciseModal from '../components/ExerciseModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// Define theme colors at the top of the file, right after const { width: screenWidth } = Dimensions.get('window');
+const PRIMARY_BG = '#000000';
+const CARD_BG = '#1C1C1E';
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
+const PURPLE_ACCENT = '#AA00FF';
+
 // Helper function to format date as YYYY-MM-DD
 const formatDateToString = (date: Date): string => {
     const year = date.getFullYear();
@@ -1474,6 +1481,102 @@ const DiaryScreen: React.FC = () => {
         extrapolate: 'clamp'
     });
 
+    // Add right after the refreshMealData function
+    const debugAddTestEntry = async () => {
+        try {
+            console.log('🔧 Attempting to add test entry directly to database');
+            const { addFoodLog, getCurrentUserId } = require('../utils/database');
+
+            // Get current date in YYYY-MM-DD format
+            const today = formatDateToString(new Date());
+            console.log('🔧 Using today\'s date:', today);
+
+            // Get the same user ID that's used for querying
+            const userId = getCurrentUserId();
+            console.log('🔧 Using user ID:', userId);
+
+            const testEntry = {
+                meal_id: 1,
+                user_id: userId, // Use the same user ID as when querying
+                food_name: 'Test Food Entry',
+                calories: 500,
+                proteins: 20,
+                carbs: 30,
+                fats: 15,
+                fiber: 5,
+                sugar: 10,
+                date: today, // Use the exact same date format as when querying
+                meal_type: 'Breakfast',
+                synced: 0
+            };
+
+            const id = await addFoodLog(testEntry);
+            console.log('🔧 Test entry added with ID:', id);
+
+            // Refresh data after adding test entry
+            setTimeout(() => {
+                refreshMealData();
+            }, 500);
+
+            // Show alert to confirm entry was added
+            Alert.alert('Debug', `Test entry added with ID: ${id}`);
+        } catch (error) {
+            console.error('🔧 Error adding test entry:', error);
+            Alert.alert('Debug Error', `Failed to add test entry: ${error.message}`);
+        }
+    };
+
+    // Add this after the debugAddTestEntry function
+    const debugQueryDatabase = async () => {
+        try {
+            console.log('🔍 Directly querying database for food logs');
+            const { db } = require('../utils/database');
+
+            if (!db || !global.dbInitialized) {
+                Alert.alert('Debug', 'Database is not initialized!');
+                return;
+            }
+
+            // Get current date in YYYY-MM-DD format
+            const today = formatDateToString(new Date());
+
+            // Query all tables to check structure
+            const tables = await db.getAllAsync(
+                `SELECT name FROM sqlite_master WHERE type='table'`
+            );
+            console.log('🔍 Database tables:', tables);
+
+            // Check food_logs table structure
+            const columns = await db.getAllAsync(
+                `PRAGMA table_info(food_logs)`
+            );
+            console.log('🔍 Food logs table columns:', columns);
+
+            // Query all food logs regardless of date or user
+            const allLogs = await db.getAllAsync(
+                `SELECT * FROM food_logs`
+            );
+            console.log('🔍 All food logs in database:', allLogs.length);
+            if (allLogs.length > 0) {
+                console.log('🔍 First food log:', JSON.stringify(allLogs[0]));
+            }
+
+            // Query food logs for today
+            const todayLogs = await db.getAllAsync(
+                `SELECT * FROM food_logs WHERE date = ?`,
+                [today]
+            );
+            console.log(`🔍 Food logs for today (${today}):`, todayLogs.length);
+
+            Alert.alert('Debug Database',
+                `Found ${allLogs.length} total logs\n${todayLogs.length} logs for today (${today})`
+            );
+        } catch (error) {
+            console.error('🔍 Error querying database:', error);
+            Alert.alert('Debug Error', `Failed to query database: ${error.message}`);
+        }
+    };
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={containerStyle}>
@@ -1898,16 +2001,43 @@ const DiaryScreen: React.FC = () => {
                         <Text style={styles.loadingText}>Processing...</Text>
                     </View>
                 )}
+
+                {__DEV__ && (
+                    <View>
+                        <TouchableOpacity
+                            onPress={debugAddTestEntry}
+                            style={{
+                                position: 'absolute',
+                                bottom: 80,
+                                right: 10,
+                                backgroundColor: '#FF5252',
+                                padding: 8,
+                                borderRadius: 8,
+                                zIndex: 100
+                            }}
+                        >
+                            <Text style={{ color: 'white', fontWeight: 'bold' }}>Debug Add</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={debugQueryDatabase}
+                            style={{
+                                position: 'absolute',
+                                bottom: 30,
+                                right: 10,
+                                backgroundColor: '#4CAF50',
+                                padding: 8,
+                                borderRadius: 8,
+                                zIndex: 100
+                            }}
+                        >
+                            <Text style={{ color: 'white', fontWeight: 'bold' }}>Debug Query</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </SafeAreaView>
         </GestureHandlerRootView>
     );
 };
 
 export default DiaryScreen;
-
-/** COLOR PALETTE */
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
