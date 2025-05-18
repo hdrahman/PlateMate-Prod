@@ -12,11 +12,13 @@ import {
     RefreshControl,
     FlatList,
     Image,
-    Alert
+    Alert,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
 import { searchFatSecretFood, getFatSecretFoodDetails } from '../api';
@@ -34,6 +36,7 @@ const BLUE_ACCENT = '#2196F3';
 
 export default function Manual() {
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [recentEntries, setRecentEntries] = useState([]);
@@ -191,8 +194,8 @@ export default function Manual() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <View style={[styles.mainContainer, { paddingTop: insets.top }]}>
+            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
 
             {/* Loading Indicator */}
             {isLoading && (
@@ -334,11 +337,15 @@ export default function Manual() {
                     </View>
                 </ScrollView>
             )}
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    mainContainer: {
+        flex: 1,
+        backgroundColor: PRIMARY_BG,
+    },
     container: {
         flex: 1,
         backgroundColor: PRIMARY_BG,
