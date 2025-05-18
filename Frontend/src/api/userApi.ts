@@ -164,7 +164,7 @@ export const getUserProfile = async (firebaseUid: string) => {
         }
 
         // Add timeout to fetch request
-        const timeout = 8000; // 8 seconds timeout
+        const timeout = 5000; // Reduced from 8000ms to 5000ms for faster response
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -189,8 +189,12 @@ export const getUserProfile = async (firebaseUid: string) => {
                     return null;
                 }
 
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to get user profile');
+                try {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to get user profile');
+                } catch (jsonError) {
+                    throw new Error(`Failed to get user profile: ${response.status} ${response.statusText}`);
+                }
             }
 
             return await response.json();
@@ -198,7 +202,8 @@ export const getUserProfile = async (firebaseUid: string) => {
             // Handle specific network errors
             if (fetchError.name === 'AbortError') {
                 console.warn(`Request timed out after ${timeout}ms`);
-                return null; // Return null to allow local storage fallback
+                // Return error with a timeout flag
+                return { error: 'timeout' };
             }
 
             console.warn('Network error:', fetchError.message);
@@ -209,7 +214,7 @@ export const getUserProfile = async (firebaseUid: string) => {
                 fetchError.message.includes('Network error')
             )) {
                 console.warn('Network connection failed - backend may be unavailable');
-                return null; // Return null to allow local storage fallback
+                return { error: 'network' };
             }
 
             throw fetchError;

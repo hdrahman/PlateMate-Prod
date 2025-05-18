@@ -99,6 +99,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],
+    expose_headers=["*"],  # Expose all headers
 )
 
 # Include routers correctly

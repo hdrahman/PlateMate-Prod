@@ -75,8 +75,61 @@ def sync_users():
         pg_users = pg_session.query(User).all()
         pg_users_by_firebase_uid = {user.firebase_uid: user for user in pg_users if user.firebase_uid}
         
-        # Get all users from SQLite
-        sqlite_users = sqlite_session.query(User).all()
+        # Get all users from SQLite - handle different schema gracefully
+        # This custom query allows us to handle the schema difference between databases
+        sqlite_users = []
+        with sqlite_engine.connect() as conn:
+            # Check if the updated schema is in place
+            result = conn.execute(text("PRAGMA table_info(users)"))
+            columns = [row[1] for row in result.fetchall()]
+            
+            # Basic columns that should be in both schemas
+            select_columns = ["id", "firebase_uid", "email", "gender", "height", "weight", "created_at", "updated_at"]
+            
+            # Add columns only if they exist
+            if "first_name" in columns:
+                select_columns.append("first_name")
+            if "last_name" in columns:
+                select_columns.append("last_name")
+            if "onboarding_complete" in columns:
+                select_columns.append("onboarding_complete")
+            if "age" in columns:
+                select_columns.append("age")
+            if "activity_level" in columns:
+                select_columns.append("activity_level")
+            if "weight_goal" in columns:
+                select_columns.append("weight_goal")
+            if "target_weight" in columns:
+                select_columns.append("target_weight")
+            
+            # Build and execute select query
+            query = text(f"SELECT {', '.join(select_columns)} FROM users")
+            result = conn.execute(query)
+            
+            # Process each user
+            for row in result:
+                user_dict = row._asdict()
+                
+                # Create a user object with only the fields that are present
+                user = User(
+                    id=user_dict.get("id"),
+                    firebase_uid=user_dict.get("firebase_uid"),
+                    email=user_dict.get("email"),
+                    first_name=user_dict.get("first_name", ""),
+                    last_name=user_dict.get("last_name", ""),
+                    gender=user_dict.get("gender"),
+                    height=user_dict.get("height"),
+                    weight=user_dict.get("weight"),
+                    age=user_dict.get("age"),
+                    activity_level=user_dict.get("activity_level"),
+                    weight_goal=user_dict.get("weight_goal"),
+                    target_weight=user_dict.get("target_weight"),
+                    onboarding_complete=bool(user_dict.get("onboarding_complete", 0)),
+                    created_at=user_dict.get("created_at"),
+                    updated_at=user_dict.get("updated_at")
+                )
+                sqlite_users.append(user)
+        
         sqlite_users_by_firebase_uid = {user.firebase_uid: user for user in sqlite_users if user.firebase_uid}
         
         # Count for reporting
@@ -87,32 +140,82 @@ def sync_users():
         # SCENARIO 1: SQLite is empty but PostgreSQL has users - restore from PostgreSQL to SQLite
         if not sqlite_users and pg_users:
             logger.info("Local SQLite database empty. Restoring users from PostgreSQL...")
+            
+            # Connect directly to SQLite for more control
+            conn = sqlite3.connect(SQLITE_FILE_PATH)
+            cursor = conn.cursor()
+            
             for pg_user in pg_users:
                 if not pg_user.firebase_uid:
                     logger.warning(f"Skipping PostgreSQL user with ID {pg_user.id} - missing firebase_uid")
                     continue
-                    
-                # Create a new user in SQLite with same attributes
-                new_sqlite_user = User(
-                    firebase_uid=pg_user.firebase_uid,
-                    email=pg_user.email,
-                    first_name=pg_user.first_name,
-                    last_name=pg_user.last_name,
-                    onboarding_complete=pg_user.onboarding_complete,
-                    height=pg_user.height,
-                    weight=pg_user.weight,
-                    age=pg_user.age,
-                    gender=pg_user.gender,
-                    activity_level=pg_user.activity_level,
-                    weight_goal=pg_user.weight_goal,
-                    target_weight=pg_user.target_weight,
-                    created_at=pg_user.created_at,
-                    updated_at=pg_user.updated_at
-                )
-                sqlite_session.add(new_sqlite_user)
-                sqlite_users_created += 1
+                
+                # Check if the user exists
+                cursor.execute("SELECT id FROM users WHERE firebase_uid = ?", (pg_user.firebase_uid,))
+                user_exists = cursor.fetchone()
+                
+                if user_exists:
+                    # Update existing user
+                    cursor.execute("""
+                        UPDATE users SET 
+                            email = ?, 
+                            first_name = ?, 
+                            last_name = ?, 
+                            onboarding_complete = ?,
+                            height = ?, 
+                            weight = ?, 
+                            age = ?,
+                            gender = ?, 
+                            activity_level = ?, 
+                            weight_goal = ?, 
+                            target_weight = ?,
+                            created_at = ?,
+                            updated_at = ?
+                        WHERE firebase_uid = ?
+                    """, (
+                        pg_user.email,
+                        pg_user.first_name,
+                        pg_user.last_name, 
+                        1 if pg_user.onboarding_complete else 0,
+                        pg_user.height,
+                        pg_user.weight,
+                        pg_user.age,
+                        pg_user.gender.value if hasattr(pg_user.gender, 'value') else pg_user.gender,
+                        pg_user.activity_level.value if hasattr(pg_user.activity_level, 'value') else pg_user.activity_level,
+                        pg_user.weight_goal.value if hasattr(pg_user.weight_goal, 'value') else pg_user.weight_goal,
+                        pg_user.target_weight,
+                        pg_user.created_at,
+                        pg_user.updated_at,
+                        pg_user.firebase_uid
+                    ))
+                else:
+                    # Insert new user
+                    cursor.execute("""
+                        INSERT INTO users (
+                            firebase_uid, email, first_name, last_name, onboarding_complete,
+                            height, weight, age, gender, activity_level, 
+                            weight_goal, target_weight, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        pg_user.firebase_uid,
+                        pg_user.email,
+                        pg_user.first_name,
+                        pg_user.last_name,
+                        1 if pg_user.onboarding_complete else 0,
+                        pg_user.height,
+                        pg_user.weight,
+                        pg_user.age,
+                        pg_user.gender.value if hasattr(pg_user.gender, 'value') else pg_user.gender,
+                        pg_user.activity_level.value if hasattr(pg_user.activity_level, 'value') else pg_user.activity_level,
+                        pg_user.weight_goal.value if hasattr(pg_user.weight_goal, 'value') else pg_user.weight_goal,
+                        pg_user.target_weight,
+                        pg_user.created_at,
+                        pg_user.updated_at
+                    ))
+                    sqlite_users_created += 1
             
-            sqlite_session.commit()
+            conn.commit()
+            conn.close()
             logger.info(f"Restored {sqlite_users_created} users from PostgreSQL to SQLite")
         
         # SCENARIO 2: Always sync SQLite users to PostgreSQL (SQLite is the primary source)
@@ -176,10 +279,9 @@ def sync_users():
     except Exception as e:
         logger.error(f"Error synchronizing users: {e}")
         pg_session.rollback()
-        sqlite_session.rollback()
+        raise
     finally:
         pg_session.close()
-        sqlite_session.close()
 
 def sync_food_logs():
     """Synchronize food logs between SQLite and PostgreSQL"""

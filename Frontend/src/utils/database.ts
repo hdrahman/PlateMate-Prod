@@ -49,6 +49,44 @@ export const initDatabase = async () => {
     `);
         console.log('✅ food_logs table created successfully');
 
+        // Create user_profiles table
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT UNIQUE NOT NULL,
+        email TEXT NOT NULL,
+        first_name TEXT NOT NULL,
+        last_name TEXT,
+        height REAL,
+        weight REAL,
+        age INTEGER,
+        gender TEXT,
+        activity_level TEXT,
+        weight_goal TEXT,
+        target_weight REAL,
+        dietary_restrictions TEXT,
+        food_allergies TEXT,
+        cuisine_preferences TEXT,
+        spice_tolerance TEXT,
+        health_conditions TEXT,
+        daily_calorie_target INTEGER,
+        nutrient_focus TEXT,
+        unit_preference TEXT DEFAULT 'metric',
+        push_notifications_enabled INTEGER DEFAULT 1,
+        email_notifications_enabled INTEGER DEFAULT 1,
+        sms_notifications_enabled INTEGER DEFAULT 0,
+        marketing_emails_enabled INTEGER DEFAULT 1,
+        preferred_language TEXT DEFAULT 'en',
+        timezone TEXT DEFAULT 'UTC',
+        dark_mode INTEGER DEFAULT 0,
+        sync_data_offline INTEGER DEFAULT 1,
+        onboarding_complete INTEGER DEFAULT 0,
+        synced INTEGER DEFAULT 0,
+        last_modified TEXT NOT NULL
+      )
+    `);
+        console.log('✅ user_profiles table created successfully');
+
         // Run database migrations
         await updateDatabaseSchema(db);
 
@@ -861,6 +899,277 @@ export const getTodayExerciseCalories = async () => {
     } catch (error) {
         console.error('❌ Error getting today exercise calories:', error);
         return 0;
+    }
+};
+
+// Add a user profile to local SQLite database
+export const addUserProfile = async (profile: any) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to add user profile before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const {
+        firebase_uid,
+        email,
+        first_name,
+        last_name = null,
+        height = null,
+        weight = null,
+        age = null,
+        gender = null,
+        activity_level = null,
+        weight_goal = null,
+        target_weight = null,
+        dietary_restrictions = [],
+        food_allergies = [],
+        cuisine_preferences = [],
+        spice_tolerance = null,
+        health_conditions = [],
+        daily_calorie_target = null,
+        nutrient_focus = null,
+        unit_preference = 'metric',
+        push_notifications_enabled = true,
+        email_notifications_enabled = true,
+        sms_notifications_enabled = false,
+        marketing_emails_enabled = true,
+        preferred_language = 'en',
+        timezone = 'UTC',
+        dark_mode = false,
+        sync_data_offline = true,
+        onboarding_complete = false
+    } = profile;
+
+    try {
+        // Check if profile already exists
+        const existingProfile = await getUserProfileByFirebaseUid(firebase_uid);
+        if (existingProfile) {
+            return updateUserProfile(firebase_uid, profile);
+        }
+
+        // Start a transaction for better error handling
+        await db.runAsync('BEGIN TRANSACTION');
+
+        const result = await db.runAsync(
+            `INSERT INTO user_profiles (
+                firebase_uid, email, first_name, last_name, height, weight, age, gender, 
+                activity_level, weight_goal, target_weight, dietary_restrictions, food_allergies, 
+                cuisine_preferences, spice_tolerance, health_conditions, daily_calorie_target, 
+                nutrient_focus, unit_preference, push_notifications_enabled, email_notifications_enabled, 
+                sms_notifications_enabled, marketing_emails_enabled, preferred_language, timezone, 
+                dark_mode, sync_data_offline, onboarding_complete, synced, last_modified
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                firebase_uid,
+                email,
+                first_name,
+                last_name,
+                height,
+                weight,
+                age,
+                gender,
+                activity_level,
+                weight_goal,
+                target_weight,
+                JSON.stringify(dietary_restrictions),
+                JSON.stringify(food_allergies),
+                JSON.stringify(cuisine_preferences),
+                spice_tolerance,
+                JSON.stringify(health_conditions),
+                daily_calorie_target,
+                nutrient_focus ? JSON.stringify(nutrient_focus) : null,
+                unit_preference,
+                push_notifications_enabled ? 1 : 0,
+                email_notifications_enabled ? 1 : 0,
+                sms_notifications_enabled ? 1 : 0,
+                marketing_emails_enabled ? 1 : 0,
+                preferred_language,
+                timezone,
+                dark_mode ? 1 : 0,
+                sync_data_offline ? 1 : 0,
+                onboarding_complete ? 1 : 0,
+                0, // Not synced
+                getCurrentDate()
+            ]
+        );
+
+        // Commit the transaction
+        await db.runAsync('COMMIT');
+
+        console.log('✅ User profile added successfully', result.lastInsertRowId);
+        return result.lastInsertRowId;
+    } catch (error) {
+        // Rollback the transaction in case of error
+        try {
+            await db.runAsync('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('❌ Error rolling back transaction:', rollbackError);
+        }
+        console.error('❌ Error adding user profile:', error);
+        throw error;
+    }
+};
+
+// Get user profile from local SQLite by Firebase UID
+export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get user profile before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const profile = await db.getFirstAsync(
+            `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        if (!profile) {
+            return null;
+        }
+
+        // Parse JSON strings back to objects
+        return {
+            ...profile,
+            dietary_restrictions: profile.dietary_restrictions ? JSON.parse(profile.dietary_restrictions) : [],
+            food_allergies: profile.food_allergies ? JSON.parse(profile.food_allergies) : [],
+            cuisine_preferences: profile.cuisine_preferences ? JSON.parse(profile.cuisine_preferences) : [],
+            health_conditions: profile.health_conditions ? JSON.parse(profile.health_conditions) : [],
+            nutrient_focus: profile.nutrient_focus ? JSON.parse(profile.nutrient_focus) : null,
+            push_notifications_enabled: Boolean(profile.push_notifications_enabled),
+            email_notifications_enabled: Boolean(profile.email_notifications_enabled),
+            sms_notifications_enabled: Boolean(profile.sms_notifications_enabled),
+            marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
+            dark_mode: Boolean(profile.dark_mode),
+            sync_data_offline: Boolean(profile.sync_data_offline),
+            onboarding_complete: Boolean(profile.onboarding_complete)
+        };
+    } catch (error) {
+        console.error('❌ Error getting user profile:', error);
+        throw error;
+    }
+};
+
+// Update user profile in local SQLite
+export const updateUserProfile = async (firebaseUid: string, updates: any) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to update user profile before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Start a transaction
+        await db.runAsync('BEGIN TRANSACTION');
+
+        // Prepare update columns and values
+        const columns = [];
+        const values = [];
+
+        for (const [key, value] of Object.entries(updates)) {
+            // Skip the firebase_uid as it's used in the WHERE clause
+            if (key === 'firebase_uid') continue;
+
+            // Handle arrays and objects by converting to JSON
+            if (Array.isArray(value) || (value !== null && typeof value === 'object')) {
+                columns.push(`${key} = ?`);
+                values.push(JSON.stringify(value));
+            }
+            // Handle booleans by converting to 0/1
+            else if (typeof value === 'boolean') {
+                columns.push(`${key} = ?`);
+                values.push(value ? 1 : 0);
+            }
+            // Other types
+            else {
+                columns.push(`${key} = ?`);
+                values.push(value);
+            }
+        }
+
+        // Add synced status and last_modified time
+        columns.push('synced = ?');
+        values.push(0); // Mark as not synced
+        columns.push('last_modified = ?');
+        values.push(getCurrentDate());
+
+        // Add firebase_uid to values for the WHERE clause
+        values.push(firebaseUid);
+
+        const query = `
+            UPDATE user_profiles
+            SET ${columns.join(', ')}
+            WHERE firebase_uid = ?
+        `;
+
+        const result = await db.runAsync(query, values);
+
+        // Commit the transaction
+        await db.runAsync('COMMIT');
+
+        console.log('✅ User profile updated successfully', result.changes);
+        return result.changes;
+    } catch (error) {
+        // Rollback the transaction in case of error
+        try {
+            await db.runAsync('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('❌ Error rolling back transaction:', rollbackError);
+        }
+        console.error('❌ Error updating user profile:', error);
+        throw error;
+    }
+};
+
+// Get unsynced user profiles
+export const getUnsyncedUserProfiles = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get unsynced profiles before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const profiles = await db.getAllAsync(
+            `SELECT * FROM user_profiles WHERE synced = 0`
+        );
+
+        return profiles.map(profile => ({
+            ...profile,
+            dietary_restrictions: profile.dietary_restrictions ? JSON.parse(profile.dietary_restrictions) : [],
+            food_allergies: profile.food_allergies ? JSON.parse(profile.food_allergies) : [],
+            cuisine_preferences: profile.cuisine_preferences ? JSON.parse(profile.cuisine_preferences) : [],
+            health_conditions: profile.health_conditions ? JSON.parse(profile.health_conditions) : [],
+            nutrient_focus: profile.nutrient_focus ? JSON.parse(profile.nutrient_focus) : null,
+            push_notifications_enabled: Boolean(profile.push_notifications_enabled),
+            email_notifications_enabled: Boolean(profile.email_notifications_enabled),
+            sms_notifications_enabled: Boolean(profile.sms_notifications_enabled),
+            marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
+            dark_mode: Boolean(profile.dark_mode),
+            sync_data_offline: Boolean(profile.sync_data_offline),
+            onboarding_complete: Boolean(profile.onboarding_complete)
+        }));
+    } catch (error) {
+        console.error('❌ Error getting unsynced profiles:', error);
+        throw error;
+    }
+};
+
+// Mark user profile as synced
+export const markUserProfileSynced = async (firebaseUid: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to mark profile as synced before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const result = await db.runAsync(
+            `UPDATE user_profiles SET synced = 1 WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        console.log('✅ User profile marked as synced', result.changes);
+        return result.changes;
+    } catch (error) {
+        console.error('❌ Error marking profile as synced:', error);
+        throw error;
     }
 };
 

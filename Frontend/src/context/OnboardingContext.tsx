@@ -2,6 +2,8 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { createUser, getUserProfile, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
+import { syncUserProfile } from '../utils/profileSyncService';
+import { getUserProfileByFirebaseUid, addUserProfile, updateUserProfile as updateLocalUserProfile } from '../utils/database';
 
 interface OnboardingContextType {
     // Basic onboarding state
@@ -139,6 +141,85 @@ const getUserSpecificKey = (key: string, userId?: string) => {
     return `${key}_${userId}`;
 };
 
+// Helper to convert SQLite profile to frontend format
+const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile => {
+    if (!sqliteProfile) return defaultProfile;
+
+    return {
+        firstName: sqliteProfile.first_name || '',
+        lastName: sqliteProfile.last_name || '',
+        phoneNumber: sqliteProfile.phone_number || '',
+        height: sqliteProfile.height,
+        weight: sqliteProfile.weight,
+        age: sqliteProfile.age,
+        gender: sqliteProfile.gender,
+        activityLevel: sqliteProfile.activity_level,
+        unitPreference: sqliteProfile.unit_preference || 'metric',
+        dietaryRestrictions: sqliteProfile.dietary_restrictions || [],
+        foodAllergies: sqliteProfile.food_allergies || [],
+        cuisinePreferences: sqliteProfile.cuisine_preferences || [],
+        spiceTolerance: sqliteProfile.spice_tolerance,
+        weightGoal: sqliteProfile.weight_goal,
+        healthConditions: sqliteProfile.health_conditions || [],
+        dailyCalorieTarget: sqliteProfile.daily_calorie_target,
+        nutrientFocus: sqliteProfile.nutrient_focus,
+        defaultAddress: sqliteProfile.default_address,
+        preferredDeliveryTimes: sqliteProfile.preferred_delivery_times || [],
+        deliveryInstructions: sqliteProfile.delivery_instructions,
+        pushNotificationsEnabled: Boolean(sqliteProfile.push_notifications_enabled),
+        emailNotificationsEnabled: Boolean(sqliteProfile.email_notifications_enabled),
+        smsNotificationsEnabled: Boolean(sqliteProfile.sms_notifications_enabled),
+        marketingEmailsEnabled: Boolean(sqliteProfile.marketing_emails_enabled),
+        paymentMethods: sqliteProfile.payment_methods || [],
+        billingAddress: sqliteProfile.billing_address,
+        defaultPaymentMethodId: sqliteProfile.default_payment_method_id,
+        preferredLanguage: sqliteProfile.preferred_language || 'en',
+        timezone: sqliteProfile.timezone || 'UTC',
+        darkMode: Boolean(sqliteProfile.dark_mode),
+        syncDataOffline: Boolean(sqliteProfile.sync_data_offline),
+    };
+};
+
+// Helper to convert frontend profile to SQLite format
+const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, firebaseUid: string, email: string): any => {
+    return {
+        firebase_uid: firebaseUid,
+        email: email,
+        first_name: frontendProfile.firstName,
+        last_name: frontendProfile.lastName,
+        phone_number: frontendProfile.phoneNumber,
+        height: frontendProfile.height,
+        weight: frontendProfile.weight,
+        age: frontendProfile.age,
+        gender: frontendProfile.gender,
+        activity_level: frontendProfile.activityLevel,
+        unit_preference: frontendProfile.unitPreference,
+        dietary_restrictions: frontendProfile.dietaryRestrictions,
+        food_allergies: frontendProfile.foodAllergies,
+        cuisine_preferences: frontendProfile.cuisinePreferences,
+        spice_tolerance: frontendProfile.spiceTolerance,
+        weight_goal: frontendProfile.weightGoal,
+        health_conditions: frontendProfile.healthConditions,
+        daily_calorie_target: frontendProfile.dailyCalorieTarget,
+        nutrient_focus: frontendProfile.nutrientFocus,
+        default_address: frontendProfile.defaultAddress,
+        preferred_delivery_times: frontendProfile.preferredDeliveryTimes,
+        delivery_instructions: frontendProfile.deliveryInstructions,
+        push_notifications_enabled: frontendProfile.pushNotificationsEnabled,
+        email_notifications_enabled: frontendProfile.emailNotificationsEnabled,
+        sms_notifications_enabled: frontendProfile.smsNotificationsEnabled,
+        marketing_emails_enabled: frontendProfile.marketingEmailsEnabled,
+        payment_methods: frontendProfile.paymentMethods,
+        billing_address: frontendProfile.billingAddress,
+        default_payment_method_id: frontendProfile.defaultPaymentMethodId,
+        preferred_language: frontendProfile.preferredLanguage,
+        timezone: frontendProfile.timezone,
+        dark_mode: frontendProfile.darkMode,
+        sync_data_offline: frontendProfile.syncDataOffline,
+        onboarding_complete: false, // Set based on onboarding state
+    };
+};
+
 // Provider component
 export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
@@ -169,62 +250,59 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 setIsLoading(true);
                 console.log(`Loading onboarding state for user: ${user.uid}`);
 
-                // Try to get the user profile from backend first
-                const backendProfile = await getUserProfile(user.uid);
+                // First try to load from AsyncStorage for faster response
+                let shouldUseAsyncStorage = false;
+                const asyncStorageOnboardingComplete = await AsyncStorage.getItem(
+                    getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
+                );
 
-                if (backendProfile) {
-                    console.log(`Found backend profile for user: ${user.uid}`);
-                    // User exists in backend, fetch from AsyncStorage only to get onboarding state
-                    const onboardingCompleteStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
+                if (asyncStorageOnboardingComplete === 'true') {
+                    console.log('Found onboarding complete flag in AsyncStorage');
+                    shouldUseAsyncStorage = true;
+                }
+
+                if (shouldUseAsyncStorage) {
+                    // Fast path: already completed onboarding according to AsyncStorage
+                    setOnboardingComplete(true);
+
+                    // Load profile data from AsyncStorage
+                    const profileStr = await AsyncStorage.getItem(
+                        getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid)
                     );
-                    const complete = onboardingCompleteStr === 'true';
-                    setOnboardingComplete(complete);
 
-                    // Convert backend profile to frontend format
-                    const frontendProfile = {
-                        firstName: backendProfile.first_name,
-                        lastName: backendProfile.last_name || '',
-                        phoneNumber: backendProfile.phone_number || '',
-                        height: backendProfile.height,
-                        weight: backendProfile.weight,
-                        age: backendProfile.age,
-                        gender: backendProfile.gender,
-                        activityLevel: backendProfile.activity_level,
-                        unitPreference: backendProfile.unit_preference || 'metric',
-                        dietaryRestrictions: backendProfile.dietary_restrictions || [],
-                        foodAllergies: backendProfile.food_allergies || [],
-                        cuisinePreferences: backendProfile.cuisine_preferences || [],
-                        spiceTolerance: backendProfile.spice_tolerance,
-                        weightGoal: backendProfile.weight_goal,
-                        healthConditions: backendProfile.health_conditions || [],
-                        dailyCalorieTarget: backendProfile.daily_calorie_target,
-                        nutrientFocus: backendProfile.nutrient_focus,
-                        defaultAddress: backendProfile.default_address,
-                        preferredDeliveryTimes: backendProfile.preferred_delivery_times || [],
-                        deliveryInstructions: backendProfile.delivery_instructions,
-                        pushNotificationsEnabled: backendProfile.push_notifications_enabled,
-                        emailNotificationsEnabled: backendProfile.email_notifications_enabled,
-                        smsNotificationsEnabled: backendProfile.sms_notifications_enabled,
-                        marketingEmailsEnabled: backendProfile.marketing_emails_enabled,
-                        paymentMethods: backendProfile.payment_methods || [],
-                        billingAddress: backendProfile.billing_address,
-                        defaultPaymentMethodId: backendProfile.default_payment_method_id,
-                        preferredLanguage: backendProfile.preferred_language,
-                        timezone: backendProfile.timezone,
-                        darkMode: backendProfile.dark_mode,
-                        syncDataOffline: backendProfile.sync_data_offline,
-                    };
+                    if (profileStr) {
+                        console.log('Loaded profile from AsyncStorage');
+                        const asyncStorageProfile = JSON.parse(profileStr);
+                        setProfile(asyncStorageProfile);
+                        setIsLoading(false);
 
-                    setProfile(frontendProfile);
+                        // Start sync in background but don't block UI
+                        syncUserProfile(user.uid)
+                            .then(({ profile }) => {
+                                if (profile) {
+                                    // Update with latest profile data from sync
+                                    setProfile(convertSQLiteProfileToFrontendFormat(profile));
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Background sync error:', error);
+                            });
 
-                    // Set onboarding as complete if the backend indicates it's complete
-                    if (backendProfile.onboarding_complete) {
-                        setOnboardingComplete(true);
+                        return;
                     }
+                }
+
+                // Use our new sync mechanism
+                const { shouldShowOnboarding, profile: syncedProfile } = await syncUserProfile(user.uid);
+
+                if (!shouldShowOnboarding && syncedProfile) {
+                    console.log('✅ Profile found through sync mechanism');
+                    // User has a profile, use it
+                    setOnboardingComplete(true);
+                    setProfile(convertSQLiteProfileToFrontendFormat(syncedProfile));
                 } else {
-                    console.log(`No backend profile found for user: ${user.uid}, checking local storage`);
-                    // User doesn't exist in backend yet, check AsyncStorage
+                    console.log('⚠️ No synced profile found, checking AsyncStorage for onboarding progress');
+                    // No synced profile, check AsyncStorage for any onboarding progress
                     const onboardingCompleteStr = await AsyncStorage.getItem(
                         getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
                     );
@@ -239,18 +317,19 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                         setCurrentStep(parseInt(stepStr, 10));
                     }
 
-                    // Load profile data
+                    // Load profile data from AsyncStorage
                     const profileStr = await AsyncStorage.getItem(
                         getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid)
                     );
                     if (profileStr) {
-                        setProfile(JSON.parse(profileStr));
+                        const asyncStorageProfile = JSON.parse(profileStr);
+                        setProfile(asyncStorageProfile);
                     }
                 }
             } catch (error) {
-                console.error(`Error loading onboarding state for user ${user.uid}:`, error);
+                console.error('Error loading onboarding state:', error);
 
-                // Fallback to local storage if API call fails
+                // Fallback to AsyncStorage if sync mechanism fails completely
                 try {
                     const onboardingCompleteStr = await AsyncStorage.getItem(
                         getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
@@ -258,21 +337,16 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                     const complete = onboardingCompleteStr === 'true';
                     setOnboardingComplete(complete);
 
-                    const stepStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid)
-                    );
-                    if (stepStr) {
-                        setCurrentStep(parseInt(stepStr, 10));
-                    }
-
+                    // Load profile data from AsyncStorage as fallback
                     const profileStr = await AsyncStorage.getItem(
                         getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid)
                     );
                     if (profileStr) {
-                        setProfile(JSON.parse(profileStr));
+                        const asyncStorageProfile = JSON.parse(profileStr);
+                        setProfile(asyncStorageProfile);
                     }
-                } catch (localError) {
-                    console.error(`Error loading local onboarding state for user ${user.uid}:`, localError);
+                } catch (fallbackError) {
+                    console.error('Fallback to AsyncStorage also failed:', fallbackError);
                 }
             } finally {
                 setIsLoading(false);
@@ -280,140 +354,105 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         };
 
         loadOnboardingState();
-    }, [user?.uid]);
+    }, [user]);
 
     // Update profile data
     const updateProfile = async (data: Partial<UserProfile>) => {
-        if (!user) return;
-
         const updatedProfile = { ...profile, ...data };
         setProfile(updatedProfile);
 
-        try {
+        // Save to AsyncStorage for session persistence
+        if (user) {
             await AsyncStorage.setItem(
                 getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
                 JSON.stringify(updatedProfile)
             );
-        } catch (error) {
-            console.error('Error saving profile data:', error);
         }
     };
 
-    // Save onboarding progress
+    // Save progress to AsyncStorage
     const saveOnboardingProgress = async () => {
         if (!user) return;
 
-        try {
-            await AsyncStorage.setItem(
-                getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid),
-                currentStep.toString()
-            );
-            await AsyncStorage.setItem(
-                getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
-                JSON.stringify(profile)
-            );
-        } catch (error) {
-            console.error('Error saving onboarding progress:', error);
-        }
+        // Save current step and profile to AsyncStorage
+        await AsyncStorage.setItem(
+            getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid),
+            currentStep.toString()
+        );
+        await AsyncStorage.setItem(
+            getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
+            JSON.stringify(profile)
+        );
     };
 
-    // Navigate to next step
+    // Go to next step
     const goToNextStep = () => {
-        if (!user || currentStep >= totalSteps) return;
-
-        const nextStep = currentStep + 1;
+        const nextStep = Math.min(currentStep + 1, totalSteps);
         setCurrentStep(nextStep);
-        AsyncStorage.setItem(
-            getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid),
-            nextStep.toString()
-        );
+        saveOnboardingProgress();
     };
 
-    // Navigate to previous step
+    // Go to previous step
     const goToPreviousStep = () => {
-        if (!user || currentStep <= 1) return;
-
-        const prevStep = currentStep - 1;
+        const prevStep = Math.max(currentStep - 1, 1);
         setCurrentStep(prevStep);
-        AsyncStorage.setItem(
-            getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid),
-            prevStep.toString()
-        );
+        saveOnboardingProgress();
     };
 
-    // Mark onboarding as complete
+    // Complete the onboarding process
     const completeOnboarding = async () => {
-        if (!user) {
-            console.error('No user authenticated. Cannot complete onboarding.');
+        if (!user || !user.email) {
+            console.error('Cannot complete onboarding: user or email is missing');
             return;
         }
 
-        setOnboardingComplete(true);
         try {
+            setIsLoading(true);
+
+            // Mark onboarding as complete
+            setOnboardingComplete(true);
+
+            // Save to AsyncStorage
             await AsyncStorage.setItem(
                 getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid),
                 'true'
             );
-            // Also save the final profile data
-            await AsyncStorage.setItem(
-                getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
-                JSON.stringify(profile)
-            );
 
-            // Send profile data to backend API
-            try {
-                // Check if user exists in backend
-                const existingUser = await getUserProfile(user.uid);
+            // Convert frontend profile to SQLite format
+            const sqliteProfile = convertFrontendProfileToSQLiteFormat(profile, user.uid, user.email);
+            sqliteProfile.onboarding_complete = true;
 
-                if (existingUser) {
-                    // Update existing user with onboarding_complete flag
-                    const userData = {
-                        ...convertProfileToBackendFormat(profile),
-                        onboarding_complete: true
-                    };
-                    await updateUserProfile(user.uid, userData);
-                } else {
-                    // Create new user with onboarding_complete flag
-                    const userData = {
-                        firebase_uid: user.uid,
-                        email: user.email || '',
-                        first_name: profile.firstName,
-                        last_name: profile.lastName,
-                        phone_number: profile.phoneNumber,
-                        onboarding_complete: true
-                    };
-                    await createUser(userData);
+            // Save to local SQLite database
+            await addUserProfile(sqliteProfile);
 
-                    // Update with full profile data
-                    const fullUserData = {
-                        ...convertProfileToBackendFormat(profile),
-                        onboarding_complete: true
-                    };
-                    await updateUserProfile(user.uid, fullUserData);
-                }
+            console.log('✅ Profile saved to local SQLite database');
 
-                console.log('User profile synchronized with backend successfully');
-            } catch (apiError) {
-                console.error('Error synchronizing profile with backend:', apiError);
-                // Continue with local onboarding completion even if API fails
-            }
+            // The profile will be synced to the backend automatically through the sync mechanism
+
         } catch (error) {
             console.error('Error completing onboarding:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    // Reset onboarding
+    // Reset onboarding (for testing purposes)
     const resetOnboarding = async () => {
         if (!user) return;
 
-        setOnboardingComplete(false);
-        setCurrentStep(1);
-        setProfile(defaultProfile);
-
         try {
+            // Reset state
+            setOnboardingComplete(false);
+            setCurrentStep(1);
+            setProfile(defaultProfile);
+
+            // Clear AsyncStorage
             await AsyncStorage.removeItem(getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid));
             await AsyncStorage.removeItem(getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid));
             await AsyncStorage.removeItem(getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid));
+
+            // Note: We're not deleting from SQLite or backend here
+            // as that would require additional functionality
         } catch (error) {
             console.error('Error resetting onboarding:', error);
         }
@@ -432,7 +471,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 completeOnboarding,
                 resetOnboarding,
                 saveOnboardingProgress,
-                isLoading
+                isLoading,
             }}
         >
             {children}
@@ -440,5 +479,5 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     );
 };
 
-// Custom hook for accessing the onboarding context
+// Hook for accessing the onboarding context
 export const useOnboarding = () => useContext(OnboardingContext); 
