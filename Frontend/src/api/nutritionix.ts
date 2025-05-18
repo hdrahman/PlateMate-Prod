@@ -71,7 +71,7 @@ export interface FoodItem {
 /**
  * Create an empty food item with all values set to zero
  */
-const createEmptyFoodItem = (foodName: string = ''): FoodItem => {
+export const createEmptyFoodItem = (foodName: string = ''): FoodItem => {
     return {
         food_name: foodName,
         calories: 0,

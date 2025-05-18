@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
+import ManualFoodEntry from '../components/ManualFoodEntry';
 import { searchFatSecretFood, getFatSecretFoodDetails } from '../api';
 import { getRecentFoodEntries, addFoodEntry, FoodLogEntry } from '../api/foodLog';
 import { debounce } from 'lodash';
@@ -45,6 +46,7 @@ export default function Manual() {
     const [refreshing, setRefreshing] = useState(false);
     const [selectedFood, setSelectedFood] = useState(null);
     const [showFoodDetails, setShowFoodDetails] = useState(false);
+    const [showManualEntry, setShowManualEntry] = useState(false);
     const [foodCategories, setFoodCategories] = useState([
         'Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Fruits', 'Vegetables', 'Protein'
     ]);
@@ -214,6 +216,13 @@ export default function Manual() {
                 />
             )}
 
+            {/* Manual Food Entry Modal */}
+            <ManualFoodEntry
+                visible={showManualEntry}
+                onClose={() => setShowManualEntry(false)}
+                onAddFood={handleAddFood}
+            />
+
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
@@ -303,14 +312,23 @@ export default function Manual() {
                         <Text style={styles.sectionTitle}>Recent Entries</Text>
                         {recentEntries.length > 0 ? (
                             recentEntries.map((entry, index) => (
-                                <View key={`entry-${index}`}>
+                                <TouchableOpacity
+                                    key={`entry-${index}`}
+                                    onPress={() => handleFoodSelect(entry)}
+                                >
                                     {renderRecentEntry({ item: entry })}
-                                </View>
+                                </TouchableOpacity>
                             ))
                         ) : (
                             <View style={styles.emptyState}>
-                                <Ionicons name="time-outline" size={40} color={GRAY} />
-                                <Text style={styles.emptyStateText}>Your recent entries will appear here</Text>
+                                <Ionicons name="add-circle-outline" size={40} color={GRAY} />
+                                <Text style={styles.emptyStateText}>Add food entries to see them here</Text>
+                                <TouchableOpacity
+                                    style={styles.startNowButton}
+                                    onPress={() => setShowManualEntry(true)}
+                                >
+                                    <Text style={styles.startNowText}>START NOW</Text>
+                                </TouchableOpacity>
                             </View>
                         )}
                     </View>
@@ -325,6 +343,13 @@ export default function Manual() {
                         <TouchableOpacity style={styles.quickAddButton}>
                             <Ionicons name="barcode-outline" size={24} color={WHITE} style={styles.quickAddIcon} />
                             <Text style={styles.quickAddText}>SCAN BARCODE</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.quickAddButton}
+                            onPress={() => setShowManualEntry(true)}
+                        >
+                            <Ionicons name="create-outline" size={24} color={WHITE} style={styles.quickAddIcon} />
+                            <Text style={styles.quickAddText}>MANUAL ENTRY</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -499,6 +524,18 @@ const styles = StyleSheet.create({
         marginTop: 10,
         fontSize: 16,
         textAlign: 'center',
+    },
+    startNowButton: {
+        marginTop: 16,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        backgroundColor: BLUE_ACCENT,
+        borderRadius: 8,
+    },
+    startNowText: {
+        color: WHITE,
+        fontWeight: 'bold',
+        fontSize: 14,
     },
     customButton: {
         borderRadius: 10,
