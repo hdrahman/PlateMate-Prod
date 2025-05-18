@@ -39,15 +39,19 @@ const SettingsScreen = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Account</Text>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditProfileScreen")}>
+                        <Ionicons name="person-circle-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Edit Profile</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditGoalsScreen")}>
+                        <Ionicons name="fitness-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Edit Goals</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PremiumSubscriptionScreen")}>
+                        <Ionicons name="star-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Premium Subscription</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("ChangePasswordScreen")}>
+                        <Ionicons name="lock-closed-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Change Password</Text>
                     </TouchableOpacity>
                 </View>
@@ -55,24 +59,29 @@ const SettingsScreen = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Privacy & Security</Text>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("NotificationsScreen")}>
+                        <Ionicons name="notifications-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Notifications</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DataSharingScreen")}>
+                        <Ionicons name="share-social-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Data Sharing</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PrivacyPolicyScreen")}>
+                        <Ionicons name="document-text-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Privacy Policy</Text>
                     </TouchableOpacity>
                 </View>
 
                 <View style={[styles.section, styles.bottomSection]}>
                     <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccountScreen")}>
+                        <Ionicons name="trash-outline" size={20} color="#FF4C4C" style={styles.icon} />
                         <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.item, styles.fullWidthItem]}
                         onPress={handleLogout}
                     >
+                        <Ionicons name="log-out-outline" size={20} color="#FF4C4C" style={styles.icon} />
                         <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
                     </TouchableOpacity>
                 </View>
@@ -134,6 +143,8 @@ const styles = StyleSheet.create({
         borderColor: "#333",
     },
     item: {
+        flexDirection: "row",
+        alignItems: "center",
         paddingVertical: 15,
         borderBottomWidth: 1,
         borderColor: "#333",
@@ -144,10 +155,14 @@ const styles = StyleSheet.create({
     itemText: {
         fontSize: 16,
         color: "#FFF",
+        marginLeft: 10,
     },
     dangerText: {
         color: "#FF4C4C",
         textAlign: "center",
+    },
+    icon: {
+        marginRight: 10,
     },
 });
 
