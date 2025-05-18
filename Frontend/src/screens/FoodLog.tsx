@@ -1792,23 +1792,6 @@ const DiaryScreen: React.FC = () => {
                                         <Text style={styles.equationLabel}>Remaining</Text>
                                     </View>
                                 </View>
-                                <View style={styles.macroGoalsContainer}>
-                                    <Text style={styles.macroGoalsTitle}>Macro Goals</Text>
-                                    <View style={styles.macroGoalsRow}>
-                                        <View style={styles.macroGoalItem}>
-                                            <Text style={[styles.macroGoalValue, { color: '#4CAF50' }]}>{nutritionGoals.protein}g</Text>
-                                            <Text style={styles.macroGoalLabel}>Protein</Text>
-                                        </View>
-                                        <View style={styles.macroGoalItem}>
-                                            <Text style={[styles.macroGoalValue, { color: '#2196F3' }]}>{nutritionGoals.carbs}g</Text>
-                                            <Text style={styles.macroGoalLabel}>Carbs</Text>
-                                        </View>
-                                        <View style={styles.macroGoalItem}>
-                                            <Text style={[styles.macroGoalValue, { color: '#FFC107' }]}>{nutritionGoals.fat}g</Text>
-                                            <Text style={styles.macroGoalLabel}>Fat</Text>
-                                        </View>
-                                    </View>
-                                </View>
                             </GradientBorderCard>
 
                             {/* 3) Meals */}
