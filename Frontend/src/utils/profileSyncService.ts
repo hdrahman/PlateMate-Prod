@@ -7,10 +7,10 @@ import {
 } from './database';
 import { isOnline } from './syncService';
 import { auth } from './firebase';
-import { API_URL } from '@env';
+import { BACKEND_URL } from './config';
 
-// Use API_URL as BACKEND_URL for consistency with other modules
-const BACKEND_URL = API_URL;
+// No longer use API_URL from .env, use BACKEND_URL from config
+// const BACKEND_URL = API_URL;
 
 // Convert backend profile format to SQLite format
 const convertBackendProfileToSQLiteFormat = (backendProfile: any) => {

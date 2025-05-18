@@ -1,4 +1,4 @@
-import { API_URL } from '@env';
+import { BACKEND_URL } from '../utils/config';
 import { auth } from '../utils/firebase';
 
 // User profile data interfaces
@@ -103,9 +103,9 @@ export const createUser = async (userData: CreateUserData) => {
 
         try {
             const token = await getFirebaseToken();
-            console.log(`Creating user at ${API_URL}/users for ${userData.firebase_uid}`);
+            console.log(`Creating user at ${BACKEND_URL}/users for ${userData.firebase_uid}`);
 
-            const response = await fetch(`${API_URL}/users`, {
+            const response = await fetch(`${BACKEND_URL}/users`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -170,9 +170,9 @@ export const getUserProfile = async (firebaseUid: string) => {
 
         try {
             const token = await getFirebaseToken();
-            console.log(`Fetching profile from ${API_URL}/users/${firebaseUid}`);
+            console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
 
-            const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -246,12 +246,12 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
 
         try {
             const token = await getFirebaseToken();
-            console.log(`Updating profile at ${API_URL}/users/${firebaseUid}`);
+            console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
 
             // Log the update data for debugging
             console.log(`Update data: ${JSON.stringify(userData)}`);
 
-            const response = await fetch(`${API_URL}/users/${firebaseUid}`, {
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -317,7 +317,7 @@ export const updateSubscription = async (firebaseUid: string, subscriptionStatus
         }
 
         const token = await getFirebaseToken();
-        const response = await fetch(`${API_URL}/users/${firebaseUid}/subscription`, {
+        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/subscription`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
