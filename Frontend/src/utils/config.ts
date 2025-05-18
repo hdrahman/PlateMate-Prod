@@ -14,4 +14,7 @@ export const NUTRITIONIX_API_KEY = '9afa0a24d0e9827a02336a7ba23a1ec0'; // Add yo
 
 // Spoonacular API credentials - replace with your actual credentials
 // To get your own credentials, sign up at https://spoonacular.com/food-api
-export const SPOONACULAR_API_KEY = '01c80e4d89704df2bdaa51ce8f2372f4'; 
+export const SPOONACULAR_API_KEY = '01c80e4d89704df2bdaa51ce8f2372f4';
+
+// FatSecret API credentials - obtained from backend
+export const FATSECRET_ENABLED = true; // Set to false to disable FatSecret API completely 

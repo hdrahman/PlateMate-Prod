@@ -79,7 +79,7 @@ export const addFoodEntry = async (
         };
 
         const response = await axios.post(
-            `${BACKEND_URL}/create`,
+            `${BACKEND_URL}/meal_entries/create`,
             foodLogEntry
         );
 
@@ -96,7 +96,7 @@ export const addFoodEntry = async (
 export const getFoodLogsByDate = async (date: Date): Promise<FoodLogEntry[]> => {
     try {
         const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-        const response = await axios.get(`${BACKEND_URL}/by-date/${formattedDate}`);
+        const response = await axios.get(`${BACKEND_URL}/meal_entries/by-date/${formattedDate}`);
         return response.data;
     } catch (error) {
         console.error('Error fetching food logs:', error);

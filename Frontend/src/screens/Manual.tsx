@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
-import { searchFood, FoodItem as FoodItemType, getFoodDetails, enhanceFoodImage } from '../api/nutritionix';
+import { searchFatSecretFood, getFatSecretFoodDetails } from '../api';
 import { getRecentFoodEntries, addFoodEntry, FoodLogEntry } from '../api/foodLog';
 import { debounce } from 'lodash';
 
@@ -35,14 +35,14 @@ const BLUE_ACCENT = '#2196F3';
 export default function Manual() {
     const navigation = useNavigation();
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<FoodItemType[]>([]);
-    const [recentEntries, setRecentEntries] = useState<FoodLogEntry[]>([]);
+    const [searchResults, setSearchResults] = useState([]);
+    const [recentEntries, setRecentEntries] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [selectedFood, setSelectedFood] = useState<FoodItemType | null>(null);
+    const [selectedFood, setSelectedFood] = useState(null);
     const [showFoodDetails, setShowFoodDetails] = useState(false);
-    const [foodCategories, setFoodCategories] = useState<string[]>([
+    const [foodCategories, setFoodCategories] = useState([
         'Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Fruits', 'Vegetables', 'Protein'
     ]);
 
@@ -65,7 +65,7 @@ export default function Manual() {
     };
 
     // Handle search query changes
-    const handleSearchChange = (text: string) => {
+    const handleSearchChange = (text) => {
         setSearchQuery(text);
         if (text.length > 2) {
             setIsSearching(true);
@@ -78,19 +78,10 @@ export default function Manual() {
 
     // Debounced search to prevent too many API calls
     const debouncedSearch = useCallback(
-        debounce(async (query: string) => {
+        debounce(async (query) => {
             try {
-                // Set minimum healthiness rating to 8.5 to only show very healthy foods
-                let results = await searchFood(query, 8.5);
-
-                // Enhance images for all search results
-                if (results.length > 0) {
-                    const enhancedResults = await Promise.all(
-                        results.map(async (food) => await enhanceFoodImage(food))
-                    );
-                    results = enhancedResults;
-                }
-
+                // Use FatSecret API for all searches
+                const results = await searchFatSecretFood(query);
                 setSearchResults(results);
             } catch (error) {
                 console.error('Error searching for food:', error);
@@ -109,24 +100,31 @@ export default function Manual() {
     };
 
     // Handle selecting a food item
-    const handleFoodSelect = async (food: FoodItemType) => {
+    const handleFoodSelect = async (food) => {
         try {
             setIsLoading(true);
-            // Get more detailed information if available
-            const detailedFood = await getFoodDetails(food.food_name);
 
-            // Try to enhance the food image with a better quality one
-            const enhancedFood = detailedFood || food;
-            const foodWithBetterImage = await enhanceFoodImage(enhancedFood);
+            // If we have a FatSecret ID, get detailed info
+            if (food.notes?.includes('FatSecret')) {
+                const foodId = food.notes.split('FatSecret ID: ')[1];
+                if (foodId) {
+                    // Get detailed info from FatSecret API
+                    const detailedFood = await getFatSecretFoodDetails(foodId);
+                    if (detailedFood) {
+                        setSelectedFood(detailedFood);
+                        setShowFoodDetails(true);
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+            }
 
-            setSelectedFood(foodWithBetterImage);
+            // Use whatever info we have
+            setSelectedFood(food);
             setShowFoodDetails(true);
         } catch (error) {
             console.error('Error getting food details:', error);
-
-            // Fallback to original food if enhancement fails
-            const foodWithBetterImage = await enhanceFoodImage(food);
-            setSelectedFood(foodWithBetterImage);
+            setSelectedFood(food);
             setShowFoodDetails(true);
         } finally {
             setIsLoading(false);
@@ -134,7 +132,7 @@ export default function Manual() {
     };
 
     // Handle adding food to log
-    const handleAddFood = async (food: FoodItemType, mealType: string, quantity: number) => {
+    const handleAddFood = async (food, mealType, quantity) => {
         try {
             setIsLoading(true);
             await addFoodEntry(food, mealType, quantity);
@@ -157,14 +155,14 @@ export default function Manual() {
     };
 
     // Render food category item
-    const renderFoodCategory = ({ item }: { item: string }) => (
+    const renderFoodCategory = ({ item }) => (
         <TouchableOpacity style={styles.categoryItem}>
             <Text style={styles.categoryText}>{item}</Text>
         </TouchableOpacity>
     );
 
     // Render recent entry item
-    const renderRecentEntry = ({ item }: { item: FoodLogEntry }) => (
+    const renderRecentEntry = ({ item }) => (
         <TouchableOpacity style={styles.recentEntryItem}>
             <View style={styles.recentEntryImageContainer}>
                 {item.image_url ? (
@@ -225,8 +223,7 @@ export default function Manual() {
                 >
                     <Ionicons name="arrow-back" size={28} color={WHITE} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Manual Entry</Text>
-                <View style={{ width: 28 }} />
+                <Text style={styles.headerTitle}>Food Search</Text>
             </View>
 
             {/* Search Bar */}
@@ -312,30 +309,6 @@ export default function Manual() {
                         )}
                     </View>
 
-                    {/* Popular Foods */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Popular Foods</Text>
-                        <View style={styles.popularFoodsGrid}>
-                            {['Spinach', 'Broccoli', 'Salmon', 'Kale'].map((food, index) => (
-                                <TouchableOpacity
-                                    key={`popular-${index}`}
-                                    style={styles.popularFoodItem}
-                                    onPress={async () => {
-                                        const results = await searchFood(food, 8.5);
-                                        if (results.length > 0) {
-                                            handleFoodSelect(results[0]);
-                                        }
-                                    }}
-                                >
-                                    <View style={styles.popularFoodIcon}>
-                                        <Ionicons name="nutrition" size={24} color={WHITE} />
-                                    </View>
-                                    <Text style={styles.popularFoodName}>{food}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
-
                     {/* Create Custom Food */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Create Custom Food</Text>
@@ -393,231 +366,204 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     headerTitle: {
+        color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
-        color: WHITE,
+        flex: 1,
+        textAlign: 'center',
     },
     searchContainer: {
         paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingBottom: 10,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: CARD_BG,
-        borderRadius: 8,
         paddingHorizontal: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: LIGHT_GRAY,
     },
     searchIcon: {
         marginRight: 8,
     },
     searchInput: {
         flex: 1,
-        paddingVertical: 12,
+        height: 44,
         color: WHITE,
         fontSize: 16,
     },
     clearButton: {
-        padding: 6,
+        padding: 8,
     },
     searchingContainer: {
-        flexDirection: 'row',
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
+        paddingTop: 50,
     },
     searchingText: {
         color: WHITE,
-        marginLeft: 10,
+        marginTop: 10,
         fontSize: 16,
-    },
-    searchResultsContainer: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
     },
     content: {
         flex: 1,
+        paddingHorizontal: 16,
     },
     section: {
-        margin: 16,
-        marginTop: 8,
-        marginBottom: 16,
+        marginBottom: 20,
     },
     sectionTitle: {
+        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
-        marginBottom: 12,
+        marginBottom: 10,
     },
     categoriesContainer: {
-        paddingRight: 16,
+        paddingBottom: 10,
     },
     categoryItem: {
         backgroundColor: CARD_BG,
-        borderRadius: 20,
         paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingVertical: 8,
+        borderRadius: 20,
         marginRight: 8,
+        borderWidth: 1,
+        borderColor: LIGHT_GRAY,
     },
     categoryText: {
         color: WHITE,
+        fontSize: 14,
         fontWeight: '500',
-    },
-    foodItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: CARD_BG,
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 8,
-    },
-    foodName: {
-        fontSize: 16,
-        color: WHITE,
     },
     recentEntryItem: {
         flexDirection: 'row',
-        alignItems: 'center',
         backgroundColor: CARD_BG,
-        borderRadius: 8,
+        borderRadius: 12,
         padding: 12,
-        marginBottom: 8,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: LIGHT_GRAY,
     },
     recentEntryImageContainer: {
         width: 50,
         height: 50,
         borderRadius: 25,
         backgroundColor: LIGHT_GRAY,
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
         marginRight: 12,
     },
     recentEntryImage: {
-        width: '100%',
-        height: '100%',
+        width: 50,
+        height: 50,
         borderRadius: 25,
     },
     recentEntryDetails: {
         flex: 1,
+        justifyContent: 'center',
     },
     recentEntryName: {
+        color: WHITE,
         fontSize: 16,
         fontWeight: '500',
-        color: WHITE,
         marginBottom: 4,
     },
     recentEntryInfo: {
-        fontSize: 14,
         color: GRAY,
+        fontSize: 14,
     },
     macroSummary: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginLeft: 8,
+        justifyContent: 'flex-end',
+        width: 80,
     },
     macroItem: {
         alignItems: 'center',
         marginHorizontal: 4,
-        minWidth: 25,
     },
     macroValue: {
+        color: WHITE,
         fontSize: 14,
         fontWeight: 'bold',
-        color: WHITE,
     },
     macroLabel: {
-        fontSize: 12,
         color: GRAY,
+        fontSize: 12,
     },
     emptyState: {
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: CARD_BG,
-        borderRadius: 8,
-        padding: 32,
+        paddingVertical: 30,
     },
     emptyStateText: {
         color: GRAY,
-        marginTop: 12,
-        textAlign: 'center',
-    },
-    popularFoodsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-    popularFoodItem: {
-        width: '48%',
-        backgroundColor: CARD_BG,
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 10,
-        alignItems: 'center',
-    },
-    popularFoodIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: LIGHT_GRAY,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    popularFoodName: {
-        fontSize: 14,
-        color: WHITE,
+        marginTop: 10,
+        fontSize: 16,
         textAlign: 'center',
     },
     customButton: {
-        borderRadius: 8,
+        borderRadius: 10,
         overflow: 'hidden',
     },
     customButtonGradient: {
-        paddingVertical: 16,
+        paddingVertical: 14,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     customButtonText: {
         color: WHITE,
-        fontWeight: 'bold',
         fontSize: 16,
+        fontWeight: 'bold',
     },
     quickAddButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: CARD_BG,
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 8,
+        padding: 14,
+        borderRadius: 10,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: LIGHT_GRAY,
     },
     quickAddIcon: {
-        marginRight: 12,
+        marginRight: 10,
     },
     quickAddText: {
         color: WHITE,
-        fontWeight: '500',
         fontSize: 16,
+        fontWeight: '500',
     },
     tipSection: {
         backgroundColor: CARD_BG,
-        borderRadius: 8,
+        borderRadius: 12,
         padding: 16,
+        borderWidth: 1,
+        borderColor: LIGHT_GRAY,
     },
     tipTitle: {
+        color: WHITE,
         fontSize: 16,
         fontWeight: 'bold',
-        color: BLUE_ACCENT,
         marginBottom: 8,
     },
     tipText: {
         color: GRAY,
+        fontSize: 14,
         lineHeight: 20,
+    },
+    searchResultsContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 10,
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 999,
+        zIndex: 1000,
     },
 }); 

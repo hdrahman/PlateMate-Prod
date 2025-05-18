@@ -15,6 +15,7 @@ from routes.gpt import router as gpt_router  # Include GPT router
 from routes.exercises import router as exercises_router  # Include exercises router
 from routes.arli_ai import router as arli_ai_router  # Include Arli AI router
 from routes.users import router as users_router  # Include users router
+from routes.fatsecret import router as fatsecret_router  # Include FatSecret router
 
 # Load environment variables
 load_dotenv()
@@ -109,6 +110,7 @@ app.include_router(gpt_router, prefix='/gpt', tags=['gpt'])  # Include GPT route
 app.include_router(exercises_router, tags=['exercises'])  # Include exercises router
 app.include_router(arli_ai_router, prefix='/arli', tags=['arli_ai'])  # Include Arli AI router
 app.include_router(users_router, prefix='/users', tags=['users'])  # Include users router
+app.include_router(fatsecret_router, prefix='/api', tags=['fatsecret'])  # Include FatSecret router
 
 @app.get("/")
 def home():
