@@ -5,7 +5,6 @@ import {
     TextInput,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
     ScrollView,
     Alert,
     StatusBar,
@@ -20,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { Auth, auth } from '../utils/firebase';
 import { updateProfile } from 'firebase/auth';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Extend the User type to include our custom fields
 interface ExtendedUser extends Auth.User {
@@ -351,7 +351,7 @@ const EditProfile = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
             <StatusBar barStyle="light-content" />
 
             {/* Header */}

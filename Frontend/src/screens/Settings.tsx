@@ -1,9 +1,10 @@
 import React, { useContext } from "react";
-import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView, Alert, StatusBar } from "react-native";
+import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, StatusBar } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
@@ -20,7 +21,7 @@ const SettingsScreen = () => {
     };
 
     return (
-        <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]}>
+        <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]} edges={["top", "left", "right"]}>
             <StatusBar barStyle="light-content" />
             <View style={[styles.header, isDarkTheme ? styles.dark : styles.light]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>

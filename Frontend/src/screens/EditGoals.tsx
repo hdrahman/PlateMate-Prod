@@ -1,20 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     TextInput,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
     ScrollView,
     StatusBar,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Animated,
+    Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Picker } from '@react-native-picker/picker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Constants for colors - matching EditProfile
+const PRIMARY_BG = '#000000';
+const CARD_BG = '#1C1C1E';
+const WHITE = '#FFFFFF';
+const GRAY = '#AAAAAA';
+const LIGHT_GRAY = '#333333';
+const BLUE_ACCENT = '#2196F3';
+const GRADIENT_START = '#2E5BFF';
+const GRADIENT_END = '#5AA9FA';
+const GREEN = '#4CAF50';
+const ORANGE = '#FF9800';
+const PURPLE = '#9C27B0';
+
+const { width } = Dimensions.get('window');
 
 interface GoalsData {
     targetWeight?: number;
@@ -24,13 +41,23 @@ interface GoalsData {
     fatGoal?: number;
     fitnessGoal?: string;
     activityLevel?: string;
+    weeklyWorkouts?: number;
+    stepGoal?: number;
+    waterGoal?: number;
+    sleepGoal?: number;
 }
 
 export default function EditGoals() {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
-
+    const [activeTab, setActiveTab] = useState('nutrition');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Animation values
+    const slideAnim = useRef(new Animated.Value(0)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    // Nutrition goals
     const [targetWeight, setTargetWeight] = useState('');
     const [calorieGoal, setCalorieGoal] = useState('');
     const [proteinGoal, setProteinGoal] = useState('');
@@ -39,20 +66,32 @@ export default function EditGoals() {
     const [fitnessGoal, setFitnessGoal] = useState('maintain');
     const [activityLevel, setActivityLevel] = useState('moderate');
 
-    useEffect(() => {
-        // This would typically fetch the user's goals from a database
-        // For now, we'll simulate this with placeholder data
+    // Fitness goals
+    const [weeklyWorkouts, setWeeklyWorkouts] = useState('4');
+    const [stepGoal, setStepGoal] = useState('10000');
+    const [waterGoal, setWaterGoal] = useState('2000');
+    const [sleepGoal, setSleepGoal] = useState('8');
 
-        // Simulate retrieving data from Firestore
+    useEffect(() => {
+        // Animation on component mount
+        Animated.parallel([
+            Animated.timing(slideAnim, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 1200,
+                useNativeDriver: true,
+            }),
+        ]).start();
+
+        // Fetch user's goals
         const fetchUserGoals = async () => {
             try {
                 // In a real app, you would get this from Firestore or another database
-                // For example:
-                // const db = firebase.firestore();
-                // const userDoc = await db.collection('users').doc(user.uid).get();
-                // const userData = userDoc.data();
-
-                // Instead, we'll use placeholder data
+                // For demonstration, we'll use placeholder data
                 const userData = {
                     targetWeight: 70,
                     calorieGoal: 2000,
@@ -60,7 +99,11 @@ export default function EditGoals() {
                     carbGoal: 200,
                     fatGoal: 65,
                     fitnessGoal: 'maintain',
-                    activityLevel: 'moderate'
+                    activityLevel: 'moderate',
+                    weeklyWorkouts: 4,
+                    stepGoal: 10000,
+                    waterGoal: 2000,
+                    sleepGoal: 8
                 };
 
                 setTargetWeight(userData.targetWeight?.toString() || '');
@@ -70,6 +113,10 @@ export default function EditGoals() {
                 setFatGoal(userData.fatGoal?.toString() || '');
                 setFitnessGoal(userData.fitnessGoal || 'maintain');
                 setActivityLevel(userData.activityLevel || 'moderate');
+                setWeeklyWorkouts(userData.weeklyWorkouts?.toString() || '4');
+                setStepGoal(userData.stepGoal?.toString() || '10000');
+                setWaterGoal(userData.waterGoal?.toString() || '2000');
+                setSleepGoal(userData.sleepGoal?.toString() || '8');
             } catch (error) {
                 console.error('Error fetching user goals', error);
             }
@@ -91,14 +138,14 @@ export default function EditGoals() {
                 carbGoal: carbGoal ? parseInt(carbGoal) : undefined,
                 fatGoal: fatGoal ? parseInt(fatGoal) : undefined,
                 fitnessGoal,
-                activityLevel
+                activityLevel,
+                weeklyWorkouts: weeklyWorkouts ? parseInt(weeklyWorkouts) : undefined,
+                stepGoal: stepGoal ? parseInt(stepGoal) : undefined,
+                waterGoal: waterGoal ? parseInt(waterGoal) : undefined,
+                sleepGoal: sleepGoal ? parseInt(sleepGoal) : undefined,
             };
 
             // In a real app, you would save this to Firestore or another database
-            // For example:
-            // const db = firebase.firestore();
-            // await db.collection('users').doc(user.uid).update(goalsData);
-
             // Simulate saving data
             await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -112,123 +159,328 @@ export default function EditGoals() {
         }
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Edit Fitness Goals</Text>
-            </View>
+    const renderNutritionTab = () => {
+        return (
+            <Animated.View
+                style={[
+                    styles.tabContent,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{
+                            translateY: slideAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                            })
+                        }]
+                    }
+                ]}
+            >
+                {/* Summary Card */}
+                <LinearGradient
+                    colors={[GRADIENT_START, GRADIENT_END]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.summaryCard}
+                >
+                    <View style={styles.summaryContent}>
+                        <Text style={styles.summaryTitle}>Nutrition Goals</Text>
+                        <View style={styles.summaryStats}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{calorieGoal || '0'}</Text>
+                                <Text style={styles.statLabel}>Calories/day</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{targetWeight || '0'} kg</Text>
+                                <Text style={styles.statLabel}>Target Weight</Text>
+                            </View>
+                        </View>
+                    </View>
+                </LinearGradient>
 
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.section}>
+                {/* Weight & Calorie Goals */}
+                <View style={styles.formSection}>
                     <Text style={styles.sectionTitle}>Weight & Calorie Goals</Text>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Target Weight (kg)</Text>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Target Weight (kg)</Text>
                         <TextInput
                             style={styles.input}
                             value={targetWeight}
                             onChangeText={setTargetWeight}
                             placeholder="Enter target weight"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={GRAY}
                             keyboardType="decimal-pad"
                         />
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Daily Calorie Goal</Text>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Daily Calorie Goal</Text>
                         <TextInput
                             style={styles.input}
                             value={calorieGoal}
                             onChangeText={setCalorieGoal}
                             placeholder="Enter calorie goal"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={GRAY}
                             keyboardType="number-pad"
                         />
                     </View>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Macronutrient Goals (g)</Text>
+                {/* Macronutrient Goals */}
+                <View style={styles.formSection}>
+                    <Text style={styles.sectionTitle}>Macronutrient Goals</Text>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Protein (g)</Text>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Protein (g)</Text>
                         <TextInput
                             style={styles.input}
                             value={proteinGoal}
                             onChangeText={setProteinGoal}
                             placeholder="Enter protein goal"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={GRAY}
                             keyboardType="number-pad"
                         />
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Carbohydrates (g)</Text>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Carbohydrates (g)</Text>
                         <TextInput
                             style={styles.input}
                             value={carbGoal}
                             onChangeText={setCarbGoal}
-                            placeholder="Enter carbohydrate goal"
-                            placeholderTextColor="#888"
+                            placeholder="Enter carb goal"
+                            placeholderTextColor={GRAY}
                             keyboardType="number-pad"
                         />
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Fat (g)</Text>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Fat (g)</Text>
                         <TextInput
                             style={styles.input}
                             value={fatGoal}
                             onChangeText={setFatGoal}
                             placeholder="Enter fat goal"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={GRAY}
                             keyboardType="number-pad"
                         />
                     </View>
                 </View>
 
-                <View style={styles.section}>
+                {/* Activity Profile */}
+                <View style={styles.formSection}>
                     <Text style={styles.sectionTitle}>Activity Profile</Text>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Fitness Goal</Text>
-                        <View style={styles.pickerContainer}>
-                            <Picker
-                                selectedValue={fitnessGoal}
-                                onValueChange={(value) => setFitnessGoal(value)}
-                                style={styles.picker}
-                                dropdownIconColor="#FFF"
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Fitness Goal</Text>
+                        <View style={styles.segmentedControl}>
+                            <TouchableOpacity
+                                style={[styles.segmentOption, fitnessGoal === 'lose' && styles.segmentActive]}
+                                onPress={() => setFitnessGoal('lose')}
                             >
-                                <Picker.Item label="Lose Weight" value="lose" />
-                                <Picker.Item label="Maintain Weight" value="maintain" />
-                                <Picker.Item label="Gain Weight" value="gain" />
-                                <Picker.Item label="Build Muscle" value="build" />
-                            </Picker>
+                                <Text style={[styles.segmentText, fitnessGoal === 'lose' && styles.segmentTextActive]}>
+                                    Lose Weight
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.segmentOption, fitnessGoal === 'maintain' && styles.segmentActive]}
+                                onPress={() => setFitnessGoal('maintain')}
+                            >
+                                <Text style={[styles.segmentText, fitnessGoal === 'maintain' && styles.segmentTextActive]}>
+                                    Maintain
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.segmentOption, fitnessGoal === 'gain' && styles.segmentActive]}
+                                onPress={() => setFitnessGoal('gain')}
+                            >
+                                <Text style={[styles.segmentText, fitnessGoal === 'gain' && styles.segmentTextActive]}>
+                                    Gain Weight
+                                </Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Activity Level</Text>
-                        <View style={styles.pickerContainer}>
-                            <Picker
-                                selectedValue={activityLevel}
-                                onValueChange={(value) => setActivityLevel(value)}
-                                style={styles.picker}
-                                dropdownIconColor="#FFF"
-                            >
-                                <Picker.Item label="Sedentary (office job)" value="sedentary" />
-                                <Picker.Item label="Light Activity (1-2 days/week)" value="light" />
-                                <Picker.Item label="Moderate Activity (3-5 days/week)" value="moderate" />
-                                <Picker.Item label="Very Active (6-7 days/week)" value="active" />
-                                <Picker.Item label="Athletic (2x per day)" value="athletic" />
-                            </Picker>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Activity Level</Text>
+                        <View style={styles.dropdownField}>
+                            <Text style={styles.dropdownText}>{getActivityLevelLabel(activityLevel)}</Text>
+                            <Ionicons name="chevron-down" size={20} color={BLUE_ACCENT} />
                         </View>
                     </View>
                 </View>
+            </Animated.View>
+        );
+    };
+
+    const renderFitnessTab = () => {
+        return (
+            <Animated.View
+                style={[
+                    styles.tabContent,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{
+                            translateY: slideAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                            })
+                        }]
+                    }
+                ]}
+            >
+                {/* Summary Card */}
+                <LinearGradient
+                    colors={[ORANGE, PURPLE]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.summaryCard}
+                >
+                    <View style={styles.summaryContent}>
+                        <Text style={styles.summaryTitle}>Fitness Goals</Text>
+                        <View style={styles.summaryStats}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{weeklyWorkouts || '0'}</Text>
+                                <Text style={styles.statLabel}>Workouts/week</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{stepGoal || '0'}</Text>
+                                <Text style={styles.statLabel}>Daily Steps</Text>
+                            </View>
+                        </View>
+                    </View>
+                </LinearGradient>
+
+                {/* Workout Goals */}
+                <View style={styles.formSection}>
+                    <Text style={styles.sectionTitle}>Workout Goals</Text>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Weekly Workouts</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={weeklyWorkouts}
+                            onChangeText={setWeeklyWorkouts}
+                            placeholder="Workouts per week"
+                            placeholderTextColor={GRAY}
+                            keyboardType="number-pad"
+                        />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Daily Step Goal</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={stepGoal}
+                            onChangeText={setStepGoal}
+                            placeholder="Target daily steps"
+                            placeholderTextColor={GRAY}
+                            keyboardType="number-pad"
+                        />
+                    </View>
+                </View>
+
+                {/* Health Goals */}
+                <View style={styles.formSection}>
+                    <Text style={styles.sectionTitle}>Health Goals</Text>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Daily Water Intake (ml)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={waterGoal}
+                            onChangeText={setWaterGoal}
+                            placeholder="Water intake goal"
+                            placeholderTextColor={GRAY}
+                            keyboardType="number-pad"
+                        />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.inputLabel}>Sleep Goal (hours)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={sleepGoal}
+                            onChangeText={setSleepGoal}
+                            placeholder="Target sleep hours"
+                            placeholderTextColor={GRAY}
+                            keyboardType="number-pad"
+                        />
+                    </View>
+                </View>
+            </Animated.View>
+        );
+    };
+
+    // Helper function to get activity level label
+    const getActivityLevelLabel = (value: string) => {
+        const labels: Record<string, string> = {
+            'sedentary': 'Sedentary (office job)',
+            'light': 'Light Activity (1-2 days/week)',
+            'moderate': 'Moderate Activity (3-5 days/week)',
+            'active': 'Very Active (6-7 days/week)',
+            'athletic': 'Athletic (2x per day)'
+        };
+        return labels[value] || 'Select activity level';
+    };
+
+    return (
+        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+            <StatusBar barStyle="light-content" />
+
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={28} color={WHITE} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Edit Fitness Goals</Text>
+                <View style={{ width: 28 }}></View>
+            </View>
+
+            {/* Tabs */}
+            <View style={styles.tabs}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'nutrition' && styles.activeTab]}
+                    onPress={() => setActiveTab('nutrition')}
+                >
+                    <Ionicons
+                        name="nutrition"
+                        size={24}
+                        color={activeTab === 'nutrition' ? BLUE_ACCENT : GRAY}
+                    />
+                    <Text
+                        style={[
+                            styles.tabText,
+                            activeTab === 'nutrition' && styles.activeTabText
+                        ]}
+                    >
+                        Nutrition
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'fitness' && styles.activeTab]}
+                    onPress={() => setActiveTab('fitness')}
+                >
+                    <Ionicons
+                        name="barbell"
+                        size={24}
+                        color={activeTab === 'fitness' ? BLUE_ACCENT : GRAY}
+                    />
+                    <Text
+                        style={[
+                            styles.tabText,
+                            activeTab === 'fitness' && styles.activeTabText
+                        ]}
+                    >
+                        Fitness
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.content}>
+                {activeTab === 'nutrition' ? renderNutritionTab() : renderFitnessTab()}
 
                 <TouchableOpacity
                     style={styles.saveButton}
@@ -236,7 +488,7 @@ export default function EditGoals() {
                     disabled={isLoading}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color="#fff" />
+                        <ActivityIndicator color={WHITE} />
                     ) : (
                         <Text style={styles.saveButtonText}>Save Goals</Text>
                     )}
@@ -249,78 +501,168 @@ export default function EditGoals() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        height: 60,
-        borderBottomWidth: 1,
-        borderBottomColor: '#444',
+        justifyContent: 'space-between',
         paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: LIGHT_GRAY,
     },
     backButton: {
-        padding: 5,
+        padding: 4,
     },
     headerTitle: {
-        color: '#FFF',
+        color: WHITE,
         fontSize: 22,
         fontWeight: 'bold',
-        marginLeft: 10,
+    },
+    tabs: {
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        borderBottomColor: LIGHT_GRAY,
+    },
+    tab: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+    },
+    activeTab: {
+        borderBottomWidth: 2,
+        borderBottomColor: BLUE_ACCENT,
+    },
+    tabText: {
+        color: GRAY,
+        fontSize: 16,
+        marginLeft: 8,
+    },
+    activeTabText: {
+        color: BLUE_ACCENT,
+        fontWeight: 'bold',
     },
     content: {
+        flex: 1,
+    },
+    tabContent: {
+        padding: 16,
+    },
+    summaryCard: {
+        borderRadius: 16,
         padding: 20,
-        paddingBottom: 40,
+        marginBottom: 24,
     },
-    section: {
-        marginBottom: 30,
+    summaryContent: {
+        alignItems: 'center',
     },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#9B00FF',
-        marginBottom: 15,
+    summaryTitle: {
+        color: WHITE,
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 16,
     },
-    formGroup: {
+    summaryStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+    },
+    statItem: {
+        alignItems: 'center',
+        padding: 10,
+    },
+    statDivider: {
+        width: 1,
+        height: 40,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        marginHorizontal: 20,
+    },
+    statValue: {
+        color: WHITE,
+        fontSize: 22,
+        fontWeight: 'bold',
+    },
+    statLabel: {
+        color: WHITE,
+        fontSize: 14,
+        opacity: 0.8,
+    },
+    formSection: {
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 16,
         marginBottom: 20,
     },
-    label: {
-        color: '#FFF',
-        fontSize: 16,
+    sectionTitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 16,
+    },
+    inputGroup: {
+        marginBottom: 16,
+    },
+    inputLabel: {
+        color: GRAY,
+        fontSize: 14,
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#1A1A1A',
-        color: '#FFF',
-        height: 50,
+        backgroundColor: LIGHT_GRAY,
         borderRadius: 8,
-        paddingHorizontal: 15,
+        padding: 12,
+        color: WHITE,
         fontSize: 16,
-        borderWidth: 1,
-        borderColor: '#333',
     },
-    pickerContainer: {
-        backgroundColor: '#1A1A1A',
+    segmentedControl: {
+        flexDirection: 'row',
+        backgroundColor: LIGHT_GRAY,
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#333',
         overflow: 'hidden',
     },
-    picker: {
-        height: 50,
-        color: '#FFF',
+    segmentOption: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    segmentActive: {
+        backgroundColor: BLUE_ACCENT,
+    },
+    segmentText: {
+        color: GRAY,
+        fontWeight: '600',
+    },
+    segmentTextActive: {
+        color: WHITE,
+    },
+    dropdownField: {
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    dropdownText: {
+        color: WHITE,
+        fontSize: 16,
+        flex: 1,
     },
     saveButton: {
-        backgroundColor: '#9B00FF',
-        height: 50,
-        borderRadius: 8,
-        justifyContent: 'center',
+        backgroundColor: BLUE_ACCENT,
+        borderRadius: 12,
+        paddingVertical: 16,
         alignItems: 'center',
-        marginTop: 20,
+        marginVertical: 20,
+        marginHorizontal: 16,
     },
     saveButtonText: {
-        color: '#FFF',
+        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
-    }
+    },
 });
