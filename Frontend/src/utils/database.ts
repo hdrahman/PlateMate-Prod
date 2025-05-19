@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateDatabaseSchema } from './updateDatabase';
 import { auth } from './firebase/index';
-import { triggerDatabaseChangeNotification } from './databaseObserver';
+import { notifyDatabaseChanged } from './databaseWatcher';
 
 // Open the database
 let db: SQLite.SQLiteDatabase;
@@ -198,11 +198,7 @@ export const unsubscribeFromFoodLogChanges = (callback: DatabaseChangeCallback) 
     changeListeners.delete(callback);
 };
 
-// Modify the existing food log mutation operations to trigger change notifications
-
-// Original addFoodLog function
-const originalAddFoodLog = addFoodLog;
-// Override with version that notifies listeners
+// Add a food log entry
 export const addFoodLog = async (foodLog: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to add food log before database initialization');
@@ -342,7 +338,7 @@ export const addFoodLog = async (foodLog: any) => {
 
         // Trigger notification for observers
         try {
-            await triggerDatabaseChangeNotification();
+            await notifyDatabaseChanged();
         } catch (notifyError) {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
@@ -362,9 +358,7 @@ export const addFoodLog = async (foodLog: any) => {
     }
 };
 
-// Original updateFoodLog function
-const originalUpdateFoodLog = updateFoodLog;
-// Override with version that notifies listeners
+// Update a food log entry
 export const updateFoodLog = async (id: number, updates: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to update food log before database initialization');
@@ -417,7 +411,7 @@ export const updateFoodLog = async (id: number, updates: any) => {
 
         // Trigger notification for observers
         try {
-            await triggerDatabaseChangeNotification();
+            await notifyDatabaseChanged();
         } catch (notifyError) {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
@@ -430,9 +424,7 @@ export const updateFoodLog = async (id: number, updates: any) => {
     }
 };
 
-// Original deleteFoodLog function (if it exists)
-const originalDeleteFoodLog = deleteFoodLog;
-// Override with version that notifies listeners
+// Delete a food log entry
 export const deleteFoodLog = async (id: number) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to delete food log before database initialization');
@@ -458,7 +450,7 @@ export const deleteFoodLog = async (id: number) => {
 
         // Trigger notification for observers
         try {
-            await triggerDatabaseChangeNotification();
+            await notifyDatabaseChanged();
         } catch (notifyError) {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
@@ -1279,38 +1271,7 @@ export const markUserProfileSynced = async (firebaseUid: string) => {
 
 export { db };
 
-// Wrap existing addFoodLog function to trigger notifications after adding a food log
-const originalAddFoodLog = addFoodLog;
-export const addFoodLogWithNotification = async (foodLog: any) => {
-    const result = await originalAddFoodLog(foodLog);
-    try {
-        await triggerDatabaseChangeNotification();
-    } catch (error) {
-        console.error('Error notifying observers after adding food log:', error);
-    }
-    return result;
-};
-
-// Wrap existing updateFoodLog function to trigger notifications after updating a food log
-const originalUpdateFoodLog = updateFoodLog;
-export const updateFoodLogWithNotification = async (id: number, updates: any) => {
-    const result = await originalUpdateFoodLog(id, updates);
-    try {
-        await triggerDatabaseChangeNotification();
-    } catch (error) {
-        console.error('Error notifying observers after updating food log:', error);
-    }
-    return result;
-};
-
-// Wrap existing deleteFoodLog function to trigger notifications after deleting a food log
-const originalDeleteFoodLog = deleteFoodLog;
-export const deleteFoodLogWithNotification = async (id: number) => {
-    const result = await originalDeleteFoodLog(id);
-    try {
-        await triggerDatabaseChangeNotification();
-    } catch (error) {
-        console.error('Error notifying observers after deleting food log:', error);
-    }
-    return result;
-}; 
+// Export wrappers with simpler names for backward compatibility
+export const addFoodLogWithNotification = addFoodLog;
+export const updateFoodLogWithNotification = updateFoodLog;
+export const deleteFoodLogWithNotification = deleteFoodLog; 
