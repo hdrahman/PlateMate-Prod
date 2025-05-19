@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateDatabaseSchema } from './updateDatabase';
 import { auth } from './firebase/index';
-import { notifyDatabaseChanged } from './databaseWatcher';
+import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
 
 // Open the database
 let db: SQLite.SQLiteDatabase;
@@ -166,36 +166,16 @@ export const getCurrentUserId = (): string => {
     return 'anonymous'; // Default if not signed in
 };
 
-// Type for database change callback functions
-type DatabaseChangeCallback = () => Promise<void>;
-
-// Store for change listeners
-const changeListeners: Set<DatabaseChangeCallback> = new Set();
-
-// Function to notify all listeners about a database change
-const notifyDatabaseChange = async () => {
-    console.log(`🔄 Notifying ${changeListeners.size} database change listeners`);
-    // Execute all callbacks in parallel
-    await Promise.all(Array.from(changeListeners).map(callback => {
-        try {
-            return callback();
-        } catch (error) {
-            console.error('❌ Error in database change listener:', error);
-            return Promise.resolve();
-        }
-    }));
-};
-
-// Subscribe to database changes
-export const subscribeToFoodLogChanges = (callback: DatabaseChangeCallback) => {
+// Forward database change subscription functions to use our databaseWatcher module
+export const subscribeToFoodLogChanges = (callback: () => void | Promise<void>) => {
     console.log('📊 Adding database change listener');
-    changeListeners.add(callback);
+    return subscribeToDatabaseChanges(callback);
 };
 
 // Unsubscribe from database changes
-export const unsubscribeFromFoodLogChanges = (callback: DatabaseChangeCallback) => {
+export const unsubscribeFromFoodLogChanges = (callback: () => void | Promise<void>) => {
     console.log('📊 Removing database change listener');
-    changeListeners.delete(callback);
+    unsubscribeFromDatabaseChanges(callback);
 };
 
 // Add a food log entry

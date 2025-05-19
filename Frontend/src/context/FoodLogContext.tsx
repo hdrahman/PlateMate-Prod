@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { getFoodLogsByDate as getLocalFoodLogsByDate, addFoodLog as addLocalFoodLog } from '../utils/database';
-import { watchDatabaseChanges, unwatchDatabaseChanges, notifyDatabaseChanged } from '../utils/databaseWatcher';
+import { subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges, notifyDatabaseChanged } from '../utils/databaseWatcher';
 
 // Local helper to format date as YYYY-MM-DD
 function formatDateToString(date: Date): string {
@@ -350,30 +350,25 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     };
 
-    // Stop watching for food log changes
-    const stopWatchingFoodLogs = useCallback(() => {
-        if (isWatching && unsubscribeRef.current) {
-            unsubscribeRef.current();
-            unsubscribeRef.current = null;
-            setIsWatching(false);
-            console.log('Stopped watching food logs');
-        }
-    }, [isWatching]);
-
-    // Start watching for food log changes
+    // Start watching food logs
     const startWatchingFoodLogs = useCallback(() => {
-        // Don't start another watcher if one is already running
-        if (isWatching) {
-            console.log('Watcher already running, not starting another one');
-            return;
-        }
+        if (isWatching) return;
 
-        // Subscribe to database changes - use the new watcher system
-        const unsubscribe = watchDatabaseChanges(handleDatabaseChange);
+        console.log('Starting database watch');
+        const unsubscribe = subscribeToDatabaseChanges(handleDatabaseChange);
         unsubscribeRef.current = unsubscribe;
         setIsWatching(true);
-        console.log('Started watching food logs for real-time changes');
     }, [isWatching, handleDatabaseChange]);
+
+    // Stop watching food logs
+    const stopWatchingFoodLogs = useCallback(() => {
+        if (!isWatching || !unsubscribeRef.current) return;
+
+        console.log('Stopping database watch');
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+        setIsWatching(false);
+    }, [isWatching]);
 
     // Get logs for a specific date
     const getLogsByDate = async (date: Date): Promise<FoodLogEntry[]> => {
