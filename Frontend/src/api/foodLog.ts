@@ -34,7 +34,6 @@ export interface FoodLogEntry {
     meal_type: string;
     brand_name?: string;
     quantity?: string;
-    notes?: string;
     synced?: number;
     sync_action?: string;
     last_modified?: string;
@@ -52,7 +51,7 @@ export const addFoodEntry = async (
     try {
         const meal_id = getMealIdFromType(mealType);
 
-        const foodLogEntry: Omit<FoodLogEntry, 'id'> = {
+        const foodLogEntry: Omit<FoodLogEntry, 'id' | 'notes'> = {
             meal_id,
             user_id: userId,
             food_name: foodItem.food_name,
@@ -80,7 +79,6 @@ export const addFoodEntry = async (
             meal_type: mealType,
             brand_name: foodItem.brand_name,
             quantity: `${quantity} ${foodItem.serving_unit}`,
-            notes: foodItem.notes
         };
 
         // Skip backend API call and only save locally

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from DB import get_db  # Import correct database session
 from models import FoodLog
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -10,33 +10,32 @@ router = APIRouter()
 
 class FoodLogCreate(BaseModel):
     meal_id: int
-    user_id: Optional[int] = 1
+    user_id: Optional[int] = Field(default=1)
     food_name: str
-    calories: int
-    proteins: int
-    carbs: float
-    fats: int
-    fiber: int
-    sugar: int
-    saturated_fat: int
-    polyunsaturated_fat: int
-    monounsaturated_fat: int
-    trans_fat: int
-    cholesterol: int
-    sodium: int
-    potassium: int
-    vitamin_a: int
-    vitamin_c: int
-    calcium: int
-    iron: int
-    image_url: str
-    file_key: Optional[str] = "default_file_key"
+    calories: Optional[int] = Field(default=0)
+    proteins: Optional[int] = Field(default=0)
+    carbs: Optional[int] = Field(default=0)
+    fats: Optional[int] = Field(default=0)
+    fiber: Optional[int] = Field(default=0)
+    sugar: Optional[int] = Field(default=0)
+    saturated_fat: Optional[int] = Field(default=0)
+    polyunsaturated_fat: Optional[int] = Field(default=0)
+    monounsaturated_fat: Optional[int] = Field(default=0)
+    trans_fat: Optional[int] = Field(default=0)
+    cholesterol: Optional[int] = Field(default=0)
+    sodium: Optional[int] = Field(default=0)
+    potassium: Optional[int] = Field(default=0)
+    vitamin_a: Optional[int] = Field(default=0)
+    vitamin_c: Optional[int] = Field(default=0)
+    calcium: Optional[int] = Field(default=0)
+    iron: Optional[int] = Field(default=0)
+    image_url: Optional[str] = Field(default="placeholder_manual_image.png")
+    file_key: Optional[str] = Field(default="default_file_key")
     healthiness_rating: Optional[int] = None
     date: Optional[str] = None
     meal_type: Optional[str] = None
     brand_name: Optional[str] = None
     quantity: Optional[str] = None
-    notes: Optional[str] = None
 
 class FoodLogUpdate(FoodLogCreate):
     pass

@@ -36,7 +36,6 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
     const [selectedMeal, setSelectedMeal] = useState<string>('Breakfast');
     const [quantity, setQuantity] = useState<string>('1');
     const [servingUnit, setServingUnit] = useState<string>('serving');
-    const [notes, setNotes] = useState<string>('');
 
     // Optional nutrients with default value 0
     const [fiber, setFiber] = useState<string>('0');
@@ -57,7 +56,6 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         setSelectedMeal('Breakfast');
         setQuantity('1');
         setServingUnit('serving');
-        setNotes('');
     };
 
     // Handle save
@@ -102,7 +100,6 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
             serving_weight_grams: 0,
             serving_qty: parsedQuantity,
             healthiness_rating: 5, // Default middle value
-            notes: notes ? notes + ' (Manual Entry)' : '(Manual Entry)'
         };
 
         // Add food to log
@@ -278,19 +275,6 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                                 />
                             </View>
                         </View>
-                    </View>
-
-                    {/* Notes */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Notes (Optional)</Text>
-                        <TextInput
-                            style={styles.notesInput}
-                            placeholder="Add notes about this food..."
-                            placeholderTextColor={GRAY}
-                            value={notes}
-                            onChangeText={setNotes}
-                            multiline
-                        />
                     </View>
 
                     {/* Save Button */}
