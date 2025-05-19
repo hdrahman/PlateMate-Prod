@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateDatabaseSchema } from './updateDatabase';
 import { auth } from './firebase/index';
+import { triggerDatabaseChangeNotification } from './databaseObserver';
 
 // Open the database
 let db: SQLite.SQLiteDatabase;
@@ -165,7 +166,43 @@ export const getCurrentUserId = (): string => {
     return 'anonymous'; // Default if not signed in
 };
 
-// Add a new food log entry
+// Type for database change callback functions
+type DatabaseChangeCallback = () => Promise<void>;
+
+// Store for change listeners
+const changeListeners: Set<DatabaseChangeCallback> = new Set();
+
+// Function to notify all listeners about a database change
+const notifyDatabaseChange = async () => {
+    console.log(`🔄 Notifying ${changeListeners.size} database change listeners`);
+    // Execute all callbacks in parallel
+    await Promise.all(Array.from(changeListeners).map(callback => {
+        try {
+            return callback();
+        } catch (error) {
+            console.error('❌ Error in database change listener:', error);
+            return Promise.resolve();
+        }
+    }));
+};
+
+// Subscribe to database changes
+export const subscribeToFoodLogChanges = (callback: DatabaseChangeCallback) => {
+    console.log('📊 Adding database change listener');
+    changeListeners.add(callback);
+};
+
+// Unsubscribe from database changes
+export const unsubscribeFromFoodLogChanges = (callback: DatabaseChangeCallback) => {
+    console.log('📊 Removing database change listener');
+    changeListeners.delete(callback);
+};
+
+// Modify the existing food log mutation operations to trigger change notifications
+
+// Original addFoodLog function
+const originalAddFoodLog = addFoodLog;
+// Override with version that notifies listeners
 export const addFoodLog = async (foodLog: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to add food log before database initialization');
@@ -302,6 +339,15 @@ export const addFoodLog = async (foodLog: any) => {
         console.log('✅ Food log added and verified:', addedEntry ? 'Success' : 'Failed to verify');
 
         console.log('✅ Food log added successfully with ID', result.lastInsertRowId);
+
+        // Trigger notification for observers
+        try {
+            await triggerDatabaseChangeNotification();
+        } catch (notifyError) {
+            console.error('⚠️ Error notifying database observers:', notifyError);
+            // Continue anyway - the operation succeeded
+        }
+
         return result.lastInsertRowId;
     } catch (error) {
         // Rollback the transaction in case of error
@@ -316,45 +362,9 @@ export const addFoodLog = async (foodLog: any) => {
     }
 };
 
-// Get food logs by date
-export const getFoodLogsByDate = async (date: string) => {
-    if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to get food logs before database initialization');
-        throw new Error('Database not initialized');
-    }
-
-    const firebaseUserId = getCurrentUserId();
-    console.log(`🔍 Looking for food logs with date=${date} and user_id=${firebaseUserId}`);
-
-    try {
-        // First check if there are any logs for this date
-        const countResult = await db.getFirstAsync(
-            `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
-            [date, firebaseUserId]
-        );
-        console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${date}`);
-
-        // Get all logs for this date
-        const result = await db.getAllAsync(
-            `SELECT * FROM food_logs WHERE date = ? AND user_id = ? ORDER BY id DESC`,
-            [date, firebaseUserId]
-        );
-
-        // Log the first record for debugging
-        if (result && result.length > 0) {
-            console.log(`📋 First food log: ${JSON.stringify(result[0])}`);
-        } else {
-            console.log(`📋 No food logs found for date: ${date}`);
-        }
-
-        return result;
-    } catch (error) {
-        console.error('❌ Error getting food logs by date:', error);
-        throw error;
-    }
-};
-
-// Update a food log entry
+// Original updateFoodLog function
+const originalUpdateFoodLog = updateFoodLog;
+// Override with version that notifies listeners
 export const updateFoodLog = async (id: number, updates: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to update food log before database initialization');
@@ -404,6 +414,15 @@ export const updateFoodLog = async (id: number, updates: any) => {
         const result = await db.runAsync(sql, values);
 
         console.log('✅ Food log updated successfully', result.changes);
+
+        // Trigger notification for observers
+        try {
+            await triggerDatabaseChangeNotification();
+        } catch (notifyError) {
+            console.error('⚠️ Error notifying database observers:', notifyError);
+            // Continue anyway - the operation succeeded
+        }
+
         return result.changes;
     } catch (error) {
         console.error('❌ Error updating food log:', error);
@@ -411,7 +430,9 @@ export const updateFoodLog = async (id: number, updates: any) => {
     }
 };
 
-// Delete a food log entry
+// Original deleteFoodLog function (if it exists)
+const originalDeleteFoodLog = deleteFoodLog;
+// Override with version that notifies listeners
 export const deleteFoodLog = async (id: number) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to delete food log before database initialization');
@@ -434,9 +455,56 @@ export const deleteFoodLog = async (id: number) => {
     try {
         await db.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
         console.log('✅ Food log deleted successfully');
+
+        // Trigger notification for observers
+        try {
+            await triggerDatabaseChangeNotification();
+        } catch (notifyError) {
+            console.error('⚠️ Error notifying database observers:', notifyError);
+            // Continue anyway - the operation succeeded
+        }
+
         return true;
     } catch (error) {
         console.error('❌ Error deleting food log:', error);
+        throw error;
+    }
+};
+
+// Get food logs by date
+export const getFoodLogsByDate = async (date: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get food logs before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    console.log(`🔍 Looking for food logs with date=${date} and user_id=${firebaseUserId}`);
+
+    try {
+        // First check if there are any logs for this date
+        const countResult = await db.getFirstAsync(
+            `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
+            [date, firebaseUserId]
+        );
+        console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${date}`);
+
+        // Get all logs for this date
+        const result = await db.getAllAsync(
+            `SELECT * FROM food_logs WHERE date = ? AND user_id = ? ORDER BY id DESC`,
+            [date, firebaseUserId]
+        );
+
+        // Log the first record for debugging
+        if (result && result.length > 0) {
+            console.log(`📋 First food log: ${JSON.stringify(result[0])}`);
+        } else {
+            console.log(`📋 No food logs found for date: ${date}`);
+        }
+
+        return result;
+    } catch (error) {
+        console.error('❌ Error getting food logs by date:', error);
         throw error;
     }
 };
@@ -1209,4 +1277,40 @@ export const markUserProfileSynced = async (firebaseUid: string) => {
     }
 };
 
-export { db }; 
+export { db };
+
+// Wrap existing addFoodLog function to trigger notifications after adding a food log
+const originalAddFoodLog = addFoodLog;
+export const addFoodLogWithNotification = async (foodLog: any) => {
+    const result = await originalAddFoodLog(foodLog);
+    try {
+        await triggerDatabaseChangeNotification();
+    } catch (error) {
+        console.error('Error notifying observers after adding food log:', error);
+    }
+    return result;
+};
+
+// Wrap existing updateFoodLog function to trigger notifications after updating a food log
+const originalUpdateFoodLog = updateFoodLog;
+export const updateFoodLogWithNotification = async (id: number, updates: any) => {
+    const result = await originalUpdateFoodLog(id, updates);
+    try {
+        await triggerDatabaseChangeNotification();
+    } catch (error) {
+        console.error('Error notifying observers after updating food log:', error);
+    }
+    return result;
+};
+
+// Wrap existing deleteFoodLog function to trigger notifications after deleting a food log
+const originalDeleteFoodLog = deleteFoodLog;
+export const deleteFoodLogWithNotification = async (id: number) => {
+    const result = await originalDeleteFoodLog(id);
+    try {
+        await triggerDatabaseChangeNotification();
+    } catch (error) {
+        console.error('Error notifying observers after deleting food log:', error);
+    }
+    return result;
+}; 

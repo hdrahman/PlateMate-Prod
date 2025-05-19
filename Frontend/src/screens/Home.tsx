@@ -5,10 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
-import { getTodayCalories, getTodayExerciseCalories, getTodayProtein, getTodayCarbs, getTodayFats } from '../utils/database';
+import { getTodayExerciseCalories } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
+import { useFoodLog } from '../context/FoodLogContext';
 
 import {
   View,
@@ -110,6 +111,7 @@ export default function Home() {
   const navigation = useNavigation();
   const { isDarkTheme } = useContext(ThemeContext);
   const { user } = useAuth();
+  const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
   // Keep track of which "page" (card) we are on in the horizontal scroll
   const [activeIndex, setActiveIndex] = useState(0);
@@ -193,6 +195,7 @@ export default function Home() {
             syncDataOffline: profile.sync_data_offline
           });
 
+          // Update state with calculated goals
           setDailyCalorieGoal(goals.calories);
           setMacroGoals({
             protein: goals.protein,
@@ -210,78 +213,60 @@ export default function Home() {
     loadUserProfile();
   }, [user]);
 
-  // Fetch food calories from the database
+  // Set up food log watching when component mounts
   useEffect(() => {
-    const fetchCalories = async () => {
+    console.log('Home screen starting to watch food logs');
+    startWatchingFoodLogs();
+
+    // Clean up when component unmounts
+    return () => {
+      console.log('Home screen stopping food log watch');
+      stopWatchingFoodLogs();
+    };
+  }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+
+  // Load today's nutrition data from the food log context
+  useEffect(() => {
+    const loadTodayNutrients = async () => {
+      if (profileLoading) return;
+
       try {
         setFoodLoading(true);
-        const calories = await getTodayCalories();
-        setConsumedCalories(calories);
+        setMacrosLoading(true);
 
-        // Calculate percentage based on current goal
-        setPercentCons((calories / dailyCalorieGoal) * 100);
+        // Only refresh logs if needed (first load or when explicitly required)
+        if (nutrientTotals.calories === 0) {
+          await refreshLogs();
+        }
+
+        // Get the nutrition values from the context
+        setConsumedCalories(nutrientTotals.calories);
+        setProtein(nutrientTotals.protein);
+        setCarbs(nutrientTotals.carbs);
+        setFats(nutrientTotals.fat);
+
+        // Load exercise calories
+        const todayExerciseCals = await getTodayExerciseCalories();
+        setExerciseCalories(todayExerciseCals);
+
+        // Calculate remaining calories
+        const remaining = dailyCalorieGoal - nutrientTotals.calories + todayExerciseCals;
+        setRemainingCals(Math.max(0, Math.round(remaining)));
+
+        // Calculate percent consumed
+        const percentConsumed = (nutrientTotals.calories / dailyCalorieGoal) * 100;
+        setPercentCons(Math.min(100, Math.round(percentConsumed)));
       } catch (error) {
-        console.error('Error fetching calories:', error);
-        // Keep default values if there's an error
+        console.error('Error loading today nutrients:', error);
       } finally {
         setFoodLoading(false);
-      }
-    };
-
-    // Only fetch if profile is loaded
-    if (!profileLoading) {
-      fetchCalories();
-    }
-  }, [dailyCalorieGoal, profileLoading]);
-
-  // Fetch exercise calories from the database
-  useEffect(() => {
-    const fetchExerciseCalories = async () => {
-      try {
-        setExerciseLoading(true);
-        const calories = await getTodayExerciseCalories();
-        setExerciseCalories(calories);
-
-        // Now that we have both food and exercise calories, calculate remaining calories
-        setRemainingCals(dailyCalorieGoal - consumedCalories + calories);
-      } catch (error) {
-        console.error('Error fetching exercise calories:', error);
-        // Keep default values if there's an error
-      } finally {
+        setMacrosLoading(false);
         setExerciseLoading(false);
       }
     };
 
-    // Only fetch if food calories are loaded
-    if (!foodLoading) {
-      fetchExerciseCalories();
-    }
-  }, [consumedCalories, dailyCalorieGoal, foodLoading]);
-
-  // Fetch macros from the database
-  useEffect(() => {
-    const fetchMacros = async () => {
-      try {
-        setMacrosLoading(true);
-        const [proteinVal, carbsVal, fatsVal] = await Promise.all([
-          getTodayProtein(),
-          getTodayCarbs(),
-          getTodayFats(),
-        ]);
-        setProtein(proteinVal);
-        setCarbs(carbsVal);
-        setFats(fatsVal);
-      } catch (error) {
-        console.error('Error fetching macros:', error);
-        setProtein(0);
-        setCarbs(0);
-        setFats(0);
-      } finally {
-        setMacrosLoading(false);
-      }
-    };
-    fetchMacros();
-  }, []);
+    loadTodayNutrients();
+  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated]);
 
   // Handler: updates activeIndex when user scrolls horizontally
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -325,8 +310,26 @@ export default function Home() {
     steps: item.steps
   }));
 
+  // Add error handling UI component at the top of HomeScreen
+  const renderErrorBanner = () => {
+    if (!hasError) return null;
+
+    return (
+      <TouchableOpacity
+        style={styles.errorBanner}
+        onPress={forceSingleRefresh}
+      >
+        <Ionicons name="warning-outline" size={20} color="#FFD700" />
+        <Text style={styles.errorText}>
+          Database connection issue. Tap to retry.
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
+      {renderErrorBanner()}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* CHEAT DAY CARD */}
         <GradientBorderCard>
@@ -1396,6 +1399,21 @@ const styles = StyleSheet.create({
   exploreButtonText: {
     color: '#FFF',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FF6347',
+  },
+  errorText: {
+    color: '#FFD700',
+    marginLeft: 8,
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });

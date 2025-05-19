@@ -15,6 +15,7 @@ import { ThemeProvider } from './src/ThemeContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider, useOnboarding } from './src/context/OnboardingContext';
+import { FoodLogProvider } from './src/context/FoodLogContext';
 
 // Import Firebase to ensure it's properly recognized
 import { app, auth } from './src/utils/firebase/index';
@@ -406,7 +407,9 @@ export default function App() {
           <ThemeProvider>
             <StepProvider>
               <FavoritesProvider>
-                <AppNavigator />
+                <FoodLogProvider>
+                  <AppNavigator />
+                </FoodLogProvider>
               </FavoritesProvider>
             </StepProvider>
           </ThemeProvider>

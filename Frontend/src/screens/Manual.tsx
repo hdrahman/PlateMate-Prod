@@ -24,8 +24,9 @@ import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
 import { searchFatSecretFood, getFatSecretFoodDetails } from '../api';
-import { getRecentFoodEntries, addFoodEntry, FoodLogEntry } from '../api/foodLog';
+import { getRecentFoodEntries, addFoodEntryWithContext } from '../api/foodLog';
 import { debounce } from 'lodash';
+import { useFoodLog } from '../context/FoodLogContext';
 
 // Define navigation type
 type RootStackParamList = {
@@ -61,6 +62,9 @@ export default function Manual() {
     const [foodCategories, setFoodCategories] = useState([
         'Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Fruits', 'Vegetables', 'Protein'
     ]);
+
+    // Use the food log context
+    const foodLogContext = useFoodLog();
 
     // Load recent entries when component mounts
     useEffect(() => {
@@ -156,16 +160,19 @@ export default function Manual() {
             const finalMealType = mealType || defaultMealType;
 
             setIsLoading(true);
-            await addFoodEntry(food, finalMealType, quantity);
+
+            // Use the food log context to add the entry
+            await addFoodEntryWithContext(food, finalMealType, quantity, 1, foodLogContext);
+
             Alert.alert('Success', `Added ${food.food_name} to your ${finalMealType} log`, [
                 {
                     text: 'OK',
                     onPress: async () => {
                         // Add a small delay to ensure database operations complete
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise(resolve => setTimeout(resolve, 300));
 
-                        // Refresh recent entries
-                        await loadRecentEntries();
+                        // Refresh food logs across the app
+                        await foodLogContext.refreshLogs();
 
                         // Hide food details modal
                         setShowFoodDetails(false);

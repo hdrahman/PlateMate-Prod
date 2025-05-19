@@ -15,9 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { getFoodLogsByDate, initDatabase, isDatabaseReady, getUserProfileByFirebaseUid } from '../utils/database';
+import { initDatabase, isDatabaseReady, getUserProfileByFirebaseUid } from '../utils/database';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '../context/AuthContext';
+import { useFoodLog } from '../context/FoodLogContext';
 import { calculateNutritionGoals, getDefaultNutritionGoals, NutritionGoals } from '../utils/nutritionCalculator';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -29,6 +30,13 @@ const PRIMARY_BG = '#000000';
 const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
+
+// Extend the NutritionGoals type to include saturatedFat
+declare module '../utils/nutritionCalculator' {
+    interface NutritionGoals {
+        saturatedFat?: number;
+    }
+}
 
 // Convert nutrition goals to the format expected by the component
 const createMacroGoals = (goals: NutritionGoals) => {
@@ -80,7 +88,7 @@ const GradientText = ({ text, style, colors }) => {
     );
 };
 
-// Helper function to format date as YYYY-MM-DD
+// Format date to string (YYYY-MM-DD)
 const formatDateToString = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -88,28 +96,63 @@ const formatDateToString = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-// Format date for display (e.g., "Mon, Jan 1")
+// Format date for display
 const formatDateForDisplay = (date: Date): string => {
-    const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+    });
 };
 
 const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation<any>();
-    const [nutrientData, setNutrientData] = useState(initialMacroGoals);
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [loading, setLoading] = useState(false);
-    const [dbReady, setDbReady] = useState(false);
-    const [isTransitioning, setIsTransitioning] = useState(false);
     const { user } = useAuth();
+    const scrollRef = useRef<ScrollView>(null);
+    const { width: screenWidth } = Dimensions.get('window');
+
+    // Use food log context
+    const { nutrientTotals, getLogsByDate, getTotalsByDate, refreshLogs, isLoading: foodLogLoading,
+        startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
+
+    // Date handling
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [dbReady, setDbReady] = useState(global.dbInitialized);
+    const [loading, setLoading] = useState(true);
     const [profileLoading, setProfileLoading] = useState(true);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
+    // Animation for swipe gesture
+    const swipeAnim = useRef(new Animated.Value(0)).current;
+
+    // Start with default goals
+    const defaultGoals = getDefaultNutritionGoals();
+
+    // Nutrient data state (goals and current values)
+    const [nutrientData, setNutrientData] = useState({
+        calories: { goal: defaultGoals.calories, current: 0, unit: 'kcal' },
+        protein: { goal: defaultGoals.protein, current: 0, unit: 'g' },
+        carbs: { goal: defaultGoals.carbs, current: 0, unit: 'g' },
+        fat: { goal: defaultGoals.fat, current: 0, unit: 'g' },
+        fiber: { goal: defaultGoals.fiber, current: 0, unit: 'g' },
+        sugar: { goal: defaultGoals.sugar, current: 0, unit: 'g' },
+        saturatedFat: { goal: 20, current: 0, unit: 'g' },
+        polyunsaturatedFat: { goal: 0, current: 0, unit: 'g' },
+        monounsaturatedFat: { goal: 0, current: 0, unit: 'g' },
+        transFat: { goal: 0, current: 0, unit: 'g' },
+        cholesterol: { goal: 300, current: 0, unit: 'mg' },
+        sodium: { goal: 2300, current: 0, unit: 'mg' },
+        potassium: { goal: 3500, current: 0, unit: 'mg' },
+        vitaminA: { goal: 900, current: 0, unit: 'IU' },
+        vitaminC: { goal: 90, current: 0, unit: 'mg' },
+        calcium: { goal: 1000, current: 0, unit: 'mg' },
+        iron: { goal: 8, current: 0, unit: 'mg' }
+    });
 
     // Animation values
     const translateX = useRef(new Animated.Value(0)).current;
-    const swipeAnim = useRef(new Animated.Value(0)).current;
     const rotateAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
-    const scrollRef = useRef(null);
 
     // Transform interpolations for 3D effect
     const rotate = swipeAnim.interpolate({
@@ -197,18 +240,16 @@ const NutrientsScreen: React.FC = () => {
                         syncDataOffline: profile.sync_data_offline
                     });
 
-                    // Update nutrient data with user-specific goals but keep current values
-                    const newGoals = createMacroGoals(goals);
-                    setNutrientData(prevData => {
-                        const updatedData = { ...prevData };
-                        // Keep current values but update goals
-                        Object.keys(updatedData).forEach(key => {
-                            if (newGoals[key]) {
-                                updatedData[key].goal = newGoals[key].goal;
-                            }
-                        });
-                        return updatedData;
-                    });
+                    // Apply calculated goals to nutrient data
+                    const updatedNutrientData = { ...nutrientData };
+                    updatedNutrientData.calories.goal = goals.calories;
+                    updatedNutrientData.protein.goal = goals.protein;
+                    updatedNutrientData.carbs.goal = goals.carbs;
+                    updatedNutrientData.fat.goal = goals.fat;
+                    updatedNutrientData.fiber.goal = goals.fiber;
+                    updatedNutrientData.sugar.goal = goals.sugar;
+                    updatedNutrientData.saturatedFat.goal = goals.saturatedFat || 20;
+                    setNutrientData(updatedNutrientData);
                 }
             } catch (error) {
                 console.error('Error loading user profile:', error);
@@ -217,35 +258,44 @@ const NutrientsScreen: React.FC = () => {
             }
         };
 
-        loadUserProfile();
-    }, [user]);
-
-    // Initialize the database when the component mounts
-    useEffect(() => {
-        const setupDatabase = async () => {
-            try {
-                // Only initialize if not already initialized
-                if (!isDatabaseReady()) {
+        // Check database readiness
+        const checkDatabase = async () => {
+            if (!isDatabaseReady()) {
+                console.log('Database not ready, initializing...');
+                try {
                     await initDatabase();
+                    setDbReady(true);
+                } catch (error) {
+                    console.error('Error initializing database:', error);
                 }
-                setDbReady(true);
-            } catch (error) {
-                console.error('Failed to initialize database:', error);
-                // Even if it fails, try proceeding anyway
+            } else {
                 setDbReady(true);
             }
         };
 
-        setupDatabase();
-    }, []);
+        checkDatabase();
+        loadUserProfile();
+    }, [user]);
 
-    // Fetch data when date changes or database becomes ready
+    // Start watching for food log changes when component mounts
     useEffect(() => {
-        if (dbReady) {
-            fetchNutrientData();
-        }
-    }, [currentDate, dbReady]);
+        console.log('Nutrients screen starting to watch food logs');
+        startWatchingFoodLogs();
 
+        // Clean up when component unmounts
+        return () => {
+            console.log('Nutrients screen stopping food log watch');
+            stopWatchingFoodLogs();
+        };
+    }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+
+    // Fetch nutrient data when date changes or when the food log is updated
+    useEffect(() => {
+        if (profileLoading) return;
+        fetchNutrientData();
+    }, [currentDate, profileLoading, lastUpdated]);
+
+    // Function to fetch nutrient data from the food log context
     const fetchNutrientData = async () => {
         // Only fetch if profile is loaded
         if (profileLoading) return;
@@ -253,86 +303,37 @@ const NutrientsScreen: React.FC = () => {
         try {
             setLoading(true);
 
-            // Ensure the date is a string in YYYY-MM-DD format
-            const dateStr = formatDateToString(currentDate);
-            console.log('Fetching nutrient data for date:', dateStr);
+            // Ensure the date is in the correct format
+            console.log('Fetching nutrient data for date:', formatDateToString(currentDate));
 
-            // Check database readiness again just to be safe
+            // Check database readiness
             if (!isDatabaseReady()) {
                 console.log('Database not ready, initializing...');
                 await initDatabase();
             }
 
-            // Get food logs for the date
-            const logs: any[] = await getFoodLogsByDate(dateStr);
-            console.log(`Found ${logs.length} food log entries for ${dateStr}`);
+            // Don't refresh logs unnecessarily - just get totals for the selected date
+            const totals = await getTotalsByDate(currentDate);
 
-            // Reset nutrient data to defaults but keep goals
+            // Update nutrient data with the fetched totals
             const updatedData = { ...nutrientData };
-            Object.keys(updatedData).forEach(key => {
-                updatedData[key].current = 0;
-            });
-
-            // Aggregate nutrients
-            const totals = {
-                protein: 0,
-                carbs: 0,
-                fat: 0,
-                calories: 0,
-                fiber: 0,
-                sugar: 0,
-                saturatedFat: 0,
-                polyunsaturatedFat: 0,
-                monounsaturatedFat: 0,
-                transFat: 0,
-                cholesterol: 0,
-                sodium: 0,
-                potassium: 0,
-                vitaminA: 0,
-                vitaminC: 0,
-                calcium: 0,
-                iron: 0
-            };
-
-            // Sum up all nutrients from logs
-            logs.forEach(log => {
-                totals.protein += log.proteins || 0;
-                totals.carbs += log.carbs || 0;
-                totals.fat += log.fats || 0;
-                totals.calories += log.calories || 0;
-                totals.fiber += log.fiber || 0;
-                totals.sugar += log.sugar || 0;
-                totals.saturatedFat += log.saturated_fat || 0;
-                totals.polyunsaturatedFat += log.polyunsaturated_fat || 0;
-                totals.monounsaturatedFat += log.monounsaturated_fat || 0;
-                totals.transFat += log.trans_fat || 0;
-                totals.cholesterol += log.cholesterol || 0;
-                totals.sodium += log.sodium || 0;
-                totals.potassium += log.potassium || 0;
-                totals.vitaminA += log.vitamin_a || 0;
-                totals.vitaminC += log.vitamin_c || 0;
-                totals.calcium += log.calcium || 0;
-                totals.iron += log.iron || 0;
-            });
-
-            // Update nutrient data with aggregated totals
-            updatedData.protein.current = Math.round(totals.protein);
-            updatedData.carbs.current = Math.round(totals.carbs);
-            updatedData.fat.current = Math.round(totals.fat);
-            updatedData.calories.current = Math.round(totals.calories);
-            updatedData.fiber.current = Math.round(totals.fiber);
-            updatedData.sugar.current = Math.round(totals.sugar);
-            updatedData.saturatedFat.current = Math.round(totals.saturatedFat);
-            updatedData.polyunsaturatedFat.current = Math.round(totals.polyunsaturatedFat);
-            updatedData.monounsaturatedFat.current = Math.round(totals.monounsaturatedFat);
-            updatedData.transFat.current = Math.round(totals.transFat);
-            updatedData.cholesterol.current = Math.round(totals.cholesterol);
-            updatedData.sodium.current = Math.round(totals.sodium);
-            updatedData.potassium.current = Math.round(totals.potassium);
-            updatedData.vitaminA.current = Math.round(totals.vitaminA);
-            updatedData.vitaminC.current = Math.round(totals.vitaminC);
-            updatedData.calcium.current = Math.round(totals.calcium);
-            updatedData.iron.current = Math.round(totals.iron);
+            updatedData.protein.current = totals.protein;
+            updatedData.carbs.current = totals.carbs;
+            updatedData.fat.current = totals.fat;
+            updatedData.calories.current = totals.calories;
+            updatedData.fiber.current = totals.fiber;
+            updatedData.sugar.current = totals.sugar;
+            updatedData.saturatedFat.current = totals.saturatedFat;
+            updatedData.polyunsaturatedFat.current = totals.polyunsaturatedFat;
+            updatedData.monounsaturatedFat.current = totals.monounsaturatedFat;
+            updatedData.transFat.current = totals.transFat;
+            updatedData.cholesterol.current = totals.cholesterol;
+            updatedData.sodium.current = totals.sodium;
+            updatedData.potassium.current = totals.potassium;
+            updatedData.vitaminA.current = totals.vitaminA;
+            updatedData.vitaminC.current = totals.vitaminC;
+            updatedData.calcium.current = totals.calcium;
+            updatedData.iron.current = totals.iron;
 
             setNutrientData(updatedData);
         } catch (error) {
@@ -371,7 +372,6 @@ const NutrientsScreen: React.FC = () => {
         const cleanup = () => {
             // Reset animation state if component unmounts during transition
             swipeAnim.setValue(0);
-            setIsTransitioning(false);
         };
 
         return cleanup;
@@ -386,14 +386,12 @@ const NutrientsScreen: React.FC = () => {
         // Animate to the right with 3D effect
         Animated.timing(swipeAnim, {
             toValue: screenWidth,
-            duration: 250,
-            useNativeDriver: true,
-        }).start(({ finished }) => {
+            duration: 300,
+            useNativeDriver: true
+        }).start(async ({ finished }) => {
             if (finished) {
-                // Update the date
-                const newDate = new Date(currentDate);
-                newDate.setDate(newDate.getDate() - 1);
-                setCurrentDate(newDate);
+                // Change date
+                await changeDate(-1);
 
                 // Reset the animation value (off-screen to the left)
                 swipeAnim.setValue(-screenWidth);
@@ -430,14 +428,12 @@ const NutrientsScreen: React.FC = () => {
         // Animate to the left with 3D effect
         Animated.timing(swipeAnim, {
             toValue: -screenWidth,
-            duration: 250,
-            useNativeDriver: true,
-        }).start(({ finished }) => {
+            duration: 300,
+            useNativeDriver: true
+        }).start(async ({ finished }) => {
             if (finished) {
-                // Update the date
-                const newDate = new Date(currentDate);
-                newDate.setDate(newDate.getDate() + 1);
-                setCurrentDate(newDate);
+                // Change date
+                await changeDate(1);
 
                 // Reset the animation value (off-screen to the right)
                 swipeAnim.setValue(screenWidth);
@@ -544,6 +540,13 @@ const NutrientsScreen: React.FC = () => {
         }).start();
     };
 
+    // Change date by offset
+    const changeDate = async (offset: number) => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + offset);
+        setCurrentDate(newDate);
+    };
+
     const renderNutrientItem = (label: string, current: number, goal: number, unit: string) => {
         const remaining = calculateRemaining(current, goal);
         // Calculate progress as a percentage of the goal, clamped between 0 and 100
@@ -584,11 +587,29 @@ const NutrientsScreen: React.FC = () => {
         );
     };
 
+    // Error banner component
+    const renderErrorBanner = () => {
+        if (!hasError) return null;
+
+        return (
+            <TouchableOpacity
+                style={styles.errorBanner}
+                onPress={forceSingleRefresh}
+            >
+                <Ionicons name="warning-outline" size={20} color="#FFD700" />
+                <Text style={styles.errorText}>
+                    Database connection issue. Tap to retry.
+                </Text>
+            </TouchableOpacity>
+        );
+    };
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={[styles.container, containerStyle]}>
                 <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
                 <SafeAreaView style={{ flex: 1 }}>
+                    {renderErrorBanner()}
                     {/* Header */}
                     <View style={styles.header}>
                         <TouchableOpacity
@@ -834,6 +855,21 @@ const styles = StyleSheet.create({
         flex: 1,
         overflow: 'hidden', // Prevents date text from visually overflowing
         alignItems: 'center',
+    },
+    errorBanner: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 0, 0, 0.2)',
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#FF6347',
+    },
+    errorText: {
+        color: '#FFD700',
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: 'bold',
     },
 });
 

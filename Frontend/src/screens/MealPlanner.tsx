@@ -15,9 +15,10 @@ import { useFavorites } from '../context/FavoritesContext';
 // Custom imports for user data
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
-import { getTodayCalories, getTodayProtein, getTodayCarbs, getTodayFats, getTodayExerciseCalories } from '../utils/database';
+import { getTodayExerciseCalories, getUserProfileByFirebaseUid } from '../utils/database';
 import { NutritionGoals, calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
-import { UserProfile } from '../types/user'; // Assuming UserProfile type is available
+import { UserProfile } from '../types/user';
+import { useFoodLog } from '../context/FoodLogContext';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -80,7 +81,9 @@ export default function MealPlanner() {
 
     // User context
     const { user } = useAuth();
-    const { profile: onboardingProfile, isLoading: isOnboardingLoading } = useOnboarding(); // Assuming profile is directly available
+    const { profile: onboardingProfile, isLoading: isOnboardingLoading } = useOnboarding();
+    const { nutrientTotals, refreshLogs, isLoading: foodLogLoading,
+        startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
     // Meal plan preferences
     const [showPreferences, setShowPreferences] = useState<boolean>(false);
@@ -109,95 +112,108 @@ export default function MealPlanner() {
         loadRandomRecipes();
     }, []);
 
-    // Effect to load user profile and daily nutritional data
+    // Start watching for food log changes
+    useEffect(() => {
+        console.log('MealPlanner screen starting to watch food logs');
+        startWatchingFoodLogs();
+
+        // Clean up when component unmounts
+        return () => {
+            console.log('MealPlanner screen stopping food log watch');
+            stopWatchingFoodLogs();
+        };
+    }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+
     useEffect(() => {
         const loadUserData = async () => {
-            if (!user) {
-                setIsProfileLoading(false);
-                setIsDailyNutrientsLoading(false);
-                // Reset to defaults if no user
-                setTargetCalories('2000');
-                setUserGoals(getDefaultNutritionGoals());
-                setDailyNutrition({
-                    calories: 0, protein: 0, fat: 0, carbs: 0,
-                    remainingCalories: getDefaultNutritionGoals().calories,
-                    mealsLeft: 3
-                });
-                return;
-            }
-
-            setIsProfileLoading(true);
-            // Assuming onboardingProfile is the source of truth for user's profile settings
-            // If onboardingProfile is not directly UserProfile or needs calculation:
-            // You might need to call `await getUserProfileByFirebaseUid(user.uid)` from `../utils/database`
-            // and then `calculateNutritionGoals` as done in Home.tsx
-            // For now, we assume onboardingProfile has what we need or is adapted.
-
-            let currentProfile: UserProfile | null = null;
-            if (onboardingProfile) { // Use onboarding context's profile if available
-                // Ensure onboardingProfile matches UserProfile structure or adapt it
-                currentProfile = onboardingProfile as UserProfile; // Cast if confident in structure
-            }
-            // Else, you might need a fallback to fetch profile as in Home.tsx if onboardingProfile is not sufficient
-
-            let calculatedGoals = getDefaultNutritionGoals();
-            if (currentProfile) {
-                calculatedGoals = calculateNutritionGoals(currentProfile);
-                setUserGoals(calculatedGoals);
-                setTargetCalories(calculatedGoals.calories.toString());
-            } else {
-                // If profile still not found, use defaults
-                setUserGoals(getDefaultNutritionGoals());
-                setTargetCalories(getDefaultNutritionGoals().calories.toString());
-            }
-            setIsProfileLoading(false);
-
-            setIsDailyNutrientsLoading(true);
             try {
-                const [
-                    todayCalories,
-                    todayProtein,
-                    todayCarbs,
-                    todayFats,
-                    todayExerciseCals
-                ] = await Promise.all([
-                    getTodayCalories(),
-                    getTodayProtein(),
-                    getTodayCarbs(),
-                    getTodayFats(),
-                    getTodayExerciseCalories()
-                ]);
+                setIsProfileLoading(true);
+                let currentProfile: any = null;
 
-                const goalCalories = calculatedGoals.calories;
-                const remaining = goalCalories - todayCalories + todayExerciseCals;
+                // First, try to get profile from onboarding context if available
+                if (onboardingProfile && !isOnboardingLoading) {
+                    currentProfile = onboardingProfile;
+                }
 
-                setDailyNutrition(prev => ({
-                    ...prev,
-                    calories: todayCalories,
-                    protein: todayProtein,
-                    fat: todayFats,
-                    carbs: todayCarbs,
-                    remainingCalories: Math.round(remaining)
-                }));
+                // Fallback to database if needed
+                if (!currentProfile && user) {
+                    const dbProfile = await getUserProfileByFirebaseUid(user.uid);
+                    if (dbProfile) {
+                        currentProfile = {
+                            firstName: dbProfile.first_name,
+                            lastName: dbProfile.last_name,
+                            phoneNumber: '',
+                            height: dbProfile.height,
+                            weight: dbProfile.weight,
+                            age: dbProfile.age,
+                            gender: dbProfile.gender,
+                            activityLevel: dbProfile.activity_level,
+                            dietaryRestrictions: dbProfile.dietary_restrictions || [],
+                            foodAllergies: dbProfile.food_allergies || [],
+                            cuisinePreferences: dbProfile.cuisine_preferences || [],
+                            spiceTolerance: dbProfile.spice_tolerance,
+                            weightGoal: dbProfile.weight_goal,
+                            healthConditions: dbProfile.health_conditions || [],
+                            dailyCalorieTarget: dbProfile.daily_calorie_target,
+                            nutrientFocus: dbProfile.nutrient_focus
+                        };
+                    }
+                }
 
+                // Calculate nutrition goals
+                let calculatedGoals = getDefaultNutritionGoals();
+
+                if (currentProfile) {
+                    calculatedGoals = calculateNutritionGoals(currentProfile);
+                    setUserGoals(calculatedGoals);
+                    setTargetCalories(calculatedGoals.calories.toString());
+                } else {
+                    // If profile still not found, use defaults
+                    setUserGoals(getDefaultNutritionGoals());
+                    setTargetCalories(getDefaultNutritionGoals().calories.toString());
+                }
+                setIsProfileLoading(false);
+
+                setIsDailyNutrientsLoading(true);
+                try {
+                    // Use the nutrient totals from context instead of refreshing logs
+                    // This prevents unnecessary database calls
+
+                    // Get today's exercise calories
+                    const todayExerciseCals = await getTodayExerciseCalories();
+
+                    const goalCalories = calculatedGoals.calories;
+                    const remaining = goalCalories - nutrientTotals.calories + todayExerciseCals;
+
+                    setDailyNutrition(prev => ({
+                        ...prev,
+                        calories: nutrientTotals.calories,
+                        protein: nutrientTotals.protein,
+                        fat: nutrientTotals.fat,
+                        carbs: nutrientTotals.carbs,
+                        remainingCalories: Math.round(remaining)
+                    }));
+
+                } catch (error) {
+                    console.error("Error fetching daily nutrition data:", error);
+                    // Fallback to goal calories if fetch fails, assuming 0 consumption
+                    setDailyNutrition(prev => ({
+                        ...prev,
+                        calories: 0, protein: 0, fat: 0, carbs: 0,
+                        remainingCalories: calculatedGoals.calories
+                    }));
+                } finally {
+                    setIsDailyNutrientsLoading(false);
+                }
             } catch (error) {
-                console.error("Error fetching daily nutrition data:", error);
-                // Fallback to goal calories if fetch fails, assuming 0 consumption
-                setDailyNutrition(prev => ({
-                    ...prev,
-                    calories: 0, protein: 0, fat: 0, carbs: 0,
-                    remainingCalories: calculatedGoals.calories
-                }));
-            } finally {
+                console.error("Error loading user data:", error);
+                setIsProfileLoading(false);
                 setIsDailyNutrientsLoading(false);
             }
         };
 
-        if (!isOnboardingLoading) { // Wait for onboarding context to settle
-            loadUserData();
-        }
-
-    }, [user, onboardingProfile, isOnboardingLoading]);
+        loadUserData();
+    }, [user, onboardingProfile, isOnboardingLoading, nutrientTotals, lastUpdated]);
 
     // Function to load random recipes
     const loadRandomRecipes = async () => {
@@ -477,8 +493,26 @@ export default function MealPlanner() {
         </Modal>
     );
 
+    // Error banner component
+    const renderErrorBanner = () => {
+        if (!hasError) return null;
+
+        return (
+            <TouchableOpacity
+                style={styles.errorBanner}
+                onPress={forceSingleRefresh}
+            >
+                <Ionicons name="warning-outline" size={20} color="#FFD700" />
+                <Text style={styles.errorText}>
+                    Database connection issue. Tap to retry.
+                </Text>
+            </TouchableOpacity>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
+            {renderErrorBanner()}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Meal Planner</Text>
                 <Text style={styles.headerSub}>
@@ -887,5 +921,20 @@ const styles = StyleSheet.create({
     switchOptionText: {
         fontSize: 16,
         color: WHITE,
+    },
+    errorBanner: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 0, 0, 0.2)',
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#FF6347',
+    },
+    errorText: {
+        color: '#FFD700',
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: 'bold',
     },
 });
