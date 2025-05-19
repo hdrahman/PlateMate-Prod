@@ -1,5 +1,5 @@
 import { BACKEND_URL } from '../utils/config';
-import { auth } from '../utils/firebase';
+import { auth, getStoredAuthToken } from '../utils/firebase';
 
 // User profile data interfaces
 interface PhysicalAttributes {
@@ -75,16 +75,30 @@ interface UpdateUserData {
 // Function to get firebase token with better error handling
 const getFirebaseToken = async () => {
     const currentUser = auth.currentUser;
-    if (!currentUser) {
-        throw new Error('User not authenticated. Please sign in again.');
+
+    // First try to get token from current user
+    if (currentUser) {
+        try {
+            return await currentUser.getIdToken(true); // Force token refresh to ensure token is valid
+        } catch (error: any) {
+            console.error('Error getting Firebase token from current user:', error);
+            // Fall through to check stored token
+        }
     }
 
+    // If no current user or token refresh failed, try to get the stored token
     try {
-        return await currentUser.getIdToken(true); // Force token refresh to ensure token is valid
-    } catch (error: any) {
-        console.error('Error getting Firebase token:', error);
-        throw new Error('Authentication error. Please sign in again.');
+        const storedToken = await getStoredAuthToken();
+        if (storedToken) {
+            console.log('Using stored Firebase token');
+            return storedToken;
+        }
+    } catch (error) {
+        console.error('Error getting stored Firebase token:', error);
     }
+
+    // If we get here, we don't have a valid token
+    throw new Error('User not authenticated. Please sign in again.');
 };
 
 // Create a new user with improved error handling

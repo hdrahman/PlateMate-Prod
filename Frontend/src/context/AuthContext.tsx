@@ -1,5 +1,5 @@
 // Import Firebase components
-import { auth, Auth } from '../utils/firebase/index';
+import { auth, Auth, getStoredUser, getStoredAuthToken } from '../utils/firebase/index';
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Alert, Platform } from 'react-native';
@@ -14,7 +14,10 @@ const {
     onAuthStateChanged,
     signInAnonymously: firebaseSignInAnonymously,
     GoogleAuthProvider,
-    signInWithCredential
+    signInWithCredential,
+    setPersistence,
+    browserLocalPersistence,
+    inMemoryPersistence
 } = Auth;
 
 // Type for user
@@ -74,10 +77,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [user, setUser] = useState<UserType | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Check for stored credentials on mount and restore auth state
+    useEffect(() => {
+        const restoreAuthState = async () => {
+            try {
+                // Check for stored token
+                const storedUser = await getStoredUser();
+                if (storedUser) {
+                    console.log('Found stored user data, attempting to restore auth state');
+                } else {
+                    console.log('No stored user data found');
+                    setIsLoading(false);
+                }
+            } catch (error) {
+                console.error('Error restoring auth state:', error);
+                setIsLoading(false);
+            }
+        };
+
+        restoreAuthState();
+    }, []);
+
     // Listen for auth state changes
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user);
+        const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+            setUser(authUser);
             setIsLoading(false);
         });
 
