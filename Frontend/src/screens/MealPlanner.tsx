@@ -12,6 +12,13 @@ import RecipeCard from '../components/RecipeCard';
 import { Recipe, foodCategories, getRandomRecipes, generateMealPlan } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
 
+// Custom imports for user data
+import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
+import { getTodayCalories, getTodayProtein, getTodayCarbs, getTodayFats, getTodayExerciseCalories } from '../utils/database';
+import { NutritionGoals, calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
+import { UserProfile } from '../types/user'; // Assuming UserProfile type is available
+
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
 const CARD_BG = '#121212';
@@ -66,8 +73,14 @@ export default function MealPlanner() {
     const { favorites } = useFavorites();
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isProfileLoading, setIsProfileLoading] = useState<boolean>(true);
+    const [isDailyNutrientsLoading, setIsDailyNutrientsLoading] = useState<boolean>(true);
     const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
     const [showFavorites, setShowFavorites] = useState<boolean>(true);
+
+    // User context
+    const { user } = useAuth();
+    const { profile: onboardingProfile, isLoading: isOnboardingLoading } = useOnboarding(); // Assuming profile is directly available
 
     // Meal plan preferences
     const [showPreferences, setShowPreferences] = useState<boolean>(false);
@@ -89,11 +102,102 @@ export default function MealPlanner() {
         remainingCalories: 2000,
         mealsLeft: 3
     });
+    const [userGoals, setUserGoals] = useState<NutritionGoals>(getDefaultNutritionGoals());
 
     // Load random recipes on component mount
     useEffect(() => {
         loadRandomRecipes();
     }, []);
+
+    // Effect to load user profile and daily nutritional data
+    useEffect(() => {
+        const loadUserData = async () => {
+            if (!user) {
+                setIsProfileLoading(false);
+                setIsDailyNutrientsLoading(false);
+                // Reset to defaults if no user
+                setTargetCalories('2000');
+                setUserGoals(getDefaultNutritionGoals());
+                setDailyNutrition({
+                    calories: 0, protein: 0, fat: 0, carbs: 0,
+                    remainingCalories: getDefaultNutritionGoals().calories,
+                    mealsLeft: 3
+                });
+                return;
+            }
+
+            setIsProfileLoading(true);
+            // Assuming onboardingProfile is the source of truth for user's profile settings
+            // If onboardingProfile is not directly UserProfile or needs calculation:
+            // You might need to call `await getUserProfileByFirebaseUid(user.uid)` from `../utils/database`
+            // and then `calculateNutritionGoals` as done in Home.tsx
+            // For now, we assume onboardingProfile has what we need or is adapted.
+
+            let currentProfile: UserProfile | null = null;
+            if (onboardingProfile) { // Use onboarding context's profile if available
+                // Ensure onboardingProfile matches UserProfile structure or adapt it
+                currentProfile = onboardingProfile as UserProfile; // Cast if confident in structure
+            }
+            // Else, you might need a fallback to fetch profile as in Home.tsx if onboardingProfile is not sufficient
+
+            let calculatedGoals = getDefaultNutritionGoals();
+            if (currentProfile) {
+                calculatedGoals = calculateNutritionGoals(currentProfile);
+                setUserGoals(calculatedGoals);
+                setTargetCalories(calculatedGoals.calories.toString());
+            } else {
+                // If profile still not found, use defaults
+                setUserGoals(getDefaultNutritionGoals());
+                setTargetCalories(getDefaultNutritionGoals().calories.toString());
+            }
+            setIsProfileLoading(false);
+
+            setIsDailyNutrientsLoading(true);
+            try {
+                const [
+                    todayCalories,
+                    todayProtein,
+                    todayCarbs,
+                    todayFats,
+                    todayExerciseCals
+                ] = await Promise.all([
+                    getTodayCalories(),
+                    getTodayProtein(),
+                    getTodayCarbs(),
+                    getTodayFats(),
+                    getTodayExerciseCalories()
+                ]);
+
+                const goalCalories = calculatedGoals.calories;
+                const remaining = goalCalories - todayCalories + todayExerciseCals;
+
+                setDailyNutrition(prev => ({
+                    ...prev,
+                    calories: todayCalories,
+                    protein: todayProtein,
+                    fat: todayFats,
+                    carbs: todayCarbs,
+                    remainingCalories: Math.round(remaining)
+                }));
+
+            } catch (error) {
+                console.error("Error fetching daily nutrition data:", error);
+                // Fallback to goal calories if fetch fails, assuming 0 consumption
+                setDailyNutrition(prev => ({
+                    ...prev,
+                    calories: 0, protein: 0, fat: 0, carbs: 0,
+                    remainingCalories: calculatedGoals.calories
+                }));
+            } finally {
+                setIsDailyNutrientsLoading(false);
+            }
+        };
+
+        if (!isOnboardingLoading) { // Wait for onboarding context to settle
+            loadUserData();
+        }
+
+    }, [user, onboardingProfile, isOnboardingLoading]);
 
     // Function to load random recipes
     const loadRandomRecipes = async () => {
@@ -515,7 +619,7 @@ export default function MealPlanner() {
                     <View style={styles.nutritionInfoContainer}>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Remaining Calories</Text>
-                            <Text style={styles.nutritionValue}>{dailyNutrition.remainingCalories}</Text>
+                            <Text style={styles.nutritionValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.remainingCalories}</Text>
                         </View>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Meals Left</Text>
@@ -524,15 +628,15 @@ export default function MealPlanner() {
                     </View>
                     <View style={styles.macrosContainer}>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>{dailyNutrition.carbs}g</Text>
+                            <Text style={styles.macroValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.carbs}g</Text>
                             <Text style={styles.macroLabel}>Carbs</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>{dailyNutrition.protein}g</Text>
+                            <Text style={styles.macroValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.protein}g</Text>
                             <Text style={styles.macroLabel}>Protein</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>{dailyNutrition.fat}g</Text>
+                            <Text style={styles.macroValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.fat}g</Text>
                             <Text style={styles.macroLabel}>Fat</Text>
                         </View>
                     </View>
