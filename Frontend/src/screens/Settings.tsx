@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView, Alert } from "react-native";
+import { View, Text, TouchableOpacity, Switch, StyleSheet, SafeAreaView, ScrollView, Alert, StatusBar } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,7 +20,8 @@ const SettingsScreen = () => {
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
+        <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]}>
+            <StatusBar barStyle="light-content" />
             <View style={[styles.header, isDarkTheme ? styles.dark : styles.light]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
@@ -38,19 +39,19 @@ const SettingsScreen = () => {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Account</Text>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditProfileScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditProfile")}>
                         <Ionicons name="person-circle-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Edit Profile</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditGoalsScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditGoals")}>
                         <Ionicons name="fitness-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Edit Goals</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PremiumSubscriptionScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PremiumSubscription")}>
                         <Ionicons name="star-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Premium Subscription</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("ChangePasswordScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("ChangePassword")}>
                         <Ionicons name="lock-closed-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Change Password</Text>
                     </TouchableOpacity>
@@ -58,22 +59,22 @@ const SettingsScreen = () => {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Privacy & Security</Text>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("NotificationsScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("Notifications")}>
                         <Ionicons name="notifications-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Notifications</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DataSharingScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DataSharing")}>
                         <Ionicons name="share-social-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Data Sharing</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PrivacyPolicyScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PrivacyPolicy")}>
                         <Ionicons name="document-text-outline" size={20} color="#FFF" style={styles.icon} />
                         <Text style={styles.itemText}>Privacy Policy</Text>
                     </TouchableOpacity>
                 </View>
 
                 <View style={[styles.section, styles.bottomSection]}>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccountScreen")}>
+                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccount")}>
                         <Ionicons name="trash-outline" size={20} color="#FF4C4C" style={styles.icon} />
                         <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
                     </TouchableOpacity>
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
         // Removed backgroundColor to use dynamic styling
     },
     backButton: {
-        backgroundColor: "#000", // Matches container to avoid white flash
+        padding: 5,
     },
     headerTitle: {
         color: "#FFF",
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
+        paddingBottom: 40, // Add bottom padding for scrolling
     },
     section: {
         marginBottom: 30,
