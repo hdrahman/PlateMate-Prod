@@ -30,13 +30,14 @@ interface ExtendedUser extends Auth.User {
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
+const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
-const BLUE_ACCENT = '#2196F3';
-const GRADIENT_START = '#2E5BFF';
-const GRADIENT_END = '#5AA9FA';
+const BLUE_ACCENT = '#0074dd';
+const GRADIENT_START = '#0074dd';
+const GRADIENT_END = '#dd0095';
+const GRADIENT_MIDDLE = '#5c00dd';
 const GREEN = '#4CAF50';
 const ORANGE = '#FF9800';
 const PURPLE = '#9C27B0';
@@ -119,7 +120,7 @@ const EditProfile = () => {
             >
                 {/* Profile Card */}
                 <LinearGradient
-                    colors={[GRADIENT_START, GRADIENT_END]}
+                    colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.profileCard}
@@ -263,7 +264,14 @@ const EditProfile = () => {
                     style={styles.saveButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                    <LinearGradient
+                        colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.saveButtonGradient}
+                    >
+                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                    </LinearGradient>
                 </TouchableOpacity>
             </Animated.View>
         );
@@ -286,14 +294,19 @@ const EditProfile = () => {
                 ]}
             >
                 {/* Level Card */}
-                <View style={styles.levelCard}>
+                <LinearGradient
+                    colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.levelCard}
+                >
                     <View style={styles.levelHeader}>
                         <View>
                             <Text style={styles.levelTitle}>Level {level}</Text>
                             <Text style={styles.levelRank}>{rank}</Text>
                         </View>
                         <View style={styles.streakContainer}>
-                            <Ionicons name="flame" size={24} color="#FF9800" />
+                            <Ionicons name="flame" size={24} color={ORANGE} />
                             <Text style={styles.streakText}>{streakDays} day streak</Text>
                         </View>
                     </View>
@@ -309,7 +322,7 @@ const EditProfile = () => {
                         </View>
                         <Text style={styles.progressText}>{xp} / {xpToNextLevel} XP</Text>
                     </View>
-                </View>
+                </LinearGradient>
 
                 {/* Achievements */}
                 <View style={styles.achievementsSection}>
@@ -344,7 +357,14 @@ const EditProfile = () => {
                     style={styles.goalsButton}
                     onPress={() => navigation.navigate('Goals')}
                 >
-                    <Text style={styles.goalsButtonText}>Set Fitness Goals</Text>
+                    <LinearGradient
+                        colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.goalsButtonGradient}
+                    >
+                        <Text style={styles.goalsButtonText}>Set Fitness Goals</Text>
+                    </LinearGradient>
                 </TouchableOpacity>
             </Animated.View>
         );
@@ -372,7 +392,7 @@ const EditProfile = () => {
                     <Ionicons
                         name="person"
                         size={24}
-                        color={activeTab === 'profile' ? BLUE_ACCENT : GRAY}
+                        color={activeTab === 'profile' ? GRADIENT_MIDDLE : GRAY}
                     />
                     <Text
                         style={[
@@ -390,7 +410,7 @@ const EditProfile = () => {
                     <Ionicons
                         name="trophy"
                         size={24}
-                        color={activeTab === 'achievements' ? BLUE_ACCENT : GRAY}
+                        color={activeTab === 'achievements' ? GRADIENT_MIDDLE : GRAY}
                     />
                     <Text
                         style={[
@@ -446,7 +466,7 @@ const styles = StyleSheet.create({
     },
     activeTab: {
         borderBottomWidth: 2,
-        borderBottomColor: BLUE_ACCENT,
+        borderBottomColor: GRADIENT_MIDDLE,
     },
     tabText: {
         color: GRAY,
@@ -454,7 +474,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     activeTabText: {
-        color: BLUE_ACCENT,
+        color: GRADIENT_MIDDLE,
         fontWeight: 'bold',
     },
     content: {
@@ -578,7 +598,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     segmentActive: {
-        backgroundColor: BLUE_ACCENT,
+        backgroundColor: GRADIENT_MIDDLE,
     },
     segmentText: {
         color: GRAY,
@@ -601,11 +621,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     saveButton: {
-        backgroundColor: BLUE_ACCENT,
         borderRadius: 12,
+        overflow: 'hidden',
+        marginVertical: 20,
+    },
+    saveButtonGradient: {
         paddingVertical: 16,
         alignItems: 'center',
-        marginVertical: 20,
     },
     saveButtonText: {
         color: WHITE,
@@ -613,7 +635,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     levelCard: {
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         padding: 20,
         marginBottom: 24,
@@ -630,7 +651,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     levelRank: {
-        color: BLUE_ACCENT,
+        color: WHITE,
         fontSize: 16,
     },
     streakContainer: {
@@ -651,17 +672,17 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: 8,
-        backgroundColor: LIGHT_GRAY,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         borderRadius: 4,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: BLUE_ACCENT,
+        backgroundColor: WHITE,
         borderRadius: 4,
     },
     progressText: {
-        color: GRAY,
+        color: 'rgba(255, 255, 255, 0.7)',
         fontSize: 14,
         textAlign: 'right',
         marginTop: 4,
@@ -689,7 +710,7 @@ const styles = StyleSheet.create({
         marginRight: 16,
     },
     achievementCompleted: {
-        backgroundColor: BLUE_ACCENT,
+        backgroundColor: GRADIENT_MIDDLE,
     },
     achievementLocked: {
         backgroundColor: LIGHT_GRAY,
@@ -708,11 +729,13 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     goalsButton: {
-        backgroundColor: PURPLE,
         borderRadius: 12,
+        overflow: 'hidden',
+        marginVertical: 20,
+    },
+    goalsButtonGradient: {
         paddingVertical: 16,
         alignItems: 'center',
-        marginVertical: 20,
     },
     goalsButtonText: {
         color: WHITE,

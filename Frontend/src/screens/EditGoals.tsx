@@ -20,13 +20,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Constants for colors - matching EditProfile
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
+const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
-const BLUE_ACCENT = '#2196F3';
-const GRADIENT_START = '#2E5BFF';
-const GRADIENT_END = '#5AA9FA';
+const BLUE_ACCENT = '#0074dd';
+const GRADIENT_START = '#0074dd';
+const GRADIENT_MIDDLE = '#5c00dd';
+const GRADIENT_END = '#dd0095';
 const GREEN = '#4CAF50';
 const ORANGE = '#FF9800';
 const PURPLE = '#9C27B0';
@@ -177,7 +178,7 @@ export default function EditGoals() {
             >
                 {/* Summary Card */}
                 <LinearGradient
-                    colors={[GRADIENT_START, GRADIENT_END]}
+                    colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.summaryCard}
@@ -332,7 +333,7 @@ export default function EditGoals() {
             >
                 {/* Summary Card */}
                 <LinearGradient
-                    colors={[ORANGE, PURPLE]}
+                    colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.summaryCard}
@@ -448,7 +449,7 @@ export default function EditGoals() {
                     <Ionicons
                         name="nutrition"
                         size={24}
-                        color={activeTab === 'nutrition' ? BLUE_ACCENT : GRAY}
+                        color={activeTab === 'nutrition' ? GRADIENT_MIDDLE : GRAY}
                     />
                     <Text
                         style={[
@@ -466,7 +467,7 @@ export default function EditGoals() {
                     <Ionicons
                         name="barbell"
                         size={24}
-                        color={activeTab === 'fitness' ? BLUE_ACCENT : GRAY}
+                        color={activeTab === 'fitness' ? GRADIENT_MIDDLE : GRAY}
                     />
                     <Text
                         style={[
@@ -490,7 +491,14 @@ export default function EditGoals() {
                     {isLoading ? (
                         <ActivityIndicator color={WHITE} />
                     ) : (
-                        <Text style={styles.saveButtonText}>Save Goals</Text>
+                        <LinearGradient
+                            colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.saveButtonGradient}
+                        >
+                            <Text style={styles.saveButtonText}>Save Goals</Text>
+                        </LinearGradient>
                     )}
                 </TouchableOpacity>
             </ScrollView>
@@ -534,7 +542,7 @@ const styles = StyleSheet.create({
     },
     activeTab: {
         borderBottomWidth: 2,
-        borderBottomColor: BLUE_ACCENT,
+        borderBottomColor: GRADIENT_MIDDLE,
     },
     tabText: {
         color: GRAY,
@@ -542,7 +550,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     activeTabText: {
-        color: BLUE_ACCENT,
+        color: GRADIENT_MIDDLE,
         fontWeight: 'bold',
     },
     content: {
@@ -630,7 +638,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     segmentActive: {
-        backgroundColor: BLUE_ACCENT,
+        backgroundColor: GRADIENT_MIDDLE,
     },
     segmentText: {
         color: GRAY,
@@ -653,12 +661,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     saveButton: {
-        backgroundColor: BLUE_ACCENT,
         borderRadius: 12,
-        paddingVertical: 16,
-        alignItems: 'center',
+        overflow: 'hidden',
         marginVertical: 20,
         marginHorizontal: 16,
+    },
+    saveButtonGradient: {
+        paddingVertical: 16,
+        alignItems: 'center',
     },
     saveButtonText: {
         color: WHITE,
