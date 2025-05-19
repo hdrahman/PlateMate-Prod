@@ -31,6 +31,7 @@ const GRADIENT_END = '#dd0095';
 const GREEN = '#4CAF50';
 const ORANGE = '#FF9800';
 const PURPLE = '#9C27B0';
+const PINK = '#FF00F5';
 
 const { width } = Dimensions.get('window');
 
@@ -47,6 +48,23 @@ interface GoalsData {
     waterGoal?: number;
     sleepGoal?: number;
 }
+
+// Create a GradientBorder component for form sections
+const GradientBorderBox = ({ children, style }: { children: React.ReactNode, style?: any }) => {
+    return (
+        <View style={styles.gradientBorderContainer}>
+            <LinearGradient
+                colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorder}
+            />
+            <View style={[styles.gradientBorderInner, style]}>
+                {children}
+            </View>
+        </View>
+    );
+};
 
 export default function EditGoals() {
     const navigation = useNavigation<any>();
@@ -200,7 +218,7 @@ export default function EditGoals() {
                 </LinearGradient>
 
                 {/* Weight & Calorie Goals */}
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Weight & Calorie Goals</Text>
 
                     <View style={styles.inputGroup}>
@@ -226,10 +244,10 @@ export default function EditGoals() {
                             keyboardType="number-pad"
                         />
                     </View>
-                </View>
+                </GradientBorderBox>
 
                 {/* Macronutrient Goals */}
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Macronutrient Goals</Text>
 
                     <View style={styles.inputGroup}>
@@ -267,10 +285,10 @@ export default function EditGoals() {
                             keyboardType="number-pad"
                         />
                     </View>
-                </View>
+                </GradientBorderBox>
 
                 {/* Activity Profile */}
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Activity Profile</Text>
 
                     <View style={styles.inputGroup}>
@@ -307,10 +325,10 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Activity Level</Text>
                         <View style={styles.dropdownField}>
                             <Text style={styles.dropdownText}>{getActivityLevelLabel(activityLevel)}</Text>
-                            <Ionicons name="chevron-down" size={20} color={BLUE_ACCENT} />
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
                         </View>
                     </View>
-                </View>
+                </GradientBorderBox>
             </Animated.View>
         );
     };
@@ -355,7 +373,7 @@ export default function EditGoals() {
                 </LinearGradient>
 
                 {/* Workout Goals */}
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Workout Goals</Text>
 
                     <View style={styles.inputGroup}>
@@ -381,10 +399,10 @@ export default function EditGoals() {
                             keyboardType="number-pad"
                         />
                     </View>
-                </View>
+                </GradientBorderBox>
 
                 {/* Health Goals */}
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Health Goals</Text>
 
                     <View style={styles.inputGroup}>
@@ -410,7 +428,7 @@ export default function EditGoals() {
                             keyboardType="number-pad"
                         />
                     </View>
-                </View>
+                </GradientBorderBox>
             </Animated.View>
         );
     };
@@ -432,13 +450,16 @@ export default function EditGoals() {
             <StatusBar barStyle="light-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <LinearGradient
+                colors={['rgba(92, 0, 221, 0.3)', 'transparent']}
+                style={styles.header}
+            >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color={WHITE} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Edit Fitness Goals</Text>
                 <View style={{ width: 28 }}></View>
-            </View>
+            </LinearGradient>
 
             {/* Tabs */}
             <View style={styles.tabs}>
@@ -598,6 +619,25 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 14,
         opacity: 0.8,
+    },
+    gradientBorderContainer: {
+        marginBottom: 20,
+        borderRadius: 16,
+        position: 'relative',
+        padding: 2,
+    },
+    gradientBorder: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 16,
+    },
+    gradientBorderInner: {
+        backgroundColor: CARD_BG,
+        borderRadius: 14,
+        padding: 16,
     },
     formSection: {
         backgroundColor: CARD_BG,

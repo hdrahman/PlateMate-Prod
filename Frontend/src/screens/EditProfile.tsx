@@ -41,8 +41,26 @@ const GRADIENT_MIDDLE = '#5c00dd';
 const GREEN = '#4CAF50';
 const ORANGE = '#FF9800';
 const PURPLE = '#9C27B0';
+const PINK = '#FF00F5';
 
 const { width, height } = Dimensions.get('window');
+
+// Create a GradientBorder component for form sections
+const GradientBorderBox = ({ children, style }: { children: React.ReactNode, style?: any }) => {
+    return (
+        <View style={styles.gradientBorderContainer}>
+            <LinearGradient
+                colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorder}
+            />
+            <View style={[styles.gradientBorderInner, style]}>
+                {children}
+            </View>
+        </View>
+    );
+};
 
 const EditProfile = () => {
     const navigation = useNavigation<any>();
@@ -156,7 +174,7 @@ const EditProfile = () => {
                 </LinearGradient>
 
                 {/* Form Fields */}
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Personal Information</Text>
 
                     <View style={styles.inputGroup}>
@@ -224,9 +242,9 @@ const EditProfile = () => {
                             />
                         </View>
                     </View>
-                </View>
+                </GradientBorderBox>
 
-                <View style={styles.formSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Location & Preferences</Text>
 
                     <View style={styles.inputGroup}>
@@ -255,10 +273,10 @@ const EditProfile = () => {
                             <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
                                 {units}
                             </Text>
-                            <Ionicons name="chevron-down" size={20} color={BLUE_ACCENT} />
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
                         </TouchableOpacity>
                     </View>
-                </View>
+                </GradientBorderBox>
 
                 <TouchableOpacity
                     style={styles.saveButton}
@@ -325,21 +343,23 @@ const EditProfile = () => {
                 </LinearGradient>
 
                 {/* Achievements */}
-                <View style={styles.achievementsSection}>
+                <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Achievements</Text>
 
                     {achievements.map((achievement, index) => (
                         <View key={index} style={styles.achievementItem}>
-                            <View style={[
-                                styles.achievementIcon,
-                                achievement.completed ? styles.achievementCompleted : styles.achievementLocked
-                            ]}>
+                            <LinearGradient
+                                colors={achievement.completed ?
+                                    [GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END] :
+                                    ['#333', '#444', '#555']}
+                                style={styles.achievementIcon}
+                            >
                                 <Ionicons
                                     name={achievement.icon as any}
                                     size={24}
                                     color={achievement.completed ? WHITE : GRAY}
                                 />
-                            </View>
+                            </LinearGradient>
                             <View style={styles.achievementInfo}>
                                 <Text style={styles.achievementName}>{achievement.name}</Text>
                                 <Text style={styles.achievementDesc}>{achievement.description}</Text>
@@ -347,11 +367,11 @@ const EditProfile = () => {
                             {achievement.completed ? (
                                 <Ionicons name="checkmark-circle" size={24} color={GREEN} />
                             ) : (
-                                <Ionicons name="lock-closed" size={24} color={GRAY} />
+                                <Ionicons name="lock-closed" size={24} color={PINK} />
                             )}
                         </View>
                     ))}
-                </View>
+                </GradientBorderBox>
 
                 <TouchableOpacity
                     style={styles.goalsButton}
@@ -375,13 +395,16 @@ const EditProfile = () => {
             <StatusBar barStyle="light-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <LinearGradient
+                colors={['rgba(92, 0, 221, 0.3)', 'transparent']}
+                style={styles.header}
+            >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color={WHITE} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Profile</Text>
                 <View style={{ width: 28 }}></View>
-            </View>
+            </LinearGradient>
 
             {/* Tabs */}
             <View style={styles.tabs}>
@@ -546,6 +569,25 @@ const styles = StyleSheet.create({
         color: WHITE,
         marginLeft: 8,
         fontWeight: '600',
+    },
+    gradientBorderContainer: {
+        marginBottom: 20,
+        borderRadius: 16,
+        position: 'relative',
+        padding: 2,
+    },
+    gradientBorder: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 16,
+    },
+    gradientBorderInner: {
+        backgroundColor: CARD_BG,
+        borderRadius: 14,
+        padding: 16,
     },
     formSection: {
         backgroundColor: CARD_BG,
