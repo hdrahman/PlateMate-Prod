@@ -1,7 +1,15 @@
 // Configuration settings for the app
+import { Platform } from 'react-native';
 
-// Backend URL - change this to your backend server address
-export const BACKEND_URL = 'http://0.0.0.0:8000';
+// Determine the appropriate backend URL based on the platform
+// For mobile devices (iOS/Android), use the network IP
+// For web, use localhost
+const DEV_BACKEND_URL = Platform.OS === 'web'
+    ? 'http://localhost:8000'
+    : 'http://192.168.0.160:8000'; // Replace with your computer's IP address
+
+// Backend URL - dynamically set based on platform
+export const BACKEND_URL = DEV_BACKEND_URL;
 
 // Other configuration settings can be added here
 export const APP_VERSION = '1.0.0';
