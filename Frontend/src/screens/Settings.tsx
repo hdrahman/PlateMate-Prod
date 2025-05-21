@@ -40,13 +40,15 @@ const SettingsScreen = () => {
                                 </View>
                                 <Text style={styles.itemText}>Dark Mode</Text>
                             </View>
-                            <Switch
-                                value={isDarkTheme}
-                                onValueChange={toggleTheme}
-                                trackColor={{ false: "#3e3e3e", true: "#9B00FF40" }}
-                                thumbColor={isDarkTheme ? "#9B00FF" : "#f4f3f4"}
-                                ios_backgroundColor="#3e3e3e"
-                            />
+                            <View style={styles.switchContainer}>
+                                <Switch
+                                    value={isDarkTheme}
+                                    onValueChange={toggleTheme}
+                                    trackColor={{ false: "#3e3e3e", true: "#9B00FF40" }}
+                                    thumbColor={isDarkTheme ? "#9B00FF" : "#f4f3f4"}
+                                    ios_backgroundColor="#3e3e3e"
+                                />
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -192,6 +194,13 @@ const styles = StyleSheet.create({
     iconTextContainer: {
         flexDirection: "row",
         alignItems: "center",
+        flex: 1,
+    },
+    switchContainer: {
+        paddingLeft: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 5,
     },
     itemRow: {
         flexDirection: "row",
@@ -199,6 +208,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 16,
+        borderBottomWidth: 0,
+        height: 60,
     },
     item: {
         flexDirection: "row",
