@@ -35,10 +35,57 @@ interface FoodLogEntry {
     last_modified: string;
 }
 
-// Check if the device is online
+// Check if the device is online with additional validation
 export const isOnline = async (): Promise<boolean> => {
-    const netInfo = await NetInfo.fetch();
-    return netInfo.isConnected && netInfo.isInternetReachable;
+    try {
+        // First check with NetInfo
+        const netInfo = await NetInfo.fetch();
+        const isConnected = netInfo.isConnected;
+
+        if (!isConnected) {
+            console.log('📡 Device appears to be offline according to NetInfo');
+            return false;
+        }
+
+        // For Expo Go testing, don't rely as heavily on the backend ping
+        // This helps when testing with Expo Go where the backend might not be available
+        // but the app should still function in "offline mode"
+        console.log('📡 Device appears to be connected. Skipping backend ping for Expo Go testing.');
+        return true;
+
+        // Note: The following code is commented out to improve testing experience
+        // in Expo Go. Uncomment for production use where you want to verify 
+        // the backend is actually reachable.
+        /*
+        // Add a lightweight ping to our backend as additional verification
+        try {
+            // Use a 1.5 second timeout for quick check
+            const timeoutPromise = new Promise<boolean>((_, reject) => {
+                setTimeout(() => reject(new Error('Network ping timeout')), 1500);
+            });
+
+            const pingPromise = axios.get(`${BACKEND_URL}/health`, { timeout: 1500 })
+                .then(response => response.status === 200)
+                .catch(() => false);
+
+            // Race between ping and timeout
+            const pingSucceeded = await Promise.race([pingPromise, timeoutPromise]) as boolean;
+
+            if (!pingSucceeded) {
+                console.log('📡 Backend is unreachable despite being connected');
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.log('📡 Additional network check failed:', error);
+            return false;
+        }
+        */
+    } catch (error) {
+        console.error('📡 Error checking network status:', error);
+        return false;
+    }
 };
 
 // Sync a single food log

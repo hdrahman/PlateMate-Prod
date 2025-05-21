@@ -17,6 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getUserGoals, updateUserGoals } from '../utils/database'; // Local database functions
+import { updateNutritionGoals, updateFitnessGoals } from '../api/profileApi'; // Backend API functions
 
 // Constants for colors - matching EditProfile
 const PRIMARY_BG = '#000000';
@@ -71,25 +73,41 @@ export default function EditGoals() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('nutrition');
     const [isLoading, setIsLoading] = useState(false);
+    const [isFetchingData, setIsFetchingData] = useState(true);
 
     // Animation values
     const slideAnim = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    // Nutrition goals
-    const [targetWeight, setTargetWeight] = useState('');
-    const [calorieGoal, setCalorieGoal] = useState('');
-    const [proteinGoal, setProteinGoal] = useState('');
-    const [carbGoal, setCarbGoal] = useState('');
-    const [fatGoal, setFatGoal] = useState('');
-    const [fitnessGoal, setFitnessGoal] = useState('maintain');
-    const [activityLevel, setActivityLevel] = useState('moderate');
+    // Database values - these are the values we display and don't change until after save
+    const [dbGoals, setDbGoals] = useState<GoalsData>({
+        targetWeight: 0,
+        calorieGoal: 0,
+        proteinGoal: 0,
+        carbGoal: 0,
+        fatGoal: 0,
+        fitnessGoal: 'maintain',
+        activityLevel: 'moderate',
+        weeklyWorkouts: 4,
+        stepGoal: 10000,
+        waterGoal: 2000,
+        sleepGoal: 8
+    });
 
-    // Fitness goals
-    const [weeklyWorkouts, setWeeklyWorkouts] = useState('4');
-    const [stepGoal, setStepGoal] = useState('10000');
-    const [waterGoal, setWaterGoal] = useState('2000');
-    const [sleepGoal, setSleepGoal] = useState('8');
+    // Form values - these update as user types but don't affect display until saved
+    const [formValues, setFormValues] = useState<GoalsData>({
+        targetWeight: 0,
+        calorieGoal: 0,
+        proteinGoal: 0,
+        carbGoal: 0,
+        fatGoal: 0,
+        fitnessGoal: 'maintain',
+        activityLevel: 'moderate',
+        weeklyWorkouts: 4,
+        stepGoal: 10000,
+        waterGoal: 2000,
+        sleepGoal: 8
+    });
 
     useEffect(() => {
         // Animation on component mount
@@ -108,36 +126,36 @@ export default function EditGoals() {
 
         // Fetch user's goals
         const fetchUserGoals = async () => {
+            setIsFetchingData(true);
             try {
-                // In a real app, you would get this from Firestore or another database
-                // For demonstration, we'll use placeholder data
-                const userData = {
-                    targetWeight: 70,
-                    calorieGoal: 2000,
-                    proteinGoal: 150,
-                    carbGoal: 200,
-                    fatGoal: 65,
-                    fitnessGoal: 'maintain',
-                    activityLevel: 'moderate',
-                    weeklyWorkouts: 4,
-                    stepGoal: 10000,
-                    waterGoal: 2000,
-                    sleepGoal: 8
-                };
+                if (user) {
+                    // In a real implementation, get actual data from DB
+                    const userData = await getUserGoals(user.uid);
 
-                setTargetWeight(userData.targetWeight?.toString() || '');
-                setCalorieGoal(userData.calorieGoal?.toString() || '');
-                setProteinGoal(userData.proteinGoal?.toString() || '');
-                setCarbGoal(userData.carbGoal?.toString() || '');
-                setFatGoal(userData.fatGoal?.toString() || '');
-                setFitnessGoal(userData.fitnessGoal || 'maintain');
-                setActivityLevel(userData.activityLevel || 'moderate');
-                setWeeklyWorkouts(userData.weeklyWorkouts?.toString() || '4');
-                setStepGoal(userData.stepGoal?.toString() || '10000');
-                setWaterGoal(userData.waterGoal?.toString() || '2000');
-                setSleepGoal(userData.sleepGoal?.toString() || '8');
+                    // Set default values if any data is missing
+                    const goals = {
+                        targetWeight: userData?.targetWeight || 0,
+                        calorieGoal: userData?.calorieGoal || 0,
+                        proteinGoal: userData?.proteinGoal || 0,
+                        carbGoal: userData?.carbGoal || 0,
+                        fatGoal: userData?.fatGoal || 0,
+                        fitnessGoal: userData?.fitnessGoal || 'maintain',
+                        activityLevel: userData?.activityLevel || 'moderate',
+                        weeklyWorkouts: userData?.weeklyWorkouts || 0,
+                        stepGoal: userData?.stepGoal || 0,
+                        waterGoal: userData?.waterGoal || 0,
+                        sleepGoal: userData?.sleepGoal || 0
+                    };
+
+                    // Update both database values and form values
+                    setDbGoals(goals);
+                    setFormValues({ ...goals });
+                }
             } catch (error) {
                 console.error('Error fetching user goals', error);
+                Alert.alert('Error', 'Failed to load your goals. Please try again.');
+            } finally {
+                setIsFetchingData(false);
             }
         };
 
@@ -150,23 +168,66 @@ export default function EditGoals() {
         setIsLoading(true);
 
         try {
-            const goalsData: GoalsData = {
-                targetWeight: targetWeight ? parseFloat(targetWeight) : undefined,
-                calorieGoal: calorieGoal ? parseInt(calorieGoal) : undefined,
-                proteinGoal: proteinGoal ? parseInt(proteinGoal) : undefined,
-                carbGoal: carbGoal ? parseInt(carbGoal) : undefined,
-                fatGoal: fatGoal ? parseInt(fatGoal) : undefined,
-                fitnessGoal,
-                activityLevel,
-                weeklyWorkouts: weeklyWorkouts ? parseInt(weeklyWorkouts) : undefined,
-                stepGoal: stepGoal ? parseInt(stepGoal) : undefined,
-                waterGoal: waterGoal ? parseInt(waterGoal) : undefined,
-                sleepGoal: sleepGoal ? parseInt(sleepGoal) : undefined,
-            };
+            if (!user) {
+                throw new Error('User not authenticated');
+            }
 
-            // In a real app, you would save this to Firestore or another database
-            // Simulate saving data
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+                // First try to save to the backend via the API
+                // Use the profileApi functions that we've already improved with timeout handling
+                if (activeTab === 'nutrition') {
+                    // Format nutrition goals for the API
+                    const nutritionGoals = {
+                        daily_calorie_target: formValues.calorieGoal || 0,
+                        protein_goal: formValues.proteinGoal || 0,
+                        carb_goal: formValues.carbGoal || 0,
+                        fat_goal: formValues.fatGoal || 0,
+                        target_weight: formValues.targetWeight || 0,
+                        weight_goal: (formValues.fitnessGoal === 'maintain' ? 'maintain' :
+                            formValues.fitnessGoal === 'lose' ? 'lose_0_5' :
+                                formValues.fitnessGoal === 'gain' ? 'gain_0_25' : 'maintain') as any,
+                    };
+
+                    await updateNutritionGoals(nutritionGoals);
+                } else {
+                    // Format fitness goals for the API
+                    const fitnessGoals = {
+                        activity_level: formValues.activityLevel || 'moderate',
+                        weekly_workouts: formValues.weeklyWorkouts || 0,
+                        step_goal: formValues.stepGoal || 0,
+                        water_goal: formValues.waterGoal || 0,
+                        sleep_goal: formValues.sleepGoal || 0,
+                    };
+
+                    await updateFitnessGoals(fitnessGoals);
+                }
+
+                // If we get here, backend save was successful
+                console.log('Goals saved to backend successfully');
+            } catch (backendError) {
+                console.error('Error saving to backend, falling back to local save:', backendError);
+                // Continue execution to save locally
+            }
+
+            // Always save to local database whether backend succeeds or fails
+            // This ensures data is available offline
+            // Use a simpler object to avoid database schema issues
+            await updateUserGoals(user.uid, {
+                targetWeight: formValues.targetWeight,
+                calorieGoal: formValues.calorieGoal,
+                proteinGoal: formValues.proteinGoal,
+                carbGoal: formValues.carbGoal,
+                fatGoal: formValues.fatGoal,
+                fitnessGoal: formValues.fitnessGoal,
+                activityLevel: formValues.activityLevel,
+                weeklyWorkouts: formValues.weeklyWorkouts,
+                stepGoal: formValues.stepGoal,
+                waterGoal: formValues.waterGoal,
+                sleepGoal: formValues.sleepGoal
+            });
+
+            // Only update display values after successful DB update
+            setDbGoals({ ...formValues });
 
             Alert.alert('Success', 'Fitness goals updated successfully');
             navigation.goBack();
@@ -178,7 +239,23 @@ export default function EditGoals() {
         }
     };
 
+    const updateFormValue = (field: keyof GoalsData, value: any) => {
+        setFormValues(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
     const renderNutritionTab = () => {
+        if (isFetchingData) {
+            return (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={BLUE_ACCENT} />
+                    <Text style={styles.loadingText}>Loading your goals...</Text>
+                </View>
+            );
+        }
+
         return (
             <Animated.View
                 style={[
@@ -205,12 +282,12 @@ export default function EditGoals() {
                         <Text style={styles.summaryTitle}>Nutrition Goals</Text>
                         <View style={styles.summaryStats}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{calorieGoal || '0'}</Text>
+                                <Text style={styles.statValue}>{dbGoals.calorieGoal || 0}</Text>
                                 <Text style={styles.statLabel}>Calories/day</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{targetWeight || '0'} kg</Text>
+                                <Text style={styles.statValue}>{dbGoals.targetWeight || 0} kg</Text>
                                 <Text style={styles.statLabel}>Target Weight</Text>
                             </View>
                         </View>
@@ -225,8 +302,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Target Weight (kg)</Text>
                         <TextInput
                             style={styles.input}
-                            value={targetWeight}
-                            onChangeText={setTargetWeight}
+                            value={formValues.targetWeight?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('targetWeight', text ? parseFloat(text) : 0)}
                             placeholder="Enter target weight"
                             placeholderTextColor={GRAY}
                             keyboardType="decimal-pad"
@@ -237,8 +314,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Daily Calorie Goal</Text>
                         <TextInput
                             style={styles.input}
-                            value={calorieGoal}
-                            onChangeText={setCalorieGoal}
+                            value={formValues.calorieGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('calorieGoal', text ? parseInt(text) : 0)}
                             placeholder="Enter calorie goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -254,8 +331,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Protein (g)</Text>
                         <TextInput
                             style={styles.input}
-                            value={proteinGoal}
-                            onChangeText={setProteinGoal}
+                            value={formValues.proteinGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('proteinGoal', text ? parseInt(text) : 0)}
                             placeholder="Enter protein goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -266,8 +343,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Carbohydrates (g)</Text>
                         <TextInput
                             style={styles.input}
-                            value={carbGoal}
-                            onChangeText={setCarbGoal}
+                            value={formValues.carbGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('carbGoal', text ? parseInt(text) : 0)}
                             placeholder="Enter carb goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -278,8 +355,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Fat (g)</Text>
                         <TextInput
                             style={styles.input}
-                            value={fatGoal}
-                            onChangeText={setFatGoal}
+                            value={formValues.fatGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('fatGoal', text ? parseInt(text) : 0)}
                             placeholder="Enter fat goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -295,26 +372,26 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Fitness Goal</Text>
                         <View style={styles.segmentedControl}>
                             <TouchableOpacity
-                                style={[styles.segmentOption, fitnessGoal === 'lose' && styles.segmentActive]}
-                                onPress={() => setFitnessGoal('lose')}
+                                style={[styles.segmentOption, formValues.fitnessGoal === 'lose' && styles.segmentActive]}
+                                onPress={() => updateFormValue('fitnessGoal', 'lose')}
                             >
-                                <Text style={[styles.segmentText, fitnessGoal === 'lose' && styles.segmentTextActive]}>
+                                <Text style={[styles.segmentText, formValues.fitnessGoal === 'lose' && styles.segmentTextActive]}>
                                     Lose Weight
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.segmentOption, fitnessGoal === 'maintain' && styles.segmentActive]}
-                                onPress={() => setFitnessGoal('maintain')}
+                                style={[styles.segmentOption, formValues.fitnessGoal === 'maintain' && styles.segmentActive]}
+                                onPress={() => updateFormValue('fitnessGoal', 'maintain')}
                             >
-                                <Text style={[styles.segmentText, fitnessGoal === 'maintain' && styles.segmentTextActive]}>
+                                <Text style={[styles.segmentText, formValues.fitnessGoal === 'maintain' && styles.segmentTextActive]}>
                                     Maintain
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.segmentOption, fitnessGoal === 'gain' && styles.segmentActive]}
-                                onPress={() => setFitnessGoal('gain')}
+                                style={[styles.segmentOption, formValues.fitnessGoal === 'gain' && styles.segmentActive]}
+                                onPress={() => updateFormValue('fitnessGoal', 'gain')}
                             >
-                                <Text style={[styles.segmentText, fitnessGoal === 'gain' && styles.segmentTextActive]}>
+                                <Text style={[styles.segmentText, formValues.fitnessGoal === 'gain' && styles.segmentTextActive]}>
                                     Gain Weight
                                 </Text>
                             </TouchableOpacity>
@@ -324,7 +401,7 @@ export default function EditGoals() {
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Activity Level</Text>
                         <View style={styles.dropdownField}>
-                            <Text style={styles.dropdownText}>{getActivityLevelLabel(activityLevel)}</Text>
+                            <Text style={styles.dropdownText}>{getActivityLevelLabel(formValues.activityLevel || 'moderate')}</Text>
                             <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
                         </View>
                     </View>
@@ -360,12 +437,12 @@ export default function EditGoals() {
                         <Text style={styles.summaryTitle}>Fitness Goals</Text>
                         <View style={styles.summaryStats}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{weeklyWorkouts || '0'}</Text>
+                                <Text style={styles.statValue}>{dbGoals.weeklyWorkouts || 0}</Text>
                                 <Text style={styles.statLabel}>Workouts/week</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{stepGoal || '0'}</Text>
+                                <Text style={styles.statValue}>{dbGoals.stepGoal || 0}</Text>
                                 <Text style={styles.statLabel}>Daily Steps</Text>
                             </View>
                         </View>
@@ -380,8 +457,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Weekly Workouts</Text>
                         <TextInput
                             style={styles.input}
-                            value={weeklyWorkouts}
-                            onChangeText={setWeeklyWorkouts}
+                            value={formValues.weeklyWorkouts?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('weeklyWorkouts', text ? parseInt(text) : 0)}
                             placeholder="Workouts per week"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -392,8 +469,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Daily Step Goal</Text>
                         <TextInput
                             style={styles.input}
-                            value={stepGoal}
-                            onChangeText={setStepGoal}
+                            value={formValues.stepGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('stepGoal', text ? parseInt(text) : 0)}
                             placeholder="Target daily steps"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -409,8 +486,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Daily Water Intake (ml)</Text>
                         <TextInput
                             style={styles.input}
-                            value={waterGoal}
-                            onChangeText={setWaterGoal}
+                            value={formValues.waterGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('waterGoal', text ? parseInt(text) : 0)}
                             placeholder="Water intake goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -421,8 +498,8 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Sleep Goal (hours)</Text>
                         <TextInput
                             style={styles.input}
-                            value={sleepGoal}
-                            onChangeText={setSleepGoal}
+                            value={formValues.sleepGoal?.toString() || ''}
+                            onChangeText={(text) => updateFormValue('sleepGoal', text ? parseInt(text) : 0)}
                             placeholder="Target sleep hours"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -714,5 +791,16 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginTop: 20,
     },
 });

@@ -1,5 +1,5 @@
 import { BACKEND_URL } from '../utils/config';
-import { auth, getStoredAuthToken } from '../utils/firebase';
+import { auth, getStoredAuthToken } from '../utils/firebase/index';
 
 // User profile data interfaces
 interface PhysicalAttributes {
@@ -75,15 +75,35 @@ interface UpdateUserData {
 // Function to get firebase token with better error handling
 const getFirebaseToken = async () => {
     const currentUser = auth.currentUser;
+    let retries = 0;
+    const maxRetries = 3;
 
-    // First try to get token from current user
-    if (currentUser) {
+    // Recursive retry function
+    const tryGetToken = async (attempts: number): Promise<string | null> => {
         try {
-            return await currentUser.getIdToken(true); // Force token refresh to ensure token is valid
+            if (currentUser) {
+                return await currentUser.getIdToken(true); // Force token refresh
+            }
+            return null;
         } catch (error: any) {
-            console.error('Error getting Firebase token from current user:', error);
-            // Fall through to check stored token
+            console.error(`Error getting Firebase token (attempt ${attempts}):`, error);
+
+            // Specifically retry on network errors
+            if (error.code === 'auth/network-request-failed' && attempts < maxRetries) {
+                console.log(`Retrying token fetch (${attempts + 1}/${maxRetries})...`);
+                // Increasing backoff delay: 1s, 2s, 4s
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+                return tryGetToken(attempts + 1);
+            }
+
+            return null;
         }
+    };
+
+    // First try to get token from current user with retries
+    if (currentUser) {
+        const token = await tryGetToken(0);
+        if (token) return token;
     }
 
     // If no current user or token refresh failed, try to get the stored token

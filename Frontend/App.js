@@ -352,20 +352,10 @@ function AppNavigator() {
 export default function App() {
   const [isReady, setIsReady] = useState(false);
 
-  // Initialize Firebase and app data
+  // Initialize app data
   useEffect(() => {
-    initFirebase();
     initApp();
   }, []);
-
-  const initFirebase = async () => {
-    try {
-      // Firebase is already initialized in the import
-      console.log("Firebase initialized successfully");
-    } catch (error) {
-      console.error("Error initializing Firebase:", error);
-    }
-  };
 
   const initApp = async () => {
     try {

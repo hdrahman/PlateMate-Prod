@@ -261,42 +261,81 @@ export const syncProfileFromLocalToBackend = async (firebaseUid: string): Promis
             return false;
         }
 
-        try {
-            // First check if user exists in backend
-            console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
-            const existingProfile = await getUserProfile(firebaseUid);
+        // Maximum number of retry attempts
+        const maxRetries = 3;
+        let attempts = 0;
+        let syncSuccessful = false;
 
-            // Convert to the format that matches exactly what the backend expects
-            const backendUpdateData = convertToBackendUpdateFormat(localProfile);
-            console.log('Backend update data:', JSON.stringify(backendUpdateData));
+        while (attempts < maxRetries && !syncSuccessful) {
+            try {
+                // Add exponential backoff delay after first attempt
+                if (attempts > 0) {
+                    const backoffDelay = Math.pow(2, attempts) * 1000; // 2s, 4s, 8s
+                    console.log(`⏰ Retry attempt ${attempts + 1}/${maxRetries} after ${backoffDelay}ms delay`);
+                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                }
 
-            if (existingProfile) {
-                // Update existing profile
-                console.log(`Updating existing profile for ${firebaseUid}`);
-                await updateUserProfile(firebaseUid, backendUpdateData);
-            } else {
-                // Create new profile - first create basic user
-                console.log(`Creating user at ${BACKEND_URL}/users for ${firebaseUid}`);
-                await createUser({
-                    firebase_uid: firebaseUid,
-                    email: localProfile.email,
-                    first_name: localProfile.first_name,
-                    last_name: localProfile.last_name || ""
-                });
+                // First check if user exists in backend
+                console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
+                const existingProfile = await getUserProfile(firebaseUid);
 
-                // Then update with all profile details
-                console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
-                await updateUserProfile(firebaseUid, backendUpdateData);
+                // Convert to the format that matches exactly what the backend expects
+                const backendUpdateData = convertToBackendUpdateFormat(localProfile);
+                console.log('Backend update data:', JSON.stringify(backendUpdateData));
+
+                if (existingProfile) {
+                    // Update existing profile
+                    console.log(`Updating existing profile for ${firebaseUid}`);
+                    await updateUserProfile(firebaseUid, backendUpdateData);
+                } else {
+                    // Create new profile - first create basic user
+                    console.log(`Creating user at ${BACKEND_URL}/users for ${firebaseUid}`);
+                    await createUser({
+                        firebase_uid: firebaseUid,
+                        email: localProfile.email,
+                        first_name: localProfile.first_name,
+                        last_name: localProfile.last_name || ""
+                    });
+
+                    // Then update with all profile details
+                    console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
+                    await updateUserProfile(firebaseUid, backendUpdateData);
+                }
+
+                // Mark profile as synced in local SQLite
+                await markUserProfileSynced(firebaseUid);
+                console.log('✅ User profile marked as synced');
+                syncSuccessful = true;
+                return true;
+            } catch (error: any) {
+                attempts++;
+
+                // Check if it's a network-related error
+                const isNetworkError = error.message && (
+                    error.message.includes('Network Error') ||
+                    error.message.includes('network-request-failed') ||
+                    error.message.includes('Network request failed') ||
+                    error.message.includes('timeout') ||
+                    error.message.includes('ECONNREFUSED')
+                );
+
+                if (isNetworkError) {
+                    console.warn(`🔄 Network error during sync attempt ${attempts}/${maxRetries}:`, error.message);
+                    // Continue loop for retry on network errors
+                } else {
+                    // Non-network errors won't be resolved by retrying
+                    console.error('❌ Non-network error syncing to backend:', error);
+                    return false;
+                }
+
+                // If this was the last attempt, log final failure
+                if (attempts >= maxRetries) {
+                    console.error(`❌ Failed to sync profile after ${maxRetries} attempts`);
+                }
             }
-
-            // Mark profile as synced in local SQLite
-            await markUserProfileSynced(firebaseUid);
-            console.log('✅ User profile marked as synced');
-            return true;
-        } catch (error) {
-            console.error('❌ Error syncing to backend:', error);
-            return false;
         }
+
+        return syncSuccessful;
     } catch (error) {
         console.error('❌ Error syncing profile from local to backend:', error);
         return false;

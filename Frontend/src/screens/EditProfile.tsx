@@ -17,9 +17,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Auth, auth } from '../utils/firebase';
-import { updateProfile } from 'firebase/auth';
+import { Auth, auth } from '../utils/firebase/index';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { updateProfile as updateBackendProfile, updateCompleteProfile, getProfile } from '../api/profileApi'; // Import the profile update functions
+import { updateUserProfile as updateLocalUserProfile } from '../utils/database'; // Import the local database function
+import { testBackendConnection } from '../utils/networkUtils';
+import {
+    cmToFeetInches,
+    feetInchesToCm,
+    kgToLbs,
+    lbsToKg,
+    formatHeight,
+    formatWeight
+} from '../utils/unitConversion';
+import _ from 'lodash'; // Import lodash for deep cloning
 
 // Extend the User type to include our custom fields
 interface ExtendedUser extends Auth.User {
@@ -74,6 +85,8 @@ const EditProfile = () => {
     // Mock profile data
     const [username, setUsername] = useState('haamed_rahman');
     const [height, setHeight] = useState('5 ft 11 in');
+    const [heightFeet, setHeightFeet] = useState('5');
+    const [heightInches, setHeightInches] = useState('11');
     const [age, setAge] = useState(21);
     const [weight, setWeight] = useState('105 kg');
     const [sex, setSex] = useState('Male');
@@ -83,6 +96,7 @@ const EditProfile = () => {
     const [zipCode, setZipCode] = useState('31311');
     const [units, setUnits] = useState('Kilograms, Feet/Inches, Kilometers, Calories, Milliliters');
     const [email, setEmail] = useState('haamed1.450@gmail.com');
+    const [isSaving, setIsSaving] = useState(false);
 
     // Gamification data
     const [level, setLevel] = useState(12);
@@ -119,6 +133,219 @@ const EditProfile = () => {
             // Update with user data
         }
     }, [user]);
+
+    // Load user profile data
+    useEffect(() => {
+        const loadProfileData = async () => {
+            try {
+                const profileData = await getProfile();
+                if (profileData && profileData.profile) {
+                    // Set basic info
+                    const p = profileData.profile;
+                    setUsername(`${p.first_name || ''}${p.last_name ? '_' + p.last_name : ''}`);
+                    setLocation(p.location || '');
+
+                    // Keep the default age if not provided
+                    // Age might be calculated from date_of_birth in the backend, but not sent directly
+                    if (p.date_of_birth) {
+                        // Could calculate age from date_of_birth if needed
+                        // For now, keep the default age
+                    }
+
+                    // Email from Firebase
+                    setEmail(user?.email || '');
+
+                    // Handle imperial vs metric units
+                    const isImperial = p.is_imperial_units || false;
+                    if (isImperial) {
+                        setUnits('Pounds, Feet/Inches, Miles, Calories, Fluid Ounces');
+                    } else {
+                        setUnits('Kilograms, Centimeters, Kilometers, Calories, Milliliters');
+                    }
+
+                    // Handle height based on unit preference
+                    if (p.height) {
+                        if (isImperial) {
+                            const { feet, inches } = cmToFeetInches(p.height);
+                            setHeightFeet(feet.toString());
+                            setHeightInches(inches.toString());
+                            setHeight(`${feet}' ${inches}"`);
+                        } else {
+                            setHeight(`${p.height} cm`);
+                        }
+                    }
+
+                    // Handle weight based on unit preference
+                    if (p.weight) {
+                        if (isImperial) {
+                            const lbs = kgToLbs(p.weight);
+                            setWeight(`${lbs} lbs`);
+                        } else {
+                            setWeight(`${p.weight} kg`);
+                        }
+                    }
+
+                    // Set gender/sex
+                    if (p.gender) {
+                        setSex(p.gender.charAt(0).toUpperCase() + p.gender.slice(1));
+                    }
+
+                    // Set gamification data if available
+                    if (profileData.gamification) {
+                        const g = profileData.gamification;
+                        setLevel(g.level || 1);
+                        setXp(g.xp || 0);
+                        setXpToNextLevel(g.xp_to_next_level || 100);
+                        setRank(g.rank || 'Beginner');
+                        setStreakDays(g.streak_days || 0);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                // Use defaults from state initialization
+            }
+        };
+
+        loadProfileData();
+    }, [user]);
+
+    // Save profile changes
+    const saveProfile = async () => {
+        try {
+            setIsSaving(true);
+
+            // Convert height from imperial to metric (cm) for storage
+            let heightInCm;
+            if (heightFeet && heightInches) {
+                heightInCm = feetInchesToCm(
+                    parseFloat(heightFeet),
+                    parseFloat(heightInches)
+                );
+            } else {
+                heightInCm = 0;
+            }
+
+            // Convert weight to metric (kg) for storage
+            let weightInKg;
+            if (weight) {
+                // Check if weight is in lbs or kg format
+                if (weight.includes('lb')) {
+                    const lbs = parseFloat(weight.replace(/lbs|lb/g, '').trim());
+                    weightInKg = lbsToKg(lbs);
+                } else {
+                    weightInKg = parseFloat(weight.replace(/kg/g, '').trim());
+                }
+            } else {
+                weightInKg = 0;
+            }
+
+            // Create profile data object - always store in metric
+            const profileData = {
+                first_name: username.split('_')[0] || username,
+                last_name: username.split('_')[1] || '',
+                height: heightInCm,
+                weight: weightInKg,
+                gender: sex.toLowerCase() as 'male' | 'female' | 'other',
+                location: location,
+                // Store the user's unit preference, but still store all data in metric
+                is_imperial_units: units.toLowerCase().includes('pounds') || units.toLowerCase().includes('feet'),
+            };
+
+            try {
+                // Get current profile or create fallback data
+                let existingProfile = null;
+
+                try {
+                    existingProfile = await getProfile();
+                    console.log('Successfully fetched existing profile:', existingProfile);
+                } catch (error) {
+                    console.warn('Failed to fetch current profile:', error);
+
+                    // Create fallback data with default empty objects
+                    // to ensure we're not sending null values for nested objects
+                    existingProfile = {
+                        profile: { ...profileData },
+                        nutrition_goals: {},
+                        fitness_goals: {},
+                        gamification: {}
+                    };
+                }
+
+                // Create a complete update payload using deep clone to avoid reference issues
+                const updateData = {
+                    profile: profileData,
+                    nutrition_goals: existingProfile?.nutrition_goals || {},
+                    fitness_goals: existingProfile?.fitness_goals || {},
+                    gamification: existingProfile?.gamification || {}
+                };
+
+                console.log('Sending update with data:', updateData);
+
+                try {
+                    // Try complete profile update first
+                    const response = await updateCompleteProfile(updateData);
+                    console.log('Profile updated successfully:', response);
+                } catch (updateError) {
+                    console.warn('Failed to update complete profile, attempting fallback:', updateError);
+
+                    // Fallback to basic profile update if complete update fails
+                    await updateBackendProfile(profileData);
+                }
+
+                // Always save locally for offline access
+                if (user) {
+                    await updateLocalUserProfile(user.uid, {
+                        first_name: profileData.first_name,
+                        last_name: profileData.last_name,
+                        height: profileData.height,
+                        weight: profileData.weight,
+                        gender: profileData.gender,
+                        location: profileData.location,
+                        // Remove properties that don't exist in the database schema
+                        synced: 0
+                    });
+                    Alert.alert('Success', 'Profile saved successfully.');
+                } else {
+                    Alert.alert('Error', 'Failed to update profile. Please try again.');
+                    return; // Exit early if no user
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+
+                // If backend update fails, still save locally
+                if (user) {
+                    try {
+                        await updateLocalUserProfile(user.uid, {
+                            first_name: profileData.first_name,
+                            last_name: profileData.last_name,
+                            height: profileData.height,
+                            weight: profileData.weight,
+                            gender: profileData.gender,
+                            location: profileData.location,
+                            // Remove properties that don't exist in the database schema
+                            synced: 0
+                        });
+                        Alert.alert('Success', 'Profile saved locally. Changes will sync when you reconnect to the internet.');
+                    } catch (localError) {
+                        console.error('Error saving profile locally:', localError);
+                        Alert.alert('Error', 'Failed to update profile. Please try again.');
+                        return; // Exit early if we can't even save locally
+                    }
+                } else {
+                    Alert.alert('Error', 'Failed to update profile. Please try again.');
+                    return; // Exit early if no user
+                }
+            }
+
+            // Navigate back
+            navigation.goBack();
+        } catch (error) {
+            console.error('Error in profile update process:', error);
+            Alert.alert('Error', 'Failed to update profile. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const renderProfileTab = () => {
         return (
@@ -225,21 +452,44 @@ const EditProfile = () => {
                     <View style={styles.inputRow}>
                         <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                             <Text style={styles.inputLabel}>Height</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={height}
-                                onChangeText={setHeight}
-                                placeholderTextColor={GRAY}
-                            />
+                            <View style={styles.heightInputContainer}>
+                                <View style={styles.heightInputGroup}>
+                                    <TextInput
+                                        style={styles.heightInput}
+                                        value={heightFeet}
+                                        onChangeText={setHeightFeet}
+                                        keyboardType="numeric"
+                                        placeholderTextColor={GRAY}
+                                        placeholder="5"
+                                    />
+                                    <Text style={styles.heightUnitText}>ft</Text>
+                                </View>
+                                <View style={styles.heightInputGroup}>
+                                    <TextInput
+                                        style={styles.heightInput}
+                                        value={heightInches}
+                                        onChangeText={setHeightInches}
+                                        keyboardType="numeric"
+                                        placeholderTextColor={GRAY}
+                                        placeholder="11"
+                                    />
+                                    <Text style={styles.heightUnitText}>in</Text>
+                                </View>
+                            </View>
                         </View>
                         <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                             <Text style={styles.inputLabel}>Weight</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={weight}
-                                onChangeText={setWeight}
-                                placeholderTextColor={GRAY}
-                            />
+                            <View style={styles.weightInputContainer}>
+                                <TextInput
+                                    style={styles.weightInput}
+                                    value={weight.replace(/kg|lbs/g, '').trim()}
+                                    onChangeText={(text) => setWeight(text)}
+                                    keyboardType="numeric"
+                                    placeholderTextColor={GRAY}
+                                    placeholder="75"
+                                />
+                                <Text style={styles.weightUnitText}>kg</Text>
+                            </View>
                         </View>
                     </View>
                 </GradientBorderBox>
@@ -280,7 +530,8 @@ const EditProfile = () => {
 
                 <TouchableOpacity
                     style={styles.saveButton}
-                    onPress={() => navigation.goBack()}
+                    onPress={saveProfile}
+                    disabled={isSaving}
                 >
                     <LinearGradient
                         colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
@@ -288,9 +539,30 @@ const EditProfile = () => {
                         end={{ x: 1, y: 0 }}
                         style={styles.saveButtonGradient}
                     >
-                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                        {isSaving ? (
+                            <ActivityIndicator color={WHITE} size="small" />
+                        ) : (
+                            <Text style={styles.saveButtonText}>Save Changes</Text>
+                        )}
                     </LinearGradient>
                 </TouchableOpacity>
+
+                {/* Debug button - only visible in development */}
+                {__DEV__ && (
+                    <TouchableOpacity
+                        style={[styles.saveButton, { marginTop: 10 }]}
+                        onPress={testBackendConnection}
+                    >
+                        <View style={{
+                            backgroundColor: '#333',
+                            paddingVertical: 16,
+                            alignItems: 'center',
+                            borderRadius: 12
+                        }}>
+                            <Text style={styles.saveButtonText}>Test Connection</Text>
+                        </View>
+                    </TouchableOpacity>
+                )}
             </Animated.View>
         );
     };
@@ -783,6 +1055,52 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    heightInputContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    heightInputGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        flex: 0.48,
+        height: 48,
+        paddingHorizontal: 12,
+    },
+    heightInput: {
+        flex: 1,
+        color: WHITE,
+        fontSize: 16,
+        padding: 0,
+    },
+    heightUnitText: {
+        color: BLUE_ACCENT,
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginLeft: 4,
+    },
+    weightInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        height: 48,
+        paddingHorizontal: 12,
+    },
+    weightInput: {
+        flex: 1,
+        color: WHITE,
+        fontSize: 16,
+        padding: 0,
+    },
+    weightUnitText: {
+        color: BLUE_ACCENT,
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginLeft: 4,
     },
 });
 

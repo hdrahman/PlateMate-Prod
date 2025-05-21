@@ -1254,4 +1254,101 @@ export { db };
 // Export wrappers with simpler names for backward compatibility
 export const addFoodLogWithNotification = addFoodLog;
 export const updateFoodLogWithNotification = updateFoodLog;
-export const deleteFoodLogWithNotification = deleteFoodLog; 
+export const deleteFoodLogWithNotification = deleteFoodLog;
+
+// Interface for user goals
+export interface UserGoals {
+    targetWeight?: number;
+    calorieGoal?: number;
+    proteinGoal?: number;
+    carbGoal?: number;
+    fatGoal?: number;
+    fitnessGoal?: string;
+    activityLevel?: string;
+    weeklyWorkouts?: number;
+    stepGoal?: number;
+    waterGoal?: number;
+    sleepGoal?: number;
+}
+
+// Get user goals from the database
+export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | null> => {
+    if (!db || !global.dbInitialized) {
+        console.log('🔄 Database not initialized, initializing now...');
+        await initDatabase();
+    }
+
+    try {
+        console.log(`🔍 Fetching goals for user: ${firebaseUid}`);
+
+        // Get the user profile which contains nutrition/fitness goals
+        const profile = await getUserProfileByFirebaseUid(firebaseUid);
+
+        if (!profile) {
+            console.log('⚠️ No user profile found, returning defaults');
+            return null;
+        }
+
+        // Extract goals from the user profile
+        // Note: Values may be stored in different places in your actual schema
+        // This is just an example implementation
+        return {
+            targetWeight: profile.target_weight || 0,
+            calorieGoal: profile.daily_calorie_target || 0,
+            proteinGoal: profile.protein_goal || 0,
+            carbGoal: profile.carb_goal || 0,
+            fatGoal: profile.fat_goal || 0,
+            fitnessGoal: profile.weight_goal || 'maintain',
+            activityLevel: profile.activity_level || 'moderate',
+            weeklyWorkouts: profile.weekly_workouts || 0,
+            stepGoal: profile.step_goal || 0,
+            waterGoal: profile.water_goal || 0,
+            sleepGoal: profile.sleep_goal || 0
+        };
+    } catch (error) {
+        console.error('❌ Error fetching user goals:', error);
+        throw error;
+    }
+};
+
+// Update user goals in the database
+export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.log('🔄 Database not initialized, initializing now...');
+        await initDatabase();
+    }
+
+    try {
+        console.log(`🔄 Updating goals for user: ${firebaseUid}`);
+
+        // Format the goals for the user profile update
+        const profileUpdates = {
+            target_weight: goals.targetWeight,
+            daily_calorie_target: goals.calorieGoal,
+            protein_goal: goals.proteinGoal,
+            carb_goal: goals.carbGoal,
+            fat_goal: goals.fatGoal,
+            weight_goal: goals.fitnessGoal,
+            activity_level: goals.activityLevel,
+            weekly_workouts: goals.weeklyWorkouts,
+            step_goal: goals.stepGoal,
+            water_goal: goals.waterGoal,
+            sleep_goal: goals.sleepGoal,
+            // Mark as unsynced so it will be sent to the backend
+            synced: 0,
+            sync_action: 'update',
+            last_modified: new Date().toISOString()
+        };
+
+        // Update the user profile
+        await updateUserProfile(firebaseUid, profileUpdates);
+
+        // Notify listeners of the change
+        notifyDatabaseChanged();
+
+        console.log('✅ User goals updated successfully');
+    } catch (error) {
+        console.error('❌ Error updating user goals:', error);
+        throw error;
+    }
+}; 

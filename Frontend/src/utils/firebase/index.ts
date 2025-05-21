@@ -1,6 +1,15 @@
 // Import polyfills first
 import 'react-native-get-random-values';
 
+/**
+ * IMPORTANT: This is the ONLY Firebase initialization file in the app.
+ * Do not create or use other Firebase initialization files.
+ * Always import from '@/utils/firebase/index' or '../utils/firebase/index'
+ * 
+ * Using multiple Firebase initialization attempts will cause the error:
+ * "Firebase: Firebase App named '[DEFAULT]' already exists with different options or config (app/duplicate-app)"
+ */
+
 // Firebase configuration
 import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';

@@ -1,12 +1,22 @@
 // Configuration settings for the app
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+// Get the local IP address from Expo Constants for physical device testing
+// This helps connect to your development machine when using Expo Go
+const getLocalIpAddress = () => {
+    if (Constants.manifest && Constants.manifest.debuggerHost) {
+        return Constants.manifest.debuggerHost.split(':').shift();
+    }
+    return '192.168.0.160'; // Fallback to the previous hardcoded IP
+};
 
 // Determine the appropriate backend URL based on the platform
 // For mobile devices (iOS/Android), use the network IP
-// For web, use localhost
+// For web, also use the IP address for consistent connectivity
 const DEV_BACKEND_URL = Platform.OS === 'web'
-    ? 'http://localhost:8000'
-    : 'http://192.168.0.160:8000'; // Replace with your computer's IP address
+    ? 'http://192.168.0.160:8001'
+    : `http://${getLocalIpAddress()}:8001`; // Use the dynamically detected IP
 
 // Backend URL - dynamically set based on platform
 export const BACKEND_URL = DEV_BACKEND_URL;

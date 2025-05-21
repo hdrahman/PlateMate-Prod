@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Auth } from '../utils/firebase';
+import { Auth } from '../utils/firebase/index';
 import {
     deleteUser,
     reauthenticateWithCredential,
