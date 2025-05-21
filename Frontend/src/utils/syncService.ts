@@ -5,9 +5,18 @@ import {
     getUnsyncedFoodLogs,
     markFoodLogAsSynced,
     updateLastSyncTime,
-    purgeOldData
+    purgeOldData,
+    getLastSyncTime,
+    updateUserProfile,
+    markUserProfileSynced,
+    getUnsyncedUserProfiles,
+    getUnsyncedSteps,
+    markStepsSynced,
+    getUnsyncedStreaks,
+    markStreakSynced
 } from './database';
-import { BACKEND_URL } from './config';
+import { BACKEND_URL, isDebug } from './config';
+import { auth } from './firebase/index';
 
 // Sync interval in milliseconds (3 hours)
 const SYNC_INTERVAL = 3 * 60 * 60 * 1000;
@@ -35,56 +44,196 @@ interface FoodLogEntry {
     last_modified: string;
 }
 
-// Check if the device is online with additional validation
-export const isOnline = async (): Promise<boolean> => {
-    try {
-        // First check with NetInfo
-        const netInfo = await NetInfo.fetch();
-        const isConnected = netInfo.isConnected;
+// Network status check
+let isConnected = true;
 
-        if (!isConnected) {
-            console.log('📡 Device appears to be offline according to NetInfo');
-            return false;
+// Update network status
+export const setOnlineStatus = (status: boolean) => {
+    isConnected = status;
+};
+
+// Check if device is online
+export const isOnline = (): boolean => {
+    return isConnected;
+};
+
+// Main data sync function
+export const syncData = async (): Promise<boolean> => {
+    // Check online status
+    if (!isOnline()) {
+        console.log('🔄 Device offline, skipping sync');
+        return false;
+    }
+
+    // Check if user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+        console.log('🔄 User not authenticated, skipping sync');
+        return false;
+    }
+
+    console.log('🔄 Starting data sync');
+
+    try {
+        // Get access token
+        const accessToken = await user.getIdToken();
+
+        // Create axios instance with auth header
+        const api = axios.create({
+            baseURL: BACKEND_URL,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        // Debug: Log details if in debug mode
+        if (isDebug) {
+            console.log('🔄 Sync using URL:', BACKEND_URL);
+            console.log('🔄 Auth token received:', accessToken ? '✅ YES' : '❌ NO');
         }
 
-        // For Expo Go testing, don't rely as heavily on the backend ping
-        // This helps when testing with Expo Go where the backend might not be available
-        // but the app should still function in "offline mode"
-        console.log('📡 Device appears to be connected. Skipping backend ping for Expo Go testing.');
-        return true;
+        // Track if any sync operations were attempted
+        let syncAttempted = false;
 
-        // Note: The following code is commented out to improve testing experience
-        // in Expo Go. Uncomment for production use where you want to verify 
-        // the backend is actually reachable.
-        /*
-        // Add a lightweight ping to our backend as additional verification
-        try {
-            // Use a 1.5 second timeout for quick check
-            const timeoutPromise = new Promise<boolean>((_, reject) => {
-                setTimeout(() => reject(new Error('Network ping timeout')), 1500);
+        // 1. Sync user profiles
+        const unsyncedProfiles = await getUnsyncedUserProfiles();
+        if (unsyncedProfiles.length > 0) {
+            syncAttempted = true;
+            console.log(`🔄 Syncing ${unsyncedProfiles.length} user profiles`);
+
+            for (const profile of unsyncedProfiles) {
+                if (profile.firebase_uid) {
+                    try {
+                        await api.post('/users/sync-profile', {
+                            profile
+                        });
+
+                        // Mark as synced locally
+                        await markUserProfileSynced(profile.firebase_uid);
+                        console.log(`✅ User profile synced: ${profile.firebase_uid}`);
+                    } catch (error) {
+                        console.error('❌ Error syncing user profile:', error);
+                    }
+                }
+            }
+        }
+
+        // 2. Sync food logs
+        const unsyncedFoodLogs = await getUnsyncedFoodLogs();
+        if (unsyncedFoodLogs.length > 0) {
+            syncAttempted = true;
+            console.log(`🔄 Syncing ${unsyncedFoodLogs.length} food logs`);
+
+            const response = await api.post('/food-logs/sync', {
+                logs: unsyncedFoodLogs
             });
 
-            const pingPromise = axios.get(`${BACKEND_URL}/health`, { timeout: 1500 })
-                .then(response => response.status === 200)
-                .catch(() => false);
-
-            // Race between ping and timeout
-            const pingSucceeded = await Promise.race([pingPromise, timeoutPromise]) as boolean;
-
-            if (!pingSucceeded) {
-                console.log('📡 Backend is unreachable despite being connected');
-                return false;
+            if (response.data && response.data.success) {
+                // Mark food logs as synced
+                for (const log of unsyncedFoodLogs) {
+                    if (log.id) {
+                        await markFoodLogAsSynced(log.id, log.id);
+                    }
+                }
+                console.log(`✅ ${unsyncedFoodLogs.length} food logs synced`);
             }
-
-            return true;
-        } catch (error) {
-            console.log('📡 Additional network check failed:', error);
-            return false;
+        } else {
+            console.log('✅ No unsynced food logs to sync');
         }
-        */
+
+        // 3. Sync step data
+        const unsyncedSteps = await getUnsyncedSteps();
+        if (unsyncedSteps.length > 0) {
+            syncAttempted = true;
+            console.log(`🔄 Syncing ${unsyncedSteps.length} step records`);
+
+            try {
+                const response = await api.post('/steps/sync', {
+                    steps: unsyncedSteps
+                });
+
+                if (response.data && response.data.success) {
+                    // Mark steps as synced
+                    const stepIds = unsyncedSteps.map(s => s.id).filter(id => id !== undefined);
+                    await markStepsSynced(stepIds);
+                    console.log(`✅ ${unsyncedSteps.length} step records synced`);
+                }
+            } catch (error) {
+                console.error('❌ Error syncing steps:', error);
+            }
+        } else {
+            console.log('✅ No unsynced step data to sync');
+        }
+
+        // 4. Sync streak data
+        const unsyncedStreaks = await getUnsyncedStreaks();
+        if (unsyncedStreaks.length > 0) {
+            syncAttempted = true;
+            console.log(`🔄 Syncing ${unsyncedStreaks.length} streak records`);
+
+            try {
+                const response = await api.post('/streaks/sync', {
+                    streaks: unsyncedStreaks
+                });
+
+                if (response.data && response.data.success) {
+                    // Mark streaks as synced
+                    for (const streak of unsyncedStreaks) {
+                        if (streak.firebase_uid) {
+                            await markStreakSynced(streak.firebase_uid);
+                        }
+                    }
+                    console.log(`✅ ${unsyncedStreaks.length} streak records synced`);
+                }
+            } catch (error) {
+                console.error('❌ Error syncing streaks:', error);
+            }
+        } else {
+            console.log('✅ No unsynced streak data to sync');
+        }
+
+        // Update last sync time if any sync was attempted
+        if (syncAttempted) {
+            await updateLastSyncTime('success');
+            console.log('✅ Sync completed successfully');
+        } else {
+            console.log('✅ No data to sync');
+        }
+
+        return true;
     } catch (error) {
-        console.error('📡 Error checking network status:', error);
+        console.error('❌ Error during sync process:', error);
+
+        // Update sync status with error
+        await updateLastSyncTime('error');
         return false;
+    }
+};
+
+// Returns true if a sync is needed based on time threshold
+export const shouldSync = async (): Promise<boolean> => {
+    try {
+        // Get last sync time
+        const lastSync = await getLastSyncTime();
+
+        if (!lastSync || !lastSync.last_sync) {
+            // Never synced before or no sync record
+            return true;
+        }
+
+        // Parse last sync time
+        const lastSyncTime = new Date(lastSync.last_sync).getTime();
+        const now = new Date().getTime();
+
+        // Calculate difference in minutes
+        const diffMinutes = (now - lastSyncTime) / (1000 * 60);
+
+        // Sync if it's been more than 15 minutes
+        return diffMinutes > 15;
+    } catch (error) {
+        console.error('❌ Error checking sync status:', error);
+        return true; // Default to syncing if there's an error
     }
 };
 

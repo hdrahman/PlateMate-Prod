@@ -21,6 +21,9 @@ const DEV_BACKEND_URL = Platform.OS === 'web'
 // Backend URL - dynamically set based on platform
 export const BACKEND_URL = DEV_BACKEND_URL;
 
+// Check if we're in development environment
+export const isDebug = __DEV__;
+
 // Other configuration settings can be added here
 export const APP_VERSION = '1.0.0';
 export const DEFAULT_USER_ID = 1;

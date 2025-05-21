@@ -198,141 +198,112 @@ export const addFoodLog = async (foodLog: any) => {
     const firebaseUserId = getCurrentUserId();
     console.log('📝 Adding food log for user:', firebaseUserId);
 
-    const {
-        user_id = firebaseUserId, // Use Firebase user ID instead of default 1
-        food_name = 'Unnamed Food',
-        meal_id = 0,
-        calories = 0,
-        proteins = 0,
-        carbs = 0,
-        fats = 0,
-        fiber = 0,
-        sugar = 0,
-        saturated_fat = 0,
-        polyunsaturated_fat = 0,
-        monounsaturated_fat = 0,
-        trans_fat = 0,
-        cholesterol = 0,
-        sodium = 0,
-        potassium = 0,
-        vitamin_a = 0,
-        vitamin_c = 0,
-        calcium = 0,
-        iron = 0,
-        weight = null,
-        weight_unit = 'g',
-        image_url = '',
-        file_key = 'default_file_key',
-        healthiness_rating = 5,
-        date = getCurrentDate(),
-        meal_type = 'Breakfast',
-        brand_name = '',
-        quantity = '',
-        notes = ''
-    } = foodLog;
-
-    // Ensure date is in the correct format (YYYY-MM-DD)
-    let formattedDate = date;
-    if (date) {
-        // If date is already in YYYY-MM-DD format, use it as is
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            formattedDate = date;
-        } else {
-            // Otherwise, try to extract the date part
-            try {
-                const dateObj = new Date(date);
-                formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-            } catch (error) {
-                console.error('❌ Error formatting date:', error);
-                // Fall back to current date if parsing fails
-                formattedDate = new Date().toISOString().split('T')[0];
-            }
-        }
-    } else {
-        // If no date provided, use today's date
-        formattedDate = new Date().toISOString().split('T')[0];
-    }
-
-    console.log(`📝 Adding food log with date: ${formattedDate}, name: ${food_name}, meal_type: ${meal_type}`);
+    // Set current timestamp
+    const timestamp = new Date().toISOString();
 
     try {
-        // Start a transaction for better error handling
-        await db.runAsync('BEGIN TRANSACTION');
+        // Format the meal data - Use Firebase UID directly as the user_id
+        const formattedData = {
+            meal_id: foodLog.meal_id || Math.floor(Math.random() * 1000000),
+            user_id: firebaseUserId, // Use Firebase UID directly
+            food_name: foodLog.food_name,
+            calories: foodLog.calories || 0,
+            proteins: foodLog.proteins || 0,
+            carbs: foodLog.carbs || 0,
+            fats: foodLog.fats || 0,
+            fiber: foodLog.fiber || 0,
+            sugar: foodLog.sugar || 0,
+            saturated_fat: foodLog.saturated_fat || 0,
+            polyunsaturated_fat: foodLog.polyunsaturated_fat || 0,
+            monounsaturated_fat: foodLog.monounsaturated_fat || 0,
+            trans_fat: foodLog.trans_fat || 0,
+            cholesterol: foodLog.cholesterol || 0,
+            sodium: foodLog.sodium || 0,
+            potassium: foodLog.potassium || 0,
+            vitamin_a: foodLog.vitamin_a || 0,
+            vitamin_c: foodLog.vitamin_c || 0,
+            calcium: foodLog.calcium || 0,
+            iron: foodLog.iron || 0,
+            image_url: foodLog.image_url || 'https://via.placeholder.com/150',
+            file_key: foodLog.file_key || 'default_file_key',
+            healthiness_rating: foodLog.healthiness_rating || 0,
+            date: foodLog.date || timestamp.split('T')[0],
+            meal_type: foodLog.meal_type || 'snack',
+            brand_name: foodLog.brand_name || '',
+            quantity: foodLog.quantity || '1 serving',
+            notes: foodLog.notes || '',
+            weight: foodLog.weight || null,
+            weight_unit: foodLog.weight_unit || 'g',
+            synced: 0,
+            sync_action: 'create',
+            last_modified: timestamp
+        };
 
+        // Log complete food entry data for debugging
+        console.log('📝 Food entry being added:', JSON.stringify(formattedData, null, 2));
+
+        // Insert into database
         const result = await db.runAsync(
-            `INSERT INTO food_logs (
-                user_id, meal_id, food_name, calories, proteins, carbs, fats,
-                fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
-                trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
-                calcium, iron, weight, weight_unit, image_url, file_key, healthiness_rating,
-                date, meal_type, brand_name, quantity, notes, synced, sync_action, last_modified
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO food_logs 
+          (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
+           fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
+           trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
+           calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
+           brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                user_id,
-                meal_id,
-                food_name,
-                calories,
-                proteins,
-                carbs,
-                fats,
-                fiber,
-                sugar,
-                saturated_fat,
-                polyunsaturated_fat,
-                monounsaturated_fat,
-                trans_fat,
-                cholesterol,
-                sodium,
-                potassium,
-                vitamin_a,
-                vitamin_c,
-                calcium,
-                iron,
-                weight,
-                weight_unit,
-                image_url,
-                file_key,
-                healthiness_rating,
-                formattedDate,
-                meal_type,
-                brand_name,
-                quantity,
-                notes,
-                0, // Not synced
-                'create', // Sync action
-                getCurrentDate()
+                formattedData.meal_id,
+                formattedData.user_id,
+                formattedData.food_name,
+                formattedData.calories,
+                formattedData.proteins,
+                formattedData.carbs,
+                formattedData.fats,
+                formattedData.fiber,
+                formattedData.sugar,
+                formattedData.saturated_fat,
+                formattedData.polyunsaturated_fat,
+                formattedData.monounsaturated_fat,
+                formattedData.trans_fat,
+                formattedData.cholesterol,
+                formattedData.sodium,
+                formattedData.potassium,
+                formattedData.vitamin_a,
+                formattedData.vitamin_c,
+                formattedData.calcium,
+                formattedData.iron,
+                formattedData.image_url,
+                formattedData.file_key,
+                formattedData.healthiness_rating,
+                formattedData.date,
+                formattedData.meal_type,
+                formattedData.brand_name,
+                formattedData.quantity,
+                formattedData.notes,
+                formattedData.weight,
+                formattedData.weight_unit,
+                formattedData.synced,
+                formattedData.sync_action,
+                formattedData.last_modified
             ]
         );
 
-        // Commit the transaction
-        await db.runAsync('COMMIT');
-
-        // Debug: Verify the entry was added by fetching it
-        const addedEntry = await db.getFirstAsync(
+        // After insert, verify the entry was added by directly querying
+        console.log(`✅ Food log inserted with ID ${result.lastInsertRowId}, verifying...`);
+        const verifyEntry = await db.getFirstAsync(
             `SELECT * FROM food_logs WHERE id = ?`,
             [result.lastInsertRowId]
         );
-        console.log('✅ Food log added and verified:', addedEntry ? 'Success' : 'Failed to verify');
+        console.log(`✅ Verification query result:`, verifyEntry ? 'Found' : 'Not found');
 
-        console.log('✅ Food log added successfully with ID', result.lastInsertRowId);
+        // Update user streak after logging food
+        await checkAndUpdateStreak(firebaseUserId);
 
-        // Trigger notification for observers
-        try {
-            await notifyDatabaseChanged();
-        } catch (notifyError) {
-            console.error('⚠️ Error notifying database observers:', notifyError);
-            // Continue anyway - the operation succeeded
-        }
+        // Notify listeners about the data change
+        notifyDatabaseChanged();
 
         return result.lastInsertRowId;
     } catch (error) {
-        // Rollback the transaction in case of error
-        try {
-            await db.runAsync('ROLLBACK');
-        } catch (rollbackError) {
-            console.error('Error during rollback:', rollbackError);
-        }
-
         console.error('❌ Error adding food log:', error);
         throw error;
     }
@@ -454,24 +425,44 @@ export const getFoodLogsByDate = async (date: string) => {
     console.log(`🔍 Looking for food logs with date=${date} and user_id=${firebaseUserId}`);
 
     try {
+        // Debug query: Get ALL food logs regardless of date or user to see what's in the database
+        const allLogs = await db.getAllAsync(`SELECT * FROM food_logs LIMIT 10`);
+        console.log(`📊 DEBUG: Found ${allLogs.length} total food logs in database`);
+        if (allLogs.length > 0) {
+            console.log(`📊 DEBUG: First food log in database:`, JSON.stringify(allLogs[0]));
+        }
+
         // First check if there are any logs for this date
         const countResult = await db.getFirstAsync(
-            `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
-            [date, firebaseUserId]
+            `SELECT COUNT(*) as count FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+            [`${date}%`, firebaseUserId]
         );
         console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${date}`);
 
         // Get all logs for this date
         const result = await db.getAllAsync(
-            `SELECT * FROM food_logs WHERE date = ? AND user_id = ? ORDER BY id DESC`,
-            [date, firebaseUserId]
+            `SELECT * FROM food_logs WHERE date LIKE ? AND user_id = ? ORDER BY id DESC`,
+            [`${date}%`, firebaseUserId]
         );
 
         // Log the first record for debugging
         if (result && result.length > 0) {
-            console.log(`📋 First food log: ${JSON.stringify(result[0])}`);
+            console.log(`📝 First food log: ${JSON.stringify(result[0])}`);
         } else {
             console.log(`📋 No food logs found for date: ${date}`);
+
+            // Try another query without user_id to check if data exists but with wrong user
+            const logsWithoutUser = await db.getAllAsync(
+                `SELECT * FROM food_logs WHERE date LIKE ? LIMIT 5`,
+                [`${date}%`]
+            );
+
+            if (logsWithoutUser && logsWithoutUser.length > 0) {
+                console.log(`📊 DEBUG: Found ${logsWithoutUser.length} logs for date without user filter`);
+                console.log(`📊 DEBUG: First entry:`, JSON.stringify(logsWithoutUser[0]));
+            } else {
+                console.log(`📊 DEBUG: No logs found for date ${date} even without user filter`);
+            }
         }
 
         return result;
@@ -627,57 +618,78 @@ export const getExercisesByDate = async (date: string) => {
 export const addExercise = async (exercise: any) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to add exercise before database initialization');
-        throw new Error('Database not initialized');
-    }
-
-    const firebaseUserId = getCurrentUserId();
-
-    const {
-        user_id = firebaseUserId,
-        exercise_name,
-        calories_burned,
-        duration,
-        date = getCurrentDate(),
-        notes = ''
-    } = exercise;
-
-    // Ensure date is in the correct format (YYYY-MM-DD)
-    let formattedDate = date;
-    if (date) {
-        // If date is already in YYYY-MM-DD format, use it as is
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            formattedDate = date;
-        } else {
-            // Otherwise, try to extract the date part
-            try {
-                const dateObj = new Date(date);
-                formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-            } catch (error) {
-                console.error('❌ Error formatting date:', error);
-                // Fall back to current date if parsing fails
-                formattedDate = getCurrentDate().split('T')[0];
+        try {
+            await initDatabase();
+            if (!global.dbInitialized) {
+                throw new Error('Failed to initialize database');
             }
+        } catch (initError) {
+            console.error('❌ Failed to auto-initialize database:', initError);
+            throw new Error('Database not initialized and auto-init failed');
         }
     }
 
+    // Get current user ID from Firebase
+    const firebaseUserId = getCurrentUserId();
+
+    const now = new Date().toISOString();
+
     try {
+        // Query for user ID
+        const userIdResult = await db.getFirstAsync(
+            `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUserId]
+        );
+
+        // If user not found, use default
+        const userId = userIdResult?.id || 1;
+
+        // Ensure date is set if not already
+        const date = exercise.date || now;
+
+        console.log('📊 Preparing to add exercise into database:', {
+            exercise_name: exercise.exercise_name,
+            calories_burned: exercise.calories_burned,
+            duration: exercise.duration,
+            userId
+        });
+
         const result = await db.runAsync(
             `INSERT INTO exercises (
-        user_id, exercise_name, calories_burned, duration,
-        date, notes, synced, sync_action, last_modified
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                user_id, exercise_name, calories_burned, duration, 
+                date, notes, synced, sync_action, last_modified
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                user_id,
-                exercise_name,
-                calories_burned,
-                duration,
-                formattedDate,
-                notes,
-                0, // not synced
-                'create', // sync action
-                getCurrentDate()
+                userId,
+                exercise.exercise_name,
+                exercise.calories_burned || 0,
+                exercise.duration || 0,
+                date,
+                exercise.notes || '',
+                0, // Not synced by default
+                'create', // Default action is create
+                now // Last modified timestamp
             ]
         );
+
+        console.log('✅ Exercise added successfully:', result);
+
+        // Emit change notification
+        notifyDatabaseChanged();
+
+        // Check and update streak for the user
+        if (firebaseUserId && firebaseUserId !== 'anonymous') {
+            // Using setTimeout to prevent blocking the main thread
+            setTimeout(async () => {
+                try {
+                    await checkAndUpdateStreak(firebaseUserId);
+                } catch (error) {
+                    console.error('❌ Error updating streak after exercise:', error);
+                }
+            }, 100);
+        }
+
         return result.lastInsertRowId;
     } catch (error) {
         console.error('❌ Error adding exercise:', error);
@@ -1351,4 +1363,270 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
         console.error('❌ Error updating user goals:', error);
         throw error;
     }
+};
+
+// Get user's current streak
+export const getUserStreak = async (firebaseUid: string): Promise<number> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get user streak before database initialization');
+        return 0;
+    }
+
+    try {
+        // First check if user_streaks table exists
+        const tableExists = await db.getFirstAsync(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='user_streaks'`
+        );
+
+        // If table doesn't exist yet, check for activity instead
+        if (!tableExists) {
+            console.log('⚠️ user_streaks table does not exist yet, checking for activity');
+            // Check if there's activity for today
+            const hasActivity = await hasActivityForToday(firebaseUid);
+            // If they have activity today but no streak table, they're on day 1
+            return hasActivity ? 1 : 0;
+        }
+
+        // Check if user has an entry in the user_streaks table
+        const streak = await db.getFirstAsync(
+            `SELECT current_streak FROM user_streaks WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        // If no streak record found, check if they have activity today
+        if (!streak) {
+            // Check if there's activity for today
+            const hasActivity = await hasActivityForToday(firebaseUid);
+            // If they have activity today but no streak record, they're on day 1
+            return hasActivity ? 1 : 0;
+        }
+
+        return streak.current_streak || 0;
+    } catch (error) {
+        console.error('❌ Error getting user streak:', error);
+        return 0;
+    }
+};
+
+// Check and update user streak based on current activity
+export const checkAndUpdateStreak = async (firebaseUid: string): Promise<number> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to update streak before database initialization');
+        return 0;
+    }
+
+    try {
+        // First check if user_streaks table exists
+        const tableExists = await db.getFirstAsync(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='user_streaks'`
+        );
+
+        // If table doesn't exist yet, create it
+        if (!tableExists) {
+            console.log('⚠️ Creating user_streaks table...');
+            await db.execAsync(`
+                CREATE TABLE IF NOT EXISTS user_streaks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    firebase_uid TEXT UNIQUE NOT NULL,
+                    current_streak INTEGER DEFAULT 0,
+                    longest_streak INTEGER DEFAULT 0,
+                    last_activity_date TEXT,
+                    synced INTEGER DEFAULT 0,
+                    sync_action TEXT DEFAULT 'create',
+                    last_modified TEXT NOT NULL
+                )
+            `);
+        }
+
+        // Get the current date (YYYY-MM-DD)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split('T')[0];
+
+        // Yesterday's date
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        // Check if user has a streak record
+        const streakRecord = await db.getFirstAsync(
+            `SELECT * FROM user_streaks WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        let currentStreak = 0;
+        let longestStreak = 0;
+        let lastActivityDate = null;
+
+        if (streakRecord) {
+            currentStreak = streakRecord.current_streak || 0;
+            longestStreak = streakRecord.longest_streak || 0;
+            lastActivityDate = streakRecord.last_activity_date;
+        }
+
+        // If last activity was today, no need to update
+        if (lastActivityDate === todayStr) {
+            return currentStreak;
+        }
+
+        // If last activity was yesterday, increment streak
+        if (lastActivityDate === yesterdayStr) {
+            currentStreak += 1;
+            // Update longest streak if current is higher
+            if (currentStreak > longestStreak) {
+                longestStreak = currentStreak;
+            }
+        }
+        // If last activity was before yesterday, reset streak to 1
+        else if (lastActivityDate && lastActivityDate !== todayStr) {
+            currentStreak = 1;
+        }
+        // If no prior activity, start streak at 1
+        else {
+            currentStreak = 1;
+        }
+
+        // Get current timestamp
+        const now = new Date().toISOString();
+
+        // If user has a streak record, update it
+        if (streakRecord) {
+            await db.runAsync(
+                `UPDATE user_streaks 
+                SET current_streak = ?, longest_streak = ?, last_activity_date = ?, 
+                sync_action = 'update', last_modified = ?
+                WHERE firebase_uid = ?`,
+                [currentStreak, longestStreak, todayStr, now, firebaseUid]
+            );
+        }
+        // Otherwise, create a new streak record
+        else {
+            await db.runAsync(
+                `INSERT INTO user_streaks 
+                (firebase_uid, current_streak, longest_streak, last_activity_date, sync_action, last_modified) 
+                VALUES (?, ?, ?, ?, ?, ?)`,
+                [firebaseUid, currentStreak, longestStreak, todayStr, 'create', now]
+            );
+        }
+
+        return currentStreak;
+    } catch (error) {
+        console.error('❌ Error updating streak:', error);
+        return 0;
+    }
+};
+
+// Check if user has any activity for the current day
+export const hasActivityForToday = async (firebaseUid: string): Promise<boolean> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to check activity before database initialization');
+        return false;
+    }
+
+    try {
+        // Get the current date (YYYY-MM-DD)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split('T')[0];
+
+        // Try to get the user's ID from the profile table
+        let userId: any = null;
+        try {
+            const userProfile = await db.getFirstAsync(
+                `SELECT id FROM user_profiles WHERE firebase_uid = ? LIMIT 1`,
+                [firebaseUid]
+            );
+            userId = userProfile?.id;
+        } catch (error) {
+            console.log(`No user profile found for ${firebaseUid}, using firebase_uid directly`);
+        }
+
+        // If we couldn't get a user ID, use the firebase UID directly
+        if (!userId) {
+            // Check for food logs today using firebase_uid directly
+            const foodLog = await db.getFirstAsync(
+                `SELECT id FROM food_logs WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
+                [firebaseUid]
+            );
+
+            if (foodLog) {
+                return true;
+            }
+
+            // Check for exercises today using firebase_uid directly
+            const exercise = await db.getFirstAsync(
+                `SELECT id FROM exercises WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
+                [firebaseUid]
+            );
+
+            if (exercise) {
+                return true;
+            }
+        } else {
+            // Check for food logs today
+            const foodLog = await db.getFirstAsync(
+                `SELECT id FROM food_logs WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
+                [userId]
+            );
+
+            if (foodLog) {
+                return true;
+            }
+
+            // Check for exercises today
+            const exercise = await db.getFirstAsync(
+                `SELECT id FROM exercises WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
+                [userId]
+            );
+
+            if (exercise) {
+                return true;
+            }
+        }
+
+        return false;
+    } catch (error) {
+        console.error('❌ Error checking daily activity:', error);
+        return false;
+    }
+};
+
+// Get unsynced streak records for server sync
+export const getUnsyncedStreaks = async (): Promise<any[]> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get unsynced streaks before database initialization');
+        return [];
+    }
+
+    try {
+        const streaks = await db.getAllAsync(
+            `SELECT * FROM user_streaks WHERE synced = 0`
+        );
+        return streaks || [];
+    } catch (error) {
+        console.error('❌ Error getting unsynced streaks:', error);
+        return [];
+    }
+};
+
+// Mark streak record as synced
+export const markStreakSynced = async (firebaseUid: string): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to mark streak as synced before database initialization');
+        return;
+    }
+
+    try {
+        await db.runAsync(
+            `UPDATE user_streaks SET synced = 1 WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+    } catch (error) {
+        console.error('❌ Error marking streak as synced:', error);
+    }
+};
+
+// Export all database functions
+export {
+    // ... existing exports
 }; 

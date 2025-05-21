@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 3; // Increment this to version 3
+const CURRENT_VERSION = 4; // Increment this to version 4
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -65,6 +65,24 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                                 user_id INTEGER DEFAULT 1,
                                 date TEXT NOT NULL,
                                 count INTEGER NOT NULL DEFAULT 0,
+                                synced INTEGER DEFAULT 0,
+                                sync_action TEXT DEFAULT 'create',
+                                last_modified TEXT NOT NULL
+                            )
+                        `);
+                    }
+                },
+                // Migration to version 4 - Add user_streaks table
+                async () => {
+                    if (currentVersion < 4) {
+                        console.log('Migrating to version 4: Creating user_streaks table');
+                        await db.execAsync(`
+                            CREATE TABLE IF NOT EXISTS user_streaks (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                firebase_uid TEXT UNIQUE NOT NULL,
+                                current_streak INTEGER DEFAULT 0,
+                                longest_streak INTEGER DEFAULT 0,
+                                last_activity_date TEXT,
                                 synced INTEGER DEFAULT 0,
                                 sync_action TEXT DEFAULT 'create',
                                 last_modified TEXT NOT NULL

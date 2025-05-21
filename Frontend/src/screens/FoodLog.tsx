@@ -26,7 +26,7 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise } from '../utils/database';
+import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -136,6 +136,7 @@ const DiaryScreen: React.FC = () => {
     const { user } = useAuth();
     const [nutritionGoals, setNutritionGoals] = useState(getDefaultNutritionGoals());
     const [profileLoading, setProfileLoading] = useState(true);
+    const [userStreak, setUserStreak] = useState(0);
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -203,8 +204,13 @@ const DiaryScreen: React.FC = () => {
 
     // Add a function to trigger refresh
     const refreshMealData = () => {
-        console.log('refreshMealData called - incrementing refreshTrigger');
+        console.log('Refreshing meal data and checking streak...');
         setRefreshTrigger(prev => prev + 1);
+
+        // Also check and update streak if user has activity
+        if (user?.uid) {
+            checkAndUpdateUserStreak(user.uid);
+        }
     };
 
     // Add a special useEffect for handling focus events with a slight delay
@@ -325,7 +331,7 @@ const DiaryScreen: React.FC = () => {
 
                 // Format the current date to match the database format (YYYY-MM-DD)
                 const formattedDate = formatDateToString(currentDate);
-                console.log('Fetching meals for date:', formattedDate);
+                console.log('Fetching meals for date:', formattedDate, 'Raw date object:', currentDate);
 
                 // Check if database is ready
                 if (!isDatabaseReady()) {
@@ -342,10 +348,17 @@ const DiaryScreen: React.FC = () => {
                 setMealData(defaultMeals);
 
                 // Try to get data from local SQLite database
-                console.log('Fetching from local SQLite database...');
+                console.log('Fetching from local SQLite database for date:', formattedDate);
                 try {
                     const localData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
                     console.log('Local meal data found:', localData.length, 'entries');
+
+                    // Debug: Print all found entries
+                    if (localData && localData.length > 0) {
+                        localData.forEach((entry, idx) => {
+                            console.log(`Entry ${idx + 1}:`, entry.food_name, 'Date:', entry.date, 'Meal type:', entry.meal_type);
+                        });
+                    }
 
                     // Store local data in a ref for later use
                     localMealDataRef.current = localData;
@@ -1598,9 +1611,9 @@ const DiaryScreen: React.FC = () => {
             console.log('🔧 Using user ID:', userId);
 
             const testEntry = {
-                meal_id: 1,
+                meal_id: Math.floor(Math.random() * 1000000), // Random ID to ensure uniqueness
                 user_id: userId, // Use the same user ID as when querying
-                food_name: 'Test Food Entry',
+                food_name: `Test Food Entry ${new Date().toLocaleTimeString()}`,
                 calories: 500,
                 proteins: 20,
                 carbs: 30,
@@ -1617,6 +1630,7 @@ const DiaryScreen: React.FC = () => {
 
             // Refresh data after adding test entry
             setTimeout(() => {
+                console.log('🔄 Triggering refresh after adding test entry');
                 refreshMealData();
             }, 500);
 
@@ -1632,27 +1646,32 @@ const DiaryScreen: React.FC = () => {
     const debugQueryDatabase = async () => {
         try {
             console.log('🔍 Directly querying database for food logs');
-            const { db } = require('../utils/database');
+            const { db, getCurrentUserId } = require('../utils/database');
 
             if (!db || !global.dbInitialized) {
                 Alert.alert('Debug', 'Database is not initialized!');
                 return;
             }
 
+            // Get current Firebase user ID
+            const firebaseUserId = getCurrentUserId();
+            console.log('🔍 Current Firebase User ID:', firebaseUserId);
+
             // Get current date in YYYY-MM-DD format
             const today = formatDateToString(new Date());
+            console.log('🔍 Current date format:', today);
 
             // Query all tables to check structure
             const tables = await db.getAllAsync(
                 `SELECT name FROM sqlite_master WHERE type='table'`
             );
-            console.log('🔍 Database tables:', tables);
+            console.log('🔍 Database tables:', tables.map(t => t.name).join(', '));
 
             // Check food_logs table structure
             const columns = await db.getAllAsync(
                 `PRAGMA table_info(food_logs)`
             );
-            console.log('🔍 Food logs table columns:', columns);
+            console.log('🔍 Food logs table columns:', columns.map(c => c.name).join(', '));
 
             // Query all food logs regardless of date or user
             const allLogs = await db.getAllAsync(
@@ -1661,23 +1680,77 @@ const DiaryScreen: React.FC = () => {
             console.log('🔍 All food logs in database:', allLogs.length);
             if (allLogs.length > 0) {
                 console.log('🔍 First food log:', JSON.stringify(allLogs[0]));
+
+                // Count distinct user_ids in food_logs
+                const userIds = [...new Set(allLogs.map(log => log.user_id))];
+                console.log('🔍 Distinct user_ids in food_logs:', userIds);
             }
 
             // Query food logs for today
             const todayLogs = await db.getAllAsync(
-                `SELECT * FROM food_logs WHERE date = ?`,
-                [today]
+                `SELECT * FROM food_logs WHERE date LIKE ?`,
+                [`${today}%`]
             );
             console.log(`🔍 Food logs for today (${today}):`, todayLogs.length);
 
+            // Query logs specifically for current user
+            const userLogs = await db.getAllAsync(
+                `SELECT * FROM food_logs WHERE user_id = ?`,
+                [firebaseUserId]
+            );
+            console.log(`🔍 Food logs for current user (${firebaseUserId}):`, userLogs.length);
+
+            // Query with both filters
+            const userTodayLogs = await db.getAllAsync(
+                `SELECT * FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+                [`${today}%`, firebaseUserId]
+            );
+            console.log(`🔍 Food logs for today AND current user:`, userTodayLogs.length);
+
             Alert.alert('Debug Database',
-                `Found ${allLogs.length} total logs\n${todayLogs.length} logs for today (${today})`
+                `Found ${allLogs.length} total logs\n${todayLogs.length} logs for today (${today})\n${userLogs.length} logs for current user\n${userTodayLogs.length} logs matching both`
             );
         } catch (error) {
             console.error('🔍 Error querying database:', error);
             Alert.alert('Debug Error', `Failed to query database: ${error.message}`);
         }
     };
+
+    // Function to check and update the user's streak
+    const checkAndUpdateUserStreak = async (firebaseUid: string) => {
+        try {
+            // Check if user has activity for today
+            const hasActivity = await hasActivityForToday(firebaseUid);
+
+            if (hasActivity) {
+                // Update streak and get the new value
+                const newStreak = await checkAndUpdateStreak(firebaseUid);
+                setUserStreak(newStreak);
+            } else {
+                // Just get the current streak without updating
+                const currentStreak = await getUserStreak(firebaseUid);
+                setUserStreak(currentStreak);
+            }
+        } catch (error) {
+            console.error('Error updating streak:', error);
+        }
+    };
+
+    // Add useEffect to load streak on component mount
+    useEffect(() => {
+        if (user?.uid) {
+            getUserStreak(user.uid)
+                .then(streak => setUserStreak(streak))
+                .catch(error => console.error('Error loading streak:', error));
+        }
+    }, [user]);
+
+    // Add useEffect to check for streak update when food is logged
+    useEffect(() => {
+        if (user?.uid && refreshTrigger > 0) {
+            checkAndUpdateUserStreak(user.uid);
+        }
+    }, [refreshTrigger, user]);
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -1690,7 +1763,7 @@ const DiaryScreen: React.FC = () => {
                             <View style={styles.headerRight}>
                                 <TouchableOpacity onPress={toggleStreakInfo} style={styles.streakButton}>
                                     <MaskedView
-                                        maskElement={<Text style={styles.streakNumber}>7</Text>}
+                                        maskElement={<Text style={styles.streakNumber}>{userStreak}</Text>}
                                     >
                                         <LinearGradient
                                             colors={["#0074dd", "#5c00dd", "#dd0095"]}
@@ -1713,7 +1786,7 @@ const DiaryScreen: React.FC = () => {
                                 {showStreakInfo && (
                                     <View style={styles.streakInfo}>
                                         <View style={styles.streakInfoArrow} />
-                                        <Text style={styles.streakInfoText}>This is your streak count. Keep logging daily to maintain your streak!</Text>
+                                        <Text style={styles.streakInfoText}>You've logged activities for {userStreak} {userStreak === 1 ? 'day' : 'days'} in a row. Keep it up!</Text>
                                     </View>
                                 )}
                                 {/* New icon button */}
