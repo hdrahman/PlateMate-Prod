@@ -7,6 +7,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from 'react-native-svg';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { handleTakePhoto } from './src/screens/Camera';
 import { initDatabase } from './src/utils/database';
 import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
@@ -392,19 +393,21 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <AuthProvider>
-        <OnboardingProvider>
-          <ThemeProvider>
-            <StepProvider>
-              <FavoritesProvider>
-                <FoodLogProvider>
-                  <AppNavigator />
-                </FoodLogProvider>
-              </FavoritesProvider>
-            </StepProvider>
-          </ThemeProvider>
-        </OnboardingProvider>
-      </AuthProvider>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <OnboardingProvider>
+            <ThemeProvider>
+              <StepProvider>
+                <FavoritesProvider>
+                  <FoodLogProvider>
+                    <AppNavigator />
+                  </FoodLogProvider>
+                </FavoritesProvider>
+              </StepProvider>
+            </ThemeProvider>
+          </OnboardingProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
     </>
   );
 }

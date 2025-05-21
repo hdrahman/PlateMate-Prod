@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserGoals, updateUserGoals } from '../utils/database'; // Local database functions
-import { updateNutritionGoals, updateFitnessGoals, getProfile } from '../api/profileApi'; // Backend API functions
+import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
 
 // Constants for colors - matching EditProfile
@@ -143,46 +143,11 @@ export default function EditGoals() {
             setIsFetchingData(true);
             try {
                 if (user) {
-                    // First, get user profile to check unit preference
-                    await fetchUserProfile();
-
-                    // Get user goals from local database
+                    // First, get user goals from local database (fast)
                     const userData = await getUserGoals(user.uid);
 
-                    // Also try to get nutrition goals from backend
-                    try {
-                        const profileData = await getProfile();
-                        if (profileData && profileData.nutrition_goals) {
-                            // If we have backend data for target weight, use it
-                            const targetWeight = profileData.nutrition_goals.target_weight;
-
-                            // Set default values if any data is missing
-                            const goals = {
-                                targetWeight: targetWeight || userData?.targetWeight || 0,
-                                calorieGoal: profileData.nutrition_goals.daily_calorie_goal || userData?.calorieGoal || 0,
-                                proteinGoal: profileData.nutrition_goals.protein_goal || userData?.proteinGoal || 0,
-                                carbGoal: profileData.nutrition_goals.carb_goal || userData?.carbGoal || 0,
-                                fatGoal: profileData.nutrition_goals.fat_goal || userData?.fatGoal || 0,
-                                fitnessGoal: profileData.nutrition_goals.weight_goal?.startsWith('lose') ? 'lose' :
-                                    profileData.nutrition_goals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
-                                activityLevel: profileData.nutrition_goals.activity_level || userData?.activityLevel || 'moderate',
-                                weeklyWorkouts: userData?.weeklyWorkouts || 0,
-                                stepGoal: userData?.stepGoal || 0,
-                                waterGoal: userData?.waterGoal || 0,
-                                sleepGoal: userData?.sleepGoal || 0
-                            };
-
-                            // Update both database values and form values
-                            setDbGoals(goals);
-                            setFormValues({ ...goals });
-                            return;
-                        }
-                    } catch (backendError) {
-                        console.error('Failed to get goals from backend, using local data', backendError);
-                    }
-
-                    // If we get here, we're using local data only
-                    const goals = {
+                    // Set initial values from local database immediately
+                    const localGoals = {
                         targetWeight: userData?.targetWeight || 0,
                         calorieGoal: userData?.calorieGoal || 0,
                         proteinGoal: userData?.proteinGoal || 0,
@@ -196,14 +161,58 @@ export default function EditGoals() {
                         sleepGoal: userData?.sleepGoal || 0
                     };
 
-                    // Update both database values and form values
-                    setDbGoals(goals);
-                    setFormValues({ ...goals });
+                    // Update both database values and form values with local data first
+                    setDbGoals(localGoals);
+                    setFormValues({ ...localGoals });
+                    setIsFetchingData(false);
+
+                    // In parallel, try to get user profile to check unit preference
+                    fetchUserProfile().catch(error => {
+                        console.warn('Error fetching user profile for units', error);
+                    });
+
+                    // Then try to get nutrition goals from backend (might be slower)
+                    try {
+                        // Set a timeout for the API call
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Request timeout')), 5000)
+                        );
+
+                        const profilePromise = getProfile();
+                        const profileData = await Promise.race([profilePromise, timeoutPromise]) as CompleteProfile;
+
+                        if (profileData && profileData.nutrition_goals) {
+                            // If we have backend data for target weight, use it
+                            const targetWeight = profileData.nutrition_goals.target_weight;
+
+                            // Set default values if any data is missing
+                            const backendGoals = {
+                                targetWeight: targetWeight || userData?.targetWeight || 0,
+                                calorieGoal: profileData.nutrition_goals.daily_calorie_goal || userData?.calorieGoal || 0,
+                                proteinGoal: profileData.nutrition_goals.protein_goal || userData?.proteinGoal || 0,
+                                carbGoal: profileData.nutrition_goals.carb_goal || userData?.carbGoal || 0,
+                                fatGoal: profileData.nutrition_goals.fat_goal || userData?.fatGoal || 0,
+                                fitnessGoal: profileData.nutrition_goals.weight_goal?.startsWith('lose') ? 'lose' :
+                                    profileData.nutrition_goals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
+                                activityLevel: profileData.nutrition_goals.activity_level || userData?.activityLevel || 'moderate',
+                                weeklyWorkouts: profileData.fitness_goals?.weekly_workouts || userData?.weeklyWorkouts || 0,
+                                stepGoal: profileData.fitness_goals?.daily_step_goal || userData?.stepGoal || 0,
+                                waterGoal: profileData.fitness_goals?.water_intake_goal || userData?.waterGoal || 0,
+                                sleepGoal: userData?.sleepGoal || 0
+                            };
+
+                            // Update with backend data if available (not blocking UI)
+                            setDbGoals(backendGoals);
+                            setFormValues({ ...backendGoals });
+                        }
+                    } catch (backendError) {
+                        console.warn('Failed to get goals from backend, using local data', backendError);
+                        // No action needed since we already set local data
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching user goals', error);
                 Alert.alert('Error', 'Failed to load your goals. Please try again.');
-            } finally {
                 setIsFetchingData(false);
             }
         };

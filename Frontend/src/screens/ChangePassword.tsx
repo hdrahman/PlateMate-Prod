@@ -5,11 +5,12 @@ import {
     TextInput,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
-    StatusBar,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Platform,
+    StatusBar as RNStatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
@@ -92,8 +93,11 @@ export default function ChangePassword() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView
+            style={styles.container}
+            edges={['top']}
+        >
+            <RNStatusBar barStyle="light-content" />
 
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
