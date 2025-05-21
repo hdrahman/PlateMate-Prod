@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Boolean, JSON, Enum
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Boolean, JSON, Enum, Table
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from DB import Base
@@ -7,6 +7,7 @@ import enum
 class Gender(enum.Enum):
     male = "male"
     female = "female"
+    other = "other"
 
 class ActivityLevel(enum.Enum):
     sedentary = "sedentary"
@@ -16,11 +17,11 @@ class ActivityLevel(enum.Enum):
     very_active = "very_active"
 
 class WeightGoal(enum.Enum):
+    lose = "lose"
     lose_extreme = "lose_extreme"
-    lose_heavy = "lose_heavy"
+    lose_heavy = "lose_heavy"  
     lose_moderate = "lose_moderate"
     lose_light = "lose_light"
-    lose = "lose"
     maintain = "maintain"
     gain = "gain"
     gain_light = "gain_light"
@@ -44,10 +45,12 @@ class User(Base):
     age = Column(Integer, nullable=True)
     gender = Column(Enum(Gender), nullable=True)
     activity_level = Column(Enum(ActivityLevel), nullable=True)
-    
-    # Basic health & fitness goals
     weight_goal = Column(Enum(WeightGoal), nullable=True)
-    target_weight = Column(Float, nullable=True)  # in kg
+    target_weight = Column(Float, nullable=True)  # stored in kg
+    date_of_birth = Column(DateTime, nullable=True)
+    location = Column(String, nullable=True)
+    is_imperial_units = Column(Boolean, default=False)
+    profile_image_url = Column(String, nullable=True)
     
     # System fields
     created_at = Column(DateTime, default=func.now())
@@ -56,6 +59,88 @@ class User(Base):
     # Relationships
     food_logs = relationship("FoodLog", back_populates="user")
     exercises = relationship("Exercise", back_populates="user")
+    nutrition_goals = relationship("NutritionGoals", back_populates="user", uselist=False)
+    fitness_goals = relationship("FitnessGoals", back_populates="user", uselist=False)
+    gamification = relationship("UserGamification", back_populates="user", uselist=False)
+    achievements = relationship("UserAchievement", back_populates="user")
+
+    def calculate_age(self):
+        """Calculate user's age from date_of_birth if available."""
+        if not self.date_of_birth:
+            return None
+        
+        from datetime import datetime
+        today = datetime.now()
+        born = self.date_of_birth
+        age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+        return age
+
+class NutritionGoals(Base):
+    __tablename__ = "nutrition_goals"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    target_weight = Column(Float, nullable=True)
+    daily_calorie_goal = Column(Integer, nullable=True)
+    protein_goal = Column(Integer, nullable=True)
+    carb_goal = Column(Integer, nullable=True)
+    fat_goal = Column(Integer, nullable=True)
+    weight_goal = Column(Enum(WeightGoal), nullable=True)
+    activity_level = Column(Enum(ActivityLevel), nullable=True)
+    
+    # Relationship with User
+    user = relationship("User", back_populates="nutrition_goals")
+
+class FitnessGoals(Base):
+    __tablename__ = "fitness_goals"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    weekly_workouts = Column(Integer, nullable=True)
+    daily_step_goal = Column(Integer, nullable=True)
+    water_intake_goal = Column(Integer, nullable=True)  # in ml
+    
+    # Relationship with User
+    user = relationship("User", back_populates="fitness_goals")
+
+class UserGamification(Base):
+    __tablename__ = "user_gamification"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    level = Column(Integer, default=1)
+    xp = Column(Integer, default=0)
+    xp_to_next_level = Column(Integer, default=100)
+    rank = Column(String, default="Beginner")
+    streak_days = Column(Integer, default=0)
+    last_activity_date = Column(DateTime, default=func.now())
+    
+    # Relationship with User
+    user = relationship("User", back_populates="gamification")
+
+class Achievement(Base):
+    __tablename__ = "achievements"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    icon = Column(String, nullable=True)
+    xp_reward = Column(Integer, default=50)
+    
+    # Relationship with UserAchievement
+    users = relationship("UserAchievement", back_populates="achievement")
+
+class UserAchievement(Base):
+    __tablename__ = "user_achievements"
+    
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), primary_key=True)
+    completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="achievements")
+    achievement = relationship("Achievement", back_populates="users")
 
 class FoodLog(Base):
     __tablename__ = "food_logs"

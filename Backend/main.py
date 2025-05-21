@@ -1,12 +1,27 @@
-from fastapi import FastAPI, Request, BackgroundTasks, Depends
+from fastapi import FastAPI, Request, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
-from dotenv import load_dotenv
 import time
 import asyncio
 from sqlalchemy.orm import Session
+
+# Import and run env_check before loading dotenv
+try:
+    from utils.env_check import check_env_file
+    if check_env_file():
+        print("✅ Environment file check completed successfully")
+    else:
+        print("⚠️ Environment file check failed - there may be issues loading environment variables")
+except Exception as e:
+    print(f"⚠️ Error running environment file check: {e}")
+    print(traceback.format_exc())
+
+# Now load environment variables after fixing any issues
+from dotenv import load_dotenv
+load_dotenv()
+
 from DB import get_db
 
 from routes.image import router as image_router
@@ -16,9 +31,7 @@ from routes.exercises import router as exercises_router  # Include exercises rou
 from routes.arli_ai import router as arli_ai_router  # Include Arli AI router
 from routes.users import router as users_router  # Include users router
 from routes.fatsecret import router as fatsecret_router  # Include FatSecret router
-
-# Load environment variables
-load_dotenv()
+from routes.profile import router as profile_router  # Include profile router
 
 app = FastAPI()
 
@@ -61,6 +74,19 @@ async def startup_event():
         else:
             print("⚠️ Firebase Admin SDK initialization failed. Authentication will not work properly.")
             print("   Please ensure firebase-admin-sdk.json is available or set FIREBASE_CREDENTIALS_JSON env variable.")
+        
+        # Initialize database schema
+        try:
+            from utils.schema_init import init_schema
+            
+            print("🔄 Initializing database schema...")
+            if init_schema():
+                print("✅ Database schema initialization completed successfully")
+            else:
+                print("⚠️ Database schema initialization failed")
+        except Exception as e:
+            print(f"❌ Error during database schema initialization: {e}")
+            print(traceback.format_exc())
             
         # Run initial database sync on startup
         try:
@@ -111,6 +137,7 @@ app.include_router(exercises_router, tags=['exercises'])  # Include exercises ro
 app.include_router(arli_ai_router, prefix='/arli', tags=['arli_ai'])  # Include Arli AI router
 app.include_router(users_router, prefix='/users', tags=['users'])  # Include users router
 app.include_router(fatsecret_router, prefix='/api', tags=['fatsecret'])  # Include FatSecret router
+app.include_router(profile_router, prefix='/profile', tags=['profile'])  # Include profile router
 
 @app.get("/")
 def home():
@@ -134,3 +161,8 @@ async def manual_sync(background_tasks: BackgroundTasks, db: Session = Depends(g
     background_tasks.add_task(run_sync)
     
     return {"message": "Database synchronization started in the background"}
+
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint for network connectivity testing"""
+    return {"status": "ok", "message": "Server is running"}

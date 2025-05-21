@@ -56,8 +56,8 @@ The backend includes tools to help troubleshoot authentication issues:
 ## API Documentation
 
 Once the server is running, you can access the API documentation at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://192.168.0.160:8000/docs
+- ReDoc: http://192.168.0.160:8000/redoc
 
 ## Troubleshooting
 
