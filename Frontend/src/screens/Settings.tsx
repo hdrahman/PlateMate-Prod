@@ -29,63 +29,102 @@ const SettingsScreen = () => {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Settings</Text>
             </View>
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Appearance</Text>
-                    <View style={styles.itemRow}>
-                        <Text style={styles.itemText}>Dark Mode</Text>
-                        <Switch value={isDarkTheme} onValueChange={toggleTheme} />
+                    <View style={styles.card}>
+                        <View style={styles.itemRow}>
+                            <View style={styles.iconTextContainer}>
+                                <View style={[styles.iconBubble, { backgroundColor: '#9B00FF30' }]}>
+                                    <Ionicons name="moon-outline" size={20} color="#9B00FF" />
+                                </View>
+                                <Text style={styles.itemText}>Dark Mode</Text>
+                            </View>
+                            <Switch
+                                value={isDarkTheme}
+                                onValueChange={toggleTheme}
+                                trackColor={{ false: "#3e3e3e", true: "#9B00FF40" }}
+                                thumbColor={isDarkTheme ? "#9B00FF" : "#f4f3f4"}
+                                ios_backgroundColor="#3e3e3e"
+                            />
+                        </View>
                     </View>
                 </View>
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Account</Text>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditProfile")}>
-                        <Ionicons name="person-circle-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Edit Profile</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("EditGoals")}>
-                        <Ionicons name="fitness-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Edit Goals</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PremiumSubscription")}>
-                        <Ionicons name="star-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Premium Subscription</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("ChangePassword")}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Change Password</Text>
-                    </TouchableOpacity>
+                    <View style={styles.card}>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditProfile")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#4A90E230' }]}>
+                                <Ionicons name="person-circle-outline" size={20} color="#4A90E2" />
+                            </View>
+                            <Text style={styles.itemText}>Edit Profile</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditGoals")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#50C87830' }]}>
+                                <Ionicons name="fitness-outline" size={20} color="#50C878" />
+                            </View>
+                            <Text style={styles.itemText}>Edit Goals</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PremiumSubscription")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#FFD70030' }]}>
+                                <Ionicons name="star-outline" size={20} color="#FFD700" />
+                            </View>
+                            <Text style={styles.itemText}>Premium Subscription</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("ChangePassword")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#9B00FF30' }]}>
+                                <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" />
+                            </View>
+                            <Text style={styles.itemText}>Change Password</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Privacy & Security</Text>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("Notifications")}>
-                        <Ionicons name="notifications-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Notifications</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DataSharing")}>
-                        <Ionicons name="share-social-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Data Sharing</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("PrivacyPolicy")}>
-                        <Ionicons name="document-text-outline" size={20} color="#FFF" style={styles.icon} />
-                        <Text style={styles.itemText}>Privacy Policy</Text>
-                    </TouchableOpacity>
+                    <View style={styles.card}>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("Notifications")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#FF700030' }]}>
+                                <Ionicons name="notifications-outline" size={20} color="#FF7000" />
+                            </View>
+                            <Text style={styles.itemText}>Notifications</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DataSharing")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#00BFFF30' }]}>
+                                <Ionicons name="share-social-outline" size={20} color="#00BFFF" />
+                            </View>
+                            <Text style={styles.itemText}>Data Sharing</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("PrivacyPolicy")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#C0C0C030' }]}>
+                                <Ionicons name="document-text-outline" size={20} color="#C0C0C0" />
+                            </View>
+                            <Text style={styles.itemText}>Privacy Policy</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <View style={[styles.section, styles.bottomSection]}>
-                    <TouchableOpacity style={[styles.item, styles.fullWidthItem]} onPress={() => navigation.navigate("DeleteAccount")}>
-                        <Ionicons name="trash-outline" size={20} color="#FF4C4C" style={styles.icon} />
-                        <Text style={[styles.itemText, styles.dangerText]}>Delete Account</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.item, styles.fullWidthItem]}
-                        onPress={handleLogout}
-                    >
-                        <Ionicons name="log-out-outline" size={20} color="#FF4C4C" style={styles.icon} />
-                        <Text style={[styles.itemText, styles.dangerText]}>Log Out</Text>
-                    </TouchableOpacity>
+                    <View style={styles.logoutContainer}>
+                        <TouchableOpacity
+                            style={styles.logoutButton}
+                            onPress={handleLogout}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.logoutContent}>
+                                <Ionicons name="log-out-outline" size={22} color="#FFF" style={styles.logoutIcon} />
+                                <Text style={styles.logoutText}>Log Out</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -95,10 +134,10 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#000", // Ensures smooth transition
+        backgroundColor: "#121212",
     },
     dark: {
-        backgroundColor: "#000",
+        backgroundColor: "#121212",
     },
     light: {
         backgroundColor: "#1E1E1E",
@@ -108,9 +147,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
         height: 60,
         borderBottomWidth: 1,
-        borderBottomColor: "#444",
+        borderBottomColor: "#333",
         paddingHorizontal: 16,
-        // Removed backgroundColor to use dynamic styling
     },
     backButton: {
         padding: 5,
@@ -123,48 +161,99 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
-        paddingBottom: 40, // Add bottom padding for scrolling
+        paddingBottom: 40,
     },
     section: {
-        marginBottom: 30,
+        marginBottom: 24,
     },
     bottomSection: {
-        marginBottom: 10, // Reduced space after the last section
+        marginTop: 10,
+        marginBottom: 20,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: "600",
         color: "#9B00FF",
-        marginBottom: 10,
+        marginBottom: 12,
+        marginLeft: 4,
+    },
+    card: {
+        backgroundColor: "#1E1E1E",
+        borderRadius: 16,
+        overflow: "hidden",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: "#333",
+    },
+    iconTextContainer: {
+        flexDirection: "row",
+        alignItems: "center",
     },
     itemRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderColor: "#333",
+        paddingVertical: 14,
+        paddingHorizontal: 16,
     },
     item: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 15,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         borderBottomWidth: 1,
-        borderColor: "#333",
+        borderBottomColor: "#333",
     },
-    fullWidthItem: {
-        marginHorizontal: 0,
+    lastItem: {
+        borderBottomWidth: 0,
     },
     itemText: {
         fontSize: 16,
         color: "#FFF",
+        flex: 1,
+    },
+    iconBubble: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
+    },
+    chevron: {
         marginLeft: 10,
     },
-    dangerText: {
-        color: "#FF4C4C",
-        textAlign: "center",
+    logoutContainer: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#FF000050',
     },
-    icon: {
+    logoutButton: {
+        backgroundColor: "#FF3B30",
+        borderRadius: 12,
+        shadowColor: "#FF0000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        elevation: 5,
+    },
+    logoutContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 14,
+    },
+    logoutText: {
+        color: "#FFF",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+    logoutIcon: {
         marginRight: 10,
     },
 });
