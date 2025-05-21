@@ -11,7 +11,8 @@ import {
     ActivityIndicator,
     Image,
     Dimensions,
-    Animated
+    Animated,
+    Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -95,6 +96,8 @@ const EditProfile = () => {
     const [timeZone, setTimeZone] = useState('Riyadh');
     const [zipCode, setZipCode] = useState('31311');
     const [units, setUnits] = useState('Kilograms, Feet/Inches, Kilometers, Calories, Milliliters');
+    const [isImperialUnits, setIsImperialUnits] = useState(false);
+    const [showUnitPicker, setShowUnitPicker] = useState(false);
     const [email, setEmail] = useState('haamed1.450@gmail.com');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -157,6 +160,7 @@ const EditProfile = () => {
 
                     // Handle imperial vs metric units
                     const isImperial = p.is_imperial_units || false;
+                    setIsImperialUnits(isImperial);
                     if (isImperial) {
                         setUnits('Pounds, Feet/Inches, Miles, Calories, Fluid Ounces');
                     } else {
@@ -202,7 +206,7 @@ const EditProfile = () => {
                 }
             } catch (error) {
                 console.error('Error loading profile:', error);
-                // Use defaults from state initialization
+                Alert.alert('Error', 'Failed to load profile data. Please try again.');
             }
         };
 
@@ -247,8 +251,8 @@ const EditProfile = () => {
                 weight: weightInKg,
                 gender: sex.toLowerCase() as 'male' | 'female' | 'other',
                 location: location,
-                // Store the user's unit preference, but still store all data in metric
-                is_imperial_units: units.toLowerCase().includes('pounds') || units.toLowerCase().includes('feet'),
+                // Store the user's unit preference based on the direct state
+                is_imperial_units: isImperialUnits,
             };
 
             try {
@@ -345,6 +349,19 @@ const EditProfile = () => {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Toggle unit system
+    const toggleUnitSystem = (imperial: boolean) => {
+        setIsImperialUnits(imperial);
+
+        if (imperial) {
+            setUnits('Pounds, Feet/Inches, Miles, Calories, Fluid Ounces');
+        } else {
+            setUnits('Kilograms, Centimeters, Kilometers, Calories, Milliliters');
+        }
+
+        setShowUnitPicker(false);
     };
 
     const renderProfileTab = () => {
@@ -519,9 +536,12 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Measurement Units</Text>
-                        <TouchableOpacity style={styles.dropdownField}>
+                        <TouchableOpacity
+                            style={styles.dropdownField}
+                            onPress={() => setShowUnitPicker(true)}
+                        >
                             <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
-                                {units}
+                                {isImperialUnits ? 'Imperial (lbs, feet/inches)' : 'Metric (kg, cm)'}
                             </Text>
                             <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
                         </TouchableOpacity>
@@ -721,6 +741,44 @@ const EditProfile = () => {
             <ScrollView style={styles.content}>
                 {activeTab === 'profile' ? renderProfileTab() : renderAchievementsTab()}
             </ScrollView>
+
+            {/* Units Selection Modal */}
+            <Modal
+                visible={showUnitPicker}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowUnitPicker(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowUnitPicker(false)}
+                >
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Measurement Units</Text>
+
+                        <TouchableOpacity
+                            style={[styles.modalOption, isImperialUnits && styles.modalOptionSelected]}
+                            onPress={() => toggleUnitSystem(true)}
+                        >
+                            <Text style={[styles.modalOptionText, isImperialUnits && styles.modalOptionTextSelected]}>
+                                Imperial (lbs, feet/inches)
+                            </Text>
+                            {isImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.modalOption, !isImperialUnits && styles.modalOptionSelected]}
+                            onPress={() => toggleUnitSystem(false)}
+                        >
+                            <Text style={[styles.modalOptionText, !isImperialUnits && styles.modalOptionTextSelected]}>
+                                Metric (kg, cm)
+                            </Text>
+                            {!isImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -1101,6 +1159,48 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         marginLeft: 4,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: width * 0.85,
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 20,
+    },
+    modalTitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    modalOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        marginVertical: 6,
+        borderWidth: 1,
+        borderColor: LIGHT_GRAY,
+    },
+    modalOptionSelected: {
+        borderColor: GRADIENT_MIDDLE,
+        backgroundColor: 'rgba(92, 0, 221, 0.1)',
+    },
+    modalOptionText: {
+        color: GRAY,
+        fontSize: 16,
+    },
+    modalOptionTextSelected: {
+        color: WHITE,
+        fontWeight: '500',
     },
 });
 

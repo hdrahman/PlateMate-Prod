@@ -18,7 +18,8 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserGoals, updateUserGoals } from '../utils/database'; // Local database functions
-import { updateNutritionGoals, updateFitnessGoals } from '../api/profileApi'; // Backend API functions
+import { updateNutritionGoals, updateFitnessGoals, getProfile } from '../api/profileApi'; // Backend API functions
+import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
 
 // Constants for colors - matching EditProfile
 const PRIMARY_BG = '#000000';
@@ -74,6 +75,7 @@ export default function EditGoals() {
     const [activeTab, setActiveTab] = useState('nutrition');
     const [isLoading, setIsLoading] = useState(false);
     const [isFetchingData, setIsFetchingData] = useState(true);
+    const [isImperialUnits, setIsImperialUnits] = useState(false);
 
     // Animation values
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -124,15 +126,62 @@ export default function EditGoals() {
             }),
         ]).start();
 
+        // Fetch user's profile to get unit preference
+        const fetchUserProfile = async () => {
+            try {
+                const profileData = await getProfile();
+                if (profileData && profileData.profile) {
+                    setIsImperialUnits(profileData.profile.is_imperial_units || false);
+                }
+            } catch (error) {
+                console.error('Error fetching user profile', error);
+            }
+        };
+
         // Fetch user's goals
         const fetchUserGoals = async () => {
             setIsFetchingData(true);
             try {
                 if (user) {
-                    // In a real implementation, get actual data from DB
+                    // First, get user profile to check unit preference
+                    await fetchUserProfile();
+
+                    // Get user goals from local database
                     const userData = await getUserGoals(user.uid);
 
-                    // Set default values if any data is missing
+                    // Also try to get nutrition goals from backend
+                    try {
+                        const profileData = await getProfile();
+                        if (profileData && profileData.nutrition_goals) {
+                            // If we have backend data for target weight, use it
+                            const targetWeight = profileData.nutrition_goals.target_weight;
+
+                            // Set default values if any data is missing
+                            const goals = {
+                                targetWeight: targetWeight || userData?.targetWeight || 0,
+                                calorieGoal: profileData.nutrition_goals.daily_calorie_goal || userData?.calorieGoal || 0,
+                                proteinGoal: profileData.nutrition_goals.protein_goal || userData?.proteinGoal || 0,
+                                carbGoal: profileData.nutrition_goals.carb_goal || userData?.carbGoal || 0,
+                                fatGoal: profileData.nutrition_goals.fat_goal || userData?.fatGoal || 0,
+                                fitnessGoal: profileData.nutrition_goals.weight_goal?.startsWith('lose') ? 'lose' :
+                                    profileData.nutrition_goals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
+                                activityLevel: profileData.nutrition_goals.activity_level || userData?.activityLevel || 'moderate',
+                                weeklyWorkouts: userData?.weeklyWorkouts || 0,
+                                stepGoal: userData?.stepGoal || 0,
+                                waterGoal: userData?.waterGoal || 0,
+                                sleepGoal: userData?.sleepGoal || 0
+                            };
+
+                            // Update both database values and form values
+                            setDbGoals(goals);
+                            setFormValues({ ...goals });
+                            return;
+                        }
+                    } catch (backendError) {
+                        console.error('Failed to get goals from backend, using local data', backendError);
+                    }
+
+                    // If we get here, we're using local data only
                     const goals = {
                         targetWeight: userData?.targetWeight || 0,
                         calorieGoal: userData?.calorieGoal || 0,
@@ -172,9 +221,14 @@ export default function EditGoals() {
                 throw new Error('User not authenticated');
             }
 
+            // Convert weight to metric for storage if in imperial units
+            let targetWeightKg = formValues.targetWeight;
+            if (isImperialUnits && formValues.targetWeight) {
+                targetWeightKg = lbsToKg(formValues.targetWeight);
+            }
+
             try {
                 // First try to save to the backend via the API
-                // Use the profileApi functions that we've already improved with timeout handling
                 if (activeTab === 'nutrition') {
                     // Format nutrition goals for the API
                     const nutritionGoals = {
@@ -182,7 +236,7 @@ export default function EditGoals() {
                         protein_goal: formValues.proteinGoal || 0,
                         carb_goal: formValues.carbGoal || 0,
                         fat_goal: formValues.fatGoal || 0,
-                        target_weight: formValues.targetWeight || 0,
+                        target_weight: targetWeightKg || 0,
                         weight_goal: (formValues.fitnessGoal === 'maintain' ? 'maintain' :
                             formValues.fitnessGoal === 'lose' ? 'lose_0_5' :
                                 formValues.fitnessGoal === 'gain' ? 'gain_0_25' : 'maintain') as any,
@@ -213,7 +267,7 @@ export default function EditGoals() {
             // This ensures data is available offline
             // Use a simpler object to avoid database schema issues
             await updateUserGoals(user.uid, {
-                targetWeight: formValues.targetWeight,
+                targetWeight: targetWeightKg,
                 calorieGoal: formValues.calorieGoal,
                 proteinGoal: formValues.proteinGoal,
                 carbGoal: formValues.carbGoal,
@@ -227,7 +281,10 @@ export default function EditGoals() {
             });
 
             // Only update display values after successful DB update
-            setDbGoals({ ...formValues });
+            setDbGoals({
+                ...formValues,
+                targetWeight: targetWeightKg // Always store in kg in state
+            });
 
             Alert.alert('Success', 'Fitness goals updated successfully');
             navigation.goBack();
@@ -287,7 +344,11 @@ export default function EditGoals() {
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{dbGoals.targetWeight || 0} kg</Text>
+                                <Text style={styles.statValue}>
+                                    {isImperialUnits
+                                        ? `${Math.round(kgToLbs(dbGoals.targetWeight || 0))} lbs`
+                                        : `${dbGoals.targetWeight || 0} kg`}
+                                </Text>
                                 <Text style={styles.statLabel}>Target Weight</Text>
                             </View>
                         </View>
@@ -299,15 +360,22 @@ export default function EditGoals() {
                     <Text style={styles.sectionTitle}>Weight & Calorie Goals</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Target Weight (kg)</Text>
+                        <Text style={styles.inputLabel}>
+                            Target Weight {isImperialUnits ? '(lbs)' : '(kg)'}
+                        </Text>
                         <TextInput
                             style={styles.input}
                             value={formValues.targetWeight?.toString() || ''}
                             onChangeText={(text) => updateFormValue('targetWeight', text ? parseFloat(text) : 0)}
-                            placeholder="Enter target weight"
+                            placeholder={`Enter target weight in ${isImperialUnits ? 'pounds' : 'kilograms'}`}
                             placeholderTextColor={GRAY}
                             keyboardType="decimal-pad"
                         />
+                        <Text style={styles.inputHint}>
+                            {isImperialUnits
+                                ? 'Enter your target weight in pounds'
+                                : 'Enter your target weight in kilograms'}
+                        </Text>
                     </View>
 
                     <View style={styles.inputGroup}>
@@ -802,5 +870,11 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         marginTop: 20,
+    },
+    inputHint: {
+        fontSize: 12,
+        color: GRAY,
+        marginTop: 4,
+        marginLeft: 2,
     },
 });
