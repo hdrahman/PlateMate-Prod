@@ -83,6 +83,57 @@ const EditProfile = () => {
     const slideAnim = React.useRef(new Animated.Value(0)).current;
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
+    // Location options (all countries in the world)
+    const locationOptions = [
+        'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
+        'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain',
+        'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+        'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria',
+        'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada',
+        'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
+        'Congo (Congo-Brazzaville)', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus',
+        'Czech Republic (Czechia)', 'Democratic Republic of the Congo', 'Denmark',
+        'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador',
+        'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji',
+        'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece',
+        'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti', 'Holy See',
+        'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland',
+        'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait',
+        'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya',
+        'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar', 'Malawi', 'Malaysia',
+        'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
+        'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique',
+        'Myanmar (Burma)', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand',
+        'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman',
+        'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
+        'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda',
+        'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa',
+        'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia',
+        'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands',
+        'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka',
+        'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan',
+        'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago',
+        'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine',
+        'United Arab Emirates', 'United Kingdom', 'United States of America', 'Uruguay',
+        'Uzbekistan', 'Vanuatu', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
+    ].sort();
+
+    // Timezone options (comprehensive list)
+    const timeZoneOptions = [
+        'GMT-12:00 (Baker Island)', 'GMT-11:00 (American Samoa)', 'GMT-10:00 (Hawaii)',
+        'GMT-09:30 (Marquesas Islands)', 'GMT-09:00 (Alaska)', 'GMT-08:00 (Los Angeles, Vancouver)',
+        'GMT-07:00 (Denver, Edmonton)', 'GMT-06:00 (Mexico City, Chicago)', 'GMT-05:00 (New York, Toronto)',
+        'GMT-04:00 (Santiago, Halifax)', 'GMT-03:30 (St. John\'s)', 'GMT-03:00 (Buenos Aires, São Paulo)',
+        'GMT-02:00 (South Georgia)', 'GMT-01:00 (Cape Verde)', 'GMT+00:00 (London, Dublin)',
+        'GMT+01:00 (Paris, Berlin, Rome)', 'GMT+02:00 (Cairo, Johannesburg)', 'GMT+03:00 (Moscow, Riyadh)',
+        'GMT+03:30 (Tehran)', 'GMT+04:00 (Dubai, Baku)', 'GMT+04:30 (Kabul)', 'GMT+05:00 (Karachi, Tashkent)',
+        'GMT+05:30 (New Delhi, Mumbai)', 'GMT+05:45 (Kathmandu)', 'GMT+06:00 (Dhaka, Almaty)',
+        'GMT+06:30 (Yangon)', 'GMT+07:00 (Bangkok, Jakarta)', 'GMT+08:00 (Beijing, Singapore)',
+        'GMT+08:45 (Eucla)', 'GMT+09:00 (Tokyo, Seoul)', 'GMT+09:30 (Adelaide)', 'GMT+10:00 (Sydney, Melbourne)',
+        'GMT+10:30 (Lord Howe Island)', 'GMT+11:00 (Noumea)', 'GMT+12:00 (Auckland)',
+        'GMT+12:45 (Chatham Islands)', 'GMT+13:00 (Samoa, Tonga)', 'GMT+14:00 (Kiritimati)'
+    ];
+
     // Mock profile data
     const [username, setUsername] = useState('haamed_rahman');
     const [height, setHeight] = useState('5 ft 11 in');
@@ -98,6 +149,10 @@ const EditProfile = () => {
     const [units, setUnits] = useState('Kilograms, Feet/Inches, Kilometers, Calories, Milliliters');
     const [isImperialUnits, setIsImperialUnits] = useState(false);
     const [showUnitPicker, setShowUnitPicker] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
+    const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filteredLocations, setFilteredLocations] = useState([...locationOptions]);
     const [email, setEmail] = useState('haamed1.450@gmail.com');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -136,6 +191,52 @@ const EditProfile = () => {
             // Update with user data
         }
     }, [user]);
+
+    // Add effect to update input formats when unit system changes
+    useEffect(() => {
+        if (isImperialUnits) {
+            // Convert height from cm to feet/inches if it's in cm format
+            if (height && height.includes('cm')) {
+                const cm = parseFloat(height.replace(/cm/g, '').trim());
+                const { feet, inches } = cmToFeetInches(cm);
+                setHeightFeet(feet.toString());
+                setHeightInches(inches.toString());
+                setHeight(`${feet}' ${inches}"`);
+            }
+
+            // Convert weight from kg to lbs if it's in kg format
+            if (weight && weight.includes('kg')) {
+                const kg = parseFloat(weight.replace(/kg/g, '').trim());
+                const lbs = kgToLbs(kg);
+                setWeight(`${lbs} lbs`);
+            }
+        } else {
+            // Convert height from feet/inches to cm if needed
+            if (heightFeet && heightInches) {
+                const cm = feetInchesToCm(
+                    parseFloat(heightFeet),
+                    parseFloat(heightInches)
+                );
+                setHeight(`${cm} cm`);
+            }
+
+            // Convert weight from lbs to kg if it's in lbs format
+            if (weight && weight.includes('lbs')) {
+                const lbs = parseFloat(weight.replace(/lbs/g, '').trim());
+                const kg = lbsToKg(lbs);
+                setWeight(`${kg} kg`);
+            }
+        }
+    }, [isImperialUnits]);
+
+    // Helper function to update height based on input
+    const updateHeight = (value: string) => {
+        const numValue = value.trim();
+        // Only update if the value is numeric
+        if (/^\d*\.?\d*$/.test(numValue)) {
+            setHeight(`${numValue} cm`);
+        }
+    };
 
     // Load user profile data
     useEffect(() => {
@@ -469,30 +570,46 @@ const EditProfile = () => {
                     <View style={styles.inputRow}>
                         <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                             <Text style={styles.inputLabel}>Height</Text>
-                            <View style={styles.heightInputContainer}>
-                                <View style={styles.heightInputGroup}>
-                                    <TextInput
-                                        style={styles.heightInput}
-                                        value={heightFeet}
-                                        onChangeText={setHeightFeet}
-                                        keyboardType="numeric"
-                                        placeholderTextColor={GRAY}
-                                        placeholder="5"
-                                    />
-                                    <Text style={styles.heightUnitText}>ft</Text>
+                            {isImperialUnits ? (
+                                <View style={styles.heightInputContainer}>
+                                    <View style={styles.heightInputGroup}>
+                                        <TextInput
+                                            style={styles.heightInput}
+                                            value={heightFeet}
+                                            onChangeText={setHeightFeet}
+                                            keyboardType="numeric"
+                                            placeholderTextColor={GRAY}
+                                            placeholder="5"
+                                        />
+                                        <Text style={styles.heightUnitText}>ft</Text>
+                                    </View>
+                                    <View style={styles.heightInputGroup}>
+                                        <TextInput
+                                            style={styles.heightInput}
+                                            value={heightInches}
+                                            onChangeText={setHeightInches}
+                                            keyboardType="numeric"
+                                            placeholderTextColor={GRAY}
+                                            placeholder="11"
+                                        />
+                                        <Text style={styles.heightUnitText}>in</Text>
+                                    </View>
                                 </View>
-                                <View style={styles.heightInputGroup}>
-                                    <TextInput
-                                        style={styles.heightInput}
-                                        value={heightInches}
-                                        onChangeText={setHeightInches}
-                                        keyboardType="numeric"
-                                        placeholderTextColor={GRAY}
-                                        placeholder="11"
-                                    />
-                                    <Text style={styles.heightUnitText}>in</Text>
+                            ) : (
+                                <View style={styles.heightInputContainer}>
+                                    <View style={[styles.heightInputGroup, { flex: 1, paddingHorizontal: 15 }]}>
+                                        <TextInput
+                                            style={styles.heightInput}
+                                            value={height.replace(/cm/g, '').trim()}
+                                            onChangeText={updateHeight}
+                                            keyboardType="numeric"
+                                            placeholderTextColor={GRAY}
+                                            placeholder="180"
+                                        />
+                                        <Text style={styles.heightUnitText}>cm</Text>
+                                    </View>
                                 </View>
-                            </View>
+                            )}
                         </View>
                         <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                             <Text style={styles.inputLabel}>Weight</Text>
@@ -503,9 +620,9 @@ const EditProfile = () => {
                                     onChangeText={(text) => setWeight(text)}
                                     keyboardType="numeric"
                                     placeholderTextColor={GRAY}
-                                    placeholder="75"
+                                    placeholder={isImperialUnits ? "165" : "75"}
                                 />
-                                <Text style={styles.weightUnitText}>kg</Text>
+                                <Text style={styles.weightUnitText}>{isImperialUnits ? "lbs" : "kg"}</Text>
                             </View>
                         </View>
                     </View>
@@ -516,22 +633,28 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Location</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={location}
-                            onChangeText={setLocation}
-                            placeholderTextColor={GRAY}
-                        />
+                        <TouchableOpacity
+                            style={styles.dropdownField}
+                            onPress={() => setShowLocationPicker(true)}
+                        >
+                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                                {location}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Time Zone</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={timeZone}
-                            onChangeText={setTimeZone}
-                            placeholderTextColor={GRAY}
-                        />
+                        <TouchableOpacity
+                            style={styles.dropdownField}
+                            onPress={() => setShowTimeZonePicker(true)}
+                        >
+                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                                {timeZone}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
@@ -566,23 +689,6 @@ const EditProfile = () => {
                         )}
                     </LinearGradient>
                 </TouchableOpacity>
-
-                {/* Debug button - only visible in development */}
-                {__DEV__ && (
-                    <TouchableOpacity
-                        style={[styles.saveButton, { marginTop: 10 }]}
-                        onPress={testBackendConnection}
-                    >
-                        <View style={{
-                            backgroundColor: '#333',
-                            paddingVertical: 16,
-                            alignItems: 'center',
-                            borderRadius: 12
-                        }}>
-                            <Text style={styles.saveButtonText}>Test Connection</Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
             </Animated.View>
         );
     };
@@ -778,6 +884,144 @@ const EditProfile = () => {
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
+            </Modal>
+
+            {/* Location Picker Modal */}
+            <Modal
+                visible={showLocationPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowLocationPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.pickerModalContent]}>
+                        <LinearGradient
+                            colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.pickerHeader}
+                        >
+                            <Text style={styles.pickerTitle}>Select Country</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setShowLocationPicker(false);
+                                    setSearchQuery('');
+                                    setFilteredLocations([...locationOptions]);
+                                }}
+                                style={styles.pickerCloseIcon}
+                            >
+                                <Ionicons name="close" size={24} color={WHITE} />
+                            </TouchableOpacity>
+                        </LinearGradient>
+
+                        <View style={styles.searchContainer}>
+                            <Ionicons name="search" size={20} color={GRAY} style={styles.searchIcon} />
+                            <TextInput
+                                style={[styles.searchInput, { color: WHITE }]}
+                                placeholder="Search countries..."
+                                placeholderTextColor={GRAY}
+                                value={searchQuery}
+                                onChangeText={(text) => {
+                                    setSearchQuery(text);
+                                    if (text.trim() === '') {
+                                        setFilteredLocations([...locationOptions]);
+                                    } else {
+                                        const filtered = locationOptions.filter(
+                                            country => country.toLowerCase().includes(text.toLowerCase())
+                                        );
+                                        setFilteredLocations(filtered);
+                                    }
+                                }}
+                                returnKeyType="search"
+                                autoCapitalize="none"
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSearchQuery('');
+                                        setFilteredLocations([...locationOptions]);
+                                    }}
+                                    style={styles.clearSearchButton}
+                                >
+                                    <Ionicons name="close-circle" size={20} color={GRAY} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {filteredLocations.length > 0 ? (
+                            <ScrollView style={styles.pickerScrollView}>
+                                {filteredLocations.map((loc, index) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={[styles.pickerOption, location === loc && styles.pickerOptionSelected]}
+                                        onPress={() => {
+                                            setLocation(loc);
+                                            setShowLocationPicker(false);
+                                            setSearchQuery('');
+                                            setFilteredLocations([...locationOptions]);
+                                        }}
+                                    >
+                                        <Text style={[styles.pickerOptionText, location === loc && styles.pickerOptionTextSelected]}>
+                                            {loc}
+                                        </Text>
+                                        {location === loc && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        ) : (
+                            <View style={styles.noResultsContainer}>
+                                <Ionicons name="search-outline" size={50} color={GRAY} />
+                                <Text style={styles.noResultsText}>No countries found</Text>
+                                <Text style={styles.noResultsSubText}>Try a different search term</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Time Zone Picker Modal */}
+            <Modal
+                visible={showTimeZonePicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowTimeZonePicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.pickerModalContent]}>
+                        <LinearGradient
+                            colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.pickerHeader}
+                        >
+                            <Text style={styles.pickerTitle}>Select Time Zone</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowTimeZonePicker(false)}
+                                style={styles.pickerCloseIcon}
+                            >
+                                <Ionicons name="close" size={24} color={WHITE} />
+                            </TouchableOpacity>
+                        </LinearGradient>
+
+                        <ScrollView style={styles.pickerScrollView}>
+                            {timeZoneOptions.map((tz, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[styles.pickerOption, timeZone === tz && styles.pickerOptionSelected]}
+                                    onPress={() => {
+                                        setTimeZone(tz);
+                                        setShowTimeZonePicker(false);
+                                    }}
+                                >
+                                    <Text style={[styles.pickerOptionText, timeZone === tz && styles.pickerOptionTextSelected]}>
+                                        {tz}
+                                    </Text>
+                                    {timeZone === tz && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
             </Modal>
         </SafeAreaView>
     );
@@ -1201,6 +1445,94 @@ const styles = StyleSheet.create({
     modalOptionTextSelected: {
         color: WHITE,
         fontWeight: '500',
+    },
+    pickerModalContent: {
+        width: width * 0.95,
+        maxHeight: height * 0.8,
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        overflow: 'hidden',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.1)',
+    },
+    pickerTitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    pickerCloseIcon: {
+        padding: 5,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: LIGHT_GRAY,
+        margin: 10,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        height: 45,
+        fontSize: 16,
+    },
+    pickerScrollView: {
+        maxHeight: height * 0.6,
+    },
+    pickerOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+    },
+    pickerOptionSelected: {
+        backgroundColor: 'rgba(92, 0, 221, 0.15)',
+    },
+    pickerOptionText: {
+        color: WHITE,
+        fontSize: 16,
+    },
+    pickerOptionTextSelected: {
+        color: GRADIENT_MIDDLE,
+        fontWeight: '600',
+    },
+    clearSearchButton: {
+        padding: 5,
+    },
+    noResultsContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 50,
+    },
+    noResultsText: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginTop: 15,
+    },
+    noResultsSubText: {
+        color: GRAY,
+        fontSize: 14,
+        marginTop: 5,
     },
 });
 
