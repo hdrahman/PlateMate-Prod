@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from models import User, Gender, ActivityLevel, WeightGoal, UserWeight
 from DB import get_db
 from auth.firebase_auth import get_current_user, verify_firebase_token
-from utils.weight_utils import add_weight_entry
+from utils.weight_utils import add_weight_entry, clear_weight_history
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -346,4 +346,32 @@ async def get_weight_history(
     
     # Get weight history
     weight_entries = get_user_weight_history(db, db_user.id, limit)
-    return {"weights": weight_entries} 
+    return {"weights": weight_entries}
+
+@router.post("/{firebase_uid}/weight/clear", status_code=status.HTTP_200_OK)
+async def clear_user_weight_history(
+    firebase_uid: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Clear all weight entries except for the first entry (starting weight)
+    and the most recent entry (current weight).
+    """
+    # Only allow users to clear their own weight history
+    if current_user.firebase_uid != firebase_uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this user's weight history"
+        )
+    
+    db_user = get_user_by_firebase_uid(db, firebase_uid=firebase_uid)
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Clear weight history
+    result = clear_weight_history(db, db_user.id)
+    return result 

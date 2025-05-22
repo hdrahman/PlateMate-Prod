@@ -543,4 +543,42 @@ export const convertBackendToProfileFormat = (backendData: any): any => {
         syncDataOffline: backendData.sync_data_offline,
         onboardingComplete: backendData.onboarding_complete
     };
+};
+
+// Clear weight history (keeping only starting and current weights)
+export const clearWeightHistory = async (firebaseUid: string): Promise<any> => {
+    try {
+        // Validate that the user is signed in and matches the requested profile
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            throw new Error('User not authenticated. Please sign in again.');
+        }
+
+        // Only allow users to access their own profile
+        if (currentUser.uid !== firebaseUid) {
+            console.warn('Attempting to clear another user\'s weight history. Operation denied.');
+            throw new Error('You can only clear your own weight history.');
+        }
+
+        const token = await getFirebaseToken();
+        console.log(`Clearing weight history via ${BACKEND_URL}/users/${firebaseUid}/weight/clear`);
+
+        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weight/clear`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to clear weight history');
+        }
+
+        return await response.json();
+    } catch (error: any) {
+        console.error('Error clearing weight history:', error);
+        throw error;
+    }
 }; 

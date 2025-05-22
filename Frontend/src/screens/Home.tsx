@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
-import { getWeightHistory, WeightEntry, addWeightEntry } from '../api/userApi';
+import { getWeightHistory, WeightEntry, addWeightEntry, clearWeightHistory } from '../api/userApi';
 
 import {
   View,
@@ -538,6 +538,77 @@ export default function Home() {
     </Modal>
   );
 
+  // Add function to clear weight history
+  const handleClearWeightHistory = async () => {
+    if (!user) return;
+
+    try {
+      // Show loading
+      setWeightLoading(true);
+
+      // Confirm with user before proceeding
+      Alert.alert(
+        "Clear Weight History",
+        "This will remove all weight entries except your starting and current weights. This action cannot be undone.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => setWeightLoading(false)
+          },
+          {
+            text: "Clear",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                // Call API to clear weight history
+                await clearWeightHistory(user.uid);
+
+                // Refresh weight history
+                const history = await getWeightHistory(user.uid);
+
+                if (history && history.weights && history.weights.length > 0) {
+                  // Sort history chronologically - oldest first
+                  const sortedWeights = [...history.weights].sort((a, b) =>
+                    new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+                  );
+
+                  // Format all entries
+                  const formattedHistory = sortedWeights.map(entry => ({
+                    date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                    weight: entry.weight
+                  }));
+
+                  setWeightHistory(formattedHistory);
+
+                  // Update starting and current weights
+                  setStartingWeight(sortedWeights[0].weight);
+                  const lastWeight = sortedWeights[sortedWeights.length - 1].weight;
+                  setCurrentWeight(lastWeight);
+
+                  // Show success message
+                  Alert.alert(
+                    "Success",
+                    "Weight history has been cleared, keeping only your starting and current weights."
+                  );
+                }
+              } catch (error) {
+                console.error('Error clearing weight history:', error);
+                Alert.alert("Error", "Failed to clear weight history. Please try again.");
+              } finally {
+                setWeightLoading(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error:', error);
+      setWeightLoading(false);
+      Alert.alert("Error", "An unexpected error occurred. Please try again.");
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
       {renderErrorBanner()}
@@ -885,7 +956,7 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
 
   return (
     <View style={{ width: '100%', alignItems: 'center', paddingBottom: 5 }}>
-      {/* TITLE + PLUS ICON */}
+      {/* TITLE + PLUS ICON + CLEAR BUTTON */}
       <View
         style={{
           width: '90%',
