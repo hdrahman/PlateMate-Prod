@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Response, Query
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
@@ -242,7 +242,8 @@ async def get_profile(current_user: User = Depends(get_current_user), db: Sessio
 async def update_profile(
     profile_update: Dict[str, Any] = Body(...), 
     current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    skip_weight_history: bool = Query(False, description="Skip adding weight history entries when updating profile")
 ):
     """Update the user's profile data (basic profile, goals, etc.)."""
     # Ensure user records exist
@@ -259,11 +260,13 @@ async def update_profile(
         profile_data = profile_update["profile"]
         for field, value in profile_data.items():
             if hasattr(user, field) and value is not None:
-                setattr(user, field, value)
-                
-                # When weight is updated, add a new entry to weight history
-                if field == "weight":
+                # When weight is updated, add a new entry to weight history only if it changed
+                # and skip_weight_history is False (i.e., not a sync operation)
+                if field == "weight" and not skip_weight_history and abs(getattr(user, field, 0) - value) >= 0.01:
                     add_weight_entry(db, user.id, value)
+                
+                # Set the attribute value
+                setattr(user, field, value)
     
     # Update nutrition goals
     if "nutrition_goals" in profile_update and nutrition_goals:

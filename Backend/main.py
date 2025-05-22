@@ -77,13 +77,20 @@ async def startup_event():
         
         # Initialize database schema
         try:
-            from utils.schema_init import init_schema
+            from utils.schema_init import init_schema, sync_user_location_data
             
             print("🔄 Initializing database schema...")
             if init_schema():
                 print("✅ Database schema initialization completed successfully")
             else:
                 print("⚠️ Database schema initialization failed")
+                
+            # Sync location data between databases
+            print("🔄 Synchronizing location data between databases...")
+            if sync_user_location_data():
+                print("✅ Location data synchronization completed successfully")
+            else:
+                print("⚠️ Location data synchronization failed")
         except Exception as e:
             print(f"❌ Error during database schema initialization: {e}")
             print(traceback.format_exc())

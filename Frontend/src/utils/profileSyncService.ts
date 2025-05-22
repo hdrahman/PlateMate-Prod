@@ -286,7 +286,8 @@ export const syncProfileFromLocalToBackend = async (firebaseUid: string): Promis
                 if (existingProfile) {
                     // Update existing profile
                     console.log(`Updating existing profile for ${firebaseUid}`);
-                    await updateUserProfile(firebaseUid, backendUpdateData);
+                    // Set skipWeightHistory to true for sync operations
+                    await updateUserProfile(firebaseUid, backendUpdateData, true);
                 } else {
                     // Create new profile - first create basic user
                     console.log(`Creating user at ${BACKEND_URL}/users for ${firebaseUid}`);
@@ -299,7 +300,8 @@ export const syncProfileFromLocalToBackend = async (firebaseUid: string): Promis
 
                     // Then update with all profile details
                     console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
-                    await updateUserProfile(firebaseUid, backendUpdateData);
+                    // Set skipWeightHistory to true for sync operations
+                    await updateUserProfile(firebaseUid, backendUpdateData, true);
                 }
 
                 // Mark profile as synced in local SQLite

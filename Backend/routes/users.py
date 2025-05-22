@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List, Dict, Any
@@ -7,6 +7,9 @@ import json
 from datetime import datetime, timedelta
 from enum import Enum
 import logging
+import os
+import sqlite3
+from dotenv import load_dotenv
 
 from models import User, Gender, ActivityLevel, WeightGoal, UserWeight
 from DB import get_db
@@ -57,6 +60,7 @@ class PhysicalAttributes(BaseModel):
     age: Optional[int] = None
     gender: Optional[GenderEnum] = None
     activity_level: Optional[ActivityLevelEnum] = None
+    location: Optional[str] = None
 
 class HealthGoals(BaseModel):
     weight_goal: Optional[WeightGoalEnum] = None
@@ -204,7 +208,8 @@ async def update_user_profile(
     firebase_uid: str, 
     user_update: UserUpdate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    skip_weight_history: bool = Query(False, description="Skip adding weight history entries when updating profile")
 ):
     # Only allow users to update their own data
     if current_user.firebase_uid != firebase_uid:
@@ -239,8 +244,11 @@ async def update_user_profile(
         if pa.weight is not None:
             update_data["weight"] = pa.weight
             
-            # When weight is updated, add a new entry to weight history
-            add_weight_entry(db, db_user.id, pa.weight)
+            # When weight is updated, add a new entry to weight history only if not skipped
+            # and the weight has actually changed
+            current_weight = getattr(db_user, "weight", 0)
+            if not skip_weight_history and abs(current_weight - pa.weight) >= 0.01:
+                add_weight_entry(db, db_user.id, pa.weight)
             
         if pa.age is not None:
             update_data["age"] = pa.age
@@ -248,6 +256,35 @@ async def update_user_profile(
             update_data["gender"] = pa.gender
         if pa.activity_level is not None:
             update_data["activity_level"] = pa.activity_level
+        # Check for location update
+        if pa.location is not None:
+            update_data["location"] = pa.location
+            
+            # Manually sync location with SQLite database
+            try:
+                # Get SQLite database path
+                load_dotenv()
+                local_db_url = os.getenv("LOCAL_DB_PATH", "sqlite:///./platemate_local.db")
+                db_path = local_db_url.replace("sqlite:///", "")
+                
+                # Connect to SQLite and update location
+                if os.path.exists(db_path):
+                    sqlite_conn = sqlite3.connect(db_path)
+                    cursor = sqlite_conn.cursor()
+                    
+                    # Update location for this user
+                    cursor.execute(
+                        "UPDATE users SET location = ? WHERE firebase_uid = ?",
+                        (pa.location, firebase_uid)
+                    )
+                    
+                    # Commit and close
+                    sqlite_conn.commit()
+                    sqlite_conn.close()
+                    print(f"✅ Updated location in SQLite for user {firebase_uid}: {pa.location}")
+            except Exception as e:
+                print(f"⚠️ Error updating SQLite location: {e}")
+                # Don't raise the exception - we still want to update PostgreSQL
     
     # Health goals
     if user_update.health_goals:

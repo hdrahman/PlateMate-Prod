@@ -272,7 +272,7 @@ export const getUserProfile = async (firebaseUid: string) => {
 };
 
 // Update user profile with improved error handling
-export const updateUserProfile = async (firebaseUid: string, userData: UpdateUserData) => {
+export const updateUserProfile = async (firebaseUid: string, userData: UpdateUserData, skipWeightHistory: boolean = false) => {
     try {
         // Validate that the user is signed in and matches the requested profile
         const currentUser = auth.currentUser;
@@ -287,9 +287,9 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
 
         try {
             const token = await getFirebaseToken();
-            console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
+            console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`);
 
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}`, {
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

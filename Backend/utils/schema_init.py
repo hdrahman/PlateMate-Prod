@@ -2,6 +2,7 @@ import os
 import sqlite3
 from dotenv import load_dotenv
 import logging
+import psycopg2
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, 
@@ -175,6 +176,99 @@ def init_schema():
         conn.close()
         logger.info("Database connection closed.")
 
+def sync_user_location_data():
+    """
+    Ensure location data is synchronized between SQLite and PostgreSQL.
+    This function specifically checks for location values and syncs them in both directions.
+    """
+    # Load environment variables
+    load_dotenv()
+    
+    # Get database paths
+    local_db_url = os.getenv("LOCAL_DB_PATH", "sqlite:///./platemate_local.db")
+    db_path = local_db_url.replace("sqlite:///", "")
+    postgres_url = os.getenv("DATABASE_URL")
+    
+    if not postgres_url:
+        logger.error("DATABASE_URL environment variable not set")
+        return False
+    
+    logger.info("Starting location data synchronization between SQLite and PostgreSQL")
+    
+    # Connect to both databases
+    sqlite_conn = None
+    pg_conn = None
+    
+    try:
+        # Connect to SQLite
+        sqlite_conn = sqlite3.connect(db_path)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # Connect to PostgreSQL
+        pg_conn = psycopg2.connect(postgres_url)
+        pg_cursor = pg_conn.cursor()
+        
+        # 1. Get users with location data from SQLite
+        sqlite_cursor.execute("SELECT firebase_uid, location FROM users WHERE location IS NOT NULL AND location != ''")
+        sqlite_users = {row[0]: row[1] for row in sqlite_cursor.fetchall()}
+        
+        # 2. Get users with location data from PostgreSQL
+        pg_cursor.execute("SELECT firebase_uid, location FROM users WHERE location IS NOT NULL AND location != ''")
+        pg_users = {row[0]: row[1] for row in pg_cursor.fetchall()}
+        
+        # Start transactions
+        sqlite_conn.execute("BEGIN")
+        # Use cursor for PostgreSQL transactions
+        pg_cursor.execute("BEGIN")
+        
+        # 3. Update PostgreSQL with location data from SQLite
+        sqlite_updates = 0
+        pg_updates = 0
+        
+        for firebase_uid, location in sqlite_users.items():
+            if firebase_uid not in pg_users or pg_users[firebase_uid] != location:
+                pg_cursor.execute(
+                    "UPDATE users SET location = %s WHERE firebase_uid = %s",
+                    (location, firebase_uid)
+                )
+                pg_updates += 1
+                logger.info(f"Updated PostgreSQL user {firebase_uid} with location: {location}")
+        
+        # 4. Update SQLite with location data from PostgreSQL
+        for firebase_uid, location in pg_users.items():
+            if firebase_uid not in sqlite_users or sqlite_users[firebase_uid] != location:
+                sqlite_cursor.execute(
+                    "UPDATE users SET location = ? WHERE firebase_uid = ?",
+                    (location, firebase_uid)
+                )
+                sqlite_updates += 1
+                logger.info(f"Updated SQLite user {firebase_uid} with location: {location}")
+        
+        # Commit transactions
+        sqlite_conn.commit()
+        pg_conn.commit()
+        
+        logger.info(f"Location synchronization complete: Updated {pg_updates} PostgreSQL records, {sqlite_updates} SQLite records")
+        return True
+        
+    except Exception as e:
+        # Rollback transactions in case of error
+        if sqlite_conn:
+            sqlite_conn.rollback()
+        if pg_conn:
+            pg_conn.rollback()
+        logger.error(f"Error synchronizing location data: {e}")
+        return False
+    
+    finally:
+        # Close connections
+        if sqlite_conn:
+            sqlite_conn.close()
+        if pg_conn:
+            pg_conn.close()
+        logger.info("Database connections closed")
+
 # If run directly
 if __name__ == "__main__":
-    init_schema() 
+    init_schema()
+    sync_user_location_data() 

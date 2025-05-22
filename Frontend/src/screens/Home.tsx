@@ -54,19 +54,11 @@ const MACRO_RING_SIZE = 60;
 // Default data until we load from user profile
 // ─────────────────────────────────────────────────────────────────────────────
 const defaultGoals = getDefaultNutritionGoals();
-const WeightLost = 8;
 
 // Cheat day data
 const cheatDaysTotal = 7;
 const cheatDaysCompleted = 3;
 const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
-
-// Weight history data
-const weightHistory = [
-  { date: '11/03', weight: 104 },
-  { date: '12/03', weight: 98 },
-  { date: '02/01', weight: 107 }
-];
 
 // Steps history
 const stepsHistory = [
@@ -163,6 +155,10 @@ export default function Home() {
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [weightLost, setWeightLost] = useState(0);
 
+  // Add state for temporary today's weight display
+  const [showTodayWeight, setShowTodayWeight] = useState(false);
+  const [todayWeight, setTodayWeight] = useState<number | null>(null);
+
   // Load user profile and calculate nutrition goals
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -206,7 +202,9 @@ export default function Home() {
             timezone: profile.timezone || 'UTC',
             unitPreference: profile.unit_preference || 'metric',
             darkMode: profile.dark_mode,
-            syncDataOffline: profile.sync_data_offline
+            syncDataOffline: profile.sync_data_offline,
+            targetWeight: profile.target_weight,
+            startingWeight: profile.starting_weight
           });
 
           // Update state with calculated goals
@@ -282,7 +280,7 @@ export default function Home() {
     loadTodayNutrients();
   }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated]);
 
-  // Load weight history
+  // Load weight history only once when the component mounts
   useEffect(() => {
     const loadWeightHistory = async () => {
       if (!user) return;
@@ -294,17 +292,38 @@ export default function Home() {
         const history = await getWeightHistory(user.uid);
 
         if (history && history.weights && history.weights.length > 0) {
-          // Transform weight history for chart
-          const formattedHistory = history.weights.map(entry => ({
+          // Sort history chronologically - oldest first
+          const sortedWeights = [...history.weights].sort((a, b) =>
+            new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+          );
+
+          // Format all entries to show the complete weight trend
+          const formattedHistory = sortedWeights.map(entry => ({
             date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
             weight: entry.weight
           }));
 
-          setWeightHistory(formattedHistory.reverse()); // Most recent last
+          setWeightHistory(formattedHistory);
 
-          // Get current weight (most recent entry)
-          if (formattedHistory.length > 0) {
-            setCurrentWeight(formattedHistory[formattedHistory.length - 1].weight);
+          // Set starting weight from the first entry
+          setStartingWeight(sortedWeights[0].weight);
+
+          // Set current weight from the last entry
+          const lastWeight = sortedWeights[sortedWeights.length - 1].weight;
+          setCurrentWeight(lastWeight);
+
+          // Check if the last entry is from today
+          const lastEntryDate = new Date(sortedWeights[sortedWeights.length - 1].recorded_at);
+          const today = new Date();
+          const isToday =
+            lastEntryDate.getDate() === today.getDate() &&
+            lastEntryDate.getMonth() === today.getMonth() &&
+            lastEntryDate.getFullYear() === today.getFullYear();
+
+          // If the last entry is not from today, set today's temporary weight
+          if (!isToday) {
+            setShowTodayWeight(true);
+            setTodayWeight(lastWeight);
           }
         }
       } catch (error) {
@@ -314,7 +333,11 @@ export default function Home() {
       }
     };
 
-    loadWeightHistory();
+    // We still need user to be available for this to work
+    if (user) {
+      loadWeightHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Calculate weight lost when profile and weight history are loaded
@@ -341,15 +364,36 @@ export default function Home() {
         return;
       }
 
-      // Add new weight entry
-      await addWeightEntry(user.uid, weightValue);
+      // Check if the weight is different from the current weight
+      // Use a small threshold to account for floating-point precision
+      const weightChanged = !currentWeight || Math.abs(weightValue - currentWeight) >= 0.01;
 
-      // Update local state
-      const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-      setWeightHistory([...weightHistory, { date: today, weight: weightValue }]);
+      if (weightChanged) {
+        // Only add to backend if weight actually changed
+        await addWeightEntry(user.uid, weightValue);
+
+        // Update local state with the new entry
+        const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+
+        // Add the new entry to the existing weight history
+        const updatedHistory = [...weightHistory, { date: today, weight: weightValue }];
+        setWeightHistory(updatedHistory);
+
+        // No need to show temporary today weight anymore
+        setShowTodayWeight(false);
+
+        // If this is the first entry, set it as starting weight
+        if (weightHistory.length === 0) {
+          setStartingWeight(weightValue);
+        }
+      } else {
+        // If weight hasn't changed, just update the UI without adding to history
+        console.log('Weight unchanged, not creating new entry');
+      }
+
+      // Always update current weight with the new entry
       setCurrentWeight(weightValue);
 
-      // Close modal and reset input
       setWeightModalVisible(false);
       setNewWeight('');
 
@@ -711,6 +755,8 @@ export default function Home() {
                   data={weightHistory}
                   onAddPress={() => setWeightModalVisible(true)}
                   weightLoading={weightLoading}
+                  showTodayWeight={showTodayWeight}
+                  todayWeight={todayWeight}
                 />
               </View>
             </GradientBorderCard>
@@ -772,25 +818,36 @@ export default function Home() {
 /************************************
  *  WEIGHT GRAPH COMPONENT
  ************************************/
-function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string; weight: number }[]; onAddPress: () => void; weightLoading: boolean }) {
+function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWeight }: { data: { date: string; weight: number }[]; onAddPress: () => void; weightLoading: boolean; showTodayWeight: boolean; todayWeight: number | null }) {
   // Dimensions for the chart
   const GRAPH_WIDTH = 0.94 * width;
   const GRAPH_HEIGHT = 220;
   const MARGIN = 30; // a bit bigger margin for labels
 
+  // Create a combined dataset that includes history and today's temporary point if needed
+  const combinedData = [...data];
+
+  // Add today's temporary weight point if needed
+  if (showTodayWeight && todayWeight !== null && data.length > 0) {
+    combinedData.push({
+      date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+      weight: todayWeight
+    });
+  }
+
   // X-values: indices of data
-  const xValues = data.map((_, i) => i);
+  const xValues = combinedData.map((_, i) => i);
   // Y-values: actual weight
-  const yValues = data.map(d => d.weight);
+  const yValues = combinedData.map(d => d.weight);
 
   // Build scales
-  const minWeight = Math.min(...yValues);
-  const maxWeight = Math.max(...yValues);
+  const minWeight = Math.min(...yValues, ...yValues.map(w => w - 0.5)); // Add a bit of padding at bottom
+  const maxWeight = Math.max(...yValues, ...yValues.map(w => w + 0.5)); // Add a bit of padding at top
 
-  // Add a small top buffer (+1) so final dot isn't at the very top
+  // Add a small buffer so points aren't at the very edges
   const scaleY = d3Scale
     .scaleLinear()
-    .domain([minWeight, maxWeight + 1])
+    .domain([minWeight, maxWeight])
     .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
 
   const scaleX = d3Scale
@@ -798,8 +855,9 @@ function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string
     .domain([0, xValues.length - 1])
     .range([MARGIN, GRAPH_WIDTH - MARGIN]);
 
-  // We'll get about 4-5 ticks for Y
-  const yTickValues = d3Scale.scaleLinear().domain([minWeight, maxWeight + 1]).ticks(5);
+  // Get appropriate number of Y ticks based on range
+  const yTickCount = Math.min(5, Math.ceil((maxWeight - minWeight) * 2));
+  const yTickValues = d3Scale.scaleLinear().domain([minWeight, maxWeight]).ticks(yTickCount);
 
   // Straight lines between points
   const lineGenerator = d3Shape
@@ -808,7 +866,14 @@ function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string
     .y(d => scaleY(d.weight))
     .curve(d3Shape.curveLinear);
 
-  const pathData = lineGenerator(data);
+  const pathData = lineGenerator(combinedData);
+
+  // Select a subset of x-axis labels to prevent crowding
+  const shouldShowLabel = (i: number) => {
+    if (combinedData.length <= 5) return true; // Show all labels if 5 or fewer points
+    if (i === 0 || i === combinedData.length - 1) return true; // Always show first and last
+    return i % Math.ceil(combinedData.length / 5) === 0; // Show approximately 5 labels total
+  };
 
   return (
     <View style={{ width: '100%', alignItems: 'center', paddingBottom: 5 }}>
@@ -834,14 +899,14 @@ function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string
           <ActivityIndicator size="large" color="#E040FB" />
           <Text style={styles.loadingText}>Loading weight data...</Text>
         </View>
-      ) : data.length === 0 ? (
+      ) : combinedData.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No weight data available yet.</Text>
           <Text style={styles.emptySubtext}>Tap the + button to add your weight.</Text>
         </View>
       ) : (
         <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
-          <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
+          <Svg width={Math.max(GRAPH_WIDTH, combinedData.length * 60)} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
             {/* ───────── GRID + AXES ───────── */}
             <G>
               {/* Horizontal grid + Y labels */}
@@ -865,14 +930,14 @@ function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string
                       textAnchor="end"
                       alignmentBaseline="middle"
                     >
-                      {tickValue}
+                      {tickValue.toFixed(1)}
                     </SvgText>
                   </React.Fragment>
                 );
               })}
 
               {/* Vertical grid + X labels */}
-              {data.map((d, i) => {
+              {combinedData.map((d, i) => {
                 const xCoord = scaleX(i);
                 return (
                   <React.Fragment key={`x-tick-${i}`}>
@@ -884,16 +949,18 @@ function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string
                       stroke="rgba(255,255,255,0.1)"
                       strokeWidth={1}
                     />
-                    <SvgText
-                      x={xCoord}
-                      y={GRAPH_HEIGHT - MARGIN / 2}
-                      fill="#FFF"
-                      fontSize={10}
-                      textAnchor="middle"
-                      alignmentBaseline="middle"
-                    >
-                      {d.date}
-                    </SvgText>
+                    {shouldShowLabel(i) && (
+                      <SvgText
+                        x={xCoord}
+                        y={GRAPH_HEIGHT - MARGIN / 2}
+                        fill="#FFF"
+                        fontSize={10}
+                        textAnchor="middle"
+                        alignmentBaseline="middle"
+                      >
+                        {d.date}
+                      </SvgText>
+                    )}
                   </React.Fragment>
                 );
               })}
@@ -909,21 +976,37 @@ function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string
                   strokeWidth={2}
                 />
               )}
-              {data.map((d, i) => {
+              {combinedData.map((d, i) => {
                 const cx = scaleX(i);
                 const cy = scaleY(d.weight);
+                const isTodayPoint = showTodayWeight && i === combinedData.length - 1 && i > 0;
+
                 return (
                   <Circle
                     key={`circle-${i}`}
                     cx={cx}
                     cy={cy}
-                    r={4}
-                    fill="#FF4500"  // changed color to orange red
+                    r={isTodayPoint ? 5 : 4}  // Make today's point slightly larger
+                    fill={isTodayPoint ? "#00CFFF" : "#FF4500"}  // Different color for today's point
                     stroke="#FFF"
-                    strokeWidth={1}
+                    strokeWidth={isTodayPoint ? 2 : 1}  // Thicker stroke for today's point
+                    strokeDasharray={isTodayPoint ? "2,2" : ""}  // Dashed stroke for today's point
                   />
                 );
               })}
+
+              {/* Add a label for today's temporary point if it exists */}
+              {showTodayWeight && combinedData.length > 1 && (
+                <SvgText
+                  x={scaleX(combinedData.length - 1)}
+                  y={scaleY(combinedData[combinedData.length - 1].weight) - 10}
+                  fill="#00CFFF"
+                  fontSize={10}
+                  textAnchor="middle"
+                >
+                  Today
+                </SvgText>
+              )}
             </G>
           </Svg>
         </ScrollView>

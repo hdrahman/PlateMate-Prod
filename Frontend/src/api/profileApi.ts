@@ -94,7 +94,7 @@ export const getProfile = async (): Promise<CompleteProfile> => {
 };
 
 // Update user profile
-export const updateProfile = async (profileData: UserProfile): Promise<CompleteProfile> => {
+export const updateProfile = async (profileData: UserProfile, skipWeightHistory: boolean = false): Promise<CompleteProfile> => {
     try {
         const token = await getIdToken();
 
@@ -104,7 +104,7 @@ export const updateProfile = async (profileData: UserProfile): Promise<CompleteP
 
         try {
             const response = await axios.put(
-                `${API_URL}/profile/`,
+                `${API_URL}/profile/?skip_weight_history=${skipWeightHistory}`,
                 { profile: profileData },
                 {
                     headers: {
@@ -204,11 +204,11 @@ export const getAchievements = async (): Promise<Achievement[]> => {
 };
 
 // Update complete profile (profile, nutrition goals, fitness goals in one call)
-export const updateCompleteProfile = async (profileData: Partial<CompleteProfile>): Promise<CompleteProfile> => {
+export const updateCompleteProfile = async (profileData: Partial<CompleteProfile>, skipWeightHistory: boolean = false): Promise<CompleteProfile> => {
     try {
         const token = await getIdToken();
         const response = await axios.put(
-            `${API_URL}/profile/`,
+            `${API_URL}/profile/?skip_weight_history=${skipWeightHistory}`,
             profileData,
             {
                 headers: {
