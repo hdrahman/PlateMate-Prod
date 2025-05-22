@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-    FlatList, ActivityIndicator, TextInput, StatusBar
+    View, Text, StyleSheet, TouchableOpacity,
+    FlatList, ActivityIndicator, TextInput, StatusBar, Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from '../components/RecipeCard';
 import { Recipe, searchRecipes, RecipeSearchParams } from '../api/recipes';
 
@@ -14,6 +16,7 @@ const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const PURPLE_ACCENT = '#AA00FF';
+const BLUE_ACCENT = '#0074dd';
 
 // Define the route params type
 type SearchResultsParams = {
@@ -21,6 +24,43 @@ type SearchResultsParams = {
     cuisine?: string;
     diet?: string;
     includeIngredients?: string[];
+};
+
+// GradientBorderCard component for consistent card styling
+interface GradientBorderCardProps {
+    children: React.ReactNode;
+    style?: any;
+}
+
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+    return (
+        <View style={[styles.gradientBorderContainer, style]}>
+            <LinearGradient
+                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    borderRadius: 10,
+                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+            />
+            <View
+                style={{
+                    margin: 1,
+                    borderRadius: 9,
+                    backgroundColor: '#121212',
+                    padding: 16,
+                    flex: 1,
+                }}
+            >
+                {children}
+            </View>
+        </View>
+    );
 };
 
 export default function SearchResults() {
@@ -93,7 +133,7 @@ export default function SearchResults() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <StatusBar barStyle="light-content" />
 
             <View style={styles.header}>
@@ -104,27 +144,29 @@ export default function SearchResults() {
                     <Ionicons name="arrow-back" size={24} color={WHITE} />
                 </TouchableOpacity>
 
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={SUBDUED} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search recipes, ingredients..."
-                        placeholderTextColor={SUBDUED}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearch}
-                        returnKeyType="search"
-                        autoFocus={!route.params?.query}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity
-                            onPress={() => setSearchQuery('')}
-                            style={styles.clearButton}
-                        >
-                            <Ionicons name="close-circle" size={20} color={SUBDUED} />
-                        </TouchableOpacity>
-                    )}
-                </View>
+                <GradientBorderCard style={styles.searchContainerWrapper}>
+                    <View style={styles.searchContainer}>
+                        <Ionicons name="search" size={20} color={SUBDUED} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search recipes, ingredients..."
+                            placeholderTextColor={SUBDUED}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                            returnKeyType="search"
+                            autoFocus={!route.params?.query}
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity
+                                onPress={() => setSearchQuery('')}
+                                style={styles.clearButton}
+                            >
+                                <Ionicons name="close-circle" size={20} color={SUBDUED} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </GradientBorderCard>
             </View>
 
             <View style={styles.resultsContainer}>
@@ -157,6 +199,19 @@ export default function SearchResults() {
                         <Text style={styles.emptySubtext}>
                             Try different keywords or check your filters
                         </Text>
+                        <TouchableOpacity
+                            style={styles.retryButton}
+                            onPress={() => navigation.goBack()}
+                        >
+                            <LinearGradient
+                                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                style={styles.gradientButton}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                            >
+                                <Text style={styles.retryButtonText}>Go Back</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
                     </View>
                 )}
             </View>
@@ -179,15 +234,23 @@ const styles = StyleSheet.create({
     },
     backButton: {
         marginRight: 12,
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    searchContainerWrapper: {
+        flex: 1,
+        height: 50,
+        padding: 0,
     },
     searchContainer: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 10,
         paddingHorizontal: 12,
-        paddingVertical: 8,
     },
     searchInput: {
         flex: 1,
@@ -201,12 +264,12 @@ const styles = StyleSheet.create({
     },
     resultsContainer: {
         flex: 1,
+        padding: 16,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
     },
     loadingText: {
         color: WHITE,
@@ -215,33 +278,54 @@ const styles = StyleSheet.create({
     },
     resultCount: {
         color: SUBDUED,
-        padding: 16,
         fontSize: 14,
-    },
-    listContent: {
-        paddingHorizontal: 10,
-        paddingBottom: 30,
+        marginBottom: 16,
     },
     recipeCardContainer: {
-        marginBottom: 12,
+        marginBottom: 16,
+    },
+    listContent: {
+        paddingBottom: 16,
     },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        paddingHorizontal: 32,
     },
     emptyText: {
         color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
         marginTop: 16,
+        marginBottom: 8,
     },
     emptySubtext: {
         color: SUBDUED,
         fontSize: 16,
         textAlign: 'center',
-        marginTop: 8,
-        marginHorizontal: 30,
+        marginBottom: 24,
+    },
+    retryButton: {
+        width: '60%',
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
+        marginTop: 16,
+    },
+    gradientButton: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    retryButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    gradientBorderContainer: {
+        borderRadius: 10,
+        overflow: 'hidden',
     },
 });

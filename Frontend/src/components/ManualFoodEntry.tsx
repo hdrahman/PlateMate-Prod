@@ -7,19 +7,59 @@ import {
     TouchableOpacity,
     Modal,
     ScrollView,
-    Alert
+    Alert,
+    Platform,
+    StatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FoodItem } from '../api/nutritionix';
 
 // Define theme colors
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
+const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
-const BLUE_ACCENT = '#2196F3';
+const BLUE_ACCENT = '#0074dd';
+const PURPLE_ACCENT = '#AA00FF';
+
+// GradientBorderCard component for consistent card styling
+interface GradientBorderCardProps {
+    children: React.ReactNode;
+    style?: any;
+}
+
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+    return (
+        <View style={[styles.gradientBorderContainer, style]}>
+            <LinearGradient
+                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    borderRadius: 10,
+                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+            />
+            <View
+                style={{
+                    margin: 1,
+                    borderRadius: 9,
+                    backgroundColor: '#121212',
+                    padding: 16,
+                }}
+            >
+                {children}
+            </View>
+        </View>
+    );
+};
 
 interface ManualFoodEntryProps {
     visible: boolean;
@@ -117,7 +157,9 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
             transparent={false}
             onRequestClose={onClose}
         >
-            <View style={styles.container}>
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -128,8 +170,37 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                 </View>
 
                 <ScrollView style={styles.content}>
+                    {/* Meal Type Selector - Moved to top */}
+                    <GradientBorderCard style={styles.section}>
+                        <Text style={styles.sectionTitle}>Add to Meal</Text>
+                        <View style={styles.mealOptions}>
+                            {mealOptions.map((meal, index) => (
+                                <TouchableOpacity
+                                    key={meal}
+                                    style={[
+                                        styles.mealOption,
+                                        selectedMeal === meal && styles.selectedMealOption,
+                                        index === mealOptions.length - 1 && { marginRight: 0 }
+                                    ]}
+                                    onPress={() => setSelectedMeal(meal)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.mealOptionText,
+                                            selectedMeal === meal && styles.selectedMealOptionText
+                                        ]}
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                    >
+                                        {meal}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </GradientBorderCard>
+
                     {/* Basic Info */}
-                    <View style={styles.section}>
+                    <GradientBorderCard style={styles.section}>
                         <Text style={styles.sectionTitle}>Basic Information</Text>
 
                         {/* Food Name */}
@@ -168,41 +239,15 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                                 />
                             </View>
                         </View>
-                    </View>
-
-                    {/* Meal Type Selector */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Add to Meal</Text>
-                        <View style={styles.mealOptions}>
-                            {mealOptions.map((meal) => (
-                                <TouchableOpacity
-                                    key={meal}
-                                    style={[
-                                        styles.mealOption,
-                                        selectedMeal === meal && styles.selectedMealOption
-                                    ]}
-                                    onPress={() => setSelectedMeal(meal)}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.mealOptionText,
-                                            selectedMeal === meal && styles.selectedMealOptionText
-                                        ]}
-                                    >
-                                        {meal}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
+                    </GradientBorderCard>
 
                     {/* Nutrition Facts */}
-                    <View style={styles.section}>
+                    <GradientBorderCard style={styles.section}>
                         <Text style={styles.sectionTitle}>Nutrition Facts</Text>
 
                         {/* Calories */}
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Calories*</Text>
+                            <Text style={styles.label}>Calories</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="0"
@@ -213,12 +258,13 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                             />
                         </View>
 
-                        {/* Macros Row */}
-                        <View style={styles.row}>
-                            <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Protein (g)</Text>
+                        {/* Macronutrients Grid */}
+                        <Text style={styles.subSectionTitle}>Macronutrients (g)</Text>
+                        <View style={styles.macroRow}>
+                            <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
+                                <Text style={styles.macroLabel}>Protein</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={styles.macroInput}
                                     placeholder="0"
                                     placeholderTextColor={GRAY}
                                     value={proteins}
@@ -226,10 +272,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                                     keyboardType="numeric"
                                 />
                             </View>
-                            <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Carbs (g)</Text>
+                            <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
+                                <Text style={styles.macroLabel}>Carbs</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={styles.macroInput}
                                     placeholder="0"
                                     placeholderTextColor={GRAY}
                                     value={carbs}
@@ -237,10 +283,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                                     keyboardType="numeric"
                                 />
                             </View>
-                            <View style={[styles.inputGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>Fat (g)</Text>
+                            <View style={styles.macroInputGroup}>
+                                <Text style={styles.macroLabel}>Fat</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={styles.macroInput}
                                     placeholder="0"
                                     placeholderTextColor={GRAY}
                                     value={fats}
@@ -250,12 +296,13 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                             </View>
                         </View>
 
-                        {/* Additional Macros */}
-                        <View style={styles.row}>
-                            <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Fiber (g)</Text>
+                        {/* Additional Nutrients */}
+                        <Text style={styles.subSectionTitle}>Additional (g)</Text>
+                        <View style={styles.macroRow}>
+                            <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
+                                <Text style={styles.macroLabel}>Fiber</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={styles.macroInput}
                                     placeholder="0"
                                     placeholderTextColor={GRAY}
                                     value={fiber}
@@ -263,10 +310,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                                     keyboardType="numeric"
                                 />
                             </View>
-                            <View style={[styles.inputGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>Sugar (g)</Text>
+                            <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
+                                <Text style={styles.macroLabel}>Sugar</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={styles.macroInput}
                                     placeholder="0"
                                     placeholderTextColor={GRAY}
                                     value={sugar}
@@ -274,22 +321,28 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                                     keyboardType="numeric"
                                 />
                             </View>
+                            <View style={styles.macroInputGroup}>
+                                <Text style={styles.macroLabel}></Text>
+                            </View>
                         </View>
-                    </View>
+                    </GradientBorderCard>
 
                     {/* Save Button */}
-                    <TouchableOpacity style={styles.addButton} onPress={handleSave}>
+                    <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={handleSave}
+                    >
                         <LinearGradient
-                            colors={['#2196F3', '#673AB7']}
+                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                            style={styles.saveGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
-                            style={styles.addButtonGradient}
                         >
-                            <Text style={styles.addButtonText}>ADD TO FOOD LOG</Text>
+                            <Text style={styles.saveButtonText}>Save Food</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </ScrollView>
-            </View>
+            </SafeAreaView>
         </Modal>
     );
 }
@@ -304,104 +357,126 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: 50,
-        paddingBottom: 16,
-        backgroundColor: CARD_BG,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },
     closeButton: {
-        padding: 8,
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
     },
     headerTitle: {
-        color: WHITE,
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
-        textAlign: 'center',
+        color: WHITE,
     },
     content: {
         flex: 1,
         padding: 16,
     },
     section: {
-        marginBottom: 24,
+        marginBottom: 16,
     },
     sectionTitle: {
-        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
-        marginBottom: 12,
+        color: WHITE,
+        marginBottom: 16,
+    },
+    subSectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginTop: 16,
+        marginBottom: 8,
     },
     inputGroup: {
-        marginBottom: 12,
+        marginBottom: 16,
+    },
+    label: {
+        color: WHITE,
+        fontSize: 14,
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 8,
+        padding: 12,
+        color: WHITE,
+        fontSize: 16,
     },
     row: {
         flexDirection: 'row',
-        marginBottom: 12,
-    },
-    label: {
-        color: GRAY,
-        fontSize: 14,
-        marginBottom: 4,
-    },
-    input: {
-        backgroundColor: CARD_BG,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: LIGHT_GRAY,
-        color: WHITE,
-        padding: 10,
-        fontSize: 16,
+        alignItems: 'center',
     },
     mealOptions: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
         justifyContent: 'space-between',
+        marginBottom: 8,
     },
     mealOption: {
-        width: '48%',
-        backgroundColor: CARD_BG,
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 10,
+        flex: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 20,
+        marginRight: 8,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: LIGHT_GRAY,
     },
     selectedMealOption: {
-        borderColor: BLUE_ACCENT,
-        backgroundColor: 'rgba(33, 150, 243, 0.15)',
+        backgroundColor: PURPLE_ACCENT,
     },
     mealOptionText: {
-        color: GRAY,
-        fontSize: 16,
+        color: WHITE,
+        fontSize: 13,
+        textAlign: 'center',
     },
     selectedMealOptionText: {
-        color: WHITE,
         fontWeight: 'bold',
     },
-    notesInput: {
-        backgroundColor: CARD_BG,
+    macroRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    macroInputGroup: {
+        flex: 1,
+    },
+    macroLabel: {
+        color: WHITE,
+        fontSize: 14,
+        marginBottom: 8,
+    },
+    macroInput: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: LIGHT_GRAY,
+        padding: 12,
         color: WHITE,
-        padding: 10,
         fontSize: 16,
-        minHeight: 80,
-        textAlignVertical: 'top',
     },
-    addButton: {
-        marginVertical: 20,
-        borderRadius: 12,
+    saveButton: {
+        height: 50,
+        borderRadius: 25,
         overflow: 'hidden',
+        marginVertical: 24,
     },
-    addButtonGradient: {
-        paddingVertical: 16,
-        alignItems: 'center',
+    saveGradient: {
+        width: '100%',
+        height: '100%',
         justifyContent: 'center',
+        alignItems: 'center',
     },
-    addButtonText: {
+    saveButtonText: {
         color: WHITE,
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    gradientBorderContainer: {
+        borderRadius: 10,
+        overflow: 'hidden',
     },
 }); 
