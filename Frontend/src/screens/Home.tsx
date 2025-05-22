@@ -864,9 +864,17 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
     .line<{ date: string; weight: number }>()
     .x((d, i) => scaleX(i))
     .y(d => scaleY(d.weight))
-    .curve(d3Shape.curveLinear);
+    .curve(d3Shape.curveCatmullRom.alpha(0.5));
+
+  const areaGenerator = d3Shape
+    .area<{ date: string; weight: number }>()
+    .x((d, i) => scaleX(i))
+    .y0(GRAPH_HEIGHT - MARGIN) // Bottom of the graph
+    .y1(d => scaleY(d.weight))
+    .curve(d3Shape.curveCatmullRom.alpha(0.5)); // Match the line curve
 
   const pathData = lineGenerator(combinedData);
+  const areaData = areaGenerator(combinedData);
 
   // Select a subset of x-axis labels to prevent crowding
   const shouldShowLabel = (i: number) => {
@@ -968,12 +976,35 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
 
             {/* ───────── LINE + POINTS ───────── */}
             <G>
+              {/* Area fill under the curve */}
+              {areaData && (
+                <Path
+                  d={areaData}
+                  fill="url(#areaGradient)"
+                  opacity={0.15}
+                />
+              )}
+
+              {/* Define gradients */}
+              <Defs>
+                <SvgLinearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <Stop offset="0%" stopColor="#FF6347" />
+                  <Stop offset="100%" stopColor="#FF8C00" />
+                </SvgLinearGradient>
+                <SvgLinearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <Stop offset="0%" stopColor="#FF6347" />
+                  <Stop offset="100%" stopColor="#FF6347" stopOpacity="0" />
+                </SvgLinearGradient>
+              </Defs>
+
               {pathData && (
                 <Path
                   d={pathData}
                   fill="none"
-                  stroke="#FF6347"  // changed color to tomato
-                  strokeWidth={2}
+                  stroke="url(#lineGradient)"
+                  strokeWidth={3.5}   // Slightly thicker
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
               )}
               {combinedData.map((d, i) => {
@@ -981,18 +1012,22 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
                 const cy = scaleY(d.weight);
                 const isTodayPoint = showTodayWeight && i === combinedData.length - 1 && i > 0;
 
-                return (
-                  <Circle
-                    key={`circle-${i}`}
-                    cx={cx}
-                    cy={cy}
-                    r={isTodayPoint ? 5 : 4}  // Make today's point slightly larger
-                    fill={isTodayPoint ? "#00CFFF" : "#FF4500"}  // Different color for today's point
-                    stroke="#FFF"
-                    strokeWidth={isTodayPoint ? 2 : 1}  // Thicker stroke for today's point
-                    strokeDasharray={isTodayPoint ? "2,2" : ""}  // Dashed stroke for today's point
-                  />
-                );
+                // Only render dots for certain points to reduce visual clutter
+                if (isTodayPoint || i === 0 || i === combinedData.length - 1 || i % 3 === 0) {
+                  return (
+                    <Circle
+                      key={`circle-${i}`}
+                      cx={cx}
+                      cy={cy}
+                      r={isTodayPoint ? 3.5 : 2}  // Even smaller dots
+                      fill={isTodayPoint ? "#00CFFF" : "rgba(255,69,0,0.4)"}  // More transparent
+                      stroke={isTodayPoint ? "#FFF" : "rgba(255,255,255,0.4)"}
+                      strokeWidth={isTodayPoint ? 1 : 0.3}  // Thinner stroke
+                      strokeDasharray={isTodayPoint ? "2,2" : ""}
+                    />
+                  );
+                }
+                return null;
               })}
 
               {/* Add a label for today's temporary point if it exists */}
@@ -1050,9 +1085,17 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
     .line<{ date: string; steps: number }>()
     .x((d, i) => scaleX(i))
     .y(d => scaleY(d.steps))
-    .curve(d3Shape.curveLinear);
+    .curve(d3Shape.curveCatmullRom.alpha(0.5)); // Match the WeightGraph curve type
+
+  const areaGenerator = d3Shape
+    .area<{ date: string; steps: number }>()
+    .x((d, i) => scaleX(i))
+    .y0(GRAPH_HEIGHT - MARGIN) // Bottom of the graph
+    .y1(d => scaleY(d.steps))
+    .curve(d3Shape.curveCatmullRom.alpha(0.5)); // Match the line curve
 
   const pathData = lineGenerator(data);
+  const areaData = areaGenerator(data);
 
   return (
     <View style={{ width: '100%', alignItems: 'center', paddingBottom: 5 }}>
@@ -1130,28 +1173,56 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
 
           {/* Steps line + points */}
           <G>
+            {/* Area fill under the curve */}
+            {areaData && (
+              <Path
+                d={areaData}
+                fill="url(#stepsAreaGradient)"
+                opacity={0.15}
+              />
+            )}
+
+            {/* Define gradients */}
+            <Defs>
+              <SvgLinearGradient id="stepsLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <Stop offset="0%" stopColor="#1E90FF" />
+                <Stop offset="100%" stopColor="#00BFFF" />
+              </SvgLinearGradient>
+              <SvgLinearGradient id="stepsAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <Stop offset="0%" stopColor="#1E90FF" />
+                <Stop offset="100%" stopColor="#1E90FF" stopOpacity="0" />
+              </SvgLinearGradient>
+            </Defs>
+
             {pathData && (
               <Path
                 d={pathData}
                 fill="none"
-                stroke="#1E90FF"  // changed color to dodger blue
-                strokeWidth={2}
+                stroke="url(#stepsLineGradient)"
+                strokeWidth={3.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             )}
             {data.map((d, i) => {
               const cx = scaleX(i);
               const cy = scaleY(d.steps);
-              return (
-                <Circle
-                  key={`steps-circle-${i}`}
-                  cx={cx}
-                  cy={cy}
-                  r={4}
-                  fill="#4169E1"  // changed color to royal blue
-                  stroke="#FFF"
-                  strokeWidth={1}
-                />
-              );
+
+              // Only render dots for certain points to reduce visual clutter
+              if (i === 0 || i === data.length - 1 || i % 3 === 0) {
+                return (
+                  <Circle
+                    key={`steps-circle-${i}`}
+                    cx={cx}
+                    cy={cy}
+                    r={2}
+                    fill="rgba(65,105,225,0.4)"
+                    stroke="rgba(255,255,255,0.4)"
+                    strokeWidth={0.3}
+                  />
+                );
+              }
+              return null;
             })}
           </G>
         </Svg>
