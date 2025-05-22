@@ -20,6 +20,8 @@ export interface UserProfile {
 
     // Health & fitness goals
     weightGoal: string | null;
+    targetWeight: number | null;
+    startingWeight: number | null;
     healthConditions: string[];
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
@@ -46,6 +48,18 @@ export interface UserProfile {
     unitPreference: string;
     darkMode: boolean;
     syncDataOffline: boolean;
+}
+
+// Weight entry for tracking weight history
+export interface WeightEntry {
+    id?: number;
+    weight: number;
+    recorded_at: string;
+}
+
+// Weight history response from API
+export interface WeightHistoryResponse {
+    weights: WeightEntry[];
 }
 
 // User authentication state

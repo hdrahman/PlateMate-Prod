@@ -69,7 +69,7 @@ interface ManualFoodEntryProps {
 
 export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualFoodEntryProps) {
     const [foodName, setFoodName] = useState<string>('');
-    const [calories, setCalories] = useState<string>('0');
+    const [calories, setCalories] = useState<string>('');
     const [proteins, setProteins] = useState<string>('0');
     const [carbs, setCarbs] = useState<string>('0');
     const [fats, setFats] = useState<string>('0');
@@ -81,13 +81,16 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
     const [fiber, setFiber] = useState<string>('0');
     const [sugar, setSugar] = useState<string>('0');
 
+    // Check if form is valid (has food name and calories)
+    const isFormValid = foodName.trim() !== '' && calories.trim() !== '' && parseFloat(calories) > 0;
+
     // Meal options
     const mealOptions = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
     // Reset form
     const resetForm = () => {
         setFoodName('');
-        setCalories('0');
+        setCalories('');
         setProteins('0');
         setCarbs('0');
         setFats('0');
@@ -103,6 +106,11 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         // Validate required fields
         if (!foodName.trim()) {
             Alert.alert('Error', 'Please enter a food name');
+            return;
+        }
+
+        if (!calories.trim() || parseFloat(calories) <= 0) {
+            Alert.alert('Error', 'Please enter valid calories');
             return;
         }
 
@@ -174,28 +182,32 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                     <GradientBorderCard style={styles.section}>
                         <Text style={styles.sectionTitle}>Add to Meal</Text>
                         <View style={styles.mealOptions}>
-                            {mealOptions.map((meal, index) => (
-                                <TouchableOpacity
-                                    key={meal}
-                                    style={[
-                                        styles.mealOption,
-                                        selectedMeal === meal && styles.selectedMealOption,
-                                        index === mealOptions.length - 1 && { marginRight: 0 }
-                                    ]}
-                                    onPress={() => setSelectedMeal(meal)}
-                                >
-                                    <Text
+                            {mealOptions.map((meal, index) => {
+                                const isBreakfast = meal === 'Breakfast';
+                                return (
+                                    <TouchableOpacity
+                                        key={meal}
                                         style={[
-                                            styles.mealOptionText,
-                                            selectedMeal === meal && styles.selectedMealOptionText
+                                            styles.mealOption,
+                                            selectedMeal === meal && styles.selectedMealOption,
+                                            index === mealOptions.length - 1 && { marginRight: 0 },
+                                            isBreakfast && { flex: 1.2 } // Give more space to "Breakfast"
                                         ]}
-                                        numberOfLines={1}
-                                        ellipsizeMode="tail"
+                                        onPress={() => setSelectedMeal(meal)}
                                     >
-                                        {meal}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
+                                        <Text
+                                            style={[
+                                                styles.mealOptionText,
+                                                selectedMeal === meal && styles.selectedMealOptionText
+                                            ]}
+                                            numberOfLines={1}
+                                            ellipsizeMode="tail"
+                                        >
+                                            {meal}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     </GradientBorderCard>
 
@@ -247,10 +259,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
 
                         {/* Calories */}
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Calories</Text>
+                            <Text style={styles.label}>Calories*</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="0"
+                                placeholder="Enter calories"
                                 placeholderTextColor={GRAY}
                                 value={calories}
                                 onChangeText={setCalories}
@@ -331,14 +343,21 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                     <TouchableOpacity
                         style={styles.saveButton}
                         onPress={handleSave}
+                        disabled={!isFormValid}
                     >
                         <LinearGradient
-                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                            style={styles.saveGradient}
+                            colors={isFormValid ? ["#0074dd", "#5c00dd", "#dd0095"] : ["#444444", "#333333", "#222222"]}
+                            style={[
+                                styles.saveGradient,
+                                !isFormValid && styles.disabledButton
+                            ]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                         >
-                            <Text style={styles.saveButtonText}>Save Food</Text>
+                            <Text style={[
+                                styles.saveButtonText,
+                                !isFormValid && styles.disabledButtonText
+                            ]}>Save Food</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </ScrollView>
@@ -421,20 +440,23 @@ const styles = StyleSheet.create({
     },
     mealOption: {
         flex: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 12,
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderRadius: 20,
-        marginRight: 8,
+        marginRight: 6,
         alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 70,
     },
     selectedMealOption: {
         backgroundColor: PURPLE_ACCENT,
     },
     mealOptionText: {
         color: WHITE,
-        fontSize: 13,
+        fontSize: 12,
         textAlign: 'center',
+        fontWeight: '500',
     },
     selectedMealOptionText: {
         fontWeight: 'bold',
@@ -478,5 +500,11 @@ const styles = StyleSheet.create({
     gradientBorderContainer: {
         borderRadius: 10,
         overflow: 'hidden',
+    },
+    disabledButton: {
+        opacity: 0.5,
+    },
+    disabledButtonText: {
+        color: 'rgba(255, 255, 255, 0.5)',
     },
 }); 

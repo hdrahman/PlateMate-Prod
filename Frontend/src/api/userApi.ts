@@ -72,6 +72,16 @@ interface UpdateUserData {
     app_settings?: AppSettings;
 }
 
+// Weight history interfaces
+export interface WeightEntry {
+    weight: number;
+    recorded_at: string;
+}
+
+export interface WeightHistoryResponse {
+    weights: WeightEntry[];
+}
+
 // Function to get firebase token with better error handling
 const getFirebaseToken = async () => {
     const currentUser = auth.currentUser;
@@ -248,6 +258,7 @@ export const getUserProfile = async (firebaseUid: string) => {
                 fetchError.message.includes('Network error')
             )) {
                 console.warn('Network connection failed - backend may be unavailable');
+                // Return error with a network flag
                 return { error: 'network' };
             }
 
@@ -255,35 +266,28 @@ export const getUserProfile = async (firebaseUid: string) => {
         }
     } catch (error: any) {
         console.error('Error getting user profile:', error);
-        throw error;
+        // Return more structured error
+        return { error: error.message || 'unknown' };
     }
 };
 
 // Update user profile with improved error handling
 export const updateUserProfile = async (firebaseUid: string, userData: UpdateUserData) => {
     try {
-        // Validate that the user is signed in and matches the profile being updated
+        // Validate that the user is signed in and matches the requested profile
         const currentUser = auth.currentUser;
-        if (!currentUser) {
-            throw new Error('User not authenticated. Please sign in again.');
-        }
-
-        // Only allow users to update their own profile
-        if (currentUser.uid !== firebaseUid) {
-            throw new Error('Not authorized to update another user\'s profile.');
+        if (!currentUser || currentUser.uid !== firebaseUid) {
+            throw new Error('Authentication mismatch. Please sign in again.');
         }
 
         // Add timeout to fetch request
-        const timeout = 15000; // 15 seconds timeout
+        const timeout = 8000; // 8 seconds timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
             const token = await getFirebaseToken();
             console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}`);
-
-            // Log the update data for debugging
-            console.log(`Update data: ${JSON.stringify(userData)}`);
 
             const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}`, {
                 method: 'PUT',
@@ -298,19 +302,24 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                // Try to parse response body for error details
+                // Handle specific HTTP error codes
+                if (response.status === 404) {
+                    throw new Error('User not found. Please sign up first.');
+                }
+
+                if (response.status === 403) {
+                    throw new Error('Not authorized to update this profile.');
+                }
+
                 try {
                     const errorData = await response.json();
-                    console.error('API error response:', errorData);
-                    throw new Error(errorData.detail || `Failed to update user profile: ${response.status}`);
+                    throw new Error(errorData.detail || 'Failed to update user profile');
                 } catch (jsonError) {
                     throw new Error(`Failed to update user profile: ${response.status} ${response.statusText}`);
                 }
             }
 
-            const responseData = await response.json();
-            console.log('Profile update response:', JSON.stringify(responseData));
-            return responseData;
+            return await response.json();
         } catch (fetchError: any) {
             // Handle specific network errors
             if (fetchError.name === 'AbortError') {
@@ -318,7 +327,7 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
                 throw new Error('Connection to server timed out. Please try again later.');
             }
 
-            console.warn('Network error updating profile:', fetchError.message);
+            console.warn('Network error updating user:', fetchError.message);
             // Handle known network errors
             if (fetchError.message && (
                 fetchError.message.includes('Network request failed') ||
@@ -336,23 +345,95 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
     }
 };
 
-// Update subscription status with improved error handling
-export const updateSubscription = async (firebaseUid: string, subscriptionStatus: string) => {
+// Add a new weight entry
+export const addWeightEntry = async (firebaseUid: string, weight: number) => {
     try {
-        // Validate that the user is signed in and matches the subscription being updated
+        // Validate that the user is signed in and matches the requested profile
+        const currentUser = auth.currentUser;
+        if (!currentUser || currentUser.uid !== firebaseUid) {
+            throw new Error('Authentication mismatch. Please sign in again.');
+        }
+
+        const token = await getFirebaseToken();
+        console.log(`Adding weight entry at ${BACKEND_URL}/users/${firebaseUid}/weight`);
+
+        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weight`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ weight })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to add weight entry');
+        }
+
+        return await response.json();
+    } catch (error: any) {
+        console.error('Error adding weight entry:', error);
+        throw error;
+    }
+};
+
+// Get weight history
+export const getWeightHistory = async (firebaseUid: string, limit: number = 100): Promise<WeightHistoryResponse> => {
+    try {
+        // Validate that the user is signed in and matches the requested profile
         const currentUser = auth.currentUser;
         if (!currentUser) {
             throw new Error('User not authenticated. Please sign in again.');
         }
 
-        // Only allow users to update their own subscription
+        // Only allow users to access their own profile
         if (currentUser.uid !== firebaseUid) {
-            throw new Error('Not authorized to update another user\'s subscription.');
+            console.warn('Attempting to access another user\'s weight history. Redirecting to own history.');
+            firebaseUid = currentUser.uid;
         }
 
         const token = await getFirebaseToken();
+        console.log(`Fetching weight history from ${BACKEND_URL}/users/${firebaseUid}/weight/history?limit=${limit}`);
+
+        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weight/history?limit=${limit}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                console.log('User not found in database (404 response)');
+                return { weights: [] };
+            }
+
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to get weight history');
+        }
+
+        return await response.json();
+    } catch (error: any) {
+        console.error('Error getting weight history:', error);
+        return { weights: [] };
+    }
+};
+
+// Update subscription status
+export const updateSubscription = async (firebaseUid: string, subscriptionStatus: string) => {
+    try {
+        // Validate that the user is signed in and matches the requested profile
+        const currentUser = auth.currentUser;
+        if (!currentUser || currentUser.uid !== firebaseUid) {
+            throw new Error('Authentication mismatch. Please sign in again.');
+        }
+
+        const token = await getFirebaseToken();
+        console.log(`Updating subscription at ${BACKEND_URL}/users/${firebaseUid}/subscription`);
+
         const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/subscription`, {
-            method: 'POST',
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
@@ -362,17 +443,17 @@ export const updateSubscription = async (firebaseUid: string, subscriptionStatus
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to update subscription');
+            throw new Error(errorData.detail || 'Failed to update subscription status');
         }
 
         return await response.json();
     } catch (error: any) {
-        console.error('Error updating subscription:', error);
+        console.error('Error updating subscription status:', error);
         throw error;
     }
 };
 
-// Convert frontend profile format to backend format
+// Helper to convert front-end profile format to backend format
 export const convertProfileToBackendFormat = (profile: any): UpdateUserData => {
     return {
         first_name: profile.firstName,
@@ -423,46 +504,43 @@ export const convertProfileToBackendFormat = (profile: any): UpdateUserData => {
     };
 };
 
-// Convert backend user format to frontend format
+// Helper to convert backend data format to front-end profile format
 export const convertBackendToProfileFormat = (backendData: any): any => {
     return {
+        id: backendData.id,
         firstName: backendData.first_name,
         lastName: backendData.last_name,
-        phoneNumber: backendData.phone_number,
-
+        phoneNumber: backendData.phone_number || '',
         height: backendData.height,
         weight: backendData.weight,
         age: backendData.age,
         gender: backendData.gender,
         activityLevel: backendData.activity_level,
-
         dietaryRestrictions: backendData.dietary_restrictions || [],
         foodAllergies: backendData.food_allergies || [],
         cuisinePreferences: backendData.cuisine_preferences || [],
         spiceTolerance: backendData.spice_tolerance,
-
         weightGoal: backendData.weight_goal,
+        targetWeight: backendData.target_weight,
+        startingWeight: backendData.starting_weight,
         healthConditions: backendData.health_conditions || [],
         dailyCalorieTarget: backendData.daily_calorie_target,
         nutrientFocus: backendData.nutrient_focus,
-
         defaultAddress: backendData.default_address,
         preferredDeliveryTimes: backendData.preferred_delivery_times || [],
         deliveryInstructions: backendData.delivery_instructions,
-
         pushNotificationsEnabled: backendData.push_notifications_enabled,
         emailNotificationsEnabled: backendData.email_notifications_enabled,
         smsNotificationsEnabled: backendData.sms_notifications_enabled,
         marketingEmailsEnabled: backendData.marketing_emails_enabled,
-
         paymentMethods: backendData.payment_methods || [],
         billingAddress: backendData.billing_address,
         defaultPaymentMethodId: backendData.default_payment_method_id,
-
-        preferredLanguage: backendData.preferred_language,
-        timezone: backendData.timezone,
-        unitPreference: backendData.unit_preference,
+        preferredLanguage: backendData.preferred_language || 'en',
+        timezone: backendData.timezone || 'UTC',
+        unitPreference: backendData.unit_preference || 'metric',
         darkMode: backendData.dark_mode,
-        syncDataOffline: backendData.sync_data_offline
+        syncDataOffline: backendData.sync_data_offline,
+        onboardingComplete: backendData.onboarding_complete
     };
 }; 

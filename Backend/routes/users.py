@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta
 from enum import Enum
 
-from models import User, Gender, ActivityLevel, WeightGoal
+from models import User, Gender, ActivityLevel, WeightGoal, UserWeight
 from DB import get_db
 from auth.firebase_auth import get_current_user, verify_firebase_token
 
@@ -81,10 +81,25 @@ class UserResponse(BaseModel):
     # Health & fitness goals
     weight_goal: Optional[str] = None
     target_weight: Optional[float] = None
+    starting_weight: Optional[float] = None
     
     # Timestamps
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        orm_mode = True
+
+# Weight history models
+class WeightEntry(BaseModel):
+    weight: float
+    recorded_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True
+
+class WeightHistoryResponse(BaseModel):
+    weights: List[WeightEntry]
     
     class Config:
         orm_mode = True
@@ -119,6 +134,31 @@ def update_user(db: Session, user_id: int, user_data: dict):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+def add_weight_entry(db: Session, user_id: int, weight: float):
+    # Create new weight entry
+    weight_entry = UserWeight(
+        user_id=user_id,
+        weight=weight
+    )
+    db.add(weight_entry)
+    
+    # Also update current weight in user profile
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    # If this is the first weight entry and starting_weight is not set, set it
+    if user.starting_weight is None:
+        user.starting_weight = weight
+    
+    # Always update current weight
+    user.weight = weight
+    
+    db.commit()
+    db.refresh(weight_entry)
+    return weight_entry
+
+def get_user_weight_history(db: Session, user_id: int, limit: int = 100):
+    return db.query(UserWeight).filter(UserWeight.user_id == user_id).order_by(UserWeight.recorded_at.desc()).limit(limit).all()
 
 # API Endpoints
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -214,6 +254,10 @@ async def update_user_profile(
             update_data["height"] = pa.height
         if pa.weight is not None:
             update_data["weight"] = pa.weight
+            
+            # When weight is updated, add a new entry to weight history
+            add_weight_entry(db, db_user.id, pa.weight)
+            
         if pa.age is not None:
             update_data["age"] = pa.age
         if pa.gender is not None:
@@ -231,4 +275,54 @@ async def update_user_profile(
             update_data["target_weight"] = hg.target_weight
     
     updated_user = update_user(db, db_user.id, update_data)
-    return updated_user 
+    return updated_user
+
+@router.post("/{firebase_uid}/weight", response_model=WeightEntry, status_code=status.HTTP_201_CREATED)
+async def add_user_weight(
+    firebase_uid: str,
+    weight_entry: WeightEntry,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Only allow users to add their own weight data
+    if current_user.firebase_uid != firebase_uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to add weight data for this user"
+        )
+    
+    db_user = get_user_by_firebase_uid(db, firebase_uid=firebase_uid)
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Add weight entry
+    new_entry = add_weight_entry(db, db_user.id, weight_entry.weight)
+    return new_entry
+
+@router.get("/{firebase_uid}/weight/history", response_model=WeightHistoryResponse)
+async def get_weight_history(
+    firebase_uid: str,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Only allow users to access their own weight history
+    if current_user.firebase_uid != firebase_uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this user's weight history"
+        )
+    
+    db_user = get_user_by_firebase_uid(db, firebase_uid=firebase_uid)
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Get weight history
+    weight_entries = get_user_weight_history(db, db_user.id, limit)
+    return {"weights": weight_entries} 

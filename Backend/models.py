@@ -47,6 +47,7 @@ class User(Base):
     activity_level = Column(Enum(ActivityLevel), nullable=True)
     weight_goal = Column(Enum(WeightGoal), nullable=True)
     target_weight = Column(Float, nullable=True)  # stored in kg
+    starting_weight = Column(Float, nullable=True)  # stored in kg, initial weight when user starts tracking
     date_of_birth = Column(DateTime, nullable=True)
     location = Column(String, nullable=True)
     is_imperial_units = Column(Boolean, default=False)
@@ -63,6 +64,7 @@ class User(Base):
     fitness_goals = relationship("FitnessGoals", back_populates="user", uselist=False)
     gamification = relationship("UserGamification", back_populates="user", uselist=False)
     achievements = relationship("UserAchievement", back_populates="user")
+    weight_history = relationship("UserWeight", back_populates="user")
 
     def calculate_age(self):
         """Calculate user's age from date_of_birth if available."""
@@ -74,6 +76,17 @@ class User(Base):
         born = self.date_of_birth
         age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
         return age
+
+class UserWeight(Base):
+    __tablename__ = "user_weights"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    weight = Column(Float, nullable=False)  # stored in kg
+    recorded_at = Column(DateTime, default=func.now())
+    
+    # Relationship with User
+    user = relationship("User", back_populates="weight_history")
 
 class NutritionGoals(Base):
     __tablename__ = "nutrition_goals"

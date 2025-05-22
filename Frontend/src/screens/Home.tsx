@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
+import { getWeightHistory, WeightEntry, addWeightEntry } from '../api/userApi';
 
 import {
   View,
@@ -21,7 +22,10 @@ import {
   TouchableOpacity,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput,
+  Modal,
+  Alert
 } from 'react-native';
 import Svg, {
   Circle,
@@ -149,6 +153,16 @@ export default function Home() {
     loading: stepsLoading
   } = useSteps();
 
+  // Add state for weight history
+  const [weightHistory, setWeightHistory] = useState<Array<{ date: string; weight: number }>>([]);
+  const [weightLoading, setWeightLoading] = useState(true);
+  const [weightModalVisible, setWeightModalVisible] = useState(false);
+  const [newWeight, setNewWeight] = useState('');
+  const [startingWeight, setStartingWeight] = useState<number | null>(null);
+  const [targetWeight, setTargetWeight] = useState<number | null>(null);
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [weightLost, setWeightLost] = useState(0);
+
   // Load user profile and calculate nutrition goals
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -268,6 +282,88 @@ export default function Home() {
     loadTodayNutrients();
   }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated]);
 
+  // Load weight history
+  useEffect(() => {
+    const loadWeightHistory = async () => {
+      if (!user) return;
+
+      try {
+        setWeightLoading(true);
+
+        // Get weight history from API
+        const history = await getWeightHistory(user.uid);
+
+        if (history && history.weights && history.weights.length > 0) {
+          // Transform weight history for chart
+          const formattedHistory = history.weights.map(entry => ({
+            date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            weight: entry.weight
+          }));
+
+          setWeightHistory(formattedHistory.reverse()); // Most recent last
+
+          // Get current weight (most recent entry)
+          if (formattedHistory.length > 0) {
+            setCurrentWeight(formattedHistory[formattedHistory.length - 1].weight);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading weight history:', error);
+      } finally {
+        setWeightLoading(false);
+      }
+    };
+
+    loadWeightHistory();
+  }, [user]);
+
+  // Calculate weight lost when profile and weight history are loaded
+  useEffect(() => {
+    if (!profileLoading && !weightLoading && currentWeight !== null) {
+      // If starting_weight is available, use it; otherwise use the first weight entry
+      const initialWeight = startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : currentWeight);
+
+      // Calculate weight lost
+      const lost = initialWeight - currentWeight;
+      setWeightLost(parseFloat(lost.toFixed(1)));
+    }
+  }, [profileLoading, weightLoading, currentWeight, startingWeight, weightHistory]);
+
+  // Handle adding new weight
+  const handleAddWeight = async () => {
+    if (!user || !newWeight) return;
+
+    try {
+      const weightValue = parseFloat(newWeight);
+
+      if (isNaN(weightValue) || weightValue <= 0) {
+        Alert.alert('Invalid Weight', 'Please enter a valid weight value.');
+        return;
+      }
+
+      // Add new weight entry
+      await addWeightEntry(user.uid, weightValue);
+
+      // Update local state
+      const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+      setWeightHistory([...weightHistory, { date: today, weight: weightValue }]);
+      setCurrentWeight(weightValue);
+
+      // Close modal and reset input
+      setWeightModalVisible(false);
+      setNewWeight('');
+
+      // Recalculate weight lost
+      if (startingWeight) {
+        const lost = startingWeight - weightValue;
+        setWeightLost(parseFloat(lost.toFixed(1)));
+      }
+    } catch (error) {
+      console.error('Error adding weight entry:', error);
+      Alert.alert('Error', 'Failed to add weight entry. Please try again.');
+    }
+  };
+
   // Handler: updates activeIndex when user scrolls horizontally
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
@@ -326,6 +422,77 @@ export default function Home() {
       </TouchableOpacity>
     );
   };
+
+  // Replace the static weight card with dynamic data
+  const renderWeightLostCard = () => (
+    <GradientBorderCard>
+      <View style={styles.burnContainer}>
+        <Text style={styles.burnTitle}>Weight Lost</Text>
+        <View style={styles.burnBarBackground}>
+          <LinearGradient
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            colors={['#006400', '#006400', '#00FF00']} // smoother gradient, first half dark green
+            style={[
+              styles.burnBarFill,
+              {
+                width: `${Math.min(
+                  (weightLost / (startingWeight && targetWeight ? startingWeight - targetWeight : 10)) * 100,
+                  100
+                )}%`
+              }
+            ]} // dynamically adjust width
+          />
+        </View>
+        <View style={styles.weightLabelsContainer}>
+          <Text style={styles.weightLabel}>{startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : '--')} kg</Text>
+          <Text style={styles.burnDetails}>{weightLost} Kilograms Lost!</Text> {/* Centered text */}
+          <Text style={styles.weightLabel}>{targetWeight || '--'} kg</Text>
+        </View>
+      </View>
+    </GradientBorderCard>
+  );
+
+  // Add a modal for entering new weight
+  const renderWeightModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={weightModalVisible}
+      onRequestClose={() => setWeightModalVisible(false)}
+    >
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Add New Weight</Text>
+          <TextInput
+            style={styles.weightInput}
+            value={newWeight}
+            onChangeText={setNewWeight}
+            placeholder="Enter weight in kg"
+            keyboardType="numeric"
+            placeholderTextColor="#888"
+          />
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => {
+                setWeightModalVisible(false);
+                setNewWeight('');
+              }}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.saveButton]}
+              onPress={handleAddWeight}
+            >
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
@@ -524,62 +691,36 @@ export default function Home() {
         <View style={{ height: 3 }} />
 
         {/* WEIGHT LOST CARD */}
-        <GradientBorderCard>
-          <View style={styles.burnContainer}>
-            <Text style={styles.burnTitle}>Weight Lost</Text>
-            <View style={styles.burnBarBackground}>
-              <LinearGradient
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                colors={['#006400', '#006400', '#00FF00']} // smoother gradient, first half dark green
-                style={[styles.burnBarFill, { width: `${Math.min((WeightLost / 10) * 100, 100)}%` }]} // dynamically adjust width
+        {renderWeightLostCard()}
+
+        {/* WEIGHT TREND CARD */}
+        <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+          <GradientBorderCard>
+            <View style={styles.trendContainer}>
+              <WeightGraph
+                data={weightHistory}
+                onAddPress={() => setWeightModalVisible(true)}
+                weightLoading={weightLoading}
               />
             </View>
-            <View style={styles.weightLabelsContainer}>
-              <Text style={styles.weightLabel}>104 kg</Text>
-              <Text style={styles.burnDetails}>{WeightLost} Kilograms Lost!</Text> {/* Centered text */}
-              <Text style={styles.weightLabel}>96 kg</Text>
+          </GradientBorderCard>
+        </View>
+
+        {/* STEPS TREND CARD (2nd page) */}
+        <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+          <GradientBorderCard>
+            <View style={styles.trendContainer}>
+              {stepsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#E040FB" />
+                  <Text style={styles.loadingText}>Loading step data...</Text>
+                </View>
+              ) : (
+                <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
+              )}
             </View>
-          </View>
-        </GradientBorderCard>
-
-        {/* Add space between the cards */}
-        <View style={{ height: 4 }} />
-
-        {/* -- TREND CARDS WRAPPED IN A HORIZONTAL SCROLL -- */}
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onScrollEnd}
-          style={{ width: '100%' }}
-          contentContainerStyle={{ alignItems: 'center' }}
-        >
-          {/* WEIGHT TREND CARD (1st page) */}
-          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-            <GradientBorderCard>
-              <View style={styles.trendContainer}>
-                <WeightGraph data={weightHistory} />
-              </View>
-            </GradientBorderCard>
-          </View>
-
-          {/* STEPS TREND CARD (2nd page) */}
-          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-            <GradientBorderCard>
-              <View style={styles.trendContainer}>
-                {stepsLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#E040FB" />
-                    <Text style={styles.loadingText}>Loading step data...</Text>
-                  </View>
-                ) : (
-                  <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
-                )}
-              </View>
-            </GradientBorderCard>
-          </View>
-        </ScrollView>
+          </GradientBorderCard>
+        </View>
 
         {/* PAGINATION DOTS */}
         <View style={styles.dotsContainer}>
@@ -612,6 +753,7 @@ export default function Home() {
           </TouchableOpacity>
         </GradientBorderCard>
       </ScrollView>
+      {renderWeightModal()}
     </SafeAreaView>
   );
 }
@@ -619,7 +761,7 @@ export default function Home() {
 /************************************
  *  WEIGHT GRAPH COMPONENT
  ************************************/
-function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
+function WeightGraph({ data, onAddPress, weightLoading }: { data: { date: string; weight: number }[]; onAddPress: () => void; weightLoading: boolean }) {
   // Dimensions for the chart
   const GRAPH_WIDTH = 0.94 * width;
   const GRAPH_HEIGHT = 220;
@@ -670,99 +812,111 @@ function WeightGraph({ data }: { data: { date: string; weight: number }[] }) {
         }}
       >
         <Text style={styles.weightGraphTitle}>Weight Trend:</Text>
-        <TouchableOpacity onPress={() => console.log('Add more dates!')}>
+        <TouchableOpacity onPress={onAddPress}>
           <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
       {/* SCROLLABLE CHART */}
-      <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
-        <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
-          {/* ───────── GRID + AXES ───────── */}
-          <G>
-            {/* Horizontal grid + Y labels */}
-            {yTickValues.map((tickValue) => {
-              const yCoord = scaleY(tickValue);
-              return (
-                <React.Fragment key={`y-tick-${tickValue}`}>
-                  <SvgLine
-                    x1={MARGIN}
-                    x2={GRAPH_WIDTH - MARGIN}
-                    y1={yCoord}
-                    y2={yCoord}
-                    stroke="rgba(255,255,255,0.2)"
-                    strokeWidth={1}
-                  />
-                  <SvgText
-                    x={MARGIN - 5}
-                    y={yCoord}
-                    fill="#FFF"
-                    fontSize={10}
-                    textAnchor="end"
-                    alignmentBaseline="middle"
-                  >
-                    {tickValue}
-                  </SvgText>
-                </React.Fragment>
-              );
-            })}
+      {weightLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E040FB" />
+          <Text style={styles.loadingText}>Loading weight data...</Text>
+        </View>
+      ) : data.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No weight data available yet.</Text>
+          <Text style={styles.emptySubtext}>Tap the + button to add your weight.</Text>
+        </View>
+      ) : (
+        <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
+          <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
+            {/* ───────── GRID + AXES ───────── */}
+            <G>
+              {/* Horizontal grid + Y labels */}
+              {yTickValues.map((tickValue) => {
+                const yCoord = scaleY(tickValue);
+                return (
+                  <React.Fragment key={`y-tick-${tickValue}`}>
+                    <SvgLine
+                      x1={MARGIN}
+                      x2={GRAPH_WIDTH - MARGIN}
+                      y1={yCoord}
+                      y2={yCoord}
+                      stroke="rgba(255,255,255,0.2)"
+                      strokeWidth={1}
+                    />
+                    <SvgText
+                      x={MARGIN - 5}
+                      y={yCoord}
+                      fill="#FFF"
+                      fontSize={10}
+                      textAnchor="end"
+                      alignmentBaseline="middle"
+                    >
+                      {tickValue}
+                    </SvgText>
+                  </React.Fragment>
+                );
+              })}
 
-            {/* Vertical grid + X labels */}
-            {data.map((d, i) => {
-              const xCoord = scaleX(i);
-              return (
-                <React.Fragment key={`x-tick-${i}`}>
-                  <SvgLine
-                    x1={xCoord}
-                    x2={xCoord}
-                    y1={GRAPH_HEIGHT - MARGIN}
-                    y2={MARGIN}
-                    stroke="rgba(255,255,255,0.1)"
-                    strokeWidth={1}
-                  />
-                  <SvgText
-                    x={xCoord}
-                    y={GRAPH_HEIGHT - MARGIN / 2}
-                    fill="#FFF"
-                    fontSize={10}
-                    textAnchor="middle"
-                    alignmentBaseline="middle"
-                  >
-                    {d.date}
-                  </SvgText>
-                </React.Fragment>
-              );
-            })}
-          </G>
+              {/* Vertical grid + X labels */}
+              {data.map((d, i) => {
+                const xCoord = scaleX(i);
+                return (
+                  <React.Fragment key={`x-tick-${i}`}>
+                    <SvgLine
+                      x1={xCoord}
+                      x2={xCoord}
+                      y1={GRAPH_HEIGHT - MARGIN}
+                      y2={MARGIN}
+                      stroke="rgba(255,255,255,0.1)"
+                      strokeWidth={1}
+                    />
+                    <SvgText
+                      x={xCoord}
+                      y={GRAPH_HEIGHT - MARGIN / 2}
+                      fill="#FFF"
+                      fontSize={10}
+                      textAnchor="middle"
+                      alignmentBaseline="middle"
+                    >
+                      {d.date}
+                    </SvgText>
+                  </React.Fragment>
+                );
+              })}
+            </G>
 
-          {/* ───────── LINE + POINTS ───────── */}
-          <G>
-            {pathData && (
-              <Path
-                d={pathData}
-                fill="none"
-                stroke="#FF6347"  // changed color to tomato
-                strokeWidth={2}
-              />
-            )}
-            {data.map((d, i) => {
-              const cx = scaleX(i);
-              const cy = scaleY(d.weight);
-              return (
-                <Circle
-                  key={`circle-${i}`}
-                  cx={cx}
-                  cy={cy}
-                  r={4}
-                  fill="#FF4500"  // changed color to orange red
-                  stroke="#FFF"
-                  strokeWidth={1}
+            {/* ───────── LINE + POINTS ───────── */}
+            <G>
+              {pathData && (
+                <Path
+                  d={pathData}
+                  fill="none"
+                  stroke="#FF6347"  // changed color to tomato
+                  strokeWidth={2}
                 />
-              );
-            })}
-          </G>
-        </Svg>
-      </ScrollView>
+              )}
+              {data.map((d, i) => {
+                const cx = scaleX(i);
+                const cy = scaleY(d.weight);
+                return (
+                  <Circle
+                    key={`circle-${i}`}
+                    cx={cx}
+                    cy={cy}
+                    r={4}
+                    fill="#FF4500"  // changed color to orange red
+                    stroke="#FFF"
+                    strokeWidth={1}
+                  />
+                );
+              })}
+            </G>
+          </Svg>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -1415,5 +1569,83 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalView: {
+    width: '80%',
+    backgroundColor: '#1e1e1e',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 15,
+  },
+  weightInput: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#555',
+    borderRadius: 10,
+    padding: 10,
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    padding: 12,
+    borderRadius: 10,
+    width: '48%',
+    alignItems: 'center',
+  },
+  saveButton: {
+    backgroundColor: '#5c00dd',
+  },
+  cancelButton: {
+    backgroundColor: '#555',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 200,
+  },
+  emptyText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    color: '#CCC',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
