@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List, Dict, Any
@@ -6,10 +6,16 @@ from pydantic import BaseModel, Field, EmailStr
 import json
 from datetime import datetime, timedelta
 from enum import Enum
+import logging
 
 from models import User, Gender, ActivityLevel, WeightGoal, UserWeight
 from DB import get_db
 from auth.firebase_auth import get_current_user, verify_firebase_token
+from utils.weight_utils import add_weight_entry
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -134,28 +140,6 @@ def update_user(db: Session, user_id: int, user_data: dict):
     db.commit()
     db.refresh(db_user)
     return db_user
-
-def add_weight_entry(db: Session, user_id: int, weight: float):
-    # Create new weight entry
-    weight_entry = UserWeight(
-        user_id=user_id,
-        weight=weight
-    )
-    db.add(weight_entry)
-    
-    # Also update current weight in user profile
-    user = db.query(User).filter(User.id == user_id).first()
-    
-    # If this is the first weight entry and starting_weight is not set, set it
-    if user.starting_weight is None:
-        user.starting_weight = weight
-    
-    # Always update current weight
-    user.weight = weight
-    
-    db.commit()
-    db.refresh(weight_entry)
-    return weight_entry
 
 def get_user_weight_history(db: Session, user_id: int, limit: int = 100):
     return db.query(UserWeight).filter(UserWeight.user_id == user_id).order_by(UserWeight.recorded_at.desc()).limit(limit).all()

@@ -693,34 +693,45 @@ export default function Home() {
         {/* WEIGHT LOST CARD */}
         {renderWeightLostCard()}
 
-        {/* WEIGHT TREND CARD */}
-        <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-          <GradientBorderCard>
-            <View style={styles.trendContainer}>
-              <WeightGraph
-                data={weightHistory}
-                onAddPress={() => setWeightModalVisible(true)}
-                weightLoading={weightLoading}
-              />
-            </View>
-          </GradientBorderCard>
-        </View>
+        {/* HORIZONTALLY SCROLLABLE TREND CARDS */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onScrollEnd}
+          snapToInterval={width}
+          decelerationRate="fast"
+          snapToAlignment="center"
+        >
+          {/* WEIGHT TREND CARD */}
+          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            <GradientBorderCard>
+              <View style={styles.trendContainer}>
+                <WeightGraph
+                  data={weightHistory}
+                  onAddPress={() => setWeightModalVisible(true)}
+                  weightLoading={weightLoading}
+                />
+              </View>
+            </GradientBorderCard>
+          </View>
 
-        {/* STEPS TREND CARD (2nd page) */}
-        <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-          <GradientBorderCard>
-            <View style={styles.trendContainer}>
-              {stepsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#E040FB" />
-                  <Text style={styles.loadingText}>Loading step data...</Text>
-                </View>
-              ) : (
-                <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
-              )}
-            </View>
-          </GradientBorderCard>
-        </View>
+          {/* STEPS TREND CARD */}
+          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            <GradientBorderCard>
+              <View style={styles.trendContainer}>
+                {stepsLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#E040FB" />
+                    <Text style={styles.loadingText}>Loading step data...</Text>
+                  </View>
+                ) : (
+                  <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
+                )}
+              </View>
+            </GradientBorderCard>
+          </View>
+        </ScrollView>
 
         {/* PAGINATION DOTS */}
         <View style={styles.dotsContainer}>

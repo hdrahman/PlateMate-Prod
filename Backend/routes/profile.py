@@ -1,19 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Response
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from enum import Enum
 import logging
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 from models import User, NutritionGoals, FitnessGoals, UserGamification, Achievement, UserAchievement, Gender, ActivityLevel, WeightGoal
 from DB import get_db
 from auth.firebase_auth import get_current_user
+from utils.weight_utils import add_weight_entry
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('profile_routes')
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -261,6 +260,10 @@ async def update_profile(
         for field, value in profile_data.items():
             if hasattr(user, field) and value is not None:
                 setattr(user, field, value)
+                
+                # When weight is updated, add a new entry to weight history
+                if field == "weight":
+                    add_weight_entry(db, user.id, value)
     
     # Update nutrition goals
     if "nutrition_goals" in profile_update and nutrition_goals:
