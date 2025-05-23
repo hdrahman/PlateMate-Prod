@@ -1,0 +1,128 @@
+# PlateMate SQLite Database Schema
+
+## Overview
+PlateMate uses SQLite for local development/offline functionality. This document outlines the schema structure.
+
+## Tables
+
+### 1. users
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `firebase_uid`: TEXT UNIQUE NOT NULL
+- `email`: TEXT UNIQUE NOT NULL
+- `first_name`: TEXT NOT NULL
+- `last_name`: TEXT
+- `onboarding_complete`: BOOLEAN DEFAULT 0
+- `height`: REAL (in cm)
+- `weight`: REAL (in kg)
+- `age`: INTEGER
+- `gender`: TEXT CHECK(gender IN ('male', 'female', 'other'))
+- `activity_level`: TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active'))
+- `weight_goal`: TEXT CHECK(weight_goal IN ('lose', 'lose_extreme', 'lose_heavy', 'lose_moderate', 'lose_light', 'maintain', 'gain', 'gain_light', 'gain_moderate'))
+- `target_weight`: REAL (in kg)
+- `starting_weight`: REAL (in kg)
+- `date_of_birth`: TIMESTAMP
+- `location`: TEXT
+- `is_imperial_units`: BOOLEAN DEFAULT 0
+- `profile_image_url`: TEXT
+- `created_at`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `updated_at`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+### 2. user_weights
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_id`: INTEGER NOT NULL (FOREIGN KEY to users.id)
+- `weight`: REAL NOT NULL (in kg)
+- `recorded_at`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+### 3. nutrition_goals
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_id`: INTEGER UNIQUE NOT NULL (FOREIGN KEY to users.id)
+- `target_weight`: REAL
+- `daily_calorie_goal`: INTEGER
+- `protein_goal`: INTEGER
+- `carb_goal`: INTEGER
+- `fat_goal`: INTEGER
+- `weight_goal`: TEXT CHECK(weight_goal IN ('lose', 'lose_extreme', 'lose_heavy', 'lose_moderate', 'lose_light', 'maintain', 'gain', 'gain_light', 'gain_moderate'))
+- `activity_level`: TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active'))
+
+### 4. fitness_goals
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_id`: INTEGER UNIQUE NOT NULL (FOREIGN KEY to users.id)
+- `weekly_workouts`: INTEGER
+- `daily_step_goal`: INTEGER
+- `water_intake_goal`: INTEGER (in ml)
+
+### 5. user_gamification
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_id`: INTEGER UNIQUE NOT NULL (FOREIGN KEY to users.id)
+- `level`: INTEGER DEFAULT 1
+- `xp`: INTEGER DEFAULT 0
+- `xp_to_next_level`: INTEGER DEFAULT 100
+- `rank`: TEXT DEFAULT 'Beginner'
+- `streak_days`: INTEGER DEFAULT 0
+- `last_activity_date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+### 6. achievements
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `name`: TEXT NOT NULL
+- `description`: TEXT NOT NULL
+- `icon`: TEXT
+- `xp_reward`: INTEGER DEFAULT 50
+
+### 7. user_achievements
+- `user_id`: INTEGER NOT NULL (FOREIGN KEY to users.id)
+- `achievement_id`: INTEGER NOT NULL (FOREIGN KEY to achievements.id)
+- `completed`: BOOLEAN DEFAULT 0
+- `completed_at`: TIMESTAMP
+- PRIMARY KEY (user_id, achievement_id)
+
+### 8. food_logs
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `meal_id`: INTEGER NOT NULL
+- `user_id`: INTEGER (FOREIGN KEY to users.id)
+- `food_name`: TEXT NOT NULL
+- `calories`: INTEGER NOT NULL
+- `proteins`: INTEGER NOT NULL
+- `carbs`: INTEGER NOT NULL
+- `fats`: INTEGER NOT NULL
+- `fiber`: INTEGER NOT NULL
+- `sugar`: INTEGER NOT NULL
+- `saturated_fat`: INTEGER NOT NULL
+- `polyunsaturated_fat`: INTEGER NOT NULL
+- `monounsaturated_fat`: INTEGER NOT NULL
+- `trans_fat`: INTEGER NOT NULL
+- `cholesterol`: INTEGER NOT NULL
+- `sodium`: INTEGER NOT NULL
+- `potassium`: INTEGER NOT NULL
+- `vitamin_a`: INTEGER NOT NULL
+- `vitamin_c`: INTEGER NOT NULL
+- `calcium`: INTEGER NOT NULL
+- `iron`: INTEGER NOT NULL
+- `weight`: REAL
+- `weight_unit`: TEXT DEFAULT 'g'
+- `image_url`: TEXT NOT NULL
+- `file_key`: TEXT NOT NULL DEFAULT 'default_file_key'
+- `healthiness_rating`: INTEGER
+- `date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `meal_type`: TEXT
+
+### 9. exercises
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_id`: INTEGER (FOREIGN KEY to users.id)
+- `exercise_name`: TEXT NOT NULL
+- `calories_burned`: INTEGER NOT NULL
+- `duration`: INTEGER NOT NULL (in minutes)
+- `date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `notes`: TEXT
+
+### 10. alembic_version
+- `version_num`: TEXT NOT NULL
+
+## Relationships
+- `users` -> `food_logs`: one-to-many
+- `users` -> `exercises`: one-to-many
+- `users` -> `nutrition_goals`: one-to-one
+- `users` -> `fitness_goals`: one-to-one
+- `users` -> `user_gamification`: one-to-one
+- `users` -> `user_achievements`: one-to-many
+- `users` -> `user_weights`: one-to-many
+- `achievements` -> `user_achievements`: one-to-many 
