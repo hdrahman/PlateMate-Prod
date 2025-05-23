@@ -15,8 +15,8 @@ const getLocalIpAddress = () => {
 // For mobile devices (iOS/Android), use the network IP
 // For web, also use the IP address for consistent connectivity
 const DEV_BACKEND_URL = Platform.OS === 'web'
-    ? 'http://192.168.0.160:8001'
-    : `http://${getLocalIpAddress()}:8001`; // Use the dynamically detected IP
+    ? 'http://192.168.0.160:8000'
+    : `http://${getLocalIpAddress()}:8000`; // Use the dynamically detected IP
 
 // Backend URL - dynamically set based on platform
 export const BACKEND_URL = DEV_BACKEND_URL;

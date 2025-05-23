@@ -12,8 +12,8 @@ const getLocalIpAddress = () => {
 
 // Determine the appropriate API URL based on the platform
 export const API_URL = Platform.OS === 'web'
-    ? 'http://192.168.0.160:8001'
-    : `http://${getLocalIpAddress()}:8001`;
+    ? 'http://192.168.0.160:8000'
+    : `http://${getLocalIpAddress()}:8000`;
 
 // Unit Constants
 export const METRIC_WEIGHT_UNIT = 'kg';

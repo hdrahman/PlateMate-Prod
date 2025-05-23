@@ -208,7 +208,7 @@ export const getUserProfile = async (firebaseUid: string) => {
         }
 
         // Add timeout to fetch request
-        const timeout = 5000; // Reduced from 8000ms to 5000ms for faster response
+        const timeout = 10000; // Increased from 5000ms to 10000ms for better connectivity
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -281,7 +281,7 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
         }
 
         // Add timeout to fetch request
-        const timeout = 8000; // 8 seconds timeout
+        const timeout = 15000; // Increased from 8000ms to 15000ms for better connectivity
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
