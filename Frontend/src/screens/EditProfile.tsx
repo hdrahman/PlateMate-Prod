@@ -20,9 +20,13 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { Auth, auth } from '../utils/firebase/index';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { updateProfile as updateBackendProfile, updateCompleteProfile, getProfile } from '../api/profileApi'; // Import the profile update functions
-import { updateUserProfile as updateLocalUserProfile } from '../utils/database'; // Import the local database function
-import { testBackendConnection } from '../utils/networkUtils';
+import {
+    getUserProfileByFirebaseUid,
+    getUserGoals,
+    getUserStreak,
+    initDatabase,
+    isDatabaseReady
+} from '../utils/database';
 import {
     cmToFeetInches,
     feetInchesToCm,
@@ -78,6 +82,7 @@ const EditProfile = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
+    const [isLoading, setIsLoading] = useState(true);
 
     // Animation values
     const slideAnim = React.useRef(new Animated.Value(0)).current;
@@ -163,9 +168,9 @@ const EditProfile = () => {
     const [rank, setRank] = useState('Silver Athlete');
     const [streakDays, setStreakDays] = useState(8);
     const [achievements, setAchievements] = useState([
-        { name: 'Early Bird', description: 'Complete 5 morning workouts', completed: true, icon: 'sunny' },
-        { name: 'Consistency King', description: 'Maintain a 7-day streak', completed: true, icon: 'trending-up' },
-        { name: 'Weight Warrior', description: 'Lose 5kg', completed: true, icon: 'barbell' },
+        { name: 'Early Bird', description: 'Complete 5 morning workouts', completed: false, icon: 'sunny' },
+        { name: 'Consistency King', description: 'Maintain a 7-day streak', completed: false, icon: 'trending-up' },
+        { name: 'Weight Warrior', description: 'Lose 5kg', completed: false, icon: 'barbell' },
         { name: 'Marathon Master', description: 'Run 42km total', completed: false, icon: 'walk' },
         { name: 'Nutrition Ninja', description: 'Log meals for 30 days', completed: false, icon: 'nutrition' },
     ]);
@@ -185,11 +190,104 @@ const EditProfile = () => {
             }),
         ]).start();
 
-        // Here you would fetch user data from backend
-        // For now using static data from state
-        if (user) {
-            // Update with user data
-        }
+        // Fetch user data from SQLite database
+        const loadProfileData = async () => {
+            try {
+                setIsLoading(true);
+
+                // Ensure database is initialized
+                if (!isDatabaseReady()) {
+                    await initDatabase();
+                }
+
+                if (user && user.uid) {
+                    // Get user profile from SQLite
+                    const profile = await getUserProfileByFirebaseUid(user.uid);
+
+                    // Get user goals from SQLite
+                    const goals = await getUserGoals(user.uid);
+
+                    // Get user streak
+                    const streak = await getUserStreak(user.uid);
+
+                    if (profile) {
+                        // Set basic profile info
+                        setUsername(`${profile.first_name || '---'}${profile.last_name ? '_' + profile.last_name : ''}`);
+                        setEmail(profile.email || '---');
+                        setLocation(profile.location || '---');
+
+                        // Set height (convert from cm if needed)
+                        if (profile.height) {
+                            if (profile.is_imperial_units) {
+                                const { feet, inches } = cmToFeetInches(profile.height);
+                                setHeightFeet(feet.toString());
+                                setHeightInches(inches.toString());
+                                setHeight(`${feet}' ${inches}"`);
+                            } else {
+                                setHeight(`${profile.height} cm`);
+                            }
+                        } else {
+                            setHeight('---');
+                        }
+
+                        // Set weight (convert from kg if needed)
+                        if (profile.weight) {
+                            if (profile.is_imperial_units) {
+                                const lbs = kgToLbs(profile.weight);
+                                setWeight(`${Math.round(lbs)} lbs`);
+                            } else {
+                                setWeight(`${profile.weight} kg`);
+                            }
+                        } else {
+                            setWeight('---');
+                        }
+
+                        // Set other profile fields
+                        setSex(profile.gender || '---');
+                        setDateOfBirth(profile.date_of_birth || '---');
+                        setIsImperialUnits(!!profile.is_imperial_units);
+                    }
+
+                    if (goals) {
+                        // Set nutrition & fitness goals
+                        // These values are likely stored in the user_profiles table in our SQLite implementation
+                        // rather than separate tables as in the backend
+                    }
+
+                    // Set gamification data
+                    // Currently we don't have this in the SQLite database directly, so use default/placeholder values
+                    setLevel(profile?.level || 1);
+                    setXp(profile?.xp || 0);
+                    setXpToNextLevel(profile?.xp_to_next_level || 100);
+                    setRank(profile?.rank || 'Beginner');
+                    setStreakDays(streak || 0);
+
+                    // Set achievements (placeholder data for now)
+                    // In a real implementation, we would fetch this from a user_achievements table
+                    setAchievements([
+                        { name: 'Early Bird', description: 'Complete 5 morning workouts', completed: false, icon: 'sunny' },
+                        { name: 'Consistency King', description: 'Maintain a 7-day streak', completed: streak >= 7, icon: 'trending-up' },
+                        { name: 'Weight Warrior', description: 'Lose 5kg', completed: false, icon: 'barbell' },
+                        { name: 'Marathon Master', description: 'Run 42km total', completed: false, icon: 'walk' },
+                        { name: 'Nutrition Ninja', description: 'Log meals for 30 days', completed: false, icon: 'nutrition' },
+                    ]);
+                }
+            } catch (error) {
+                console.error('Error loading profile data from SQLite:', error);
+                // Set default values if there's an error
+                setUsername('---');
+                setHeight('---');
+                setWeight('---');
+                setSex('---');
+                setDateOfBirth('---');
+                setLocation('---');
+                setEmail(user?.email || '---');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadProfileData();
     }, [user]);
 
     // Add effect to update input formats when unit system changes
@@ -238,218 +336,13 @@ const EditProfile = () => {
         }
     };
 
-    // Load user profile data
-    useEffect(() => {
-        const loadProfileData = async () => {
-            try {
-                const profileData = await getProfile();
-                if (profileData && profileData.profile) {
-                    // Set basic info
-                    const p = profileData.profile;
-                    setUsername(`${p.first_name || ''}${p.last_name ? '_' + p.last_name : ''}`);
-                    setLocation(p.location || '');
-
-                    // Keep the default age if not provided
-                    // Age might be calculated from date_of_birth in the backend, but not sent directly
-                    if (p.date_of_birth) {
-                        // Could calculate age from date_of_birth if needed
-                        // For now, keep the default age
-                    }
-
-                    // Email from Firebase
-                    setEmail(user?.email || '');
-
-                    // Handle imperial vs metric units
-                    const isImperial = p.is_imperial_units || false;
-                    setIsImperialUnits(isImperial);
-                    if (isImperial) {
-                        setUnits('Pounds, Feet/Inches, Miles, Calories, Fluid Ounces');
-                    } else {
-                        setUnits('Kilograms, Centimeters, Kilometers, Calories, Milliliters');
-                    }
-
-                    // Handle height based on unit preference
-                    if (p.height) {
-                        if (isImperial) {
-                            const { feet, inches } = cmToFeetInches(p.height);
-                            setHeightFeet(feet.toString());
-                            setHeightInches(inches.toString());
-                            setHeight(`${feet}' ${inches}"`);
-                        } else {
-                            setHeight(`${p.height} cm`);
-                        }
-                    }
-
-                    // Handle weight based on unit preference
-                    if (p.weight) {
-                        if (isImperial) {
-                            const lbs = kgToLbs(p.weight);
-                            setWeight(`${lbs} lbs`);
-                        } else {
-                            setWeight(`${p.weight} kg`);
-                        }
-                    }
-
-                    // Set gender/sex
-                    if (p.gender) {
-                        setSex(p.gender.charAt(0).toUpperCase() + p.gender.slice(1));
-                    }
-
-                    // Set gamification data if available
-                    if (profileData.gamification) {
-                        const g = profileData.gamification;
-                        setLevel(g.level || 1);
-                        setXp(g.xp || 0);
-                        setXpToNextLevel(g.xp_to_next_level || 100);
-                        setRank(g.rank || 'Beginner');
-                        setStreakDays(g.streak_days || 0);
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading profile:', error);
-                Alert.alert('Error', 'Failed to load profile data. Please try again.');
-            }
-        };
-
-        loadProfileData();
-    }, [user]);
-
-    // Save profile changes
+    // Modify saveProfile to just show an alert since we're not implementing edit functionality
     const saveProfile = async () => {
-        try {
-            setIsSaving(true);
-
-            // Convert height from imperial to metric (cm) for storage
-            let heightInCm;
-            if (heightFeet && heightInches) {
-                heightInCm = feetInchesToCm(
-                    parseFloat(heightFeet),
-                    parseFloat(heightInches)
-                );
-            } else {
-                heightInCm = 0;
-            }
-
-            // Convert weight to metric (kg) for storage
-            let weightInKg;
-            if (weight) {
-                // Check if weight is in lbs or kg format
-                if (weight.includes('lb')) {
-                    const lbs = parseFloat(weight.replace(/lbs|lb/g, '').trim());
-                    weightInKg = lbsToKg(lbs);
-                } else {
-                    weightInKg = parseFloat(weight.replace(/kg/g, '').trim());
-                }
-            } else {
-                weightInKg = 0;
-            }
-
-            // Create profile data object - always store in metric
-            const profileData = {
-                first_name: username.split('_')[0] || username,
-                last_name: username.split('_')[1] || '',
-                height: heightInCm,
-                weight: weightInKg,
-                gender: sex.toLowerCase() as 'male' | 'female' | 'other',
-                location: location,
-                // Store the user's unit preference based on the direct state
-                is_imperial_units: isImperialUnits,
-            };
-
-            try {
-                // Get current profile or create fallback data
-                let existingProfile = null;
-
-                try {
-                    existingProfile = await getProfile();
-                    console.log('Successfully fetched existing profile:', existingProfile);
-                } catch (error) {
-                    console.warn('Failed to fetch current profile:', error);
-
-                    // Create fallback data with default empty objects
-                    // to ensure we're not sending null values for nested objects
-                    existingProfile = {
-                        profile: { ...profileData },
-                        nutrition_goals: {},
-                        fitness_goals: {},
-                        gamification: {}
-                    };
-                }
-
-                // Create a complete update payload using deep clone to avoid reference issues
-                const updateData = {
-                    profile: profileData,
-                    nutrition_goals: existingProfile?.nutrition_goals || {},
-                    fitness_goals: existingProfile?.fitness_goals || {},
-                    gamification: existingProfile?.gamification || {}
-                };
-
-                console.log('Sending update with data:', updateData);
-
-                try {
-                    // Try complete profile update first
-                    const response = await updateCompleteProfile(updateData);
-                    console.log('Profile updated successfully:', response);
-                } catch (updateError) {
-                    console.warn('Failed to update complete profile, attempting fallback:', updateError);
-
-                    // Fallback to basic profile update if complete update fails
-                    await updateBackendProfile(profileData);
-                }
-
-                // Always save locally for offline access
-                if (user) {
-                    await updateLocalUserProfile(user.uid, {
-                        first_name: profileData.first_name,
-                        last_name: profileData.last_name,
-                        height: profileData.height,
-                        weight: profileData.weight,
-                        gender: profileData.gender,
-                        location: profileData.location,
-                        // Remove properties that don't exist in the database schema
-                        synced: 0
-                    });
-                    Alert.alert('Success', 'Profile saved successfully.');
-                } else {
-                    Alert.alert('Error', 'Failed to update profile. Please try again.');
-                    return; // Exit early if no user
-                }
-            } catch (error) {
-                console.error('Error updating profile:', error);
-
-                // If backend update fails, still save locally
-                if (user) {
-                    try {
-                        await updateLocalUserProfile(user.uid, {
-                            first_name: profileData.first_name,
-                            last_name: profileData.last_name,
-                            height: profileData.height,
-                            weight: profileData.weight,
-                            gender: profileData.gender,
-                            location: profileData.location,
-                            // Remove properties that don't exist in the database schema
-                            synced: 0
-                        });
-                        Alert.alert('Success', 'Profile saved locally. Changes will sync when you reconnect to the internet.');
-                    } catch (localError) {
-                        console.error('Error saving profile locally:', localError);
-                        Alert.alert('Error', 'Failed to update profile. Please try again.');
-                        return; // Exit early if we can't even save locally
-                    }
-                } else {
-                    Alert.alert('Error', 'Failed to update profile. Please try again.');
-                    return; // Exit early if no user
-                }
-            }
-
-            // Navigate back
-            navigation.goBack();
-        } catch (error) {
-            console.error('Error in profile update process:', error);
-            Alert.alert('Error', 'Failed to update profile. Please try again.');
-        } finally {
-            setIsSaving(false);
-        }
+        Alert.alert(
+            "Profile Editing Disabled",
+            "Editing profile is currently disabled. This page is read-only.",
+            [{ text: "OK" }]
+        );
     };
 
     // Toggle unit system
@@ -466,6 +359,15 @@ const EditProfile = () => {
     };
 
     const renderProfileTab = () => {
+        if (isLoading) {
+            return (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={BLUE_ACCENT} />
+                    <Text style={styles.loadingText}>Loading profile data...</Text>
+                </View>
+            );
+        }
+
         return (
             <Animated.View
                 style={[
@@ -494,28 +396,28 @@ const EditProfile = () => {
                             style={styles.profileImage}
                         />
                         <View style={styles.profileInfo}>
-                            <Text style={styles.profileName}>{username}</Text>
-                            <Text style={styles.profileLocation}>{location}</Text>
+                            <Text style={styles.profileName}>{username || '---'}</Text>
+                            <Text style={styles.profileLocation}>{location || '---'}</Text>
                             <View style={styles.statsRow}>
                                 <View style={styles.statItem}>
-                                    <Text style={styles.statValue}>{weight}</Text>
+                                    <Text style={styles.statValue}>{weight || '---'}</Text>
                                     <Text style={styles.statLabel}>Weight</Text>
                                 </View>
                                 <View style={styles.statItem}>
-                                    <Text style={styles.statValue}>{height}</Text>
+                                    <Text style={styles.statValue}>{height || '---'}</Text>
                                     <Text style={styles.statLabel}>Height</Text>
                                 </View>
                                 <View style={styles.statItem}>
-                                    <Text style={styles.statValue}>{age}</Text>
+                                    <Text style={styles.statValue}>{age || '---'}</Text>
                                     <Text style={styles.statLabel}>Age</Text>
                                 </View>
                             </View>
                         </View>
                     </View>
-                    <TouchableOpacity style={styles.editButton}>
-                        <Ionicons name="camera-outline" size={20} color={WHITE} />
-                        <Text style={styles.editButtonText}>Change Photo</Text>
-                    </TouchableOpacity>
+                    <View style={styles.readOnlyBadge}>
+                        <Ionicons name="eye" size={16} color={WHITE} />
+                        <Text style={styles.readOnlyBadgeText}>Read Only</Text>
+                    </View>
                 </LinearGradient>
 
                 {/* Form Fields */}
@@ -524,106 +426,28 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Username</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={username}
-                            onChangeText={setUsername}
-                            placeholderTextColor={GRAY}
-                        />
+                        <Text style={styles.displayValue}>{username || '---'}</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Email</Text>
-                        <TextInput
-                            style={[styles.input, styles.inputDisabled]}
-                            value={email}
-                            editable={false}
-                            placeholderTextColor={GRAY}
-                        />
+                        <Text style={styles.displayValue}>{email || '---'}</Text>
                         <Text style={styles.inputHint}>Email cannot be changed</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Sex</Text>
-                        <View style={styles.segmentedControl}>
-                            <TouchableOpacity
-                                style={[styles.segmentOption, sex === 'Male' && styles.segmentActive]}
-                                onPress={() => setSex('Male')}
-                            >
-                                <Text style={[styles.segmentText, sex === 'Male' && styles.segmentTextActive]}>Male</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.segmentOption, sex === 'Female' && styles.segmentActive]}
-                                onPress={() => setSex('Female')}
-                            >
-                                <Text style={[styles.segmentText, sex === 'Female' && styles.segmentTextActive]}>Female</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.segmentOption, sex === 'Other' && styles.segmentActive]}
-                                onPress={() => setSex('Other')}
-                            >
-                                <Text style={[styles.segmentText, sex === 'Other' && styles.segmentTextActive]}>Other</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <Text style={styles.displayValue}>{sex || '---'}</Text>
                     </View>
 
                     <View style={styles.inputRow}>
                         <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                             <Text style={styles.inputLabel}>Height</Text>
-                            {isImperialUnits ? (
-                                <View style={styles.heightInputContainer}>
-                                    <View style={styles.heightInputGroup}>
-                                        <TextInput
-                                            style={styles.heightInput}
-                                            value={heightFeet}
-                                            onChangeText={setHeightFeet}
-                                            keyboardType="numeric"
-                                            placeholderTextColor={GRAY}
-                                            placeholder="5"
-                                        />
-                                        <Text style={styles.heightUnitText}>ft</Text>
-                                    </View>
-                                    <View style={styles.heightInputGroup}>
-                                        <TextInput
-                                            style={styles.heightInput}
-                                            value={heightInches}
-                                            onChangeText={setHeightInches}
-                                            keyboardType="numeric"
-                                            placeholderTextColor={GRAY}
-                                            placeholder="11"
-                                        />
-                                        <Text style={styles.heightUnitText}>in</Text>
-                                    </View>
-                                </View>
-                            ) : (
-                                <View style={styles.heightInputContainer}>
-                                    <View style={[styles.heightInputGroup, { flex: 1, paddingHorizontal: 15 }]}>
-                                        <TextInput
-                                            style={styles.heightInput}
-                                            value={height.replace(/cm/g, '').trim()}
-                                            onChangeText={updateHeight}
-                                            keyboardType="numeric"
-                                            placeholderTextColor={GRAY}
-                                            placeholder="180"
-                                        />
-                                        <Text style={styles.heightUnitText}>cm</Text>
-                                    </View>
-                                </View>
-                            )}
+                            <Text style={styles.displayValue}>{height || '---'}</Text>
                         </View>
                         <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                             <Text style={styles.inputLabel}>Weight</Text>
-                            <View style={styles.weightInputContainer}>
-                                <TextInput
-                                    style={styles.weightInput}
-                                    value={weight.replace(/kg|lbs/g, '').trim()}
-                                    onChangeText={(text) => setWeight(text)}
-                                    keyboardType="numeric"
-                                    placeholderTextColor={GRAY}
-                                    placeholder={isImperialUnits ? "165" : "75"}
-                                />
-                                <Text style={styles.weightUnitText}>{isImperialUnits ? "lbs" : "kg"}</Text>
-                            </View>
+                            <Text style={styles.displayValue}>{weight || '---'}</Text>
                         </View>
                     </View>
                 </GradientBorderBox>
@@ -633,48 +457,25 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Location</Text>
-                        <TouchableOpacity
-                            style={styles.dropdownField}
-                            onPress={() => setShowLocationPicker(true)}
-                        >
-                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
-                                {location}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
-                        </TouchableOpacity>
+                        <Text style={styles.displayValue}>{location || '---'}</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Time Zone</Text>
-                        <TouchableOpacity
-                            style={styles.dropdownField}
-                            onPress={() => setShowTimeZonePicker(true)}
-                        >
-                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
-                                {timeZone}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
-                        </TouchableOpacity>
+                        <Text style={styles.displayValue}>{timeZone || '---'}</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Measurement Units</Text>
-                        <TouchableOpacity
-                            style={styles.dropdownField}
-                            onPress={() => setShowUnitPicker(true)}
-                        >
-                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
-                                {isImperialUnits ? 'Imperial (lbs, feet/inches)' : 'Metric (kg, cm)'}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
-                        </TouchableOpacity>
+                        <Text style={styles.displayValue}>
+                            {isImperialUnits ? 'Imperial (lbs, feet/inches)' : 'Metric (kg, cm)'}
+                        </Text>
                     </View>
                 </GradientBorderBox>
 
                 <TouchableOpacity
                     style={styles.saveButton}
                     onPress={saveProfile}
-                    disabled={isSaving}
                 >
                     <LinearGradient
                         colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
@@ -682,11 +483,7 @@ const EditProfile = () => {
                         end={{ x: 1, y: 0 }}
                         style={styles.saveButtonGradient}
                     >
-                        {isSaving ? (
-                            <ActivityIndicator color={WHITE} size="small" />
-                        ) : (
-                            <Text style={styles.saveButtonText}>Save Changes</Text>
-                        )}
+                        <Text style={styles.saveButtonText}>Return to Profile</Text>
                     </LinearGradient>
                 </TouchableOpacity>
             </Animated.View>
@@ -694,6 +491,15 @@ const EditProfile = () => {
     };
 
     const renderAchievementsTab = () => {
+        if (isLoading) {
+            return (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={BLUE_ACCENT} />
+                    <Text style={styles.loadingText}>Loading achievements data...</Text>
+                </View>
+            );
+        }
+
         return (
             <Animated.View
                 style={[
@@ -718,12 +524,12 @@ const EditProfile = () => {
                 >
                     <View style={styles.levelHeader}>
                         <View>
-                            <Text style={styles.levelTitle}>Level {level}</Text>
-                            <Text style={styles.levelRank}>{rank}</Text>
+                            <Text style={styles.levelTitle}>Level {level || '1'}</Text>
+                            <Text style={styles.levelRank}>{rank || 'Beginner'}</Text>
                         </View>
                         <View style={styles.streakContainer}>
                             <Ionicons name="flame" size={24} color={ORANGE} />
-                            <Text style={styles.streakText}>{streakDays} day streak</Text>
+                            <Text style={styles.streakText}>{streakDays || '0'} day streak</Text>
                         </View>
                     </View>
 
@@ -732,11 +538,11 @@ const EditProfile = () => {
                             <View
                                 style={[
                                     styles.progressFill,
-                                    { width: `${(xp / xpToNextLevel) * 100}%` }
+                                    { width: `${((xp || 0) / (xpToNextLevel || 100)) * 100}%` }
                                 ]}
                             />
                         </View>
-                        <Text style={styles.progressText}>{xp} / {xpToNextLevel} XP</Text>
+                        <Text style={styles.progressText}>{xp || 0} / {xpToNextLevel || 100} XP</Text>
                     </View>
                 </LinearGradient>
 
@@ -744,36 +550,40 @@ const EditProfile = () => {
                 <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Achievements</Text>
 
-                    {achievements.map((achievement, index) => (
-                        <View key={index} style={styles.achievementItem}>
-                            <LinearGradient
-                                colors={achievement.completed ?
-                                    [GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END] :
-                                    ['#333', '#444', '#555']}
-                                style={styles.achievementIcon}
-                            >
-                                <Ionicons
-                                    name={achievement.icon as any}
-                                    size={24}
-                                    color={achievement.completed ? WHITE : GRAY}
-                                />
-                            </LinearGradient>
-                            <View style={styles.achievementInfo}>
-                                <Text style={styles.achievementName}>{achievement.name}</Text>
-                                <Text style={styles.achievementDesc}>{achievement.description}</Text>
+                    {achievements.length > 0 ? (
+                        achievements.map((achievement, index) => (
+                            <View key={index} style={styles.achievementItem}>
+                                <LinearGradient
+                                    colors={achievement.completed ?
+                                        [GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END] :
+                                        ['#333', '#444', '#555']}
+                                    style={styles.achievementIcon}
+                                >
+                                    <Ionicons
+                                        name={achievement.icon as any}
+                                        size={24}
+                                        color={achievement.completed ? WHITE : GRAY}
+                                    />
+                                </LinearGradient>
+                                <View style={styles.achievementInfo}>
+                                    <Text style={styles.achievementName}>{achievement.name}</Text>
+                                    <Text style={styles.achievementDesc}>{achievement.description}</Text>
+                                </View>
+                                {achievement.completed ? (
+                                    <Ionicons name="checkmark-circle" size={24} color={GREEN} />
+                                ) : (
+                                    <Ionicons name="lock-closed" size={24} color={PINK} />
+                                )}
                             </View>
-                            {achievement.completed ? (
-                                <Ionicons name="checkmark-circle" size={24} color={GREEN} />
-                            ) : (
-                                <Ionicons name="lock-closed" size={24} color={PINK} />
-                            )}
-                        </View>
-                    ))}
+                        ))
+                    ) : (
+                        <Text style={styles.noDataText}>No achievements available</Text>
+                    )}
                 </GradientBorderBox>
 
                 <TouchableOpacity
                     style={styles.goalsButton}
-                    onPress={() => navigation.navigate('Goals')}
+                    onPress={() => navigation.goBack()}
                 >
                     <LinearGradient
                         colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
@@ -781,7 +591,7 @@ const EditProfile = () => {
                         end={{ x: 1, y: 0 }}
                         style={styles.goalsButtonGradient}
                     >
-                        <Text style={styles.goalsButtonText}>Set Fitness Goals</Text>
+                        <Text style={styles.goalsButtonText}>Return to Profile</Text>
                     </LinearGradient>
                 </TouchableOpacity>
             </Animated.View>
@@ -856,7 +666,7 @@ const EditProfile = () => {
                 onRequestClose={() => setShowUnitPicker(false)}
             >
                 <TouchableOpacity
-                    style={styles.modalOverlay}
+                    style={styles.modalContainer}
                     activeOpacity={1}
                     onPress={() => setShowUnitPicker(false)}
                 >
@@ -1041,25 +851,30 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: LIGHT_GRAY,
     },
-    backButton: {
-        padding: 4,
-    },
     headerTitle: {
         color: WHITE,
-        fontSize: 22,
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
+    backButton: {
+        padding: 8,
+    },
+    saveText: {
+        color: GRADIENT_MIDDLE,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     tabs: {
         flexDirection: 'row',
+        paddingHorizontal: 16,
         borderBottomWidth: 1,
         borderBottomColor: LIGHT_GRAY,
     },
     tab: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
         paddingVertical: 16,
+        marginRight: 24,
     },
     activeTab: {
         borderBottomWidth: 2,
@@ -1223,6 +1038,45 @@ const styles = StyleSheet.create({
     segmentTextActive: {
         color: WHITE,
     },
+    heightInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    heightInputGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    heightInput: {
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        color: WHITE,
+        fontSize: 16,
+        minWidth: 50,
+    },
+    heightUnitText: {
+        color: WHITE,
+        fontSize: 16,
+        marginLeft: 8,
+    },
+    weightInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    weightInput: {
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        color: WHITE,
+        fontSize: 16,
+        flex: 1,
+    },
+    weightUnitText: {
+        color: WHITE,
+        fontSize: 16,
+        marginLeft: 8,
+    },
     dropdownField: {
         backgroundColor: LIGHT_GRAY,
         borderRadius: 8,
@@ -1267,47 +1121,36 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     levelRank: {
-        color: WHITE,
+        color: GRAY,
         fontSize: 16,
     },
     streakContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 152, 0, 0.2)',
-        borderRadius: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
     },
     streakText: {
-        color: ORANGE,
-        fontWeight: 'bold',
-        marginLeft: 6,
+        color: WHITE,
+        fontSize: 16,
+        marginLeft: 8,
     },
     progressContainer: {
-        marginTop: 8,
+        marginTop: 10,
     },
     progressBar: {
-        height: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 4,
+        height: 10,
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 5,
         overflow: 'hidden',
+        marginBottom: 5,
     },
     progressFill: {
         height: '100%',
-        backgroundColor: WHITE,
-        borderRadius: 4,
+        backgroundColor: GRADIENT_MIDDLE,
     },
     progressText: {
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: WHITE,
         fontSize: 14,
-        textAlign: 'right',
-        marginTop: 4,
-    },
-    achievementsSection: {
-        backgroundColor: CARD_BG,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 20,
+        textAlign: 'center',
     },
     achievementItem: {
         flexDirection: 'row',
@@ -1323,12 +1166,12 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 16,
+        marginRight: 12,
     },
     achievementCompleted: {
         backgroundColor: GRADIENT_MIDDLE,
     },
-    achievementLocked: {
+    achievementIncomplete: {
         backgroundColor: LIGHT_GRAY,
     },
     achievementInfo: {
@@ -1344,6 +1187,10 @@ const styles = StyleSheet.create({
         color: GRAY,
         fontSize: 14,
     },
+    achievementStatus: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
     goalsButton: {
         borderRadius: 12,
         overflow: 'hidden',
@@ -1358,57 +1205,11 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
-    heightInputContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    heightInputGroup: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: LIGHT_GRAY,
-        borderRadius: 8,
-        flex: 0.48,
-        height: 48,
-        paddingHorizontal: 12,
-    },
-    heightInput: {
+    modalContainer: {
         flex: 1,
-        color: WHITE,
-        fontSize: 16,
-        padding: 0,
-    },
-    heightUnitText: {
-        color: BLUE_ACCENT,
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginLeft: 4,
-    },
-    weightInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: LIGHT_GRAY,
-        borderRadius: 8,
-        height: 48,
-        paddingHorizontal: 12,
-    },
-    weightInput: {
-        flex: 1,
-        color: WHITE,
-        fontSize: 16,
-        padding: 0,
-    },
-    weightUnitText: {
-        color: BLUE_ACCENT,
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginLeft: 4,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.8)',
     },
     modalContent: {
         width: width * 0.85,
@@ -1533,6 +1334,80 @@ const styles = StyleSheet.create({
         color: GRAY,
         fontSize: 14,
         marginTop: 5,
+    },
+    readOnlyText: {
+        fontSize: 16,
+        color: WHITE,
+        flex: 1,
+        textAlign: 'right',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    loadingText: {
+        fontSize: 16,
+        color: WHITE,
+        marginTop: 10,
+    },
+    noDataText: {
+        fontSize: 16,
+        color: GRAY,
+        textAlign: 'center',
+        padding: 20,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    formRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    label: {
+        color: GRAY,
+        fontSize: 14,
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    achievementsList: {
+        marginBottom: 20,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    displayValue: {
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        color: WHITE,
+        fontSize: 16,
+    },
+    readOnlyBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 20,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        marginTop: 12,
+    },
+    readOnlyBadgeText: {
+        color: WHITE,
+        marginLeft: 6,
+        fontWeight: '600',
     },
 });
 
