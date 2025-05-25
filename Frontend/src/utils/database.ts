@@ -1626,6 +1626,101 @@ export const markStreakSynced = async (firebaseUid: string): Promise<void> => {
     }
 };
 
+// Add a function to ensure the location column exists
+export const ensureLocationColumnExists = async (): Promise<boolean> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to check database schema before initialization');
+        await initDatabase();
+    }
+
+    try {
+        console.log('Checking if location column exists in user_profiles table...');
+
+        // Get the table info to see if location column exists
+        const tableInfo = await db.getAllAsync('PRAGMA table_info(user_profiles)');
+
+        // Type-safe check for column existence
+        const hasLocationColumn = tableInfo.some((col: any) =>
+            col && typeof col === 'object' && 'name' in col && col.name === 'location'
+        );
+
+        if (hasLocationColumn) {
+            console.log('✅ Location column already exists in user_profiles table');
+            return true;
+        }
+
+        // Column doesn't exist, add it
+        console.log('Location column not found, adding it now...');
+
+        try {
+            await db.execAsync('ALTER TABLE user_profiles ADD COLUMN location TEXT');
+            console.log('✅ Successfully added location column to user_profiles table');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to add location column:', error);
+
+            // Try a more radical approach - recreate the table with location column
+            try {
+                console.log('Attempting to recreate user_profiles table with location column...');
+
+                // Begin transaction
+                await db.execAsync('BEGIN TRANSACTION');
+
+                // Get current schema in a type-safe way
+                const columns = tableInfo
+                    .filter((col: any) => col && typeof col === 'object' && 'name' in col && 'type' in col)
+                    .map((col: any) => `${col.name} ${col.type}`);
+
+                // Create backup table
+                await db.execAsync(`
+                    CREATE TABLE user_profiles_backup AS 
+                    SELECT * FROM user_profiles
+                `);
+
+                // Drop original table
+                await db.execAsync('DROP TABLE user_profiles');
+
+                // Create new table with location column
+                await db.execAsync(`
+                    CREATE TABLE user_profiles (
+                        ${columns.join(', ')},
+                        location TEXT
+                    )
+                `);
+
+                // Copy data back from backup
+                await db.execAsync(`
+                    INSERT INTO user_profiles 
+                    SELECT *, NULL as location
+                    FROM user_profiles_backup
+                `);
+
+                // Drop backup table
+                await db.execAsync('DROP TABLE user_profiles_backup');
+
+                // Commit transaction
+                await db.execAsync('COMMIT');
+
+                console.log('✅ Successfully recreated user_profiles table with location column');
+                return true;
+            } catch (recreateError) {
+                // Rollback transaction
+                try {
+                    await db.execAsync('ROLLBACK');
+                } catch (rollbackError) {
+                    console.error('❌ Error rolling back transaction:', rollbackError);
+                }
+
+                console.error('❌ Failed to recreate user_profiles table:', recreateError);
+                return false;
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error checking for location column:', error);
+        return false;
+    }
+};
+
 // Export all database functions
 export {
     // ... existing exports

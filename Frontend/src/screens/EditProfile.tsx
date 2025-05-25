@@ -26,7 +26,8 @@ import {
     getUserStreak,
     initDatabase,
     isDatabaseReady,
-    updateUserProfile
+    updateUserProfile,
+    ensureLocationColumnExists
 } from '../utils/database';
 import {
     cmToFeetInches,
@@ -37,6 +38,7 @@ import {
     formatWeight
 } from '../utils/unitConversion';
 import _ from 'lodash'; // Import lodash for deep cloning
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Extend the User type to include our custom fields
 interface ExtendedUser extends Auth.User {
@@ -198,6 +200,151 @@ const EditProfile = () => {
         setHasUnsavedChanges(true);
     };
 
+    // Move loadProfileData outside useEffect
+    const loadProfileData = async () => {
+        try {
+            setIsLoading(true);
+
+            // Ensure database is initialized
+            if (!isDatabaseReady()) {
+                await initDatabase();
+            }
+
+            if (user && user.uid) {
+                // Get user profile from SQLite
+                const profile = await getUserProfileByFirebaseUid(user.uid);
+
+                // Get user goals from SQLite
+                const goals = await getUserGoals(user.uid);
+
+                // Get user streak
+                const streak = await getUserStreak(user.uid);
+
+                // Try to get location from AsyncStorage as fallback
+                let savedLocation = '---';
+                try {
+                    const asyncStorageLocation = await AsyncStorage.getItem(`user_location_${user.uid}`);
+                    if (asyncStorageLocation) {
+                        savedLocation = asyncStorageLocation;
+                    }
+                } catch (asyncError) {
+                    console.log('Could not load location from AsyncStorage:', asyncError);
+                }
+
+                if (profile) {
+                    // Set basic profile info (for display in profile card)
+                    const firstName = profile.first_name || '---';
+                    const lastName = profile.last_name || '';
+                    const displayUsername = `${firstName}${lastName ? '_' + lastName : ''}`;
+
+                    setUsername(displayUsername);
+                    setEmail(profile.email || '---');
+
+                    // Try to get location from database, fall back to AsyncStorage if not available
+                    setLocation(profile.location || savedLocation);
+
+                    // Check if profile has unit_preference and map it to isImperialUnits
+                    const isImperial = profile.unit_preference === 'imperial';
+                    setIsImperialUnits(isImperial);
+
+                    // Set height (convert from cm if needed)
+                    if (profile.height) {
+                        if (isImperial) {
+                            const { feet, inches } = cmToFeetInches(profile.height);
+                            setHeightFeet(feet.toString());
+                            setHeightInches(inches.toString());
+                            setHeight(`${feet}' ${inches}"`);
+                        } else {
+                            setHeight(`${profile.height} cm`);
+                        }
+                    } else {
+                        setHeight('---');
+                    }
+
+                    // Set weight (convert from kg if needed)
+                    if (profile.weight) {
+                        if (isImperial) {
+                            const lbs = kgToLbs(profile.weight);
+                            setWeight(`${Math.round(lbs)} lbs`);
+                        } else {
+                            setWeight(`${profile.weight} kg`);
+                        }
+                    } else {
+                        setWeight('---');
+                    }
+
+                    // Set other profile fields
+                    setSex(profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : '---');
+                    setDateOfBirth(profile.date_of_birth || '---');
+
+                    // Set timezone
+                    setTimeZone(profile.timezone || 'UTC');
+
+                    // Set editable values (for form fields)
+                    setEditedUsername(displayUsername);
+                    setEditedLocation(profile.location || savedLocation); // Use fallback if needed
+                    setEditedSex(profile.gender || '');
+                    setEditedIsImperialUnits(isImperial);
+                    setEditedTimeZone(profile.timezone || 'UTC');
+
+                    if (profile.height) {
+                        if (isImperial) {
+                            const { feet, inches } = cmToFeetInches(profile.height);
+                            setEditedHeightFeet(feet.toString());
+                            setEditedHeightInches(inches.toString());
+                        }
+                    }
+
+                    if (profile.weight) {
+                        if (isImperial) {
+                            const lbs = kgToLbs(profile.weight);
+                            setEditedWeight(Math.round(lbs).toString());
+                        } else {
+                            setEditedWeight(profile.weight.toString());
+                        }
+                    }
+                }
+
+                if (goals) {
+                    // Set nutrition & fitness goals
+                    // These values are likely stored in the user_profiles table in our SQLite implementation
+                    // rather than separate tables as in the backend
+                }
+
+                // Set gamification data
+                // Currently we don't have this in the SQLite database directly, so use default/placeholder values
+                setLevel(profile?.level || 1);
+                setXp(profile?.xp || 0);
+                setXpToNextLevel(profile?.xp_to_next_level || 100);
+                setRank(profile?.rank || 'Beginner');
+                setStreakDays(streak || 0);
+
+                // Set achievements (placeholder data for now)
+                // In a real implementation, we would fetch this from a user_achievements table
+                setAchievements([
+                    { name: 'Early Bird', description: 'Complete 5 morning workouts', completed: false, icon: 'sunny' },
+                    { name: 'Consistency King', description: 'Maintain a 7-day streak', completed: streak >= 7, icon: 'trending-up' },
+                    { name: 'Weight Warrior', description: 'Lose 5kg', completed: false, icon: 'barbell' },
+                    { name: 'Marathon Master', description: 'Run 42km total', completed: false, icon: 'walk' },
+                    { name: 'Nutrition Ninja', description: 'Log meals for 30 days', completed: false, icon: 'nutrition' },
+                ]);
+            }
+        } catch (error) {
+            console.error('Error loading profile data from SQLite:', error);
+            // Set default values if there's an error
+            setUsername('---');
+            setHeight('---');
+            setWeight('---');
+            setSex('---');
+            setDateOfBirth('---');
+            setLocation('---');
+            setEmail(user?.email || '---');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Keep only one useEffect with the combined functionality
     useEffect(() => {
         // Animation on component mount
         Animated.parallel([
@@ -213,140 +360,15 @@ const EditProfile = () => {
             }),
         ]).start();
 
-        // Fetch user data from SQLite database
-        const loadProfileData = async () => {
-            try {
-                setIsLoading(true);
-
-                // Ensure database is initialized
-                if (!isDatabaseReady()) {
-                    await initDatabase();
-                }
-
-                if (user && user.uid) {
-                    // Get user profile from SQLite
-                    const profile = await getUserProfileByFirebaseUid(user.uid);
-
-                    // Get user goals from SQLite
-                    const goals = await getUserGoals(user.uid);
-
-                    // Get user streak
-                    const streak = await getUserStreak(user.uid);
-
-                    if (profile) {
-                        // Set basic profile info (for display in profile card)
-                        const firstName = profile.first_name || '---';
-                        const lastName = profile.last_name || '';
-                        const displayUsername = `${firstName}${lastName ? '_' + lastName : ''}`;
-
-                        setUsername(displayUsername);
-                        setEmail(profile.email || '---');
-
-                        // Handle location UI field even though it's not stored in database
-                        setLocation('---');
-
-                        // Check if profile has unit_preference and map it to isImperialUnits
-                        const isImperial = profile.unit_preference === 'imperial';
-                        setIsImperialUnits(isImperial);
-
-                        // Set height (convert from cm if needed)
-                        if (profile.height) {
-                            if (isImperial) {
-                                const { feet, inches } = cmToFeetInches(profile.height);
-                                setHeightFeet(feet.toString());
-                                setHeightInches(inches.toString());
-                                setHeight(`${feet}' ${inches}"`);
-                            } else {
-                                setHeight(`${profile.height} cm`);
-                            }
-                        } else {
-                            setHeight('---');
-                        }
-
-                        // Set weight (convert from kg if needed)
-                        if (profile.weight) {
-                            if (isImperial) {
-                                const lbs = kgToLbs(profile.weight);
-                                setWeight(`${Math.round(lbs)} lbs`);
-                            } else {
-                                setWeight(`${profile.weight} kg`);
-                            }
-                        } else {
-                            setWeight('---');
-                        }
-
-                        // Set other profile fields
-                        setSex(profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : '---');
-                        setDateOfBirth(profile.date_of_birth || '---');
-
-                        // Set timezone
-                        setTimeZone(profile.timezone || 'UTC');
-
-                        // Set editable values (for form fields)
-                        setEditedUsername(displayUsername);
-                        setEditedLocation(''); // No location in database, but still handle UI
-                        setEditedSex(profile.gender || '');
-                        setEditedIsImperialUnits(isImperial);
-                        setEditedTimeZone(profile.timezone || 'UTC');
-
-                        if (profile.height) {
-                            if (isImperial) {
-                                const { feet, inches } = cmToFeetInches(profile.height);
-                                setEditedHeightFeet(feet.toString());
-                                setEditedHeightInches(inches.toString());
-                            }
-                        }
-
-                        if (profile.weight) {
-                            if (isImperial) {
-                                const lbs = kgToLbs(profile.weight);
-                                setEditedWeight(Math.round(lbs).toString());
-                            } else {
-                                setEditedWeight(profile.weight.toString());
-                            }
-                        }
-                    }
-
-                    if (goals) {
-                        // Set nutrition & fitness goals
-                        // These values are likely stored in the user_profiles table in our SQLite implementation
-                        // rather than separate tables as in the backend
-                    }
-
-                    // Set gamification data
-                    // Currently we don't have this in the SQLite database directly, so use default/placeholder values
-                    setLevel(profile?.level || 1);
-                    setXp(profile?.xp || 0);
-                    setXpToNextLevel(profile?.xp_to_next_level || 100);
-                    setRank(profile?.rank || 'Beginner');
-                    setStreakDays(streak || 0);
-
-                    // Set achievements (placeholder data for now)
-                    // In a real implementation, we would fetch this from a user_achievements table
-                    setAchievements([
-                        { name: 'Early Bird', description: 'Complete 5 morning workouts', completed: false, icon: 'sunny' },
-                        { name: 'Consistency King', description: 'Maintain a 7-day streak', completed: streak >= 7, icon: 'trending-up' },
-                        { name: 'Weight Warrior', description: 'Lose 5kg', completed: false, icon: 'barbell' },
-                        { name: 'Marathon Master', description: 'Run 42km total', completed: false, icon: 'walk' },
-                        { name: 'Nutrition Ninja', description: 'Log meals for 30 days', completed: false, icon: 'nutrition' },
-                    ]);
-                }
-            } catch (error) {
-                console.error('Error loading profile data from SQLite:', error);
-                // Set default values if there's an error
-                setUsername('---');
-                setHeight('---');
-                setWeight('---');
-                setSex('---');
-                setDateOfBirth('---');
-                setLocation('---');
-                setEmail(user?.email || '---');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadProfileData();
+        // Ensure location column exists using our database utility function
+        ensureLocationColumnExists().then(() => {
+            // Fetch user data from SQLite database
+            loadProfileData();
+        }).catch(error => {
+            console.error('Error ensuring location column exists:', error);
+            // Still try to load profile data even if column creation failed
+            loadProfileData();
+        });
     }, [user]);
 
     // Modify input handlers to track changes
@@ -437,29 +459,50 @@ const EditProfile = () => {
             const lastName = nameParts.length > 1 ? nameParts[1] : '';
 
             // Create profile data object based strictly on the fields that exist in user_profiles table
-            const profileData = {
+            // Exclude location first in case it's not supported
+            const baseProfileData = {
                 first_name: firstName,
                 last_name: lastName,
                 height: heightInCm,
                 weight: weightInKg,
                 gender: editedSex.toLowerCase(),
-                // The user_profiles table has unit_preference instead of is_imperial_units
                 unit_preference: editedIsImperialUnits ? 'imperial' : 'metric',
-                // Store timezone in the timezone field
                 timezone: editedTimeZone || 'UTC',
-                // Make sure email is included
                 email: email
             };
 
-            console.log('Saving profile with data:', profileData);
+            // Save the location value regardless of whether we could save it to the database
+            // We'll use it for the UI display
+            const locationToDisplay = editedLocation || '';
 
-            // Save to SQLite database
+            // Attempt to save with location first
             if (user) {
-                await updateUserProfile(user.uid, profileData);
+                try {
+                    // Try saving with location included
+                    const profileDataWithLocation = {
+                        ...baseProfileData,
+                        location: locationToDisplay
+                    };
+
+                    console.log('Saving profile with location:', profileDataWithLocation);
+                    await updateUserProfile(user.uid, profileDataWithLocation);
+
+                    // If successful, save location value to AsyncStorage as backup
+                    await AsyncStorage.setItem(`user_location_${user.uid}`, locationToDisplay);
+                } catch (locationError) {
+                    console.error("Failed to save with location column:", locationError);
+
+                    // Fallback: Try saving without location field
+                    console.log('Falling back to saving without location field');
+                    await updateUserProfile(user.uid, baseProfileData);
+
+                    // Save location to AsyncStorage as a fallback storage mechanism
+                    await AsyncStorage.setItem(`user_location_${user.uid}`, locationToDisplay);
+                }
 
                 // Now update the displayed values to match the edited values
                 setUsername(editedUsername);
-                setLocation(editedLocation); // Still update the UI even if we don't store in DB
+                setLocation(locationToDisplay); // Always update UI with the location value
                 setSex(editedSex.charAt(0).toUpperCase() + editedSex.slice(1));
                 setIsImperialUnits(editedIsImperialUnits);
 
