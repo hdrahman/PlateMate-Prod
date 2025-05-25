@@ -233,11 +233,17 @@ const EditProfile = () => {
 
                         setUsername(displayUsername);
                         setEmail(profile.email || '---');
-                        setLocation(profile.location || '---');
+
+                        // Handle location UI field even though it's not stored in database
+                        setLocation('---');
+
+                        // Check if profile has unit_preference and map it to isImperialUnits
+                        const isImperial = profile.unit_preference === 'imperial';
+                        setIsImperialUnits(isImperial);
 
                         // Set height (convert from cm if needed)
                         if (profile.height) {
-                            if (profile.is_imperial_units) {
+                            if (isImperial) {
                                 const { feet, inches } = cmToFeetInches(profile.height);
                                 setHeightFeet(feet.toString());
                                 setHeightInches(inches.toString());
@@ -251,7 +257,7 @@ const EditProfile = () => {
 
                         // Set weight (convert from kg if needed)
                         if (profile.weight) {
-                            if (profile.is_imperial_units) {
+                            if (isImperial) {
                                 const lbs = kgToLbs(profile.weight);
                                 setWeight(`${Math.round(lbs)} lbs`);
                             } else {
@@ -264,16 +270,19 @@ const EditProfile = () => {
                         // Set other profile fields
                         setSex(profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : '---');
                         setDateOfBirth(profile.date_of_birth || '---');
-                        setIsImperialUnits(!!profile.is_imperial_units);
+
+                        // Set timezone
+                        setTimeZone(profile.timezone || 'UTC');
 
                         // Set editable values (for form fields)
                         setEditedUsername(displayUsername);
-                        setEditedLocation(profile.location || '');
+                        setEditedLocation(''); // No location in database, but still handle UI
                         setEditedSex(profile.gender || '');
-                        setEditedIsImperialUnits(!!profile.is_imperial_units);
+                        setEditedIsImperialUnits(isImperial);
+                        setEditedTimeZone(profile.timezone || 'UTC');
 
                         if (profile.height) {
-                            if (profile.is_imperial_units) {
+                            if (isImperial) {
                                 const { feet, inches } = cmToFeetInches(profile.height);
                                 setEditedHeightFeet(feet.toString());
                                 setEditedHeightInches(inches.toString());
@@ -281,7 +290,7 @@ const EditProfile = () => {
                         }
 
                         if (profile.weight) {
-                            if (profile.is_imperial_units) {
+                            if (isImperial) {
                                 const lbs = kgToLbs(profile.weight);
                                 setEditedWeight(Math.round(lbs).toString());
                             } else {
@@ -370,18 +379,22 @@ const EditProfile = () => {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.length > 1 ? nameParts[1] : '';
 
-            // Create profile data object - always store in metric
+            // Create profile data object based strictly on the fields that exist in user_profiles table
             const profileData = {
                 first_name: firstName,
                 last_name: lastName,
                 height: heightInCm,
                 weight: weightInKg,
                 gender: editedSex.toLowerCase(),
-                location: editedLocation,
-                is_imperial_units: editedIsImperialUnits,
-                timezone: editedTimeZone,
+                // The user_profiles table has unit_preference instead of is_imperial_units
+                unit_preference: editedIsImperialUnits ? 'imperial' : 'metric',
+                // Store timezone in the timezone field
+                timezone: editedTimeZone || 'UTC',
+                // Make sure email is included
                 email: email
             };
+
+            console.log('Saving profile with data:', profileData);
 
             // Save to SQLite database
             if (user) {
@@ -389,7 +402,7 @@ const EditProfile = () => {
 
                 // Now update the displayed values to match the edited values
                 setUsername(editedUsername);
-                setLocation(editedLocation);
+                setLocation(editedLocation); // Still update the UI even if we don't store in DB
                 setSex(editedSex.charAt(0).toUpperCase() + editedSex.slice(1));
                 setIsImperialUnits(editedIsImperialUnits);
 
@@ -418,7 +431,7 @@ const EditProfile = () => {
             }
         } catch (error) {
             console.error('Error saving profile:', error);
-            Alert.alert('Error', 'Failed to update profile. Please try again.');
+            Alert.alert('Error', `Failed to update profile: ${error.message || 'Unknown error'}`);
         } finally {
             setIsSaving(false);
         }
