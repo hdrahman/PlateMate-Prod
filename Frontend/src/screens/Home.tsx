@@ -403,19 +403,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Calculate weight lost when profile and weight history are loaded
+  // Calculate weight lost when profile and weight history are loaded - fix the logic
   useEffect(() => {
     if (!profileLoading && !weightLoading && currentWeight !== null) {
       // If starting_weight is available, use it; otherwise use the first weight entry
       const initialWeight = startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : currentWeight);
 
-      // Calculate weight lost
-      const lost = initialWeight - currentWeight;
-      setWeightLost(parseFloat(lost.toFixed(1)));
+      // Calculate weight change (can be positive for loss or negative for gain)
+      const weightChange = initialWeight - currentWeight;
+      setWeightLost(parseFloat(weightChange.toFixed(1)));
     }
   }, [profileLoading, weightLoading, currentWeight, startingWeight, weightHistory]);
 
-  // Handle adding new weight
+  // Update the handleAddWeight function
   const handleAddWeight = async () => {
     if (!user || !newWeight) return;
 
@@ -441,53 +441,54 @@ export default function Home() {
         setStartingWeight(weightValue);
       }
 
-      // Check if the weight is different from the current weight
-      // Use a small threshold to account for floating-point precision
-      const weightChanged = !currentWeight || Math.abs(weightValue - currentWeight) >= 0.01;
+      // Always update the current weight in user profile
+      await updateUserProfile(user.uid, { weight: weightValue });
+      setCurrentWeight(weightValue);
 
-      if (weightChanged) {
-        // Add weight entry to history
-        await addWeightEntry(user.uid, weightValue);
+      // Add weight entry to history
+      await addWeightEntry(user.uid, weightValue);
 
-        // Update current weight in user profile
-        await updateUserProfile(user.uid, { weight: weightValue });
+      // Update local state with the new entry
+      const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 
-        // Update local state with the new entry
-        const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+      // Add the new entry to the existing weight history
+      const updatedHistory = [...weightHistory];
 
-        // Add the new entry to the existing weight history
-        const updatedHistory = [...weightHistory];
+      // If the last entry is also from today, replace it instead of adding a new one
+      const lastEntryIndex = updatedHistory.length - 1;
+      const lastEntry = lastEntryIndex >= 0 ? updatedHistory[lastEntryIndex] : null;
 
-        // If the last entry is also from today, replace it instead of adding a new one
-        const lastEntryIndex = updatedHistory.length - 1;
-        const lastEntry = lastEntryIndex >= 0 ? updatedHistory[lastEntryIndex] : null;
-
-        if (lastEntry && lastEntry.date === today) {
-          // Replace today's entry
-          updatedHistory[lastEntryIndex] = { date: today, weight: weightValue };
-        } else {
-          // Add new entry
-          updatedHistory.push({ date: today, weight: weightValue });
-        }
-
-        setWeightHistory(updatedHistory);
-        setCurrentWeight(weightValue);
-
-        // No need to show temporary today weight anymore
-        setShowTodayWeight(false);
+      if (lastEntry && lastEntry.date === today) {
+        // Replace today's entry
+        updatedHistory[lastEntryIndex] = { date: today, weight: weightValue };
       } else {
-        // If weight hasn't changed, just update the UI without adding to history
-        console.log('Weight unchanged, not creating new entry');
+        // Add new entry
+        updatedHistory.push({ date: today, weight: weightValue });
       }
 
+      setWeightHistory(updatedHistory);
+
+      // No need to show temporary today weight anymore
+      setShowTodayWeight(false);
+      setTodayWeight(null);
+
+      // Recalculate weight lost or gained
+      if (startingWeight) {
+        const weightChange = startingWeight - weightValue;
+        setWeightLost(parseFloat(weightChange.toFixed(1)));
+      }
+
+      // Success message with feedback
+      Alert.alert(
+        'Weight Updated',
+        `Your weight has been updated to ${weightValue} kg.`,
+        [{ text: 'OK' }],
+        { cancelable: true }
+      );
+
+      // Close modal and clear input
       setWeightModalVisible(false);
       setNewWeight('');
-
-      // Recalculate weight lost
-      if (startingWeight) {
-        const lost = startingWeight - weightValue;
-        setWeightLost(parseFloat(lost.toFixed(1)));
-      }
     } catch (error) {
       console.error('Error adding weight entry:', error);
       Alert.alert('Error', 'Failed to add weight entry. Please try again.');
@@ -558,32 +559,60 @@ export default function Home() {
     );
   };
 
-  // Replace the static weight card with dynamic data
+  // Update the weight lost card render function
   const renderWeightLostCard = () => (
     <GradientBorderCard>
       <View style={styles.burnContainer}>
-        <Text style={styles.burnTitle}>Weight Lost</Text>
+        <Text style={styles.burnTitle}>
+          {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
+        </Text>
         <View style={styles.burnBarBackground}>
-          <LinearGradient
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            colors={['#006400', '#006400', '#00FF00']} // smoother gradient, first half dark green
-            style={[
-              styles.burnBarFill,
-              {
-                width: `${Math.min(
-                  (weightLost / (startingWeight && targetWeight && startingWeight > targetWeight
-                    ? startingWeight - targetWeight
-                    : 10)) * 100,
-                  100
-                )}%`
-              }
-            ]} // dynamically adjust width
-          />
+          {weightLost >= 0 ? (
+            // Weight loss (positive) - use green gradient
+            <LinearGradient
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              colors={['#006400', '#006400', '#00FF00']} // green gradient
+              style={[
+                styles.burnBarFill,
+                {
+                  width: `${Math.min(
+                    (Math.abs(weightLost) / (startingWeight && targetWeight && startingWeight > targetWeight
+                      ? startingWeight - targetWeight
+                      : 10)) * 100,
+                    100
+                  )}%`
+                }
+              ]}
+            />
+          ) : (
+            // Weight gain (negative) - use red gradient
+            <LinearGradient
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              colors={['#8B0000', '#8B0000', '#FF0000']} // red gradient
+              style={[
+                styles.burnBarFill,
+                {
+                  width: `${Math.min(
+                    (Math.abs(weightLost) / 10) * 100, // use a default of 10kg for the scale if no target
+                    100
+                  )}%`
+                }
+              ]}
+            />
+          )}
         </View>
         <View style={styles.weightLabelsContainer}>
           <Text style={styles.weightLabel}>{startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : '--')} kg</Text>
-          <Text style={styles.burnDetails}>{weightLost} Kilograms Lost!</Text> {/* Centered text */}
+          <Text style={[
+            styles.burnDetails,
+            weightLost < 0 && styles.burnDetailsGain
+          ]}>
+            {weightLost >= 0
+              ? `${Math.abs(weightLost)} Kilograms Lost!`
+              : `${Math.abs(weightLost)} Kilograms Gained!`}
+          </Text>
           <Text style={styles.weightLabel}>{targetWeight ? `${targetWeight} kg` : '---'}</Text>
         </View>
       </View>
@@ -600,18 +629,42 @@ export default function Home() {
     >
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
-          <Text style={styles.modalTitle}>Add New Weight</Text>
-          <TextInput
-            style={styles.weightInput}
-            value={newWeight}
-            onChangeText={setNewWeight}
-            placeholder="Enter weight in kg"
-            keyboardType="numeric"
-            placeholderTextColor="#888"
-          />
+          <Text style={styles.modalTitle}>Update Weight</Text>
+          <View style={{
+            width: '100%',
+            position: 'relative',
+            marginBottom: 20,
+          }}>
+            <TextInput
+              style={[styles.weightInput, {
+                borderColor: newWeight ? 'rgba(155, 0, 255, 0.6)' : '#555', // More subtle highlight
+                paddingRight: 40, // Make room for the unit label
+              }]}
+              value={newWeight}
+              onChangeText={setNewWeight}
+              placeholder="Enter weight in kg"
+              keyboardType="numeric"
+              placeholderTextColor="rgba(150, 150, 150, 0.6)"
+              autoFocus={true}
+            />
+            <Text style={{
+              position: 'absolute',
+              right: 15,
+              top: 15,
+              color: 'rgba(170, 170, 170, 0.8)',
+              fontSize: 16,
+              fontWeight: '400',
+            }}>
+              kg
+            </Text>
+          </View>
           <View style={styles.modalButtons}>
             <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
+              style={[styles.modalButton, {
+                backgroundColor: 'rgba(60, 60, 60, 0.8)',
+                borderWidth: 1,
+                borderColor: '#555',
+              }]}
               onPress={() => {
                 setWeightModalVisible(false);
                 setNewWeight('');
@@ -620,7 +673,11 @@ export default function Home() {
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalButton, styles.saveButton]}
+              style={[styles.modalButton, {
+                backgroundColor: 'rgba(55, 0, 110, 0.6)',
+                borderWidth: 1,
+                borderColor: '#9B00FF',
+              }]}
               onPress={handleAddWeight}
             >
               <Text style={styles.buttonText}>Save</Text>
@@ -751,6 +808,175 @@ export default function Home() {
       Alert.alert("Error", "An unexpected error occurred. Please try again.");
     }
   };
+
+  // In the Home component, add this function to check if today's weight has been recorded
+  // Check if a weight entry exists for today
+  const hasTodayWeightEntry = (weightHistory: Array<{ date: string; weight: number }>) => {
+    const today = new Date();
+    const todayString = today.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+
+    return weightHistory.some(entry => entry.date === todayString);
+  };
+
+  // Update the automatic weight recording effect to be more reliable and include date checks
+  useEffect(() => {
+    if (!user || !currentWeight) return;
+
+    // Function to record today's weight if it hasn't been recorded yet
+    const recordTodayWeight = async () => {
+      try {
+        // Check if we already have a weight entry for today
+        const history = await getWeightHistory(user.uid);
+        const today = new Date();
+        const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        // Check if there's an entry for today
+        const hasEntryForToday = history && history.weights &&
+          history.weights.some(entry => entry.recorded_at.startsWith(todayString));
+
+        // If no entry for today, record the current weight
+        if (!hasEntryForToday) {
+          await addWeightEntry(user.uid, currentWeight);
+          console.log('Daily weight recorded automatically');
+
+          // Update the local weight history display
+          const newEntry = {
+            date: today.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            weight: currentWeight
+          };
+
+          // Check if the last entry is from today, and if so, replace it instead of adding a new one
+          const updatedHistory = [...weightHistory];
+          const lastEntryIndex = updatedHistory.length - 1;
+
+          if (lastEntryIndex >= 0 && updatedHistory[lastEntryIndex].date === newEntry.date) {
+            updatedHistory[lastEntryIndex] = newEntry;
+          } else {
+            updatedHistory.push(newEntry);
+          }
+
+          setWeightHistory(updatedHistory);
+          setShowTodayWeight(false);
+
+          // Recalculate weight change
+          if (startingWeight) {
+            const weightChange = startingWeight - currentWeight;
+            setWeightLost(parseFloat(weightChange.toFixed(1)));
+          }
+        }
+      } catch (error) {
+        console.error('Error in automatic weight recording:', error);
+      }
+    };
+
+    // Set up a timer to check at midnight and also check when the component mounts
+    const checkTimeAndRecordWeight = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+
+      // Check if it's midnight (00:00)
+      if (hours === 0 && minutes === 0) {
+        recordTodayWeight();
+      }
+    };
+
+    // Run once when the component mounts to ensure today's weight is recorded
+    recordTodayWeight();
+
+    // Check every minute for midnight trigger
+    const interval = setInterval(checkTimeAndRecordWeight, 60000);
+
+    // Clear interval on unmount
+    return () => clearInterval(interval);
+  }, [user, currentWeight, weightHistory]);
+
+  useEffect(() => {
+    const setStartingWeightTo110 = async () => {
+      if (user) {
+        try {
+          // Import the necessary functions from database.ts
+          const { db, initDatabase, isDatabaseReady } = require('../utils/database');
+
+          // Make sure the database is initialized
+          if (!isDatabaseReady()) {
+            console.log("Database not ready, initializing first...");
+            await initDatabase();
+          }
+
+          console.log("Checking if user profile exists...");
+
+          // First check if the user profile exists
+          const userProfile = await db.getFirstAsync(
+            `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
+            [user.uid]
+          );
+
+          if (!userProfile) {
+            console.log("User profile doesn't exist, creating one first...");
+            // Create a minimal profile
+            await db.runAsync(
+              `INSERT INTO user_profiles (
+                firebase_uid, email, first_name, last_name, 
+                starting_weight, weight, synced, last_modified
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                user.uid,
+                user.email || 'unknown@email.com',
+                user.displayName?.split(' ')[0] || 'User',
+                user.displayName?.split(' ').slice(1).join(' ') || '',
+                110, // starting weight
+                currentWeight || 110, // current weight 
+                0, // not synced
+                new Date().toISOString()
+              ]
+            );
+            console.log("Created new user profile with starting weight 110kg");
+          } else {
+            console.log("User profile exists, updating starting weight to 110kg");
+            // Update existing profile
+            await db.runAsync(
+              `UPDATE user_profiles SET starting_weight = ?, synced = 0, last_modified = ? WHERE firebase_uid = ?`,
+              [110, new Date().toISOString(), user.uid]
+            );
+            console.log("Starting weight updated to 110kg directly in SQLite");
+          }
+
+          // Update the local state
+          setStartingWeight(110);
+
+          // Recalculate weight change if current weight exists
+          if (currentWeight) {
+            const weightChange = 110 - currentWeight;
+            setWeightLost(parseFloat(weightChange.toFixed(1)));
+          }
+        } catch (error) {
+          console.error("Error updating starting weight directly:", error);
+
+          // Try an alternative method if the first fails
+          try {
+            console.log("Trying alternative method - memory update only");
+            // Just update the state variables without touching the database
+            setStartingWeight(110);
+
+            if (currentWeight) {
+              const weightChange = 110 - currentWeight;
+              setWeightLost(parseFloat(weightChange.toFixed(1)));
+            }
+
+            console.log("Updated starting weight in memory only (110kg)");
+          } catch (fallbackError) {
+            console.error("Alternative method also failed:", fallbackError);
+          }
+        }
+      }
+    };
+
+    // Run once when component mounts
+    setStartingWeightTo110();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
@@ -1065,13 +1291,22 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
     const minVal = Math.min(...values);
     const maxVal = Math.max(...values);
 
-    // If range is very small, add padding to make changes more visible
+    // For longer time periods, use a wider context
+    const timeRangeFactor = Math.min(1.5, 1 + (combinedData.length / 30)); // Gradually increase context with more data points
+
+    // Calculate range padding based on the weight range and time range
+    const rangePadding = Math.max(
+      1, // Minimum padding
+      (maxVal - minVal) * 0.15 * timeRangeFactor // Dynamic padding based on range and time
+    );
+
+    // If range is very small, add more padding to make changes more visible
     if (maxVal - minVal < 2) {
-      return [Math.max(0, minVal - 1), maxVal + 1];
+      return [Math.max(0, minVal - rangePadding), maxVal + rangePadding];
     }
 
-    // Otherwise, add just a little padding
-    return [Math.max(0, minVal - 0.5), maxVal + 0.5];
+    // Otherwise, add proportional padding
+    return [Math.max(0, minVal - rangePadding / 2), maxVal + rangePadding / 2];
   };
 
   const [minWeight, maxWeight] = calculateOptimalYRange(yValues);
@@ -1136,12 +1371,29 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: -10 // was 5
+          marginBottom: -10
         }}
       >
         <Text style={styles.weightGraphTitle}>Weight Trend:</Text>
-        <TouchableOpacity onPress={onAddPress}>
-          <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
+        <TouchableOpacity
+          onPress={onAddPress}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            borderWidth: 1,
+            borderColor: 'rgba(156, 39, 176, 0.4)',
+            shadowColor: '#9B00FF',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.3,
+            shadowRadius: 2,
+            elevation: 2,
+          }}
+        >
+          <MaterialCommunityIcons name="pencil" size={18} color="#9B00FF" />
         </TouchableOpacity>
       </View>
 
@@ -1263,41 +1515,27 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
                   strokeLinejoin="round"
                 />
               )}
+
               {combinedData.map((d, i) => {
                 const cx = scaleX(i);
                 const cy = scaleY(d.weight);
-                const isTodayPoint = showTodayWeight && i === combinedData.length - 1 && i > 0;
 
                 // Only render dots for certain points to reduce visual clutter
-                if (isTodayPoint || i === 0 || i === combinedData.length - 1 || i % 3 === 0) {
+                if (i === 0 || i === combinedData.length - 1 || i % 3 === 0) {
                   return (
                     <Circle
                       key={`circle-${i}`}
                       cx={cx}
                       cy={cy}
-                      r={isTodayPoint ? 3.5 : 2}  // Even smaller dots
-                      fill={isTodayPoint ? "#00CFFF" : "rgba(255,69,0,0.4)"}  // More transparent
-                      stroke={isTodayPoint ? "#FFF" : "rgba(255,255,255,0.4)"}
-                      strokeWidth={isTodayPoint ? 1 : 0.3}  // Thinner stroke
-                      strokeDasharray={isTodayPoint ? "2,2" : ""}
+                      r={3}
+                      fill="rgba(255,69,0,0.6)"
+                      stroke="rgba(255,255,255,0.4)"
+                      strokeWidth={0.5}
                     />
                   );
                 }
                 return null;
               })}
-
-              {/* Add a label for today's temporary point if it exists */}
-              {showTodayWeight && combinedData.length > 1 && (
-                <SvgText
-                  x={scaleX(combinedData.length - 1)}
-                  y={scaleY(combinedData[combinedData.length - 1].weight) - 10}
-                  fill="#00CFFF"
-                  fontSize={10}
-                  textAnchor="middle"
-                >
-                  Today
-                </SvgText>
-              )}
             </G>
           </Svg>
         </ScrollView>
@@ -1330,8 +1568,13 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
     const minVal = Math.min(...values);
     const maxVal = Math.max(...values);
 
+    // For longer time periods, use a wider context
+    const timeRangeFactor = Math.min(1.5, 1 + (data.length / 30)); // Gradually increase context with more data points
+
     // For steps, always start at 0 and add good padding on top
-    return [0, maxVal + Math.max(1000, maxVal * 0.1)]; // Add 10% or 1000 steps, whichever is larger
+    const topPadding = Math.max(1000, maxVal * 0.2 * timeRangeFactor); // Adjust padding based on time range
+
+    return [0, maxVal + topPadding]; // Add padding to the top only
   };
 
   const [minSteps, maxSteps] = calculateOptimalYRange(yValues);
@@ -1394,12 +1637,29 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: -10 // was 5
+          marginBottom: -10
         }}
       >
         <Text style={styles.weightGraphTitle}>Steps Trend:</Text>
-        <TouchableOpacity onPress={() => console.log('Add more steps!')}>
-          <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
+        <TouchableOpacity
+          onPress={() => console.log('Add more steps!')}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            borderWidth: 1,
+            borderColor: 'rgba(30, 144, 255, 0.4)',
+            shadowColor: '#1E90FF',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.3,
+            shadowRadius: 2,
+            elevation: 2,
+          }}
+        >
+          <MaterialCommunityIcons name="walk" size={18} color="#1E90FF" />
         </TouchableOpacity>
       </View>
 
@@ -1896,11 +2156,14 @@ const styles = StyleSheet.create({
   burnDetails: {
     color: '#FFF',
     fontSize: 12,
-    fontStyle: 'italic', // added italic styling
-    fontWeight: 'bold',   // added bold styling
-    fontFamily: 'Courier New', // change font here
-    textAlign: 'center', // Center the text horizontally
-    flex: 1, // Allow the text to take up available space
+    fontStyle: 'italic',
+    fontWeight: 'bold',
+    fontFamily: 'Courier New',
+    textAlign: 'center',
+    flex: 1,
+  },
+  burnDetailsGain: {
+    color: '#FF9999',
   },
   /* Weight Trend */
   weightGraphTitle: {
@@ -2054,17 +2317,20 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(80, 80, 80, 0.5)',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: '#fff',
     marginBottom: 15,
+    textAlign: 'center',
   },
   weightInput: {
     width: '100%',
@@ -2072,10 +2338,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#555',
     borderRadius: 10,
-    padding: 10,
-    fontSize: 16,
+    padding: 15,
+    fontSize: 18,
     color: '#fff',
-    marginBottom: 20,
+    textAlign: 'center',
+    backgroundColor: 'rgba(30, 30, 30, 0.6)',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -2088,15 +2355,9 @@ const styles = StyleSheet.create({
     width: '48%',
     alignItems: 'center',
   },
-  saveButton: {
-    backgroundColor: '#5c00dd',
-  },
-  cancelButton: {
-    backgroundColor: '#555',
-  },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '500',
     fontSize: 16,
   },
   emptyContainer: {
