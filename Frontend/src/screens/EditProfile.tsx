@@ -25,7 +25,8 @@ import {
     getUserGoals,
     getUserStreak,
     initDatabase,
-    isDatabaseReady
+    isDatabaseReady,
+    updateUserProfile
 } from '../utils/database';
 import {
     cmToFeetInches,
@@ -83,10 +84,43 @@ const EditProfile = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Animation values
     const slideAnim = React.useRef(new Animated.Value(0)).current;
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+    // Displayed values (these will be shown in the profile card at the top)
+    const [username, setUsername] = useState('');
+    const [height, setHeight] = useState('');
+    const [heightFeet, setHeightFeet] = useState('');
+    const [heightInches, setHeightInches] = useState('');
+    const [age, setAge] = useState(0);
+    const [weight, setWeight] = useState('');
+    const [sex, setSex] = useState('');
+    const [dateOfBirth, setDateOfBirth] = useState('');
+    const [location, setLocation] = useState('');
+    const [timeZone, setTimeZone] = useState('');
+    const [zipCode, setZipCode] = useState('');
+    const [units, setUnits] = useState('');
+    const [isImperialUnits, setIsImperialUnits] = useState(false);
+    const [email, setEmail] = useState('');
+
+    // Add editable values (these will be used in the form fields)
+    const [editedUsername, setEditedUsername] = useState('');
+    const [editedHeightFeet, setEditedHeightFeet] = useState('');
+    const [editedHeightInches, setEditedHeightInches] = useState('');
+    const [editedWeight, setEditedWeight] = useState('');
+    const [editedSex, setEditedSex] = useState('');
+    const [editedLocation, setEditedLocation] = useState('');
+    const [editedTimeZone, setEditedTimeZone] = useState('');
+    const [editedIsImperialUnits, setEditedIsImperialUnits] = useState(false);
+
+    // Add back the UI state variables
+    const [showUnitPicker, setShowUnitPicker] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
+    const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Location options (all countries in the world)
     const locationOptions = [
@@ -123,6 +157,9 @@ const EditProfile = () => {
         'Uzbekistan', 'Vanuatu', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
     ].sort();
 
+    // Now set filteredLocations after locationOptions is defined
+    const [filteredLocations, setFilteredLocations] = useState([...locationOptions]);
+
     // Timezone options (comprehensive list)
     const timeZoneOptions = [
         'GMT-12:00 (Baker Island)', 'GMT-11:00 (American Samoa)', 'GMT-10:00 (Hawaii)',
@@ -138,28 +175,6 @@ const EditProfile = () => {
         'GMT+10:30 (Lord Howe Island)', 'GMT+11:00 (Noumea)', 'GMT+12:00 (Auckland)',
         'GMT+12:45 (Chatham Islands)', 'GMT+13:00 (Samoa, Tonga)', 'GMT+14:00 (Kiritimati)'
     ];
-
-    // Mock profile data
-    const [username, setUsername] = useState('haamed_rahman');
-    const [height, setHeight] = useState('5 ft 11 in');
-    const [heightFeet, setHeightFeet] = useState('5');
-    const [heightInches, setHeightInches] = useState('11');
-    const [age, setAge] = useState(21);
-    const [weight, setWeight] = useState('105 kg');
-    const [sex, setSex] = useState('Male');
-    const [dateOfBirth, setDateOfBirth] = useState('Oct 28, 2003');
-    const [location, setLocation] = useState('United States');
-    const [timeZone, setTimeZone] = useState('Riyadh');
-    const [zipCode, setZipCode] = useState('31311');
-    const [units, setUnits] = useState('Kilograms, Feet/Inches, Kilometers, Calories, Milliliters');
-    const [isImperialUnits, setIsImperialUnits] = useState(false);
-    const [showUnitPicker, setShowUnitPicker] = useState(false);
-    const [showLocationPicker, setShowLocationPicker] = useState(false);
-    const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredLocations, setFilteredLocations] = useState([...locationOptions]);
-    const [email, setEmail] = useState('haamed1.450@gmail.com');
-    const [isSaving, setIsSaving] = useState(false);
 
     // Gamification data
     const [level, setLevel] = useState(12);
@@ -211,8 +226,12 @@ const EditProfile = () => {
                     const streak = await getUserStreak(user.uid);
 
                     if (profile) {
-                        // Set basic profile info
-                        setUsername(`${profile.first_name || '---'}${profile.last_name ? '_' + profile.last_name : ''}`);
+                        // Set basic profile info (for display in profile card)
+                        const firstName = profile.first_name || '---';
+                        const lastName = profile.last_name || '';
+                        const displayUsername = `${firstName}${lastName ? '_' + lastName : ''}`;
+
+                        setUsername(displayUsername);
                         setEmail(profile.email || '---');
                         setLocation(profile.location || '---');
 
@@ -243,9 +262,32 @@ const EditProfile = () => {
                         }
 
                         // Set other profile fields
-                        setSex(profile.gender || '---');
+                        setSex(profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : '---');
                         setDateOfBirth(profile.date_of_birth || '---');
                         setIsImperialUnits(!!profile.is_imperial_units);
+
+                        // Set editable values (for form fields)
+                        setEditedUsername(displayUsername);
+                        setEditedLocation(profile.location || '');
+                        setEditedSex(profile.gender || '');
+                        setEditedIsImperialUnits(!!profile.is_imperial_units);
+
+                        if (profile.height) {
+                            if (profile.is_imperial_units) {
+                                const { feet, inches } = cmToFeetInches(profile.height);
+                                setEditedHeightFeet(feet.toString());
+                                setEditedHeightInches(inches.toString());
+                            }
+                        }
+
+                        if (profile.weight) {
+                            if (profile.is_imperial_units) {
+                                const lbs = kgToLbs(profile.weight);
+                                setEditedWeight(Math.round(lbs).toString());
+                            } else {
+                                setEditedWeight(profile.weight.toString());
+                            }
+                        }
                     }
 
                     if (goals) {
@@ -290,74 +332,105 @@ const EditProfile = () => {
         loadProfileData();
     }, [user]);
 
-    // Add effect to update input formats when unit system changes
-    useEffect(() => {
-        if (isImperialUnits) {
-            // Convert height from cm to feet/inches if it's in cm format
-            if (height && height.includes('cm')) {
-                const cm = parseFloat(height.replace(/cm/g, '').trim());
-                const { feet, inches } = cmToFeetInches(cm);
-                setHeightFeet(feet.toString());
-                setHeightInches(inches.toString());
-                setHeight(`${feet}' ${inches}"`);
-            }
-
-            // Convert weight from kg to lbs if it's in kg format
-            if (weight && weight.includes('kg')) {
-                const kg = parseFloat(weight.replace(/kg/g, '').trim());
-                const lbs = kgToLbs(kg);
-                setWeight(`${lbs} lbs`);
-            }
-        } else {
-            // Convert height from feet/inches to cm if needed
-            if (heightFeet && heightInches) {
-                const cm = feetInchesToCm(
-                    parseFloat(heightFeet),
-                    parseFloat(heightInches)
-                );
-                setHeight(`${cm} cm`);
-            }
-
-            // Convert weight from lbs to kg if it's in lbs format
-            if (weight && weight.includes('lbs')) {
-                const lbs = parseFloat(weight.replace(/lbs/g, '').trim());
-                const kg = lbsToKg(lbs);
-                setWeight(`${kg} kg`);
-            }
-        }
-    }, [isImperialUnits]);
-
-    // Helper function to update height based on input
-    const updateHeight = (value: string) => {
-        const numValue = value.trim();
-        // Only update if the value is numeric
-        if (/^\d*\.?\d*$/.test(numValue)) {
-            setHeight(`${numValue} cm`);
-        }
-    };
-
-    // Modify saveProfile to just show an alert since we're not implementing edit functionality
+    // Update saveProfile to save changes to the database
     const saveProfile = async () => {
-        Alert.alert(
-            "Profile Editing Disabled",
-            "Editing profile is currently disabled. This page is read-only.",
-            [{ text: "OK" }]
-        );
+        try {
+            setIsSaving(true);
+
+            // Convert height from imperial to metric (cm) for storage
+            let heightInCm;
+            if (editedHeightFeet && editedHeightInches) {
+                heightInCm = feetInchesToCm(
+                    parseFloat(editedHeightFeet),
+                    parseFloat(editedHeightInches)
+                );
+            } else if (height.includes('cm')) {
+                // If height is already in cm, extract the value
+                heightInCm = parseFloat(height.replace(/cm/g, '').trim());
+            } else {
+                heightInCm = 0;
+            }
+
+            // Convert weight to metric (kg) for storage
+            let weightInKg;
+            if (editedWeight) {
+                if (editedIsImperialUnits) {
+                    // Convert from lbs to kg
+                    weightInKg = lbsToKg(parseFloat(editedWeight));
+                } else {
+                    // Already in kg
+                    weightInKg = parseFloat(editedWeight);
+                }
+            } else {
+                weightInKg = 0;
+            }
+
+            // Extract first and last name from username
+            const nameParts = editedUsername.split('_');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.length > 1 ? nameParts[1] : '';
+
+            // Create profile data object - always store in metric
+            const profileData = {
+                first_name: firstName,
+                last_name: lastName,
+                height: heightInCm,
+                weight: weightInKg,
+                gender: editedSex.toLowerCase(),
+                location: editedLocation,
+                is_imperial_units: editedIsImperialUnits,
+                timezone: editedTimeZone,
+                email: email
+            };
+
+            // Save to SQLite database
+            if (user) {
+                await updateUserProfile(user.uid, profileData);
+
+                // Now update the displayed values to match the edited values
+                setUsername(editedUsername);
+                setLocation(editedLocation);
+                setSex(editedSex.charAt(0).toUpperCase() + editedSex.slice(1));
+                setIsImperialUnits(editedIsImperialUnits);
+
+                // Update height based on units
+                if (editedIsImperialUnits) {
+                    setHeightFeet(editedHeightFeet);
+                    setHeightInches(editedHeightInches);
+                    setHeight(`${editedHeightFeet}' ${editedHeightInches}"`);
+                } else {
+                    setHeight(`${heightInCm} cm`);
+                }
+
+                // Update weight based on units
+                if (editedIsImperialUnits) {
+                    const lbs = parseFloat(editedWeight);
+                    setWeight(`${lbs} lbs`);
+                } else {
+                    setWeight(`${weightInKg} kg`);
+                }
+
+                setTimeZone(editedTimeZone);
+
+                Alert.alert('Success', 'Profile updated successfully.');
+            } else {
+                Alert.alert('Error', 'User not found. Please log in again.');
+            }
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            Alert.alert('Error', 'Failed to update profile. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     // Toggle unit system
     const toggleUnitSystem = (imperial: boolean) => {
-        setIsImperialUnits(imperial);
-
-        if (imperial) {
-            setUnits('Pounds, Feet/Inches, Miles, Calories, Fluid Ounces');
-        } else {
-            setUnits('Kilograms, Centimeters, Kilometers, Calories, Milliliters');
-        }
-
+        setEditedIsImperialUnits(imperial);
         setShowUnitPicker(false);
     };
 
+    // Update renderProfileTab to include editable fields
     const renderProfileTab = () => {
         if (isLoading) {
             return (
@@ -383,7 +456,7 @@ const EditProfile = () => {
                     }
                 ]}
             >
-                {/* Profile Card */}
+                {/* Profile Card - This will remain unchanged until save is clicked */}
                 <LinearGradient
                     colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
                     start={{ x: 0, y: 0 }}
@@ -415,18 +488,24 @@ const EditProfile = () => {
                         </View>
                     </View>
                     <View style={styles.readOnlyBadge}>
-                        <Ionicons name="eye" size={16} color={WHITE} />
-                        <Text style={styles.readOnlyBadgeText}>Read Only</Text>
+                        <Ionicons name="information-circle" size={16} color={WHITE} />
+                        <Text style={styles.readOnlyBadgeText}>Save changes to update profile</Text>
                     </View>
                 </LinearGradient>
 
-                {/* Form Fields */}
+                {/* Form Fields - These will be editable */}
                 <GradientBorderBox>
                     <Text style={styles.sectionTitle}>Personal Information</Text>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Username</Text>
-                        <Text style={styles.displayValue}>{username || '---'}</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={editedUsername}
+                            onChangeText={setEditedUsername}
+                            placeholder="Your username"
+                            placeholderTextColor={GRAY}
+                        />
                     </View>
 
                     <View style={styles.inputGroup}>
@@ -437,17 +516,89 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Sex</Text>
-                        <Text style={styles.displayValue}>{sex || '---'}</Text>
+                        <View style={styles.segmentedControl}>
+                            <TouchableOpacity
+                                style={[styles.segmentOption, editedSex.toLowerCase() === 'male' && styles.segmentActive]}
+                                onPress={() => setEditedSex('male')}
+                            >
+                                <Text style={[styles.segmentText, editedSex.toLowerCase() === 'male' && styles.segmentTextActive]}>Male</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.segmentOption, editedSex.toLowerCase() === 'female' && styles.segmentActive]}
+                                onPress={() => setEditedSex('female')}
+                            >
+                                <Text style={[styles.segmentText, editedSex.toLowerCase() === 'female' && styles.segmentTextActive]}>Female</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.segmentOption, editedSex.toLowerCase() === 'other' && styles.segmentActive]}
+                                onPress={() => setEditedSex('other')}
+                            >
+                                <Text style={[styles.segmentText, editedSex.toLowerCase() === 'other' && styles.segmentTextActive]}>Other</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View style={styles.inputRow}>
                         <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                             <Text style={styles.inputLabel}>Height</Text>
-                            <Text style={styles.displayValue}>{height || '---'}</Text>
+                            {editedIsImperialUnits ? (
+                                <View style={styles.heightInputContainer}>
+                                    <View style={styles.heightInputGroup}>
+                                        <TextInput
+                                            style={styles.heightInput}
+                                            value={editedHeightFeet}
+                                            onChangeText={setEditedHeightFeet}
+                                            keyboardType="numeric"
+                                            placeholderTextColor={GRAY}
+                                            placeholder="5"
+                                        />
+                                        <Text style={styles.heightUnitText}>ft</Text>
+                                    </View>
+                                    <View style={styles.heightInputGroup}>
+                                        <TextInput
+                                            style={styles.heightInput}
+                                            value={editedHeightInches}
+                                            onChangeText={setEditedHeightInches}
+                                            keyboardType="numeric"
+                                            placeholderTextColor={GRAY}
+                                            placeholder="11"
+                                        />
+                                        <Text style={styles.heightUnitText}>in</Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={styles.heightInputContainer}>
+                                    <View style={[styles.heightInputGroup, { flex: 1 }]}>
+                                        <TextInput
+                                            style={styles.heightInput}
+                                            value={height.includes('cm') ? height.replace(/cm/g, '').trim() : ''}
+                                            onChangeText={(value) => {
+                                                if (/^\d*\.?\d*$/.test(value)) {
+                                                    setHeight(`${value} cm`);
+                                                }
+                                            }}
+                                            keyboardType="numeric"
+                                            placeholderTextColor={GRAY}
+                                            placeholder="180"
+                                        />
+                                        <Text style={styles.heightUnitText}>cm</Text>
+                                    </View>
+                                </View>
+                            )}
                         </View>
                         <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                             <Text style={styles.inputLabel}>Weight</Text>
-                            <Text style={styles.displayValue}>{weight || '---'}</Text>
+                            <View style={styles.weightInputContainer}>
+                                <TextInput
+                                    style={styles.weightInput}
+                                    value={editedWeight}
+                                    onChangeText={setEditedWeight}
+                                    keyboardType="numeric"
+                                    placeholderTextColor={GRAY}
+                                    placeholder="75"
+                                />
+                                <Text style={styles.weightUnitText}>{editedIsImperialUnits ? "lbs" : "kg"}</Text>
+                            </View>
                         </View>
                     </View>
                 </GradientBorderBox>
@@ -457,25 +608,48 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Location</Text>
-                        <Text style={styles.displayValue}>{location || '---'}</Text>
+                        <TouchableOpacity
+                            style={styles.dropdownField}
+                            onPress={() => setShowLocationPicker(true)}
+                        >
+                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                                {editedLocation || 'Select location'}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Time Zone</Text>
-                        <Text style={styles.displayValue}>{timeZone || '---'}</Text>
+                        <TouchableOpacity
+                            style={styles.dropdownField}
+                            onPress={() => setShowTimeZonePicker(true)}
+                        >
+                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                                {editedTimeZone || timeZone || 'Select time zone'}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Measurement Units</Text>
-                        <Text style={styles.displayValue}>
-                            {isImperialUnits ? 'Imperial (lbs, feet/inches)' : 'Metric (kg, cm)'}
-                        </Text>
+                        <TouchableOpacity
+                            style={styles.dropdownField}
+                            onPress={() => setShowUnitPicker(true)}
+                        >
+                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                                {editedIsImperialUnits ? 'Imperial (lbs, feet/inches)' : 'Metric (kg, cm)'}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        </TouchableOpacity>
                     </View>
                 </GradientBorderBox>
 
                 <TouchableOpacity
                     style={styles.saveButton}
                     onPress={saveProfile}
+                    disabled={isSaving}
                 >
                     <LinearGradient
                         colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
@@ -483,7 +657,11 @@ const EditProfile = () => {
                         end={{ x: 1, y: 0 }}
                         style={styles.saveButtonGradient}
                     >
-                        <Text style={styles.saveButtonText}>Return to Profile</Text>
+                        {isSaving ? (
+                            <ActivityIndicator color={WHITE} size="small" />
+                        ) : (
+                            <Text style={styles.saveButtonText}>Save Changes</Text>
+                        )}
                     </LinearGradient>
                 </TouchableOpacity>
             </Animated.View>
@@ -674,23 +852,23 @@ const EditProfile = () => {
                         <Text style={styles.modalTitle}>Measurement Units</Text>
 
                         <TouchableOpacity
-                            style={[styles.modalOption, isImperialUnits && styles.modalOptionSelected]}
+                            style={[styles.modalOption, editedIsImperialUnits && styles.modalOptionSelected]}
                             onPress={() => toggleUnitSystem(true)}
                         >
-                            <Text style={[styles.modalOptionText, isImperialUnits && styles.modalOptionTextSelected]}>
+                            <Text style={[styles.modalOptionText, editedIsImperialUnits && styles.modalOptionTextSelected]}>
                                 Imperial (lbs, feet/inches)
                             </Text>
-                            {isImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
+                            {editedIsImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.modalOption, !isImperialUnits && styles.modalOptionSelected]}
+                            style={[styles.modalOption, !editedIsImperialUnits && styles.modalOptionSelected]}
                             onPress={() => toggleUnitSystem(false)}
                         >
-                            <Text style={[styles.modalOptionText, !isImperialUnits && styles.modalOptionTextSelected]}>
+                            <Text style={[styles.modalOptionText, !editedIsImperialUnits && styles.modalOptionTextSelected]}>
                                 Metric (kg, cm)
                             </Text>
-                            {!isImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
+                            {!editedIsImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
@@ -763,18 +941,18 @@ const EditProfile = () => {
                                 {filteredLocations.map((loc, index) => (
                                     <TouchableOpacity
                                         key={index}
-                                        style={[styles.pickerOption, location === loc && styles.pickerOptionSelected]}
+                                        style={[styles.pickerOption, editedLocation === loc && styles.pickerOptionSelected]}
                                         onPress={() => {
-                                            setLocation(loc);
+                                            setEditedLocation(loc);
                                             setShowLocationPicker(false);
                                             setSearchQuery('');
                                             setFilteredLocations([...locationOptions]);
                                         }}
                                     >
-                                        <Text style={[styles.pickerOptionText, location === loc && styles.pickerOptionTextSelected]}>
+                                        <Text style={[styles.pickerOptionText, editedLocation === loc && styles.pickerOptionTextSelected]}>
                                             {loc}
                                         </Text>
-                                        {location === loc && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
+                                        {editedLocation === loc && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
@@ -817,16 +995,16 @@ const EditProfile = () => {
                             {timeZoneOptions.map((tz, index) => (
                                 <TouchableOpacity
                                     key={index}
-                                    style={[styles.pickerOption, timeZone === tz && styles.pickerOptionSelected]}
+                                    style={[styles.pickerOption, editedTimeZone === tz && styles.pickerOptionSelected]}
                                     onPress={() => {
-                                        setTimeZone(tz);
+                                        setEditedTimeZone(tz);
                                         setShowTimeZonePicker(false);
                                     }}
                                 >
-                                    <Text style={[styles.pickerOptionText, timeZone === tz && styles.pickerOptionTextSelected]}>
+                                    <Text style={[styles.pickerOptionText, editedTimeZone === tz && styles.pickerOptionTextSelected]}>
                                         {tz}
                                     </Text>
-                                    {timeZone === tz && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
+                                    {editedTimeZone === tz && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
