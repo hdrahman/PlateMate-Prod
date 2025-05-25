@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getUserProfileByFirebaseUid } from '../utils/database';
+import { getUserProfileByFirebaseUid, getUserGoals } from '../utils/database';
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
@@ -36,7 +36,7 @@ const ProfileScreen = () => {
         goalWeight: 0,
         weightLost: 7,
         weeklyGoal: 'Lose 1 kg per week',
-        dailyCalories: 1800,
+        dailyCalories: 0,
         macros: {
             carbs: 225,
             fat: 60,
@@ -53,11 +53,15 @@ const ProfileScreen = () => {
                 // Get user profile from local database
                 const profile = await getUserProfileByFirebaseUid(user.uid);
 
+                // Get user goals from the database to get the calorie goal
+                const userGoals = await getUserGoals(user.uid);
+
                 if (profile) {
                     // Update profile data with fetched information
                     setProfileData(prevData => ({
                         ...prevData,
                         goalWeight: profile.target_weight || 0,
+                        dailyCalories: userGoals?.calorieGoal || 0,
                         // Update other fields as needed
                     }));
                 }
@@ -149,7 +153,9 @@ const ProfileScreen = () => {
 
                     <View style={styles.goalItem}>
                         <Text style={styles.goalLabel}>Daily Calories</Text>
-                        <Text style={styles.goalValue}>{profileData.dailyCalories} cal</Text>
+                        <Text style={styles.goalValue}>
+                            {profileData.dailyCalories ? `${profileData.dailyCalories} cal` : "---"}
+                        </Text>
                     </View>
                     <View style={styles.goalSubItem}>
                         <Text style={styles.goalSubtext}>Carbs {profileData.macros.carbs}g / Fat {profileData.macros.fat}g / Protein {profileData.macros.protein}g</Text>

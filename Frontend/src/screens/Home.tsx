@@ -7,7 +7,7 @@ import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
 import { getTodayExerciseCalories } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
-import { getUserProfileByFirebaseUid } from '../utils/database';
+import { getUserProfileByFirebaseUid, getUserGoals, updateUserProfile } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
 import { getWeightHistory, WeightEntry, addWeightEntry, clearWeightHistory } from '../api/userApi';
@@ -175,6 +175,9 @@ export default function Home() {
             setTargetWeight(profile.target_weight);
           }
 
+          // Get user goals for calorie goal
+          const userGoals = await getUserGoals(user.uid);
+
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
             firstName: profile.first_name,
@@ -212,12 +215,12 @@ export default function Home() {
             startingWeight: profile.starting_weight
           });
 
-          // Update state with calculated goals
-          setDailyCalorieGoal(goals.calories);
+          // Update state with calculated goals, prioritizing the database value
+          setDailyCalorieGoal(userGoals?.calorieGoal || goals.calories);
           setMacroGoals({
-            protein: goals.protein,
-            carbs: goals.carbs,
-            fat: goals.fat
+            protein: userGoals?.proteinGoal || goals.protein,
+            carbs: userGoals?.carbGoal || goals.carbs,
+            fat: userGoals?.fatGoal || goals.fat
           });
         }
       } catch (error) {
@@ -302,43 +305,89 @@ export default function Home() {
       try {
         setWeightLoading(true);
 
+        // Get user profile from local database to get starting weight and current weight
+        const profile = await getUserProfileByFirebaseUid(user.uid);
+        if (!profile) {
+          console.log('No profile found');
+          setWeightLoading(false);
+          return;
+        }
+
         // Get weight history from API
         const history = await getWeightHistory(user.uid);
 
+        // Initialize the weight history array
+        let formattedHistory = [];
+
+        // Add starting weight as the first point if available
+        if (profile.starting_weight) {
+          // Use profile creation date or a date earlier than all weight entries
+          const startDate = profile.created_at || new Date(2000, 0, 1).toISOString();
+          formattedHistory.push({
+            date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            weight: profile.starting_weight
+          });
+          // Set starting weight state
+          setStartingWeight(profile.starting_weight);
+        }
+
+        // Add intermediary weights from weight history
         if (history && history.weights && history.weights.length > 0) {
           // Sort history chronologically - oldest first
           const sortedWeights = [...history.weights].sort((a, b) =>
             new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
           );
 
-          // Format all entries to show the complete weight trend
-          const formattedHistory = sortedWeights.map(entry => ({
+          // Format and add all intermediary weight entries
+          const intermediaryWeights = sortedWeights.map(entry => ({
             date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
             weight: entry.weight
           }));
 
-          setWeightHistory(formattedHistory);
+          formattedHistory = [...formattedHistory, ...intermediaryWeights];
 
-          // Set starting weight from the first entry
-          setStartingWeight(sortedWeights[0].weight);
-
-          // Set current weight from the last entry
-          const lastWeight = sortedWeights[sortedWeights.length - 1].weight;
-          setCurrentWeight(lastWeight);
-
-          // Check if the last entry is from today
-          const lastEntryDate = new Date(sortedWeights[sortedWeights.length - 1].recorded_at);
-          const today = new Date();
-          const isToday =
-            lastEntryDate.getDate() === today.getDate() &&
-            lastEntryDate.getMonth() === today.getMonth() &&
-            lastEntryDate.getFullYear() === today.getFullYear();
-
-          // If the last entry is not from today, set today's temporary weight
-          if (!isToday) {
-            setShowTodayWeight(true);
-            setTodayWeight(lastWeight);
+          // If we don't have a starting weight yet, use the first weight entry
+          if (!profile.starting_weight && sortedWeights.length > 0) {
+            setStartingWeight(sortedWeights[0].weight);
           }
+        }
+
+        // Add current weight as the last point if different from the last history entry
+        if (profile.weight) {
+          const lastEntryWeight = formattedHistory.length > 0 ?
+            formattedHistory[formattedHistory.length - 1].weight : null;
+
+          // Only add current weight if it's different from the last history entry
+          // or if there are no history entries
+          if (!lastEntryWeight || Math.abs(lastEntryWeight - profile.weight) >= 0.01) {
+            formattedHistory.push({
+              date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+              weight: profile.weight
+            });
+          }
+
+          // Set current weight state
+          setCurrentWeight(profile.weight);
+        }
+
+        // Set the complete weight history
+        setWeightHistory(formattedHistory);
+
+        // If there's no entry for today, set up the temporary today point
+        const today = new Date();
+        const hasEntryForToday = formattedHistory.some(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate.getDate() === today.getDate() &&
+            entryDate.getMonth() === today.getMonth() &&
+            entryDate.getFullYear() === today.getFullYear();
+        });
+
+        if (!hasEntryForToday && currentWeight) {
+          setShowTodayWeight(true);
+          setTodayWeight(currentWeight);
+        } else {
+          setShowTodayWeight(false);
+          setTodayWeight(null);
         }
       } catch (error) {
         console.error('Error loading weight history:', error);
@@ -378,35 +427,58 @@ export default function Home() {
         return;
       }
 
+      // Get the current user profile
+      const profile = await getUserProfileByFirebaseUid(user.uid);
+      if (!profile) {
+        Alert.alert('Error', 'Unable to find user profile.');
+        return;
+      }
+
+      // Check if this is the first weight entry and we need to set starting weight
+      if (!startingWeight) {
+        // Update the starting_weight in the user profile
+        await updateUserProfile(user.uid, { starting_weight: weightValue });
+        setStartingWeight(weightValue);
+      }
+
       // Check if the weight is different from the current weight
       // Use a small threshold to account for floating-point precision
       const weightChanged = !currentWeight || Math.abs(weightValue - currentWeight) >= 0.01;
 
       if (weightChanged) {
-        // Only add to backend if weight actually changed
+        // Add weight entry to history
         await addWeightEntry(user.uid, weightValue);
+
+        // Update current weight in user profile
+        await updateUserProfile(user.uid, { weight: weightValue });
 
         // Update local state with the new entry
         const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 
         // Add the new entry to the existing weight history
-        const updatedHistory = [...weightHistory, { date: today, weight: weightValue }];
+        const updatedHistory = [...weightHistory];
+
+        // If the last entry is also from today, replace it instead of adding a new one
+        const lastEntryIndex = updatedHistory.length - 1;
+        const lastEntry = lastEntryIndex >= 0 ? updatedHistory[lastEntryIndex] : null;
+
+        if (lastEntry && lastEntry.date === today) {
+          // Replace today's entry
+          updatedHistory[lastEntryIndex] = { date: today, weight: weightValue };
+        } else {
+          // Add new entry
+          updatedHistory.push({ date: today, weight: weightValue });
+        }
+
         setWeightHistory(updatedHistory);
+        setCurrentWeight(weightValue);
 
         // No need to show temporary today weight anymore
         setShowTodayWeight(false);
-
-        // If this is the first entry, set it as starting weight
-        if (weightHistory.length === 0) {
-          setStartingWeight(weightValue);
-        }
       } else {
         // If weight hasn't changed, just update the UI without adding to history
         console.log('Weight unchanged, not creating new entry');
       }
-
-      // Always update current weight with the new entry
-      setCurrentWeight(weightValue);
 
       setWeightModalVisible(false);
       setNewWeight('');
@@ -436,7 +508,12 @@ export default function Home() {
 
   // Data for the right card with updated colors.
   const rightStats = [
-    { label: 'Goal', value: dailyCalorieGoal, icon: 'flag-outline', color: '#FFB74D' }, // warm orange hue
+    {
+      label: 'Goal',
+      value: dailyCalorieGoal || '---',
+      icon: 'flag-outline',
+      color: '#FFB74D'
+    },
     {
       label: 'Food',
       value: foodLoading ? '-' : consumedCalories,
@@ -577,37 +654,87 @@ export default function Home() {
             style: "destructive",
             onPress: async () => {
               try {
+                // Get user profile to ensure we have starting and current weights
+                const profile = await getUserProfileByFirebaseUid(user.uid);
+                if (!profile) {
+                  Alert.alert("Error", "Unable to find user profile.");
+                  setWeightLoading(false);
+                  return;
+                }
+
+                // Ensure we have both starting and current weights before clearing
+                if (!profile.starting_weight || !profile.weight) {
+                  // If we don't have both weights, we need to set them
+                  let updates: { starting_weight?: number; weight?: number } = {};
+
+                  // If no starting weight, use the first weight entry or current weight
+                  if (!profile.starting_weight) {
+                    if (weightHistory.length > 0) {
+                      updates.starting_weight = weightHistory[0].weight;
+                    } else if (profile.weight) {
+                      updates.starting_weight = profile.weight;
+                    } else {
+                      Alert.alert("Error", "No weights available to preserve.");
+                      setWeightLoading(false);
+                      return;
+                    }
+                  }
+
+                  // If no current weight, use the last weight entry or starting weight
+                  if (!profile.weight && weightHistory.length > 0) {
+                    updates.weight = weightHistory[weightHistory.length - 1].weight;
+                  }
+
+                  // Update the profile with necessary weights
+                  if (Object.keys(updates).length > 0) {
+                    await updateUserProfile(user.uid, updates);
+                  }
+                }
+
                 // Call API to clear weight history
                 await clearWeightHistory(user.uid);
 
-                // Refresh weight history
-                const history = await getWeightHistory(user.uid);
+                // Reload weight history with just starting and current weights
+                let formattedHistory = [];
 
-                if (history && history.weights && history.weights.length > 0) {
-                  // Sort history chronologically - oldest first
-                  const sortedWeights = [...history.weights].sort((a, b) =>
-                    new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-                  );
+                // Get updated profile
+                const updatedProfile = await getUserProfileByFirebaseUid(user.uid);
 
-                  // Format all entries
-                  const formattedHistory = sortedWeights.map(entry => ({
-                    date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-                    weight: entry.weight
-                  }));
-
-                  setWeightHistory(formattedHistory);
-
-                  // Update starting and current weights
-                  setStartingWeight(sortedWeights[0].weight);
-                  const lastWeight = sortedWeights[sortedWeights.length - 1].weight;
-                  setCurrentWeight(lastWeight);
-
-                  // Show success message
-                  Alert.alert(
-                    "Success",
-                    "Weight history has been cleared, keeping only your starting and current weights."
-                  );
+                // Add starting weight
+                if (updatedProfile.starting_weight) {
+                  const startDate = updatedProfile.created_at || new Date(2000, 0, 1).toISOString();
+                  formattedHistory.push({
+                    date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                    weight: updatedProfile.starting_weight
+                  });
+                  setStartingWeight(updatedProfile.starting_weight);
                 }
+
+                // Add current weight if different from starting weight
+                if (updatedProfile.weight &&
+                  (!updatedProfile.starting_weight ||
+                    Math.abs(updatedProfile.weight - updatedProfile.starting_weight) >= 0.01)) {
+                  formattedHistory.push({
+                    date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                    weight: updatedProfile.weight
+                  });
+                  setCurrentWeight(updatedProfile.weight);
+                }
+
+                // Update weight history
+                setWeightHistory(formattedHistory);
+
+                // Calculate weight lost
+                if (updatedProfile.starting_weight && updatedProfile.weight) {
+                  const lost = updatedProfile.starting_weight - updatedProfile.weight;
+                  setWeightLost(parseFloat(lost.toFixed(1)));
+                }
+
+                // Show success message
+                Alert.alert(
+                  "Success",
+                  "Weight history has been cleared, keeping only your starting and current weights."
+                );
               } catch (error) {
                 console.error('Error clearing weight history:', error);
                 Alert.alert("Error", "Failed to clear weight history. Please try again.");
@@ -906,10 +1033,14 @@ export default function Home() {
  *  WEIGHT GRAPH COMPONENT
  ************************************/
 function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWeight }: { data: { date: string; weight: number }[]; onAddPress: () => void; weightLoading: boolean; showTodayWeight: boolean; todayWeight: number | null }) {
-  // Dimensions for the chart
-  const GRAPH_WIDTH = 0.94 * width;
-  const GRAPH_HEIGHT = 220;
-  const MARGIN = 30; // a bit bigger margin for labels
+  // Dimensions for the chart - use more of the available width
+  const GRAPH_WIDTH = 0.98 * width;
+  const GRAPH_HEIGHT = 250; // Increased height to 250 from 220
+  const MARGIN_RIGHT = 60; // Increased right margin from 45 to 60
+  const MARGIN_LEFT = 35; // Reduced left margin to shift graph left
+  const MARGIN_BOTTOM = 60; // Increased bottom margin for date labels
+  const MARGIN_TOP = 30; // Top margin
+  const EXTRA_RIGHT_PADDING = 30; // Increased from 20 to 30 for more space on the right
 
   // Create a combined dataset that includes history and today's temporary point if needed
   const combinedData = [...data];
@@ -927,20 +1058,42 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
   // Y-values: actual weight
   const yValues = combinedData.map(d => d.weight);
 
-  // Build scales
-  const minWeight = Math.min(...yValues, ...yValues.map(w => w - 0.5)); // Add a bit of padding at bottom
-  const maxWeight = Math.max(...yValues, ...yValues.map(w => w + 0.5)); // Add a bit of padding at top
+  // Calculate optimal Y-axis range for better visualization
+  const calculateOptimalYRange = (values: number[]) => {
+    if (values.length === 0) return [0, 100];
+
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
+
+    // If range is very small, add padding to make changes more visible
+    if (maxVal - minVal < 2) {
+      return [Math.max(0, minVal - 1), maxVal + 1];
+    }
+
+    // Otherwise, add just a little padding
+    return [Math.max(0, minVal - 0.5), maxVal + 0.5];
+  };
+
+  const [minWeight, maxWeight] = calculateOptimalYRange(yValues);
 
   // Add a small buffer so points aren't at the very edges
   const scaleY = d3Scale
     .scaleLinear()
     .domain([minWeight, maxWeight])
-    .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
+    .range([GRAPH_HEIGHT - MARGIN_BOTTOM, MARGIN_TOP]); // Updated to use MARGIN_TOP and MARGIN_BOTTOM
+
+  // Calculate optimal spacing between data points based on available width
+  const availableWidth = GRAPH_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+  // Ensure we have enough space between points, but not too much
+  const minSpacing = 40; // Minimum space between points (pixels)
+  const maxSpacing = 80; // Maximum space between points (pixels)
+  const calculatedSpacing = availableWidth / (combinedData.length > 1 ? combinedData.length - 1 : 1);
+  const optimalSpacing = Math.min(maxSpacing, Math.max(minSpacing, calculatedSpacing));
 
   const scaleX = d3Scale
     .scaleLinear()
     .domain([0, xValues.length - 1])
-    .range([MARGIN, GRAPH_WIDTH - MARGIN]);
+    .range([MARGIN_LEFT, GRAPH_WIDTH - MARGIN_RIGHT]);
 
   // Get appropriate number of Y ticks based on range
   const yTickCount = Math.min(5, Math.ceil((maxWeight - minWeight) * 2));
@@ -956,7 +1109,7 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
   const areaGenerator = d3Shape
     .area<{ date: string; weight: number }>()
     .x((d, i) => scaleX(i))
-    .y0(GRAPH_HEIGHT - MARGIN) // Bottom of the graph
+    .y0(GRAPH_HEIGHT - MARGIN_BOTTOM) // Bottom of the graph
     .y1(d => scaleY(d.weight))
     .curve(d3Shape.curveCatmullRom.alpha(0.5)); // Match the line curve
 
@@ -965,8 +1118,12 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
 
   // Select a subset of x-axis labels to prevent crowding
   const shouldShowLabel = (i: number) => {
-    if (combinedData.length <= 5) return true; // Show all labels if 5 or fewer points
+    if (combinedData.length <= 4) return true; // Show all labels if 4 or fewer points
     if (i === 0 || i === combinedData.length - 1) return true; // Always show first and last
+    // If more than 8 points, show fewer labels
+    if (combinedData.length > 8) {
+      return i % Math.ceil(combinedData.length / 4) === 0; // Show approximately 4 labels total
+    }
     return i % Math.ceil(combinedData.length / 5) === 0; // Show approximately 5 labels total
   };
 
@@ -1000,8 +1157,17 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
           <Text style={styles.emptySubtext}>Tap the + button to add your weight.</Text>
         </View>
       ) : (
-        <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
-          <Svg width={Math.max(GRAPH_WIDTH, combinedData.length * 60)} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
+        <ScrollView
+          horizontal
+          style={{ width: '100%' }}
+          contentContainerStyle={{ paddingRight: 35, paddingLeft: 0 }} // Increased right padding from 20 to 35
+          showsHorizontalScrollIndicator={false}
+        >
+          <Svg
+            width={Math.max(GRAPH_WIDTH, optimalSpacing * (combinedData.length - 1) + MARGIN_LEFT + MARGIN_RIGHT + EXTRA_RIGHT_PADDING)}
+            height={GRAPH_HEIGHT}
+            style={{ backgroundColor: 'transparent' }}
+          >
             {/* ───────── GRID + AXES ───────── */}
             <G>
               {/* Horizontal grid + Y labels */}
@@ -1010,15 +1176,15 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
                 return (
                   <React.Fragment key={`y-tick-${tickValue}`}>
                     <SvgLine
-                      x1={MARGIN}
-                      x2={GRAPH_WIDTH - MARGIN}
+                      x1={MARGIN_LEFT}
+                      x2={GRAPH_WIDTH - MARGIN_RIGHT}
                       y1={yCoord}
                       y2={yCoord}
                       stroke="rgba(255,255,255,0.2)"
                       strokeWidth={1}
                     />
                     <SvgText
-                      x={MARGIN - 5}
+                      x={MARGIN_LEFT - 5}
                       y={yCoord}
                       fill="#FFF"
                       fontSize={10}
@@ -1034,22 +1200,25 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
               {/* Vertical grid + X labels */}
               {combinedData.map((d, i) => {
                 const xCoord = scaleX(i);
+                const isLastLabel = i === combinedData.length - 1;
+
                 return (
                   <React.Fragment key={`x-tick-${i}`}>
                     <SvgLine
                       x1={xCoord}
                       x2={xCoord}
-                      y1={GRAPH_HEIGHT - MARGIN}
-                      y2={MARGIN}
+                      y1={GRAPH_HEIGHT - MARGIN_BOTTOM}
+                      y2={MARGIN_TOP}
                       stroke="rgba(255,255,255,0.1)"
                       strokeWidth={1}
                     />
                     {shouldShowLabel(i) && (
                       <SvgText
                         x={xCoord}
-                        y={GRAPH_HEIGHT - MARGIN / 2}
-                        fill="#FFF"
-                        fontSize={10}
+                        y={GRAPH_HEIGHT - MARGIN_BOTTOM / 2}
+                        fill={isLastLabel ? "#FFA500" : "#FFF"}
+                        fontSize={isLastLabel ? 13 : 10} // Increased font size for last label from 12 to 13
+                        fontWeight={isLastLabel ? "bold" : "normal"}
                         textAnchor="middle"
                         alignmentBaseline="middle"
                       >
@@ -1141,31 +1310,53 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
  *  STEPS GRAPH COMPONENT (Second Card)
  ************************************/
 function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
-  const GRAPH_WIDTH = 0.9 * width;
-  const GRAPH_HEIGHT = 200;
-  const MARGIN = 30;
+  const GRAPH_WIDTH = 0.98 * width;
+  const GRAPH_HEIGHT = 230; // Increased height to 230 from 200
+  const MARGIN_RIGHT = 60; // Increased right margin from 45 to 60
+  const MARGIN_LEFT = 35; // Reduced left margin to shift graph left
+  const MARGIN_BOTTOM = 60; // Increased bottom margin for date labels
+  const MARGIN_TOP = 30; // Top margin
+  const EXTRA_RIGHT_PADDING = 30; // Increased from 20 to 30 for more space on the right
 
   // X-values
   const xValues = data.map((_, i) => i);
   // Y-values: steps
   const yValues = data.map(d => d.steps);
 
-  const minSteps = Math.min(...yValues);
-  const maxSteps = Math.max(...yValues);
+  // Calculate optimal Y-axis range
+  const calculateOptimalYRange = (values: number[]) => {
+    if (values.length === 0) return [0, 10000];
 
-  // buffer to avoid top cutoff
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
+
+    // For steps, always start at 0 and add good padding on top
+    return [0, maxVal + Math.max(1000, maxVal * 0.1)]; // Add 10% or 1000 steps, whichever is larger
+  };
+
+  const [minSteps, maxSteps] = calculateOptimalYRange(yValues);
+
+  // Use the optimal range for Y scale
   const scaleY = d3Scale
     .scaleLinear()
-    .domain([minSteps, maxSteps + 500])
-    .range([GRAPH_HEIGHT - MARGIN, MARGIN]);
+    .domain([minSteps, maxSteps])
+    .range([GRAPH_HEIGHT - MARGIN_BOTTOM, MARGIN_TOP]); // Updated to use MARGIN_TOP and MARGIN_BOTTOM
+
+  // Calculate optimal spacing between data points based on available width
+  const availableWidth = GRAPH_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+  // Ensure we have enough space between points, but not too much
+  const minSpacing = 40; // Minimum space between points (pixels)
+  const maxSpacing = 80; // Maximum space between points (pixels)
+  const calculatedSpacing = availableWidth / (data.length > 1 ? data.length - 1 : 1);
+  const optimalSpacing = Math.min(maxSpacing, Math.max(minSpacing, calculatedSpacing));
 
   const scaleX = d3Scale
     .scaleLinear()
     .domain([0, xValues.length - 1])
-    .range([MARGIN, GRAPH_WIDTH - MARGIN]);
+    .range([MARGIN_LEFT, GRAPH_WIDTH - MARGIN_RIGHT]);
 
-  // Ticks
-  const yTickValues = d3Scale.scaleLinear().domain([minSteps, maxSteps + 500]).ticks(5);
+  // Ticks - use the optimal range
+  const yTickValues = d3Scale.scaleLinear().domain([minSteps, maxSteps]).ticks(5);
 
   // Straight lines
   const lineGenerator = d3Shape
@@ -1177,12 +1368,23 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
   const areaGenerator = d3Shape
     .area<{ date: string; steps: number }>()
     .x((d, i) => scaleX(i))
-    .y0(GRAPH_HEIGHT - MARGIN) // Bottom of the graph
+    .y0(GRAPH_HEIGHT - MARGIN_BOTTOM) // Bottom of the graph
     .y1(d => scaleY(d.steps))
     .curve(d3Shape.curveCatmullRom.alpha(0.5)); // Match the line curve
 
   const pathData = lineGenerator(data);
   const areaData = areaGenerator(data);
+
+  // Select a subset of x-axis labels to prevent crowding
+  const shouldShowLabel = (i: number) => {
+    if (data.length <= 4) return true; // Show all labels if 4 or fewer points
+    if (i === 0 || i === data.length - 1) return true; // Always show first and last
+    // If more than 8 points, show fewer labels
+    if (data.length > 8) {
+      return i % Math.ceil(data.length / 4) === 0; // Show approximately 4 labels total
+    }
+    return i % Math.ceil(data.length / 5) === 0; // Show approximately 5 labels total
+  };
 
   return (
     <View style={{ width: '100%', alignItems: 'center', paddingBottom: 5 }}>
@@ -1201,8 +1403,17 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal style={{ width: '100%' }} showsHorizontalScrollIndicator={false}>
-        <Svg width={GRAPH_WIDTH} height={GRAPH_HEIGHT} style={{ backgroundColor: 'transparent' }}>
+      <ScrollView
+        horizontal
+        style={{ width: '100%' }}
+        contentContainerStyle={{ paddingRight: 35, paddingLeft: 0 }} // Increased right padding from 20 to 35
+        showsHorizontalScrollIndicator={false}
+      >
+        <Svg
+          width={Math.max(GRAPH_WIDTH, optimalSpacing * (data.length - 1) + MARGIN_LEFT + MARGIN_RIGHT + EXTRA_RIGHT_PADDING)}
+          height={GRAPH_HEIGHT}
+          style={{ backgroundColor: 'transparent' }}
+        >
           <G>
             {/* Horizontal grid + Y labels */}
             {yTickValues.map((tickValue) => {
@@ -1210,15 +1421,15 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
               return (
                 <React.Fragment key={`steps-y-${tickValue}`}>
                   <SvgLine
-                    x1={MARGIN}
-                    x2={GRAPH_WIDTH - MARGIN}
+                    x1={MARGIN_LEFT}
+                    x2={GRAPH_WIDTH - MARGIN_RIGHT}
                     y1={yCoord}
                     y2={yCoord}
                     stroke="rgba(255,255,255,0.2)"
                     strokeWidth={1}
                   />
                   <SvgText
-                    x={MARGIN - 5}
+                    x={MARGIN_LEFT - 5}
                     y={yCoord}
                     fill="#FFF"
                     fontSize={10}
@@ -1233,26 +1444,31 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
             {/* Vertical grid + X labels */}
             {data.map((d, i) => {
               const xCoord = scaleX(i);
+              const isLastLabel = i === data.length - 1;
+
               return (
                 <React.Fragment key={`steps-x-${i}`}>
                   <SvgLine
                     x1={xCoord}
                     x2={xCoord}
-                    y1={GRAPH_HEIGHT - MARGIN}
-                    y2={MARGIN}
+                    y1={GRAPH_HEIGHT - MARGIN_BOTTOM}
+                    y2={MARGIN_TOP}
                     stroke="rgba(255,255,255,0.1)"
                     strokeWidth={1}
                   />
-                  <SvgText
-                    x={xCoord}
-                    y={GRAPH_HEIGHT - MARGIN / 2}
-                    fill="#FFF"
-                    fontSize={10}
-                    textAnchor="middle"
-                    alignmentBaseline="middle"
-                  >
-                    {d.date}
-                  </SvgText>
+                  {shouldShowLabel(i) && (
+                    <SvgText
+                      x={xCoord}
+                      y={GRAPH_HEIGHT - MARGIN_BOTTOM / 2}
+                      fill={isLastLabel ? "#FFA500" : "#FFF"} // Highlight the last label
+                      fontSize={isLastLabel ? 13 : 10} // Increased font size for last label from 12 to 13
+                      fontWeight={isLastLabel ? "bold" : "normal"} // Bold for the last label
+                      textAnchor="middle"
+                      alignmentBaseline="middle"
+                    >
+                      {d.date}
+                    </SvgText>
+                  )}
                 </React.Fragment>
               );
             })}
@@ -1716,7 +1932,8 @@ const styles = StyleSheet.create({
   },
   // New style for positioning the trend elements (StepsTrend and WeightTrend)
   trendContainer: {
-    marginTop: 10
+    marginTop: 10,
+    minHeight: 280 // Added minimum height to accommodate taller graphs
   },
   goalCard: {
     width: '95%',

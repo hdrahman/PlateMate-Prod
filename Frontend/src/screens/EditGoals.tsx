@@ -253,6 +253,11 @@ export default function EditGoals() {
                                 formValues.fitnessGoal === 'gain' ? 'gain_0_25' : 'maintain') as any,
                     };
 
+                    // Handle the case where calorieGoal is explicitly undefined (user cleared the field)
+                    if (formValues.calorieGoal === undefined) {
+                        nutritionGoals.daily_calorie_target = 0;
+                    }
+
                     // Also update the profile with the target weight
                     try {
                         const profileData = await getProfile();
@@ -331,6 +336,15 @@ export default function EditGoals() {
             return;
         }
 
+        // Special handling for calorieGoal to allow empty values
+        if (field === 'calorieGoal' && (value === '' || value === null)) {
+            setFormValues(prev => ({
+                ...prev,
+                [field]: undefined
+            }));
+            return;
+        }
+
         setFormValues(prev => ({
             ...prev,
             [field]: value
@@ -373,7 +387,9 @@ export default function EditGoals() {
                         <Text style={styles.summaryTitle}>Nutrition Goals</Text>
                         <View style={styles.summaryStats}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{dbGoals.calorieGoal || 0}</Text>
+                                <Text style={styles.statValue}>
+                                    {dbGoals.calorieGoal ? dbGoals.calorieGoal : "---"}
+                                </Text>
                                 <Text style={styles.statLabel}>Calories/day</Text>
                             </View>
                             <View style={styles.statDivider} />
@@ -418,12 +434,15 @@ export default function EditGoals() {
                         <Text style={styles.inputLabel}>Daily Calorie Goal</Text>
                         <TextInput
                             style={styles.input}
-                            value={formValues.calorieGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('calorieGoal', text ? parseInt(text) : 0)}
-                            placeholder="Enter calorie goal"
+                            value={formValues.calorieGoal ? formValues.calorieGoal.toString() : ''}
+                            onChangeText={(text) => updateFormValue('calorieGoal', text ? parseInt(text) : '')}
+                            placeholder="Enter calorie goal or leave empty"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
                         />
+                        <Text style={styles.inputHint}>
+                            Enter your daily calorie goal or leave empty
+                        </Text>
                     </View>
                 </GradientBorderBox>
 
