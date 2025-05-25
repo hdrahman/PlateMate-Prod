@@ -29,6 +29,7 @@ export interface UserProfile {
     location?: string;
     is_imperial_units?: boolean;
     profile_image_url?: string;
+    target_weight?: number;
 }
 
 export type WeightGoalType = 'lose_1' | 'lose_0_75' | 'lose_0_5' | 'lose_0_25' | 'maintain' | 'gain_0_25' | 'gain_0_5';

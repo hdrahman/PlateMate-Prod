@@ -170,6 +170,11 @@ export default function Home() {
         const profile = await getUserProfileByFirebaseUid(user.uid);
 
         if (profile) {
+          // Update target weight if it exists in the profile
+          if (profile.target_weight) {
+            setTargetWeight(profile.target_weight);
+          }
+
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
             firstName: profile.first_name,
@@ -223,7 +228,16 @@ export default function Home() {
     };
 
     loadUserProfile();
-  }, [user]);
+
+    // Add focus listener to refresh data when returning to this screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Reload user profile to get the latest target weight
+      loadUserProfile();
+    });
+
+    // Clean up the listener when component unmounts
+    return unsubscribe;
+  }, [user, navigation]);
 
   // Set up food log watching when component mounts
   useEffect(() => {
@@ -481,7 +495,9 @@ export default function Home() {
               styles.burnBarFill,
               {
                 width: `${Math.min(
-                  (weightLost / (startingWeight && targetWeight ? startingWeight - targetWeight : 10)) * 100,
+                  (weightLost / (startingWeight && targetWeight && startingWeight > targetWeight
+                    ? startingWeight - targetWeight
+                    : 10)) * 100,
                   100
                 )}%`
               }
@@ -491,7 +507,7 @@ export default function Home() {
         <View style={styles.weightLabelsContainer}>
           <Text style={styles.weightLabel}>{startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : '--')} kg</Text>
           <Text style={styles.burnDetails}>{weightLost} Kilograms Lost!</Text> {/* Centered text */}
-          <Text style={styles.weightLabel}>{targetWeight || '--'} kg</Text>
+          <Text style={styles.weightLabel}>{targetWeight ? `${targetWeight} kg` : '---'}</Text>
         </View>
       </View>
     </GradientBorderCard>

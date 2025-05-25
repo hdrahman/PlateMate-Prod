@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
+import { getUserGoals } from '../utils/database';
+import { getProfile } from '../api/profileApi';
+import { kgToLbs } from '../utils/unitConversion';
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
@@ -22,33 +26,118 @@ const GOLD = '#FFD700';
 
 const GoalsScreen = () => {
     const navigation = useNavigation<any>();
+    const { user } = useAuth();
+    const [isLoading, setIsLoading] = useState(true);
+    const [isImperialUnits, setIsImperialUnits] = useState(false);
 
-    // Mock data - in a real app, this would come from an API/database
+    // Initial goals state with empty/default values
     const [goals, setGoals] = useState({
         startingWeight: {
-            value: 112,
-            date: '28 Sept 2020'
+            value: 0,
+            date: '---'
         },
-        currentWeight: 105,
-        goalWeight: 85,
-        weeklyGoal: 'Lose 1 kg per week',
-        activityLevel: 'Not Very Active',
+        currentWeight: 0,
+        goalWeight: null, // Set to null to indicate no value yet
+        weeklyGoal: '---',
+        activityLevel: '---',
         nutrition: {
-            calories: 1800,
-            carbs: 225,
-            fat: 60,
-            protein: 90
+            calories: 0,
+            carbs: 0,
+            fat: 0,
+            protein: 0
         },
         fitness: {
             workoutsPerWeek: 0,
             minutesPerWorkout: 0
         },
         premium: {
-            caloriesByMeal: true,
-            macrosByMeal: true,
-            adjustForExercise: true
+            caloriesByMeal: false,
+            macrosByMeal: false,
+            adjustForExercise: false
         }
     });
+
+    useEffect(() => {
+        const fetchGoals = async () => {
+            if (!user) return;
+
+            setIsLoading(true);
+            try {
+                // Fetch user goals from local database
+                const userGoals = await getUserGoals(user.uid);
+
+                // Try to get profile data for additional info
+                let profileData = null;
+                try {
+                    profileData = await getProfile();
+                    if (profileData && profileData.profile) {
+                        setIsImperialUnits(profileData.profile.is_imperial_units || false);
+                    }
+                } catch (profileError) {
+                    console.warn('Failed to fetch profile data:', profileError);
+                }
+
+                // Get target weight directly from the database
+                const targetWeight = profileData?.profile?.target_weight ||
+                    (profileData?.nutrition_goals?.target_weight) ||
+                    userGoals?.targetWeight || null;
+
+                // Update the goals state with fetched data
+                setGoals(prevGoals => ({
+                    ...prevGoals,
+                    startingWeight: {
+                        value: profileData?.profile?.starting_weight || 0,
+                        date: profileData?.profile?.created_at ? new Date(profileData.profile.created_at).toLocaleDateString() : '---'
+                    },
+                    currentWeight: profileData?.profile?.weight || 0,
+                    goalWeight: targetWeight, // Use the target weight from database
+                    weeklyGoal: userGoals?.fitnessGoal === 'lose'
+                        ? 'Lose weight'
+                        : userGoals?.fitnessGoal === 'gain'
+                            ? 'Gain weight'
+                            : 'Maintain weight',
+                    activityLevel: userGoals?.activityLevel || '---',
+                    nutrition: {
+                        calories: userGoals?.calorieGoal || 0,
+                        carbs: userGoals?.carbGoal || 0,
+                        fat: userGoals?.fatGoal || 0,
+                        protein: userGoals?.proteinGoal || 0
+                    },
+                    fitness: {
+                        workoutsPerWeek: userGoals?.weeklyWorkouts || 0,
+                        minutesPerWorkout: 0 // Not tracked yet
+                    }
+                }));
+            } catch (error) {
+                console.error('Error fetching goals:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchGoals();
+
+        // Add focus listener to refresh data when returning to this screen
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchGoals();
+        });
+
+        // Clean up the listener when component unmounts
+        return unsubscribe;
+    }, [user, navigation]);
+
+    // Format weight display with unit and handle empty values
+    const formatWeight = (weight) => {
+        if (weight === null || weight === undefined || weight === 0) {
+            return "---";
+        }
+
+        if (isImperialUnits) {
+            return `${Math.round(kgToLbs(weight))} lbs`;
+        }
+
+        return `${weight} kg`;
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -70,17 +159,19 @@ const GoalsScreen = () => {
                 <View style={styles.section}>
                     <View style={styles.goalRow}>
                         <Text style={styles.goalLabel}>Starting Weight</Text>
-                        <Text style={styles.goalValue}>{goals.startingWeight.value} kg on {goals.startingWeight.date}</Text>
+                        <Text style={styles.goalValue}>
+                            {goals.startingWeight.value ? formatWeight(goals.startingWeight.value) + ` on ${goals.startingWeight.date}` : "---"}
+                        </Text>
                     </View>
 
                     <View style={styles.goalRow}>
                         <Text style={styles.goalLabel}>Current Weight</Text>
-                        <Text style={styles.goalValue}>{goals.currentWeight} kg</Text>
+                        <Text style={styles.goalValue}>{formatWeight(goals.currentWeight)}</Text>
                     </View>
 
                     <View style={styles.goalRow}>
                         <Text style={styles.goalLabel}>Goal Weight</Text>
-                        <Text style={styles.goalValue}>{goals.goalWeight} kg</Text>
+                        <Text style={styles.goalValue}>{formatWeight(goals.goalWeight)}</Text>
                     </View>
 
                     <View style={styles.goalRow}>

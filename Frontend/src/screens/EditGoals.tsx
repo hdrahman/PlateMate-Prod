@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserGoals, updateUserGoals } from '../utils/database'; // Local database functions
-import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile } from '../api/profileApi'; // Backend API functions
+import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
 
 // Constants for colors - matching EditProfile
@@ -181,20 +181,22 @@ export default function EditGoals() {
                         const profilePromise = getProfile();
                         const profileData = await Promise.race([profilePromise, timeoutPromise]) as CompleteProfile;
 
-                        if (profileData && profileData.nutrition_goals) {
-                            // If we have backend data for target weight, use it
-                            const targetWeight = profileData.nutrition_goals.target_weight;
+                        if (profileData) {
+                            // If we have backend data for target weight, use it from the profile directly
+                            const targetWeight = profileData.profile?.target_weight ||
+                                (profileData.nutrition_goals && profileData.nutrition_goals.target_weight) ||
+                                userData?.targetWeight || 0;
 
                             // Set default values if any data is missing
                             const backendGoals = {
-                                targetWeight: targetWeight || userData?.targetWeight || 0,
-                                calorieGoal: profileData.nutrition_goals.daily_calorie_goal || userData?.calorieGoal || 0,
-                                proteinGoal: profileData.nutrition_goals.protein_goal || userData?.proteinGoal || 0,
-                                carbGoal: profileData.nutrition_goals.carb_goal || userData?.carbGoal || 0,
-                                fatGoal: profileData.nutrition_goals.fat_goal || userData?.fatGoal || 0,
-                                fitnessGoal: profileData.nutrition_goals.weight_goal?.startsWith('lose') ? 'lose' :
-                                    profileData.nutrition_goals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
-                                activityLevel: profileData.nutrition_goals.activity_level || userData?.activityLevel || 'moderate',
+                                targetWeight: targetWeight,
+                                calorieGoal: profileData.nutrition_goals?.daily_calorie_goal || userData?.calorieGoal || 0,
+                                proteinGoal: profileData.nutrition_goals?.protein_goal || userData?.proteinGoal || 0,
+                                carbGoal: profileData.nutrition_goals?.carb_goal || userData?.carbGoal || 0,
+                                fatGoal: profileData.nutrition_goals?.fat_goal || userData?.fatGoal || 0,
+                                fitnessGoal: profileData.nutrition_goals?.weight_goal?.startsWith('lose') ? 'lose' :
+                                    profileData.nutrition_goals?.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
+                                activityLevel: profileData.nutrition_goals?.activity_level || userData?.activityLevel || 'moderate',
                                 weeklyWorkouts: profileData.fitness_goals?.weekly_workouts || userData?.weeklyWorkouts || 0,
                                 stepGoal: profileData.fitness_goals?.daily_step_goal || userData?.stepGoal || 0,
                                 waterGoal: profileData.fitness_goals?.water_intake_goal || userData?.waterGoal || 0,
@@ -251,6 +253,20 @@ export default function EditGoals() {
                                 formValues.fitnessGoal === 'gain' ? 'gain_0_25' : 'maintain') as any,
                     };
 
+                    // Also update the profile with the target weight
+                    try {
+                        const profileData = await getProfile();
+                        if (profileData && profileData.profile) {
+                            // Update the profile with the new target weight
+                            await updateProfile({
+                                ...profileData.profile,
+                                target_weight: targetWeightKg || undefined
+                            });
+                        }
+                    } catch (profileError) {
+                        console.warn('Error updating profile target weight, continuing with nutrition goals update', profileError);
+                    }
+
                     await updateNutritionGoals(nutritionGoals);
                 } else {
                     // Format fitness goals for the API
@@ -306,6 +322,15 @@ export default function EditGoals() {
     };
 
     const updateFormValue = (field: keyof GoalsData, value: any) => {
+        // Special handling for targetWeight to allow empty values
+        if (field === 'targetWeight' && (value === '' || value === null)) {
+            setFormValues(prev => ({
+                ...prev,
+                [field]: undefined
+            }));
+            return;
+        }
+
         setFormValues(prev => ({
             ...prev,
             [field]: value
@@ -354,9 +379,11 @@ export default function EditGoals() {
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Text style={styles.statValue}>
-                                    {isImperialUnits
-                                        ? `${Math.round(kgToLbs(dbGoals.targetWeight || 0))} lbs`
-                                        : `${dbGoals.targetWeight || 0} kg`}
+                                    {isImperialUnits && dbGoals.targetWeight
+                                        ? `${Math.round(kgToLbs(dbGoals.targetWeight))} lbs`
+                                        : dbGoals.targetWeight
+                                            ? `${dbGoals.targetWeight} kg`
+                                            : "---"}
                                 </Text>
                                 <Text style={styles.statLabel}>Target Weight</Text>
                             </View>
@@ -374,16 +401,16 @@ export default function EditGoals() {
                         </Text>
                         <TextInput
                             style={styles.input}
-                            value={formValues.targetWeight?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('targetWeight', text ? parseFloat(text) : 0)}
-                            placeholder={`Enter target weight in ${isImperialUnits ? 'pounds' : 'kilograms'}`}
+                            value={formValues.targetWeight ? formValues.targetWeight.toString() : ''}
+                            onChangeText={(text) => updateFormValue('targetWeight', text ? parseFloat(text) : '')}
+                            placeholder={`${isImperialUnits ? 'Enter target weight in pounds' : 'Enter target weight in kilograms'} or leave empty`}
                             placeholderTextColor={GRAY}
                             keyboardType="decimal-pad"
                         />
                         <Text style={styles.inputHint}>
                             {isImperialUnits
-                                ? 'Enter your target weight in pounds'
-                                : 'Enter your target weight in kilograms'}
+                                ? 'Enter your target weight in pounds or leave empty'
+                                : 'Enter your target weight in kilograms or leave empty'}
                         </Text>
                     </View>
 

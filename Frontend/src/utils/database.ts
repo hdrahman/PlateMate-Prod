@@ -1302,8 +1302,6 @@ export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | nul
         }
 
         // Extract goals from the user profile
-        // Note: Values may be stored in different places in your actual schema
-        // This is just an example implementation
         return {
             targetWeight: profile.target_weight || 0,
             calorieGoal: profile.daily_calorie_target || 0,

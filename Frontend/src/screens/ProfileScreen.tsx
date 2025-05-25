@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getUserProfileByFirebaseUid } from '../utils/database';
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
@@ -32,7 +33,7 @@ const ProfileScreen = () => {
         location: 'United States',
         startingWeight: 112,
         currentWeight: 105,
-        goalWeight: 85,
+        goalWeight: 0,
         weightLost: 7,
         weeklyGoal: 'Lose 1 kg per week',
         dailyCalories: 1800,
@@ -45,10 +46,27 @@ const ProfileScreen = () => {
 
     useEffect(() => {
         // Here you would fetch user data from backend
-        // For now using static data
-        if (user) {
-            // Update with user data
-        }
+        const fetchUserProfile = async () => {
+            if (!user) return;
+
+            try {
+                // Get user profile from local database
+                const profile = await getUserProfileByFirebaseUid(user.uid);
+
+                if (profile) {
+                    // Update profile data with fetched information
+                    setProfileData(prevData => ({
+                        ...prevData,
+                        goalWeight: profile.target_weight || 0,
+                        // Update other fields as needed
+                    }));
+                }
+            } catch (error) {
+                console.error('Error fetching user profile:', error);
+            }
+        };
+
+        fetchUserProfile();
     }, [user]);
 
     const goToEditProfile = () => {
