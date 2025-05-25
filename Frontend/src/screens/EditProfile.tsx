@@ -190,6 +190,14 @@ const EditProfile = () => {
         { name: 'Nutrition Ninja', description: 'Log meals for 30 days', completed: false, icon: 'nutrition' },
     ]);
 
+    // Add a state to track unsaved changes
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Helper function to check if user has made changes to their profile
+    const checkForChanges = (key: string, value: any) => {
+        setHasUnsavedChanges(true);
+    };
+
     useEffect(() => {
         // Animation on component mount
         Animated.parallel([
@@ -341,6 +349,55 @@ const EditProfile = () => {
         loadProfileData();
     }, [user]);
 
+    // Modify input handlers to track changes
+    const handleUsernameChange = (text: string) => {
+        setEditedUsername(text);
+        checkForChanges('username', text);
+    };
+
+    const handleSexChange = (value: string) => {
+        setEditedSex(value);
+        checkForChanges('sex', value);
+    };
+
+    const handleHeightFeetChange = (text: string) => {
+        setEditedHeightFeet(text);
+        checkForChanges('heightFeet', text);
+    };
+
+    const handleHeightInchesChange = (text: string) => {
+        setEditedHeightInches(text);
+        checkForChanges('heightInches', text);
+    };
+
+    const handleHeightCmChange = (value: string) => {
+        if (/^\d*\.?\d*$/.test(value)) {
+            setHeight(`${value} cm`);
+            checkForChanges('height', value);
+        }
+    };
+
+    const handleWeightChange = (text: string) => {
+        setEditedWeight(text);
+        checkForChanges('weight', text);
+    };
+
+    const handleLocationChange = (location: string) => {
+        setEditedLocation(location);
+        checkForChanges('location', location);
+    };
+
+    const handleTimeZoneChange = (timezone: string) => {
+        setEditedTimeZone(timezone);
+        checkForChanges('timezone', timezone);
+    };
+
+    const handleUnitSystemChange = (imperial: boolean) => {
+        setEditedIsImperialUnits(imperial);
+        setShowUnitPicker(false);
+        checkForChanges('units', imperial);
+    };
+
     // Update saveProfile to save changes to the database
     const saveProfile = async () => {
         try {
@@ -425,6 +482,9 @@ const EditProfile = () => {
 
                 setTimeZone(editedTimeZone);
 
+                // Reset unsaved changes flag after successful save
+                setHasUnsavedChanges(false);
+
                 Alert.alert('Success', 'Profile updated successfully.');
             } else {
                 Alert.alert('Error', 'User not found. Please log in again.');
@@ -435,12 +495,6 @@ const EditProfile = () => {
         } finally {
             setIsSaving(false);
         }
-    };
-
-    // Toggle unit system
-    const toggleUnitSystem = (imperial: boolean) => {
-        setEditedIsImperialUnits(imperial);
-        setShowUnitPicker(false);
     };
 
     // Update renderProfileTab to include editable fields
@@ -500,10 +554,13 @@ const EditProfile = () => {
                             </View>
                         </View>
                     </View>
-                    <View style={styles.readOnlyBadge}>
-                        <Ionicons name="information-circle" size={16} color={WHITE} />
-                        <Text style={styles.readOnlyBadgeText}>Save changes to update profile</Text>
-                    </View>
+                    {/* Only show save changes badge if there are unsaved changes */}
+                    {hasUnsavedChanges && (
+                        <View style={styles.readOnlyBadge}>
+                            <Ionicons name="information-circle" size={16} color={WHITE} />
+                            <Text style={styles.readOnlyBadgeText}>Save changes to update profile</Text>
+                        </View>
+                    )}
                 </LinearGradient>
 
                 {/* Form Fields - These will be editable */}
@@ -515,7 +572,7 @@ const EditProfile = () => {
                         <TextInput
                             style={styles.input}
                             value={editedUsername}
-                            onChangeText={setEditedUsername}
+                            onChangeText={handleUsernameChange}
                             placeholder="Your username"
                             placeholderTextColor={GRAY}
                         />
@@ -523,8 +580,7 @@ const EditProfile = () => {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Email</Text>
-                        <Text style={styles.displayValue}>{email || '---'}</Text>
-                        <Text style={styles.inputHint}>Email cannot be changed</Text>
+                        <Text style={[styles.displayValue, styles.disabledInput]}>{email || '---'}</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
@@ -532,19 +588,19 @@ const EditProfile = () => {
                         <View style={styles.segmentedControl}>
                             <TouchableOpacity
                                 style={[styles.segmentOption, editedSex.toLowerCase() === 'male' && styles.segmentActive]}
-                                onPress={() => setEditedSex('male')}
+                                onPress={() => handleSexChange('male')}
                             >
                                 <Text style={[styles.segmentText, editedSex.toLowerCase() === 'male' && styles.segmentTextActive]}>Male</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.segmentOption, editedSex.toLowerCase() === 'female' && styles.segmentActive]}
-                                onPress={() => setEditedSex('female')}
+                                onPress={() => handleSexChange('female')}
                             >
                                 <Text style={[styles.segmentText, editedSex.toLowerCase() === 'female' && styles.segmentTextActive]}>Female</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.segmentOption, editedSex.toLowerCase() === 'other' && styles.segmentActive]}
-                                onPress={() => setEditedSex('other')}
+                                onPress={() => handleSexChange('other')}
                             >
                                 <Text style={[styles.segmentText, editedSex.toLowerCase() === 'other' && styles.segmentTextActive]}>Other</Text>
                             </TouchableOpacity>
@@ -560,7 +616,7 @@ const EditProfile = () => {
                                         <TextInput
                                             style={styles.heightInput}
                                             value={editedHeightFeet}
-                                            onChangeText={setEditedHeightFeet}
+                                            onChangeText={handleHeightFeetChange}
                                             keyboardType="numeric"
                                             placeholderTextColor={GRAY}
                                             placeholder="5"
@@ -571,7 +627,7 @@ const EditProfile = () => {
                                         <TextInput
                                             style={styles.heightInput}
                                             value={editedHeightInches}
-                                            onChangeText={setEditedHeightInches}
+                                            onChangeText={handleHeightInchesChange}
                                             keyboardType="numeric"
                                             placeholderTextColor={GRAY}
                                             placeholder="11"
@@ -585,11 +641,7 @@ const EditProfile = () => {
                                         <TextInput
                                             style={styles.heightInput}
                                             value={height.includes('cm') ? height.replace(/cm/g, '').trim() : ''}
-                                            onChangeText={(value) => {
-                                                if (/^\d*\.?\d*$/.test(value)) {
-                                                    setHeight(`${value} cm`);
-                                                }
-                                            }}
+                                            onChangeText={handleHeightCmChange}
                                             keyboardType="numeric"
                                             placeholderTextColor={GRAY}
                                             placeholder="180"
@@ -601,16 +653,18 @@ const EditProfile = () => {
                         </View>
                         <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                             <Text style={styles.inputLabel}>Weight</Text>
-                            <View style={styles.weightInputContainer}>
-                                <TextInput
-                                    style={styles.weightInput}
-                                    value={editedWeight}
-                                    onChangeText={setEditedWeight}
-                                    keyboardType="numeric"
-                                    placeholderTextColor={GRAY}
-                                    placeholder="75"
-                                />
-                                <Text style={styles.weightUnitText}>{editedIsImperialUnits ? "lbs" : "kg"}</Text>
+                            <View style={styles.heightInputContainer}>
+                                <View style={[styles.heightInputGroup, { flex: 1 }]}>
+                                    <TextInput
+                                        style={styles.heightInput}
+                                        value={editedWeight}
+                                        onChangeText={handleWeightChange}
+                                        keyboardType="numeric"
+                                        placeholderTextColor={GRAY}
+                                        placeholder="75"
+                                    />
+                                    <Text style={styles.heightUnitText}>{editedIsImperialUnits ? "lbs" : "kg"}</Text>
+                                </View>
                             </View>
                         </View>
                     </View>
@@ -866,7 +920,7 @@ const EditProfile = () => {
 
                         <TouchableOpacity
                             style={[styles.modalOption, editedIsImperialUnits && styles.modalOptionSelected]}
-                            onPress={() => toggleUnitSystem(true)}
+                            onPress={() => handleUnitSystemChange(true)}
                         >
                             <Text style={[styles.modalOptionText, editedIsImperialUnits && styles.modalOptionTextSelected]}>
                                 Imperial (lbs, feet/inches)
@@ -876,7 +930,7 @@ const EditProfile = () => {
 
                         <TouchableOpacity
                             style={[styles.modalOption, !editedIsImperialUnits && styles.modalOptionSelected]}
-                            onPress={() => toggleUnitSystem(false)}
+                            onPress={() => handleUnitSystemChange(false)}
                         >
                             <Text style={[styles.modalOptionText, !editedIsImperialUnits && styles.modalOptionTextSelected]}>
                                 Metric (kg, cm)
@@ -956,7 +1010,7 @@ const EditProfile = () => {
                                         key={index}
                                         style={[styles.pickerOption, editedLocation === loc && styles.pickerOptionSelected]}
                                         onPress={() => {
-                                            setEditedLocation(loc);
+                                            handleLocationChange(loc);
                                             setShowLocationPicker(false);
                                             setSearchQuery('');
                                             setFilteredLocations([...locationOptions]);
@@ -1010,7 +1064,7 @@ const EditProfile = () => {
                                     key={index}
                                     style={[styles.pickerOption, editedTimeZone === tz && styles.pickerOptionSelected]}
                                     onPress={() => {
-                                        setEditedTimeZone(tz);
+                                        handleTimeZoneChange(tz);
                                         setShowTimeZonePicker(false);
                                     }}
                                 >
@@ -1060,12 +1114,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderBottomWidth: 1,
         borderBottomColor: LIGHT_GRAY,
+        justifyContent: 'center',
     },
     tab: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         paddingVertical: 16,
-        marginRight: 24,
+        paddingHorizontal: 20,
+        marginHorizontal: 8,
+        minWidth: 130,
     },
     activeTab: {
         borderBottomWidth: 2,
@@ -1075,6 +1133,7 @@ const styles = StyleSheet.create({
         color: GRAY,
         fontSize: 16,
         marginLeft: 8,
+        fontWeight: '500',
     },
     activeTabText: {
         color: GRADIENT_MIDDLE,
@@ -1232,11 +1291,13 @@ const styles = StyleSheet.create({
     heightInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
     },
     heightInputGroup: {
         flexDirection: 'row',
         alignItems: 'center',
         marginRight: 10,
+        flex: 1,
     },
     heightInput: {
         backgroundColor: LIGHT_GRAY,
@@ -1244,26 +1305,10 @@ const styles = StyleSheet.create({
         padding: 12,
         color: WHITE,
         fontSize: 16,
+        flex: 1,
         minWidth: 50,
     },
     heightUnitText: {
-        color: WHITE,
-        fontSize: 16,
-        marginLeft: 8,
-    },
-    weightInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    weightInput: {
-        backgroundColor: LIGHT_GRAY,
-        borderRadius: 8,
-        padding: 12,
-        color: WHITE,
-        fontSize: 16,
-        flex: 1,
-    },
-    weightUnitText: {
         color: WHITE,
         fontSize: 16,
         marginLeft: 8,
@@ -1599,6 +1644,10 @@ const styles = StyleSheet.create({
         color: WHITE,
         marginLeft: 6,
         fontWeight: '600',
+    },
+    disabledInput: {
+        opacity: 0.7,
+        backgroundColor: 'rgba(30, 30, 30, 0.8)', // Darker background for disabled input
     },
 });
 
