@@ -13,8 +13,8 @@ const getLocalIpAddress = () => {
 
 // Determine the appropriate API URL based on the platform
 const API_URL = Platform.OS === 'web'
-    ? 'http://192.168.0.160:8001'
-    : `http://${getLocalIpAddress()}:8001`;
+    ? 'http://192.168.0.160:8000'
+    : `http://${getLocalIpAddress()}:8000`;
 
 // Helper function to get Firebase ID token is now imported from firebase/auth
 
