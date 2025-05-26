@@ -65,6 +65,7 @@ class User(Base):
     gamification = relationship("UserGamification", back_populates="user", uselist=False)
     achievements = relationship("UserAchievement", back_populates="user")
     weight_history = relationship("UserWeight", back_populates="user")
+    plates = relationship("UserPlate", back_populates="user")
 
     def calculate_age(self):
         """Calculate user's age from date_of_birth if available."""
@@ -98,6 +99,12 @@ class NutritionGoals(Base):
     protein_goal = Column(Integer, nullable=True)
     carb_goal = Column(Integer, nullable=True)
     fat_goal = Column(Integer, nullable=True)
+    fiber_goal = Column(Integer, nullable=True)
+    sugar_goal = Column(Integer, nullable=True)
+    saturated_fat_goal = Column(Integer, nullable=True)
+    cholesterol_goal = Column(Integer, nullable=True)
+    sodium_goal = Column(Integer, nullable=True)
+    potassium_goal = Column(Integer, nullable=True)
     weight_goal = Column(Enum(WeightGoal), nullable=True)
     activity_level = Column(Enum(ActivityLevel), nullable=True)
     
@@ -203,3 +210,15 @@ class Exercise(Base):
     
     # Relationship with User
     user = relationship("User", back_populates="exercises")
+
+class UserPlate(Base):
+    __tablename__ = "user_plates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    plate_image_url = Column(String, nullable=True)
+    analysis_result = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    
+    # Relationship with User
+    user = relationship("User", back_populates="plates")

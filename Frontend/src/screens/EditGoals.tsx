@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserGoals, updateUserGoals } from '../utils/database'; // Local database functions
-import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile } from '../api/profileApi'; // Backend API functions
+import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile, resetNutritionGoals } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
 
 // Constants for colors - matching EditProfile
@@ -351,6 +351,70 @@ export default function EditGoals() {
         }));
     };
 
+    // Function to handle resetting nutrition goals to calculated values
+    const handleReset = async () => {
+        Alert.alert(
+            "Reset Nutrition Goals",
+            "This will reset your nutrition goals to the recommended values based on your profile data. Continue?",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Reset",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+
+                            // Call the reset API endpoint
+                            const resetGoals = await resetNutritionGoals();
+
+                            // Update form values with the reset goals
+                            const updatedGoals = {
+                                ...formValues,
+                                calorieGoal: resetGoals.daily_calorie_goal,
+                                proteinGoal: resetGoals.protein_goal,
+                                carbGoal: resetGoals.carb_goal,
+                                fatGoal: resetGoals.fat_goal,
+                                targetWeight: resetGoals.target_weight || formValues.targetWeight,
+                                fitnessGoal: resetGoals.weight_goal?.startsWith('lose') ? 'lose' :
+                                    resetGoals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
+                                activityLevel: resetGoals.activity_level || 'moderate'
+                            };
+
+                            // Update both displayed values
+                            setFormValues(updatedGoals);
+                            setDbGoals(updatedGoals);
+
+                            // Also update local database
+                            if (user) {
+                                await updateUserGoals(user.uid, {
+                                    calorieGoal: resetGoals.daily_calorie_goal,
+                                    proteinGoal: resetGoals.protein_goal,
+                                    carbGoal: resetGoals.carb_goal,
+                                    fatGoal: resetGoals.fat_goal,
+                                    targetWeight: resetGoals.target_weight,
+                                    fitnessGoal: resetGoals.weight_goal?.startsWith('lose') ? 'lose' :
+                                        resetGoals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
+                                    activityLevel: resetGoals.activity_level
+                                });
+                            }
+
+                            Alert.alert("Success", "Your nutrition goals have been reset to the recommended values.");
+                        } catch (error) {
+                            console.error('Error resetting goals:', error);
+                            Alert.alert("Error", "Failed to reset goals. Please try again.");
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const renderNutritionTab = () => {
         if (isFetchingData) {
             return (
@@ -485,6 +549,14 @@ export default function EditGoals() {
                             keyboardType="number-pad"
                         />
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.resetButton}
+                        onPress={handleReset}
+                        disabled={isLoading}
+                    >
+                        <Text style={styles.resetButtonText}>Reset to Recommended Values</Text>
+                    </TouchableOpacity>
                 </GradientBorderBox>
 
                 {/* Activity Profile */}
@@ -931,5 +1003,20 @@ const styles = StyleSheet.create({
         color: GRAY,
         marginTop: 4,
         marginLeft: 2,
+    },
+    resetButton: {
+        backgroundColor: '#333333',
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginTop: 16,
+        padding: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: GRADIENT_MIDDLE,
+    },
+    resetButtonText: {
+        color: GRADIENT_START,
+        fontSize: 16,
+        fontWeight: 'bold',
     },
 });

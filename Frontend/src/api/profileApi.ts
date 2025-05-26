@@ -222,4 +222,24 @@ export const updateCompleteProfile = async (profileData: Partial<CompleteProfile
         console.error('Error updating complete profile:', error);
         throw error;
     }
+};
+
+// Reset nutrition goals to calculated values
+export const resetNutritionGoals = async (): Promise<NutritionGoals> => {
+    try {
+        const token = await getIdToken();
+        const response = await axios.post(
+            `${API_URL}/profile/reset-nutrition-goals`,
+            {},
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Error resetting nutrition goals:', error);
+        throw error;
+    }
 }; 
