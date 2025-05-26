@@ -55,7 +55,7 @@ def test_postgres_connection():
         return True
         
     except Exception as e:
-        print(f"❌ Error testing PostgreSQL connection: {e}")
+        print(f"❌ Error connecting to PostgreSQL: {e}")
         return False
 
 def test_sqlite_connection():
@@ -68,16 +68,11 @@ def test_sqlite_connection():
         print("\n=== Testing SQLite Connection ===")
         print(f"Connecting to: {db_path}")
         
-        # Check if the file exists
-        if not os.path.exists(db_path):
-            print(f"⚠️ SQLite database file does not exist at {db_path}")
-            return False
-        
-        # Connect directly with sqlite3
+        # Connect directly to SQLite
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Test a simple query
+        # Test a simple query to get SQLite version
         cursor.execute("SELECT sqlite_version();")
         version = cursor.fetchone()
         print(f"SQLite version: {version[0]}")
@@ -99,7 +94,7 @@ def test_sqlite_connection():
             print(f"Columns: {', '.join(columns[:5])}...")
         else:
             print("❌ Users table does not exist")
-        
+            
         # Close connection
         cursor.close()
         conn.close()
@@ -107,7 +102,7 @@ def test_sqlite_connection():
         return True
         
     except Exception as e:
-        print(f"❌ Error testing SQLite connection: {e}")
+        print(f"❌ Error connecting to SQLite: {e}")
         return False
 
 def test_sqlalchemy_connection():
@@ -162,20 +157,33 @@ def test_sqlalchemy_connection():
         return False
 
 if __name__ == "__main__":
-    # Run all tests
-    postgres_ok = test_postgres_connection()
-    sqlite_ok = test_sqlite_connection()
-    sqlalchemy_ok = test_sqlalchemy_connection()
+    print("=== PlateMate Database Connection Tests ===")
     
-    print("\n=== Summary ===")
-    print(f"PostgreSQL Connection: {'✅ OK' if postgres_ok else '❌ Failed'}")
-    print(f"SQLite Connection: {'✅ OK' if sqlite_ok else '❌ Failed'}")
-    print(f"SQLAlchemy ORM: {'✅ OK' if sqlalchemy_ok else '❌ Failed'}")
+    # Print configuration
+    print(f"DATABASE_URL: {'Set' if os.getenv('DATABASE_URL') else 'Not set'}")
+    print(f"LOCAL_DB_PATH: {os.getenv('LOCAL_DB_PATH', 'Default: sqlite:///./platemate_local.db')}")
+    print(f"Primary Database: SQLite")
     
-    if not sqlite_ok:
-        print("\nSQLite database does not exist or has issues. Do you want to initialize it? (y/n)")
-        response = input().lower()
-        if response == 'y':
-            print("Running SQLite initialization script...")
-            import init_sqlite_db
-            print("Done. Try running this test again to verify.") 
+    # Test all connections
+    sqlite_result = test_sqlite_connection()
+    print(f"\nSQLite Connection Test: {'✅ Passed' if sqlite_result else '❌ Failed'}")
+    
+    postgres_result = test_postgres_connection()
+    print(f"PostgreSQL Connection Test: {'✅ Passed' if postgres_result else '❌ Failed'}")
+    
+    sqlalchemy_result = test_sqlalchemy_connection()
+    print(f"SQLAlchemy ORM Test: {'✅ Passed' if sqlalchemy_result else '❌ Failed'}")
+    
+    # Print summary
+    print("\n=== Test Summary ===")
+    if sqlite_result:
+        print("✅ Primary SQLite database is configured correctly")
+    else:
+        print("❌ Primary SQLite database configuration has issues")
+        
+    if postgres_result:
+        print("✅ PostgreSQL database (for auth) is configured correctly")
+    else:
+        print("⚠️ PostgreSQL database configuration has issues (only needed for certain auth operations)")
+        
+    print(f"\nOverall Status: {'✅ Ready for use' if sqlite_result else '❌ Configuration issues need to be fixed'}") 

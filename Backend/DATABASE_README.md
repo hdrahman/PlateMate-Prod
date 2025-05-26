@@ -2,11 +2,9 @@
 
 ## Overview
 
-PlateMate uses a dual database strategy:
-1. **PostgreSQL (Neon)** - Primary production database hosted on Neon cloud
-2. **SQLite** - Local development/offline database 
-
-The application can switch between these databases using environment variables.
+PlateMate uses SQLite as its primary database for all functionality:
+1. **SQLite** - Primary database for all data storage and retrieval
+2. **PostgreSQL (Neon)** - Used only for authentication (Firebase integration) when needed
 
 ## User Model
 
@@ -50,7 +48,7 @@ Database configuration is managed through the `.env` file:
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 
 # Local Database Configuration
-USE_LOCAL_DB=false  # Set to true to use SQLite
+USE_LOCAL_DB=true  # Should always be true, as SQLite is now primary
 LOCAL_DB_PATH="sqlite:///./platemate_local.db"
 ```
 
@@ -59,28 +57,22 @@ LOCAL_DB_PATH="sqlite:///./platemate_local.db"
 Several utility scripts are provided:
 
 - `init_sqlite_db.py` - Initialize the SQLite database with the schema
-- `apply_simplified_schema.py` - Apply the simplified schema to the PostgreSQL database
-- `test_db_connection.py` - Test connectivity to both databases
+- `test_db_connection.py` - Test connectivity to the database
 
 ## Using SQLAlchemy ORM
 
-The application uses SQLAlchemy ORM to interact with both databases. The `DB.py` file contains configuration to connect to either database based on environment variables:
+The application uses SQLAlchemy ORM to interact with the database. The `DB.py` file contains configuration to connect to SQLite:
 
 ```python
-# Configure the database connection
-if USE_LOCAL_DB:
-    print("🔍 Using local SQLite database")
-    SQLALCHEMY_DATABASE_URL = LOCAL_DB_PATH
-    # SQLite-specific configuration
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, 
-        connect_args={"check_same_thread": False},
-        echo=True
-    )
-else:
-    print("🔍 Using Neon PostgreSQL database")
-    SQLALCHEMY_DATABASE_URL = DATABASE_URL
-    engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True)
+# Always use SQLite as the primary database
+print("🔍 Using SQLite as the primary database")
+SQLALCHEMY_DATABASE_URL = LOCAL_DB_PATH
+# SQLite-specific configuration
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args={"check_same_thread": False},
+    echo=True
+)
 ```
 
 ## Migration History
@@ -90,4 +82,5 @@ Current schema version: `simplified_user_schema`
 Migration history:
 1. Initial database setup
 2. Added enhanced profile fields (`020fa0d54ebc`)
-3. Simplified schema to essential fields (`simplified_user_schema`) 
+3. Simplified schema to essential fields (`simplified_user_schema`)
+4. Switched to SQLite as primary database 

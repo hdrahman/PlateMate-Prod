@@ -6,7 +6,7 @@ import os
 import json
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from DB import get_db
+from DB import get_db, get_postgres_db
 from models import User
 
 # Load environment variables
