@@ -550,13 +550,16 @@ export default function EditGoals() {
                         />
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.resetButton}
-                        onPress={handleReset}
-                        disabled={isLoading}
-                    >
-                        <Text style={styles.resetButtonText}>Reset to Recommended Values</Text>
-                    </TouchableOpacity>
+                    <View style={styles.resetButtonContainer}>
+                        <TouchableOpacity
+                            style={styles.resetButton}
+                            onPress={handleReset}
+                            disabled={isLoading}
+                        >
+                            <Ionicons name="refresh-outline" size={14} color={GRADIENT_START} />
+                            <Text style={styles.resetButtonText}>Reset to Recommended Values</Text>
+                        </TouchableOpacity>
+                    </View>
                 </GradientBorderBox>
 
                 {/* Activity Profile */}
@@ -1004,19 +1007,21 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginLeft: 2,
     },
+    resetButtonContainer: {
+        alignItems: 'flex-end',
+        marginTop: 8,
+    },
     resetButton: {
-        backgroundColor: '#333333',
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginTop: 16,
-        padding: 16,
+        flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: GRADIENT_MIDDLE,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: 'transparent',
     },
     resetButtonText: {
         color: GRADIENT_START,
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 14,
+        marginLeft: 4,
     },
 });
