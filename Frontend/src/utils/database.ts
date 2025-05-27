@@ -1420,8 +1420,8 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
         // Update the user profile
         await updateUserProfile(firebaseUid, profileUpdates);
 
-        // Update or create nutrition goals if fitness goal or nutrition goals are provided
-        if (goals.fitnessGoal || goals.calorieGoal || goals.proteinGoal || goals.carbGoal || goals.fatGoal) {
+        // Update or create nutrition goals if fitness goal, activity level, or nutrition goals are provided
+        if (goals.fitnessGoal || goals.activityLevel || goals.calorieGoal || goals.proteinGoal || goals.carbGoal || goals.fatGoal) {
             const timestamp = new Date().toISOString();
 
             // Check if nutrition goals record exists

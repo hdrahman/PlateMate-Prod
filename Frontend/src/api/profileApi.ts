@@ -49,6 +49,7 @@ export interface FitnessGoals {
     weekly_workouts?: number;
     daily_step_goal?: number;
     water_intake_goal?: number;
+    // Note: sleep_goal is not supported by backend, only stored locally in SQLite
 }
 
 export interface UserGamification {

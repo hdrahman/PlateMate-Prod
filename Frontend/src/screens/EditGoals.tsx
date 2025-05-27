@@ -193,55 +193,9 @@ export default function EditGoals() {
                         console.warn('⚠️ Error fetching user profile for units', error);
                     });
 
-                    // SECONDARY: Try to get nutrition goals from backend for sync (non-blocking)
-                    try {
-                        // Set a timeout for the API call
-                        const timeoutPromise = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Request timeout')), 5000)
-                        );
-
-                        const profilePromise = getProfile();
-                        const profileData = await Promise.race([profilePromise, timeoutPromise]) as CompleteProfile;
-
-                        if (profileData) {
-                            // If we have backend data for target weight, use it from the profile directly
-                            const targetWeight = profileData.profile?.target_weight ||
-                                (profileData.nutrition_goals && profileData.nutrition_goals.target_weight) ||
-                                userData?.targetWeight;
-
-                            // Use backend data if available, otherwise keep SQLite data - no fallbacks
-                            const backendGoals = {
-                                targetWeight: targetWeight,
-                                calorieGoal: profileData.nutrition_goals?.daily_calorie_goal || userData?.calorieGoal,
-                                proteinGoal: profileData.nutrition_goals?.protein_goal || userData?.proteinGoal,
-                                carbGoal: profileData.nutrition_goals?.carb_goal || userData?.carbGoal,
-                                fatGoal: profileData.nutrition_goals?.fat_goal || userData?.fatGoal,
-                                fitnessGoal: mapBackendWeightGoal(profileData.nutrition_goals?.weight_goal || userData?.fitnessGoal),
-                                activityLevel: profileData.nutrition_goals?.activity_level || userData?.activityLevel,
-                                weeklyWorkouts: profileData.fitness_goals?.weekly_workouts || userData?.weeklyWorkouts,
-                                stepGoal: profileData.fitness_goals?.daily_step_goal || userData?.stepGoal,
-                                waterGoal: profileData.fitness_goals?.water_intake_goal || userData?.waterGoal,
-                                sleepGoal: userData?.sleepGoal
-                            };
-
-                            // Sync backend data to SQLite if newer/different (optional update)
-                            console.log('📡 Backend data received, syncing to SQLite if needed...');
-                            setDbGoals(backendGoals);
-                            setFormValues({ ...backendGoals });
-
-                            // Update original caloric-affecting values with backend data
-                            setOriginalCaloricValues({
-                                targetWeight: backendGoals.targetWeight,
-                                fitnessGoal: backendGoals.fitnessGoal,
-                                activityLevel: backendGoals.activityLevel
-                            });
-
-                            console.log('✅ Backend sync completed');
-                        }
-                    } catch (backendError) {
-                        console.warn('⚠️ Backend sync failed, using SQLite data (primary)', backendError);
-                        // No action needed since we already set SQLite data
-                    }
+                    // DISABLED: Backend sync disabled to prevent overwriting SQLite data
+                    // SQLite is the primary source of truth for offline functionality
+                    console.log('ℹ️ Backend sync disabled - using SQLite as primary source for offline functionality');
                 }
             } catch (error) {
                 console.error('Error fetching user goals', error);
@@ -371,13 +325,13 @@ export default function EditGoals() {
 
                     await updateNutritionGoals(nutritionGoals);
                 } else {
-                    // Format fitness goals for the API
+                    // Format fitness goals for the API (only fields supported by backend)
                     const fitnessGoals = {
-                        activity_level: formValues.activityLevel,
                         weekly_workouts: formValues.weeklyWorkouts,
-                        step_goal: formValues.stepGoal,
-                        water_goal: formValues.waterGoal,
-                        sleep_goal: formValues.sleepGoal,
+                        daily_step_goal: formValues.stepGoal,
+                        water_intake_goal: formValues.waterGoal,
+                        // Note: sleep_goal is not supported by backend FitnessGoals model,
+                        // it's stored in SQLite user_profiles table only
                     };
 
                     await updateFitnessGoals(fitnessGoals);
