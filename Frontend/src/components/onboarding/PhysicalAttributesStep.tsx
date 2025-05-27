@@ -43,278 +43,245 @@ const units = [
 ];
 
 const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile, updateProfile, onNext }) => {
-    // For metric units
-    const [height, setHeight] = useState(profile.height !== null ? profile.height.toString() : '');
-    const [weight, setWeight] = useState(profile.weight !== null ? profile.weight.toString() : '');
+    const [height, setHeight] = useState<string>(profile.height?.toString() || '');
+    const [weight, setWeight] = useState<string>(profile.weight?.toString() || '');
+    const [age, setAge] = useState<string>(profile.age?.toString() || '');
+    const [gender, setGender] = useState<string>(profile.gender || 'male');
+    const [activityLevel, setActivityLevel] = useState<string>(profile.activityLevel || 'moderate');
+    const [fitnessGoal, setFitnessGoal] = useState<string>(profile.fitnessGoal || 'balanced');
+    const [activityLevelIndex, setActivityLevelIndex] = useState<number>(2); // Default to moderate (index 2)
 
-    // For imperial units
-    const [heightFeet, setHeightFeet] = useState('');
-    const [heightInches, setHeightInches] = useState('');
-    const [weightLbs, setWeightLbs] = useState('');
-
-    const [age, setAge] = useState(profile.age !== null ? profile.age.toString() : '');
-    const [gender, setGender] = useState(profile.gender || null);
-    const [activityLevel, setActivityLevel] = useState(profile.activityLevel || null);
-    const [unitSystem, setUnitSystem] = useState(profile.unitPreference || 'metric');
-
-    // Initialize imperial values if needed
+    // Set initial activity level index based on profile
     useEffect(() => {
-        if (unitSystem === 'imperial' && profile.height) {
-            // Convert cm to feet and inches
-            const totalInches = profile.height / 2.54;
-            const feet = Math.floor(totalInches / 12);
-            const inches = Math.round(totalInches % 12);
-
-            setHeightFeet(feet.toString());
-            setHeightInches(inches.toString());
+        const index = activityLevels.findIndex(level => level.id === activityLevel);
+        if (index !== -1) {
+            setActivityLevelIndex(index);
         }
+    }, []);
 
-        if (unitSystem === 'imperial' && profile.weight) {
-            // Convert kg to lbs
-            const lbs = Math.round(profile.weight * 2.20462);
-            setWeightLbs(lbs.toString());
-        }
-    }, [unitSystem, profile.height, profile.weight]);
-
-    const handleSubmit = async () => {
-        let heightValue = null;
-        let weightValue = null;
-
-        if (unitSystem === 'metric') {
-            heightValue = height ? parseFloat(height) : null;
-            weightValue = weight ? parseFloat(weight) : null;
-        } else {
-            // Convert imperial to metric for storage
-            if (heightFeet && heightInches) {
-                const totalInches = (parseInt(heightFeet, 10) * 12) + parseInt(heightInches, 10);
-                heightValue = Math.round(totalInches * 2.54);
-            }
-
-            if (weightLbs) {
-                weightValue = Math.round(parseInt(weightLbs, 10) / 2.20462 * 10) / 10;
-            }
-        }
-
-        await updateProfile({
-            height: heightValue,
-            weight: weightValue,
-            age: age ? parseInt(age, 10) : null,
-            gender,
-            activityLevel,
-            unitPreference: unitSystem,
-        });
-        onNext();
+    const handleActivityLevelChange = (index: number) => {
+        setActivityLevelIndex(index);
+        setActivityLevel(activityLevels[index].id);
     };
 
-    const renderHeightWeightInputs = () => {
-        if (unitSystem === 'metric') {
-            return (
-                <View style={styles.inputRow}>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Height (cm)</Text>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="175"
-                                placeholderTextColor="#666"
-                                value={height}
-                                onChangeText={setHeight}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                    </View>
+    const handleSubmit = async () => {
+        try {
+            const heightValue = height ? parseFloat(height) : undefined;
+            const weightValue = weight ? parseFloat(weight) : undefined;
+            const ageValue = age ? parseInt(age) : undefined;
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Weight (kg)</Text>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="70"
-                                placeholderTextColor="#666"
-                                value={weight}
-                                onChangeText={setWeight}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                    </View>
-                </View>
-            );
-        } else {
-            return (
-                <>
-                    <View style={styles.inputRow}>
-                        <View style={[styles.inputGroup, { flex: 1 }]}>
-                            <Text style={styles.label}>Height (ft)</Text>
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="5"
-                                    placeholderTextColor="#666"
-                                    value={heightFeet}
-                                    onChangeText={setHeightFeet}
-                                    keyboardType="numeric"
-                                />
-                            </View>
-                        </View>
+            await updateProfile({
+                height: heightValue,
+                weight: weightValue,
+                age: ageValue,
+                gender,
+                activityLevel,
+                fitnessGoal,
+            });
 
-                        <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
-                            <Text style={styles.label}>Height (in)</Text>
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="10"
-                                    placeholderTextColor="#666"
-                                    value={heightInches}
-                                    onChangeText={setHeightInches}
-                                    keyboardType="numeric"
-                                />
-                            </View>
-                        </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Weight (lbs)</Text>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="154"
-                                placeholderTextColor="#666"
-                                value={weightLbs}
-                                onChangeText={setWeightLbs}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                    </View>
-                </>
-            );
+            onNext();
+        } catch (error) {
+            console.error('Error updating profile:', error);
         }
     };
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={100}
+            style={{ flex: 1 }}
         >
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={styles.container}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
-                <Text style={styles.title}>Physical Details</Text>
-                <Text style={styles.subtitle}>This helps us customize your nutrition plan</Text>
+                <Text style={styles.title}>Physical Attributes</Text>
+                <Text style={styles.subtitle}>Tell us about yourself for accurate calculations</Text>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Preferred Units</Text>
-                    <View style={styles.unitsContainer}>
-                        {units.map((unit) => (
-                            <TouchableOpacity
-                                key={unit.id}
-                                style={[
-                                    styles.unitButton,
-                                    unitSystem === unit.id && styles.selectedUnit,
-                                ]}
-                                onPress={() => setUnitSystem(unit.id)}
-                            >
-                                <Text style={[
-                                    styles.unitLabel,
-                                    unitSystem === unit.id && styles.selectedUnitText,
-                                ]}>
-                                    {unit.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                {/* Height Input */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Height (cm)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={height}
+                        onChangeText={setHeight}
+                        placeholder="Enter your height"
+                        placeholderTextColor="#666"
+                        keyboardType="numeric"
+                    />
+                </View>
+
+                {/* Weight Input */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Weight (kg)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={weight}
+                        onChangeText={setWeight}
+                        placeholder="Enter your weight"
+                        placeholderTextColor="#666"
+                        keyboardType="numeric"
+                    />
+                </View>
+
+                {/* Age Input */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Age</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={age}
+                        onChangeText={setAge}
+                        placeholder="Enter your age"
+                        placeholderTextColor="#666"
+                        keyboardType="numeric"
+                    />
+                </View>
+
+                {/* Gender Selection */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Gender</Text>
+                    <View style={styles.genderContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.genderButton,
+                                gender === 'male' && styles.selectedGender
+                            ]}
+                            onPress={() => setGender('male')}
+                        >
+                            <Ionicons
+                                name="male"
+                                size={20}
+                                color={gender === 'male' ? '#0074dd' : '#666'}
+                            />
+                            <Text style={[
+                                styles.genderText,
+                                gender === 'male' && styles.selectedGenderText
+                            ]}>Male</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.genderButton,
+                                gender === 'female' && styles.selectedGender
+                            ]}
+                            onPress={() => setGender('female')}
+                        >
+                            <Ionicons
+                                name="female"
+                                size={20}
+                                color={gender === 'female' ? '#0074dd' : '#666'}
+                            />
+                            <Text style={[
+                                styles.genderText,
+                                gender === 'female' && styles.selectedGenderText
+                            ]}>Female</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Body Measurements</Text>
+                {/* Activity Level Selection with custom UI */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Activity Level</Text>
+                    <View style={styles.activityContainer}>
+                        <Text style={styles.activityLabel}>{activityLevels[activityLevelIndex].label}</Text>
+                        <Text style={styles.activityDescription}>{activityLevels[activityLevelIndex].description}</Text>
 
-                    {renderHeightWeightInputs()}
+                        <View style={styles.activitySlider}>
+                            {activityLevels.map((level, index) => (
+                                <TouchableOpacity
+                                    key={level.id}
+                                    style={[
+                                        styles.activitySliderItem,
+                                        activityLevelIndex === index && styles.activitySliderItemActive
+                                    ]}
+                                    onPress={() => handleActivityLevelChange(index)}
+                                >
+                                    <View style={[
+                                        styles.activitySliderDot,
+                                        activityLevelIndex === index && styles.activitySliderDotActive,
+                                        activityLevelIndex > index && styles.activitySliderDotCompleted
+                                    ]} />
+                                </TouchableOpacity>
+                            ))}
+                            <View style={styles.activitySliderLine} />
+                        </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Age</Text>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="30"
-                                placeholderTextColor="#666"
-                                value={age}
-                                onChangeText={setAge}
-                                keyboardType="numeric"
-                            />
+                        <View style={styles.sliderLabels}>
+                            <Text style={styles.sliderLabelText}>Less Active</Text>
+                            <Text style={styles.sliderLabelText}>More Active</Text>
                         </View>
                     </View>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Gender</Text>
-                    <View style={styles.optionsContainer}>
-                        {genders.map((item) => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={[
-                                    styles.optionButton,
-                                    gender === item.id && styles.selectedOption,
-                                ]}
-                                onPress={() => setGender(item.id)}
-                            >
-                                <Text style={[
-                                    styles.optionLabel,
-                                    gender === item.id && styles.selectedOptionText,
-                                ]}>
-                                    {item.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                {/* Fitness Goal Selection */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Fitness Goal</Text>
+                    <View style={styles.goalsContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.goalButton,
+                                fitnessGoal === 'fat_loss' && styles.selectedGoal
+                            ]}
+                            onPress={() => setFitnessGoal('fat_loss')}
+                        >
+                            <MaterialCommunityIcons
+                                name="fire"
+                                size={20}
+                                color={fitnessGoal === 'fat_loss' ? '#0074dd' : '#666'}
+                            />
+                            <Text style={[
+                                styles.goalText,
+                                fitnessGoal === 'fat_loss' && styles.selectedGoalText
+                            ]}>Fat Loss</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.goalButton,
+                                fitnessGoal === 'balanced' && styles.selectedGoal
+                            ]}
+                            onPress={() => setFitnessGoal('balanced')}
+                        >
+                            <Ionicons
+                                name="fitness"
+                                size={20}
+                                color={fitnessGoal === 'balanced' ? '#0074dd' : '#666'}
+                            />
+                            <Text style={[
+                                styles.goalText,
+                                fitnessGoal === 'balanced' && styles.selectedGoalText
+                            ]}>Balanced</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.goalButton,
+                                fitnessGoal === 'muscle_gain' && styles.selectedGoal
+                            ]}
+                            onPress={() => setFitnessGoal('muscle_gain')}
+                        >
+                            <Ionicons
+                                name="barbell"
+                                size={20}
+                                color={fitnessGoal === 'muscle_gain' ? '#0074dd' : '#666'}
+                            />
+                            <Text style={[
+                                styles.goalText,
+                                fitnessGoal === 'muscle_gain' && styles.selectedGoalText
+                            ]}>Muscle Gain</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Activity Level</Text>
-                    <View style={styles.activityContainer}>
-                        {activityLevels.map((item) => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={[
-                                    styles.activityButton,
-                                    activityLevel === item.id && styles.selectedActivity,
-                                ]}
-                                onPress={() => setActivityLevel(item.id)}
-                            >
-                                <View style={styles.activityContent}>
-                                    <Text style={[
-                                        styles.activityLabel,
-                                        activityLevel === item.id && styles.selectedActivityText,
-                                    ]}>
-                                        {item.label}
-                                    </Text>
-                                    <Text style={styles.activityDescription}>{item.description}</Text>
-                                </View>
-                                {activityLevel === item.id && (
-                                    <View style={styles.checkContainer}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#0074dd" />
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                <View style={styles.infoContainer}>
-                    <Ionicons name="information-circle-outline" size={20} color="#999" style={styles.infoIcon} />
-                    <Text style={styles.infoText}>
-                        This information helps us calculate your daily calorie and nutrient needs. You can always update it later.
-                    </Text>
-                </View>
-
-                <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+                <TouchableOpacity
+                    style={styles.submitButton}
+                    onPress={handleSubmit}
+                    activeOpacity={0.8}
+                >
                     <LinearGradient
-                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                        colors={['#0074dd', '#5c00dd']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                        style={styles.buttonGradient}
+                        style={styles.submitButtonGradient}
                     >
-                        <Text style={styles.buttonText}>Continue</Text>
+                        <Text style={styles.submitButtonText}>Continue</Text>
                         <Ionicons name="arrow-forward" size={20} color="#fff" />
                     </LinearGradient>
                 </TouchableOpacity>
@@ -325,14 +292,12 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        width: '100%',
-    },
-    scrollContent: {
-        paddingBottom: 40,
+        paddingHorizontal: 20,
+        paddingTop: 40,
+        paddingBottom: 60,
     },
     title: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
         color: '#fff',
         marginBottom: 8,
@@ -341,164 +306,158 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 16,
         color: '#aaa',
-        marginBottom: 32,
+        marginBottom: 30,
         textAlign: 'center',
     },
-    section: {
+    inputContainer: {
         marginBottom: 24,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 12,
-        padding: 16,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginBottom: 16,
-    },
-    inputRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    inputGroup: {
-        flex: 1,
-        marginBottom: 16,
     },
     label: {
-        fontSize: 14,
-        color: '#ccc',
+        fontSize: 16,
+        color: '#fff',
         marginBottom: 8,
     },
-    inputContainer: {
+    input: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-    },
-    input: {
+        padding: 12,
         color: '#fff',
         fontSize: 16,
     },
-    unitsContainer: {
+    genderContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 16,
     },
-    unitButton: {
-        flex: 1,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginHorizontal: 5,
-    },
-    selectedUnit: {
-        backgroundColor: 'rgba(0, 116, 221, 0.3)',
-        borderWidth: 1,
-        borderColor: '#0074dd',
-    },
-    unitLabel: {
-        color: '#ddd',
-        fontSize: 14,
-    },
-    selectedUnitText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    optionsContainer: {
+    genderButton: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: -5,
-    },
-    optionButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
         borderRadius: 8,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        marginHorizontal: 5,
-        marginBottom: 10,
-        minWidth: '45%',
-        justifyContent: 'center',
-        alignItems: 'center',
+        flex: 0.48,
     },
-    selectedOption: {
-        backgroundColor: 'rgba(0, 116, 221, 0.3)',
+    selectedGender: {
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
         borderWidth: 1,
         borderColor: '#0074dd',
     },
-    optionLabel: {
-        color: '#ddd',
-        fontSize: 14,
+    genderText: {
+        color: '#aaa',
+        marginLeft: 8,
+        fontSize: 16,
     },
-    selectedOptionText: {
+    selectedGenderText: {
         color: '#fff',
         fontWeight: 'bold',
     },
     activityContainer: {
-        marginBottom: 10,
-    },
-    activityButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 16,
-        borderRadius: 8,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        marginBottom: 8,
-    },
-    selectedActivity: {
-        backgroundColor: 'rgba(0, 116, 221, 0.3)',
-        borderWidth: 1,
-        borderColor: '#0074dd',
-    },
-    activityContent: {
-        flex: 1,
+        borderRadius: 8,
+        padding: 16,
     },
     activityLabel: {
-        color: '#fff',
         fontSize: 16,
+        color: '#fff',
+        fontWeight: 'bold',
         marginBottom: 4,
     },
     activityDescription: {
+        fontSize: 14,
         color: '#aaa',
-        fontSize: 12,
+        marginBottom: 16,
     },
-    selectedActivityText: {
+    activitySlider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'relative',
+        height: 40,
+        marginVertical: 10,
+    },
+    activitySliderLine: {
+        position: 'absolute',
+        height: 3,
+        backgroundColor: '#333',
+        width: '100%',
+        top: '50%',
+        marginTop: -1.5,
+        zIndex: 1,
+    },
+    activitySliderItem: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 2,
+    },
+    activitySliderItemActive: {
+        backgroundColor: 'rgba(0,116,221,0.2)',
+        borderWidth: 1,
+        borderColor: '#0074dd',
+    },
+    activitySliderDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#666',
+    },
+    activitySliderDotActive: {
+        backgroundColor: '#0074dd',
+    },
+    activitySliderDotCompleted: {
+        backgroundColor: 'rgba(0,116,221,0.5)',
+    },
+    sliderLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 8,
+    },
+    sliderLabelText: {
+        fontSize: 12,
+        color: '#aaa',
+    },
+    goalsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    goalButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        flex: 0.31,
+    },
+    selectedGoal: {
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
+        borderWidth: 1,
+        borderColor: '#0074dd',
+    },
+    goalText: {
+        color: '#aaa',
+        marginLeft: 8,
+        fontSize: 14,
+    },
+    selectedGoalText: {
+        color: '#fff',
         fontWeight: 'bold',
     },
-    checkContainer: {
-        marginLeft: 10,
-    },
-    infoContainer: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 24,
-    },
-    infoIcon: {
-        marginRight: 8,
-    },
-    infoText: {
-        color: '#aaa',
-        fontSize: 14,
-        flex: 1,
-    },
-    button: {
-        width: '100%',
-        height: 56,
-        borderRadius: 28,
+    submitButton: {
+        marginTop: 32,
+        borderRadius: 12,
         overflow: 'hidden',
     },
-    buttonGradient: {
-        flex: 1,
+    submitButtonGradient: {
+        paddingVertical: 16,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    buttonText: {
+    submitButtonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',

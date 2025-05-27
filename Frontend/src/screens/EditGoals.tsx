@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -10,16 +10,21 @@ import {
     Alert,
     ActivityIndicator,
     Animated,
-    Dimensions
+    Dimensions,
+    Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getUserGoals, updateUserGoals } from '../utils/database'; // Local database functions
+import { getUserGoals, updateUserGoals, getUserProfileByFirebaseUid } from '../utils/database'; // Local database functions
 import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile, resetNutritionGoals } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
+import { calculateNutritionGoalsFromProfile, Gender, ActivityLevel, WeightGoal, mapWeightGoal } from '../utils/offlineNutritionCalculator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Slider from '@react-native-community/slider';
+import WheelPicker from '@quidone/react-native-wheel-picker';
 
 // Constants for colors - matching EditProfile
 const PRIMARY_BG = '#000000';
@@ -52,6 +57,26 @@ interface GoalsData {
     sleepGoal?: number;
 }
 
+// Activity level data for slider
+const ACTIVITY_LEVELS = [
+    { key: 'sedentary', label: 'Desk Job', description: 'Office work, driving, studying' },
+    { key: 'light', label: 'Standing Job', description: 'Teacher, cashier, lab work' },
+    { key: 'moderate', label: 'Walking Job', description: 'Nurse, waiter, retail worker' },
+    { key: 'active', label: 'Physical Job', description: 'Construction, cleaning, chef' },
+    { key: 'very_active', label: 'Heavy Labor', description: 'Farming, moving, manual labor' }
+];
+
+// Fitness goal data for wheel picker (values in kg/week)
+const FITNESS_GOALS = [
+    { id: 'lose_1', value: -1.0, label: '-1.0 kg/week', description: 'Aggressive weight loss' },
+    { id: 'lose_0_75', value: -0.75, label: '-0.75 kg/week', description: 'Fast weight loss' },
+    { id: 'lose_0_5', value: -0.5, label: '-0.5 kg/week (Recommended)', description: 'Moderate weight loss' },
+    { id: 'lose_0_25', value: -0.25, label: '-0.25 kg/week', description: 'Slow weight loss' },
+    { id: 'maintain', value: 0, label: '0 kg/week', description: 'Maintain current weight' },
+    { id: 'gain_0_25', value: 0.25, label: '+0.25 kg/week', description: 'Slow weight gain' },
+    { id: 'gain_0_5', value: 0.5, label: '+0.5 kg/week', description: 'Moderate weight gain' }
+];
+
 // Create a GradientBorder component for form sections
 const GradientBorderBox = ({ children, style }: { children: React.ReactNode, style?: any }) => {
     return (
@@ -82,34 +107,22 @@ export default function EditGoals() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     // Database values - these are the values we display and don't change until after save
-    const [dbGoals, setDbGoals] = useState<GoalsData>({
-        targetWeight: 0,
-        calorieGoal: 0,
-        proteinGoal: 0,
-        carbGoal: 0,
-        fatGoal: 0,
-        fitnessGoal: 'maintain',
-        activityLevel: 'moderate',
-        weeklyWorkouts: 4,
-        stepGoal: 10000,
-        waterGoal: 2000,
-        sleepGoal: 8
-    });
+    const [dbGoals, setDbGoals] = useState<GoalsData>({});
 
     // Form values - these update as user types but don't affect display until saved
-    const [formValues, setFormValues] = useState<GoalsData>({
-        targetWeight: 0,
-        calorieGoal: 0,
-        proteinGoal: 0,
-        carbGoal: 0,
-        fatGoal: 0,
-        fitnessGoal: 'maintain',
-        activityLevel: 'moderate',
-        weeklyWorkouts: 4,
-        stepGoal: 10000,
-        waterGoal: 2000,
-        sleepGoal: 8
-    });
+    const [formValues, setFormValues] = useState<GoalsData>({});
+
+    // Modal states for wheel picker
+    const [showFitnessGoalPicker, setShowFitnessGoalPicker] = useState(false);
+    const [activityLevelIndex, setActivityLevelIndex] = useState(0); // Will be set from database
+
+    // Track values that affect caloric requirements
+    const [originalCaloricValues, setOriginalCaloricValues] = useState<{
+        targetWeight?: number;
+        fitnessGoal?: string;
+        activityLevel?: string;
+    }>({});
+    const [showCaloricWarning, setShowCaloricWarning] = useState(false);
 
     useEffect(() => {
         // Animation on component mount
@@ -143,35 +156,44 @@ export default function EditGoals() {
             setIsFetchingData(true);
             try {
                 if (user) {
-                    // First, get user goals from local database (fast)
+                    // PRIMARY: Get user goals from SQLite database (primary data source - fast)
                     const userData = await getUserGoals(user.uid);
 
-                    // Set initial values from local database immediately
+                    // Set initial values from SQLite database immediately - no fallbacks
                     const localGoals = {
-                        targetWeight: userData?.targetWeight || 0,
-                        calorieGoal: userData?.calorieGoal || 0,
-                        proteinGoal: userData?.proteinGoal || 0,
-                        carbGoal: userData?.carbGoal || 0,
-                        fatGoal: userData?.fatGoal || 0,
-                        fitnessGoal: userData?.fitnessGoal || 'maintain',
-                        activityLevel: userData?.activityLevel || 'moderate',
-                        weeklyWorkouts: userData?.weeklyWorkouts || 0,
-                        stepGoal: userData?.stepGoal || 0,
-                        waterGoal: userData?.waterGoal || 0,
-                        sleepGoal: userData?.sleepGoal || 0
+                        targetWeight: userData?.targetWeight,
+                        calorieGoal: userData?.calorieGoal,
+                        proteinGoal: userData?.proteinGoal,
+                        carbGoal: userData?.carbGoal,
+                        fatGoal: userData?.fatGoal,
+                        fitnessGoal: userData?.fitnessGoal,
+                        activityLevel: userData?.activityLevel,
+                        weeklyWorkouts: userData?.weeklyWorkouts,
+                        stepGoal: userData?.stepGoal,
+                        waterGoal: userData?.waterGoal,
+                        sleepGoal: userData?.sleepGoal
                     };
 
-                    // Update both database values and form values with local data first
+                    // Update UI with SQLite data first (immediate display)
                     setDbGoals(localGoals);
                     setFormValues({ ...localGoals });
+
+                    // Store original caloric-affecting values from SQLite
+                    setOriginalCaloricValues({
+                        targetWeight: localGoals.targetWeight,
+                        fitnessGoal: localGoals.fitnessGoal,
+                        activityLevel: localGoals.activityLevel
+                    });
+
                     setIsFetchingData(false);
+                    console.log('✅ Goals loaded from SQLite database (primary)');
 
                     // In parallel, try to get user profile to check unit preference
                     fetchUserProfile().catch(error => {
-                        console.warn('Error fetching user profile for units', error);
+                        console.warn('⚠️ Error fetching user profile for units', error);
                     });
 
-                    // Then try to get nutrition goals from backend (might be slower)
+                    // SECONDARY: Try to get nutrition goals from backend for sync (non-blocking)
                     try {
                         // Set a timeout for the API call
                         const timeoutPromise = new Promise((_, reject) =>
@@ -185,31 +207,40 @@ export default function EditGoals() {
                             // If we have backend data for target weight, use it from the profile directly
                             const targetWeight = profileData.profile?.target_weight ||
                                 (profileData.nutrition_goals && profileData.nutrition_goals.target_weight) ||
-                                userData?.targetWeight || 0;
+                                userData?.targetWeight;
 
-                            // Set default values if any data is missing
+                            // Use backend data if available, otherwise keep SQLite data - no fallbacks
                             const backendGoals = {
                                 targetWeight: targetWeight,
-                                calorieGoal: profileData.nutrition_goals?.daily_calorie_goal || userData?.calorieGoal || 0,
-                                proteinGoal: profileData.nutrition_goals?.protein_goal || userData?.proteinGoal || 0,
-                                carbGoal: profileData.nutrition_goals?.carb_goal || userData?.carbGoal || 0,
-                                fatGoal: profileData.nutrition_goals?.fat_goal || userData?.fatGoal || 0,
-                                fitnessGoal: profileData.nutrition_goals?.weight_goal?.startsWith('lose') ? 'lose' :
-                                    profileData.nutrition_goals?.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
-                                activityLevel: profileData.nutrition_goals?.activity_level || userData?.activityLevel || 'moderate',
-                                weeklyWorkouts: profileData.fitness_goals?.weekly_workouts || userData?.weeklyWorkouts || 0,
-                                stepGoal: profileData.fitness_goals?.daily_step_goal || userData?.stepGoal || 0,
-                                waterGoal: profileData.fitness_goals?.water_intake_goal || userData?.waterGoal || 0,
-                                sleepGoal: userData?.sleepGoal || 0
+                                calorieGoal: profileData.nutrition_goals?.daily_calorie_goal || userData?.calorieGoal,
+                                proteinGoal: profileData.nutrition_goals?.protein_goal || userData?.proteinGoal,
+                                carbGoal: profileData.nutrition_goals?.carb_goal || userData?.carbGoal,
+                                fatGoal: profileData.nutrition_goals?.fat_goal || userData?.fatGoal,
+                                fitnessGoal: mapBackendWeightGoal(profileData.nutrition_goals?.weight_goal || userData?.fitnessGoal),
+                                activityLevel: profileData.nutrition_goals?.activity_level || userData?.activityLevel,
+                                weeklyWorkouts: profileData.fitness_goals?.weekly_workouts || userData?.weeklyWorkouts,
+                                stepGoal: profileData.fitness_goals?.daily_step_goal || userData?.stepGoal,
+                                waterGoal: profileData.fitness_goals?.water_intake_goal || userData?.waterGoal,
+                                sleepGoal: userData?.sleepGoal
                             };
 
-                            // Update with backend data if available (not blocking UI)
+                            // Sync backend data to SQLite if newer/different (optional update)
+                            console.log('📡 Backend data received, syncing to SQLite if needed...');
                             setDbGoals(backendGoals);
                             setFormValues({ ...backendGoals });
+
+                            // Update original caloric-affecting values with backend data
+                            setOriginalCaloricValues({
+                                targetWeight: backendGoals.targetWeight,
+                                fitnessGoal: backendGoals.fitnessGoal,
+                                activityLevel: backendGoals.activityLevel
+                            });
+
+                            console.log('✅ Backend sync completed');
                         }
                     } catch (backendError) {
-                        console.warn('Failed to get goals from backend, using local data', backendError);
-                        // No action needed since we already set local data
+                        console.warn('⚠️ Backend sync failed, using SQLite data (primary)', backendError);
+                        // No action needed since we already set SQLite data
                     }
                 }
             } catch (error) {
@@ -224,7 +255,49 @@ export default function EditGoals() {
         }
     }, [user]);
 
+    // Helper functions for activity level and fitness goal (memoized to prevent infinite re-renders)
+    const getActivityLevelIndex = useCallback((key?: string) => {
+        if (!key) return 0;
+        const index = ACTIVITY_LEVELS.findIndex(level => level.key === key);
+        return index !== -1 ? index : 0;
+    }, []);
+
+    // Sync activity level index with form values
+    useEffect(() => {
+        if (formValues.activityLevel) {
+            const newIndex = getActivityLevelIndex(formValues.activityLevel);
+            setActivityLevelIndex(newIndex);
+        }
+    }, [formValues.activityLevel, getActivityLevelIndex]);
+
+    // Check if caloric-affecting values have changed
+    const hasCaloricValuesChanged = () => {
+        const currentTargetWeight = isImperialUnits && formValues.targetWeight
+            ? lbsToKg(formValues.targetWeight)
+            : formValues.targetWeight;
+
+        const originalTargetWeight = isImperialUnits && originalCaloricValues.targetWeight
+            ? originalCaloricValues.targetWeight
+            : originalCaloricValues.targetWeight;
+
+        return (
+            currentTargetWeight !== originalTargetWeight ||
+            formValues.fitnessGoal !== originalCaloricValues.fitnessGoal ||
+            formValues.activityLevel !== originalCaloricValues.activityLevel
+        );
+    };
+
     const handleSave = async () => {
+        // Check if caloric-affecting values have changed (for both tabs)
+        if (hasCaloricValuesChanged()) {
+            setShowCaloricWarning(true);
+            return;
+        }
+
+        await performSave();
+    };
+
+    const performSave = async () => {
         setIsLoading(true);
 
         try {
@@ -238,19 +311,43 @@ export default function EditGoals() {
                 targetWeightKg = lbsToKg(formValues.targetWeight);
             }
 
+            // PRIMARY: Save to SQLite database first (this is our primary data source)
+            console.log('Saving goals to SQLite database (primary)...');
+            await updateUserGoals(user.uid, {
+                targetWeight: targetWeightKg,
+                calorieGoal: formValues.calorieGoal,
+                proteinGoal: formValues.proteinGoal,
+                carbGoal: formValues.carbGoal,
+                fatGoal: formValues.fatGoal,
+                fitnessGoal: formValues.fitnessGoal,
+                activityLevel: formValues.activityLevel,
+                weeklyWorkouts: formValues.weeklyWorkouts,
+                stepGoal: formValues.stepGoal,
+                waterGoal: formValues.waterGoal,
+                sleepGoal: formValues.sleepGoal
+            });
+
+            // Update display values after successful SQLite save
+            setDbGoals({
+                ...formValues,
+                targetWeight: targetWeightKg // Always store in kg in state
+            });
+
+            console.log('✅ Goals saved to SQLite successfully');
+
+            // SECONDARY: Try to sync to backend for cloud backup (non-blocking)
             try {
-                // First try to save to the backend via the API
+                console.log('Syncing goals to backend for cloud backup...');
+
                 if (activeTab === 'nutrition') {
                     // Format nutrition goals for the API
                     const nutritionGoals = {
-                        daily_calorie_target: formValues.calorieGoal || 0,
-                        protein_goal: formValues.proteinGoal || 0,
-                        carb_goal: formValues.carbGoal || 0,
-                        fat_goal: formValues.fatGoal || 0,
-                        target_weight: targetWeightKg || 0,
-                        weight_goal: (formValues.fitnessGoal === 'maintain' ? 'maintain' :
-                            formValues.fitnessGoal === 'lose' ? 'lose_0_5' :
-                                formValues.fitnessGoal === 'gain' ? 'gain_0_25' : 'maintain') as any,
+                        daily_calorie_target: formValues.calorieGoal,
+                        protein_goal: formValues.proteinGoal,
+                        carb_goal: formValues.carbGoal,
+                        fat_goal: formValues.fatGoal,
+                        target_weight: targetWeightKg,
+                        weight_goal: formValues.fitnessGoal as any,
                     };
 
                     // Handle the case where calorieGoal is explicitly undefined (user cleared the field)
@@ -269,60 +366,149 @@ export default function EditGoals() {
                             });
                         }
                     } catch (profileError) {
-                        console.warn('Error updating profile target weight, continuing with nutrition goals update', profileError);
+                        console.warn('⚠️ Error updating profile target weight, continuing with nutrition goals sync', profileError);
                     }
 
                     await updateNutritionGoals(nutritionGoals);
                 } else {
                     // Format fitness goals for the API
                     const fitnessGoals = {
-                        activity_level: formValues.activityLevel || 'moderate',
-                        weekly_workouts: formValues.weeklyWorkouts || 0,
-                        step_goal: formValues.stepGoal || 0,
-                        water_goal: formValues.waterGoal || 0,
-                        sleep_goal: formValues.sleepGoal || 0,
+                        activity_level: formValues.activityLevel,
+                        weekly_workouts: formValues.weeklyWorkouts,
+                        step_goal: formValues.stepGoal,
+                        water_goal: formValues.waterGoal,
+                        sleep_goal: formValues.sleepGoal,
                     };
 
                     await updateFitnessGoals(fitnessGoals);
                 }
 
-                // If we get here, backend save was successful
-                console.log('Goals saved to backend successfully');
+                console.log('✅ Goals synced to backend successfully');
             } catch (backendError) {
-                console.error('Error saving to backend, falling back to local save:', backendError);
-                // Continue execution to save locally
+                console.warn('⚠️ Backend sync failed (non-critical), goals saved locally:', backendError);
+                // This is non-critical since SQLite (primary) save was successful
             }
-
-            // Always save to local database whether backend succeeds or fails
-            // This ensures data is available offline
-            // Use a simpler object to avoid database schema issues
-            await updateUserGoals(user.uid, {
-                targetWeight: targetWeightKg,
-                calorieGoal: formValues.calorieGoal,
-                proteinGoal: formValues.proteinGoal,
-                carbGoal: formValues.carbGoal,
-                fatGoal: formValues.fatGoal,
-                fitnessGoal: formValues.fitnessGoal,
-                activityLevel: formValues.activityLevel,
-                weeklyWorkouts: formValues.weeklyWorkouts,
-                stepGoal: formValues.stepGoal,
-                waterGoal: formValues.waterGoal,
-                sleepGoal: formValues.sleepGoal
-            });
-
-            // Only update display values after successful DB update
-            setDbGoals({
-                ...formValues,
-                targetWeight: targetWeightKg // Always store in kg in state
-            });
 
             Alert.alert('Success', 'Fitness goals updated successfully');
             navigation.goBack();
         } catch (error) {
             Alert.alert('Error', 'Failed to update goals. Please try again.');
-            console.error('Goals update error:', error);
+            console.error('❌ SQLite save error:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleCaloricWarningResponse = async (proceed: boolean) => {
+        setShowCaloricWarning(false);
+
+        if (proceed) {
+            try {
+                setIsLoading(true);
+
+                // Convert weight to metric for storage if in imperial units
+                let targetWeightKg = formValues.targetWeight;
+                if (isImperialUnits && formValues.targetWeight) {
+                    targetWeightKg = lbsToKg(formValues.targetWeight);
+                }
+
+                // PRIMARY: Save current changes to SQLite first
+                console.log('Saving updated goals to SQLite database...');
+                await updateUserGoals(user.uid, {
+                    targetWeight: targetWeightKg,
+                    calorieGoal: formValues.calorieGoal,
+                    proteinGoal: formValues.proteinGoal,
+                    carbGoal: formValues.carbGoal,
+                    fatGoal: formValues.fatGoal,
+                    fitnessGoal: formValues.fitnessGoal,
+                    activityLevel: formValues.activityLevel,
+                    weeklyWorkouts: formValues.weeklyWorkouts,
+                    stepGoal: formValues.stepGoal,
+                    waterGoal: formValues.waterGoal,
+                    sleepGoal: formValues.sleepGoal
+                });
+
+                // Calculate nutrition goals offline using user profile data
+                let resetGoals;
+                try {
+                    console.log('Calculating nutrition goals offline...');
+
+                    // Get user profile from SQLite
+                    const userProfile = await getUserProfileByFirebaseUid(user.uid);
+                    if (!userProfile) {
+                        throw new Error('User profile not found in local database');
+                    }
+
+                    // Use current form values for calculation
+                    const profileForCalculation = {
+                        ...userProfile,
+                        weight_goal: formValues.fitnessGoal || 'maintain', // default to maintain if no fitness goal set
+                        activity_level: formValues.activityLevel || userProfile.activity_level,
+                        target_weight: targetWeightKg || userProfile.target_weight
+                    };
+
+                    resetGoals = calculateNutritionGoalsFromProfile(profileForCalculation);
+
+                    if (!resetGoals) {
+                        throw new Error('Unable to calculate nutrition goals - missing required profile data');
+                    }
+
+                    console.log('✅ Nutrition goals calculated offline');
+                } catch (resetError) {
+                    console.warn('⚠️ Offline calculation failed:', resetError);
+                    Alert.alert("Error", "Cannot calculate nutrition goals. Please ensure your profile has height, weight, age, gender, and activity level set.");
+                    return;
+                }
+
+                // Update form values with the reset goals
+                const updatedGoals = {
+                    ...formValues,
+                    calorieGoal: resetGoals.daily_calorie_goal,
+                    proteinGoal: resetGoals.protein_goal,
+                    carbGoal: resetGoals.carb_goal,
+                    fatGoal: resetGoals.fat_goal,
+                };
+
+                // Update both displayed values
+                setFormValues(updatedGoals);
+                setDbGoals({
+                    ...updatedGoals,
+                    targetWeight: targetWeightKg // Always store in kg in state
+                });
+
+                // PRIMARY: Update SQLite database with reset values
+                console.log('Updating SQLite with reset nutrition goals...');
+                await updateUserGoals(user.uid, {
+                    targetWeight: targetWeightKg,
+                    calorieGoal: resetGoals.daily_calorie_goal,
+                    proteinGoal: resetGoals.protein_goal,
+                    carbGoal: resetGoals.carb_goal,
+                    fatGoal: resetGoals.fat_goal,
+                    fitnessGoal: formValues.fitnessGoal,
+                    activityLevel: formValues.activityLevel,
+                    weeklyWorkouts: formValues.weeklyWorkouts,
+                    stepGoal: formValues.stepGoal,
+                    waterGoal: formValues.waterGoal,
+                    sleepGoal: formValues.sleepGoal
+                });
+
+                console.log('✅ Goals updated in SQLite with reset nutrition values');
+
+                // Update original values to prevent warning again
+                setOriginalCaloricValues({
+                    targetWeight: formValues.targetWeight,
+                    fitnessGoal: formValues.fitnessGoal,
+                    activityLevel: formValues.activityLevel
+                });
+
+                Alert.alert("Success", "Your goals have been updated and nutrition targets have been recalculated based on your new settings.");
+                navigation.goBack();
+            } catch (error) {
+                console.error('❌ Error updating goals with reset:', error);
+                Alert.alert("Error", "Failed to update goals. Please try again.");
+            } finally {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -368,8 +554,37 @@ export default function EditGoals() {
                         try {
                             setIsLoading(true);
 
-                            // Call the reset API endpoint
-                            const resetGoals = await resetNutritionGoals();
+                            // Calculate nutrition goals offline using user profile data
+                            let resetGoals;
+                            try {
+                                console.log('Calculating nutrition goals offline...');
+
+                                // Get user profile from SQLite
+                                const userProfile = await getUserProfileByFirebaseUid(user.uid);
+                                if (!userProfile) {
+                                    throw new Error('User profile not found in local database');
+                                }
+
+                                // Use current form values for calculation
+                                const profileForCalculation = {
+                                    ...userProfile,
+                                    weight_goal: formValues.fitnessGoal || 'maintain', // default to maintain if no fitness goal set
+                                    activity_level: formValues.activityLevel || userProfile.activity_level,
+                                    target_weight: formValues.targetWeight ? (isImperialUnits ? lbsToKg(formValues.targetWeight) : formValues.targetWeight) : userProfile.target_weight
+                                };
+
+                                resetGoals = calculateNutritionGoalsFromProfile(profileForCalculation);
+
+                                if (!resetGoals) {
+                                    throw new Error('Unable to calculate nutrition goals - missing required profile data');
+                                }
+
+                                console.log('✅ Nutrition goals calculated offline');
+                            } catch (resetError) {
+                                console.warn('⚠️ Offline calculation failed:', resetError);
+                                Alert.alert("Error", "Cannot calculate nutrition goals. Please ensure your profile has height, weight, age, gender, and activity level set.");
+                                return;
+                            }
 
                             // Update form values with the reset goals
                             const updatedGoals = {
@@ -379,28 +594,40 @@ export default function EditGoals() {
                                 carbGoal: resetGoals.carb_goal,
                                 fatGoal: resetGoals.fat_goal,
                                 targetWeight: resetGoals.target_weight || formValues.targetWeight,
-                                fitnessGoal: resetGoals.weight_goal?.startsWith('lose') ? 'lose' :
-                                    resetGoals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
-                                activityLevel: resetGoals.activity_level || 'moderate'
+                                fitnessGoal: resetGoals.weight_goal || formValues.fitnessGoal,
+                                activityLevel: resetGoals.activity_level || formValues.activityLevel
                             };
 
-                            // Update both displayed values
-                            setFormValues(updatedGoals);
-                            setDbGoals(updatedGoals);
-
-                            // Also update local database
-                            if (user) {
-                                await updateUserGoals(user.uid, {
-                                    calorieGoal: resetGoals.daily_calorie_goal,
-                                    proteinGoal: resetGoals.protein_goal,
-                                    carbGoal: resetGoals.carb_goal,
-                                    fatGoal: resetGoals.fat_goal,
-                                    targetWeight: resetGoals.target_weight,
-                                    fitnessGoal: resetGoals.weight_goal?.startsWith('lose') ? 'lose' :
-                                        resetGoals.weight_goal?.startsWith('gain') ? 'gain' : 'maintain',
-                                    activityLevel: resetGoals.activity_level
-                                });
+                            // Convert weight to metric for storage if in imperial units
+                            let targetWeightKg = updatedGoals.targetWeight;
+                            if (isImperialUnits && updatedGoals.targetWeight) {
+                                targetWeightKg = lbsToKg(updatedGoals.targetWeight);
                             }
+
+                            // PRIMARY: Update SQLite database first
+                            console.log('Updating SQLite with reset nutrition goals...');
+                            await updateUserGoals(user.uid, {
+                                calorieGoal: resetGoals.daily_calorie_goal,
+                                proteinGoal: resetGoals.protein_goal,
+                                carbGoal: resetGoals.carb_goal,
+                                fatGoal: resetGoals.fat_goal,
+                                targetWeight: targetWeightKg,
+                                fitnessGoal: resetGoals.weight_goal || formValues.fitnessGoal,
+                                activityLevel: resetGoals.activity_level || formValues.activityLevel,
+                                weeklyWorkouts: formValues.weeklyWorkouts,
+                                stepGoal: formValues.stepGoal,
+                                waterGoal: formValues.waterGoal,
+                                sleepGoal: formValues.sleepGoal
+                            });
+
+                            console.log('✅ Reset goals saved to SQLite successfully');
+
+                            // Update displayed values after successful SQLite save
+                            setFormValues(updatedGoals);
+                            setDbGoals({
+                                ...updatedGoals,
+                                targetWeight: targetWeightKg // Always store in kg in state
+                            });
 
                             Alert.alert("Success", "Your nutrition goals have been reset to the recommended values.");
                         } catch (error) {
@@ -519,7 +746,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.proteinGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('proteinGoal', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('proteinGoal', text ? parseInt(text) : undefined)}
                             placeholder="Enter protein goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -531,7 +758,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.carbGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('carbGoal', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('carbGoal', text ? parseInt(text) : undefined)}
                             placeholder="Enter carb goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -543,7 +770,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.fatGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('fatGoal', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('fatGoal', text ? parseInt(text) : undefined)}
                             placeholder="Enter fat goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -568,39 +795,46 @@ export default function EditGoals() {
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Fitness Goal</Text>
-                        <View style={styles.segmentedControl}>
-                            <TouchableOpacity
-                                style={[styles.segmentOption, formValues.fitnessGoal === 'lose' && styles.segmentActive]}
-                                onPress={() => updateFormValue('fitnessGoal', 'lose')}
-                            >
-                                <Text style={[styles.segmentText, formValues.fitnessGoal === 'lose' && styles.segmentTextActive]}>
-                                    Lose Weight
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.segmentOption, formValues.fitnessGoal === 'maintain' && styles.segmentActive]}
-                                onPress={() => updateFormValue('fitnessGoal', 'maintain')}
-                            >
-                                <Text style={[styles.segmentText, formValues.fitnessGoal === 'maintain' && styles.segmentTextActive]}>
-                                    Maintain
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.segmentOption, formValues.fitnessGoal === 'gain' && styles.segmentActive]}
-                                onPress={() => updateFormValue('fitnessGoal', 'gain')}
-                            >
-                                <Text style={[styles.segmentText, formValues.fitnessGoal === 'gain' && styles.segmentTextActive]}>
-                                    Gain Weight
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={styles.wheelPickerButton}
+                            onPress={() => setShowFitnessGoalPicker(true)}
+                        >
+                            <Text style={styles.wheelPickerButtonText}>
+                                {getFitnessGoalLabel(formValues.fitnessGoal)}
+                            </Text>
+                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <Text style={styles.inputLabel}>Activity Level</Text>
-                        <View style={styles.dropdownField}>
-                            <Text style={styles.dropdownText}>{getActivityLevelLabel(formValues.activityLevel || 'moderate')}</Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                        <View style={styles.activitySliderContainer}>
+                            <View style={styles.sliderLabels}>
+                                <Text style={styles.sliderLabel}>Less Active</Text>
+                                <Text style={styles.sliderLabel}>More Active</Text>
+                            </View>
+                            <Slider
+                                style={{ width: '100%', height: 40 }}
+                                minimumValue={0}
+                                maximumValue={ACTIVITY_LEVELS.length - 1}
+                                step={1}
+                                value={activityLevelIndex}
+                                onValueChange={(value) => {
+                                    setActivityLevelIndex(value);
+                                    updateFormValue('activityLevel', getActivityLevelKey(value));
+                                }}
+                                minimumTrackTintColor={GRADIENT_START}
+                                maximumTrackTintColor={LIGHT_GRAY}
+                                thumbTintColor={GRADIENT_MIDDLE}
+                            />
+                            <View style={styles.activityLevelInfo}>
+                                <Text style={styles.activityLevelTitle}>
+                                    {ACTIVITY_LEVELS[activityLevelIndex]?.label}
+                                </Text>
+                                <Text style={styles.activityLevelDescription}>
+                                    {ACTIVITY_LEVELS[activityLevelIndex]?.description}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 </GradientBorderBox>
@@ -635,12 +869,12 @@ export default function EditGoals() {
                         <Text style={styles.summaryTitle}>Fitness Goals</Text>
                         <View style={styles.summaryStats}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{dbGoals.weeklyWorkouts || 0}</Text>
+                                <Text style={styles.statValue}>{dbGoals.weeklyWorkouts || "---"}</Text>
                                 <Text style={styles.statLabel}>Workouts/week</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{dbGoals.stepGoal || 0}</Text>
+                                <Text style={styles.statValue}>{dbGoals.stepGoal || "---"}</Text>
                                 <Text style={styles.statLabel}>Daily Steps</Text>
                             </View>
                         </View>
@@ -656,7 +890,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.weeklyWorkouts?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('weeklyWorkouts', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('weeklyWorkouts', text ? parseInt(text) : undefined)}
                             placeholder="Workouts per week"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -668,7 +902,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.stepGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('stepGoal', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('stepGoal', text ? parseInt(text) : undefined)}
                             placeholder="Target daily steps"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -685,7 +919,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.waterGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('waterGoal', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('waterGoal', text ? parseInt(text) : undefined)}
                             placeholder="Water intake goal"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -697,7 +931,7 @@ export default function EditGoals() {
                         <TextInput
                             style={styles.input}
                             value={formValues.sleepGoal?.toString() || ''}
-                            onChangeText={(text) => updateFormValue('sleepGoal', text ? parseInt(text) : 0)}
+                            onChangeText={(text) => updateFormValue('sleepGoal', text ? parseInt(text) : undefined)}
                             placeholder="Target sleep hours"
                             placeholderTextColor={GRAY}
                             keyboardType="number-pad"
@@ -708,17 +942,57 @@ export default function EditGoals() {
         );
     };
 
-    // Helper function to get activity level label
-    const getActivityLevelLabel = (value: string) => {
-        const labels: Record<string, string> = {
-            'sedentary': 'Sedentary (office job)',
-            'light': 'Light Activity (1-2 days/week)',
-            'moderate': 'Moderate Activity (3-5 days/week)',
-            'active': 'Very Active (6-7 days/week)',
-            'athletic': 'Athletic (2x per day)'
-        };
-        return labels[value] || 'Select activity level';
-    };
+    const getActivityLevelKey = useCallback((index: number) => {
+        return ACTIVITY_LEVELS[index]?.key;
+    }, []);
+
+    // Map backend weight goal to new fitness goal format
+    const mapBackendWeightGoal = useCallback((weightGoal?: string) => {
+        if (!weightGoal) return undefined;
+
+        switch (weightGoal) {
+            case 'lose_1': return 'lose_1';
+            case 'lose_0_75': return 'lose_0_75';
+            case 'lose_0_5': return 'lose_0_5';
+            case 'lose_0_25': return 'lose_0_25';
+            case 'maintain': return 'maintain';
+            case 'gain_0_25': return 'gain_0_25';
+            case 'gain_0_5': return 'gain_0_5';
+            case 'gain_0_75': return 'gain_0_75';
+            case 'gain_1': return 'gain_1';
+            default:
+                // Legacy mapping for old values
+                if (weightGoal?.startsWith('lose')) return 'lose_0_5';
+                if (weightGoal?.startsWith('gain')) return 'gain_0_5';
+                return undefined;
+        }
+    }, []);
+
+    const getFitnessGoalLabel = useCallback((id?: string) => {
+        if (!id) return '---';
+        const goal = FITNESS_GOALS.find(goal => goal.id === id);
+        if (!goal) return '---';
+
+        if (isImperialUnits) {
+            // Convert kg/week to lbs/week for display
+            const lbsValue = goal.value * 2.20462;
+            if (goal.value === 0) {
+                return '0 lbs/week';
+            } else if (goal.value > 0) {
+                return `+${lbsValue.toFixed(2)} lbs/week${goal.id === 'lose_0_5' ? ' (Recommended)' : ''}`;
+            } else {
+                return `${lbsValue.toFixed(2)} lbs/week${goal.id === 'lose_0_5' ? ' (Recommended)' : ''}`;
+            }
+        }
+
+        return goal.label;
+    }, [isImperialUnits]);
+
+    const getActivityLevelLabel = useCallback((value?: string) => {
+        if (!value) return '---';
+        const level = ACTIVITY_LEVELS.find(level => level.key === value);
+        return level ? `${level.label} - ${level.description}` : '---';
+    }, []);
 
     return (
         <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -798,6 +1072,101 @@ export default function EditGoals() {
                     )}
                 </TouchableOpacity>
             </ScrollView>
+
+            {/* Fitness Goal Wheel Picker Modal */}
+            <Modal
+                visible={showFitnessGoalPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowFitnessGoalPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Select Fitness Goal</Text>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={() => setShowFitnessGoalPicker(false)}
+                            >
+                                <Ionicons name="close" size={24} color={GRAY} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.wheelPickerContainer}>
+                            <WheelPicker
+                                data={FITNESS_GOALS.map(goal => ({
+                                    value: goal.id,
+                                    label: isImperialUnits ?
+                                        (goal.value === 0 ? '0 lbs/week' :
+                                            goal.value > 0 ? `+${(goal.value * 2.20462).toFixed(2)} lbs/week${goal.id === 'lose_0_5' ? ' (Recommended)' : ''}` :
+                                                `${(goal.value * 2.20462).toFixed(2)} lbs/week${goal.id === 'lose_0_5' ? ' (Recommended)' : ''}`) :
+                                        goal.label
+                                }))}
+                                value={formValues.fitnessGoal}
+                                onValueChanged={({ item }) => {
+                                    updateFormValue('fitnessGoal', item.value);
+                                }}
+                                itemTextStyle={{ color: WHITE, fontSize: 16 }}
+                                itemHeight={35}
+                                visibleItemCount={5}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.doneButton}
+                            onPress={() => setShowFitnessGoalPicker(false)}
+                        >
+                            <Text style={styles.doneButtonText}>Done</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Caloric Warning Modal */}
+            <Modal
+                visible={showCaloricWarning}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowCaloricWarning(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.warningModalContent}>
+                        <View style={styles.warningHeader}>
+                            <Ionicons name="warning" size={32} color={ORANGE} />
+                            <Text style={styles.warningTitle}>Calorie Goals Will Change</Text>
+                        </View>
+
+                        <Text style={styles.warningMessage}>
+                            You've changed your target weight, fitness goal, or activity level. These changes will affect your daily calorie and macro requirements.
+                        </Text>
+
+                        <Text style={styles.warningSubMessage}>
+                            Your nutrition goals will be automatically recalculated based on your new settings.
+                        </Text>
+
+                        <View style={styles.warningButtons}>
+                            <TouchableOpacity
+                                style={styles.cancelWarningButton}
+                                onPress={() => handleCaloricWarningResponse(false)}
+                            >
+                                <Text style={styles.cancelWarningButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.proceedWarningButton}
+                                onPress={() => handleCaloricWarningResponse(true)}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <ActivityIndicator color={WHITE} size="small" />
+                                ) : (
+                                    <Text style={styles.proceedWarningButtonText}>Update & Recalculate</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -1023,5 +1392,145 @@ const styles = StyleSheet.create({
         color: GRADIENT_START,
         fontSize: 14,
         marginLeft: 4,
+    },
+    wheelPickerButton: {
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    wheelPickerButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        flex: 1,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 20,
+        width: width - 40,
+        maxHeight: 350,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    modalTitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    wheelPickerContainer: {
+        height: 180,
+        marginVertical: 5,
+    },
+    doneButton: {
+        backgroundColor: GRADIENT_MIDDLE,
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    doneButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    activitySliderContainer: {
+        marginTop: 10,
+    },
+    sliderLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    sliderLabel: {
+        color: GRAY,
+        fontSize: 12,
+    },
+    activityLevelInfo: {
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    activityLevelTitle: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    activityLevelDescription: {
+        color: GRAY,
+        fontSize: 14,
+        marginTop: 4,
+    },
+    warningModalContent: {
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 24,
+        width: width - 40,
+        maxWidth: 400,
+    },
+    warningHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    warningTitle: {
+        color: WHITE,
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginLeft: 12,
+    },
+    warningMessage: {
+        color: WHITE,
+        fontSize: 16,
+        lineHeight: 24,
+        marginBottom: 12,
+    },
+    warningSubMessage: {
+        color: GRAY,
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 24,
+    },
+    warningButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    cancelWarningButton: {
+        flex: 1,
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    cancelWarningButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    proceedWarningButton: {
+        flex: 1,
+        backgroundColor: ORANGE,
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    proceedWarningButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: 'bold',
     },
 });

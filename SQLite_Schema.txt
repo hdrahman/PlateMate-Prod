@@ -17,7 +17,6 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `age`: INTEGER
 - `gender`: TEXT CHECK(gender IN ('male', 'female', 'other'))
 - `activity_level`: TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active'))
-- `weight_goal`: TEXT CHECK(weight_goal IN ('lose', 'lose_extreme', 'lose_heavy', 'lose_moderate', 'lose_light', 'maintain', 'gain', 'gain_light', 'gain_moderate'))
 - `target_weight`: REAL (in kg)
 - `starting_weight`: REAL (in kg)
 - `date_of_birth`: TIMESTAMP
@@ -41,7 +40,7 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `protein_goal`: INTEGER
 - `carb_goal`: INTEGER
 - `fat_goal`: INTEGER
-- `weight_goal`: TEXT CHECK(weight_goal IN ('lose', 'lose_extreme', 'lose_heavy', 'lose_moderate', 'lose_light', 'maintain', 'gain', 'gain_light', 'gain_moderate'))
+- `weight_goal`: TEXT CHECK(weight_goal IN ('lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5'))
 - `activity_level`: TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active'))
 
 ### 4. fitness_goals

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,10 +9,14 @@ import {
     Platform,
     Image,
     SafeAreaView,
+    Modal,
+    Animated,
+    Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import WheelPicker from '../WheelPicker';
 
 interface HealthGoalsStepProps {
     profile: UserProfile;
@@ -55,6 +59,15 @@ const nutrientFocus = [
     { id: 'sodium', label: 'Sodium', default: 2300, unit: 'mg' },
 ];
 
+// Add activityLevels constant below the other constants
+const activityLevels = [
+    { id: 'sedentary', label: 'Sedentary', description: 'Little to no exercise' },
+    { id: 'light', label: 'Lightly Active', description: '1-3 days/week' },
+    { id: 'moderate', label: 'Moderately Active', description: '3-5 days/week' },
+    { id: 'active', label: 'Very Active', description: '6-7 days/week' },
+    { id: 'extreme', label: 'Extremely Active', description: 'Physical job or 2x training' },
+];
+
 const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfile, onNext }) => {
     const [mainGoal, setMainGoal] = useState<'lose' | 'maintain' | 'gain'>(
         profile.weightGoal?.startsWith('lose') ? 'lose' :
@@ -64,6 +77,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
     const [selectedConditions, setSelectedConditions] = useState<string[]>(profile.healthConditions || []);
     const [calculatedCalories, setCalculatedCalories] = useState<number>(0);
     const [calculatedNutrients, setCalculatedNutrients] = useState<any>({});
+    const [showFitnessGoalPicker, setShowFitnessGoalPicker] = useState(false);
 
     // Calculate recommended calories and nutrients based on profile and goals
     useEffect(() => {
@@ -210,34 +224,58 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
         }
 
         const options = mainGoal === 'lose' ? weightLossOptions : weightGainOptions;
+        const selectedOption = options.find(option => option.id === detailedGoal);
 
         return (
             <View style={styles.detailedGoalsContainer}>
-                {options.map((option) => (
-                    <TouchableOpacity
-                        key={option.id}
-                        style={[
-                            styles.detailedGoalCard,
-                            detailedGoal === option.id && styles.selectedDetailedGoal
-                        ]}
-                        onPress={() => handleDetailedGoalSelect(option.id)}
-                    >
-                        <View style={styles.detailedGoalContent}>
-                            <Text style={[
-                                styles.detailedGoalLabel,
-                                detailedGoal === option.id && styles.selectedDetailedGoalText
-                            ]}>
-                                {option.label}
-                            </Text>
-                            <Text style={styles.detailedGoalDescription}>{option.description}</Text>
-                        </View>
-                        {detailedGoal === option.id && (
-                            <View style={styles.checkIcon}>
-                                <Ionicons name="checkmark-circle" size={20} color="#0074dd" />
+                <TouchableOpacity
+                    style={styles.goalPickerButton}
+                    onPress={() => setShowFitnessGoalPicker(true)}
+                >
+                    <View style={styles.goalPickerContent}>
+                        <Text style={styles.goalPickerLabel}>{selectedOption?.label || 'Select rate'}</Text>
+                        <Text style={styles.goalPickerDescription}>{selectedOption?.description || ''}</Text>
+                    </View>
+                    <Ionicons name="chevron-down" size={24} color="#0074dd" />
+                </TouchableOpacity>
+
+                <Modal
+                    visible={showFitnessGoalPicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowFitnessGoalPicker(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Select your target rate</Text>
+                                <TouchableOpacity
+                                    style={styles.modalCloseButton}
+                                    onPress={() => setShowFitnessGoalPicker(false)}
+                                >
+                                    <Ionicons name="close" size={24} color="#fff" />
+                                </TouchableOpacity>
                             </View>
-                        )}
-                    </TouchableOpacity>
-                ))}
+
+                            <WheelPicker
+                                data={options}
+                                selectedValue={detailedGoal}
+                                onValueChange={(value) => {
+                                    handleDetailedGoalSelect(value);
+                                }}
+                                containerHeight={250}
+                                containerStyle={styles.wheelPicker}
+                            />
+
+                            <TouchableOpacity
+                                style={styles.modalDoneButton}
+                                onPress={() => setShowFitnessGoalPicker(false)}
+                            >
+                                <Text style={styles.modalDoneButtonText}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
             </View>
         );
     };
@@ -250,6 +288,18 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
         >
             <Text style={styles.title}>Health & Fitness Goals</Text>
             <Text style={styles.subtitle}>Let's personalize your nutrition plan</Text>
+
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Activity Level</Text>
+                <View style={styles.activitySummary}>
+                    <Text style={styles.activitySummaryLabel}>
+                        {activityLevels.find(level => level.id === profile.activityLevel)?.label || 'Moderately Active'}
+                    </Text>
+                    <Text style={styles.activitySummaryDesc}>
+                        {activityLevels.find(level => level.id === profile.activityLevel)?.description || '3-5 days/week'}
+                    </Text>
+                </View>
+            </View>
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>What's your goal?</Text>
@@ -475,58 +525,88 @@ const styles = StyleSheet.create({
     detailedGoalsContainer: {
         marginBottom: 8,
     },
-    detailedGoalCard: {
+    goalPickerButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingVertical: 16,
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         borderRadius: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        marginBottom: 8,
-    },
-    selectedDetailedGoal: {
         backgroundColor: 'rgba(0, 116, 221, 0.2)',
         borderWidth: 1,
-        borderColor: '#0074dd',
+        borderColor: 'rgba(0, 116, 221, 0.5)',
     },
-    detailedGoalContent: {
+    goalPickerContent: {
         flex: 1,
     },
-    detailedGoalLabel: {
+    goalPickerLabel: {
         fontSize: 16,
         color: '#fff',
+        fontWeight: 'bold',
         marginBottom: 4,
     },
-    detailedGoalDescription: {
+    goalPickerDescription: {
         fontSize: 12,
         color: '#aaa',
     },
-    selectedDetailedGoalText: {
-        fontWeight: 'bold',
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'flex-end',
     },
-    checkIcon: {
-        marginLeft: 8,
+    modalContent: {
+        backgroundColor: '#121212',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
     },
-    maintainContainer: {
-        marginBottom: 8,
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
     },
-    maintainCard: {
-        padding: 16,
-        borderRadius: 10,
-        backgroundColor: 'rgba(0, 116, 221, 0.2)',
-        borderWidth: 1,
-        borderColor: '#0074dd',
-    },
-    maintainTitle: {
-        fontSize: 16,
+    modalTitle: {
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: 8,
     },
-    maintainDescription: {
+    modalCloseButton: {
+        padding: 5,
+    },
+    modalDoneButton: {
+        backgroundColor: '#0074dd',
+        borderRadius: 10,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    modalDoneButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    wheelPicker: {
+        alignSelf: 'center',
+        width: '90%',
+        borderRadius: 15,
+    },
+    activitySummary: {
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
+        borderRadius: 10,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 116, 221, 0.5)',
+    },
+    activitySummaryLabel: {
+        fontSize: 16,
+        color: '#fff',
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    activitySummaryDesc: {
         fontSize: 14,
-        color: '#ddd',
+        color: '#aaa',
     },
     calculatedContainer: {
         alignItems: 'center',
@@ -642,6 +722,26 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         marginRight: 8,
+    },
+    maintainContainer: {
+        marginBottom: 8,
+    },
+    maintainCard: {
+        padding: 16,
+        borderRadius: 10,
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 116, 221, 0.5)',
+    },
+    maintainTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 8,
+    },
+    maintainDescription: {
+        fontSize: 14,
+        color: '#ddd',
     },
 });
 

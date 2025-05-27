@@ -406,13 +406,15 @@ async def update_nutrition_goals(
         # Get age either from stored age or calculate from date of birth
         age = current_user.age or current_user.calculate_age()
         if age:
-            # Get weight goal from update if provided, otherwise from user profile or default
+            # Get weight goal from update if provided, otherwise from nutrition_goals table or default
             weight_goal = None
             if nutrition_update.weight_goal:
                 # Convert enum string to enum instance
                 weight_goal = WeightGoal(nutrition_update.weight_goal)
             else:
-                weight_goal = current_user.weight_goal or WeightGoal.maintain
+                # Get existing weight goal from nutrition_goals table
+                existing_nutrition_goals = db.query(NutritionGoals).filter(NutritionGoals.user_id == current_user.id).first()
+                weight_goal = existing_nutrition_goals.weight_goal if existing_nutrition_goals else WeightGoal.maintain
             
             # Calculate nutrition goals
             calculated_goals = calculate_nutrition_goals(
@@ -538,8 +540,9 @@ async def calculate_user_nutrition_goals(
             detail="Missing age information. Please add your age or date of birth to your profile."
         )
     
-    # Get weight goal, defaulting to maintain if not set
-    weight_goal = current_user.weight_goal or WeightGoal.maintain
+    # Get weight goal from nutrition_goals table, defaulting to maintain if not set
+    nutrition_goals = db.query(NutritionGoals).filter(NutritionGoals.user_id == current_user.id).first()
+    weight_goal = nutrition_goals.weight_goal if nutrition_goals else WeightGoal.maintain
     
     try:
         # Calculate nutrition goals
@@ -633,8 +636,9 @@ async def reset_nutrition_goals(
             detail="Missing age information. Please add your age or date of birth to your profile."
         )
     
-    # Get weight goal, defaulting to maintain if not set
-    weight_goal = current_user.weight_goal or WeightGoal.maintain
+    # Get weight goal from nutrition_goals table, defaulting to maintain if not set
+    nutrition_goals_existing = db.query(NutritionGoals).filter(NutritionGoals.user_id == current_user.id).first()
+    weight_goal = nutrition_goals_existing.weight_goal if nutrition_goals_existing else WeightGoal.maintain
     
     try:
         # Calculate nutrition goals

@@ -1,7 +1,7 @@
 """update_user_model_with_enhanced_profile
 
 Revision ID: 020fa0d54ebc
-Revises: 793352ee185c
+Revises: 0a1c8aa29aa0
 Create Date: 2025-05-18 10:15:00.000000
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import JSON, ENUM
 
 # revision identifiers, used by Alembic.
 revision: str = '020fa0d54ebc'
-down_revision: Union[str, None] = '793352ee185c'
+down_revision: Union[str, None] = '0a1c8aa29aa0'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

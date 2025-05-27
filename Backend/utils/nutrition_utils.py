@@ -71,16 +71,14 @@ def apply_weight_goal_adjustment(tdee: float, weight_goal: WeightGoal) -> float:
     """
     adjustments = {
         # Weight loss goals (calories to subtract)
-        WeightGoal.lose_light: 250,       # 0.25kg/week loss
-        WeightGoal.lose_moderate: 500,    # 0.5kg/week loss  
-        WeightGoal.lose_heavy: 750,       # 0.75kg/week loss
-        WeightGoal.lose: 1000,            # 1kg/week loss
-        WeightGoal.lose_extreme: 1250,    # 1.25kg/week loss
+        WeightGoal.lose_0_25: 250,        # 0.25kg/week loss
+        WeightGoal.lose_0_5: 500,         # 0.5kg/week loss  
+        WeightGoal.lose_0_75: 750,        # 0.75kg/week loss
+        WeightGoal.lose_1: 1000,          # 1kg/week loss
         
         # Weight gain goals (calories to add)
-        WeightGoal.gain_light: 250,       # 0.25kg/week gain
-        WeightGoal.gain_moderate: 500,    # 0.5kg/week gain
-        WeightGoal.gain: 750,             # 0.75kg/week gain
+        WeightGoal.gain_0_25: 250,        # 0.25kg/week gain
+        WeightGoal.gain_0_5: 500,         # 0.5kg/week gain
         
         # Maintenance
         WeightGoal.maintain: 0            # No adjustment
@@ -89,12 +87,12 @@ def apply_weight_goal_adjustment(tdee: float, weight_goal: WeightGoal) -> float:
     adjustment = adjustments.get(weight_goal, 0)
     
     # If it's a weight loss goal, subtract calories
-    if weight_goal in [WeightGoal.lose_light, WeightGoal.lose_moderate, 
-                       WeightGoal.lose_heavy, WeightGoal.lose, WeightGoal.lose_extreme]:
+    if weight_goal in [WeightGoal.lose_0_25, WeightGoal.lose_0_5, 
+                       WeightGoal.lose_0_75, WeightGoal.lose_1]:
         return tdee - adjustment
     
     # If it's a weight gain goal, add calories
-    elif weight_goal in [WeightGoal.gain_light, WeightGoal.gain_moderate, WeightGoal.gain]:
+    elif weight_goal in [WeightGoal.gain_0_25, WeightGoal.gain_0_5]:
         return tdee + adjustment
     
     # If it's maintenance or unrecognized, return TDEE as is
@@ -112,13 +110,13 @@ def calculate_macros_by_goal(tdee: float, weight_goal: WeightGoal, weight_kg: fl
     fat_pct = 0.30
     
     # Adjust based on weight goal
-    if weight_goal in [WeightGoal.lose_light, WeightGoal.lose_moderate, 
-                     WeightGoal.lose_heavy, WeightGoal.lose, WeightGoal.lose_extreme]:
+    if weight_goal in [WeightGoal.lose_0_25, WeightGoal.lose_0_5, 
+                     WeightGoal.lose_0_75, WeightGoal.lose_1]:
         # Higher protein for weight loss (preserve muscle)
         protein_pct = 0.30
         carbs_pct = 0.40
         fat_pct = 0.30
-    elif weight_goal in [WeightGoal.gain_light, WeightGoal.gain_moderate, WeightGoal.gain]:
+    elif weight_goal in [WeightGoal.gain_0_25, WeightGoal.gain_0_5]:
         # Balanced for muscle gain with higher carbs for energy
         protein_pct = 0.25
         carbs_pct = 0.50
@@ -127,8 +125,8 @@ def calculate_macros_by_goal(tdee: float, weight_goal: WeightGoal, weight_kg: fl
     # Calculate protein based on body weight if weight loss
     # This is an alternative method - protein based on body weight rather than percentage of calories
     # For weight loss, we often want higher protein
-    if weight_goal in [WeightGoal.lose_light, WeightGoal.lose_moderate, 
-                     WeightGoal.lose_heavy, WeightGoal.lose, WeightGoal.lose_extreme]:
+    if weight_goal in [WeightGoal.lose_0_25, WeightGoal.lose_0_5, 
+                     WeightGoal.lose_0_75, WeightGoal.lose_1]:
         # Aim for 1.6-2.2g of protein per kg body weight for weight loss
         protein_g = weight_kg * 2.0  # 2g per kg is a good target for weight loss
         protein_calories = protein_g * CALORIES_PER_G_PROTEIN
@@ -218,8 +216,9 @@ def update_user_nutrition_goals(db: Session, user: User) -> Dict[str, Any]:
     if not age:
         return None
     
-    # Get weight goal, defaulting to maintain if not set
-    weight_goal = user.weight_goal or WeightGoal.maintain
+    # Get weight goal from nutrition_goals table, defaulting to maintain if not set
+    nutrition_goals = db.query(NutritionGoals).filter(NutritionGoals.user_id == user.id).first()
+    weight_goal = nutrition_goals.weight_goal if nutrition_goals else WeightGoal.maintain
     
     # Calculate nutrition goals
     goals = calculate_nutrition_goals(

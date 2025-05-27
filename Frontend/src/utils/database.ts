@@ -63,7 +63,6 @@ export const initDatabase = async () => {
         age INTEGER,
         gender TEXT,
         activity_level TEXT,
-        weight_goal TEXT,
         target_weight REAL,
         dietary_restrictions TEXT,
         food_allergies TEXT,
@@ -87,6 +86,25 @@ export const initDatabase = async () => {
       )
     `);
         console.log('✅ user_profiles table created successfully');
+
+        // Create nutrition_goals table
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS nutrition_goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT UNIQUE NOT NULL,
+        target_weight REAL,
+        daily_calorie_goal INTEGER,
+        protein_goal INTEGER,
+        carb_goal INTEGER,
+        fat_goal INTEGER,
+        weight_goal TEXT CHECK(weight_goal IN ('lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5')),
+        activity_level TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active')),
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL
+      )
+    `);
+        console.log('✅ nutrition_goals table created successfully');
 
         // Run database migrations
         await updateDatabaseSchema(db);
@@ -433,7 +451,7 @@ export const getFoodLogsByDate = async (date: string) => {
         }
 
         // First check if there are any logs for this date
-        const countResult = await db.getFirstAsync(
+        const countResult = await db.getFirstAsync<{ count: number }>(
             `SELECT COUNT(*) as count FROM food_logs WHERE date LIKE ? AND user_id = ?`,
             [`${date}%`, firebaseUserId]
         );
@@ -636,7 +654,7 @@ export const addExercise = async (exercise: any) => {
 
     try {
         // Query for user ID
-        const userIdResult = await db.getFirstAsync(
+        const userIdResult = await db.getFirstAsync<{ id: number }>(
             `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
             [firebaseUserId]
         );
@@ -1099,6 +1117,49 @@ export const addUserProfile = async (profile: any) => {
     }
 };
 
+// Interface for user profile
+interface UserProfile {
+    id?: number;
+    firebase_uid: string;
+    email: string;
+    first_name: string;
+    last_name?: string;
+    height?: number;
+    weight?: number;
+    age?: number;
+    gender?: string;
+    activity_level?: string;
+    target_weight?: number;
+    dietary_restrictions?: string;
+    food_allergies?: string;
+    cuisine_preferences?: string;
+    spice_tolerance?: string;
+    health_conditions?: string;
+    daily_calorie_target?: number;
+    nutrient_focus?: string;
+    unit_preference?: string;
+    push_notifications_enabled?: number;
+    email_notifications_enabled?: number;
+    sms_notifications_enabled?: number;
+    marketing_emails_enabled?: number;
+    preferred_language?: string;
+    timezone?: string;
+    dark_mode?: number;
+    sync_data_offline?: number;
+    onboarding_complete?: number;
+    synced?: number;
+    last_modified?: string;
+    protein_goal?: number;
+    carb_goal?: number;
+    fat_goal?: number;
+    weekly_workouts?: number;
+    step_goal?: number;
+    water_goal?: number;
+    sleep_goal?: number;
+    starting_weight?: number;
+    location?: string;
+}
+
 // Get user profile from local SQLite by Firebase UID
 export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
     if (!db || !global.dbInitialized) {
@@ -1107,7 +1168,7 @@ export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
     }
 
     try {
-        const profile = await db.getFirstAsync(
+        const profile = await db.getFirstAsync<UserProfile>(
             `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
             [firebaseUid]
         );
@@ -1215,7 +1276,7 @@ export const getUnsyncedUserProfiles = async () => {
     }
 
     try {
-        const profiles = await db.getAllAsync(
+        const profiles = await db.getAllAsync<UserProfile>(
             `SELECT * FROM user_profiles WHERE synced = 0`
         );
 
@@ -1301,19 +1362,25 @@ export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | nul
             return null;
         }
 
-        // Extract goals from the user profile
+        // Get nutrition goals from the nutrition_goals table
+        const nutritionGoals = await db.getFirstAsync(
+            `SELECT * FROM nutrition_goals WHERE firebase_uid = ?`,
+            [firebaseUid]
+        ) as any;
+
+        // Extract goals from both sources
         return {
-            targetWeight: profile.target_weight || 0,
-            calorieGoal: profile.daily_calorie_target || 0,
-            proteinGoal: profile.protein_goal || 0,
-            carbGoal: profile.carb_goal || 0,
-            fatGoal: profile.fat_goal || 0,
-            fitnessGoal: profile.weight_goal || 'maintain',
-            activityLevel: profile.activity_level || 'moderate',
-            weeklyWorkouts: profile.weekly_workouts || 0,
-            stepGoal: profile.step_goal || 0,
-            waterGoal: profile.water_goal || 0,
-            sleepGoal: profile.sleep_goal || 0
+            targetWeight: profile.target_weight,
+            calorieGoal: nutritionGoals?.daily_calorie_goal || profile.daily_calorie_target,
+            proteinGoal: nutritionGoals?.protein_goal || profile.protein_goal,
+            carbGoal: nutritionGoals?.carb_goal || profile.carb_goal,
+            fatGoal: nutritionGoals?.fat_goal || profile.fat_goal,
+            fitnessGoal: nutritionGoals?.weight_goal, // Get from nutrition_goals table
+            activityLevel: nutritionGoals?.activity_level || profile.activity_level,
+            weeklyWorkouts: profile.weekly_workouts,
+            stepGoal: profile.step_goal,
+            waterGoal: profile.water_goal,
+            sleepGoal: profile.sleep_goal
         };
     } catch (error) {
         console.error('❌ Error fetching user goals:', error);
@@ -1338,7 +1405,7 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
             protein_goal: goals.proteinGoal,
             carb_goal: goals.carbGoal,
             fat_goal: goals.fatGoal,
-            weight_goal: goals.fitnessGoal,
+            // weight_goal is now stored in nutrition_goals table, not user profile
             activity_level: goals.activityLevel,
             weekly_workouts: goals.weeklyWorkouts,
             step_goal: goals.stepGoal,
@@ -1352,6 +1419,64 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
 
         // Update the user profile
         await updateUserProfile(firebaseUid, profileUpdates);
+
+        // Update or create nutrition goals if fitness goal or nutrition goals are provided
+        if (goals.fitnessGoal || goals.calorieGoal || goals.proteinGoal || goals.carbGoal || goals.fatGoal) {
+            const timestamp = new Date().toISOString();
+
+            // Check if nutrition goals record exists
+            const existingNutritionGoals = await db.getFirstAsync(
+                `SELECT id FROM nutrition_goals WHERE firebase_uid = ?`,
+                [firebaseUid]
+            );
+
+            if (existingNutritionGoals) {
+                // Update existing record
+                await db.runAsync(
+                    `UPDATE nutrition_goals SET 
+                     target_weight = COALESCE(?, target_weight),
+                     daily_calorie_goal = COALESCE(?, daily_calorie_goal),
+                     protein_goal = COALESCE(?, protein_goal),
+                     carb_goal = COALESCE(?, carb_goal),
+                     fat_goal = COALESCE(?, fat_goal),
+                     weight_goal = COALESCE(?, weight_goal),
+                     activity_level = COALESCE(?, activity_level),
+                     synced = 0,
+                     sync_action = 'update',
+                     last_modified = ?
+                     WHERE firebase_uid = ?`,
+                    [
+                        goals.targetWeight,
+                        goals.calorieGoal,
+                        goals.proteinGoal,
+                        goals.carbGoal,
+                        goals.fatGoal,
+                        goals.fitnessGoal,
+                        goals.activityLevel,
+                        timestamp,
+                        firebaseUid
+                    ]
+                );
+            } else {
+                // Create new record
+                await db.runAsync(
+                    `INSERT INTO nutrition_goals 
+                     (firebase_uid, target_weight, daily_calorie_goal, protein_goal, carb_goal, fat_goal, weight_goal, activity_level, synced, sync_action, last_modified)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'create', ?)`,
+                    [
+                        firebaseUid,
+                        goals.targetWeight,
+                        goals.calorieGoal,
+                        goals.proteinGoal,
+                        goals.carbGoal,
+                        goals.fatGoal,
+                        goals.fitnessGoal,
+                        goals.activityLevel,
+                        timestamp
+                    ]
+                );
+            }
+        }
 
         // Notify listeners of the change
         notifyDatabaseChanged();

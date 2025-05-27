@@ -4,12 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, EmailStr
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from enum import Enum
 import logging
 import os
 import sqlite3
 from dotenv import load_dotenv
+from uuid import UUID
 
 from models import User, Gender, ActivityLevel, WeightGoal, UserWeight
 from DB import get_db
@@ -35,15 +36,13 @@ class ActivityLevelEnum(str, Enum):
     very_active = "very_active"
 
 class WeightGoalEnum(str, Enum):
-    lose_extreme = "lose_extreme"
-    lose_heavy = "lose_heavy"
-    lose_moderate = "lose_moderate"
-    lose_light = "lose_light"
-    lose = "lose"
+    lose_1 = "lose_1"
+    lose_0_75 = "lose_0_75"
+    lose_0_5 = "lose_0_5"
+    lose_0_25 = "lose_0_25"
     maintain = "maintain"
-    gain = "gain"
-    gain_light = "gain_light"
-    gain_moderate = "gain_moderate"
+    gain_0_25 = "gain_0_25"
+    gain_0_5 = "gain_0_5"
 
 # Pydantic models for request validation
 class UserBase(BaseModel):
@@ -51,8 +50,8 @@ class UserBase(BaseModel):
     firebase_uid: str
 
 class UserCreate(UserBase):
-    first_name: str
-    last_name: Optional[str] = None
+    first_name: str = Field(..., max_length=50)
+    last_name: Optional[str] = Field(None, max_length=50)
 
 class PhysicalAttributes(BaseModel):
     height: Optional[float] = None  # in cm
@@ -73,30 +72,20 @@ class UserUpdate(BaseModel):
     physical_attributes: Optional[PhysicalAttributes] = None
     health_goals: Optional[HealthGoals] = None
 
-class UserResponse(BaseModel):
+class UserResponse(UserBase):
     id: int
-    firebase_uid: str
-    email: str
     first_name: str
     last_name: Optional[str] = None
-    onboarding_complete: bool = False
-    
-    # Basic physical attributes
     height: Optional[float] = None
     weight: Optional[float] = None
-    age: Optional[int] = None
     gender: Optional[str] = None
-    activity_level: Optional[str] = None
-    
-    # Health & fitness goals
-    weight_goal: Optional[str] = None
-    target_weight: Optional[float] = None
-    starting_weight: Optional[float] = None
-    
-    # Timestamps
+    date_of_birth: Optional[date] = None
+    location: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
-    
+    updated_at: Optional[datetime] = None
+    is_imperial_units: Optional[bool] = None
+    profile_image_url: Optional[str] = None
+
     class Config:
         orm_mode = True
 
@@ -147,6 +136,31 @@ def update_user(db: Session, user_id: int, user_data: dict):
 
 def get_user_weight_history(db: Session, user_id: int, limit: int = 100):
     return db.query(UserWeight).filter(UserWeight.user_id == user_id).order_by(UserWeight.recorded_at.desc()).limit(limit).all()
+
+def clear_weight_history(db: Session, user_id: int):
+    # Get all weight entries ordered by recorded_at
+    weight_entries = db.query(UserWeight).filter(UserWeight.user_id == user_id).order_by(UserWeight.recorded_at).all()
+    
+    # If there are less than 3 entries, nothing to clear
+    if len(weight_entries) < 3:
+        return {"message": "No weight history to clear. Keeping all entries."}
+    
+    # Keep first entry (starting weight) and last entry (current weight)
+    entries_to_keep = [weight_entries[0].id, weight_entries[-1].id]
+    
+    # Delete all entries except the ones to keep
+    result = db.query(UserWeight).filter(
+        UserWeight.user_id == user_id,
+        ~UserWeight.id.in_(entries_to_keep)
+    ).delete(synchronize_session=False)
+    
+    db.commit()
+    
+    return {
+        "message": f"Cleared {result} weight entries. Kept starting weight and current weight.",
+        "entries_removed": result,
+        "entries_kept": 2
+    }
 
 # API Endpoints
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -327,9 +341,10 @@ async def add_user_weight(
 async def get_weight_history(
     firebase_uid: str,
     limit: int = 100,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),  # Use SQLite for home page data
     current_user: User = Depends(get_current_user)
 ):
+    """Get user weight history - using SQLite as primary for home page data"""
     # Only allow users to access their own weight history
     if current_user.firebase_uid != firebase_uid:
         raise HTTPException(
@@ -351,12 +366,13 @@ async def get_weight_history(
 @router.post("/{firebase_uid}/weight/clear", status_code=status.HTTP_200_OK)
 async def clear_user_weight_history(
     firebase_uid: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),  # Use SQLite for home page data
     current_user: User = Depends(get_current_user)
 ):
     """
     Clear all weight entries except for the first entry (starting weight)
     and the most recent entry (current weight).
+    Uses SQLite as primary for home page data.
     """
     # Only allow users to clear their own weight history
     if current_user.firebase_uid != firebase_uid:

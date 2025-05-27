@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 5; // Increment this to version 5
+const CURRENT_VERSION = 7; // Increment this to version 7
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -160,6 +160,53 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             }
                         } catch (error) {
                             console.error(`❌ Error handling location column migration:`, error);
+                        }
+                    }
+                },
+                // Migration to version 6 - Add fitness goal columns to user_profiles
+                async () => {
+                    if (currentVersion < 6) {
+                        console.log('Migrating to version 6: Adding fitness goal columns to user_profiles');
+
+                        const fitnessColumns = [
+                            'protein_goal INTEGER',
+                            'carb_goal INTEGER',
+                            'fat_goal INTEGER',
+                            'weekly_workouts INTEGER',
+                            'step_goal INTEGER',
+                            'water_goal INTEGER',
+                            'sleep_goal INTEGER'
+                        ];
+
+                        for (const column of fitnessColumns) {
+                            const columnName = column.split(' ')[0];
+                            try {
+                                // Check if column exists by trying to select it
+                                await db.execAsync(`SELECT ${columnName} FROM user_profiles LIMIT 1`).catch(async () => {
+                                    // Column doesn't exist, add it
+                                    await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN ${column}`);
+                                    console.log(`✅ Added column ${columnName} to user_profiles`);
+                                });
+                            } catch (error) {
+                                console.error(`❌ Error processing column ${columnName}:`, error);
+                            }
+                        }
+                    }
+                },
+                // Migration to version 7 - Add starting_weight column to user_profiles
+                async () => {
+                    if (currentVersion < 7) {
+                        console.log('Migrating to version 7: Adding starting_weight column to user_profiles');
+
+                        try {
+                            // Check if column exists by trying to select it
+                            await db.execAsync(`SELECT starting_weight FROM user_profiles LIMIT 1`).catch(async () => {
+                                // Column doesn't exist, add it
+                                await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN starting_weight REAL`);
+                                console.log(`✅ Added starting_weight column to user_profiles`);
+                            });
+                        } catch (error) {
+                            console.error(`❌ Error adding starting_weight column:`, error);
                         }
                     }
                 }

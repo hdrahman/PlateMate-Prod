@@ -25,6 +25,7 @@ export interface UserProfile {
     healthConditions: string[];
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
+    fitnessGoal?: string;
 
     // Delivery preferences
     defaultAddress: string | null;

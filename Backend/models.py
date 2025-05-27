@@ -17,15 +17,13 @@ class ActivityLevel(enum.Enum):
     very_active = "very_active"
 
 class WeightGoal(enum.Enum):
-    lose = "lose"
-    lose_extreme = "lose_extreme"
-    lose_heavy = "lose_heavy"  
-    lose_moderate = "lose_moderate"
-    lose_light = "lose_light"
+    lose_1 = "lose_1"
+    lose_0_75 = "lose_0_75"
+    lose_0_5 = "lose_0_5"
+    lose_0_25 = "lose_0_25"
     maintain = "maintain"
-    gain = "gain"
-    gain_light = "gain_light"
-    gain_moderate = "gain_moderate"
+    gain_0_25 = "gain_0_25"
+    gain_0_5 = "gain_0_5"
 
 class User(Base):
     __tablename__ = "users"
@@ -45,7 +43,6 @@ class User(Base):
     age = Column(Integer, nullable=True)
     gender = Column(Enum(Gender), nullable=True)
     activity_level = Column(Enum(ActivityLevel), nullable=True)
-    weight_goal = Column(Enum(WeightGoal), nullable=True)
     target_weight = Column(Float, nullable=True)  # stored in kg
     starting_weight = Column(Float, nullable=True)  # stored in kg, initial weight when user starts tracking
     date_of_birth = Column(DateTime, nullable=True)
