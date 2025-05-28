@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, GestureResponderEvent 
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Define color constants for consistent theming
 const CARD_BG = '#121212';
@@ -15,6 +16,32 @@ interface RecipeCardProps {
     onPress?: (recipe: Recipe) => void;
     compact?: boolean;
 }
+
+// Function to determine the color based on health score
+const getHealthScoreColor = (score: number): string => {
+    if (score >= 80) return '#4CAF50'; // Green for excellent
+    if (score >= 60) return '#8BC34A'; // Light green for good
+    if (score >= 40) return '#FFEB3B'; // Yellow for moderate
+    if (score >= 20) return '#FF9800'; // Orange for fair
+    return '#F44336'; // Red for poor
+};
+
+// Function to determine health score label
+const getHealthScoreLabel = (score: number): string => {
+    if (score >= 80) return 'Excellent';
+    if (score >= 60) return 'Good';
+    if (score >= 40) return 'Moderate';
+    if (score >= 20) return 'Fair';
+    return 'Poor';
+};
+
+// Function to format number of likes (1000 -> 1K)
+const formatLikes = (likes: number): string => {
+    if (!likes) return '0';
+    if (likes >= 1000000) return `${(likes / 1000000).toFixed(1)}M`;
+    if (likes >= 1000) return `${(likes / 1000).toFixed(1)}K`;
+    return likes.toString();
+};
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = false }) => {
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
@@ -51,6 +78,28 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                         color={isFav ? "#FF4081" : WHITE}
                     />
                 </TouchableOpacity>
+
+                <View style={styles.healthScoreBadge}>
+                    <LinearGradient
+                        colors={[getHealthScoreColor(recipe.healthScore), getHealthScoreColor(recipe.healthScore) + '99']}
+                        style={styles.healthScoreGradient}
+                    >
+                        <Ionicons name="heart" size={compact ? 12 : 14} color={WHITE} />
+                        <Text style={styles.healthScoreText}>{recipe.healthScore}</Text>
+                    </LinearGradient>
+                </View>
+
+                {(recipe.aggregateLikes && recipe.aggregateLikes > 0) && (
+                    <View style={styles.popularityBadge}>
+                        <LinearGradient
+                            colors={['#2196F3', '#03A9F4']}
+                            style={styles.popularityGradient}
+                        >
+                            <Ionicons name="thumbs-up" size={compact ? 12 : 14} color={WHITE} />
+                            <Text style={styles.popularityText}>{formatLikes(recipe.aggregateLikes)}</Text>
+                        </LinearGradient>
+                    </View>
+                )}
             </View>
 
             <View style={styles.infoContainer}>
@@ -75,10 +124,16 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                         <Text style={styles.metaText}>{recipe.servings} serv</Text>
                     </View>
 
-                    <View style={styles.metaItem}>
-                        <Ionicons name="heart-outline" size={compact ? 14 : 16} color={SUBDUED} />
-                        <Text style={styles.metaText}>{recipe.healthScore}/100</Text>
-                    </View>
+                    {!compact && (
+                        <View style={styles.healthScoreLabel}>
+                            <Text style={[
+                                styles.healthScoreLabelText,
+                                { color: getHealthScoreColor(recipe.healthScore) }
+                            ]}>
+                                {getHealthScoreLabel(recipe.healthScore)}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {!compact && recipe.diets.length > 0 && (
@@ -138,6 +193,44 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    healthScoreBadge: {
+        position: 'absolute',
+        bottom: 10,
+        right: 10,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    healthScoreGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    healthScoreText: {
+        color: WHITE,
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginLeft: 4,
+    },
+    popularityBadge: {
+        position: 'absolute',
+        bottom: 10,
+        left: 10,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    popularityGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    popularityText: {
+        color: WHITE,
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginLeft: 4,
+    },
     infoContainer: {
         padding: 12,
         flex: 1,
@@ -156,6 +249,7 @@ const styles = StyleSheet.create({
     metaContainer: {
         flexDirection: 'row',
         marginBottom: 8,
+        alignItems: 'center',
     },
     metaItem: {
         flexDirection: 'row',
@@ -166,6 +260,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: SUBDUED,
         marginLeft: 4,
+    },
+    healthScoreLabel: {
+        marginLeft: 'auto',
+    },
+    healthScoreLabelText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     tagsContainer: {
         flexDirection: 'row',

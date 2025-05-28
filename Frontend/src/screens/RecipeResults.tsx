@@ -28,12 +28,13 @@ export default function RecipeResults() {
     useEffect(() => {
         // Get search query from navigation params
         if (route.params?.query) {
-            setSearchQuery(route.params.query);
-            performSearch(route.params.query);
+            const query = route.params.query.trim();
+            setSearchQuery(query);
+            performSearch(query);
         } else {
             setLoading(false);
         }
-    }, [route.params]);
+    }, [route.params?.query]);
 
     // Function to search for recipes
     const performSearch = async (query: string) => {

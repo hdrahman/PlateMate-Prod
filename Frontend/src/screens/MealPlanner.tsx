@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-    ScrollView, TextInput, Modal, Platform, Alert,
-    ActivityIndicator, Switch
+    ScrollView, TextInput, Platform, Alert,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
-import { Recipe, foodCategories, getRandomRecipes, generateMealPlan } from '../api/recipes';
+import { Recipe, foodCategories, getRandomRecipes } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
 
 // Custom imports for user data
@@ -33,41 +33,7 @@ interface GradientBorderCardProps {
     style?: any;
 }
 
-// Define diet options
-const dietOptions = [
-    { label: 'No Restrictions', value: undefined },
-    { label: 'Vegetarian', value: 'vegetarian' },
-    { label: 'Vegan', value: 'vegan' },
-    { label: 'Gluten Free', value: 'gluten-free' },
-    { label: 'Ketogenic', value: 'ketogenic' },
-    { label: 'Paleo', value: 'paleo' },
-    { label: 'Pescetarian', value: 'pescetarian' },
-    { label: 'Whole30', value: 'whole30' },
-];
 
-// Define meal type options
-const mealTypeOptions = [
-    { label: 'All', value: undefined },
-    { label: 'Breakfast', value: 'breakfast' },
-    { label: 'Lunch', value: 'lunch' },
-    { label: 'Dinner', value: 'dinner' },
-    { label: 'Snack', value: 'snack' },
-    { label: 'Dessert', value: 'dessert' },
-];
-
-// Define cuisine options
-const cuisineOptions = [
-    { label: 'All', value: undefined },
-    { label: 'Italian', value: 'italian' },
-    { label: 'Mexican', value: 'mexican' },
-    { label: 'Asian', value: 'asian' },
-    { label: 'Mediterranean', value: 'mediterranean' },
-    { label: 'American', value: 'american' },
-    { label: 'Indian', value: 'indian' },
-    { label: 'French', value: 'french' },
-    { label: 'Thai', value: 'thai' },
-    { label: 'Greek', value: 'greek' },
-];
 
 export default function MealPlanner() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -85,16 +51,7 @@ export default function MealPlanner() {
     const { nutrientTotals, refreshLogs, isLoading: foodLogLoading,
         startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
-    // Meal plan preferences
-    const [showPreferences, setShowPreferences] = useState<boolean>(false);
-    const [targetCalories, setTargetCalories] = useState<string>('2000');
-    const [selectedDiet, setSelectedDiet] = useState<string | undefined>(undefined);
-    const [selectedMealType, setSelectedMealType] = useState<string | undefined>(undefined);
-    const [selectedCuisine, setSelectedCuisine] = useState<string | undefined>(undefined);
-    const [excludeIngredients, setExcludeIngredients] = useState<string>('');
-    const [maxReadyTime, setMaxReadyTime] = useState<string>('');
-    const [highProtein, setHighProtein] = useState<boolean>(false);
-    const [lowCarb, setLowCarb] = useState<boolean>(false);
+
 
     // Daily nutrition stats
     const [dailyNutrition, setDailyNutrition] = useState({
@@ -107,9 +64,9 @@ export default function MealPlanner() {
     });
     const [userGoals, setUserGoals] = useState<NutritionGoals>(getDefaultNutritionGoals());
 
-    // Load random recipes on component mount
+    // Load popular healthy recipes on component mount
     useEffect(() => {
-        loadRandomRecipes();
+        loadFeaturedRecipes();
     }, []);
 
     // Start watching for food log changes
@@ -166,11 +123,9 @@ export default function MealPlanner() {
                 if (currentProfile) {
                     calculatedGoals = calculateNutritionGoals(currentProfile);
                     setUserGoals(calculatedGoals);
-                    setTargetCalories(calculatedGoals.calories.toString());
                 } else {
                     // If profile still not found, use defaults
                     setUserGoals(getDefaultNutritionGoals());
-                    setTargetCalories(getDefaultNutritionGoals().calories.toString());
                 }
                 setIsProfileLoading(false);
 
@@ -215,14 +170,14 @@ export default function MealPlanner() {
         loadUserData();
     }, [user, onboardingProfile, isOnboardingLoading, nutrientTotals, lastUpdated]);
 
-    // Function to load random recipes
-    const loadRandomRecipes = async () => {
+    // Function to load featured healthy and popular recipes
+    const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
             const recipes = await getRandomRecipes(5);
             setFeaturedRecipes(recipes);
         } catch (error) {
-            console.error('Error loading random recipes:', error);
+            console.error('Error loading healthy popular recipes:', error);
             Alert.alert('Error', 'Failed to load recipes. Please try again later.');
         } finally {
             setIsLoading(false);
@@ -232,7 +187,8 @@ export default function MealPlanner() {
     // Handle search submission
     const handleSearch = () => {
         if (searchQuery.trim()) {
-            navigation.navigate('RecipeResults', { query: searchQuery });
+            navigation.navigate('RecipeResults', { query: searchQuery.trim() });
+            setSearchQuery(''); // Clear the search field after submitting
         }
     };
 
@@ -241,76 +197,7 @@ export default function MealPlanner() {
         navigation.navigate('RecipeDetails', { recipeId: recipe.id });
     };
 
-    // Generate a personalized meal plan
-    const handleGenerateMealPlan = async () => {
-        try {
-            setIsLoading(true);
 
-            // Prepare exclude ingredients list if any
-            const excludeList = excludeIngredients
-                .split(',')
-                .map(item => item.trim())
-                .filter(item => item.length > 0);
-
-            // Build parameters for meal plan generation
-            const mealPlanParams: any = {
-                timeFrame: 'day' as 'day' | 'week',
-                targetCalories: parseInt(targetCalories) || 2000,
-                diet: selectedDiet,
-                exclude: excludeList.length > 0 ? excludeList : undefined
-            };
-
-            // Add additional filters
-            if (selectedMealType) {
-                mealPlanParams.type = selectedMealType;
-            }
-
-            if (selectedCuisine) {
-                mealPlanParams.cuisine = selectedCuisine;
-            }
-
-            if (maxReadyTime && parseInt(maxReadyTime) > 0) {
-                mealPlanParams.maxReadyTime = parseInt(maxReadyTime);
-            }
-
-            if (highProtein) {
-                mealPlanParams.minProtein = 25; // Set minimum protein in grams
-            }
-
-            if (lowCarb) {
-                mealPlanParams.maxCarbs = 50; // Set maximum carbs in grams
-            }
-
-            // Call API to generate meal plan
-            const mealPlanData = await generateMealPlan(mealPlanParams);
-
-            // Update daily nutrition with the meal plan data
-            if (mealPlanData.nutrients) {
-                setDailyNutrition({
-                    calories: Math.round(mealPlanData.nutrients.calories),
-                    protein: Math.round(mealPlanData.nutrients.protein),
-                    fat: Math.round(mealPlanData.nutrients.fat),
-                    carbs: Math.round(mealPlanData.nutrients.carbohydrates),
-                    remainingCalories: Math.round(parseInt(targetCalories) - mealPlanData.nutrients.calories),
-                    mealsLeft: 3 - mealPlanData.meals.length
-                });
-            }
-
-            // Close preferences modal
-            setShowPreferences(false);
-
-            // Navigate to meal plan results
-            navigation.navigate('MealPlannerResults', {
-                mealPlan: mealPlanData.meals,
-                nutrients: mealPlanData.nutrients
-            });
-        } catch (error) {
-            console.error('Error generating meal plan:', error);
-            Alert.alert('Error', 'Failed to generate meal plan. Please try again later.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     // Handle scanning pantry (placeholder for future feature)
     const handleScanPantry = () => {
@@ -349,149 +236,7 @@ export default function MealPlanner() {
         );
     };
 
-    // Preferences Modal component
-    const PreferencesModal = () => (
-        <Modal
-            visible={showPreferences}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setShowPreferences(false)}
-        >
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Meal Plan Preferences</Text>
-                        <TouchableOpacity
-                            onPress={() => setShowPreferences(false)}
-                            style={styles.closeButton}
-                        >
-                            <Ionicons name="close" size={24} color={WHITE} />
-                        </TouchableOpacity>
-                    </View>
 
-                    <ScrollView style={styles.modalScrollView}>
-                        {/* Calories Input */}
-                        <Text style={styles.preferenceLabel}>Target Calories</Text>
-                        <TextInput
-                            style={styles.preferenceInput}
-                            value={targetCalories}
-                            onChangeText={setTargetCalories}
-                            keyboardType="numeric"
-                            placeholder="Enter target calories"
-                            placeholderTextColor={SUBDUED}
-                        />
-
-                        {/* Diet Selection */}
-                        <Text style={styles.preferenceLabel}>Diet</Text>
-                        {dietOptions.map((option, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.dietOption}
-                                onPress={() => setSelectedDiet(option.value)}
-                            >
-                                <Text style={styles.dietOptionText}>{option.label}</Text>
-                                <View style={styles.radioOuterCircle}>
-                                    {selectedDiet === option.value && (
-                                        <View style={styles.radioInnerCircle} />
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-
-                        {/* Meal Type Selection */}
-                        <Text style={styles.preferenceLabel}>Meal Type</Text>
-                        {mealTypeOptions.map((option, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.dietOption}
-                                onPress={() => setSelectedMealType(option.value)}
-                            >
-                                <Text style={styles.dietOptionText}>{option.label}</Text>
-                                <View style={styles.radioOuterCircle}>
-                                    {selectedMealType === option.value && (
-                                        <View style={styles.radioInnerCircle} />
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-
-                        {/* Cuisine Selection */}
-                        <Text style={styles.preferenceLabel}>Cuisine</Text>
-                        {cuisineOptions.map((option, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.dietOption}
-                                onPress={() => setSelectedCuisine(option.value)}
-                            >
-                                <Text style={styles.dietOptionText}>{option.label}</Text>
-                                <View style={styles.radioOuterCircle}>
-                                    {selectedCuisine === option.value && (
-                                        <View style={styles.radioInnerCircle} />
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-
-                        {/* Max Ready Time */}
-                        <Text style={styles.preferenceLabel}>Max Ready Time (minutes)</Text>
-                        <TextInput
-                            style={styles.preferenceInput}
-                            value={maxReadyTime}
-                            onChangeText={setMaxReadyTime}
-                            keyboardType="numeric"
-                            placeholder="Enter maximum preparation time"
-                            placeholderTextColor={SUBDUED}
-                        />
-
-                        {/* Nutrition Preferences */}
-                        <Text style={styles.preferenceLabel}>Nutrition Preferences</Text>
-                        <View style={styles.switchOption}>
-                            <Text style={styles.switchOptionText}>High Protein</Text>
-                            <Switch
-                                value={highProtein}
-                                onValueChange={setHighProtein}
-                                trackColor={{ false: '#3e3e3e', true: 'rgba(170, 0, 255, 0.4)' }}
-                                thumbColor={highProtein ? PURPLE_ACCENT : '#f4f3f4'}
-                            />
-                        </View>
-                        <View style={styles.switchOption}>
-                            <Text style={styles.switchOptionText}>Low Carb</Text>
-                            <Switch
-                                value={lowCarb}
-                                onValueChange={setLowCarb}
-                                trackColor={{ false: '#3e3e3e', true: 'rgba(170, 0, 255, 0.4)' }}
-                                thumbColor={lowCarb ? PURPLE_ACCENT : '#f4f3f4'}
-                            />
-                        </View>
-
-                        {/* Exclude Ingredients */}
-                        <Text style={styles.preferenceLabel}>Exclude Ingredients</Text>
-                        <TextInput
-                            style={styles.preferenceInput}
-                            value={excludeIngredients}
-                            onChangeText={setExcludeIngredients}
-                            placeholder="Enter ingredients to exclude (comma separated)"
-                            placeholderTextColor={SUBDUED}
-                            multiline
-                        />
-
-                        {/* Generate Button */}
-                        <TouchableOpacity
-                            style={styles.generateButton}
-                            onPress={handleGenerateMealPlan}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <ActivityIndicator size="small" color={WHITE} />
-                            ) : (
-                                <Text style={styles.generateButtonText}>Generate Meal Plan</Text>
-                            )}
-                        </TouchableOpacity>
-                    </ScrollView>
-                </View>
-            </View>
-        </Modal>
-    );
 
     // Error banner component
     const renderErrorBanner = () => {
@@ -520,8 +265,7 @@ export default function MealPlanner() {
                 </Text>
             </View>
 
-            {/* Preferences Modal */}
-            <PreferencesModal />
+
 
             <ScrollView
                 style={styles.scrollView}
@@ -563,24 +307,7 @@ export default function MealPlanner() {
                     </TouchableOpacity>
                 </GradientBorderCard>
 
-                {/* Generate Meal Plan Card */}
-                <GradientBorderCard>
-                    <TouchableOpacity
-                        style={styles.actionCardContent}
-                        onPress={() => setShowPreferences(true)}
-                    >
-                        <View style={styles.actionIconContainer}>
-                            <Ionicons name="restaurant-outline" size={24} color={WHITE} />
-                        </View>
-                        <View style={styles.actionTextContainer}>
-                            <Text style={styles.actionTitle}>Generate Meal Plan</Text>
-                            <Text style={styles.actionSubtitle}>
-                                Personalized meals based on your preferences
-                            </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={22} color={SUBDUED} />
-                    </TouchableOpacity>
-                </GradientBorderCard>
+
 
                 {/* Favorite Recipes Section */}
                 {favorites.length > 0 && (
@@ -620,7 +347,7 @@ export default function MealPlanner() {
                 )}
 
                 {/* Featured Recipes Section */}
-                <Text style={styles.sectionTitle}>Featured Recipes</Text>
+                <Text style={styles.sectionTitle}>Popular Healthy Recipes</Text>
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={PURPLE_ACCENT} />

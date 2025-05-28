@@ -15,6 +15,7 @@ export interface Recipe {
     instructions: string;
     diets: string[];
     cuisines: string[];
+    aggregateLikes?: number;
 }
 
 export interface RecipeSearchParams {
@@ -82,6 +83,7 @@ const mapSpoonacularRecipe = (spoonRecipe: any): Recipe => {
         instructions: spoonRecipe.instructions?.replace(/<[^>]*>/g, '') || '',
         diets: spoonRecipe.diets || [],
         cuisines: spoonRecipe.cuisines || [],
+        aggregateLikes: spoonRecipe.aggregateLikes || 0,
     };
 };
 
@@ -93,12 +95,14 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[
     }
 
     try {
+        console.log('Searching recipes with params:', params);
         const apiParams: any = {
             apiKey: SPOONACULAR_API_KEY,
             number: params.number || 10,
             offset: params.offset || 0,
             addRecipeInformation: true,
             fillIngredients: true,
+            instructionsRequired: true,
         };
 
         if (params.query) apiParams.query = params.query;
@@ -117,6 +121,7 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[
             params: apiParams
         });
 
+        console.log(`Found ${response.data.results.length} recipes for query: ${params.query}`);
         return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error('Error searching recipes:', error);
@@ -154,18 +159,26 @@ export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => 
     }
 
     try {
-        const response = await axios.get(`${BASE_URL}/recipes/random`, {
+        // Apply filters first, then fetch exactly what we need
+        const response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
             params: {
                 apiKey: SPOONACULAR_API_KEY,
-                number: count,
+                number: count, // Fetch exactly what we need
                 addRecipeInformation: true,
-                fillIngredients: true
+                fillIngredients: true,
+                minHealthScore: 60, // Filter for healthy recipes
+                sort: 'aggregateLikes', // Sort by popularity on the API side
+                sortDirection: 'desc', // Most popular first
+                instructionsRequired: true, // Ensure recipes have instructions
+                limitLicense: false, // Wider recipe selection
+                offset: Math.floor(Math.random() * 100), // Add randomness through offset
             }
         });
 
-        return response.data.recipes.map(mapSpoonacularRecipe);
+        // No local sorting needed - API already filtered and sorted
+        return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
-        console.error('Error getting random recipes:', error);
+        console.error('Error getting featured recipes:', error);
         return [];
     }
 };
@@ -193,14 +206,20 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
     }
 
     try {
+        // Apply all filters first, then fetch exactly what we need
         let apiParams: any = {
             apiKey: SPOONACULAR_API_KEY,
-            number: count,
+            number: count, // Fetch exactly what we need
             addRecipeInformation: true,
-            fillIngredients: true
+            fillIngredients: true,
+            minHealthScore: 60, // Filter for moderately healthy recipes
+            sort: 'aggregateLikes', // Sort by popularity on the API side
+            sortDirection: 'desc', // Most popular first
+            instructionsRequired: true, // Ensure recipes have instructions
+            offset: Math.floor(Math.random() * 50), // Add some randomness
         };
 
-        // Different query parameters based on meal type
+        // Apply meal type-specific filters on the API side
         switch (mealType.toLowerCase()) {
             case 'breakfast':
                 apiParams.type = 'breakfast';
@@ -231,8 +250,9 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
                 apiParams.intolerances = 'dairy';
                 break;
             case 'healthy':
-                apiParams.sort = 'healthiness';
+                apiParams.sort = 'healthiness'; // Sort by healthiness instead of popularity
                 apiParams.sortDirection = 'desc';
+                apiParams.minHealthScore = 80; // Higher health score for healthy category
                 break;
             case 'quick':
                 apiParams.maxReadyTime = 20;
@@ -246,6 +266,7 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
             params: apiParams
         });
 
+        // No local sorting needed - API already filtered and sorted
         return response.data.results.map(mapSpoonacularRecipe);
     } catch (error) {
         console.error(`Error getting ${mealType} recipes:`, error);

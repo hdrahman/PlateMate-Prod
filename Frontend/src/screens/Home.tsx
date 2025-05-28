@@ -1159,13 +1159,14 @@ export default function Home() {
         {/* MACROS CARD */}
         <GradientBorderCard>
           <View style={styles.macrosRow}>
-            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : Math.min(100, (protein / macroGoals.protein) * 100)} current={macrosLoading ? 0 : protein} />
-            <MacroRing label="CARBS" percent={macrosLoading ? 0 : Math.min(100, (carbs / macroGoals.carbs) * 100)} current={macrosLoading ? 0 : carbs} />
-            <MacroRing label="FATS" percent={macrosLoading ? 0 : Math.min(100, (fats / macroGoals.fat) * 100)} current={macrosLoading ? 0 : fats} />
+            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : Math.min(100, (protein / macroGoals.protein) * 100)} current={macrosLoading ? 0 : protein} goal={macroGoals.protein} />
+            <MacroRing label="CARBS" percent={macrosLoading ? 0 : Math.min(100, (carbs / macroGoals.carbs) * 100)} current={macrosLoading ? 0 : carbs} goal={macroGoals.carbs} />
+            <MacroRing label="FATS" percent={macrosLoading ? 0 : Math.min(100, (fats / macroGoals.fat) * 100)} current={macrosLoading ? 0 : fats} goal={macroGoals.fat} />
             <MacroRing
               label="OTHER"
               percent={100}
               current={0}
+              goal={0}
               onPress={() => navigation.navigate('Nutrients' as never)}
             />
           </View>
@@ -1801,14 +1802,14 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
 interface MacroRingProps {
   label: string;
   percent: number;
-  current: number; // current grams (assume goal is 100g)
+  current: number; // current grams consumed
+  goal: number; // goal grams from database
   onPress?: () => void;
 }
 
-function MacroRing({ label, percent, current, onPress }: MacroRingProps) {
+function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
   const MACRO_STROKE_WIDTH = 6;
   const isOther = label.toUpperCase() === 'OTHER';
-  const goal = 100; // Assume each macro has a goal of 100g
   const diff = goal - current;
   let subText = '';
   let subTextColor = '';
