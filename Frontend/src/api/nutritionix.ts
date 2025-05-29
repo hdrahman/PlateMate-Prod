@@ -1,9 +1,12 @@
-import { SPOONACULAR_API_KEY } from '../utils/config';
+import { SPOONACULAR_API_KEY, NUTRITIONIX_APP_ID, NUTRITIONIX_API_KEY } from '../utils/config';
 import axios from 'axios';
 
-// Nutritionix API is disabled - now using FatSecret for barcode scanning
-const isConfigured = false; // Disabled Nutritionix API
+// Nutritionix API configuration
+const isConfigured = !!(NUTRITIONIX_APP_ID && NUTRITIONIX_API_KEY);
 const isSpoonacularConfigured = !!SPOONACULAR_API_KEY;
+
+// Nutritionix API base URL
+const NUTRITIONIX_BASE_URL = 'https://trackapi.nutritionix.com/v2';
 
 // Spoonacular API base URL
 const SPOONACULAR_BASE_URL = 'https://api.spoonacular.com';
@@ -117,8 +120,8 @@ export const searchFood = async (query: string, minHealthiness: number = 0): Pro
             {
                 params: { query },
                 headers: {
-                    // 'x-app-id': NUTRITIONIX_APP_ID,
-                    // 'x-app-key': NUTRITIONIX_API_KEY,
+                    'x-app-id': NUTRITIONIX_APP_ID,
+                    'x-app-key': NUTRITIONIX_API_KEY,
                 },
             }
         );
@@ -165,8 +168,8 @@ export const getFoodDetails = async (query: string): Promise<FoodItem | null> =>
             { query },
             {
                 headers: {
-                    // 'x-app-id': NUTRITIONIX_APP_ID,
-                    // 'x-app-key': NUTRITIONIX_API_KEY,
+                    'x-app-id': NUTRITIONIX_APP_ID,
+                    'x-app-key': NUTRITIONIX_API_KEY,
                     'Content-Type': 'application/json'
                 },
             }
@@ -349,5 +352,53 @@ export const enhanceFoodImage = async (foodItem: FoodItem): Promise<FoodItem> =>
     } catch (error) {
         console.error('Error enhancing food image:', error);
         return foodItem;
+    }
+};
+
+/**
+ * Search for food by barcode using Nutritionix API
+ * @param barcode - The UPC/barcode to search for
+ * @returns Food item if found, null otherwise
+ */
+export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | null> => {
+    if (!isConfigured) {
+        console.warn('Nutritionix API credentials not configured');
+        return null;
+    }
+
+    try {
+        // Remove any non-digit characters and clean the barcode
+        const cleanBarcode = barcode.replace(/\D/g, '');
+
+        console.log('Searching for barcode:', cleanBarcode);
+
+        const response = await axios.get(
+            `${NUTRITIONIX_BASE_URL}/search/item`,
+            {
+                params: {
+                    upc: cleanBarcode
+                },
+                headers: {
+                    'x-app-id': NUTRITIONIX_APP_ID,
+                    'x-app-key': NUTRITIONIX_API_KEY,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+            }
+        );
+
+        console.log('Nutritionix barcode response:', response.data);
+
+        if (response.data && response.data.foods && response.data.foods.length > 0) {
+            return mapToFoodItem(response.data.foods[0]);
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error searching for barcode:', error);
+        if (axios.isAxiosError(error) && error.response) {
+            console.error('Response status:', error.response.status);
+            console.error('Response data:', error.response.data);
+        }
+        return null;
     }
 }; 

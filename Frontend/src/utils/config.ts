@@ -33,6 +33,11 @@ export const DEFAULT_USER_ID = 1;
 export const FATSECRET_CLIENT_ID = 'eba202cd16c84c98acd0905484d7138d'; // Using actual credentials from backend
 export const FATSECRET_CLIENT_SECRET = '44605528ab6c41e3a6804107a2d9fb25'; // Using actual credentials from backend
 
+// Nutritionix API credentials - replace with your actual credentials
+// To get your own credentials, sign up at https://developer.nutritionix.com/
+export const NUTRITIONIX_APP_ID = '81f05703';
+export const NUTRITIONIX_API_KEY = '9fa47f35bdb53d11c6a06b14b63af07c';
+
 // Spoonacular API credentials - replace with your actual credentials
 // To get your own credentials, sign up at https://spoonacular.com/food-api
 export const SPOONACULAR_API_KEY = '01c80e4d89704df2bdaa51ce8f2372f4';

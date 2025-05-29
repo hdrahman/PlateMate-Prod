@@ -6,7 +6,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { addFoodLog } from '../utils/database';
-import { fetchFoodByBarcode } from '../api/fatSecret';
+import { fetchFoodByBarcode } from '../api/nutritionix';
 import * as ImagePicker from 'expo-image-picker';
 
 // Define navigation types
