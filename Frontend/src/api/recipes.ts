@@ -36,14 +36,14 @@ export const foodCategories = [
     { id: 'breakfast', name: 'Breakfast', icon: 'sunny-outline' },
     { id: 'lunch', name: 'Lunch', icon: 'fast-food-outline' },
     { id: 'dinner', name: 'Dinner', icon: 'restaurant-outline' },
-    { id: 'snack', name: 'Snacks', icon: 'cafe-outline' },
-    { id: 'dessert', name: 'Desserts', icon: 'ice-cream-outline' },
-    { id: 'vegetarian', name: 'Vegetarian', icon: 'leaf-outline' },
-    { id: 'vegan', name: 'Vegan', icon: 'nutrition-outline' },
-    { id: 'glutenFree', name: 'Gluten Free', icon: 'barcode-outline' },
-    { id: 'dairyFree', name: 'Dairy Free', icon: 'water-outline' },
-    { id: 'healthy', name: 'Healthy', icon: 'fitness-outline' },
+    { id: 'comfort', name: 'Comfort Food', icon: 'heart-outline' },
+    { id: 'mexican', name: 'Mexican', icon: 'flame-outline' },
+    { id: 'italian', name: 'Italian', icon: 'pizza-outline' },
+    { id: 'american', name: 'American', icon: 'flag-outline' },
     { id: 'quick', name: 'Quick & Easy', icon: 'timer-outline' },
+    { id: 'snack', name: 'Snacks', icon: 'cafe-outline' },
+    { id: 'healthy', name: 'Healthy', icon: 'fitness-outline' },
+    { id: 'vegetarian', name: 'Vegetarian', icon: 'leaf-outline' },
 ];
 
 // Food Cuisine Categories
@@ -68,12 +68,26 @@ const isConfigured = !!SPOONACULAR_API_KEY;
 
 // Function to map Spoonacular recipe to our Recipe interface
 const mapSpoonacularRecipe = (spoonRecipe: any): Recipe => {
+    // Get highest resolution image by modifying the image size parameter
+    let imageUrl = spoonRecipe.image || '';
+    if (imageUrl && !imageUrl.startsWith('http')) {
+        // Use highest resolution: 636x393 for best quality
+        imageUrl = `https://spoonacular.com/recipeImages/${spoonRecipe.id}-636x393.${spoonRecipe.imageType || 'jpg'}`;
+    } else if (imageUrl && imageUrl.includes('312x231')) {
+        // Replace smaller resolution with highest one
+        imageUrl = imageUrl.replace('312x231', '636x393');
+    } else if (imageUrl && imageUrl.includes('240x150')) {
+        // Replace smaller resolution with highest one
+        imageUrl = imageUrl.replace('240x150', '636x393');
+    } else if (imageUrl && imageUrl.includes('556x370')) {
+        // Replace medium resolution with highest one
+        imageUrl = imageUrl.replace('556x370', '636x393');
+    }
+
     return {
         id: spoonRecipe.id.toString(),
         title: spoonRecipe.title,
-        image: spoonRecipe.image?.startsWith('http')
-            ? spoonRecipe.image
-            : `https://spoonacular.com/recipeImages/${spoonRecipe.image}`,
+        image: imageUrl,
         readyInMinutes: spoonRecipe.readyInMinutes || 0,
         servings: spoonRecipe.servings || 1,
         sourceUrl: spoonRecipe.sourceUrl || '',
@@ -159,24 +173,85 @@ export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => 
     }
 
     try {
-        // Apply filters first, then fetch exactly what we need
-        const response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
-            params: {
-                apiKey: SPOONACULAR_API_KEY,
-                number: count, // Fetch exactly what we need
-                addRecipeInformation: true,
-                fillIngredients: true,
-                minHealthScore: 60, // Filter for healthy recipes
-                sort: 'aggregateLikes', // Sort by popularity on the API side
-                sortDirection: 'desc', // Most popular first
-                instructionsRequired: true, // Ensure recipes have instructions
-                limitLicense: false, // Wider recipe selection
-                offset: Math.floor(Math.random() * 100), // Add randomness through offset
-            }
-        });
+        // Mix of mainstream cuisines that Americans love
+        const popularCuisines = ['american', 'mexican', 'italian', 'asian', 'mediterranean'];
+        const popularKeywords = [
+            'burger', 'quesadilla', 'enchilada', 'nacho', 'loaded fries', 'pizza', 'taco',
+            'sandwich', 'pasta', 'stir fry', 'bowl', 'wrap', 'chicken', 'beef', 'cheese'
+        ];
 
-        // No local sorting needed - API already filtered and sorted
-        return response.data.results.map(mapSpoonacularRecipe);
+        // Try to get a mix of different types of popular foods
+        let allResults: Recipe[] = [];
+
+        // Fetch from different categories to ensure variety
+        for (let i = 0; i < 3; i++) {
+            const randomCuisine = popularCuisines[Math.floor(Math.random() * popularCuisines.length)];
+            const randomKeyword = popularKeywords[Math.floor(Math.random() * popularKeywords.length)];
+
+            try {
+                let response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+                    params: {
+                        apiKey: SPOONACULAR_API_KEY,
+                        number: Math.ceil(count / 2), // Get fewer per request to mix categories
+                        addRecipeInformation: true,
+                        fillIngredients: true,
+                        minHealthScore: 40, // Lower threshold for more variety while still being reasonably healthy
+                        sort: 'aggregateLikes',
+                        sortDirection: 'desc',
+                        instructionsRequired: true,
+                        limitLicense: false,
+                        cuisine: randomCuisine,
+                        query: Math.random() > 0.5 ? randomKeyword : undefined, // Sometimes use keyword, sometimes just cuisine
+                        offset: Math.floor(Math.random() * 10),
+                    }
+                });
+
+                const results = response.data.results.map(mapSpoonacularRecipe);
+                allResults.push(...results);
+            } catch (error) {
+                console.log(`Failed to fetch ${randomCuisine} recipes, continuing...`);
+            }
+        }
+
+        // If we don't have enough results, try a broader search focusing on popular American foods
+        if (allResults.length < count) {
+            try {
+                let response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+                    params: {
+                        apiKey: SPOONACULAR_API_KEY,
+                        number: count,
+                        addRecipeInformation: true,
+                        fillIngredients: true,
+                        minHealthScore: 35, // Even more flexible for mainstream appeal
+                        sort: 'aggregateLikes',
+                        sortDirection: 'desc',
+                        instructionsRequired: true,
+                        limitLicense: false,
+                        cuisine: 'american,mexican,italian',
+                        type: 'main course',
+                        offset: 0,
+                    }
+                });
+
+                const results = response.data.results.map(mapSpoonacularRecipe);
+                allResults.push(...results);
+            } catch (error) {
+                console.log('Fallback search failed, trying final basic search...');
+            }
+        }
+
+        // Remove duplicates and sort by popularity
+        const uniqueResults = allResults.filter((recipe, index, self) =>
+            index === self.findIndex(r => r.id === recipe.id)
+        );
+
+        const sortedResults = uniqueResults.sort((a, b) =>
+            (b.aggregateLikes || 0) - (a.aggregateLikes || 0)
+        );
+
+        // Return the most popular unique recipes
+        return sortedResults.slice(0, count);
+
     } catch (error) {
         console.error('Error getting featured recipes:', error);
         return [];
@@ -209,14 +284,14 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
         // Apply all filters first, then fetch exactly what we need
         let apiParams: any = {
             apiKey: SPOONACULAR_API_KEY,
-            number: count, // Fetch exactly what we need
+            number: count,
             addRecipeInformation: true,
             fillIngredients: true,
-            minHealthScore: 60, // Filter for moderately healthy recipes
-            sort: 'aggregateLikes', // Sort by popularity on the API side
-            sortDirection: 'desc', // Most popular first
-            instructionsRequired: true, // Ensure recipes have instructions
-            offset: Math.floor(Math.random() * 50), // Add some randomness
+            minHealthScore: 45, // Lower default for more mainstream appeal while still healthy
+            sort: 'aggregateLikes',
+            sortDirection: 'desc',
+            instructionsRequired: true, // Always required for usability
+            offset: Math.floor(Math.random() * 15), // Small random offset for meal types
         };
 
         // Apply meal type-specific filters on the API side
@@ -231,43 +306,101 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
             case 'dinner':
                 apiParams.type = 'main course';
                 break;
+            case 'comfort':
+                apiParams.type = 'main course';
+                apiParams.query = 'burger,pizza,nachos,quesadilla,mac and cheese,fried chicken,grilled cheese';
+                apiParams.cuisine = 'american,mexican,italian';
+                apiParams.minHealthScore = 35; // Lower for comfort foods
+                break;
+            case 'mexican':
+                apiParams.cuisine = 'mexican';
+                apiParams.query = 'taco,quesadilla,enchilada,burrito,nacho';
+                apiParams.minHealthScore = 40;
+                break;
+            case 'italian':
+                apiParams.cuisine = 'italian';
+                apiParams.query = 'pizza,pasta,lasagna,risotto,sandwich';
+                apiParams.minHealthScore = 40;
+                break;
+            case 'american':
+                apiParams.cuisine = 'american';
+                apiParams.query = 'burger,sandwich,bbq,steak,chicken,fries';
+                apiParams.minHealthScore = 40;
+                break;
             case 'snack':
                 apiParams.type = 'snack';
                 break;
-            case 'dessert':
-                apiParams.type = 'dessert';
-                break;
             case 'vegetarian':
                 apiParams.diet = 'vegetarian';
-                break;
-            case 'vegan':
-                apiParams.diet = 'vegan';
-                break;
-            case 'glutenfree':
-                apiParams.diet = 'gluten free';
-                break;
-            case 'dairyfree':
-                apiParams.intolerances = 'dairy';
+                apiParams.minHealthScore = 50; // Maintain higher standard for vegetarian
                 break;
             case 'healthy':
-                apiParams.sort = 'healthiness'; // Sort by healthiness instead of popularity
+                apiParams.sort = 'healthiness';
                 apiParams.sortDirection = 'desc';
-                apiParams.minHealthScore = 80; // Higher health score for healthy category
+                apiParams.minHealthScore = 70; // Higher standard for healthy category
                 break;
             case 'quick':
-                apiParams.maxReadyTime = 20;
+                apiParams.maxReadyTime = 25;
+                apiParams.type = 'main course';
                 break;
             default:
                 // No specific filtering
                 break;
         }
 
-        const response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+        let response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
             params: apiParams
         });
 
-        // No local sorting needed - API already filtered and sorted
-        return response.data.results.map(mapSpoonacularRecipe);
+        let results = response.data.results.map(mapSpoonacularRecipe);
+
+        // Check if results have decent engagement (at least some recipes with 5+ likes for meal types)
+        const hasGoodEngagement = results.some(recipe => (recipe.aggregateLikes || 0) >= 5);
+
+        // If results have poor engagement, try different strategies while maintaining standards
+        if (!hasGoodEngagement && results.length > 0 && mealType.toLowerCase() !== 'healthy') {
+            console.log(`Initial ${mealType} results have low engagement, trying alternative approaches...`);
+
+            // Strategy 1: Remove random offset, get most popular with same filters
+            const strategy1Params = {
+                ...apiParams,
+                minHealthScore: 45, // Lower but still reasonable for health app
+                offset: 0, // No offset - get the most popular
+            };
+
+            response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+                params: strategy1Params
+            });
+
+            results = response.data.results.map(mapSpoonacularRecipe);
+
+            // If still poor engagement, try fetching more and selecting best
+            const stillPoorEngagement = !results.some(recipe => (recipe.aggregateLikes || 0) >= 5);
+            if (stillPoorEngagement && results.length > 0) {
+                console.log(`Trying larger sample for ${mealType} recipes...`);
+
+                const strategy2Params = {
+                    ...strategy1Params,
+                    number: count * 3, // Fetch more to have options
+                    minHealthScore: 40, // Minimum acceptable for health app
+                };
+
+                response = await axios.get(`${BASE_URL}/recipes/complexSearch`, {
+                    params: strategy2Params
+                });
+
+                const allResults = response.data.results.map(mapSpoonacularRecipe);
+
+                // Select the best engaged recipes from the larger sample
+                const sortedByEngagement = allResults.sort((a, b) =>
+                    (b.aggregateLikes || 0) - (a.aggregateLikes || 0)
+                );
+
+                results = sortedByEngagement.slice(0, count);
+            }
+        }
+
+        return results;
     } catch (error) {
         console.error(`Error getting ${mealType} recipes:`, error);
         return [];

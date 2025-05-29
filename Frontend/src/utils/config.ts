@@ -28,14 +28,16 @@ export const isDebug = __DEV__;
 export const APP_VERSION = '1.0.0';
 export const DEFAULT_USER_ID = 1;
 
-// Nutritionix API credentials - replace with your actual credentials
-// To get your own credentials, sign up at https://developer.nutritionix.com/
-export const NUTRITIONIX_APP_ID = '510c49f6'; // Add your Nutritionix App ID here
-export const NUTRITIONIX_API_KEY = '9afa0a24d0e9827a02336a7ba23a1ec0'; // Add your Nutritionix API Key here
+// FatSecret API credentials - from backend .env file
+// To get your own credentials, sign up at https://platform.fatsecret.com/
+export const FATSECRET_CLIENT_ID = 'eba202cd16c84c98acd0905484d7138d'; // Using actual credentials from backend
+export const FATSECRET_CLIENT_SECRET = '44605528ab6c41e3a6804107a2d9fb25'; // Using actual credentials from backend
 
 // Spoonacular API credentials - replace with your actual credentials
 // To get your own credentials, sign up at https://spoonacular.com/food-api
 export const SPOONACULAR_API_KEY = '01c80e4d89704df2bdaa51ce8f2372f4';
 
-// FatSecret API credentials - obtained from backend
-export const FATSECRET_ENABLED = true; // Set to false to disable FatSecret API completely 
+// FatSecret API settings
+export const FATSECRET_ENABLED = true; // Set to false to disable FatSecret API completely
+export const FATSECRET_BASE_URL = 'https://platform.fatsecret.com/rest';
+export const FATSECRET_TOKEN_URL = 'https://oauth.fatsecret.com/connect/token'; 

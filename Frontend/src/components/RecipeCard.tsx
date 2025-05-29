@@ -67,6 +67,9 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                     source={{ uri: recipe.image }}
                     style={[styles.image, compact && styles.compactImage]}
                     resizeMode="cover"
+                    onError={() => console.log('Failed to load recipe image')}
+                    fadeDuration={200}
+                    loadingIndicatorSource={{ uri: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }}
                 />
                 <TouchableOpacity
                     style={styles.favoriteButton}
@@ -173,14 +176,21 @@ const styles = StyleSheet.create({
     },
     imageContainer: {
         position: 'relative',
+        backgroundColor: '#1a1a1a', // Dark background for better contrast
+        overflow: 'hidden',
+        borderRadius: 8,
     },
     image: {
         width: '100%',
         height: 160,
+        backgroundColor: '#1a1a1a', // Background color for image loading
+        borderRadius: 8,
     },
     compactImage: {
         width: 80,
         height: '100%',
+        backgroundColor: '#1a1a1a', // Background color for image loading
+        borderRadius: 8,
     },
     favoriteButton: {
         position: 'absolute',

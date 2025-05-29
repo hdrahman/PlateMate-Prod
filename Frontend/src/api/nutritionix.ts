@@ -1,8 +1,8 @@
+import { SPOONACULAR_API_KEY } from '../utils/config';
 import axios from 'axios';
-import { NUTRITIONIX_APP_ID, NUTRITIONIX_API_KEY, SPOONACULAR_API_KEY } from '../utils/config';
 
-// Check if API credentials are configured
-const isConfigured = NUTRITIONIX_APP_ID && NUTRITIONIX_API_KEY;
+// Nutritionix API is disabled - now using FatSecret for barcode scanning
+const isConfigured = false; // Disabled Nutritionix API
 const isSpoonacularConfigured = !!SPOONACULAR_API_KEY;
 
 // Spoonacular API base URL
@@ -117,8 +117,8 @@ export const searchFood = async (query: string, minHealthiness: number = 0): Pro
             {
                 params: { query },
                 headers: {
-                    'x-app-id': NUTRITIONIX_APP_ID,
-                    'x-app-key': NUTRITIONIX_API_KEY,
+                    // 'x-app-id': NUTRITIONIX_APP_ID,
+                    // 'x-app-key': NUTRITIONIX_API_KEY,
                 },
             }
         );
@@ -165,8 +165,8 @@ export const getFoodDetails = async (query: string): Promise<FoodItem | null> =>
             { query },
             {
                 headers: {
-                    'x-app-id': NUTRITIONIX_APP_ID,
-                    'x-app-key': NUTRITIONIX_API_KEY,
+                    // 'x-app-id': NUTRITIONIX_APP_ID,
+                    // 'x-app-key': NUTRITIONIX_API_KEY,
                     'Content-Type': 'application/json'
                 },
             }

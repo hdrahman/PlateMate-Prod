@@ -116,6 +116,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                     source={{ uri: recipe.image }}
                                     style={styles.recipeImage}
                                     imageStyle={styles.recipeImageStyle}
+                                    resizeMode="cover"
                                 >
                                     <LinearGradient
                                         colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -232,9 +233,11 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         borderRadius: 10,
         overflow: 'hidden',
+        backgroundColor: '#1a1a1a',
     },
     recipeImageStyle: {
         borderRadius: 10,
+        backgroundColor: '#1a1a1a',
     },
     imageFadeGradient: {
         flex: 1,

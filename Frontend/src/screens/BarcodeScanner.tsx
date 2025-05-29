@@ -4,10 +4,9 @@ import { CameraView, BarcodeScanningResult, useCameraPermissions } from 'expo-ca
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { addFoodLog } from '../utils/database';
-import { NUTRITIONIX_APP_ID, NUTRITIONIX_API_KEY } from '../utils/config';
+import { fetchFoodByBarcode } from '../api/fatSecret';
 import * as ImagePicker from 'expo-image-picker';
 
 // Define navigation types
@@ -77,7 +76,7 @@ export default function BarcodeScannerScreen() {
             // UPC/EAN barcode detected
             console.log(`Bar code with type ${type} and data ${data} has been scanned!`);
 
-            // Look up nutrition data using Nutritionix API
+            // Look up nutrition data using FatSecret API
             const foodData = await fetchFoodByBarcode(data);
 
             if (foodData) {
@@ -117,60 +116,6 @@ export default function BarcodeScannerScreen() {
             );
         } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchFoodByBarcode = async (barcode: string) => {
-        try {
-            // Check if we have app ID and key from config
-            if (!NUTRITIONIX_APP_ID || !NUTRITIONIX_API_KEY) {
-                console.warn('Nutritionix API credentials not found.');
-                return null;
-            }
-
-            const response = await axios.get(
-                `https://trackapi.nutritionix.com/v2/search/item?upc=${barcode}`,
-                {
-                    headers: {
-                        'x-app-id': NUTRITIONIX_APP_ID,
-                        'x-app-key': NUTRITIONIX_API_KEY,
-                    },
-                }
-            );
-
-            if (response.data.foods && response.data.foods.length > 0) {
-                const food = response.data.foods[0];
-                return {
-                    food_name: food.food_name,
-                    brand_name: food.brand_name,
-                    calories: food.nf_calories,
-                    proteins: food.nf_protein,
-                    carbs: food.nf_total_carbohydrate,
-                    fats: food.nf_total_fat,
-                    fiber: food.nf_dietary_fiber || 0,
-                    sugar: food.nf_sugars || 0,
-                    saturated_fat: food.nf_saturated_fat || 0,
-                    polyunsaturated_fat: 0, // Not provided by Nutritionix
-                    monounsaturated_fat: 0, // Not provided by Nutritionix
-                    trans_fat: food.nf_trans_fatty_acid || 0,
-                    cholesterol: food.nf_cholesterol || 0,
-                    sodium: food.nf_sodium || 0,
-                    potassium: food.nf_potassium || 0,
-                    vitamin_a: Math.round(food.full_nutrients?.find(n => n.attr_id === 320)?.value || 0),
-                    vitamin_c: Math.round(food.full_nutrients?.find(n => n.attr_id === 401)?.value || 0),
-                    calcium: Math.round(food.full_nutrients?.find(n => n.attr_id === 301)?.value || 0),
-                    iron: Math.round(food.full_nutrients?.find(n => n.attr_id === 303)?.value || 0),
-                    image: food.photo?.thumb,
-                    healthiness_rating: 5, // Default value, could implement a rating algorithm
-                    serving_unit: food.serving_unit,
-                    serving_weight_grams: food.serving_weight_grams,
-                    serving_qty: food.serving_qty
-                };
-            }
-            return null;
-        } catch (error) {
-            console.error('Error fetching food data:', error);
-            return null;
         }
     };
 
