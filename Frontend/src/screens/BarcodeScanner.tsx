@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, StatusBar, ActivityIndicator, Alert, TextInput, Dimensions, ScrollView, Modal, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, StatusBar, ActivityIndicator, Alert, TextInput, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, BarcodeScanningResult, useCameraPermissions } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -9,10 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { addFoodLog } from '../utils/database';
 import { barcodeService } from '../services/BarcodeService';
-import { MacronutrientPieChart, MacronutrientProgress } from '../components/charts/NutritionCharts';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,6 +37,7 @@ const COLORS = {
 type RootStackParamList = {
     ImageCapture: { mealType: string; foodData?: any; photoUri?: string; sourcePage?: string };
     BarcodeResults: { foodData: any; mealType?: string };
+    ScannedProduct: { foodData: any; mealType?: string };
     'Food Log': { refresh?: number };
     Camera: undefined;
     BarcodeScanner: undefined;
@@ -48,9 +47,6 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-// Animation timing constants
-const ANIMATION_DURATION = 200;
-
 export default function BarcodeScannerScreen() {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
@@ -58,24 +54,9 @@ export default function BarcodeScannerScreen() {
     const [torchOn, setTorchOn] = useState(false);
     const [barcodeText, setBarcodeText] = useState('');
     const [isCameraReady, setIsCameraReady] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
-    const [previewData, setPreviewData] = useState<any>(null);
-    const [quantity, setQuantity] = useState('1');
-    const [servingUnit, setServingUnit] = useState('serving');
-    const [mealType, setMealType] = useState('Snacks');
-    const [showMealDropdown, setShowMealDropdown] = useState(false);
-    const [notes, setNotes] = useState('');
-    const [showQuickAdd, setShowQuickAdd] = useState(false);
 
     const cameraRef = useRef<CameraView>(null);
     const navigation = useNavigation<NavigationProp>();
-
-    const mealTypes = [
-        { name: 'Breakfast', icon: 'sunny-outline', color: COLORS.ACCENT_ORANGE },
-        { name: 'Lunch', icon: 'restaurant-outline', color: COLORS.ACCENT_GREEN },
-        { name: 'Dinner', icon: 'moon-outline', color: COLORS.ACCENT_BLUE },
-        { name: 'Snacks', icon: 'cafe-outline', color: COLORS.ACCENT_PINK }
-    ];
 
     // Define renderControlBar function before component logic
     const renderControlBar = () => (
@@ -124,8 +105,6 @@ export default function BarcodeScannerScreen() {
         React.useCallback(() => {
             setIsCameraReady(false);
             setScanned(false);
-            setShowPreview(false);
-            setPreviewData(null);
 
             const timer = setTimeout(() => {
                 setIsCameraReady(true);
@@ -163,13 +142,15 @@ export default function BarcodeScannerScreen() {
 
             if (foodData) {
                 console.log('Successfully retrieved food data:', foodData.food_name);
-                setPreviewData(foodData);
-                setQuantity(foodData?.serving_qty ? String(foodData.serving_qty) : '1');
-                setServingUnit(foodData?.serving_unit || 'serving');
-                setShowPreview(true);
 
                 // Success haptic
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+                // Navigate to the new ScannedProduct screen
+                navigation.navigate('ScannedProduct', {
+                    foodData,
+                    mealType: 'Snacks'
+                });
             } else {
                 console.log('No food data found in any API');
 
@@ -209,80 +190,6 @@ export default function BarcodeScannerScreen() {
             );
         } finally {
             setLoading(false);
-        }
-    };
-
-    // Calculate nutrition values based on quantity
-    const calculateNutrition = (baseValue: number, currentQuantity: string) => {
-        const qty = parseFloat(currentQuantity) || 1;
-        const baseQty = previewData?.serving_qty || 1;
-        return Math.round((baseValue * qty) / baseQty);
-    };
-
-    const handleQuickAdd = async () => {
-        if (!previewData) return;
-
-        setShowQuickAdd(true);
-
-        try {
-            const userId = await AsyncStorage.getItem('user_id');
-            if (!userId) {
-                Alert.alert('Error', 'Please log in to continue');
-                return;
-            }
-
-            const calories = calculateNutrition(previewData.calories || 0, quantity);
-            const proteins = calculateNutrition(previewData.proteins || 0, quantity);
-            const carbs = calculateNutrition(previewData.carbs || 0, quantity);
-            const fats = calculateNutrition(previewData.fats || 0, quantity);
-
-            const foodLogEntry = {
-                user_id: parseInt(userId),
-                meal_type: mealType,
-                food_name: previewData.food_name || 'Unknown Food',
-                brand_name: previewData.brand_name || '',
-                quantity: `${quantity} ${servingUnit}`,
-                calories: calories,
-                proteins: proteins,
-                carbs: carbs,
-                fats: fats,
-                notes: notes ? `${notes} | Quick scanned` : 'Quick scanned',
-                timestamp: new Date().toISOString(),
-            };
-
-            const result = await addFoodLog(foodLogEntry);
-
-            if (result) {
-                // Success haptic
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-                Alert.alert(
-                    '✅ Added Successfully!',
-                    `${previewData.food_name} added to ${mealType.toLowerCase()}.`,
-                    [
-                        {
-                            text: 'View Food Log',
-                            onPress: () => navigation.navigate('Food Log', { refresh: Date.now() })
-                        },
-                        {
-                            text: 'Scan Another',
-                            onPress: () => {
-                                setShowPreview(false);
-                                setPreviewData(null);
-                                setScanned(false);
-                            },
-                            style: 'default'
-                        }
-                    ]
-                );
-            } else {
-                throw new Error('Failed to add food log entry');
-            }
-        } catch (error) {
-            console.error('Error adding food to log:', error);
-            Alert.alert('Error', 'Failed to add food to log. Please try again.');
-        } finally {
-            setShowQuickAdd(false);
         }
     };
 
@@ -349,277 +256,6 @@ export default function BarcodeScannerScreen() {
             </SafeAreaView>
         );
     }
-
-    const renderPreviewModal = () => {
-        if (!showPreview || !previewData) return null;
-
-        const calories = calculateNutrition(previewData.calories || 0, quantity);
-        const proteins = calculateNutrition(previewData.proteins || 0, quantity);
-        const carbs = calculateNutrition(previewData.carbs || 0, quantity);
-        const fats = calculateNutrition(previewData.fats || 0, quantity);
-        const fiber = previewData.fiber ? calculateNutrition(previewData.fiber, quantity) : null;
-        const sugar = previewData.sugar ? calculateNutrition(previewData.sugar, quantity) : null;
-        const sodium = previewData.sodium ? calculateNutrition(previewData.sodium, quantity) : null;
-
-        // Get the best available image from Nutritionix API
-        const getProductImage = () => {
-            if (previewData?.photo?.thumb) return previewData.photo.thumb;
-            if (previewData?.photo?.highres) return previewData.photo.highres;
-            if (previewData?.image_url) return previewData.image_url;
-            if (previewData?.thumbnail) return previewData.thumbnail;
-            return null;
-        };
-
-        const productImage = getProductImage();
-
-        return (
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={showPreview}
-                onRequestClose={() => setShowPreview(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <BlurView intensity={50} style={styles.modalBlur}>
-                        <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Nutrition Facts</Text>
-                                <TouchableOpacity
-                                    onPress={() => setShowPreview(false)}
-                                    style={styles.closeButton}
-                                >
-                                    <Ionicons name="close" size={24} color={COLORS.WHITE} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
-                                {/* Enhanced Product Header with Image */}
-                                <View style={styles.productHeaderCard}>
-                                    <View style={styles.productImageSection}>
-                                        {productImage ? (
-                                            <View style={styles.productImageContainer}>
-                                                <Image
-                                                    source={{ uri: productImage }}
-                                                    style={styles.productImage}
-                                                    resizeMode="cover"
-                                                />
-                                                <View style={styles.scanBadge}>
-                                                    <MaterialCommunityIcons name="barcode-scan" size={10} color={COLORS.ACCENT_BLUE} />
-                                                    <Text style={styles.scanBadgeText}>SCANNED</Text>
-                                                </View>
-                                            </View>
-                                        ) : (
-                                            <View style={styles.placeholderImageContainer}>
-                                                <MaterialCommunityIcons name="food" size={32} color={COLORS.GRAY_MEDIUM} />
-                                                <View style={styles.scanBadge}>
-                                                    <MaterialCommunityIcons name="barcode-scan" size={10} color={COLORS.ACCENT_BLUE} />
-                                                    <Text style={styles.scanBadgeText}>SCANNED</Text>
-                                                </View>
-                                            </View>
-                                        )}
-                                    </View>
-
-                                    <View style={styles.productInfoSection}>
-                                        <Text style={styles.enhancedProductName} numberOfLines={2}>
-                                            {previewData.food_name}
-                                        </Text>
-                                        {previewData.brand_name && (
-                                            <Text style={styles.enhancedBrandName}>{previewData.brand_name}</Text>
-                                        )}
-                                    </View>
-                                </View>
-
-                                {/* Enhanced Serving Size Controls */}
-                                <View style={styles.enhancedServingCard}>
-                                    <Text style={styles.sectionTitle}>Serving Size</Text>
-                                    <View style={styles.enhancedServingControls}>
-                                        <TouchableOpacity
-                                            style={styles.enhancedQuantityButton}
-                                            onPress={() => setQuantity(String(Math.max(0.1, parseFloat(quantity) - 0.5)))}
-                                        >
-                                            <Ionicons name="remove" size={18} color={COLORS.WHITE} />
-                                        </TouchableOpacity>
-
-                                        <View style={styles.enhancedQuantityDisplay}>
-                                            <TextInput
-                                                style={styles.enhancedQuantityInput}
-                                                value={quantity}
-                                                onChangeText={setQuantity}
-                                                keyboardType="decimal-pad"
-                                                selectTextOnFocus
-                                            />
-                                            <Text style={styles.enhancedServingUnitText}>{servingUnit}</Text>
-                                        </View>
-
-                                        <TouchableOpacity
-                                            style={styles.enhancedQuantityButton}
-                                            onPress={() => setQuantity(String(parseFloat(quantity) + 0.5))}
-                                        >
-                                            <Ionicons name="add" size={18} color={COLORS.WHITE} />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-
-                                {/* Enhanced Nutrition Display */}
-                                <View style={styles.enhancedNutritionCard}>
-                                    <Text style={styles.sectionTitle}>Nutrition Information</Text>
-
-                                    {/* Large Calorie Display */}
-                                    <View style={styles.enhancedCaloriesDisplay}>
-                                        <Text style={styles.enhancedCaloriesNumber}>{calories}</Text>
-                                        <Text style={styles.enhancedCaloriesLabel}>calories</Text>
-                                    </View>
-
-                                    {/* Enhanced Macros with Progress Bars */}
-                                    <View style={styles.macrosSection}>
-                                        <View style={styles.macroRow}>
-                                            <View style={styles.macroItemEnhanced}>
-                                                <View style={styles.macroHeader}>
-                                                    <Text style={styles.macroValue}>{carbs}g</Text>
-                                                    <Text style={styles.macroLabel}>Carbs</Text>
-                                                </View>
-                                                <View style={styles.macroBarContainer}>
-                                                    <View style={[styles.macroBar, { backgroundColor: COLORS.ACCENT_BLUE + '30' }]}>
-                                                        <View style={[styles.macroProgress, {
-                                                            width: `${Math.min(100, (carbs / Math.max(carbs, proteins, fats, 50)) * 100)}%`,
-                                                            backgroundColor: COLORS.ACCENT_BLUE
-                                                        }]} />
-                                                    </View>
-                                                </View>
-                                            </View>
-
-                                            <View style={styles.macroItemEnhanced}>
-                                                <View style={styles.macroHeader}>
-                                                    <Text style={styles.macroValue}>{proteins}g</Text>
-                                                    <Text style={styles.macroLabel}>Protein</Text>
-                                                </View>
-                                                <View style={styles.macroBarContainer}>
-                                                    <View style={[styles.macroBar, { backgroundColor: COLORS.ACCENT_GREEN + '30' }]}>
-                                                        <View style={[styles.macroProgress, {
-                                                            width: `${Math.min(100, (proteins / Math.max(carbs, proteins, fats, 50)) * 100)}%`,
-                                                            backgroundColor: COLORS.ACCENT_GREEN
-                                                        }]} />
-                                                    </View>
-                                                </View>
-                                            </View>
-
-                                            <View style={styles.macroItemEnhanced}>
-                                                <View style={styles.macroHeader}>
-                                                    <Text style={styles.macroValue}>{fats}g</Text>
-                                                    <Text style={styles.macroLabel}>Fat</Text>
-                                                </View>
-                                                <View style={styles.macroBarContainer}>
-                                                    <View style={[styles.macroBar, { backgroundColor: COLORS.ACCENT_ORANGE + '30' }]}>
-                                                        <View style={[styles.macroProgress, {
-                                                            width: `${Math.min(100, (fats / Math.max(carbs, proteins, fats, 50)) * 100)}%`,
-                                                            backgroundColor: COLORS.ACCENT_ORANGE
-                                                        }]} />
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* Additional Nutrients */}
-                                {(fiber || sugar || sodium) && (
-                                    <View style={styles.additionalNutrientsCard}>
-                                        <Text style={styles.sectionTitle}>Additional Information</Text>
-                                        <View style={styles.additionalNutrientsGrid}>
-                                            {fiber && (
-                                                <View style={styles.additionalNutrientItem}>
-                                                    <Text style={styles.additionalNutrientValue}>{fiber}g</Text>
-                                                    <Text style={styles.additionalNutrientLabel}>Fiber</Text>
-                                                </View>
-                                            )}
-                                            {sugar && (
-                                                <View style={styles.additionalNutrientItem}>
-                                                    <Text style={styles.additionalNutrientValue}>{sugar}g</Text>
-                                                    <Text style={styles.additionalNutrientLabel}>Sugar</Text>
-                                                </View>
-                                            )}
-                                            {sodium && (
-                                                <View style={styles.additionalNutrientItem}>
-                                                    <Text style={styles.additionalNutrientValue}>{sodium}mg</Text>
-                                                    <Text style={styles.additionalNutrientLabel}>Sodium</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-                                )}
-
-                                {/* Enhanced Meal Type Selection */}
-                                <View style={styles.enhancedMealCard}>
-                                    <Text style={styles.sectionTitle}>Add to Meal</Text>
-                                    <View style={styles.enhancedMealTypeGrid}>
-                                        {mealTypes.map((meal) => (
-                                            <TouchableOpacity
-                                                key={meal.name}
-                                                style={[
-                                                    styles.enhancedMealTypeButton,
-                                                    mealType === meal.name && styles.enhancedActiveMealType
-                                                ]}
-                                                onPress={() => setMealType(meal.name)}
-                                            >
-                                                <Ionicons
-                                                    name={meal.icon as any}
-                                                    size={24}
-                                                    color={mealType === meal.name ? COLORS.WHITE : meal.color}
-                                                />
-                                                <Text style={[
-                                                    styles.enhancedMealTypeText,
-                                                    mealType === meal.name && styles.enhancedActiveMealTypeText
-                                                ]}>
-                                                    {meal.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                </View>
-
-                                {/* Enhanced Notes */}
-                                <View style={styles.enhancedNotesCard}>
-                                    <Text style={styles.sectionTitle}>Notes (Optional)</Text>
-                                    <TextInput
-                                        style={styles.enhancedNotesInput}
-                                        placeholder="Add any notes about this food..."
-                                        placeholderTextColor={COLORS.GRAY_MEDIUM}
-                                        value={notes}
-                                        onChangeText={setNotes}
-                                        multiline
-                                        numberOfLines={3}
-                                        maxLength={200}
-                                        textAlignVertical="top"
-                                    />
-                                </View>
-
-                                {/* Single Action Button - No View Details */}
-                                <TouchableOpacity
-                                    style={styles.finalAddButton}
-                                    onPress={handleQuickAdd}
-                                    disabled={showQuickAdd}
-                                >
-                                    <LinearGradient
-                                        colors={showQuickAdd ? [COLORS.GRAY_MEDIUM, COLORS.GRAY_DARK] : [COLORS.ACCENT_BLUE, COLORS.ACCENT_PURPLE]}
-                                        style={styles.finalAddButtonGradient}
-                                    >
-                                        {showQuickAdd ? (
-                                            <ActivityIndicator color={COLORS.WHITE} />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="add" size={20} color={COLORS.WHITE} />
-                                                <Text style={styles.finalAddButtonText}>Add to {mealType}</Text>
-                                            </>
-                                        )}
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </ScrollView>
-                        </View>
-                    </BlurView>
-                </View>
-            </Modal>
-        );
-    };
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -731,7 +367,7 @@ export default function BarcodeScannerScreen() {
                 </View>
             )}
 
-            {scanned && !loading && !showPreview && (
+            {scanned && !loading && (
                 <View style={styles.scanCompleteContainer}>
                     <BlurView intensity={30} style={styles.scanCompleteBlur}>
                         <TouchableOpacity style={styles.scanAgainButton} onPress={() => setScanned(false)}>
@@ -750,7 +386,6 @@ export default function BarcodeScannerScreen() {
             )}
 
             {renderControlBar()}
-            {renderPreviewModal()}
         </SafeAreaView>
     );
 }
@@ -1080,316 +715,5 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         paddingHorizontal: 24,
         borderRadius: 16,
-    },
-
-    // Modal Styles
-    modalContainer: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    modalBlur: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: COLORS.CARD_BG,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        maxHeight: height * 0.9,
-        paddingTop: 20,
-        borderTopWidth: 1,
-        borderLeftWidth: 1,
-        borderRightWidth: 1,
-        borderColor: COLORS.GLASS_BORDER,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 24,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.GRAY_DARK,
-    },
-    modalTitle: {
-        color: COLORS.WHITE,
-        fontSize: 22,
-        fontWeight: '700',
-    },
-    closeButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: COLORS.GRAY_DARK,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    modalScrollView: {
-        paddingHorizontal: 24,
-        paddingBottom: 40,
-    },
-
-    // Product Card Styles
-    productHeaderCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 20,
-        marginBottom: 20,
-    },
-    productImageSection: {
-        marginRight: 20,
-    },
-    productImageContainer: {
-        position: 'relative',
-    },
-    productImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-    },
-    scanBadge: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: COLORS.ACCENT_BLUE,
-        borderRadius: 12,
-        paddingHorizontal: 4,
-        paddingVertical: 2,
-    },
-    scanBadgeText: {
-        color: COLORS.WHITE,
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    placeholderImageContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-        backgroundColor: COLORS.SECONDARY_BG,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    productInfoSection: {
-        flex: 1,
-    },
-    enhancedProductName: {
-        color: COLORS.WHITE,
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 8,
-        lineHeight: 26,
-    },
-    enhancedBrandName: {
-        color: COLORS.GRAY_LIGHT,
-        fontSize: 16,
-        fontWeight: '500',
-    },
-
-    // Enhanced Serving Size Styles
-    enhancedServingCard: {
-        backgroundColor: COLORS.SECONDARY_BG,
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 20,
-    },
-    enhancedServingControls: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    enhancedQuantityButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.ACCENT_PINK,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    enhancedQuantityDisplay: {
-        alignItems: 'center',
-        marginHorizontal: 24,
-        minWidth: 120,
-    },
-    enhancedQuantityInput: {
-        color: COLORS.WHITE,
-        fontSize: 24,
-        fontWeight: '700',
-        textAlign: 'center',
-        backgroundColor: COLORS.GRAY_DARK,
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        minWidth: 80,
-        marginBottom: 8,
-    },
-    enhancedServingUnitText: {
-        color: COLORS.GRAY_LIGHT,
-        fontSize: 14,
-        fontWeight: '500',
-    },
-
-    // Enhanced Nutrition Styles
-    enhancedNutritionCard: {
-        backgroundColor: COLORS.SECONDARY_BG,
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 20,
-    },
-    enhancedCaloriesDisplay: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    enhancedCaloriesNumber: {
-        color: COLORS.WHITE,
-        fontSize: 36,
-        fontWeight: '800',
-    },
-    enhancedCaloriesLabel: {
-        color: COLORS.GRAY_LIGHT,
-        fontSize: 14,
-        fontWeight: '500',
-        marginTop: 4,
-    },
-    macrosSection: {
-        marginBottom: 20,
-    },
-    macroRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    macroItemEnhanced: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    macroHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    macroValue: {
-        color: COLORS.WHITE,
-        fontSize: 20,
-        fontWeight: '700',
-    },
-    macroLabel: {
-        color: COLORS.GRAY_LIGHT,
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    macroBarContainer: {
-        height: 20,
-        backgroundColor: COLORS.GRAY_DARK,
-        borderRadius: 10,
-        overflow: 'hidden',
-    },
-    macroBar: {
-        height: '100%',
-        backgroundColor: COLORS.ACCENT_PINK,
-    },
-    macroProgress: {
-        height: '100%',
-        backgroundColor: COLORS.ACCENT_PINK,
-    },
-
-    // Additional Nutrients Styles
-    additionalNutrientsCard: {
-        backgroundColor: COLORS.SECONDARY_BG,
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 20,
-    },
-    additionalNutrientsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-    additionalNutrientItem: {
-        width: '48%',
-        marginBottom: 12,
-    },
-    additionalNutrientValue: {
-        color: COLORS.WHITE,
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    additionalNutrientLabel: {
-        color: COLORS.GRAY_LIGHT,
-        fontSize: 14,
-        fontWeight: '500',
-    },
-
-    // Enhanced Meal Type Styles
-    enhancedMealCard: {
-        backgroundColor: COLORS.SECONDARY_BG,
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 20,
-    },
-    enhancedMealTypeGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-    enhancedMealTypeButton: {
-        width: '48%',
-        backgroundColor: COLORS.GRAY_DARK,
-        borderRadius: 12,
-        padding: 16,
-        alignItems: 'center',
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    enhancedActiveMealType: {
-        backgroundColor: COLORS.ACCENT_PINK,
-        borderColor: COLORS.ACCENT_PINK,
-    },
-    enhancedMealTypeText: {
-        color: COLORS.GRAY_LIGHT,
-        fontSize: 14,
-        fontWeight: '600',
-        marginTop: 8,
-    },
-    enhancedActiveMealTypeText: {
-        color: COLORS.WHITE,
-    },
-
-    // Enhanced Notes Styles
-    enhancedNotesCard: {
-        backgroundColor: COLORS.SECONDARY_BG,
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 20,
-    },
-    enhancedNotesInput: {
-        color: COLORS.WHITE,
-        fontSize: 16,
-        backgroundColor: COLORS.GRAY_DARK,
-        borderRadius: 12,
-        padding: 16,
-        minHeight: 80,
-        textAlignVertical: 'top',
-    },
-
-    // Final Add Button Styles
-    finalAddButton: {
-        borderRadius: 16,
-        overflow: 'hidden',
-    },
-    finalAddButtonGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        borderRadius: 16,
-    },
-    finalAddButtonText: {
-        color: COLORS.WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
     },
 });

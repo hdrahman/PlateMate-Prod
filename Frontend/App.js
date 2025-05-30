@@ -36,6 +36,7 @@ import ImageCaptureScreen from './src/screens/ImageCapture';
 import Nutrients from './src/screens/Nutrients';
 import BarcodeScannerScreen from './src/screens/BarcodeScanner';
 import BarcodeResults from './src/screens/BarcodeResults';
+import ScannedProduct from './src/screens/ScannedProduct';
 import Manual from './src/screens/Manual';
 import MealPlanner from "./src/screens/MealPlanner";
 import MealPlannerCamera from "./src/screens/MealPlannerCamera";
@@ -334,6 +335,7 @@ function AppNavigator() {
             <Stack.Screen name="Nutrients" component={Nutrients} />
             <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
             <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
+            <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
             <Stack.Screen name="Manual" component={Manual} />
             <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
             <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
