@@ -11,6 +11,7 @@ import {
     Alert,
     ActivityIndicator,
     Dimensions,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +22,14 @@ import { BlurView } from 'expo-blur';
 import { addFoodLog } from '../utils/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import {
+    getSuggestedUnitsForFood,
+    convertFoodUnit,
+    recalculateNutrition,
+    formatUnitName,
+    isValidUnitForFood,
+    FoodUnit
+} from '../utils/foodUnitConversion';
 
 const { width, height } = Dimensions.get('window');
 
@@ -64,6 +73,9 @@ const ScannedProduct: React.FC = () => {
     const [servingUnit, setServingUnit] = useState(foodData?.serving_unit || 'serving');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showUnitModal, setShowUnitModal] = useState(false);
+    const [availableUnits, setAvailableUnits] = useState<FoodUnit[]>([]);
+    const [currentNutrition, setCurrentNutrition] = useState(foodData);
 
     const mealTypes = [
         { name: 'Breakfast', icon: 'sunny-outline', color: COLORS.ACCENT_ORANGE },
@@ -72,30 +84,116 @@ const ScannedProduct: React.FC = () => {
         { name: 'Snacks', icon: 'cafe-outline', color: COLORS.ACCENT_PINK }
     ];
 
-    // Calculate nutrition values based on quantity
-    const calculateNutrition = (baseValue: number, currentQuantity: string) => {
-        const qty = parseFloat(currentQuantity) || 1;
-        const baseQty = foodData?.serving_qty || 1;
-        return Math.round((baseValue * qty) / baseQty);
+    // Initialize available units and nutrition on mount
+    useEffect(() => {
+        const foodName = foodData?.food_name || '';
+        const units = getSuggestedUnitsForFood(foodName);
+        setAvailableUnits(units);
+
+        // Ensure current unit is in available units, if not add it
+        const currentUnitExists = units.some(unit => unit.key === servingUnit);
+        if (!currentUnitExists && servingUnit) {
+            // Add current unit to the list if it's valid for this food
+            if (isValidUnitForFood(foodName, servingUnit)) {
+                const allUnits = getSuggestedUnitsForFood(foodName);
+                const currentUnitObj = allUnits.find(unit => unit.key === servingUnit);
+                if (currentUnitObj) {
+                    setAvailableUnits([currentUnitObj, ...units]);
+                }
+            }
+        }
+    }, [foodData, servingUnit]);
+
+    // Update nutrition when quantity or unit changes
+    useEffect(() => {
+        if (foodData) {
+            const baseQuantity = foodData.serving_qty || 1;
+            const baseUnit = foodData.serving_unit || 'serving';
+            const currentQuantityNum = parseFloat(quantity) || 1;
+
+            const newNutrition = recalculateNutrition(
+                foodData,
+                baseQuantity,
+                baseUnit,
+                currentQuantityNum,
+                servingUnit,
+                foodData.food_name || '',
+                foodData.serving_weight_grams
+            );
+
+            setCurrentNutrition(newNutrition);
+        }
+    }, [quantity, servingUnit, foodData]);
+
+    // Calculate nutrition values based on current quantity and unit
+    const calories = currentNutrition?.calories || 0;
+    const proteins = currentNutrition?.proteins || 0;
+    const carbs = currentNutrition?.carbs || 0;
+    const fats = currentNutrition?.fats || 0;
+    const fiber = currentNutrition?.fiber || null;
+    const sugar = currentNutrition?.sugar || null;
+    const sodium = currentNutrition?.sodium || null;
+
+    // Handle unit change
+    const handleUnitChange = (newUnit: string) => {
+        const foodName = foodData?.food_name || '';
+
+        // Validate if the unit is appropriate for this food
+        if (!isValidUnitForFood(foodName, newUnit)) {
+            Alert.alert(
+                'Invalid Unit',
+                `${newUnit} is not a suitable measurement unit for ${foodName}. Please choose a different unit.`,
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        try {
+            // Convert current quantity to new unit
+            const currentQuantityNum = parseFloat(quantity) || 1;
+            const convertedQuantity = convertFoodUnit(
+                currentQuantityNum,
+                servingUnit,
+                newUnit,
+                foodName,
+                foodData?.serving_weight_grams
+            );
+
+            setQuantity(convertedQuantity.toFixed(2).replace(/\.?0+$/, ''));
+            setServingUnit(newUnit);
+            setShowUnitModal(false);
+        } catch (error) {
+            console.error('Error converting units:', error);
+            Alert.alert('Conversion Error', 'Unable to convert to the selected unit.');
+        }
     };
 
-    // Get the best available image from API
-    const getProductImage = () => {
-        if (foodData?.photo?.thumb) return foodData.photo.thumb;
-        if (foodData?.photo?.highres) return foodData.photo.highres;
-        if (foodData?.image_url) return foodData.image_url;
-        if (foodData?.thumbnail) return foodData.thumbnail;
-        return null;
+    // Increment/decrement with smart step sizes
+    const getStepSize = (unit: string): number => {
+        const stepSizes: Record<string, number> = {
+            'tsp': 0.25,
+            'tbsp': 0.25,
+            'fl oz': 0.5,
+            'cup': 0.25,
+            'g': 5,
+            'oz': 0.25,
+            'ml': 10,
+            'piece': 1,
+            'slice': 1,
+            'serving': 0.5,
+        };
+        return stepSizes[unit] || 0.5;
     };
 
-    // Calculate nutrition values
-    const calories = calculateNutrition(foodData.calories || 0, quantity);
-    const proteins = calculateNutrition(foodData.proteins || 0, quantity);
-    const carbs = calculateNutrition(foodData.carbs || 0, quantity);
-    const fats = calculateNutrition(foodData.fats || 0, quantity);
-    const fiber = foodData.fiber ? calculateNutrition(foodData.fiber, quantity) : null;
-    const sugar = foodData.sugar ? calculateNutrition(foodData.sugar, quantity) : null;
-    const sodium = foodData.sodium ? calculateNutrition(foodData.sodium, quantity) : null;
+    const adjustQuantity = (increment: boolean) => {
+        const currentQty = parseFloat(quantity) || 0;
+        const step = getStepSize(servingUnit);
+        const newQty = increment ? currentQty + step : Math.max(step, currentQty - step);
+        setQuantity(newQty.toString().replace(/\.?0+$/, ''));
+
+        // Haptic feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
 
     const handleSubmit = async () => {
         try {
@@ -158,8 +256,6 @@ const ScannedProduct: React.FC = () => {
         }
     };
 
-    const productImage = getProductImage();
-
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY_BG} />
@@ -183,30 +279,6 @@ const ScannedProduct: React.FC = () => {
                         style={styles.cardGradient}
                     >
                         <View style={styles.productSection}>
-                            <View style={styles.productImageSection}>
-                                {productImage ? (
-                                    <View style={styles.productImageContainer}>
-                                        <Image
-                                            source={{ uri: productImage }}
-                                            style={styles.productImage}
-                                            resizeMode="cover"
-                                        />
-                                        <View style={styles.scanBadge}>
-                                            <MaterialCommunityIcons name="barcode-scan" size={10} color={COLORS.ACCENT_BLUE} />
-                                            <Text style={styles.scanBadgeText}>SCANNED</Text>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <View style={styles.placeholderImageContainer}>
-                                        <MaterialCommunityIcons name="food" size={40} color={COLORS.GRAY_MEDIUM} />
-                                        <View style={styles.scanBadge}>
-                                            <MaterialCommunityIcons name="barcode-scan" size={10} color={COLORS.ACCENT_BLUE} />
-                                            <Text style={styles.scanBadgeText}>SCANNED</Text>
-                                        </View>
-                                    </View>
-                                )}
-                            </View>
-
                             <View style={styles.productInfoSection}>
                                 <Text style={styles.productName} numberOfLines={2}>
                                     {foodData.food_name || 'Unknown Product'}
@@ -215,15 +287,16 @@ const ScannedProduct: React.FC = () => {
                                     <Text style={styles.brandName}>{foodData.brand_name}</Text>
                                 )}
 
-                                {/* Serving Controls - Inline */}
+                                {/* Enhanced Serving Controls */}
                                 <View style={styles.servingControls}>
                                     <TouchableOpacity
                                         style={styles.quantityButton}
-                                        onPress={() => setQuantity(String(Math.max(0.1, parseFloat(quantity) - 0.5)))}
+                                        onPress={() => adjustQuantity(false)}
                                     >
                                         <Ionicons name="remove" size={16} color={COLORS.WHITE} />
                                     </TouchableOpacity>
-                                    <View style={styles.quantityDisplay}>
+
+                                    <View style={styles.quantityInputContainer}>
                                         <TextInput
                                             style={styles.quantityInput}
                                             value={quantity}
@@ -231,13 +304,23 @@ const ScannedProduct: React.FC = () => {
                                             keyboardType="decimal-pad"
                                             selectTextOnFocus
                                         />
-                                        <Text style={styles.servingUnitText}>{servingUnit}</Text>
                                     </View>
+
                                     <TouchableOpacity
                                         style={styles.quantityButton}
-                                        onPress={() => setQuantity(String(parseFloat(quantity) + 0.5))}
+                                        onPress={() => adjustQuantity(true)}
                                     >
                                         <Ionicons name="add" size={16} color={COLORS.WHITE} />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.unitSelector}
+                                        onPress={() => setShowUnitModal(true)}
+                                    >
+                                        <Text style={styles.servingUnitText}>
+                                            {formatUnitName(servingUnit, parseFloat(quantity) || 1)}
+                                        </Text>
+                                        <Ionicons name="chevron-down" size={14} color={COLORS.GRAY_LIGHT} />
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -389,6 +472,61 @@ const ScannedProduct: React.FC = () => {
                     </LinearGradient>
                 </View>
 
+                {/* Unit Selection Modal */}
+                <Modal
+                    visible={showUnitModal}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setShowUnitModal(false)}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={() => setShowUnitModal(false)}
+                    >
+                        <TouchableOpacity
+                            style={styles.unitModalContent}
+                            activeOpacity={1}
+                            onPress={() => { }}
+                        >
+                            <LinearGradient
+                                colors={[COLORS.CARD_BG, COLORS.SECONDARY_BG]}
+                                style={styles.modalGradient}
+                            >
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>Select Unit</Text>
+                                    <TouchableOpacity onPress={() => setShowUnitModal(false)}>
+                                        <Ionicons name="close" size={24} color={COLORS.GRAY_LIGHT} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView style={styles.unitsList}>
+                                    {availableUnits.map((unit) => (
+                                        <TouchableOpacity
+                                            key={unit.key}
+                                            style={[
+                                                styles.unitOption,
+                                                servingUnit === unit.key && styles.selectedUnitOption
+                                            ]}
+                                            onPress={() => handleUnitChange(unit.key)}
+                                        >
+                                            <Text style={[
+                                                styles.unitOptionText,
+                                                servingUnit === unit.key && styles.selectedUnitOptionText
+                                            ]}>
+                                                {unit.label}
+                                            </Text>
+                                            {servingUnit === unit.key && (
+                                                <Ionicons name="checkmark" size={20} color={COLORS.ACCENT_BLUE} />
+                                            )}
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </Modal>
+
                 {/* Bottom spacing for fixed button */}
                 <View style={{ height: 120 }} />
             </ScrollView>
@@ -512,46 +650,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
-    productImageSection: {
-        marginRight: 20,
-    },
-    productImageContainer: {
-        position: 'relative',
-    },
-    productImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 12,
-        backgroundColor: COLORS.GRAY_DARK,
-    },
-    placeholderImageContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 12,
-        backgroundColor: COLORS.GRAY_DARK,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    scanBadge: {
-        position: 'absolute',
-        bottom: -6,
-        right: -6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.ACCENT_BLUE + '20',
-        borderColor: COLORS.ACCENT_BLUE,
-        borderWidth: 1,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 8,
-    },
-    scanBadgeText: {
-        fontSize: 8,
-        color: COLORS.ACCENT_BLUE,
-        marginLeft: 2,
-        fontWeight: '600',
-    },
     productInfoSection: {
         flex: 1,
     },
@@ -573,37 +671,44 @@ const styles = StyleSheet.create({
     servingControls: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        marginTop: 12,
     },
     quantityButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: COLORS.ACCENT_PINK,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    quantityDisplay: {
-        alignItems: 'center',
-        flex: 1,
-        marginHorizontal: 16,
+    quantityInputContainer: {
+        marginHorizontal: 8, // Reduced from 16 to 8 for closer spacing
+        minWidth: 60,
     },
     quantityInput: {
         color: COLORS.WHITE,
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 16,
+        fontWeight: '600',
         textAlign: 'center',
         backgroundColor: COLORS.GRAY_DARK,
         borderRadius: 8,
         paddingVertical: 8,
+        paddingHorizontal: 8,
+    },
+    unitSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.GRAY_DARK,
+        borderRadius: 8,
         paddingHorizontal: 12,
-        minWidth: 60,
-        marginBottom: 4,
+        paddingVertical: 8,
+        marginLeft: 8,
     },
     servingUnitText: {
         color: COLORS.GRAY_LIGHT,
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '500',
+        marginRight: 4,
     },
 
     // Calories Section
@@ -778,6 +883,61 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         marginLeft: 8,
+    },
+
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'flex-end',
+    },
+    unitModalContent: {
+        maxHeight: height * 0.6,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden',
+    },
+    modalGradient: {
+        padding: 20,
+        minHeight: 200,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: COLORS.WHITE,
+    },
+    unitsList: {
+        maxHeight: height * 0.4,
+    },
+    unitOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginVertical: 2,
+        borderRadius: 12,
+        backgroundColor: COLORS.GRAY_DARK,
+    },
+    selectedUnitOption: {
+        backgroundColor: COLORS.ACCENT_BLUE + '20',
+        borderWidth: 1,
+        borderColor: COLORS.ACCENT_BLUE,
+    },
+    unitOptionText: {
+        fontSize: 16,
+        color: COLORS.WHITE,
+        fontWeight: '500',
+    },
+    selectedUnitOptionText: {
+        color: COLORS.ACCENT_BLUE,
+        fontWeight: '600',
     },
 });
 
