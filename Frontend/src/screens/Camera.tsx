@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,8 +23,75 @@ export default function CameraScreen() {
     const [facing, setFacing] = useState<'back' | 'front'>('back');
     const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
     const [permission, requestPermission] = useCameraPermissions();
+    const [isCameraReady, setIsCameraReady] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const navigation = useNavigation<NavigationProp>();
+
+    // Animation values for pulse effect
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const opacityAnim = useRef(new Animated.Value(0.8)).current;
+
+    // Start pulse animation when camera is ready
+    useEffect(() => {
+        if (isCameraReady) {
+            const startPulseAnimation = () => {
+                Animated.loop(
+                    Animated.sequence([
+                        Animated.parallel([
+                            Animated.timing(pulseAnim, {
+                                toValue: 1.08,
+                                duration: 800,
+                                useNativeDriver: true,
+                            }),
+                            Animated.timing(opacityAnim, {
+                                toValue: 1,
+                                duration: 800,
+                                useNativeDriver: true,
+                            }),
+                        ]),
+                        Animated.parallel([
+                            Animated.timing(pulseAnim, {
+                                toValue: 1,
+                                duration: 800,
+                                useNativeDriver: true,
+                            }),
+                            Animated.timing(opacityAnim, {
+                                toValue: 0.8,
+                                duration: 800,
+                                useNativeDriver: true,
+                            }),
+                        ]),
+                    ])
+                ).start();
+            };
+            startPulseAnimation();
+        }
+    }, [isCameraReady, pulseAnim, opacityAnim]);
+
+    // Request camera permissions when component mounts
+    useEffect(() => {
+        (async () => {
+            if (!permission?.granted) {
+                await requestPermission();
+            }
+        })();
+    }, []);
+
+    // Handle screen focus events - this is crucial for camera management
+    useFocusEffect(
+        React.useCallback(() => {
+            setIsCameraReady(false);
+
+            const timer = setTimeout(() => {
+                setIsCameraReady(true);
+            }, 300);
+
+            return () => {
+                clearTimeout(timer);
+                setIsCameraReady(false);
+            };
+        }, [])
+    );
 
     if (!permission) {
         // Camera permissions are still loading
@@ -47,10 +114,20 @@ export default function CameraScreen() {
     }
 
     const handleCapturePhoto = async () => {
-        if (!cameraRef.current) return;
+        if (!cameraRef.current || !isCameraReady) {
+            console.warn('Camera not ready or ref not available');
+            return;
+        }
 
         try {
-            const photo = await cameraRef.current.takePictureAsync();
+            // Add a small delay to ensure camera is fully ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const photo = await cameraRef.current.takePictureAsync({
+                quality: 0.8,
+                base64: false,
+                exif: false,
+            });
 
             // Navigate to ImageCapture with the photo URI
             navigation.navigate('ImageCapture', {
@@ -167,55 +244,72 @@ export default function CameraScreen() {
             </View>
 
             <View style={styles.cameraContainer}>
-                <CameraView
-                    style={styles.camera}
-                    ref={cameraRef}
-                    facing={facing}
-                    flash={flashMode}
-                    enableTorch={flashMode === 'on'}
-                    onCameraReady={() => console.log('Camera ready')}
-                >
-                    <View style={styles.cameraOverlay}>
-                        {/* Camera frame with corners */}
-                        <View style={styles.scanFrame}>
-                            {renderCorner('topLeft')}
-                            {renderCorner('topRight')}
-                            {renderCorner('bottomRight')}
-                            {renderCorner('bottomLeft')}
+                {isCameraReady && (
+                    <CameraView
+                        style={styles.camera}
+                        ref={cameraRef}
+                        facing={facing}
+                        flash={flashMode}
+                        enableTorch={flashMode === 'on'}
+                        onCameraReady={() => console.log('Camera ready')}
+                        onMountError={(error) => console.error('Camera mount error:', error)}
+                    >
+                        <View style={styles.cameraOverlay}>
+                            {/* Animated Camera frame with corners */}
+                            <Animated.View
+                                style={[
+                                    styles.scanFrame,
+                                    {
+                                        transform: [{ scale: pulseAnim }],
+                                        opacity: opacityAnim,
+                                    }
+                                ]}
+                            >
+                                {renderCorner('topLeft')}
+                                {renderCorner('topRight')}
+                                {renderCorner('bottomRight')}
+                                {renderCorner('bottomLeft')}
+                            </Animated.View>
+
+                            {/* Options control bar - moved above capture button */}
+                            <View style={styles.controlBar}>
+                                <TouchableOpacity style={styles.controlButton} onPress={openGallery}>
+                                    <Ionicons name="images-outline" size={26} color="#FFFFFF" />
+                                    <Text style={styles.buttonLabel}>Gallery</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={[styles.controlButton, styles.activeControlButton]}>
+                                    <Ionicons name="camera-outline" size={32} color="#FF00F5" />
+                                    <Text style={[styles.buttonLabel, { color: '#FF00F5' }]}>Camera</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.controlButton} onPress={openBarcode}>
+                                    <MaterialCommunityIcons name="barcode-scan" size={26} color="#FFFFFF" />
+                                    <Text style={styles.buttonLabel}>Barcode</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
+                                    <Ionicons name="document-text-outline" size={26} color="#FFFFFF" />
+                                    <Text style={styles.buttonLabel}>Manual</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Capture Button - moved below options */}
+                            <TouchableOpacity
+                                style={styles.captureButton}
+                                onPress={handleCapturePhoto}
+                            >
+                                <View style={styles.captureButtonInner} />
+                            </TouchableOpacity>
                         </View>
+                    </CameraView>
+                )}
 
-                        {/* Capture Button */}
-                        <TouchableOpacity
-                            style={styles.captureButton}
-                            onPress={handleCapturePhoto}
-                        >
-                            <View style={styles.captureButtonInner} />
-                        </TouchableOpacity>
+                {!isCameraReady && (
+                    <View style={styles.loadingCamera}>
+                        <Text style={styles.loadingText}>Initializing Camera...</Text>
                     </View>
-                </CameraView>
-            </View>
-
-            {/* Bottom control bar */}
-            <View style={styles.controlBar}>
-                <TouchableOpacity style={styles.controlButton} onPress={openGallery}>
-                    <Ionicons name="images-outline" size={26} color="#FFFFFF" />
-                    <Text style={styles.buttonLabel}>Gallery</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.controlButton}>
-                    <Ionicons name="camera-outline" size={32} color="#FFFFFF" />
-                    <Text style={styles.buttonLabel}>Camera</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.controlButton} onPress={openBarcode}>
-                    <MaterialCommunityIcons name="barcode-scan" size={26} color="#FFFFFF" />
-                    <Text style={styles.buttonLabel}>Barcode</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
-                    <Ionicons name="document-text-outline" size={26} color="#FFFFFF" />
-                    <Text style={styles.buttonLabel}>Manual</Text>
-                </TouchableOpacity>
+                )}
             </View>
         </SafeAreaView>
     );
@@ -283,8 +377,9 @@ const styles = StyleSheet.create({
     },
     cameraOverlay: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         alignItems: 'center',
+        paddingTop: 210,
     },
     // Scanner frame styles
     scanFrame: {
@@ -365,9 +460,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: 'transparent',
         paddingVertical: 16,
-        paddingBottom: 32, // Extra padding at bottom for better UX
         position: 'absolute',
-        bottom: 0,
+        bottom: 170,
         left: 0,
         right: 0,
     },
@@ -390,7 +484,7 @@ const styles = StyleSheet.create({
     },
     captureButton: {
         position: 'absolute',
-        bottom: 120,
+        bottom: 80,
         alignSelf: 'center',
         width: 70,
         height: 70,
@@ -404,5 +498,19 @@ const styles = StyleSheet.create({
         height: 60,
         borderRadius: 30,
         backgroundColor: '#FFFFFF',
+    },
+    loadingCamera: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000000',
+    },
+    loadingText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    activeControlButton: {
+        backgroundColor: 'rgba(255, 0, 245, 0.5)',
     },
 });

@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Image } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,8 +21,34 @@ export default function MealPlannerCamera() {
     const [permission, requestPermission] = useCameraPermissions();
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
     const [processingImage, setProcessingImage] = useState(false);
+    const [isCameraReady, setIsCameraReady] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const navigation = useNavigation<NavigationProp>();
+
+    // Request camera permissions when component mounts
+    useEffect(() => {
+        (async () => {
+            if (!permission?.granted) {
+                await requestPermission();
+            }
+        })();
+    }, []);
+
+    // Handle screen focus events - this is crucial for camera management
+    useFocusEffect(
+        React.useCallback(() => {
+            setIsCameraReady(false);
+
+            const timer = setTimeout(() => {
+                setIsCameraReady(true);
+            }, 300);
+
+            return () => {
+                clearTimeout(timer);
+                setIsCameraReady(false);
+            };
+        }, [])
+    );
 
     if (!permission) {
         // Camera permissions are still loading
@@ -45,10 +71,21 @@ export default function MealPlannerCamera() {
     }
 
     const handleCapturePhoto = async () => {
-        if (!cameraRef.current) return;
+        if (!cameraRef.current || !isCameraReady) {
+            console.warn('Camera not ready or ref not available');
+            return;
+        }
 
         try {
-            const photo = await cameraRef.current.takePictureAsync();
+            // Add a small delay to ensure camera is fully ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const photo = await cameraRef.current.takePictureAsync({
+                quality: 0.8,
+                base64: false,
+                exif: false,
+            });
+
             setCapturedImage(photo.uri);
             setProcessingImage(true);
 
@@ -131,24 +168,34 @@ export default function MealPlannerCamera() {
                     </View>
 
                     <View style={styles.cameraContainer}>
-                        <CameraView
-                            style={styles.camera}
-                            ref={cameraRef}
-                            facing={facing}
-                            flash={flashMode}
-                            enableTorch={flashMode === 'on'}
-                        >
-                            <LinearGradient
-                                colors={['rgba(0,0,0,0.7)', 'transparent', 'rgba(0,0,0,0.7)']}
-                                style={styles.gradient}
-                            />
+                        {isCameraReady && (
+                            <CameraView
+                                style={styles.camera}
+                                ref={cameraRef}
+                                facing={facing}
+                                flash={flashMode}
+                                enableTorch={flashMode === 'on'}
+                                onCameraReady={() => console.log('MealPlanner Camera ready')}
+                                onMountError={(error) => console.error('MealPlanner Camera mount error:', error)}
+                            >
+                                <LinearGradient
+                                    colors={['rgba(0,0,0,0.7)', 'transparent', 'rgba(0,0,0,0.7)']}
+                                    style={styles.gradient}
+                                />
 
-                            <View style={styles.instructionsContainer}>
-                                <Text style={styles.instructionsText}>
-                                    Take a photo of your pantry items to generate personalized meal suggestions
-                                </Text>
+                                <View style={styles.instructionsContainer}>
+                                    <Text style={styles.instructionsText}>
+                                        Take a photo of your pantry items to generate personalized meal suggestions
+                                    </Text>
+                                </View>
+                            </CameraView>
+                        )}
+
+                        {!isCameraReady && (
+                            <View style={styles.loadingCamera}>
+                                <Text style={styles.loadingText}>Initializing Camera...</Text>
                             </View>
-                        </CameraView>
+                        )}
                     </View>
 
                     <View style={styles.controlBar}>
@@ -300,6 +347,16 @@ const styles = StyleSheet.create({
     errorButtonText: {
         color: 'white',
         fontSize: 16,
+        fontWeight: 'bold',
+    },
+    loadingCamera: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        color: 'white',
+        fontSize: 18,
         fontWeight: 'bold',
     },
 }); 

@@ -62,31 +62,23 @@ export default function BarcodeScannerScreen() {
     const renderControlBar = () => (
         <View style={styles.controlBar}>
             <TouchableOpacity style={styles.controlButton} onPress={openGallery}>
-                <BlurView intensity={30} style={styles.controlButtonInner}>
-                    <Ionicons name="images-outline" size={24} color={COLORS.WHITE} />
-                    <Text style={styles.buttonLabel}>Gallery</Text>
-                </BlurView>
+                <Ionicons name="images-outline" size={26} color={COLORS.WHITE} />
+                <Text style={styles.buttonLabel}>Gallery</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.controlButton} onPress={handleCapturePhoto}>
-                <BlurView intensity={30} style={styles.controlButtonInner}>
-                    <Ionicons name="camera-outline" size={28} color={COLORS.WHITE} />
-                    <Text style={styles.buttonLabel}>Camera</Text>
-                </BlurView>
+                <Ionicons name="camera-outline" size={32} color={COLORS.WHITE} />
+                <Text style={styles.buttonLabel}>Camera</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.controlButton, styles.activeControlButton]}>
-                <BlurView intensity={50} style={styles.controlButtonInner}>
-                    <MaterialCommunityIcons name="barcode-scan" size={24} color={COLORS.ACCENT_PINK} />
-                    <Text style={[styles.buttonLabel, { color: COLORS.ACCENT_PINK }]}>Barcode</Text>
-                </BlurView>
+                <MaterialCommunityIcons name="barcode-scan" size={26} color="#FF00F5" />
+                <Text style={[styles.buttonLabel, { color: '#FF00F5' }]}>Barcode</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
-                <BlurView intensity={30} style={styles.controlButtonInner}>
-                    <Ionicons name="document-text-outline" size={24} color={COLORS.WHITE} />
-                    <Text style={styles.buttonLabel}>Manual</Text>
-                </BlurView>
+                <Ionicons name="document-text-outline" size={26} color={COLORS.WHITE} />
+                <Text style={styles.buttonLabel}>Manual</Text>
             </TouchableOpacity>
         </View>
     );
@@ -226,7 +218,7 @@ export default function BarcodeScannerScreen() {
     };
 
     const handleCapturePhoto = () => {
-        navigation.navigate('MainTabs', { screen: 'Camera' });
+        navigation.navigate('Camera');
     };
 
     const openFoodLog = () => {
@@ -335,25 +327,20 @@ export default function BarcodeScannerScreen() {
                 </LinearGradient>
             )}
 
-            {/* Enhanced Header */}
-            <BlurView intensity={30} style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.WHITE} />
+            {/* Simple Header - matching camera screen */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
-
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Barcode Scanner</Text>
-                    <Text style={styles.headerSubtitle}>Scan any product barcode</Text>
-                </View>
-
-                <TouchableOpacity onPress={toggleTorch} style={styles.headerButton}>
+                <Text style={styles.headerTitle}>Scanner</Text>
+                <TouchableOpacity onPress={toggleTorch} style={styles.flashButton}>
                     <Ionicons
                         name={torchOn ? "flash" : "flash-off"}
-                        size={22}
-                        color={torchOn ? COLORS.ACCENT_ORANGE : COLORS.WHITE}
+                        size={24}
+                        color="#FFF"
                     />
                 </TouchableOpacity>
-            </BlurView>
+            </View>
 
             {loading && (
                 <View style={styles.loadingOverlay}>
@@ -396,43 +383,31 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.PRIMARY_BG,
     },
 
-    // Header Styles
+    // Header Styles - matching camera screen
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+        padding: 16,
+        paddingTop: StatusBar.currentHeight || 16,
+        backgroundColor: 'transparent',
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 100,
-        backgroundColor: 'transparent',
+        zIndex: 10,
     },
-    headerButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.GLASS,
-        borderWidth: 1,
-        borderColor: COLORS.GLASS_BORDER,
-        alignItems: 'center',
-        justifyContent: 'center',
+    backButton: {
+        padding: 8,
     },
-    headerTitleContainer: {
-        alignItems: 'center',
+    flashButton: {
+        padding: 8,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.WHITE,
         textAlign: 'center',
-    },
-    headerSubtitle: {
-        fontSize: 12,
-        color: COLORS.GRAY_LIGHT,
-        marginTop: 2,
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
 
     // Camera Styles
@@ -445,7 +420,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingTop: 120,
+        paddingTop: 150,
         paddingBottom: 180,
     },
 
@@ -465,10 +440,10 @@ const styles = StyleSheet.create({
     scanLine: {
         width: '90%',
         height: 3,
-        backgroundColor: COLORS.ACCENT_PINK,
+        backgroundColor: '#9B00FF',
         borderRadius: 2,
         opacity: 0.8,
-        shadowColor: COLORS.ACCENT_PINK,
+        shadowColor: '#9B00FF',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
         shadowRadius: 8,
@@ -477,7 +452,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         width: 30,
         height: 30,
-        borderColor: COLORS.ACCENT_PINK,
+        borderColor: '#9B00FF',
         borderWidth: 3,
     },
     topLeft: {
@@ -537,35 +512,35 @@ const styles = StyleSheet.create({
     // Manual Input Styles
     manualInputContainer: {
         position: 'absolute',
-        bottom: 40,
+        bottom: 80,
         left: 20,
         right: 20,
     },
     manualInputBlur: {
-        borderRadius: 16,
+        borderRadius: 12,
         overflow: 'hidden',
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: COLORS.GLASS,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         borderWidth: 1,
-        borderColor: COLORS.GLASS_BORDER,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     manualInput: {
         flex: 1,
         color: COLORS.WHITE,
-        fontSize: 16,
-        paddingVertical: 8,
+        fontSize: 14,
+        paddingVertical: 4,
     },
     manualSubmitButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.ACCENT_PINK,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FF00F5',
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: 12,
+        marginLeft: 8,
     },
 
     // Loading Styles
@@ -636,18 +611,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-evenly',
         alignItems: 'center',
+        backgroundColor: 'transparent',
+        paddingVertical: 16,
         position: 'absolute',
-        bottom: 40,
-        left: 20,
-        right: 20,
+        bottom: 170,
+        left: 0,
+        right: 0,
         zIndex: 100,
     },
     controlButton: {
-        borderRadius: 16,
-        overflow: 'hidden',
+        alignItems: 'center',
+        padding: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        borderRadius: 12,
+        width: 70,
+        height: 70,
+        justifyContent: 'center',
     },
     activeControlButton: {
-        transform: [{ scale: 1.1 }],
+        backgroundColor: 'rgba(155, 0, 255, 0.5)',
     },
     controlButtonInner: {
         alignItems: 'center',
@@ -655,16 +637,15 @@ const styles = StyleSheet.create({
         width: 70,
         height: 70,
         paddingVertical: 8,
-        backgroundColor: COLORS.GLASS,
-        borderWidth: 1,
-        borderColor: COLORS.GLASS_BORDER,
     },
     buttonLabel: {
         color: COLORS.WHITE,
-        fontSize: 11,
-        fontWeight: '500',
+        fontSize: 12,
         marginTop: 4,
         textAlign: 'center',
+        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
 
     // Permission Styles
