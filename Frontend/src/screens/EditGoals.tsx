@@ -127,17 +127,18 @@ export default function EditGoals() {
         enabled: false
     });
 
+    // Frequency options data with research-based calorie recommendations
+    const frequencyOptions = [
+        { id: 'weekly', label: 'Weekly', days: 7, extraCalories: '300-500' },
+        { id: 'biweekly', label: 'Biweekly', days: 14, extraCalories: '400-600' },
+        { id: 'monthly', label: 'Monthly', days: 30, extraCalories: '500-700' },
+        { id: 'custom', label: 'Custom', days: null, extraCalories: 'Variable' }
+    ];
+
     // State for custom cheat day frequency
     const [showCustomFrequencyModal, setShowCustomFrequencyModal] = useState(false);
     const [customFrequencyInput, setCustomFrequencyInput] = useState('');
-
-    // Frequency options data
-    const frequencyOptions = [
-        { id: 'weekly', label: 'Weekly', days: 7 },
-        { id: 'biweekly', label: 'Biweekly', days: 14 },
-        { id: 'monthly', label: 'Monthly', days: 30 },
-        { id: 'custom', label: 'Custom', days: null }
-    ];
+    const [showCheatDayInfoModal, setShowCheatDayInfoModal] = useState(false);
 
     // Track values that affect caloric requirements
     const [originalCaloricValues, setOriginalCaloricValues] = useState<{
@@ -886,6 +887,74 @@ export default function EditGoals() {
                         </View>
                     </View>
                 </GradientBorderBox>
+
+                {/* Motivation Settings */}
+                <GradientBorderBox>
+                    <View style={styles.sectionTitleContainer}>
+                        <Text style={styles.sectionTitle}>Motivation</Text>
+                        <TouchableOpacity
+                            style={styles.infoIconContainer}
+                            onPress={() => setShowCheatDayInfoModal(true)}
+                        >
+                            <Ionicons name="information-circle-outline" size={20} color={WHITE} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <View style={styles.cheatDayToggleContainer}>
+                            <View style={styles.cheatDayToggleContent}>
+                                <Text style={styles.cheatDayToggleTitle}>Enable Cheat Days</Text>
+                                <Text style={styles.cheatDayToggleDescription}>
+                                    Track your progress towards scheduled cheat days
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[
+                                    styles.toggleSwitch,
+                                    formValues.cheatDayEnabled && styles.toggleSwitchActive
+                                ]}
+                                onPress={() => updateFormValue('cheatDayEnabled', !formValues.cheatDayEnabled)}
+                            >
+                                <View
+                                    style={[
+                                        styles.toggleKnob,
+                                        formValues.cheatDayEnabled && styles.toggleKnobActive
+                                    ]}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {formValues.cheatDayEnabled && (
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Cheat Day Frequency</Text>
+                            <View style={styles.frequencyOptionsContainer}>
+                                {frequencyOptions.map((option) => (
+                                    <TouchableOpacity
+                                        key={option.id}
+                                        style={[
+                                            styles.frequencyOption,
+                                            getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOption
+                                        ]}
+                                        onPress={() => handleFrequencyOptionSelect(option.id)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.frequencyOptionText,
+                                                getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOptionText
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            <Text style={styles.inputHint}>
+                                {getFrequencyDescription()}
+                            </Text>
+                        </View>
+                    )}
+                </GradientBorderBox>
             </Animated.View>
         );
     };
@@ -1131,29 +1200,50 @@ export default function EditGoals() {
         }
     };
 
+    // Helper function to calculate extra calories for custom frequency
+    const calculateCustomExtraCalories = (days: number) => {
+        if (days < 7) return '0'; // Minimum 7 days required
+        const weeks = days / 7;
+        const baseCalories = 300;
+        const extraCalories = Math.round(baseCalories + (50 * weeks));
+        return `${extraCalories}`;
+    };
+
+    // Helper function to get extra calories description
+    const getExtraCaloriesForFrequency = (frequency: number) => {
+        const standardOption = frequencyOptions.find(opt => opt.days === frequency);
+        if (standardOption) {
+            return standardOption.extraCalories;
+        } else {
+            // Custom frequency
+            return calculateCustomExtraCalories(frequency);
+        }
+    };
+
     // Helper function to get frequency description
     const getFrequencyDescription = () => {
         const currentFreq = formValues.cheatDayFrequency || 7;
         const standardOption = frequencyOptions.find(opt => opt.days === currentFreq);
+        const extraCalories = getExtraCaloriesForFrequency(currentFreq);
 
         if (standardOption) {
-            return `You'll have a cheat day ${standardOption.label.toLowerCase()} (every ${currentFreq} days)`;
+            return `You'll have a cheat day ${standardOption.label.toLowerCase()} (every ${currentFreq} days) with ${extraCalories} extra calories`;
         } else {
-            return `You'll have a cheat day every ${currentFreq} days (custom frequency)`;
+            return `You'll have a cheat day every ${currentFreq} days (custom frequency) with ${extraCalories} extra calories`;
         }
     };
 
-    // Handle custom frequency input
+    // Handle custom frequency input with minimum 7 days validation
     const handleCustomFrequencySubmit = () => {
         const days = parseInt(customFrequencyInput);
-        if (!isNaN(days) && days > 0 && days <= 365) {
+        if (!isNaN(days) && days >= 7 && days <= 365) {
             updateFormValue('cheatDayFrequency', days);
             setShowCustomFrequencyModal(false);
             setCustomFrequencyInput('');
         } else if (isNaN(days) || customFrequencyInput.trim() === '') {
             Alert.alert('Invalid Input', 'Please enter a valid number.');
-        } else if (days <= 0) {
-            Alert.alert('Invalid Input', 'Frequency must be at least 1 day.');
+        } else if (days < 7) {
+            Alert.alert('Invalid Input', 'Frequency must be at least 7 days for optimal metabolic benefits.');
         } else if (days > 365) {
             Alert.alert('Invalid Input', 'Frequency cannot exceed 365 days (1 year).');
         }
@@ -1358,12 +1448,12 @@ export default function EditGoals() {
                                 style={styles.input}
                                 value={customFrequencyInput}
                                 onChangeText={(text) => setCustomFrequencyInput(text)}
-                                placeholder="Enter days (1-365)"
+                                placeholder="Enter days (7-365)"
                                 placeholderTextColor={GRAY}
                                 keyboardType="number-pad"
                             />
                             <Text style={styles.inputHint}>
-                                Enter how many days between each cheat day (e.g., 21 for every 3 weeks)
+                                Enter how many days between each cheat day (minimum 7 days for optimal metabolic benefits)
                             </Text>
                         </View>
 
@@ -1381,6 +1471,93 @@ export default function EditGoals() {
                                 <Text style={styles.submitButtonText}>Submit</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Cheat Day Info Modal */}
+            <Modal
+                visible={showCheatDayInfoModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowCheatDayInfoModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.infoModalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Cheat Day Science</Text>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={() => setShowCheatDayInfoModal(false)}
+                            >
+                                <Ionicons name="close" size={24} color={GRAY} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.infoModalScroll} showsVerticalScrollIndicator={false}>
+                            <Text style={styles.infoModalSubtitle}>Extra Calories on Cheat Days</Text>
+                            <View style={styles.infoCaloriesList}>
+                                <View style={styles.infoCalorieItem}>
+                                    <Text style={styles.infoCalorieLabel}>Weekly (7 days):</Text>
+                                    <Text style={styles.infoCalorieValue}>+300-500 calories</Text>
+                                </View>
+                                <View style={styles.infoCalorieItem}>
+                                    <Text style={styles.infoCalorieLabel}>Biweekly (14 days):</Text>
+                                    <Text style={styles.infoCalorieValue}>+400-600 calories</Text>
+                                </View>
+                                <View style={styles.infoCalorieItem}>
+                                    <Text style={styles.infoCalorieLabel}>Monthly (30 days):</Text>
+                                    <Text style={styles.infoCalorieValue}>+500-700 calories</Text>
+                                </View>
+                                <View style={styles.infoCalorieItem}>
+                                    <Text style={styles.infoCalorieLabel}>Custom frequency:</Text>
+                                    <Text style={styles.infoCalorieValue}>Calculated based on duration</Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.infoModalSubtitle}>The Science Behind Cheat Days</Text>
+                            <Text style={styles.infoModalText}>
+                                Research shows that strategic refeed days can provide several benefits during weight loss:
+                            </Text>
+
+                            <View style={styles.infoBenefitsList}>
+                                <View style={styles.infoBenefitItem}>
+                                    <Text style={styles.infoBenefitBullet}>•</Text>
+                                    <Text style={styles.infoBenefitText}>
+                                        <Text style={styles.infoBenefitBold}>Leptin Boost:</Text> Increases the hunger-regulating hormone that controls metabolism and appetite
+                                    </Text>
+                                </View>
+                                <View style={styles.infoBenefitItem}>
+                                    <Text style={styles.infoBenefitBullet}>•</Text>
+                                    <Text style={styles.infoBenefitText}>
+                                        <Text style={styles.infoBenefitBold}>Glycogen Replenishment:</Text> Restores muscle energy for better workout performance
+                                    </Text>
+                                </View>
+                                <View style={styles.infoBenefitItem}>
+                                    <Text style={styles.infoBenefitBullet}>•</Text>
+                                    <Text style={styles.infoBenefitText}>
+                                        <Text style={styles.infoBenefitBold}>Psychological Relief:</Text> Improves long-term diet adherence and reduces binge eating risk
+                                    </Text>
+                                </View>
+                                <View style={styles.infoBenefitItem}>
+                                    <Text style={styles.infoBenefitBullet}>•</Text>
+                                    <Text style={styles.infoBenefitText}>
+                                        <Text style={styles.infoBenefitBold}>Metabolic Support:</Text> Helps counteract adaptive thermogenesis during prolonged dieting
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.infoModalNote}>
+                                <Text style={styles.infoModalNoteBold}>Best Practice:</Text> Focus on carbohydrate-rich foods during your cheat day for optimal leptin response and metabolic benefits.
+                            </Text>
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={styles.doneButton}
+                            onPress={() => setShowCheatDayInfoModal(false)}
+                        >
+                            <Text style={styles.doneButtonText}>Got It!</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -1831,6 +2008,95 @@ const styles = StyleSheet.create({
     submitButtonText: {
         color: WHITE,
         fontSize: 16,
+        fontWeight: 'bold',
+    },
+    sectionTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    infoIconContainer: {
+        padding: 4,
+    },
+    infoModalContent: {
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 20,
+        width: width - 40,
+        maxWidth: 400,
+        maxHeight: 600,
+    },
+    infoModalScroll: {
+        marginBottom: 20,
+        maxHeight: 450,
+    },
+    infoModalSubtitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 12,
+        marginTop: 16,
+    },
+    infoCaloriesList: {
+        marginBottom: 20,
+    },
+    infoCalorieItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+    },
+    infoCalorieLabel: {
+        color: GRAY,
+        fontSize: 14,
+    },
+    infoCalorieValue: {
+        color: '#8B4FE6',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    infoModalText: {
+        color: GRAY,
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    infoBenefitsList: {
+        marginBottom: 20,
+    },
+    infoBenefitItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    infoBenefitBullet: {
+        color: GRADIENT_MIDDLE,
+        fontSize: 16,
+        marginRight: 8,
+        marginTop: 2,
+    },
+    infoBenefitText: {
+        color: GRAY,
+        fontSize: 14,
+        lineHeight: 20,
+        flex: 1,
+    },
+    infoBenefitBold: {
+        color: WHITE,
+        fontWeight: 'bold',
+    },
+    infoModalNote: {
+        color: GRAY,
+        fontSize: 14,
+        lineHeight: 20,
+        backgroundColor: 'rgba(139, 79, 230, 0.15)',
+        padding: 12,
+        borderRadius: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: '#8B4FE6',
+    },
+    infoModalNoteBold: {
+        color: '#8B4FE6',
         fontWeight: 'bold',
     },
 });
