@@ -60,21 +60,34 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `streak_days`: INTEGER DEFAULT 0
 - `last_activity_date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
-### 6. achievements
+### 6. cheat_day_settings
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `firebase_uid`: TEXT UNIQUE NOT NULL (FOREIGN KEY to user_profiles.firebase_uid)
+- `cheat_day_frequency`: INTEGER DEFAULT 7 (days between cheat days)
+- `last_cheat_day`: TEXT (ISO date string)
+- `next_cheat_day`: TEXT (ISO date string)
+- `enabled`: INTEGER DEFAULT 1 (boolean: 1 = enabled, 0 = disabled)
+- `created_at`: TEXT DEFAULT (datetime('now'))
+- `updated_at`: TEXT DEFAULT (datetime('now'))
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL DEFAULT (datetime('now'))
+
+### 7. achievements
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
 - `name`: TEXT NOT NULL
 - `description`: TEXT NOT NULL
 - `icon`: TEXT
 - `xp_reward`: INTEGER DEFAULT 50
 
-### 7. user_achievements
+### 8. user_achievements
 - `user_id`: INTEGER NOT NULL (FOREIGN KEY to users.id)
 - `achievement_id`: INTEGER NOT NULL (FOREIGN KEY to achievements.id)
 - `completed`: BOOLEAN DEFAULT 0
 - `completed_at`: TIMESTAMP
 - PRIMARY KEY (user_id, achievement_id)
 
-### 8. food_logs
+### 9. food_logs
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
 - `meal_id`: INTEGER NOT NULL
 - `user_id`: INTEGER (FOREIGN KEY to users.id)
@@ -104,7 +117,7 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 - `meal_type`: TEXT
 
-### 9. exercises
+### 10. exercises
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
 - `user_id`: INTEGER (FOREIGN KEY to users.id)
 - `exercise_name`: TEXT NOT NULL
@@ -113,7 +126,7 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 - `notes`: TEXT
 
-### 10. alembic_version
+### 11. alembic_version
 - `version_num`: TEXT NOT NULL
 
 ## Relationships
@@ -124,4 +137,5 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `users` -> `user_gamification`: one-to-one
 - `users` -> `user_achievements`: one-to-many
 - `users` -> `user_weights`: one-to-many
+- `users` -> `cheat_day_settings`: one-to-one
 - `achievements` -> `user_achievements`: one-to-many 

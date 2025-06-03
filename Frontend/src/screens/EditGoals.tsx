@@ -25,6 +25,7 @@ import { calculateNutritionGoalsFromProfile, Gender, ActivityLevel, WeightGoal, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Slider from '@react-native-community/slider';
 import WheelPicker from '@quidone/react-native-wheel-picker';
+import { getCheatDaySettings, updateCheatDaySettings, getCheatDayProgress, CheatDayProgress } from '../utils/database';
 
 // Constants for colors - matching EditProfile
 const PRIMARY_BG = '#000000';
@@ -55,6 +56,8 @@ interface GoalsData {
     stepGoal?: number;
     waterGoal?: number;
     sleepGoal?: number;
+    cheatDayEnabled?: boolean;
+    cheatDayFrequency?: number;
 }
 
 // Activity level data for slider
@@ -116,6 +119,26 @@ export default function EditGoals() {
     const [showFitnessGoalPicker, setShowFitnessGoalPicker] = useState(false);
     const [activityLevelIndex, setActivityLevelIndex] = useState(0); // Will be set from database
 
+    // State for cheat day progress
+    const [cheatDayProgress, setCheatDayProgress] = useState<CheatDayProgress>({
+        daysCompleted: 0,
+        totalDays: 7,
+        daysUntilNext: 7,
+        enabled: false
+    });
+
+    // State for custom cheat day frequency
+    const [showCustomFrequencyModal, setShowCustomFrequencyModal] = useState(false);
+    const [customFrequencyInput, setCustomFrequencyInput] = useState('');
+
+    // Frequency options data
+    const frequencyOptions = [
+        { id: 'weekly', label: 'Weekly', days: 7 },
+        { id: 'biweekly', label: 'Biweekly', days: 14 },
+        { id: 'monthly', label: 'Monthly', days: 30 },
+        { id: 'custom', label: 'Custom', days: null }
+    ];
+
     // Track values that affect caloric requirements
     const [originalCaloricValues, setOriginalCaloricValues] = useState<{
         targetWeight?: number;
@@ -171,7 +194,9 @@ export default function EditGoals() {
                         weeklyWorkouts: userData?.weeklyWorkouts,
                         stepGoal: userData?.stepGoal,
                         waterGoal: userData?.waterGoal,
-                        sleepGoal: userData?.sleepGoal
+                        sleepGoal: userData?.sleepGoal,
+                        cheatDayEnabled: userData?.cheatDayEnabled,
+                        cheatDayFrequency: userData?.cheatDayFrequency
                     };
 
                     // Update UI with SQLite data first (immediate display)
@@ -187,6 +212,43 @@ export default function EditGoals() {
 
                     setIsFetchingData(false);
                     console.log('✅ Goals loaded from SQLite database (primary)');
+
+                    // Load cheat day progress
+                    try {
+                        const progress = await getCheatDayProgress(user.uid);
+                        setCheatDayProgress(progress);
+
+                        // Ensure formValues reflect the actual cheat day settings from the database
+                        const cheatDaySettings = await getCheatDaySettings(user.uid);
+                        if (cheatDaySettings) {
+                            // Update form values with actual cheat day settings from database
+                            setFormValues(prev => ({
+                                ...prev,
+                                cheatDayEnabled: cheatDaySettings.enabled,
+                                cheatDayFrequency: cheatDaySettings.frequency
+                            }));
+                            setDbGoals(prev => ({
+                                ...prev,
+                                cheatDayEnabled: cheatDaySettings.enabled,
+                                cheatDayFrequency: cheatDaySettings.frequency
+                            }));
+                        } else {
+                            // No cheat day settings exist yet, use defaults (disabled)
+                            setFormValues(prev => ({
+                                ...prev,
+                                cheatDayEnabled: false,
+                                cheatDayFrequency: 7
+                            }));
+                            setDbGoals(prev => ({
+                                ...prev,
+                                cheatDayEnabled: false,
+                                cheatDayFrequency: 7
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error loading cheat day progress:', error);
+                        // Keep default values on error
+                    }
 
                     // In parallel, try to get user profile to check unit preference
                     fetchUserProfile().catch(error => {
@@ -278,7 +340,9 @@ export default function EditGoals() {
                 weeklyWorkouts: formValues.weeklyWorkouts,
                 stepGoal: formValues.stepGoal,
                 waterGoal: formValues.waterGoal,
-                sleepGoal: formValues.sleepGoal
+                sleepGoal: formValues.sleepGoal,
+                cheatDayEnabled: formValues.cheatDayEnabled,
+                cheatDayFrequency: formValues.cheatDayFrequency
             });
 
             // Update display values after successful SQLite save
@@ -288,6 +352,30 @@ export default function EditGoals() {
             });
 
             console.log('✅ Goals saved to SQLite successfully');
+
+            // Update cheat day settings if they changed
+            if (formValues.cheatDayEnabled !== undefined || formValues.cheatDayFrequency !== undefined) {
+                try {
+                    console.log('Updating cheat day settings:', {
+                        enabled: formValues.cheatDayEnabled,
+                        frequency: formValues.cheatDayFrequency
+                    });
+
+                    await updateCheatDaySettings(user.uid, {
+                        enabled: formValues.cheatDayEnabled || false,
+                        frequency: formValues.cheatDayFrequency || 7
+                    });
+
+                    // Reload cheat day progress after updating settings
+                    const updatedProgress = await getCheatDayProgress(user.uid);
+                    setCheatDayProgress(updatedProgress);
+
+                    console.log('✅ Cheat day settings updated successfully');
+                } catch (error) {
+                    console.error('Error updating cheat day settings:', error);
+                    // Continue with the save process even if cheat day update fails
+                }
+            }
 
             // SECONDARY: Try to sync to backend for cloud backup (non-blocking)
             try {
@@ -379,7 +467,9 @@ export default function EditGoals() {
                     weeklyWorkouts: formValues.weeklyWorkouts,
                     stepGoal: formValues.stepGoal,
                     waterGoal: formValues.waterGoal,
-                    sleepGoal: formValues.sleepGoal
+                    sleepGoal: formValues.sleepGoal,
+                    cheatDayEnabled: formValues.cheatDayEnabled,
+                    cheatDayFrequency: formValues.cheatDayFrequency
                 });
 
                 // Calculate nutrition goals offline using user profile data
@@ -443,7 +533,9 @@ export default function EditGoals() {
                     weeklyWorkouts: formValues.weeklyWorkouts,
                     stepGoal: formValues.stepGoal,
                     waterGoal: formValues.waterGoal,
-                    sleepGoal: formValues.sleepGoal
+                    sleepGoal: formValues.sleepGoal,
+                    cheatDayEnabled: formValues.cheatDayEnabled,
+                    cheatDayFrequency: formValues.cheatDayFrequency
                 });
 
                 console.log('✅ Goals updated in SQLite with reset nutrition values');
@@ -571,7 +663,9 @@ export default function EditGoals() {
                                 weeklyWorkouts: formValues.weeklyWorkouts,
                                 stepGoal: formValues.stepGoal,
                                 waterGoal: formValues.waterGoal,
-                                sleepGoal: formValues.sleepGoal
+                                sleepGoal: formValues.sleepGoal,
+                                cheatDayEnabled: formValues.cheatDayEnabled,
+                                cheatDayFrequency: formValues.cheatDayFrequency
                             });
 
                             console.log('✅ Reset goals saved to SQLite successfully');
@@ -831,6 +925,15 @@ export default function EditGoals() {
                                 <Text style={styles.statValue}>{dbGoals.stepGoal || "---"}</Text>
                                 <Text style={styles.statLabel}>Daily Steps</Text>
                             </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>
+                                    {cheatDayProgress.enabled
+                                        ? `${cheatDayProgress.daysUntilNext}d`
+                                        : "Disabled"}
+                                </Text>
+                                <Text style={styles.statLabel}>Cheat Day</Text>
+                            </View>
                         </View>
                     </View>
                 </LinearGradient>
@@ -892,6 +995,66 @@ export default function EditGoals() {
                         />
                     </View>
                 </GradientBorderBox>
+
+                {/* Motivation Settings */}
+                <GradientBorderBox>
+                    <Text style={styles.sectionTitle}>Motivation</Text>
+
+                    <View style={styles.inputGroup}>
+                        <View style={styles.cheatDayToggleContainer}>
+                            <View style={styles.cheatDayToggleContent}>
+                                <Text style={styles.cheatDayToggleTitle}>Enable Cheat Days</Text>
+                                <Text style={styles.cheatDayToggleDescription}>
+                                    Track your progress towards scheduled cheat days
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[
+                                    styles.toggleSwitch,
+                                    formValues.cheatDayEnabled && styles.toggleSwitchActive
+                                ]}
+                                onPress={() => updateFormValue('cheatDayEnabled', !formValues.cheatDayEnabled)}
+                            >
+                                <View
+                                    style={[
+                                        styles.toggleKnob,
+                                        formValues.cheatDayEnabled && styles.toggleKnobActive
+                                    ]}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {formValues.cheatDayEnabled && (
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Cheat Day Frequency</Text>
+                            <View style={styles.frequencyOptionsContainer}>
+                                {frequencyOptions.map((option) => (
+                                    <TouchableOpacity
+                                        key={option.id}
+                                        style={[
+                                            styles.frequencyOption,
+                                            getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOption
+                                        ]}
+                                        onPress={() => handleFrequencyOptionSelect(option.id)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.frequencyOptionText,
+                                                getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOptionText
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            <Text style={styles.inputHint}>
+                                {getFrequencyDescription()}
+                            </Text>
+                        </View>
+                    )}
+                </GradientBorderBox>
             </Animated.View>
         );
     };
@@ -947,6 +1110,54 @@ export default function EditGoals() {
         const level = ACTIVITY_LEVELS.find(level => level.key === value);
         return level ? `${level.label} - ${level.description}` : '---';
     }, []);
+
+    // Helper function to get selected frequency option
+    const getSelectedFrequencyOption = () => {
+        const currentFreq = formValues.cheatDayFrequency || 7;
+        const standardOption = frequencyOptions.find(opt => opt.days === currentFreq);
+        return standardOption ? standardOption.id : 'custom';
+    };
+
+    // Handle frequency option selection
+    const handleFrequencyOptionSelect = (optionId: string) => {
+        const option = frequencyOptions.find(opt => opt.id === optionId);
+        if (option) {
+            if (option.id === 'custom') {
+                setCustomFrequencyInput((formValues.cheatDayFrequency || 7).toString());
+                setShowCustomFrequencyModal(true);
+            } else {
+                updateFormValue('cheatDayFrequency', option.days);
+            }
+        }
+    };
+
+    // Helper function to get frequency description
+    const getFrequencyDescription = () => {
+        const currentFreq = formValues.cheatDayFrequency || 7;
+        const standardOption = frequencyOptions.find(opt => opt.days === currentFreq);
+
+        if (standardOption) {
+            return `You'll have a cheat day ${standardOption.label.toLowerCase()} (every ${currentFreq} days)`;
+        } else {
+            return `You'll have a cheat day every ${currentFreq} days (custom frequency)`;
+        }
+    };
+
+    // Handle custom frequency input
+    const handleCustomFrequencySubmit = () => {
+        const days = parseInt(customFrequencyInput);
+        if (!isNaN(days) && days > 0 && days <= 365) {
+            updateFormValue('cheatDayFrequency', days);
+            setShowCustomFrequencyModal(false);
+            setCustomFrequencyInput('');
+        } else if (isNaN(days) || customFrequencyInput.trim() === '') {
+            Alert.alert('Invalid Input', 'Please enter a valid number.');
+        } else if (days <= 0) {
+            Alert.alert('Invalid Input', 'Frequency must be at least 1 day.');
+        } else if (days > 365) {
+            Alert.alert('Invalid Input', 'Frequency cannot exceed 365 days (1 year).');
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -1116,6 +1327,58 @@ export default function EditGoals() {
                                 ) : (
                                     <Text style={styles.proceedWarningButtonText}>Update & Recalculate</Text>
                                 )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Custom Frequency Modal */}
+            <Modal
+                visible={showCustomFrequencyModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowCustomFrequencyModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Enter Custom Frequency</Text>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={() => setShowCustomFrequencyModal(false)}
+                            >
+                                <Ionicons name="close" size={24} color={GRAY} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Frequency (days)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={customFrequencyInput}
+                                onChangeText={(text) => setCustomFrequencyInput(text)}
+                                placeholder="Enter days (1-365)"
+                                placeholderTextColor={GRAY}
+                                keyboardType="number-pad"
+                            />
+                            <Text style={styles.inputHint}>
+                                Enter how many days between each cheat day (e.g., 21 for every 3 weeks)
+                            </Text>
+                        </View>
+
+                        <View style={styles.buttonContainer}>
+                            <TouchableOpacity
+                                style={[styles.submitButton, { backgroundColor: LIGHT_GRAY, marginRight: 8 }]}
+                                onPress={() => setShowCustomFrequencyModal(false)}
+                            >
+                                <Text style={styles.submitButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.submitButton}
+                                onPress={handleCustomFrequencySubmit}
+                            >
+                                <Text style={styles.submitButtonText}>Submit</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1483,6 +1746,89 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     proceedWarningButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    cheatDayToggleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    cheatDayToggleContent: {
+        flex: 1,
+        marginRight: 16,
+    },
+    cheatDayToggleTitle: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    cheatDayToggleDescription: {
+        color: GRAY,
+        fontSize: 14,
+    },
+    toggleSwitch: {
+        width: 50,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        padding: 2,
+        justifyContent: 'center',
+    },
+    toggleSwitchActive: {
+        backgroundColor: GRADIENT_MIDDLE,
+    },
+    toggleKnob: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: WHITE,
+        alignSelf: 'flex-start',
+    },
+    toggleKnobActive: {
+        alignSelf: 'flex-end',
+    },
+    frequencyOptionsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+    },
+    frequencyOption: {
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        marginRight: 8,
+        marginBottom: 8,
+        minWidth: 70,
+        alignItems: 'center',
+    },
+    selectedFrequencyOption: {
+        backgroundColor: GRADIENT_MIDDLE,
+    },
+    frequencyOptionText: {
+        color: GRAY,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    selectedFrequencyOptionText: {
+        color: WHITE,
+        fontWeight: 'bold',
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 20,
+    },
+    submitButton: {
+        backgroundColor: GRADIENT_MIDDLE,
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        flex: 1,
+    },
+    submitButtonText: {
         color: WHITE,
         fontSize: 16,
         fontWeight: 'bold',

@@ -131,6 +131,25 @@ export const initDatabase = async () => {
     `);
         console.log('✅ nutrition_goals table created successfully');
 
+        // Create cheat_day_settings table
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS cheat_day_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT UNIQUE NOT NULL,
+        cheat_day_frequency INTEGER DEFAULT 7,
+        last_cheat_day TEXT,
+        next_cheat_day TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
+      )
+    `);
+        console.log('✅ cheat_day_settings table created successfully');
+
         // Run database migrations
         await updateDatabaseSchema(db);
 
@@ -1367,6 +1386,8 @@ export interface UserGoals {
     stepGoal?: number;
     waterGoal?: number;
     sleepGoal?: number;
+    cheatDayEnabled?: boolean;
+    cheatDayFrequency?: number;
 }
 
 // Get user goals from the database
@@ -1972,12 +1993,226 @@ export const markWeightEntriesSynced = async (ids: number[]): Promise<void> => {
     try {
         const placeholders = ids.map(() => '?').join(',');
         await db.runAsync(
-            `UPDATE user_weights SET synced = 1, sync_action = 'none' WHERE id IN (${placeholders})`,
+            `UPDATE user_weights SET synced = 1, sync_action = 'synced' WHERE id IN (${placeholders})`,
             ids
         );
         console.log(`✅ Marked ${ids.length} weight entries as synced`);
     } catch (error) {
         console.error('❌ Error marking weight entries as synced:', error);
+        throw error;
+    }
+};
+
+// ========================================
+// CHEAT DAY FUNCTIONS
+// ========================================
+
+// Interface for cheat day settings
+export interface CheatDaySettings {
+    enabled: boolean;
+    frequency: number; // days between cheat days
+    lastCheatDay?: string; // ISO date string
+    nextCheatDay?: string; // ISO date string
+}
+
+// Interface for cheat day progress
+export interface CheatDayProgress {
+    daysCompleted: number;
+    totalDays: number;
+    daysUntilNext: number;
+    enabled: boolean;
+}
+
+// Get user's cheat day settings
+export const getCheatDaySettings = async (firebaseUid: string): Promise<CheatDaySettings | null> => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const result = await db.getFirstAsync(
+            `SELECT * FROM cheat_day_settings WHERE firebase_uid = ?`,
+            [firebaseUid]
+        ) as any;
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            enabled: result.enabled === 1,
+            frequency: result.cheat_day_frequency,
+            lastCheatDay: result.last_cheat_day,
+            nextCheatDay: result.next_cheat_day
+        };
+    } catch (error) {
+        console.error('Error getting cheat day settings:', error);
+        return null;
+    }
+};
+
+// Initialize default cheat day settings for new users
+export const initializeCheatDaySettings = async (firebaseUid: string, frequency: number = 7): Promise<void> => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const now = new Date();
+        const nextCheatDay = new Date(now);
+        nextCheatDay.setDate(now.getDate() + frequency);
+
+        await db.runAsync(
+            `INSERT OR REPLACE INTO cheat_day_settings 
+             (firebase_uid, cheat_day_frequency, enabled, next_cheat_day, last_modified) 
+             VALUES (?, ?, 1, ?, ?)`,
+            [firebaseUid, frequency, nextCheatDay.toISOString(), getCurrentDate()]
+        );
+
+        console.log('✅ Cheat day settings initialized for user:', firebaseUid);
+    } catch (error) {
+        console.error('Error initializing cheat day settings:', error);
+        throw error;
+    }
+};
+
+// Update cheat day settings
+export const updateCheatDaySettings = async (firebaseUid: string, settings: Partial<CheatDaySettings>): Promise<void> => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get existing settings first
+        const existingSettings = await getCheatDaySettings(firebaseUid);
+
+        // Prepare values for INSERT OR REPLACE
+        const enabled = settings.enabled !== undefined ? settings.enabled : (existingSettings?.enabled || false);
+        const frequency = settings.frequency !== undefined ? settings.frequency : (existingSettings?.frequency || 7);
+        const lastCheatDay = settings.lastCheatDay !== undefined ? settings.lastCheatDay : existingSettings?.lastCheatDay;
+        const nextCheatDay = settings.nextCheatDay !== undefined ? settings.nextCheatDay : existingSettings?.nextCheatDay;
+
+        // Use INSERT OR REPLACE to handle both new and existing records
+        await db.runAsync(
+            `INSERT OR REPLACE INTO cheat_day_settings 
+             (firebase_uid, enabled, cheat_day_frequency, last_cheat_day, next_cheat_day, created_at, updated_at, synced, sync_action, last_modified) 
+             VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM cheat_day_settings WHERE firebase_uid = ?), ?), ?, 0, 'update', ?)`,
+            [
+                firebaseUid,
+                enabled ? 1 : 0,
+                frequency,
+                lastCheatDay,
+                nextCheatDay,
+                firebaseUid,  // for COALESCE subquery
+                getCurrentDate(), // fallback created_at for new records
+                getCurrentDate(), // updated_at
+                getCurrentDate()  // last_modified
+            ]
+        );
+
+        console.log('✅ Cheat day settings updated for user:', firebaseUid, {
+            enabled,
+            frequency,
+            lastCheatDay,
+            nextCheatDay
+        });
+    } catch (error) {
+        console.error('Error updating cheat day settings:', error);
+        throw error;
+    }
+};
+
+// Calculate days until next cheat day and days completed in current cycle
+export const getCheatDayProgress = async (firebaseUid: string): Promise<CheatDayProgress> => {
+    try {
+        if (!isDatabaseReady()) {
+            console.log("Database not ready, initializing first...");
+            await initDatabase();
+        }
+
+        // Get cheat day settings
+        const settings = await getCheatDaySettings(firebaseUid);
+
+        // If no settings exist or cheat day is disabled, return disabled state
+        if (!settings || !settings.enabled) {
+            return {
+                daysCompleted: 0,
+                totalDays: 7,
+                daysUntilNext: 7,
+                enabled: false
+            };
+        }
+
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+
+        // Parse the next cheat day date
+        let nextCheatDay: Date;
+        if (settings.nextCheatDay) {
+            nextCheatDay = new Date(settings.nextCheatDay);
+        } else {
+            // If no next cheat day is set, calculate it from last cheat day or start from today
+            if (settings.lastCheatDay) {
+                const lastCheatDay = new Date(settings.lastCheatDay);
+                nextCheatDay = new Date(lastCheatDay);
+                nextCheatDay.setDate(lastCheatDay.getDate() + settings.frequency);
+            } else {
+                // No last cheat day, start counting from today
+                nextCheatDay = new Date(today);
+                nextCheatDay.setDate(today.getDate() + settings.frequency);
+            }
+        }
+
+        // Calculate days until next cheat day
+        const diffTime = nextCheatDay.getTime() - today.getTime();
+        const daysUntilNext = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+        // Calculate days completed in current cycle
+        const daysCompleted = settings.frequency - daysUntilNext;
+
+        return {
+            daysCompleted: Math.max(0, daysCompleted),
+            totalDays: settings.frequency,
+            daysUntilNext: daysUntilNext,
+            enabled: true
+        };
+
+    } catch (error) {
+        console.error('Error getting cheat day progress:', error);
+        // Return disabled state on error
+        return {
+            daysCompleted: 0,
+            totalDays: 7,
+            daysUntilNext: 7,
+            enabled: false
+        };
+    }
+};
+
+// Mark cheat day as taken (reset the cycle)
+export const markCheatDayComplete = async (firebaseUid: string): Promise<void> => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const settings = await getCheatDaySettings(firebaseUid);
+        if (!settings) {
+            throw new Error('No cheat day settings found');
+        }
+
+        const now = new Date();
+        const nextCheatDay = new Date(now);
+        nextCheatDay.setDate(now.getDate() + settings.frequency);
+
+        await updateCheatDaySettings(firebaseUid, {
+            lastCheatDay: now.toISOString(),
+            nextCheatDay: nextCheatDay.toISOString()
+        });
+
+        console.log('✅ Cheat day marked as complete for user:', firebaseUid);
+    } catch (error) {
+        console.error('Error marking cheat day complete:', error);
         throw error;
     }
 };

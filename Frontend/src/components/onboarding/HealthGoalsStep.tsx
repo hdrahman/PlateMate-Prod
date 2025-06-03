@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import WheelPicker from '../WheelPicker';
+import { initializeCheatDaySettings } from '../../utils/database';
+import { useAuth } from '../../context/AuthContext';
 
 interface HealthGoalsStepProps {
     profile: UserProfile;
@@ -69,6 +71,7 @@ const activityLevels = [
 ];
 
 const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { user } = useAuth();
     const [mainGoal, setMainGoal] = useState<'lose' | 'maintain' | 'gain'>(
         profile.weightGoal?.startsWith('lose') ? 'lose' :
             profile.weightGoal?.startsWith('gain') ? 'gain' : 'maintain'
@@ -78,6 +81,10 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
     const [calculatedCalories, setCalculatedCalories] = useState<number>(0);
     const [calculatedNutrients, setCalculatedNutrients] = useState<any>({});
     const [showFitnessGoalPicker, setShowFitnessGoalPicker] = useState(false);
+
+    // Cheat day preferences state
+    const [cheatDayEnabled, setCheatDayEnabled] = useState<boolean>(profile.cheatDayEnabled ?? false);
+    const [cheatDayFrequency, setCheatDayFrequency] = useState<number>(profile.cheatDayFrequency ?? 7);
 
     // Calculate recommended calories and nutrients based on profile and goals
     useEffect(() => {
@@ -205,7 +212,20 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             healthConditions: selectedConditions,
             dailyCalorieTarget: calculatedCalories,
             nutrientFocus: calculatedNutrients,
+            cheatDayEnabled: cheatDayEnabled,
+            cheatDayFrequency: cheatDayFrequency,
         });
+
+        // Initialize cheat day settings in database if enabled
+        if (cheatDayEnabled && user?.uid) {
+            try {
+                await initializeCheatDaySettings(user.uid, cheatDayFrequency);
+            } catch (error) {
+                console.error('Error initializing cheat day settings:', error);
+                // Continue with onboarding even if cheat day initialization fails
+            }
+        }
+
         onNext();
     };
 
@@ -432,6 +452,64 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                         </TouchableOpacity>
                     ))}
                 </View>
+            </View>
+
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Cheat Day Preferences</Text>
+                <Text style={styles.sectionSubtitle}>Set up your cheat day schedule to stay motivated</Text>
+
+                <View style={styles.cheatDayToggleContainer}>
+                    <View style={styles.cheatDayToggleContent}>
+                        <Text style={styles.cheatDayToggleTitle}>Enable Cheat Days</Text>
+                        <Text style={styles.cheatDayToggleDescription}>
+                            Track your progress towards scheduled cheat days
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={[
+                            styles.toggleSwitch,
+                            cheatDayEnabled && styles.toggleSwitchActive
+                        ]}
+                        onPress={() => setCheatDayEnabled(!cheatDayEnabled)}
+                    >
+                        <View
+                            style={[
+                                styles.toggleKnob,
+                                cheatDayEnabled && styles.toggleKnobActive
+                            ]}
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                {cheatDayEnabled && (
+                    <View style={styles.cheatDayFrequencyContainer}>
+                        <Text style={styles.cheatDayFrequencyTitle}>Cheat Day Frequency</Text>
+                        <View style={styles.frequencyOptions}>
+                            {[5, 7, 10, 14].map((days) => (
+                                <TouchableOpacity
+                                    key={days}
+                                    style={[
+                                        styles.frequencyOption,
+                                        cheatDayFrequency === days && styles.selectedFrequencyOption
+                                    ]}
+                                    onPress={() => setCheatDayFrequency(days)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.frequencyOptionText,
+                                            cheatDayFrequency === days && styles.selectedFrequencyOptionText
+                                        ]}
+                                    >
+                                        Every {days} days
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <Text style={styles.cheatDayFrequencyDescription}>
+                            You'll have a cheat day every {cheatDayFrequency} days
+                        </Text>
+                    </View>
+                )}
             </View>
 
             <View style={[styles.section, styles.submitSection]}>
@@ -742,6 +820,89 @@ const styles = StyleSheet.create({
     maintainDescription: {
         fontSize: 14,
         color: '#ddd',
+    },
+    cheatDayToggleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    cheatDayToggleContent: {
+        flex: 1,
+    },
+    cheatDayToggleTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    cheatDayToggleDescription: {
+        fontSize: 14,
+        color: '#aaa',
+    },
+    toggleSwitch: {
+        width: 50,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        padding: 2,
+        justifyContent: 'center',
+    },
+    toggleSwitchActive: {
+        backgroundColor: '#0074dd',
+    },
+    toggleKnob: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#fff',
+        alignSelf: 'flex-start',
+    },
+    toggleKnobActive: {
+        alignSelf: 'flex-end',
+    },
+    cheatDayFrequencyContainer: {
+        marginTop: 16,
+    },
+    cheatDayFrequencyTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 12,
+    },
+    frequencyOptions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -4,
+    },
+    frequencyOption: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        marginHorizontal: 4,
+        marginBottom: 8,
+        minWidth: '22%',
+        alignItems: 'center',
+    },
+    selectedFrequencyOption: {
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
+        borderWidth: 1,
+        borderColor: '#0074dd',
+    },
+    frequencyOptionText: {
+        color: '#ddd',
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    selectedFrequencyOptionText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+    cheatDayFrequencyDescription: {
+        fontSize: 12,
+        color: '#aaa',
+        marginTop: 8,
+        textAlign: 'center',
     },
 });
 

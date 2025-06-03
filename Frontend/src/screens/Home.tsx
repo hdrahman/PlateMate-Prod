@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
-import { getTodayExerciseCalories } from '../utils/database';
+import { getTodayExerciseCalories, getCheatDayProgress, CheatDayProgress } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid, getUserGoals, updateUserProfile } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
@@ -59,17 +59,17 @@ const MACRO_RING_SIZE = 60;
 // ─────────────────────────────────────────────────────────────────────────────
 const defaultGoals = getDefaultNutritionGoals();
 
-// Cheat day data
-const cheatDaysTotal = 7;
-const cheatDaysCompleted = 3;
-const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
-
 // Steps history
 const stepsHistory = [
   { date: '11/03', steps: 2400 },
   { date: '12/03', steps: 3700 },
   { date: '02/01', steps: 5000 }
 ];
+
+// Cheat day data
+const cheatDaysTotal = 7;
+const cheatDaysCompleted = 3;
+const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
 
 // GradientBorderCard component for consistent card styling
 interface GradientBorderCardProps {
@@ -163,6 +163,15 @@ export default function Home() {
   const [showTodayWeight, setShowTodayWeight] = useState(false);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
 
+  // Add state for cheat day data
+  const [cheatDayData, setCheatDayData] = useState<CheatDayProgress>({
+    daysCompleted: 0,
+    totalDays: 7,
+    daysUntilNext: 7,
+    enabled: false
+  });
+  const [cheatDayLoading, setCheatDayLoading] = useState(true);
+
   // Load user profile and calculate nutrition goals
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -240,6 +249,8 @@ export default function Home() {
     const unsubscribe = navigation.addListener('focus', () => {
       // Reload user profile to get the latest target weight
       loadUserProfile();
+      // Reload cheat day data to get the latest settings
+      loadCheatDayData();
     });
 
     // Clean up the listener when component unmounts
@@ -405,7 +416,7 @@ export default function Home() {
       loadWeightHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, setWeightHistory, setCurrentWeight, setTargetWeight, setStartingWeight, setWeightLost]);
 
   // Calculate weight lost when profile and weight history are loaded - fix the logic
   useEffect(() => {
@@ -940,6 +951,38 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Load cheat day data
+  const loadCheatDayData = async () => {
+    if (!user) return;
+
+    try {
+      setCheatDayLoading(true);
+      const progress = await getCheatDayProgress(user.uid);
+      setCheatDayData(progress);
+    } catch (error) {
+      console.error('Error loading cheat day data:', error);
+      // Set default values on error
+      setCheatDayData({
+        daysCompleted: 0,
+        totalDays: 7,
+        daysUntilNext: 7,
+        enabled: false
+      });
+    } finally {
+      setCheatDayLoading(false);
+    }
+  };
+
+  // Load cheat day data when component mounts or user changes
+  useEffect(() => {
+    loadCheatDayData();
+  }, [user]);
+
+  // Calculate cheat day progress for display
+  const cheatDayProgress = cheatDayData.enabled && cheatDayData.totalDays > 0
+    ? (cheatDayData.daysCompleted / cheatDayData.totalDays) * 100
+    : 0;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
       {renderErrorBanner()}
@@ -948,18 +991,28 @@ export default function Home() {
         <GradientBorderCard>
           <View style={styles.cheatDayContainer}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={styles.cheatDayLabel}>Days until cheat day</Text>
+              <Text style={styles.cheatDayLabel}>
+                {!cheatDayData.enabled
+                  ? 'Cheat day disabled'
+                  : cheatDayData.daysUntilNext === 0
+                    ? 'Cheat day today!'
+                    : `${cheatDayData.daysUntilNext} days until cheat day`}
+              </Text>
             </View>
             <View style={styles.cheatDayBarBackground}>
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                style={[styles.cheatDayBarFill, { width: `${cheatProgress}%` }]}
+                style={[styles.cheatDayBarFill, { width: `${cheatDayProgress}%` }]}
               />
             </View>
             <Text style={styles.cheatDayStatus}>
-              {cheatDaysCompleted} / {cheatDaysTotal} days
+              {cheatDayLoading
+                ? '---'
+                : !cheatDayData.enabled
+                  ? 'Enable in goals to track'
+                  : `${cheatDayData.daysCompleted} / ${cheatDayData.totalDays} days`}
             </Text>
           </View>
         </GradientBorderCard>

@@ -27,6 +27,10 @@ export interface UserProfile {
     nutrientFocus: { [key: string]: any } | null;
     fitnessGoal?: string;
 
+    // Cheat day preferences
+    cheatDayEnabled?: boolean;
+    cheatDayFrequency?: number; // days between cheat days
+
     // Delivery preferences
     defaultAddress: string | null;
     preferredDeliveryTimes: string[];
