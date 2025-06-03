@@ -55,7 +55,7 @@ export const initDatabase = async () => {
       CREATE TABLE IF NOT EXISTS user_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         firebase_uid TEXT UNIQUE NOT NULL,
-        email TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
         first_name TEXT NOT NULL,
         last_name TEXT,
         height REAL,
@@ -82,10 +82,35 @@ export const initDatabase = async () => {
         sync_data_offline INTEGER DEFAULT 1,
         onboarding_complete INTEGER DEFAULT 0,
         synced INTEGER DEFAULT 0,
-        last_modified TEXT NOT NULL
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL,
+        protein_goal INTEGER,
+        carb_goal INTEGER,
+        fat_goal INTEGER,
+        weekly_workouts INTEGER,
+        step_goal INTEGER,
+        water_goal INTEGER,
+        sleep_goal INTEGER,
+        starting_weight REAL,
+        location TEXT
       )
     `);
         console.log('✅ user_profiles table created successfully');
+
+        // Create user_weights table for weight history
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS user_weights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT NOT NULL,
+        weight REAL NOT NULL,
+        recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
+      )
+    `);
+        console.log('✅ user_weights table created successfully');
 
         // Create nutrition_goals table
         await db.execAsync(`
@@ -1752,95 +1777,208 @@ export const markStreakSynced = async (firebaseUid: string): Promise<void> => {
 // Add a function to ensure the location column exists
 export const ensureLocationColumnExists = async (): Promise<boolean> => {
     if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to check database schema before initialization');
+        console.error('⚠️ Attempting to check location column before database initialization');
+        return false;
+    }
+
+    try {
+        // Check if location column exists in user_profiles table
+        const tableInfo = await db.getAllAsync(`PRAGMA table_info(user_profiles)`) as any[];
+        const hasLocationColumn = tableInfo.some(column => column.name === 'location');
+
+        if (!hasLocationColumn) {
+            console.log('🔄 Adding location column to user_profiles table...');
+            await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN location TEXT`);
+            console.log('✅ Location column added successfully');
+            return true;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error checking/adding location column:', error);
+        return false;
+    }
+};
+
+// Weight History Functions
+
+// Add a weight entry to local SQLite database
+export const addWeightEntryLocal = async (firebaseUid: string, weight: number): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.log('🔄 Database not initialized, initializing now...');
         await initDatabase();
     }
 
     try {
-        console.log('Checking if location column exists in user_profiles table...');
+        const timestamp = new Date().toISOString();
 
-        // Get the table info to see if location column exists
-        const tableInfo = await db.getAllAsync('PRAGMA table_info(user_profiles)');
+        // Check if there's already an entry for today
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+        const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
 
-        // Type-safe check for column existence
-        const hasLocationColumn = tableInfo.some((col: any) =>
-            col && typeof col === 'object' && 'name' in col && col.name === 'location'
+        const existingEntry = await db.getFirstAsync(
+            `SELECT id, weight FROM user_weights 
+             WHERE firebase_uid = ? AND recorded_at >= ? AND recorded_at < ?
+             ORDER BY recorded_at DESC LIMIT 1`,
+            [firebaseUid, todayStart, todayEnd]
+        ) as any;
+
+        if (existingEntry) {
+            // Update existing entry for today if weight is different
+            if (Math.abs(existingEntry.weight - weight) >= 0.01) {
+                await db.runAsync(
+                    `UPDATE user_weights SET 
+                     weight = ?, 
+                     synced = 0, 
+                     sync_action = 'update',
+                     last_modified = ?
+                     WHERE id = ?`,
+                    [weight, timestamp, existingEntry.id]
+                );
+                console.log(`✅ Updated today's weight entry: ${weight}kg`);
+            }
+        } else {
+            // Create new weight entry
+            await db.runAsync(
+                `INSERT INTO user_weights (firebase_uid, weight, recorded_at, synced, sync_action, last_modified)
+                 VALUES (?, ?, ?, 0, 'create', ?)`,
+                [firebaseUid, weight, timestamp, timestamp]
+            );
+            console.log(`✅ Added new weight entry: ${weight}kg`);
+        }
+
+        // Also update current weight in user profile
+        await updateUserProfile(firebaseUid, {
+            weight,
+            synced: 0,
+            sync_action: 'update',
+            last_modified: timestamp
+        });
+
+        notifyDatabaseChanged();
+    } catch (error) {
+        console.error('❌ Error adding weight entry:', error);
+        throw error;
+    }
+};
+
+// Get weight history from local SQLite database
+export const getWeightHistoryLocal = async (firebaseUid: string, limit: number = 100): Promise<Array<{ weight: number, recorded_at: string }>> => {
+    if (!db || !global.dbInitialized) {
+        console.log('🔄 Database not initialized, initializing now...');
+        await initDatabase();
+    }
+
+    try {
+        const weights = await db.getAllAsync(
+            `SELECT weight, recorded_at 
+             FROM user_weights 
+             WHERE firebase_uid = ? 
+             ORDER BY recorded_at DESC 
+             LIMIT ?`,
+            [firebaseUid, limit]
+        ) as Array<{ weight: number, recorded_at: string }>;
+
+        return weights;
+    } catch (error) {
+        console.error('❌ Error getting weight history:', error);
+        return [];
+    }
+};
+
+// Clear weight history (keeping only starting and current weights)
+export const clearWeightHistoryLocal = async (firebaseUid: string): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.log('🔄 Database not initialized, initializing now...');
+        await initDatabase();
+    }
+
+    try {
+        // Get user profile
+        const profile = await getUserProfileByFirebaseUid(firebaseUid);
+        if (!profile) {
+            throw new Error('User profile not found');
+        }
+
+        // Get all weight entries sorted by date
+        const allEntries = await db.getAllAsync(
+            `SELECT id, weight, recorded_at 
+             FROM user_weights 
+             WHERE firebase_uid = ? 
+             ORDER BY recorded_at ASC`,
+            [firebaseUid]
+        ) as Array<{ id: number, weight: number, recorded_at: string }>;
+
+        if (allEntries.length <= 2) {
+            console.log('⚠️ Only 2 or fewer weight entries, no cleanup needed');
+            return;
+        }
+
+        // Keep first entry (starting weight) and last entry (current weight)
+        const firstEntry = allEntries[0];
+        const lastEntry = allEntries[allEntries.length - 1];
+        const idsToKeep = [firstEntry.id, lastEntry.id];
+
+        // Delete all entries except the ones to keep
+        await db.runAsync(
+            `DELETE FROM user_weights 
+             WHERE firebase_uid = ? AND id NOT IN (${idsToKeep.map(() => '?').join(',')})`,
+            [firebaseUid, ...idsToKeep]
         );
 
-        if (hasLocationColumn) {
-            console.log('✅ Location column already exists in user_profiles table');
-            return true;
-        }
+        // Update user profile to ensure starting_weight and current weight are correct
+        const timestamp = new Date().toISOString();
+        await updateUserProfile(firebaseUid, {
+            starting_weight: firstEntry.weight,
+            weight: lastEntry.weight,
+            synced: 0,
+            sync_action: 'update',
+            last_modified: timestamp
+        });
 
-        // Column doesn't exist, add it
-        console.log('Location column not found, adding it now...');
-
-        try {
-            await db.execAsync('ALTER TABLE user_profiles ADD COLUMN location TEXT');
-            console.log('✅ Successfully added location column to user_profiles table');
-            return true;
-        } catch (error) {
-            console.error('❌ Failed to add location column:', error);
-
-            // Try a more radical approach - recreate the table with location column
-            try {
-                console.log('Attempting to recreate user_profiles table with location column...');
-
-                // Begin transaction
-                await db.execAsync('BEGIN TRANSACTION');
-
-                // Get current schema in a type-safe way
-                const columns = tableInfo
-                    .filter((col: any) => col && typeof col === 'object' && 'name' in col && 'type' in col)
-                    .map((col: any) => `${col.name} ${col.type}`);
-
-                // Create backup table
-                await db.execAsync(`
-                    CREATE TABLE user_profiles_backup AS 
-                    SELECT * FROM user_profiles
-                `);
-
-                // Drop original table
-                await db.execAsync('DROP TABLE user_profiles');
-
-                // Create new table with location column
-                await db.execAsync(`
-                    CREATE TABLE user_profiles (
-                        ${columns.join(', ')},
-                        location TEXT
-                    )
-                `);
-
-                // Copy data back from backup
-                await db.execAsync(`
-                    INSERT INTO user_profiles 
-                    SELECT *, NULL as location
-                    FROM user_profiles_backup
-                `);
-
-                // Drop backup table
-                await db.execAsync('DROP TABLE user_profiles_backup');
-
-                // Commit transaction
-                await db.execAsync('COMMIT');
-
-                console.log('✅ Successfully recreated user_profiles table with location column');
-                return true;
-            } catch (recreateError) {
-                // Rollback transaction
-                try {
-                    await db.execAsync('ROLLBACK');
-                } catch (rollbackError) {
-                    console.error('❌ Error rolling back transaction:', rollbackError);
-                }
-
-                console.error('❌ Failed to recreate user_profiles table:', recreateError);
-                return false;
-            }
-        }
+        console.log(`✅ Cleared weight history, kept ${idsToKeep.length} entries`);
+        notifyDatabaseChanged();
     } catch (error) {
-        console.error('❌ Error checking for location column:', error);
-        return false;
+        console.error('❌ Error clearing weight history:', error);
+        throw error;
+    }
+};
+
+// Get unsynced weight entries for backend sync
+export const getUnsyncedWeightEntries = async (): Promise<Array<any>> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get unsynced weight entries before database initialization');
+        return [];
+    }
+
+    try {
+        const unsyncedEntries = await db.getAllAsync(
+            `SELECT * FROM user_weights WHERE synced = 0`
+        );
+        return unsyncedEntries as Array<any>;
+    } catch (error) {
+        console.error('❌ Error getting unsynced weight entries:', error);
+        return [];
+    }
+};
+
+// Mark weight entries as synced
+export const markWeightEntriesSynced = async (ids: number[]): Promise<void> => {
+    if (!db || !global.dbInitialized || ids.length === 0) {
+        return;
+    }
+
+    try {
+        const placeholders = ids.map(() => '?').join(',');
+        await db.runAsync(
+            `UPDATE user_weights SET synced = 1, sync_action = 'none' WHERE id IN (${placeholders})`,
+            ids
+        );
+        console.log(`✅ Marked ${ids.length} weight entries as synced`);
+    } catch (error) {
+        console.error('❌ Error marking weight entries as synced:', error);
+        throw error;
     }
 };
 

@@ -8,14 +8,14 @@ const getLocalIpAddress = () => {
     if (Constants.manifest && Constants.manifest.debuggerHost) {
         return Constants.manifest.debuggerHost.split(':').shift();
     }
-    return '192.168.0.160'; // Fallback to the previous hardcoded IP
+    return '172.31.90.70'; // Fallback to the updated IP
 };
 
 // Determine the appropriate backend URL based on the platform
 // For mobile devices (iOS/Android), use the network IP
 // For web, also use the IP address for consistent connectivity
 const DEV_BACKEND_URL = Platform.OS === 'web'
-    ? 'http://192.168.0.160:8000'
+    ? 'http://172.31.90.70:8000'
     : `http://${getLocalIpAddress()}:8000`; // Use the dynamically detected IP
 
 // Backend URL - dynamically set based on platform

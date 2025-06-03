@@ -8,12 +8,12 @@ const getLocalIpAddress = () => {
     if (Constants.manifest && Constants.manifest.debuggerHost) {
         return Constants.manifest.debuggerHost.split(':').shift();
     }
-    return '192.168.0.160'; // Fallback to the previous hardcoded IP
+    return '172.31.90.70'; // Fallback to the updated IP
 };
 
 // Determine the appropriate API URL based on the platform
 const API_URL = Platform.OS === 'web'
-    ? 'http://192.168.0.160:8000'
+    ? 'http://172.31.90.70:8000'
     : `http://${getLocalIpAddress()}:8000`;
 
 // Helper function to get Firebase ID token is now imported from firebase/auth

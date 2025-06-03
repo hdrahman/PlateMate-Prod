@@ -10,7 +10,11 @@ import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid, getUserGoals, updateUserProfile } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
-import { getWeightHistory, WeightEntry, addWeightEntry, clearWeightHistory } from '../api/userApi';
+import {
+  getWeightHistoryLocal,
+  addWeightEntryLocal,
+  clearWeightHistoryLocal
+} from '../utils/database';
 
 import {
   View,
@@ -192,7 +196,7 @@ export default function Home() {
             foodAllergies: profile.food_allergies || [],
             cuisinePreferences: profile.cuisine_preferences || [],
             spiceTolerance: profile.spice_tolerance,
-            weightGoal: profile.weight_goal,
+            weightGoal: userGoals?.fitnessGoal || 'maintain', // Get from nutrition_goals table instead
             healthConditions: profile.health_conditions || [],
             dailyCalorieTarget: profile.daily_calorie_target,
             nutrientFocus: profile.nutrient_focus,
@@ -313,8 +317,8 @@ export default function Home() {
           return;
         }
 
-        // Get weight history from API
-        const history = await getWeightHistory(user.uid);
+        // Get weight history from local SQLite database
+        const historyEntries = await getWeightHistoryLocal(user.uid);
 
         // Initialize the weight history array
         let formattedHistory = [];
@@ -322,7 +326,7 @@ export default function Home() {
         // Add starting weight as the first point if available
         if (profile.starting_weight) {
           // Use profile creation date or a date earlier than all weight entries
-          const startDate = profile.created_at || new Date(2000, 0, 1).toISOString();
+          const startDate = profile.last_modified || new Date(2000, 0, 1).toISOString();
           formattedHistory.push({
             date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
             weight: profile.starting_weight
@@ -332,9 +336,9 @@ export default function Home() {
         }
 
         // Add intermediary weights from weight history
-        if (history && history.weights && history.weights.length > 0) {
+        if (historyEntries && historyEntries.length > 0) {
           // Sort history chronologically - oldest first
-          const sortedWeights = [...history.weights].sort((a, b) =>
+          const sortedWeights = [...historyEntries].sort((a, b) =>
             new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
           );
 
@@ -446,7 +450,7 @@ export default function Home() {
       setCurrentWeight(weightValue);
 
       // Add weight entry to history
-      await addWeightEntry(user.uid, weightValue);
+      await addWeightEntryLocal(user.uid, weightValue);
 
       // Update local state with the new entry
       const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
@@ -690,123 +694,79 @@ export default function Home() {
 
   // Add function to clear weight history
   const handleClearWeightHistory = async () => {
-    if (!user) return;
+    Alert.alert(
+      "Clear Weight History",
+      "This will remove all weight entries except your starting weight and current weight. This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setWeightLoading(true);
 
-    try {
-      // Show loading
-      setWeightLoading(true);
+              // Call local SQLite function to clear weight history
+              await clearWeightHistoryLocal(user.uid);
 
-      // Confirm with user before proceeding
-      Alert.alert(
-        "Clear Weight History",
-        "This will remove all weight entries except your starting and current weights. This action cannot be undone.",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => setWeightLoading(false)
-          },
-          {
-            text: "Clear",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                // Get user profile to ensure we have starting and current weights
-                const profile = await getUserProfileByFirebaseUid(user.uid);
-                if (!profile) {
-                  Alert.alert("Error", "Unable to find user profile.");
-                  setWeightLoading(false);
-                  return;
-                }
-
-                // Ensure we have both starting and current weights before clearing
-                if (!profile.starting_weight || !profile.weight) {
-                  // If we don't have both weights, we need to set them
-                  let updates: { starting_weight?: number; weight?: number } = {};
-
-                  // If no starting weight, use the first weight entry or current weight
-                  if (!profile.starting_weight) {
-                    if (weightHistory.length > 0) {
-                      updates.starting_weight = weightHistory[0].weight;
-                    } else if (profile.weight) {
-                      updates.starting_weight = profile.weight;
-                    } else {
-                      Alert.alert("Error", "No weights available to preserve.");
-                      setWeightLoading(false);
-                      return;
-                    }
-                  }
-
-                  // If no current weight, use the last weight entry or starting weight
-                  if (!profile.weight && weightHistory.length > 0) {
-                    updates.weight = weightHistory[weightHistory.length - 1].weight;
-                  }
-
-                  // Update the profile with necessary weights
-                  if (Object.keys(updates).length > 0) {
-                    await updateUserProfile(user.uid, updates);
-                  }
-                }
-
-                // Call API to clear weight history
-                await clearWeightHistory(user.uid);
-
-                // Reload weight history with just starting and current weights
-                let formattedHistory = [];
-
-                // Get updated profile
-                const updatedProfile = await getUserProfileByFirebaseUid(user.uid);
-
-                // Add starting weight
-                if (updatedProfile.starting_weight) {
-                  const startDate = updatedProfile.created_at || new Date(2000, 0, 1).toISOString();
-                  formattedHistory.push({
-                    date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-                    weight: updatedProfile.starting_weight
-                  });
-                  setStartingWeight(updatedProfile.starting_weight);
-                }
-
-                // Add current weight if different from starting weight
-                if (updatedProfile.weight &&
-                  (!updatedProfile.starting_weight ||
-                    Math.abs(updatedProfile.weight - updatedProfile.starting_weight) >= 0.01)) {
-                  formattedHistory.push({
-                    date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-                    weight: updatedProfile.weight
-                  });
-                  setCurrentWeight(updatedProfile.weight);
-                }
-
-                // Update weight history
-                setWeightHistory(formattedHistory);
-
-                // Calculate weight lost
-                if (updatedProfile.starting_weight && updatedProfile.weight) {
-                  const lost = updatedProfile.starting_weight - updatedProfile.weight;
-                  setWeightLost(parseFloat(lost.toFixed(1)));
-                }
-
-                // Show success message
-                Alert.alert(
-                  "Success",
-                  "Weight history has been cleared, keeping only your starting and current weights."
-                );
-              } catch (error) {
-                console.error('Error clearing weight history:', error);
-                Alert.alert("Error", "Failed to clear weight history. Please try again.");
-              } finally {
-                setWeightLoading(false);
+              // Reload weight history with just starting and current weights
+              // Get updated profile
+              const updatedProfile = await getUserProfileByFirebaseUid(user.uid);
+              if (!updatedProfile) {
+                throw new Error('Failed to load updated profile');
               }
+
+              // Reset the weight history with only starting and current weight
+              let formattedHistory = [];
+
+              // Add starting weight
+              if (updatedProfile.starting_weight) {
+                const startDate = updatedProfile.last_modified || new Date(2000, 0, 1).toISOString();
+                formattedHistory.push({
+                  date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                  weight: updatedProfile.starting_weight
+                });
+                setStartingWeight(updatedProfile.starting_weight);
+              }
+
+              // Add current weight if different from starting weight
+              if (updatedProfile.weight &&
+                (!updatedProfile.starting_weight ||
+                  Math.abs(updatedProfile.weight - updatedProfile.starting_weight) >= 0.01)) {
+                formattedHistory.push({
+                  date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                  weight: updatedProfile.weight
+                });
+                setCurrentWeight(updatedProfile.weight);
+              }
+
+              // Update weight history
+              setWeightHistory(formattedHistory);
+
+              // Calculate weight lost
+              if (updatedProfile.starting_weight && updatedProfile.weight) {
+                const lost = updatedProfile.starting_weight - updatedProfile.weight;
+                setWeightLost(parseFloat(lost.toFixed(1)));
+              }
+
+              // Show success message
+              Alert.alert(
+                "Success",
+                "Weight history has been cleared, keeping only your starting and current weights."
+              );
+            } catch (error) {
+              console.error('Error clearing weight history:', error);
+              Alert.alert("Error", "Failed to clear weight history. Please try again.");
+            } finally {
+              setWeightLoading(false);
             }
           }
-        ]
-      );
-    } catch (error) {
-      console.error('Error:', error);
-      setWeightLoading(false);
-      Alert.alert("Error", "An unexpected error occurred. Please try again.");
-    }
+        }
+      ]
+    );
   };
 
   // In the Home component, add this function to check if today's weight has been recorded
@@ -824,19 +784,21 @@ export default function Home() {
 
     // Function to record today's weight if it hasn't been recorded yet
     const recordTodayWeight = async () => {
+      if (!user || !currentWeight) return;
+
       try {
         // Check if we already have a weight entry for today
-        const history = await getWeightHistory(user.uid);
+        const historyEntries = await getWeightHistoryLocal(user.uid);
         const today = new Date();
         const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
 
         // Check if there's an entry for today
-        const hasEntryForToday = history && history.weights &&
-          history.weights.some(entry => entry.recorded_at.startsWith(todayString));
+        const hasEntryForToday = historyEntries && historyEntries.length > 0 &&
+          historyEntries.some(entry => entry.recorded_at.startsWith(todayString));
 
         // If no entry for today, record the current weight
         if (!hasEntryForToday) {
-          await addWeightEntry(user.uid, currentWeight);
+          await addWeightEntryLocal(user.uid, currentWeight);
           console.log('Daily weight recorded automatically');
 
           // Update the local weight history display

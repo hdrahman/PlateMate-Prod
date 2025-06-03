@@ -19,7 +19,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { addFoodLog } from '../utils/database';
+import { addFoodLog, getUserGoals, UserGoals } from '../utils/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {
@@ -30,6 +30,7 @@ import {
     isValidUnitForFood,
     FoodUnit
 } from '../utils/foodUnitConversion';
+import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -65,6 +66,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'ScannedProduct'>;
 const ScannedProduct: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
+    const { user } = useAuth();
     const { foodData, mealType: initialMealType } = route.params as { foodData: any; mealType?: string };
 
     // State management
@@ -76,6 +78,7 @@ const ScannedProduct: React.FC = () => {
     const [showUnitModal, setShowUnitModal] = useState(false);
     const [availableUnits, setAvailableUnits] = useState<FoodUnit[]>([]);
     const [currentNutrition, setCurrentNutrition] = useState(foodData);
+    const [dailyGoals, setDailyGoals] = useState<UserGoals | null>(null);
 
     const mealTypes = [
         { name: 'Breakfast', icon: 'sunny-outline', color: COLORS.ACCENT_ORANGE },
@@ -83,6 +86,29 @@ const ScannedProduct: React.FC = () => {
         { name: 'Dinner', icon: 'moon-outline', color: COLORS.ACCENT_BLUE },
         { name: 'Snacks', icon: 'cafe-outline', color: COLORS.ACCENT_PINK }
     ];
+
+    // Fetch user's daily goals
+    useEffect(() => {
+        const fetchDailyGoals = async () => {
+            if (user?.uid) {
+                try {
+                    const goals = await getUserGoals(user.uid);
+                    setDailyGoals(goals);
+                } catch (error) {
+                    console.error('Error fetching daily goals:', error);
+                    // Set default goals if fetch fails
+                    setDailyGoals({
+                        calorieGoal: 2000,
+                        proteinGoal: 100,
+                        carbGoal: 250,
+                        fatGoal: 67
+                    });
+                }
+            }
+        };
+
+        fetchDailyGoals();
+    }, [user]);
 
     // Initialize available units and nutrition on mount
     useEffect(() => {
@@ -416,6 +442,108 @@ const ScannedProduct: React.FC = () => {
                         )}
                     </LinearGradient>
                 </View>
+
+                {/* Daily Goals Progress */}
+                {dailyGoals && (
+                    <View style={styles.dailyGoalsCard}>
+                        <LinearGradient
+                            colors={[COLORS.CARD_BG, COLORS.SECONDARY_BG]}
+                            style={styles.cardGradient}
+                        >
+                            <Text style={styles.sectionTitle}>Impact on Daily Goals</Text>
+
+                            {/* Circular Progress for Calories */}
+                            <View style={styles.calorieProgressContainer}>
+                                <View style={styles.circularProgress}>
+                                    <View style={styles.circularProgressInner}>
+                                        <Text style={styles.calorieProgressValue}>{calories}</Text>
+                                        <Text style={styles.calorieProgressLabel}>Cal</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.calorieProgressInfo}>
+                                    <Text style={styles.calorieGoalText}>
+                                        {Math.round(((calories / (dailyGoals.calorieGoal || 2000)) * 100))}% of daily goal
+                                    </Text>
+                                    <Text style={styles.calorieGoalSubtext}>
+                                        {dailyGoals.calorieGoal || 2000} cal target
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Macro Progress Bars */}
+                            <View style={styles.macroProgressSection}>
+                                <View style={styles.macroProgressItem}>
+                                    <View style={styles.macroProgressHeader}>
+                                        <Text style={styles.macroProgressLabel}>Carbs</Text>
+                                        <Text style={styles.macroProgressValue}>
+                                            {Math.round(((carbs / (dailyGoals.carbGoal || 250)) * 100))}%
+                                        </Text>
+                                    </View>
+                                    <View style={styles.macroProgressBarContainer}>
+                                        <View
+                                            style={[
+                                                styles.macroProgressBar,
+                                                {
+                                                    width: `${Math.min(100, (carbs / (dailyGoals.carbGoal || 250)) * 100)}%`,
+                                                    backgroundColor: COLORS.ACCENT_BLUE
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.macroProgressSubtext}>
+                                        {carbs}g / {dailyGoals.carbGoal || 250}g
+                                    </Text>
+                                </View>
+
+                                <View style={styles.macroProgressItem}>
+                                    <View style={styles.macroProgressHeader}>
+                                        <Text style={styles.macroProgressLabel}>Protein</Text>
+                                        <Text style={styles.macroProgressValue}>
+                                            {Math.round(((proteins / (dailyGoals.proteinGoal || 100)) * 100))}%
+                                        </Text>
+                                    </View>
+                                    <View style={styles.macroProgressBarContainer}>
+                                        <View
+                                            style={[
+                                                styles.macroProgressBar,
+                                                {
+                                                    width: `${Math.min(100, (proteins / (dailyGoals.proteinGoal || 100)) * 100)}%`,
+                                                    backgroundColor: COLORS.ACCENT_GREEN
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.macroProgressSubtext}>
+                                        {proteins}g / {dailyGoals.proteinGoal || 100}g
+                                    </Text>
+                                </View>
+
+                                <View style={styles.macroProgressItem}>
+                                    <View style={styles.macroProgressHeader}>
+                                        <Text style={styles.macroProgressLabel}>Fat</Text>
+                                        <Text style={styles.macroProgressValue}>
+                                            {Math.round(((fats / (dailyGoals.fatGoal || 67)) * 100))}%
+                                        </Text>
+                                    </View>
+                                    <View style={styles.macroProgressBarContainer}>
+                                        <View
+                                            style={[
+                                                styles.macroProgressBar,
+                                                {
+                                                    width: `${Math.min(100, (fats / (dailyGoals.fatGoal || 67)) * 100)}%`,
+                                                    backgroundColor: COLORS.ACCENT_ORANGE
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.macroProgressSubtext}>
+                                        {fats}g / {dailyGoals.fatGoal || 67}g
+                                    </Text>
+                                </View>
+                            </View>
+                        </LinearGradient>
+                    </View>
+                )}
 
                 {/* Enhanced Meal Type Selection */}
                 <View style={styles.mealCard}>
@@ -938,6 +1066,100 @@ const styles = StyleSheet.create({
     selectedUnitOptionText: {
         color: COLORS.ACCENT_BLUE,
         fontWeight: '600',
+    },
+
+    // Daily Goals Progress
+    dailyGoalsCard: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 16,
+        overflow: 'hidden',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    calorieProgressContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    circularProgress: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        borderWidth: 2,
+        borderColor: COLORS.GRAY_DARK,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    circularProgressInner: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    calorieProgressValue: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: COLORS.WHITE,
+    },
+    calorieProgressLabel: {
+        fontSize: 16,
+        color: COLORS.GRAY_LIGHT,
+        fontWeight: '500',
+    },
+    calorieProgressInfo: {
+        marginLeft: 20,
+    },
+    calorieGoalText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.WHITE,
+        marginBottom: 4,
+    },
+    calorieGoalSubtext: {
+        fontSize: 14,
+        color: COLORS.GRAY_LIGHT,
+        fontWeight: '500',
+    },
+    macroProgressSection: {
+        marginBottom: 20,
+    },
+    macroProgressItem: {
+        marginBottom: 12,
+    },
+    macroProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    macroProgressLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.WHITE,
+    },
+    macroProgressValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.WHITE,
+    },
+    macroProgressBarContainer: {
+        height: 12,
+        borderRadius: 6,
+        overflow: 'hidden',
+        backgroundColor: COLORS.GRAY_DARK,
+    },
+    macroProgressBar: {
+        height: '100%',
+        borderRadius: 6,
+    },
+    macroProgressSubtext: {
+        fontSize: 14,
+        color: COLORS.GRAY_LIGHT,
+        fontWeight: '500',
     },
 });
 

@@ -1,1 +1,1 @@
-uvicorn main:app --host 192.168.0.160 --port 8000 --reload --log-level debug
+uvicorn main:app --host 172.31.90.70 --port 8000 --reload --log-level debug
