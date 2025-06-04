@@ -58,6 +58,7 @@ interface GoalsData {
     sleepGoal?: number;
     cheatDayEnabled?: boolean;
     cheatDayFrequency?: number;
+    preferredCheatDayOfWeek?: number; // 0-6, where 0 = Sunday, null = no preference
 }
 
 // Activity level data for slider
@@ -140,6 +141,10 @@ export default function EditGoals() {
     const [customFrequencyInput, setCustomFrequencyInput] = useState('');
     const [showCheatDayInfoModal, setShowCheatDayInfoModal] = useState(false);
 
+    // State for preferred day of week
+    const [showPreferredDayModal, setShowPreferredDayModal] = useState(false);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
     // Track values that affect caloric requirements
     const [originalCaloricValues, setOriginalCaloricValues] = useState<{
         targetWeight?: number;
@@ -197,7 +202,8 @@ export default function EditGoals() {
                         waterGoal: userData?.waterGoal,
                         sleepGoal: userData?.sleepGoal,
                         cheatDayEnabled: userData?.cheatDayEnabled,
-                        cheatDayFrequency: userData?.cheatDayFrequency
+                        cheatDayFrequency: userData?.cheatDayFrequency,
+                        preferredCheatDayOfWeek: userData?.preferredCheatDayOfWeek
                     };
 
                     // Update UI with SQLite data first (immediate display)
@@ -226,24 +232,28 @@ export default function EditGoals() {
                             setFormValues(prev => ({
                                 ...prev,
                                 cheatDayEnabled: cheatDaySettings.enabled,
-                                cheatDayFrequency: cheatDaySettings.frequency
+                                cheatDayFrequency: cheatDaySettings.frequency,
+                                preferredCheatDayOfWeek: cheatDaySettings.preferredDayOfWeek
                             }));
                             setDbGoals(prev => ({
                                 ...prev,
                                 cheatDayEnabled: cheatDaySettings.enabled,
-                                cheatDayFrequency: cheatDaySettings.frequency
+                                cheatDayFrequency: cheatDaySettings.frequency,
+                                preferredCheatDayOfWeek: cheatDaySettings.preferredDayOfWeek
                             }));
                         } else {
                             // No cheat day settings exist yet, use defaults (disabled)
                             setFormValues(prev => ({
                                 ...prev,
                                 cheatDayEnabled: false,
-                                cheatDayFrequency: 7
+                                cheatDayFrequency: 7,
+                                preferredCheatDayOfWeek: undefined
                             }));
                             setDbGoals(prev => ({
                                 ...prev,
                                 cheatDayEnabled: false,
-                                cheatDayFrequency: 7
+                                cheatDayFrequency: 7,
+                                preferredCheatDayOfWeek: undefined
                             }));
                         }
                     } catch (error) {
@@ -355,16 +365,18 @@ export default function EditGoals() {
             console.log('✅ Goals saved to SQLite successfully');
 
             // Update cheat day settings if they changed
-            if (formValues.cheatDayEnabled !== undefined || formValues.cheatDayFrequency !== undefined) {
+            if (formValues.cheatDayEnabled !== undefined || formValues.cheatDayFrequency !== undefined || formValues.preferredCheatDayOfWeek !== undefined) {
                 try {
                     console.log('Updating cheat day settings:', {
                         enabled: formValues.cheatDayEnabled,
-                        frequency: formValues.cheatDayFrequency
+                        frequency: formValues.cheatDayFrequency,
+                        preferredDayOfWeek: formValues.preferredCheatDayOfWeek
                     });
 
                     await updateCheatDaySettings(user.uid, {
                         enabled: formValues.cheatDayEnabled || false,
-                        frequency: formValues.cheatDayFrequency || 7
+                        frequency: formValues.cheatDayFrequency || 7,
+                        preferredDayOfWeek: formValues.preferredCheatDayOfWeek
                     });
 
                     // Reload cheat day progress after updating settings
@@ -954,6 +966,30 @@ export default function EditGoals() {
                             </Text>
                         </View>
                     )}
+
+                    {formValues.cheatDayEnabled && (
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Preferred Cheat Day</Text>
+                            <TouchableOpacity
+                                style={styles.daySelector}
+                                onPress={() => setShowPreferredDayModal(true)}
+                            >
+                                <Text style={styles.daySelectorText}>
+                                    {formValues.preferredCheatDayOfWeek !== undefined
+                                        ? dayNames[formValues.preferredCheatDayOfWeek]
+                                        : 'Any Day'
+                                    }
+                                </Text>
+                                <Ionicons name="chevron-down" size={20} color={WHITE} />
+                            </TouchableOpacity>
+                            <Text style={styles.inputHint}>
+                                {formValues.preferredCheatDayOfWeek !== undefined
+                                    ? `Your cheat days will always fall on ${dayNames[formValues.preferredCheatDayOfWeek]}s`
+                                    : 'Choose a specific day of the week for your cheat days, or leave as "Any Day" for flexible scheduling'
+                                }
+                            </Text>
+                        </View>
+                    )}
                 </GradientBorderBox>
             </Animated.View>
         );
@@ -1120,6 +1156,30 @@ export default function EditGoals() {
                             </View>
                             <Text style={styles.inputHint}>
                                 {getFrequencyDescription()}
+                            </Text>
+                        </View>
+                    )}
+
+                    {formValues.cheatDayEnabled && (
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Preferred Cheat Day</Text>
+                            <TouchableOpacity
+                                style={styles.daySelector}
+                                onPress={() => setShowPreferredDayModal(true)}
+                            >
+                                <Text style={styles.daySelectorText}>
+                                    {formValues.preferredCheatDayOfWeek !== undefined
+                                        ? dayNames[formValues.preferredCheatDayOfWeek]
+                                        : 'Any Day'
+                                    }
+                                </Text>
+                                <Ionicons name="chevron-down" size={20} color={WHITE} />
+                            </TouchableOpacity>
+                            <Text style={styles.inputHint}>
+                                {formValues.preferredCheatDayOfWeek !== undefined
+                                    ? `Your cheat days will always fall on ${dayNames[formValues.preferredCheatDayOfWeek]}s`
+                                    : 'Choose a specific day of the week for your cheat days, or leave as "Any Day" for flexible scheduling'
+                                }
                             </Text>
                         </View>
                     )}
@@ -1427,7 +1487,7 @@ export default function EditGoals() {
             <Modal
                 visible={showCustomFrequencyModal}
                 transparent={true}
-                animationType="slide"
+                animationType="fade"
                 onRequestClose={() => setShowCustomFrequencyModal(false)}
             >
                 <View style={styles.modalOverlay}>
@@ -1471,6 +1531,83 @@ export default function EditGoals() {
                                 <Text style={styles.submitButtonText}>Submit</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Preferred Day Modal */}
+            <Modal
+                visible={showPreferredDayModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowPreferredDayModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Preferred Cheat Day</Text>
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={() => setShowPreferredDayModal(false)}
+                            >
+                                <Ionicons name="close" size={24} color={GRAY} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.inputHint}>
+                            Choose a specific day of the week for your cheat days, or select "Any Day" for flexible scheduling.
+                        </Text>
+
+                        {/* Any Day Option */}
+                        <TouchableOpacity
+                            style={[
+                                styles.dayOption,
+                                formValues.preferredCheatDayOfWeek === undefined && styles.selectedDayOption
+                            ]}
+                            onPress={() => {
+                                updateFormValue('preferredCheatDayOfWeek', undefined);
+                                setShowPreferredDayModal(false);
+                            }}
+                        >
+                            <Text
+                                style={[
+                                    styles.dayOptionText,
+                                    formValues.preferredCheatDayOfWeek === undefined && styles.selectedDayOptionText
+                                ]}
+                            >
+                                Any Day (Flexible)
+                            </Text>
+                            {formValues.preferredCheatDayOfWeek === undefined && (
+                                <Ionicons name="checkmark" size={20} color={GRADIENT_MIDDLE} />
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Specific Day Options */}
+                        {dayNames.map((day, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={[
+                                    styles.dayOption,
+                                    formValues.preferredCheatDayOfWeek === index && styles.selectedDayOption
+                                ]}
+                                onPress={() => {
+                                    updateFormValue('preferredCheatDayOfWeek', index);
+                                    setShowPreferredDayModal(false);
+                                }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.dayOptionText,
+                                        formValues.preferredCheatDayOfWeek === index && styles.selectedDayOptionText
+                                    ]}
+                                >
+                                    {day}
+                                </Text>
+                                {formValues.preferredCheatDayOfWeek === index && (
+                                    <Ionicons name="checkmark" size={20} color={GRADIENT_MIDDLE} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
                     </View>
                 </View>
             </Modal>
@@ -2097,6 +2234,41 @@ const styles = StyleSheet.create({
     },
     infoModalNoteBold: {
         color: '#8B4FE6',
+        fontWeight: 'bold',
+    },
+    daySelector: {
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 8,
+        padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    daySelectorText: {
+        color: WHITE,
+        fontSize: 16,
+        flex: 1,
+    },
+    dayOption: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginBottom: 8,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: LIGHT_GRAY,
+    },
+    dayOptionText: {
+        color: GRAY,
+        fontSize: 16,
+        flex: 1,
+    },
+    selectedDayOption: {
+        backgroundColor: GRADIENT_MIDDLE,
+    },
+    selectedDayOptionText: {
+        color: WHITE,
         fontWeight: 'bold',
     },
 });

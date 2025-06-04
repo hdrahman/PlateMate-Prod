@@ -24,7 +24,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { addFoodLog } from '../utils/database';
+import { addFoodLog, addMultipleFoodLogs } from '../utils/database';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnalysisModal from '../components/AnalysisModal';
@@ -481,6 +481,8 @@ const ImageCapture: React.FC = () => {
             // Check if we have an array of nutrition data
             if (Array.isArray(result.nutrition_data) && result.nutrition_data.length > 0) {
                 // Process each food item in the array
+                const foodLogsToInsert = [];
+
                 for (const nutritionData of result.nutrition_data) {
                     // Create a food log entry with all required fields
                     const foodLog = {
@@ -513,10 +515,11 @@ const ImageCapture: React.FC = () => {
                         notes: notes
                     };
 
-                    console.log(`Saving food log for ${nutritionData.food_name} to local database`);
-                    await addFoodLog(foodLog);
+                    foodLogsToInsert.push(foodLog);
                 }
 
+                console.log(`Saving ${foodLogsToInsert.length} food logs to local database in batch`);
+                await addMultipleFoodLogs(foodLogsToInsert);
                 console.log(`Saved ${result.nutrition_data.length} food items to database`);
             } else {
                 // Fallback to old behavior if not an array or empty

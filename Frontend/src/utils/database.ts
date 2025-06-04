@@ -1388,6 +1388,7 @@ export interface UserGoals {
     sleepGoal?: number;
     cheatDayEnabled?: boolean;
     cheatDayFrequency?: number;
+    preferredCheatDayOfWeek?: number; // 0-6, where 0 = Sunday, null = no preference
 }
 
 // Get user goals from the database
@@ -1414,6 +1415,9 @@ export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | nul
             [firebaseUid]
         ) as any;
 
+        // Get cheat day settings
+        const cheatDaySettings = await getCheatDaySettings(firebaseUid);
+
         // Extract goals from both sources
         return {
             targetWeight: profile.target_weight,
@@ -1426,7 +1430,10 @@ export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | nul
             weeklyWorkouts: profile.weekly_workouts,
             stepGoal: profile.step_goal,
             waterGoal: profile.water_goal,
-            sleepGoal: profile.sleep_goal
+            sleepGoal: profile.sleep_goal,
+            cheatDayEnabled: cheatDaySettings?.enabled,
+            cheatDayFrequency: cheatDaySettings?.frequency,
+            preferredCheatDayOfWeek: cheatDaySettings?.preferredDayOfWeek
         };
     } catch (error) {
         console.error('❌ Error fetching user goals:', error);
@@ -2013,6 +2020,7 @@ export interface CheatDaySettings {
     frequency: number; // days between cheat days
     lastCheatDay?: string; // ISO date string
     nextCheatDay?: string; // ISO date string
+    preferredDayOfWeek?: number; // 0-6, where 0 = Sunday, 1 = Monday, etc. null = no preference
 }
 
 // Interface for cheat day progress
@@ -2043,7 +2051,8 @@ export const getCheatDaySettings = async (firebaseUid: string): Promise<CheatDay
             enabled: result.enabled === 1,
             frequency: result.cheat_day_frequency,
             lastCheatDay: result.last_cheat_day,
-            nextCheatDay: result.next_cheat_day
+            nextCheatDay: result.next_cheat_day,
+            preferredDayOfWeek: result.preferred_day_of_week
         };
     } catch (error) {
         console.error('Error getting cheat day settings:', error);
@@ -2052,24 +2061,29 @@ export const getCheatDaySettings = async (firebaseUid: string): Promise<CheatDay
 };
 
 // Initialize default cheat day settings for new users
-export const initializeCheatDaySettings = async (firebaseUid: string, frequency: number = 7): Promise<void> => {
+export const initializeCheatDaySettings = async (firebaseUid: string, frequency: number = 7, preferredDayOfWeek?: number): Promise<void> => {
     if (!db) {
         throw new Error('Database not initialized');
     }
 
     try {
-        const now = new Date();
-        const nextCheatDay = new Date(now);
-        nextCheatDay.setDate(now.getDate() + frequency);
+        // Use calendar day approach - normalize to midnight
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Calculate next cheat day using preferred day logic
+        const nextCheatDay = calculateNextCheatDayWithPreferredDay(today, frequency, preferredDayOfWeek);
 
         await db.runAsync(
             `INSERT OR REPLACE INTO cheat_day_settings 
-             (firebase_uid, cheat_day_frequency, enabled, next_cheat_day, last_modified) 
-             VALUES (?, ?, 1, ?, ?)`,
-            [firebaseUid, frequency, nextCheatDay.toISOString(), getCurrentDate()]
+             (firebase_uid, cheat_day_frequency, enabled, next_cheat_day, preferred_day_of_week, last_modified) 
+             VALUES (?, ?, 1, ?, ?, ?)`,
+            [firebaseUid, frequency, nextCheatDay.toISOString(), preferredDayOfWeek, getCurrentDate()]
         );
 
-        console.log('✅ Cheat day settings initialized for user:', firebaseUid);
+        console.log('✅ Cheat day settings initialized for user:', firebaseUid,
+            'Next cheat day:', nextCheatDay.toISOString().split('T')[0],
+            preferredDayOfWeek !== undefined ? `(${getDayName(preferredDayOfWeek)})` : '(No preference)');
     } catch (error) {
         console.error('Error initializing cheat day settings:', error);
         throw error;
@@ -2091,18 +2105,20 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
         const frequency = settings.frequency !== undefined ? settings.frequency : (existingSettings?.frequency || 7);
         const lastCheatDay = settings.lastCheatDay !== undefined ? settings.lastCheatDay : existingSettings?.lastCheatDay;
         const nextCheatDay = settings.nextCheatDay !== undefined ? settings.nextCheatDay : existingSettings?.nextCheatDay;
+        const preferredDayOfWeek = settings.preferredDayOfWeek !== undefined ? settings.preferredDayOfWeek : existingSettings?.preferredDayOfWeek;
 
         // Use INSERT OR REPLACE to handle both new and existing records
         await db.runAsync(
             `INSERT OR REPLACE INTO cheat_day_settings 
-             (firebase_uid, enabled, cheat_day_frequency, last_cheat_day, next_cheat_day, created_at, updated_at, synced, sync_action, last_modified) 
-             VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM cheat_day_settings WHERE firebase_uid = ?), ?), ?, 0, 'update', ?)`,
+             (firebase_uid, enabled, cheat_day_frequency, last_cheat_day, next_cheat_day, preferred_day_of_week, created_at, updated_at, synced, sync_action, last_modified) 
+             VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM cheat_day_settings WHERE firebase_uid = ?), ?), ?, 0, 'update', ?)`,
             [
                 firebaseUid,
                 enabled ? 1 : 0,
                 frequency,
                 lastCheatDay,
                 nextCheatDay,
+                preferredDayOfWeek,
                 firebaseUid,  // for COALESCE subquery
                 getCurrentDate(), // fallback created_at for new records
                 getCurrentDate(), // updated_at
@@ -2114,7 +2130,8 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
             enabled,
             frequency,
             lastCheatDay,
-            nextCheatDay
+            nextCheatDay,
+            preferredDayOfWeek: preferredDayOfWeek !== undefined ? getDayName(preferredDayOfWeek) : 'No preference'
         });
     } catch (error) {
         console.error('Error updating cheat day settings:', error);
@@ -2143,35 +2160,73 @@ export const getCheatDayProgress = async (firebaseUid: string): Promise<CheatDay
             };
         }
 
+        // Get current date normalized to midnight (calendar day approach)
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const todayStr = today.toISOString().split('T')[0];
 
-        // Parse the next cheat day date
+        // Parse or calculate the next cheat day (normalized to midnight)
         let nextCheatDay: Date;
         if (settings.nextCheatDay) {
             nextCheatDay = new Date(settings.nextCheatDay);
+            nextCheatDay.setHours(0, 0, 0, 0); // Normalize to midnight
         } else {
             // If no next cheat day is set, calculate it from last cheat day or start from today
             if (settings.lastCheatDay) {
                 const lastCheatDay = new Date(settings.lastCheatDay);
-                nextCheatDay = new Date(lastCheatDay);
-                nextCheatDay.setDate(lastCheatDay.getDate() + settings.frequency);
+                lastCheatDay.setHours(0, 0, 0, 0); // Normalize to midnight
+                nextCheatDay = calculateNextCheatDayWithPreferredDay(lastCheatDay, settings.frequency, settings.preferredDayOfWeek);
             } else {
                 // No last cheat day, start counting from today
-                nextCheatDay = new Date(today);
-                nextCheatDay.setDate(today.getDate() + settings.frequency);
+                nextCheatDay = calculateNextCheatDayWithPreferredDay(today, settings.frequency, settings.preferredDayOfWeek);
             }
+
+            // Update the database with the calculated next cheat day
+            await updateCheatDaySettings(firebaseUid, {
+                nextCheatDay: nextCheatDay.toISOString()
+            });
         }
 
-        // Calculate days until next cheat day
+        // Calculate days until next cheat day (calendar days, not 24-hour periods)
         const diffTime = nextCheatDay.getTime() - today.getTime();
         const daysUntilNext = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
         // Calculate days completed in current cycle
-        const daysCompleted = settings.frequency - daysUntilNext;
+        const daysCompleted = Math.max(0, settings.frequency - daysUntilNext);
+
+        // Log calculation details for debugging
+        console.log('🍰 Cheat day calculation:', {
+            user: firebaseUid,
+            today: todayStr,
+            nextCheatDay: nextCheatDay.toISOString().split('T')[0],
+            preferredDay: settings.preferredDayOfWeek !== undefined ? getDayName(settings.preferredDayOfWeek) : 'No preference',
+            frequency: settings.frequency,
+            daysUntilNext,
+            daysCompleted
+        });
+
+        // Auto-update if today is a cheat day (daysUntilNext = 0)
+        if (daysUntilNext === 0) {
+            console.log('🎉 Today is a cheat day! Auto-advancing cycle...');
+            await autoAdvanceCheatDayCycle(firebaseUid, settings.frequency, settings.preferredDayOfWeek);
+
+            // Recalculate after advancing
+            const newNextCheatDay = calculateNextCheatDayWithPreferredDay(today, settings.frequency, settings.preferredDayOfWeek);
+            const newDiffTime = newNextCheatDay.getTime() - today.getTime();
+            const newDaysUntilNext = Math.max(0, Math.ceil(newDiffTime / (1000 * 60 * 60 * 24)));
+
+            console.log('🔄 Cycle advanced. Next cheat day:', newNextCheatDay.toISOString().split('T')[0]);
+
+            return {
+                daysCompleted: 0, // Reset to 0 on cheat day
+                totalDays: settings.frequency,
+                daysUntilNext: newDaysUntilNext,
+                enabled: true
+            };
+        }
 
         return {
-            daysCompleted: Math.max(0, daysCompleted),
+            daysCompleted,
             totalDays: settings.frequency,
             daysUntilNext: daysUntilNext,
             enabled: true
@@ -2189,8 +2244,52 @@ export const getCheatDayProgress = async (firebaseUid: string): Promise<CheatDay
     }
 };
 
-// Mark cheat day as taken (reset the cycle)
+// Auto-advance cheat day cycle when current day is a cheat day
+const autoAdvanceCheatDayCycle = async (firebaseUid: string, frequency: number, preferredDayOfWeek?: number): Promise<void> => {
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        // Get current date normalized to midnight
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Calculate next cheat day using preferred day logic (calendar days from today)
+        const nextCheatDay = calculateNextCheatDayWithPreferredDay(today, frequency, preferredDayOfWeek);
+
+        await updateCheatDaySettings(firebaseUid, {
+            lastCheatDay: today.toISOString(),
+            nextCheatDay: nextCheatDay.toISOString(),
+            preferredDayOfWeek: preferredDayOfWeek
+        });
+
+        console.log('✅ Cheat day cycle auto-advanced for user:', firebaseUid,
+            'Next cheat day:', nextCheatDay.toISOString().split('T')[0],
+            preferredDayOfWeek !== undefined ? `(${getDayName(preferredDayOfWeek)})` : '(No preference)');
+    } catch (error) {
+        console.error('Error auto-advancing cheat day cycle:', error);
+        throw error;
+    }
+};
+
+// Check if today is a cheat day (calendar day approach)
+export const isTodayCheatDay = async (firebaseUid: string): Promise<boolean> => {
+    try {
+        const progress = await getCheatDayProgress(firebaseUid);
+        // Today is a cheat day if daysUntilNext is 0 and cheat days are enabled
+        return progress.enabled && progress.daysUntilNext === 0;
+    } catch (error) {
+        console.error('Error checking if today is cheat day:', error);
+        return false;
+    }
+};
+
+// Mark cheat day as taken (reset the cycle) - DEPRECATED: keeping for backward compatibility
+// Note: This function is now deprecated since cheat days auto-advance at midnight
 export const markCheatDayComplete = async (firebaseUid: string): Promise<void> => {
+    console.warn('⚠️ markCheatDayComplete is deprecated. Cheat days now auto-advance at midnight.');
+
     if (!db) {
         throw new Error('Database not initialized');
     }
@@ -2201,12 +2300,15 @@ export const markCheatDayComplete = async (firebaseUid: string): Promise<void> =
             throw new Error('No cheat day settings found');
         }
 
-        const now = new Date();
-        const nextCheatDay = new Date(now);
-        nextCheatDay.setDate(now.getDate() + settings.frequency);
+        // Use calendar day approach - normalize to midnight
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const nextCheatDay = new Date(today);
+        nextCheatDay.setDate(today.getDate() + settings.frequency);
 
         await updateCheatDaySettings(firebaseUid, {
-            lastCheatDay: now.toISOString(),
+            lastCheatDay: today.toISOString(),
             nextCheatDay: nextCheatDay.toISOString()
         });
 
@@ -2217,7 +2319,183 @@ export const markCheatDayComplete = async (firebaseUid: string): Promise<void> =
     }
 };
 
-// Export all database functions
-export {
-    // ... existing exports
-}; 
+// Add multiple food log entries in a single transaction
+export const addMultipleFoodLogs = async (foodLogs: any[]) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to add food logs before database initialization');
+        console.log('🔄 Attempting to initialize database automatically');
+        try {
+            await initDatabase();
+            if (!global.dbInitialized) {
+                throw new Error('Failed to initialize database');
+            }
+        } catch (initError) {
+            console.error('❌ Failed to auto-initialize database:', initError);
+            throw new Error('Database not initialized and auto-init failed');
+        }
+    }
+
+    // Get current user ID from Firebase
+    const firebaseUserId = getCurrentUserId();
+    console.log('📝 Adding multiple food logs for user:', firebaseUserId);
+
+    // Set current timestamp
+    const timestamp = new Date().toISOString();
+
+    try {
+        // Start a transaction for batch insert
+        await db.runAsync('BEGIN TRANSACTION');
+
+        const insertedIds = [];
+
+        for (const foodLog of foodLogs) {
+            // Format the meal data - Use Firebase UID directly as the user_id
+            const formattedData = {
+                meal_id: foodLog.meal_id || Math.floor(Math.random() * 1000000),
+                user_id: firebaseUserId, // Use Firebase UID directly
+                food_name: foodLog.food_name,
+                calories: foodLog.calories || 0,
+                proteins: foodLog.proteins || 0,
+                carbs: foodLog.carbs || 0,
+                fats: foodLog.fats || 0,
+                fiber: foodLog.fiber || 0,
+                sugar: foodLog.sugar || 0,
+                saturated_fat: foodLog.saturated_fat || 0,
+                polyunsaturated_fat: foodLog.polyunsaturated_fat || 0,
+                monounsaturated_fat: foodLog.monounsaturated_fat || 0,
+                trans_fat: foodLog.trans_fat || 0,
+                cholesterol: foodLog.cholesterol || 0,
+                sodium: foodLog.sodium || 0,
+                potassium: foodLog.potassium || 0,
+                vitamin_a: foodLog.vitamin_a || 0,
+                vitamin_c: foodLog.vitamin_c || 0,
+                calcium: foodLog.calcium || 0,
+                iron: foodLog.iron || 0,
+                image_url: foodLog.image_url || 'https://via.placeholder.com/150',
+                file_key: foodLog.file_key || 'default_file_key',
+                healthiness_rating: foodLog.healthiness_rating || 0,
+                date: foodLog.date || timestamp.split('T')[0],
+                meal_type: foodLog.meal_type || 'snack',
+                brand_name: foodLog.brand_name || '',
+                quantity: foodLog.quantity || '1 serving',
+                notes: foodLog.notes || '',
+                weight: foodLog.weight || null,
+                weight_unit: foodLog.weight_unit || 'g',
+                synced: 0,
+                sync_action: 'create',
+                last_modified: timestamp
+            };
+
+            // Log food entry data for debugging
+            console.log('📝 Food entry being added:', JSON.stringify(formattedData, null, 2));
+
+            // Insert into database within the transaction
+            const result = await db.runAsync(
+                `INSERT INTO food_logs 
+              (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
+               fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
+               trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
+               calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
+               brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    formattedData.meal_id,
+                    formattedData.user_id,
+                    formattedData.food_name,
+                    formattedData.calories,
+                    formattedData.proteins,
+                    formattedData.carbs,
+                    formattedData.fats,
+                    formattedData.fiber,
+                    formattedData.sugar,
+                    formattedData.saturated_fat,
+                    formattedData.polyunsaturated_fat,
+                    formattedData.monounsaturated_fat,
+                    formattedData.trans_fat,
+                    formattedData.cholesterol,
+                    formattedData.sodium,
+                    formattedData.potassium,
+                    formattedData.vitamin_a,
+                    formattedData.vitamin_c,
+                    formattedData.calcium,
+                    formattedData.iron,
+                    formattedData.image_url,
+                    formattedData.file_key,
+                    formattedData.healthiness_rating,
+                    formattedData.date,
+                    formattedData.meal_type,
+                    formattedData.brand_name,
+                    formattedData.quantity,
+                    formattedData.notes,
+                    formattedData.weight,
+                    formattedData.weight_unit,
+                    formattedData.synced,
+                    formattedData.sync_action,
+                    formattedData.last_modified
+                ]
+            );
+
+            insertedIds.push(result.lastInsertRowId);
+            console.log(`✅ Food log inserted with ID ${result.lastInsertRowId}`);
+        }
+
+        // Commit the transaction
+        await db.runAsync('COMMIT');
+        console.log(`✅ Successfully inserted ${insertedIds.length} food logs in transaction`);
+
+        // Update user streak after logging food (only once after all inserts)
+        await checkAndUpdateStreak(firebaseUserId);
+
+        // Notify listeners about the data change (only once after all inserts)
+        notifyDatabaseChanged();
+
+        return insertedIds;
+    } catch (error) {
+        // Rollback transaction on error
+        await db.runAsync('ROLLBACK');
+        console.error('❌ Error adding multiple food logs:', error);
+        throw error;
+    }
+};
+
+// Calculate next cheat day with preferred day of week logic
+const calculateNextCheatDayWithPreferredDay = (
+    currentDate: Date,
+    frequency: number,
+    preferredDayOfWeek?: number
+): Date => {
+    // Start with base calculation: current date + frequency
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(currentDate.getDate() + frequency);
+    nextDate.setHours(0, 0, 0, 0); // Normalize to midnight
+
+    // If no preferred day is set, return the basic frequency calculation
+    if (preferredDayOfWeek === undefined || preferredDayOfWeek === null) {
+        return nextDate;
+    }
+
+    // Find the next occurrence of the preferred day >= frequency days from now
+    const targetDay = preferredDayOfWeek; // 0-6 where 0 = Sunday
+    const currentDay = nextDate.getDay(); // 0-6 where 0 = Sunday
+
+    if (currentDay !== targetDay) {
+        // Calculate days to add to reach the target day
+        let daysToAdd = (targetDay - currentDay + 7) % 7;
+
+        // If the target day would be earlier in the week than our base date,
+        // we need to go to the following week
+        if (daysToAdd === 0) {
+            daysToAdd = 7;
+        }
+
+        nextDate.setDate(nextDate.getDate() + daysToAdd);
+    }
+
+    return nextDate;
+};
+
+// Helper function to get day name for debugging
+const getDayName = (dayIndex: number): string => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayIndex] || 'Unknown';
+};

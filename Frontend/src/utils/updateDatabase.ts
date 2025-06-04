@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 7; // Increment this to version 7
+const CURRENT_VERSION = 8; // Increment this to version 8 for preferred day of week feature
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -207,6 +207,23 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             });
                         } catch (error) {
                             console.error(`❌ Error adding starting_weight column:`, error);
+                        }
+                    }
+                },
+                // Migration to version 8 - Add preferred_day_of_week column to cheat_day_settings
+                async () => {
+                    if (currentVersion < 8) {
+                        console.log('Migrating to version 8: Adding preferred_day_of_week column to cheat_day_settings');
+
+                        try {
+                            // Check if column exists by trying to select it
+                            await db.execAsync(`SELECT preferred_day_of_week FROM cheat_day_settings LIMIT 1`).catch(async () => {
+                                // Column doesn't exist, add it
+                                await db.execAsync(`ALTER TABLE cheat_day_settings ADD COLUMN preferred_day_of_week INTEGER`);
+                                console.log(`✅ Added preferred_day_of_week column to cheat_day_settings`);
+                            });
+                        } catch (error) {
+                            console.error(`❌ Error adding preferred_day_of_week column:`, error);
                         }
                     }
                 }
