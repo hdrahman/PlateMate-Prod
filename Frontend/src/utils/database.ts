@@ -2071,19 +2071,22 @@ export const initializeCheatDaySettings = async (firebaseUid: string, frequency:
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // Default to undefined (From Today) if no preference specified
+        const defaultPreferredDay = preferredDayOfWeek !== undefined ? preferredDayOfWeek : undefined;
+
         // Calculate next cheat day using preferred day logic
-        const nextCheatDay = calculateNextCheatDayWithPreferredDay(today, frequency, preferredDayOfWeek);
+        const nextCheatDay = calculateNextCheatDayWithPreferredDay(today, frequency, defaultPreferredDay);
 
         await db.runAsync(
             `INSERT OR REPLACE INTO cheat_day_settings 
              (firebase_uid, cheat_day_frequency, enabled, next_cheat_day, preferred_day_of_week, last_modified) 
              VALUES (?, ?, 1, ?, ?, ?)`,
-            [firebaseUid, frequency, nextCheatDay.toISOString(), preferredDayOfWeek, getCurrentDate()]
+            [firebaseUid, frequency, nextCheatDay.toISOString(), defaultPreferredDay, getCurrentDate()]
         );
 
         console.log('✅ Cheat day settings initialized for user:', firebaseUid,
             'Next cheat day:', nextCheatDay.toISOString().split('T')[0],
-            preferredDayOfWeek !== undefined ? `(${getDayName(preferredDayOfWeek)})` : '(No preference)');
+            defaultPreferredDay !== undefined ? `(${getDayName(defaultPreferredDay)})` : '(From Today - Flexible)');
     } catch (error) {
         console.error('Error initializing cheat day settings:', error);
         throw error;
@@ -2104,8 +2107,48 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
         const enabled = settings.enabled !== undefined ? settings.enabled : (existingSettings?.enabled || false);
         const frequency = settings.frequency !== undefined ? settings.frequency : (existingSettings?.frequency || 7);
         const lastCheatDay = settings.lastCheatDay !== undefined ? settings.lastCheatDay : existingSettings?.lastCheatDay;
-        const nextCheatDay = settings.nextCheatDay !== undefined ? settings.nextCheatDay : existingSettings?.nextCheatDay;
         const preferredDayOfWeek = settings.preferredDayOfWeek !== undefined ? settings.preferredDayOfWeek : existingSettings?.preferredDayOfWeek;
+
+        // Recalculate nextCheatDay if frequency or preferredDayOfWeek changed, or if explicitly provided
+        let nextCheatDay = settings.nextCheatDay;
+
+        const frequencyChanged = settings.frequency !== undefined && settings.frequency !== existingSettings?.frequency;
+        const preferredDayChanged = settings.preferredDayOfWeek !== existingSettings?.preferredDayOfWeek;
+
+        if (!nextCheatDay && (frequencyChanged || preferredDayChanged || !existingSettings?.nextCheatDay)) {
+            // Recalculate based on current settings
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (lastCheatDay) {
+                // Calculate from last cheat day
+                const lastDate = new Date(lastCheatDay);
+                lastDate.setHours(0, 0, 0, 0);
+                const calculatedNext = calculateNextCheatDayWithPreferredDay(lastDate, frequency, preferredDayOfWeek);
+                nextCheatDay = calculatedNext.toISOString();
+
+                console.log('🔄 Recalculating next cheat day from last cheat day:', {
+                    lastCheatDay: lastDate.toISOString().split('T')[0],
+                    newFrequency: frequency,
+                    newPreferredDay: preferredDayOfWeek !== undefined ? getDayName(preferredDayOfWeek) : 'No preference',
+                    calculatedNext: calculatedNext.toISOString().split('T')[0]
+                });
+            } else {
+                // Calculate from today
+                const calculatedNext = calculateNextCheatDayWithPreferredDay(today, frequency, preferredDayOfWeek);
+                nextCheatDay = calculatedNext.toISOString();
+
+                console.log('🔄 Recalculating next cheat day from today:', {
+                    today: today.toISOString().split('T')[0],
+                    newFrequency: frequency,
+                    newPreferredDay: preferredDayOfWeek !== undefined ? getDayName(preferredDayOfWeek) : 'No preference',
+                    calculatedNext: calculatedNext.toISOString().split('T')[0]
+                });
+            }
+        } else if (!nextCheatDay) {
+            // Use existing nextCheatDay if no recalculation needed
+            nextCheatDay = existingSettings?.nextCheatDay;
+        }
 
         // Use INSERT OR REPLACE to handle both new and existing records
         await db.runAsync(
@@ -2130,7 +2173,7 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
             enabled,
             frequency,
             lastCheatDay,
-            nextCheatDay,
+            nextCheatDay: nextCheatDay ? new Date(nextCheatDay).toISOString().split('T')[0] : null,
             preferredDayOfWeek: preferredDayOfWeek !== undefined ? getDayName(preferredDayOfWeek) : 'No preference'
         });
     } catch (error) {
@@ -2165,23 +2208,44 @@ export const getCheatDayProgress = async (firebaseUid: string): Promise<CheatDay
         today.setHours(0, 0, 0, 0);
         const todayStr = today.toISOString().split('T')[0];
 
-        // Parse or calculate the next cheat day (normalized to midnight)
+        // Always recalculate the next cheat day based on current settings
+        // This ensures we handle frequency or preferred day changes correctly
         let nextCheatDay: Date;
-        if (settings.nextCheatDay) {
-            nextCheatDay = new Date(settings.nextCheatDay);
-            nextCheatDay.setHours(0, 0, 0, 0); // Normalize to midnight
-        } else {
-            // If no next cheat day is set, calculate it from last cheat day or start from today
-            if (settings.lastCheatDay) {
-                const lastCheatDay = new Date(settings.lastCheatDay);
-                lastCheatDay.setHours(0, 0, 0, 0); // Normalize to midnight
-                nextCheatDay = calculateNextCheatDayWithPreferredDay(lastCheatDay, settings.frequency, settings.preferredDayOfWeek);
-            } else {
-                // No last cheat day, start counting from today
-                nextCheatDay = calculateNextCheatDayWithPreferredDay(today, settings.frequency, settings.preferredDayOfWeek);
-            }
 
-            // Update the database with the calculated next cheat day
+        if (settings.lastCheatDay) {
+            // Calculate from the last cheat day
+            const lastCheatDay = new Date(settings.lastCheatDay);
+            lastCheatDay.setHours(0, 0, 0, 0); // Normalize to midnight
+            nextCheatDay = calculateNextCheatDayWithPreferredDay(lastCheatDay, settings.frequency, settings.preferredDayOfWeek);
+
+            console.log('🍰 Calculating from last cheat day:', {
+                lastCheatDay: lastCheatDay.toISOString().split('T')[0],
+                frequency: settings.frequency,
+                preferredDay: settings.preferredDayOfWeek !== undefined ? getDayName(settings.preferredDayOfWeek) : 'No preference',
+                calculatedNext: nextCheatDay.toISOString().split('T')[0]
+            });
+        } else {
+            // No last cheat day recorded, start counting from today
+            nextCheatDay = calculateNextCheatDayWithPreferredDay(today, settings.frequency, settings.preferredDayOfWeek);
+
+            console.log('🍰 Calculating from today (no previous cheat day):', {
+                today: todayStr,
+                frequency: settings.frequency,
+                preferredDay: settings.preferredDayOfWeek !== undefined ? getDayName(settings.preferredDayOfWeek) : 'No preference',
+                calculatedNext: nextCheatDay.toISOString().split('T')[0]
+            });
+        }
+
+        // Update the database with the recalculated next cheat day if it's different
+        const currentNextCheatDay = settings.nextCheatDay ? new Date(settings.nextCheatDay).toISOString().split('T')[0] : null;
+        const calculatedNextCheatDay = nextCheatDay.toISOString().split('T')[0];
+
+        if (currentNextCheatDay !== calculatedNextCheatDay) {
+            console.log('🔄 Updating next cheat day in database:', {
+                oldNext: currentNextCheatDay,
+                newNext: calculatedNextCheatDay
+            });
+
             await updateCheatDaySettings(firebaseUid, {
                 nextCheatDay: nextCheatDay.toISOString()
             });
@@ -2464,38 +2528,54 @@ const calculateNextCheatDayWithPreferredDay = (
     frequency: number,
     preferredDayOfWeek?: number
 ): Date => {
-    // Start with base calculation: current date + frequency
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(currentDate.getDate() + frequency);
-    nextDate.setHours(0, 0, 0, 0); // Normalize to midnight
+    // Start with today normalized to midnight
+    const startDate = new Date(currentDate);
+    startDate.setHours(0, 0, 0, 0);
 
     // If no preferred day is set, return the basic frequency calculation
     if (preferredDayOfWeek === undefined || preferredDayOfWeek === null) {
+        const nextDate = new Date(startDate);
+        nextDate.setDate(startDate.getDate() + frequency);
         return nextDate;
     }
 
-    // Find the next occurrence of the preferred day >= frequency days from now
+    // Find the first occurrence of the preferred day that is AT LEAST frequency days away
     const targetDay = preferredDayOfWeek; // 0-6 where 0 = Sunday
-    const currentDay = nextDate.getDay(); // 0-6 where 0 = Sunday
+
+    // Start checking from the minimum required date (today + frequency)
+    const minimumDate = new Date(startDate);
+    minimumDate.setDate(startDate.getDate() + frequency);
+
+    // Find the next occurrence of the target day starting from the minimum date
+    let candidateDate = new Date(minimumDate);
+    const currentDay = candidateDate.getDay();
 
     if (currentDay !== targetDay) {
         // Calculate days to add to reach the target day
         let daysToAdd = (targetDay - currentDay + 7) % 7;
 
-        // If the target day would be earlier in the week than our base date,
-        // we need to go to the following week
+        // If we're already on the target day but it's the minimum date, we're good
+        // Otherwise, if daysToAdd is 0, we need to wait until next week
         if (daysToAdd === 0) {
             daysToAdd = 7;
         }
 
-        nextDate.setDate(nextDate.getDate() + daysToAdd);
+        candidateDate.setDate(candidateDate.getDate() + daysToAdd);
     }
 
-    return nextDate;
+    // Ensure the candidate date is at least frequency days from start date
+    const daysDifference = Math.ceil((candidateDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysDifference < frequency) {
+        // Move to the next occurrence of the preferred day
+        candidateDate.setDate(candidateDate.getDate() + 7);
+    }
+
+    return candidateDate;
 };
 
 // Helper function to get day name for debugging
 const getDayName = (dayIndex: number): string => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[dayIndex] || 'Unknown';
-};
+}; 

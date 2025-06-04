@@ -145,6 +145,12 @@ export default function EditGoals() {
     const [showPreferredDayModal, setShowPreferredDayModal] = useState(false);
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+    // Create picker data with "From Today" as first option
+    const dayPickerData = [
+        { value: undefined, label: 'From Today (Flexible)' },
+        ...dayNames.map((day, index) => ({ value: index, label: day }))
+    ];
+
     // Track values that affect caloric requirements
     const [originalCaloricValues, setOriginalCaloricValues] = useState<{
         targetWeight?: number;
@@ -977,7 +983,7 @@ export default function EditGoals() {
                                 <Text style={styles.daySelectorText}>
                                     {formValues.preferredCheatDayOfWeek !== undefined
                                         ? dayNames[formValues.preferredCheatDayOfWeek]
-                                        : 'Any Day'
+                                        : 'From Today'
                                     }
                                 </Text>
                                 <Ionicons name="chevron-down" size={20} color={WHITE} />
@@ -985,7 +991,7 @@ export default function EditGoals() {
                             <Text style={styles.inputHint}>
                                 {formValues.preferredCheatDayOfWeek !== undefined
                                     ? `Your cheat days will always fall on ${dayNames[formValues.preferredCheatDayOfWeek]}s`
-                                    : 'Choose a specific day of the week for your cheat days, or leave as "Any Day" for flexible scheduling'
+                                    : 'Choose a specific day of the week for your cheat days, or leave as "From Today" for flexible scheduling'
                                 }
                             </Text>
                         </View>
@@ -1170,7 +1176,7 @@ export default function EditGoals() {
                                 <Text style={styles.daySelectorText}>
                                     {formValues.preferredCheatDayOfWeek !== undefined
                                         ? dayNames[formValues.preferredCheatDayOfWeek]
-                                        : 'Any Day'
+                                        : 'From Today'
                                     }
                                 </Text>
                                 <Ionicons name="chevron-down" size={20} color={WHITE} />
@@ -1178,7 +1184,7 @@ export default function EditGoals() {
                             <Text style={styles.inputHint}>
                                 {formValues.preferredCheatDayOfWeek !== undefined
                                     ? `Your cheat days will always fall on ${dayNames[formValues.preferredCheatDayOfWeek]}s`
-                                    : 'Choose a specific day of the week for your cheat days, or leave as "Any Day" for flexible scheduling'
+                                    : 'Choose a specific day of the week for your cheat days, or leave as "From Today" for flexible scheduling'
                                 }
                             </Text>
                         </View>
@@ -1539,7 +1545,7 @@ export default function EditGoals() {
             <Modal
                 visible={showPreferredDayModal}
                 transparent={true}
-                animationType="fade"
+                animationType="slide"
                 onRequestClose={() => setShowPreferredDayModal(false)}
             >
                 <View style={styles.modalOverlay}>
@@ -1554,60 +1560,25 @@ export default function EditGoals() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.inputHint}>
-                            Choose a specific day of the week for your cheat days, or select "Any Day" for flexible scheduling.
-                        </Text>
-
-                        {/* Any Day Option */}
-                        <TouchableOpacity
-                            style={[
-                                styles.dayOption,
-                                formValues.preferredCheatDayOfWeek === undefined && styles.selectedDayOption
-                            ]}
-                            onPress={() => {
-                                updateFormValue('preferredCheatDayOfWeek', undefined);
-                                setShowPreferredDayModal(false);
-                            }}
-                        >
-                            <Text
-                                style={[
-                                    styles.dayOptionText,
-                                    formValues.preferredCheatDayOfWeek === undefined && styles.selectedDayOptionText
-                                ]}
-                            >
-                                Any Day (Flexible)
-                            </Text>
-                            {formValues.preferredCheatDayOfWeek === undefined && (
-                                <Ionicons name="checkmark" size={20} color={GRADIENT_MIDDLE} />
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Specific Day Options */}
-                        {dayNames.map((day, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={[
-                                    styles.dayOption,
-                                    formValues.preferredCheatDayOfWeek === index && styles.selectedDayOption
-                                ]}
-                                onPress={() => {
-                                    updateFormValue('preferredCheatDayOfWeek', index);
-                                    setShowPreferredDayModal(false);
+                        <View style={styles.wheelPickerContainer}>
+                            <WheelPicker
+                                data={dayPickerData}
+                                value={formValues.preferredCheatDayOfWeek}
+                                onValueChanged={({ item }) => {
+                                    updateFormValue('preferredCheatDayOfWeek', item.value);
                                 }}
-                            >
-                                <Text
-                                    style={[
-                                        styles.dayOptionText,
-                                        formValues.preferredCheatDayOfWeek === index && styles.selectedDayOptionText
-                                    ]}
-                                >
-                                    {day}
-                                </Text>
-                                {formValues.preferredCheatDayOfWeek === index && (
-                                    <Ionicons name="checkmark" size={20} color={GRADIENT_MIDDLE} />
-                                )}
-                            </TouchableOpacity>
-                        ))}
+                                itemTextStyle={{ color: WHITE, fontSize: 16 }}
+                                itemHeight={35}
+                                visibleItemCount={5}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.doneButton}
+                            onPress={() => setShowPreferredDayModal(false)}
+                        >
+                            <Text style={styles.doneButtonText}>Done</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
