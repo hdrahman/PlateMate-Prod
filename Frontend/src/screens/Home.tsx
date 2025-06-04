@@ -581,7 +581,14 @@ export default function Home() {
         <Text style={styles.burnTitle}>
           {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
         </Text>
-        <View style={styles.burnBarBackground}>
+        <View style={[
+          styles.burnBarBackground,
+          {
+            backgroundColor: weightLost >= 0
+              ? 'rgba(0, 100, 0, 0.2)'  // subdued green for weight loss
+              : 'rgba(139, 0, 0, 0.2)'  // subdued red for weight gain
+          }
+        ]}>
           {weightLost >= 0 ? (
             // Weight loss (positive) - use green gradient
             <LinearGradient
@@ -980,8 +987,8 @@ export default function Home() {
 
   // Calculate cheat day progress for display
   const cheatDayProgress = cheatDayData.enabled && cheatDayData.totalDays > 0
-    ? (cheatDayData.daysCompleted / cheatDayData.totalDays) * 100
-    : 0;
+    ? Math.max(5, (cheatDayData.daysCompleted / cheatDayData.totalDays) * 100) // Minimum 5% to show like a dot
+    : 5; // Show 5% when disabled to maintain visual consistency
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
@@ -999,7 +1006,10 @@ export default function Home() {
                     : `${cheatDayData.daysUntilNext} days until cheat day`}
               </Text>
             </View>
-            <View style={styles.cheatDayBarBackground}>
+            <View style={[
+              styles.cheatDayBarBackground,
+              { backgroundColor: 'rgba(0, 207, 255, 0.2)' } // subdued light blue background matching the cheat day gradient
+            ]}>
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -1063,7 +1073,7 @@ export default function Home() {
                   cx={SVG_SIZE / 2}
                   cy={SVG_SIZE / 2}
                   r={radius}
-                  stroke="rgba(255, 255, 255, 0.12)"
+                  stroke="rgba(155, 0, 255, 0.15)"
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                 />
@@ -1852,17 +1862,22 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
 
   // More saturated, vibrant gradient colors for each macro.
   let gradientColors = ['#FF00F5', '#9B00FF', '#00CFFF']; // default
+  let backgroundStrokeColor = 'rgba(80, 0, 133, 0.2)'; // default subdued background
   switch (label.toUpperCase()) {
     case 'PROTEIN':
       gradientColors = ['#FF5252', '#FF1744', '#D50000'];
+      backgroundStrokeColor = 'rgba(213, 0, 0, 0.2)'; // subdued red
       break;
     case 'CARBS':
       gradientColors = ['#29B6F6', '#03A9F4', '#0288D1'];
+      backgroundStrokeColor = 'rgba(2, 136, 209, 0.2)'; // subdued blue
       break;
     case 'FATS':
       gradientColors = ['#66BB6A', '#43A047', '#18d621'];
+      backgroundStrokeColor = 'rgba(24, 214, 33, 0.2)'; // subdued green
       break;
     case 'OTHER':
+      backgroundStrokeColor = 'rgba(80, 0, 133, 0.2)'; // subdued purple for OTHER
       break;
     default:
       break;
@@ -1900,7 +1915,7 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
             cx={MACRO_RING_SIZE / 2}
             cy={MACRO_RING_SIZE / 2}
             r={radius}
-            stroke="rgba(255,255,255,0.1)"
+            stroke={backgroundStrokeColor}
             strokeWidth={MACRO_STROKE_WIDTH}
             fill="none"
           />
@@ -2034,7 +2049,6 @@ const styles = StyleSheet.create({
   cheatDayBarBackground: {
     marginTop: 8,
     height: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 5,
     overflow: 'hidden'
   },
@@ -2161,7 +2175,6 @@ const styles = StyleSheet.create({
   },
   burnBarBackground: {
     height: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 5,
     overflow: 'hidden'
   },
