@@ -31,6 +31,9 @@ import DeleteAccount from './src/screens/DeleteAccount';
 import ChangePassword from './src/screens/ChangePassword';
 import AboutUs from './src/screens/AboutUs';
 import Settings from './src/screens/Settings';
+import Notifications from './src/screens/Notifications';
+import DataSharing from './src/screens/DataSharing';
+import PrivacyPolicy from './src/screens/PrivacyPolicy';
 import CameraScreen from './src/screens/Camera';
 import ImageCaptureScreen from './src/screens/ImageCapture';
 import Nutrients from './src/screens/Nutrients';
@@ -347,6 +350,9 @@ function AppNavigator() {
             <Stack.Screen name="ChangePassword" component={ChangePassword} />
             <Stack.Screen name="AboutUs" component={AboutUs} />
             <Stack.Screen name="Settings" component={Settings} />
+            <Stack.Screen name="Notifications" component={Notifications} />
+            <Stack.Screen name="DataSharing" component={DataSharing} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
           </>
         )}
       </Stack.Navigator>
