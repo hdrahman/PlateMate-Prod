@@ -8,6 +8,13 @@ import { Ionicons } from '@expo/vector-icons';
 import ProfileScreen from '../screens/ProfileScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import EditProfile from '../screens/EditProfile';
+import EditGoals from '../screens/EditGoals';
+import PremiumSubscription from '../screens/PremiumSubscription';
+import ChangePassword from '../screens/ChangePassword';
+import Settings from '../screens/Settings';
+import NotificationsScreen from '../screens/Notifications';
+import DataSharing from '../screens/DataSharing';
+import PrivacyPolicy from '../screens/PrivacyPolicy';
 // Import other screens as needed - these would be your existing screens
 // import HomeScreen from '../screens/HomeScreen';
 // import MealLogScreen from '../screens/MealLogScreen';
@@ -19,6 +26,13 @@ type RootStackParamList = {
     Profile: undefined;
     Goals: undefined;
     EditProfile: undefined;
+    EditGoals: undefined;
+    PremiumSubscription: undefined;
+    ChangePassword: undefined;
+    Settings: undefined;
+    Notifications: undefined;
+    DataSharing: undefined;
+    PrivacyPolicy: undefined;
     // Add other screens as needed
 };
 
@@ -81,6 +95,13 @@ const AppNavigator = () => {
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="Goals" component={GoalsScreen} />
                 <Stack.Screen name="EditProfile" component={EditProfile} />
+                <Stack.Screen name="EditGoals" component={EditGoals} />
+                <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
+                <Stack.Screen name="ChangePassword" component={ChangePassword} />
+                <Stack.Screen name="Settings" component={Settings} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                <Stack.Screen name="DataSharing" component={DataSharing} />
+                <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
                 {/* Add your other screens here */}
             </Stack.Navigator>
         </NavigationContainer>

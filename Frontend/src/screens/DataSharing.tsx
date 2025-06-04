@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { DataSharingSettings } from '../types/notifications';
+import SettingsService from '../services/SettingsService';
 
 interface DataSharingOption {
     id: string;
@@ -23,174 +26,353 @@ interface DataSharingOption {
 
 export default function DataSharing() {
     const navigation = useNavigation<any>();
-
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [dataSharingOptions, setDataSharingOptions] = useState<DataSharingOption[]>([
-        {
-            id: 'activity_tracking',
-            title: 'Activity Tracking',
-            description: 'Share your activity data to help improve recommendations',
-            enabled: true
-        },
-        {
-            id: 'meal_analytics',
-            title: 'Meal Analytics',
-            description: 'Allow anonymous analysis of your meal choices to improve food recognition',
-            enabled: true
-        },
-        {
-            id: 'usage_statistics',
-            title: 'Usage Statistics',
-            description: 'Share app usage data to help us improve the user experience',
-            enabled: true
-        },
-        {
-            id: 'personalized_ads',
-            title: 'Personalized Ads',
-            description: 'Allow personalized ads based on your preferences',
-            enabled: false
-        },
-        {
-            id: 'third_party_sharing',
-            title: 'Third-Party Data Sharing',
-            description: 'Share data with trusted partners to enhance services',
-            enabled: false
-        }
-    ]);
+    const [settings, setSettings] = useState<DataSharingSettings | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Simulate fetching user data sharing preferences
-        const fetchDataSharingPreferences = async () => {
-            try {
-                // In a real app, you would fetch from a backend service
-                // For demonstration, we'll just add a delay to simulate fetching
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                // In a real app, you would update the state with fetched preferences
-                setIsLoading(false);
-            } catch (error) {
-                console.error('Error fetching data sharing preferences:', error);
-                setIsLoading(false);
-            }
-        };
-
-        fetchDataSharingPreferences();
+        loadSettings();
     }, []);
 
-    const toggleOption = (id: string) => {
-        setDataSharingOptions(prevOptions =>
-            prevOptions.map(option =>
-                option.id === id
-                    ? { ...option, enabled: !option.enabled }
-                    : option
-            )
+    const loadSettings = async () => {
+        try {
+            const dataSharingSettings = await SettingsService.getDataSharingSettings();
+            setSettings(dataSharingSettings);
+        } catch (error) {
+            console.error('Error loading data sharing settings:', error);
+            Alert.alert('Error', 'Failed to load data sharing settings');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleToggle = async (path: string, value: boolean) => {
+        try {
+            const updatedSettings = await SettingsService.updateDataSharingSetting(path, value);
+            setSettings(updatedSettings);
+        } catch (error) {
+            console.error('Error updating data sharing setting:', error);
+            Alert.alert('Error', 'Failed to update data sharing setting');
+        }
+    };
+
+    const resetToDefaults = () => {
+        Alert.alert(
+            'Reset Settings',
+            'Are you sure you want to reset all data sharing settings to defaults?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Reset',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const defaultSettings = await SettingsService.resetDataSharingSettings();
+                            setSettings(defaultSettings);
+                            Alert.alert('Success', 'Data sharing settings reset to defaults');
+                        } catch (error) {
+                            console.error('Error resetting settings:', error);
+                            Alert.alert('Error', 'Failed to reset settings');
+                        }
+                    },
+                },
+            ]
         );
     };
 
-    const saveSettings = async () => {
-        setIsSaving(true);
-
-        try {
-            // Simulate API call to save settings
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // In a real app, you would save to a backend service
-            // Example:
-            // const response = await fetch('api/user/data-sharing', {
-            //   method: 'POST',
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify(dataSharingOptions)
-            // });
-
-            Alert.alert('Success', 'Data sharing preferences updated successfully');
-        } catch (error) {
-            console.error('Error saving data sharing preferences:', error);
-            Alert.alert('Error', 'Failed to update data sharing preferences. Please try again.');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    if (isLoading) {
+    if (loading || !settings) {
         return (
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="light-content" />
+            <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#9B00FF" />
-                    <Text style={styles.loadingText}>Loading preferences...</Text>
+                    <Text style={styles.loadingText}>Loading...</Text>
                 </View>
-            </SafeAreaView>
+            </LinearGradient>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                <View style={styles.content}>
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Data Sharing</Text>
+                        <Text style={styles.subtitle}>
+                            Control how your data is used and shared
+                        </Text>
+                    </View>
 
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Data Sharing</Text>
-            </View>
+                    {/* Local Storage Disclaimer */}
+                    <View style={styles.disclaimerCard}>
+                        <Ionicons name="shield-checkmark" size={32} color="#4CAF50" />
+                        <View style={styles.disclaimerContent}>
+                            <Text style={styles.disclaimerTitle}>🔒 Your Privacy First</Text>
+                            <Text style={styles.disclaimerText}>
+                                Currently, everything is being stored locally on your device. We see nothing.
+                                Your data stays completely private and secure on your phone.
+                            </Text>
+                            <Text style={styles.disclaimerSubtext}>
+                                The settings below are for future features and your consent preferences.
+                            </Text>
+                        </View>
+                    </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.infoContainer}>
-                    <Ionicons name="shield-checkmark-outline" size={40} color="#9B00FF" />
-                    <Text style={styles.infoTitle}>Your Privacy Matters</Text>
-                    <Text style={styles.infoText}>
-                        Control how PlateMate uses your data. We prioritize your privacy
-                        and allow you to customize what information is shared.
-                    </Text>
-                </View>
+                    {/* Essential Data Usage */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="shield" size={24} color="#4CAF50" />
+                            <Text style={styles.sectionTitle}>Essential Data Usage</Text>
+                        </View>
+                        <Text style={styles.sectionDescription}>
+                            Required for basic app functionality and security
+                        </Text>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Data Sharing Options</Text>
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>App Functionality</Text>
+                                <Text style={styles.settingDescription}>
+                                    Core features like food logging and progress tracking
+                                </Text>
+                            </View>
+                            <View style={styles.requiredBadge}>
+                                <Text style={styles.requiredText}>Required</Text>
+                            </View>
+                        </View>
 
-                    {dataSharingOptions.map((option) => (
-                        <View key={option.id} style={styles.optionItem}>
-                            <View style={styles.optionTextContainer}>
-                                <Text style={styles.optionTitle}>{option.title}</Text>
-                                <Text style={styles.optionDescription}>{option.description}</Text>
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Security & Authentication</Text>
+                                <Text style={styles.settingDescription}>
+                                    Account security and session management
+                                </Text>
+                            </View>
+                            <View style={styles.requiredBadge}>
+                                <Text style={styles.requiredText}>Required</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Basic Analytics</Text>
+                                <Text style={styles.settingDescription}>
+                                    Anonymous crash reports and performance data
+                                </Text>
                             </View>
                             <Switch
-                                value={option.enabled}
-                                onValueChange={() => toggleOption(option.id)}
-                                trackColor={{ false: '#444', true: '#9B00FF' }}
-                                thumbColor={option.enabled ? '#FFF' : '#AAA'}
+                                value={settings.essential.basicAnalytics}
+                                onValueChange={(value) => handleToggle('essential.basicAnalytics', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#4CAF50' }}
+                                thumbColor={settings.essential.basicAnalytics ? '#fff' : '#f4f3f4'}
                             />
                         </View>
-                    ))}
+                    </View>
+
+                    {/* Enhancement Features */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="trending-up" size={24} color="#2196F3" />
+                            <Text style={styles.sectionTitle}>Enhancement Features</Text>
+                        </View>
+                        <Text style={styles.sectionDescription}>
+                            Improve your experience with personalized features
+                        </Text>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Personalized Content</Text>
+                                <Text style={styles.settingDescription}>
+                                    Customized meal suggestions and workout recommendations
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.enhancement.personalizedContent}
+                                onValueChange={(value) => handleToggle('enhancement.personalizedContent', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#2196F3' }}
+                                thumbColor={settings.enhancement.personalizedContent ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Improved Food Recognition</Text>
+                                <Text style={styles.settingDescription}>
+                                    Better AI accuracy through usage patterns
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.enhancement.improvedRecognition}
+                                onValueChange={(value) => handleToggle('enhancement.improvedRecognition', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#2196F3' }}
+                                thumbColor={settings.enhancement.improvedRecognition ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Better Recommendations</Text>
+                                <Text style={styles.settingDescription}>
+                                    Smarter health insights based on your progress
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.enhancement.betterRecommendations}
+                                onValueChange={(value) => handleToggle('enhancement.betterRecommendations', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#2196F3' }}
+                                thumbColor={settings.enhancement.betterRecommendations ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Marketing Communications */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="megaphone" size={24} color="#FF9800" />
+                            <Text style={styles.sectionTitle}>Marketing Communications</Text>
+                        </View>
+                        <Text style={styles.sectionDescription}>
+                            Control how we communicate with you
+                        </Text>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Personalized Ads</Text>
+                                <Text style={styles.settingDescription}>
+                                    Relevant health and fitness advertisements
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.marketing.personalizedAds}
+                                onValueChange={(value) => handleToggle('marketing.personalizedAds', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#FF9800' }}
+                                thumbColor={settings.marketing.personalizedAds ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Email Marketing</Text>
+                                <Text style={styles.settingDescription}>
+                                    Health tips, success stories, and app updates via email
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.marketing.emailMarketing}
+                                onValueChange={(value) => handleToggle('marketing.emailMarketing', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#FF9800' }}
+                                thumbColor={settings.marketing.emailMarketing ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Partner Sharing</Text>
+                                <Text style={styles.settingDescription}>
+                                    Share anonymized data with trusted health partners
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.marketing.partnerSharing}
+                                onValueChange={(value) => handleToggle('marketing.partnerSharing', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#FF9800' }}
+                                thumbColor={settings.marketing.partnerSharing ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Research & Development */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="flask" size={24} color="#9C27B0" />
+                            <Text style={styles.sectionTitle}>Research & Development</Text>
+                        </View>
+                        <Text style={styles.sectionDescription}>
+                            Help improve health technology for everyone
+                        </Text>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Anonymized Research</Text>
+                                <Text style={styles.settingDescription}>
+                                    Contribute to health and nutrition research studies
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.research.anonymizedResearch}
+                                onValueChange={(value) => handleToggle('research.anonymizedResearch', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#9C27B0' }}
+                                thumbColor={settings.research.anonymizedResearch ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Product Improvement</Text>
+                                <Text style={styles.settingDescription}>
+                                    Help us make the app better for everyone
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.research.productImprovement}
+                                onValueChange={(value) => handleToggle('research.productImprovement', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#9C27B0' }}
+                                thumbColor={settings.research.productImprovement ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Academic Partnership</Text>
+                                <Text style={styles.settingDescription}>
+                                    Support university research on digital health
+                                </Text>
+                            </View>
+                            <Switch
+                                value={settings.research.academicPartnership}
+                                onValueChange={(value) => handleToggle('research.academicPartnership', value)}
+                                trackColor={{ false: '#E5E5E5', true: '#9C27B0' }}
+                                thumbColor={settings.research.academicPartnership ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Data Rights */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="document-text" size={24} color="#607D8B" />
+                            <Text style={styles.sectionTitle}>Your Data Rights</Text>
+                        </View>
+
+                        <TouchableOpacity style={styles.actionButton}>
+                            <Ionicons name="download" size={20} color="#607D8B" />
+                            <Text style={styles.actionButtonText}>Export My Data</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionButton}>
+                            <Ionicons name="eye" size={20} color="#607D8B" />
+                            <Text style={styles.actionButtonText}>View Data Usage</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.actionButton, styles.deleteButton]}>
+                            <Ionicons name="trash" size={20} color="#F44336" />
+                            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete All Data</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Reset Button */}
+                    <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
+                        <Ionicons name="refresh" size={20} color="#FF6B6B" />
+                        <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.bottomSpacer} />
                 </View>
-
-                <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={saveSettings}
-                    disabled={isSaving}
-                >
-                    {isSaving ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <Text style={styles.saveButtonText}>Save Preferences</Text>
-                    )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.privacyPolicyButton}
-                    onPress={() => navigation.navigate('PrivacyPolicy')}
-                >
-                    <Text style={styles.privacyPolicyButtonText}>View Full Privacy Policy</Text>
-                </TouchableOpacity>
             </ScrollView>
-        </SafeAreaView>
+        </LinearGradient>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
     },
     loadingContainer: {
         flex: 1,
@@ -198,100 +380,159 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loadingText: {
-        marginTop: 10,
-        color: '#FFF',
-        fontSize: 16,
+        fontSize: 18,
+        color: '#FFFFFF',
+        fontWeight: '600',
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 60,
-        borderBottomWidth: 1,
-        borderBottomColor: '#444',
-        paddingHorizontal: 16,
-    },
-    backButton: {
-        padding: 5,
-    },
-    headerTitle: {
-        color: '#FFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-        marginLeft: 10,
+    scrollView: {
+        flex: 1,
     },
     content: {
-        padding: 20,
-        paddingBottom: 40,
+        paddingHorizontal: 20,
+        paddingTop: 60,
     },
-    infoContainer: {
-        alignItems: 'center',
+    header: {
         marginBottom: 30,
+        alignItems: 'center',
     },
-    infoTitle: {
-        fontSize: 22,
+    title: {
+        fontSize: 32,
         fontWeight: 'bold',
-        color: '#FFF',
-        marginTop: 10,
+        color: '#FFFFFF',
         marginBottom: 8,
     },
-    infoText: {
-        fontSize: 15,
-        color: '#CCC',
-        textAlign: 'center',
-        lineHeight: 22,
-    },
-    section: {
-        marginBottom: 30,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#9B00FF',
-        marginBottom: 15,
-    },
-    optionItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#333',
-    },
-    optionTextContainer: {
-        flex: 1,
-        marginRight: 10,
-    },
-    optionTitle: {
+    subtitle: {
         fontSize: 16,
-        fontWeight: '500',
-        color: '#FFF',
-        marginBottom: 4,
+        color: '#E8E8E8',
+        textAlign: 'center',
     },
-    optionDescription: {
-        fontSize: 14,
-        color: '#AAA',
+    disclaimerCard: {
+        backgroundColor: 'rgba(76, 175, 80, 0.15)',
+        borderRadius: 15,
+        padding: 20,
+        marginBottom: 25,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        borderWidth: 1,
+        borderColor: 'rgba(76, 175, 80, 0.3)',
     },
-    saveButton: {
-        backgroundColor: '#9B00FF',
-        height: 50,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 10,
-        marginBottom: 20,
+    disclaimerContent: {
+        flex: 1,
+        marginLeft: 15,
     },
-    saveButtonText: {
-        color: '#FFF',
+    disclaimerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
+        color: '#FFFFFF',
+        marginBottom: 8,
     },
-    privacyPolicyButton: {
-        alignItems: 'center',
-        paddingVertical: 10,
-    },
-    privacyPolicyButtonText: {
-        color: '#9B00FF',
+    disclaimerText: {
         fontSize: 16,
-        textDecorationLine: 'underline',
-    }
+        color: '#E8E8E8',
+        lineHeight: 22,
+        marginBottom: 8,
+    },
+    disclaimerSubtext: {
+        fontSize: 14,
+        color: '#B8C5D1',
+        lineHeight: 20,
+        fontStyle: 'italic',
+    },
+    section: {
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: 15,
+        padding: 20,
+        marginBottom: 20,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        marginLeft: 12,
+    },
+    sectionDescription: {
+        fontSize: 14,
+        color: '#B8C5D1',
+        marginBottom: 20,
+        lineHeight: 20,
+    },
+    settingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    settingInfo: {
+        flex: 1,
+        marginRight: 15,
+    },
+    settingLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#FFFFFF',
+        marginBottom: 4,
+    },
+    settingDescription: {
+        fontSize: 14,
+        color: '#E8E8E8',
+        lineHeight: 18,
+    },
+    requiredBadge: {
+        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+    },
+    requiredText: {
+        fontSize: 12,
+        color: '#4CAF50',
+        fontWeight: '600',
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        padding: 15,
+        marginBottom: 12,
+    },
+    actionButtonText: {
+        fontSize: 16,
+        color: '#FFFFFF',
+        fontWeight: '500',
+        marginLeft: 12,
+    },
+    deleteButton: {
+        backgroundColor: 'rgba(244, 67, 54, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(244, 67, 54, 0.3)',
+    },
+    deleteButtonText: {
+        color: '#F44336',
+    },
+    resetButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 107, 107, 0.2)',
+        borderRadius: 15,
+        padding: 15,
+        marginTop: 10,
+    },
+    resetButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FF6B6B',
+        marginLeft: 8,
+    },
+    bottomSpacer: {
+        height: 100,
+    },
 }); 

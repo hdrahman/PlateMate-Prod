@@ -81,6 +81,10 @@ const ProfileScreen = () => {
         navigation.navigate('Goals');
     };
 
+    const goToSettings = () => {
+        navigation.navigate('Settings');
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
@@ -101,7 +105,7 @@ const ProfileScreen = () => {
                         <Text style={styles.location}>{profileData.location}</Text>
                     </View>
                 </View>
-                <TouchableOpacity onPress={goToEditProfile}>
+                <TouchableOpacity onPress={goToSettings}>
                     <Ionicons name="settings-outline" size={28} color={WHITE} />
                 </TouchableOpacity>
             </View>
