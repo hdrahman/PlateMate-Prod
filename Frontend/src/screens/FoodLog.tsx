@@ -57,6 +57,7 @@ type RootStackParamList = {
     ImageCapture: { mealType: string; sourcePage?: string };
     Manual: { mealType: string; sourcePage?: string };
     MealGallery: undefined;
+    FoodDetail: { foodId: number };
     // Add other screens as needed
 };
 
@@ -1458,6 +1459,12 @@ const DiaryScreen: React.FC = () => {
         setActionModalVisible(true);
     };
 
+    const handleFoodItemTap = (foodId: number | undefined) => {
+        if (foodId) {
+            (navigation as any).navigate('FoodDetail', { foodId });
+        }
+    };
+
     const handleDeleteFoodItem = async () => {
         if (selectedFoodItem && selectedFoodItem.id) {
             try {
@@ -1923,6 +1930,7 @@ const DiaryScreen: React.FC = () => {
                                                         <TouchableHighlight
                                                             key={i}
                                                             underlayColor="#333"
+                                                            onPress={() => handleFoodItemTap(foodId)}
                                                             onLongPress={() => {
                                                                 handleFoodItemLongPress(foodId, foodName, meal.title, i);
                                                             }}

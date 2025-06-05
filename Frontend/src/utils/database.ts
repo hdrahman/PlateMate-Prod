@@ -296,7 +296,7 @@ export const addFoodLog = async (foodLog: any) => {
             file_key: foodLog.file_key || 'default_file_key',
             healthiness_rating: foodLog.healthiness_rating || 0,
             date: foodLog.date || timestamp.split('T')[0],
-            meal_type: foodLog.meal_type || 'snack',
+            meal_type: foodLog.meal_type || 'breakfast',
             brand_name: foodLog.brand_name || '',
             quantity: foodLog.quantity || '1 serving',
             notes: foodLog.notes || '',
@@ -2526,7 +2526,7 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
                 file_key: foodLog.file_key || 'default_file_key',
                 healthiness_rating: foodLog.healthiness_rating || 0,
                 date: foodLog.date || timestamp.split('T')[0],
-                meal_type: foodLog.meal_type || 'snack',
+                meal_type: foodLog.meal_type || 'breakfast',
                 brand_name: foodLog.brand_name || '',
                 quantity: foodLog.quantity || '1 serving',
                 notes: foodLog.notes || '',
@@ -2674,4 +2674,29 @@ const calculateNextCheatDayWithPreferredDay = (
 const getDayName = (dayIndex: number): string => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[dayIndex] || 'Unknown';
+};
+
+// Get a specific food log entry by ID
+export const getFoodLogById = async (id: number): Promise<any> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get food log before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const result = await db.getFirstAsync(
+            'SELECT * FROM food_logs WHERE id = ?',
+            [id]
+        ) as any;
+
+        if (!result) {
+            throw new Error('Food log entry not found');
+        }
+
+        console.log(`✅ Retrieved food log with ID ${id}`);
+        return result;
+    } catch (error) {
+        console.error('❌ Error retrieving food log by ID:', error);
+        throw error;
+    }
 }; 

@@ -66,7 +66,7 @@ const BarcodeResults: React.FC = () => {
     const { foodData, mealType: initialMealType } = route.params as { foodData: any; mealType?: string };
 
     // State management
-    const [mealType, setMealType] = useState(initialMealType || 'Snacks');
+    const [mealType, setMealType] = useState(initialMealType || 'Breakfast');
     const [showMealTypeDropdown, setShowMealTypeDropdown] = useState(false);
     const [quantity, setQuantity] = useState(foodData?.serving_qty ? String(foodData.serving_qty) : '1');
     const [servingUnit, setServingUnit] = useState(foodData?.serving_unit || 'serving');

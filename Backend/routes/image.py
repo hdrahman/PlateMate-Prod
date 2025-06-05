@@ -21,12 +21,26 @@ USE_MOCK_API = False  # Set to False to use the real OpenAI API
 # Load environment variables
 load_dotenv()
 
+# Get OpenAI API key and validate it
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # Initialize OpenAI Client with API key from environment
 try:
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    print("✅ OpenAI Async API client initialized successfully")
+    if not OPENAI_API_KEY:
+        print("❌ OPENAI_API_KEY not found in environment variables")
+        print("❌ OpenAI functionality will not work")
+        client = None
+    elif not OPENAI_API_KEY.startswith('sk-'):
+        print("❌ Invalid OpenAI API key format")
+        print("❌ OpenAI functionality will not work")
+        client = None
+    else:
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        print("✅ OpenAI Async API client initialized successfully")
+        print(f"✅ Using API key starting with: {OPENAI_API_KEY[:10]}...")
 except Exception as e:
     print(f"❌ Failed to initialize OpenAI Async client: {e}")
+    client = None
 
 router = APIRouter()
 
@@ -157,6 +171,14 @@ async def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
             if file_path:
                 FileManager.delete_file(file_path)
             raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
+
+        # Check if OpenAI client is available
+        if client is None:
+            print("❌ OpenAI client not available - API key not configured properly")
+            # Clean up saved file and return error
+            if file_path:
+                FileManager.delete_file(file_path)
+            raise HTTPException(status_code=500, detail="OpenAI API not configured properly. Please check OPENAI_API_KEY environment variable.")
 
         try:
             # Define analyze_food_image function inline
@@ -350,6 +372,13 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
                 "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
             })
         
+        # Check if OpenAI client is available
+        if client is None:
+            print("❌ OpenAI client not available - API key not configured properly")
+            # Clean up saved files and return error
+            FileManager.cleanup_files([fp for fp, _ in saved_files])
+            raise HTTPException(status_code=500, detail="OpenAI API not configured properly. Please check OPENAI_API_KEY environment variable.")
+
         try:
             print("📤 Sending multiple images to OpenAI for analysis...")
             
@@ -418,9 +447,14 @@ Important:
             
             gpt_response = response.choices[0].message.content.strip()
             print(f"📝 GPT-4 Vision Response: {gpt_response}")
+            print(f"📝 Response length: {len(gpt_response)} characters")
+            print(f"📝 Response starts with: {gpt_response[:100]}...")
 
             # Parse the response
             extracted_foods = parse_gpt4_response(gpt_response)
+            print(f"📊 Parsed {len(extracted_foods)} food items")
+            for i, food in enumerate(extracted_foods):
+                print(f"  Food {i+1}: {food.get('food_name', 'Unknown')}")
             print("✅ Successfully parsed GPT response")
             
             # Get the primary image URL (first saved image)

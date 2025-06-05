@@ -48,6 +48,7 @@ import RecipeDetails from "./src/screens/RecipeDetails";
 import RecipeResults from "./src/screens/RecipeResults";
 import SearchResults from "./src/screens/SearchResults";
 import MealGallery from "./src/screens/MealGallery";
+import FoodDetail from "./src/screens/FoodDetail";
 import Auth from "./src/screens/Auth";
 import Onboarding from "./src/screens/Onboarding";
 
@@ -348,6 +349,7 @@ function AppNavigator() {
             <Stack.Screen name="RecipeResults" component={RecipeResults} />
             <Stack.Screen name="SearchResults" component={SearchResults} />
             <Stack.Screen name="MealGallery" component={MealGallery} />
+            <Stack.Screen name="FoodDetail" component={FoodDetail} />
             <Stack.Screen name="EditProfile" component={EditProfile} />
             <Stack.Screen name="EditGoals" component={EditGoals} />
             <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
