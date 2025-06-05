@@ -560,6 +560,24 @@ const NutrientsScreen: React.FC = () => {
 
         const gradientColors = getNutrientColors(label);
 
+        // Create subdued background color based on the main bar color
+        const getSubduedBackgroundColor = (colors: readonly [string, string]) => {
+            // Use the first color and make it very transparent for a subdued effect
+            const baseColor = colors[0];
+            // Extract RGB values and apply low opacity
+            if (baseColor.includes('#')) {
+                // Convert hex to rgba with low opacity
+                const hex = baseColor.replace('#', '');
+                const r = parseInt(hex.substr(0, 2), 16);
+                const g = parseInt(hex.substr(2, 2), 16);
+                const b = parseInt(hex.substr(4, 2), 16);
+                return `rgba(${r}, ${g}, ${b}, 0.15)`;
+            }
+            return 'rgba(128, 128, 128, 0.15)'; // fallback
+        };
+
+        const backgroundBarColor = getSubduedBackgroundColor(gradientColors);
+
         // Display unit correctly based on nutrient type
         const displayUnit = (label.includes('Vitamin') || label.includes('Calcium') || label.includes('Iron'))
             ? ''
@@ -574,7 +592,7 @@ const NutrientsScreen: React.FC = () => {
                     <Text style={styles.nutrientLabel}>{label}</Text>
                     <Text style={styles.rightValue}>{current}/{goal}</Text>
                 </View>
-                <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBarContainer, { backgroundColor: backgroundBarColor }]}>
                     <LinearGradient
                         colors={gradientColors}
                         start={{ x: 0, y: 0 }}
@@ -827,7 +845,6 @@ const styles = StyleSheet.create({
     },
     progressBarContainer: {
         height: 5,
-        backgroundColor: '#333',
         borderRadius: 2.5,
         overflow: 'hidden',
     },
