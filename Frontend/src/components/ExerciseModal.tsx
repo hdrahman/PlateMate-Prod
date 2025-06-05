@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -48,6 +48,30 @@ const PRIMARY_BG = '#000000';
 const WHITE = '#FFFFFF';
 const PURPLE_ACCENT = '#AA00FF';
 
+// Memoized search input component to prevent re-renders
+const SearchInputComponent = React.memo(({
+    searchQuery,
+    onChangeText
+}: {
+    searchQuery: string;
+    onChangeText: (text: string) => void;
+}) => {
+    return (
+        <View style={styles.searchInputContainer}>
+            <Ionicons name="search" size={20} color="#999" />
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Search activities..."
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={onChangeText}
+                autoCorrect={false}
+                autoCapitalize="none"
+            />
+        </View>
+    );
+});
+
 const ExerciseModal: React.FC<ExerciseModalProps> = ({
     visible,
     onClose,
@@ -80,6 +104,11 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
         resetForm();
         onClose();
     };
+
+    // Handle search query changes
+    const handleSearchChange = useCallback((text: string) => {
+        setSearchQuery(text);
+    }, []);
 
     // MET activities data based on the provided charts
     const metActivities: METActivity[] = [
@@ -417,16 +446,10 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                         </View>
 
                                         {/* Search Input */}
-                                        <View style={styles.searchInputContainer}>
-                                            <Ionicons name="search" size={20} color="#999" />
-                                            <TextInput
-                                                style={styles.searchInput}
-                                                placeholder="Search activities..."
-                                                placeholderTextColor="#999"
-                                                value={searchQuery}
-                                                onChangeText={setSearchQuery}
-                                            />
-                                        </View>
+                                        <SearchInputComponent
+                                            searchQuery={searchQuery}
+                                            onChangeText={handleSearchChange}
+                                        />
 
                                         {/* Activities List */}
                                         <View style={styles.activitiesContainer}>
