@@ -293,11 +293,19 @@ const ImageCapture: React.FC = () => {
     };
 
     // Function to upload multiple images to backend and get ChatGPT analysis
-    const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any }> => {
+    const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any, localImagePaths: string[] }> => {
         try {
             console.log('🚀 Uploading multiple images to backend with ChatGPT analysis...');
             const startTime = Date.now();
             setAnalysisStage('uploading');
+
+            // Get current user ID for local storage
+            const userId = getCurrentUserId();
+
+            // Save images locally for the gallery FIRST (before uploading to backend)
+            console.log(`💾 Saving ${imageUris.length} images locally for gallery...`);
+            const localImagePaths = await saveMultipleImagesLocally(imageUris, userId);
+            console.log('✅ Images saved locally for gallery');
 
             const formData = new FormData();
             formData.append('user_id', '1');
@@ -342,10 +350,12 @@ const ImageCapture: React.FC = () => {
             setAnalysisStage('processing');
 
             console.log(`✅ Received ${data.nutrition_data.length} food items from ChatGPT analysis`);
+            console.log(`🖼️ Local image paths for gallery: ${localImagePaths.length} images saved`);
 
             return {
                 meal_id: data.meal_id,
-                nutrition_data: data.nutrition_data
+                nutrition_data: data.nutrition_data,
+                localImagePaths: localImagePaths // Return local paths for gallery
             };
         } catch (error) {
             console.error('❌ Backend ChatGPT analysis failed:', error);
@@ -538,7 +548,13 @@ const ImageCapture: React.FC = () => {
                 // Process each food item in the array
                 const foodLogsToInsert = [];
 
-                for (const nutritionData of result.nutrition_data) {
+                for (let index = 0; index < result.nutrition_data.length; index++) {
+                    const nutritionData = result.nutrition_data[index];
+                    // Use the first local image path for all food items from the same meal
+                    const primaryImagePath = result.localImagePaths && result.localImagePaths.length > 0
+                        ? result.localImagePaths[0]
+                        : imageUris[0]; // Fallback to original URI if local path not available
+
                     // Create a food log entry with all required fields
                     const foodLog = {
                         meal_id: result.meal_id,
@@ -560,7 +576,7 @@ const ImageCapture: React.FC = () => {
                         vitamin_c: nutritionData.vitamin_c || 0,
                         calcium: nutritionData.calcium || 0,
                         iron: nutritionData.iron || 0,
-                        image_url: imageUris[0],
+                        image_url: primaryImagePath,
                         file_key: 'default_key',
                         healthiness_rating: nutritionData.healthiness_rating || 5,
                         date: formattedDate,
@@ -579,6 +595,11 @@ const ImageCapture: React.FC = () => {
             } else {
                 // Fallback to old behavior if not an array or empty
                 const nutritionData = result.nutrition_data[0] || {};
+
+                // Use the first local image path or fallback to original URI
+                const primaryImagePath = result.localImagePaths && result.localImagePaths.length > 0
+                    ? result.localImagePaths[0]
+                    : imageUris[0]; // Fallback to original URI if local path not available
 
                 // Create a food log entry with all required fields
                 const foodLog = {
@@ -601,7 +622,7 @@ const ImageCapture: React.FC = () => {
                     vitamin_c: nutritionData.vitamin_c || 0,
                     calcium: nutritionData.calcium || 0,
                     iron: nutritionData.iron || 0,
-                    image_url: imageUris[0],
+                    image_url: primaryImagePath,
                     file_key: 'default_key',
                     healthiness_rating: nutritionData.healthiness_rating || 5,
                     date: formattedDate,
