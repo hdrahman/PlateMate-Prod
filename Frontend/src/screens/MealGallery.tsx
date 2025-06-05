@@ -37,6 +37,7 @@ const GRADIENT_COLORS = ["#FF00F5", "#9B00FF", "#00CFFF"] as const;
 // Define navigation types
 type RootStackParamList = {
     FoodLog: undefined;
+    FoodDetail: { foodId: number };
     // Add other screens as needed
 };
 
@@ -179,8 +180,7 @@ const MealGallery: React.FC = () => {
                     isLeftColumn ? styles.leftColumn : styles.rightColumn
                 ]}
                 onPress={() => {
-                    // TODO: Navigate to meal detail screen or implement image viewer
-                    console.log('Meal image tapped:', item);
+                    navigation.navigate('FoodDetail', { foodId: item.id });
                 }}
             >
                 <Image
