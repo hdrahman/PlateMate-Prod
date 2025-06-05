@@ -503,3 +503,53 @@ const shuffleArray = <T>(array: T[]): T[] => {
     }
     return newArray;
 };
+
+// Function to autocomplete recipe search
+export const autocompleteRecipes = async (query: string): Promise<{ id: number; title: string }[]> => {
+    if (!isConfigured || !query.trim()) {
+        return [];
+    }
+
+    try {
+        const response = await axios.get(`${BASE_URL}/recipes/autocomplete`, {
+            params: {
+                apiKey: SPOONACULAR_API_KEY,
+                query: query.trim(),
+                number: 10
+            }
+        });
+
+        return response.data.map((item: any) => ({
+            id: item.id,
+            title: item.title
+        }));
+    } catch (error) {
+        console.error('Error getting recipe autocomplete:', error);
+        return [];
+    }
+};
+
+// Function to autocomplete ingredient search
+export const autocompleteIngredients = async (query: string): Promise<{ id: number; name: string }[]> => {
+    if (!isConfigured || !query.trim()) {
+        return [];
+    }
+
+    try {
+        const response = await axios.get(`${BASE_URL}/food/ingredients/autocomplete`, {
+            params: {
+                apiKey: SPOONACULAR_API_KEY,
+                query: query.trim(),
+                number: 8
+            }
+        });
+
+        return response.data.map((item: any) => ({
+            id: item.id,
+            name: item.name
+        }));
+    } catch (error) {
+        console.error('Error getting ingredient autocomplete:', error);
+        return [];
+    }
+};

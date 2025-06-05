@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
     ScrollView, TextInput, Platform, Alert,
-    ActivityIndicator
+    ActivityIndicator, FlatList, Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
-import { Recipe, foodCategories, getRandomRecipes } from '../api/recipes';
+import { Recipe, foodCategories, getRandomRecipes, autocompleteRecipes, autocompleteIngredients } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
 import { RecipeCacheService } from '../services/RecipeCacheService';
 
@@ -34,7 +34,14 @@ interface GradientBorderCardProps {
     style?: any;
 }
 
-
+// Autocomplete suggestion types
+interface AutocompleteSuggestion {
+    id: number;
+    title?: string;
+    name?: string;
+    type: 'recipe' | 'ingredient';
+    uniqueKey?: string;
+}
 
 export default function MealPlanner() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -46,13 +53,17 @@ export default function MealPlanner() {
     const [featuredRecipes, setFeaturedRecipes] = useState<Recipe[]>([]);
     const [showFavorites, setShowFavorites] = useState<boolean>(true);
 
+    // Autocomplete states
+    const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+    const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false);
+    const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     // User context
     const { user } = useAuth();
     const { profile: onboardingProfile, isLoading: isOnboardingLoading } = useOnboarding();
     const { nutrientTotals, refreshLogs, isLoading: foodLogLoading,
         startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
-
-
 
     // Daily nutrition stats
     const [dailyNutrition, setDailyNutrition] = useState({
@@ -64,6 +75,126 @@ export default function MealPlanner() {
         mealsLeft: 3
     });
     const [userGoals, setUserGoals] = useState<NutritionGoals>(getDefaultNutritionGoals());
+
+    // Debounced autocomplete function
+    const fetchAutocomplete = useCallback(async (query: string) => {
+        if (!query.trim() || query.length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        setIsLoadingSuggestions(true);
+
+        try {
+            // Fetch both recipe and ingredient suggestions in parallel
+            const [recipeResults, ingredientResults] = await Promise.all([
+                autocompleteRecipes(query),
+                autocompleteIngredients(query)
+            ]);
+
+            const recipeSuggestions: AutocompleteSuggestion[] = recipeResults
+                .filter(item => item && item.id && item.title) // Filter out invalid items
+                .map((item, index) => ({
+                    id: item.id,
+                    title: item.title,
+                    type: 'recipe' as const,
+                    uniqueKey: `recipe-${item.id}-${index}` // Add unique key
+                }));
+
+            const ingredientSuggestions: AutocompleteSuggestion[] = ingredientResults
+                .filter(item => item && item.id && item.name) // Filter out invalid items
+                .map((item, index) => ({
+                    id: item.id,
+                    name: item.name,
+                    type: 'ingredient' as const,
+                    uniqueKey: `ingredient-${item.id}-${index}` // Add unique key
+                }));
+
+            // Combine and limit suggestions
+            const allSuggestions = [...recipeSuggestions.slice(0, 6), ...ingredientSuggestions.slice(0, 4)];
+            setSuggestions(allSuggestions);
+            setShowSuggestions(allSuggestions.length > 0);
+        } catch (error) {
+            console.error('Error fetching autocomplete suggestions:', error);
+            setSuggestions([]);
+            setShowSuggestions(false);
+        } finally {
+            setIsLoadingSuggestions(false);
+        }
+    }, []);
+
+    // Handle search query changes with debouncing
+    const handleSearchQueryChange = useCallback((text: string) => {
+        setSearchQuery(text);
+
+        // Clear existing timeout
+        if (autocompleteTimeoutRef.current) {
+            clearTimeout(autocompleteTimeoutRef.current);
+        }
+
+        // Only fetch autocomplete if text is long enough
+        if (text.trim().length >= 2) {
+            // Set new timeout for autocomplete
+            autocompleteTimeoutRef.current = setTimeout(() => {
+                fetchAutocomplete(text);
+            }, 300);
+        } else {
+            // Clear suggestions if text is too short
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    }, [fetchAutocomplete]);
+
+    // Handle suggestion selection
+    const handleSuggestionSelect = useCallback((suggestion: AutocompleteSuggestion) => {
+        const searchTerm = suggestion.title || suggestion.name || '';
+
+        // Clear suggestions immediately to prevent UI flicker
+        setShowSuggestions(false);
+
+        // Update search query without triggering autocomplete
+        if (autocompleteTimeoutRef.current) {
+            clearTimeout(autocompleteTimeoutRef.current);
+        }
+
+        setSearchQuery(searchTerm);
+        Keyboard.dismiss();
+
+        // Navigate to search results
+        if (searchTerm.trim()) {
+            navigation.navigate('RecipeResults', { query: searchTerm.trim() });
+            // Clear after a short delay to prevent flicker
+            setTimeout(() => {
+                setSearchQuery('');
+            }, 100);
+        }
+    }, [navigation]);
+
+    // Handle search submission
+    const handleSearch = useCallback(() => {
+        if (searchQuery.trim()) {
+            setShowSuggestions(false);
+            Keyboard.dismiss();
+            navigation.navigate('RecipeResults', { query: searchQuery.trim() });
+            setSearchQuery(''); // Clear the search field after submitting
+        }
+    }, [searchQuery, navigation]);
+
+    // Handle search input focus
+    const handleSearchFocus = useCallback(() => {
+        if (searchQuery.length >= 2) {
+            fetchAutocomplete(searchQuery);
+        }
+    }, [searchQuery, fetchAutocomplete]);
+
+    // Handle search input blur
+    const handleSearchBlur = useCallback(() => {
+        // Small delay to allow suggestion tap to register
+        setTimeout(() => {
+            setShowSuggestions(false);
+        }, 200);
+    }, []);
 
     // Load popular healthy recipes on component mount
     useEffect(() => {
@@ -79,6 +210,11 @@ export default function MealPlanner() {
         return () => {
             console.log('MealPlanner screen stopping food log watch');
             stopWatchingFoodLogs();
+
+            // Clear autocomplete timeout
+            if (autocompleteTimeoutRef.current) {
+                clearTimeout(autocompleteTimeoutRef.current);
+            }
         };
     }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
 
@@ -205,27 +341,86 @@ export default function MealPlanner() {
         }
     };
 
-    // Handle search submission
-    const handleSearch = () => {
-        if (searchQuery.trim()) {
-            navigation.navigate('RecipeResults', { query: searchQuery.trim() });
-            setSearchQuery(''); // Clear the search field after submitting
-        }
-    };
-
     // Handle recipe press
     const handleRecipePress = (recipe: Recipe) => {
         navigation.navigate('RecipeDetails', { recipeId: recipe.id });
     };
-
-
 
     // Handle scanning pantry (placeholder for future feature)
     const handleScanPantry = () => {
         Alert.alert('Coming Soon', 'Pantry scanning feature is coming soon!');
     };
 
+    // Search Input Component - Separated to prevent re-renders
+    const SearchInputComponent = React.memo(({
+        searchQuery,
+        onChangeText,
+        onSubmitEditing,
+        onFocus,
+        onBlur,
+        isLoadingSuggestions
+    }: {
+        searchQuery: string;
+        onChangeText: (text: string) => void;
+        onSubmitEditing: () => void;
+        onFocus: () => void;
+        onBlur: () => void;
+        isLoadingSuggestions: boolean;
+    }) => {
+        return (
+            <View style={styles.searchContainer}>
+                <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search recipes, ingredients..."
+                    placeholderTextColor={SUBDUED}
+                    value={searchQuery}
+                    onChangeText={onChangeText}
+                    onSubmitEditing={onSubmitEditing}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                    returnKeyType="search"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    clearButtonMode="while-editing"
+                />
+                {isLoadingSuggestions && (
+                    <ActivityIndicator
+                        size="small"
+                        color={PURPLE_ACCENT}
+                        style={styles.searchLoadingIcon}
+                    />
+                )}
+            </View>
+        );
+    });
 
+    // Memoized suggestion item to prevent re-renders
+    const SuggestionItem = React.memo(({
+        item,
+        onPress
+    }: {
+        item: AutocompleteSuggestion;
+        onPress: (item: AutocompleteSuggestion) => void;
+    }) => (
+        <TouchableOpacity
+            style={styles.suggestionItem}
+            onPress={() => onPress(item)}
+        >
+            <Ionicons
+                name={item.type === 'recipe' ? 'restaurant-outline' : 'leaf-outline'}
+                size={16}
+                color={SUBDUED}
+                style={styles.suggestionIcon}
+            />
+            <Text style={styles.suggestionText}>
+                {item.title || item.name || 'Unknown'}
+            </Text>
+            <Text style={styles.suggestionType}>
+                {item.type === 'recipe' ? 'Recipe' : 'Ingredient'}
+            </Text>
+        </TouchableOpacity>
+    ));
 
     // GradientBorderCard component for consistent card styling
     const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
@@ -259,8 +454,6 @@ export default function MealPlanner() {
         );
     };
 
-
-
     // Error banner component
     const renderErrorBanner = () => {
         if (!hasError) return null;
@@ -288,28 +481,51 @@ export default function MealPlanner() {
                 </Text>
             </View>
 
-
-
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollInner}
             >
                 {/* Search Box */}
-                <GradientBorderCard>
-                    <View style={styles.searchContainer}>
-                        <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search recipes, ingredients..."
-                            placeholderTextColor={SUBDUED}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
+                <View style={styles.searchWrapper}>
+                    <GradientBorderCard>
+                        <SearchInputComponent
+                            searchQuery={searchQuery}
+                            onChangeText={handleSearchQueryChange}
                             onSubmitEditing={handleSearch}
-                            returnKeyType="search"
+                            onFocus={handleSearchFocus}
+                            onBlur={handleSearchBlur}
+                            isLoadingSuggestions={isLoadingSuggestions}
                         />
-                    </View>
-                </GradientBorderCard>
+                    </GradientBorderCard>
+
+                    {/* Autocomplete Suggestions */}
+                    {showSuggestions && suggestions.length > 0 && (
+                        <View style={styles.suggestionsContainer}>
+                            <FlatList
+                                data={suggestions}
+                                keyExtractor={(item) => item.uniqueKey || `${item.type}-${item.id}-${Math.random()}`}
+                                renderItem={({ item }) => (
+                                    <SuggestionItem
+                                        item={item}
+                                        onPress={handleSuggestionSelect}
+                                    />
+                                )}
+                                showsVerticalScrollIndicator={false}
+                                style={styles.suggestionsList}
+                                nestedScrollEnabled={true}
+                                removeClippedSubviews={false}
+                                getItemLayout={(data, index) => ({
+                                    length: 48,
+                                    offset: 48 * index,
+                                    index,
+                                })}
+                                initialNumToRender={5}
+                                maxToRenderPerBatch={5}
+                            />
+                        </View>
+                    )}
+                </View>
 
                 {/* Scan Pantry Card */}
                 <GradientBorderCard>
@@ -329,8 +545,6 @@ export default function MealPlanner() {
                         <Ionicons name="chevron-forward" size={22} color={SUBDUED} />
                     </TouchableOpacity>
                 </GradientBorderCard>
-
-
 
                 {/* Favorite Recipes Section */}
                 {favorites.length > 0 && (
@@ -647,7 +861,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginTop: 24,
-        marginBottom: 12,
+        marginBottom: 12im,
     },
     toggleButton: {
         padding: 8,
@@ -687,6 +901,58 @@ const styles = StyleSheet.create({
         marginLeft: 8,
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    searchWrapper: {
+        position: 'relative',
+        zIndex: 1000,
+    },
+    searchLoadingIcon: {
+        marginLeft: 8,
+    },
+    suggestionsContainer: {
+        position: 'absolute',
+        top: 60, // Position below the search input
+        left: 0,
+        right: 0,
+        backgroundColor: CARD_BG,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(170, 0, 255, 0.3)',
+        maxHeight: 200,
+        zIndex: 1001,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    suggestionsList: {
+        maxHeight: 200,
+    },
+    suggestionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+        height: 48,
+    },
+    suggestionIcon: {
+        marginRight: 12,
+    },
+    suggestionText: {
+        flex: 1,
+        color: WHITE,
+        fontSize: 14,
+    },
+    suggestionType: {
+        color: SUBDUED,
+        fontSize: 12,
+        fontStyle: 'italic',
     },
 
 });

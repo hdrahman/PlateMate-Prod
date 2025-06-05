@@ -42,15 +42,25 @@ export default function RecipeResults() {
             setLoading(true);
             setNoResults(false);
 
+            console.log('🔍 Performing search for:', query);
+
             const results = await searchRecipes({
                 query,
                 number: 20
             });
 
-            setRecipes(results);
-            setNoResults(results.length === 0);
+            console.log('📊 Search results:', results.length, 'recipes found');
+
+            if (results && results.length > 0) {
+                setRecipes(results);
+                setNoResults(false);
+            } else {
+                setRecipes([]);
+                setNoResults(true);
+            }
         } catch (error) {
-            console.error('Error searching recipes:', error);
+            console.error('❌ Error searching recipes:', error);
+            setRecipes([]);
             setNoResults(true);
         } finally {
             setLoading(false);

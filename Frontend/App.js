@@ -45,6 +45,7 @@ import MealPlanner from "./src/screens/MealPlanner";
 import MealPlannerCamera from "./src/screens/MealPlannerCamera";
 import MealPlannerResults from "./src/screens/MealPlannerResults";
 import RecipeDetails from "./src/screens/RecipeDetails";
+import RecipeResults from "./src/screens/RecipeResults";
 import SearchResults from "./src/screens/SearchResults";
 import Auth from "./src/screens/Auth";
 import Onboarding from "./src/screens/Onboarding";
@@ -343,6 +344,7 @@ function AppNavigator() {
             <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
             <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
             <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
+            <Stack.Screen name="RecipeResults" component={RecipeResults} />
             <Stack.Screen name="SearchResults" component={SearchResults} />
             <Stack.Screen name="EditProfile" component={EditProfile} />
             <Stack.Screen name="EditGoals" component={EditGoals} />
