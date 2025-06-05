@@ -93,7 +93,16 @@ const mapSpoonacularRecipe = (spoonRecipe: any): Recipe => {
         sourceUrl: spoonRecipe.sourceUrl || '',
         summary: spoonRecipe.summary?.replace(/<[^>]*>/g, '') || '',
         healthScore: spoonRecipe.healthScore || 0,
-        ingredients: spoonRecipe.extendedIngredients?.map((ing: any) => ing.original) || [],
+        ingredients: spoonRecipe.extendedIngredients?.map((ing: any) => {
+            // Handle alternative ingredients that contain "-or-"
+            const original = ing.original || '';
+            if (original.includes(' -or- ')) {
+                // Split alternatives and return the first option as primary
+                const alternatives = original.split(' -or- ');
+                return alternatives[0].trim();
+            }
+            return original;
+        }).filter(ing => ing && ing.length > 0) || [],
         instructions: spoonRecipe.instructions?.replace(/<[^>]*>/g, '') || '',
         diets: spoonRecipe.diets || [],
         cuisines: spoonRecipe.cuisines || [],

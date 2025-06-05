@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from './RecipeCard';
 import { Recipe, getRecipesByMealType } from '../api/recipes';
+import { RecipeCacheService } from '../services/RecipeCacheService';
 
 // Define color constants for consistent theming
 const WHITE = '#FFFFFF';
@@ -48,8 +49,28 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
         const fetchRecipes = async () => {
             try {
                 setLoading(true);
+
+                // Try to get cached recipes first
+                const cachedRecipes = await RecipeCacheService.getCachedCategoryRecipes(categoryId);
+
+                if (cachedRecipes && cachedRecipes.length > 0) {
+                    console.log(`🎯 Using cached ${categoryId} recipes to save API costs`);
+                    setRecipes(cachedRecipes);
+                    setLoading(false);
+                    return;
+                }
+
+                // If no cache, fetch from API and cache the results
+                console.log(`🌐 Fetching fresh ${categoryId} recipes from API`);
                 const data = await getRecipesByMealType(categoryId, 4);
-                setRecipes(data);
+
+                if (data && data.length > 0) {
+                    setRecipes(data);
+
+                    // Cache the recipes for the rest of the day
+                    await RecipeCacheService.cacheCategoryRecipes(categoryId, data);
+                    console.log(`💾 ${categoryId} recipes cached for today`);
+                }
             } catch (error) {
                 console.error(`Error fetching ${categoryId} recipes:`, error);
             } finally {

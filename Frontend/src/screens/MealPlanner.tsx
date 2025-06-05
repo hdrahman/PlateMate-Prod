@@ -11,6 +11,7 @@ import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
 import { Recipe, foodCategories, getRandomRecipes } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
+import { RecipeCacheService } from '../services/RecipeCacheService';
 
 // Custom imports for user data
 import { useAuth } from '../context/AuthContext';
@@ -109,7 +110,7 @@ export default function MealPlanner() {
                             foodAllergies: dbProfile.food_allergies || [],
                             cuisinePreferences: dbProfile.cuisine_preferences || [],
                             spiceTolerance: dbProfile.spice_tolerance,
-                            weightGoal: dbProfile.weight_goal,
+                            weightGoal: 'maintain',
                             healthConditions: dbProfile.health_conditions || [],
                             dailyCalorieTarget: dbProfile.daily_calorie_target,
                             nutrientFocus: dbProfile.nutrient_focus
@@ -170,12 +171,32 @@ export default function MealPlanner() {
         loadUserData();
     }, [user, onboardingProfile, isOnboardingLoading, nutrientTotals, lastUpdated]);
 
-    // Function to load featured healthy and popular recipes
+    // Function to load featured healthy and popular recipes with caching
     const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
+
+            // Try to get cached recipes first
+            const cachedRecipes = await RecipeCacheService.getCachedFeaturedRecipes();
+
+            if (cachedRecipes && cachedRecipes.length > 0) {
+                console.log('🎯 Using cached featured recipes to save API costs');
+                setFeaturedRecipes(cachedRecipes);
+                setIsLoading(false);
+                return;
+            }
+
+            // If no cache, fetch from API and cache the results
+            console.log('🌐 Fetching fresh featured recipes from API');
             const recipes = await getRandomRecipes(5);
-            setFeaturedRecipes(recipes);
+
+            if (recipes && recipes.length > 0) {
+                setFeaturedRecipes(recipes);
+
+                // Cache the recipes for the rest of the day
+                await RecipeCacheService.cacheFeaturedRecipes(recipes);
+                console.log('💾 Featured recipes cached for today');
+            }
         } catch (error) {
             console.error('Error loading healthy popular recipes:', error);
             Alert.alert('Error', 'Failed to load recipes. Please try again later.');
@@ -203,6 +224,8 @@ export default function MealPlanner() {
     const handleScanPantry = () => {
         Alert.alert('Coming Soon', 'Pantry scanning feature is coming soon!');
     };
+
+
 
     // GradientBorderCard component for consistent card styling
     const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
@@ -415,7 +438,7 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 16,
         paddingTop: Platform.OS === 'android' ? 50 : 10,
-        paddingBottom: 10,
+        paddingBottom: 0,
     },
     headerTitle: {
         fontSize: 28,
@@ -432,6 +455,7 @@ const styles = StyleSheet.create({
     },
     scrollInner: {
         padding: 16,
+        paddingTop: 8,
         paddingBottom: 80,
     },
     gradientBorderContainer: {
@@ -664,4 +688,5 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
     },
+
 });

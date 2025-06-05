@@ -2,19 +2,25 @@ import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Image,
     TouchableOpacity, ActivityIndicator, SafeAreaView,
-    Share, Linking
+    Share, Linking, Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { getRecipeById, Recipe } from '../api/recipes';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Get screen dimensions for responsive design
+const { width: screenWidth } = Dimensions.get('window');
+
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
 const CARD_BG = '#121212';
+const SECONDARY_CARD_BG = '#1A1A1A';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
+const LIGHT_GRAY = '#666666';
 const PURPLE_ACCENT = '#AA00FF';
+const PURPLE_LIGHT = 'rgba(170, 0, 255, 0.1)';
 
 // Define the route params type
 type RecipeDetailsParams = {
@@ -84,6 +90,27 @@ export default function RecipeDetails() {
         }
     };
 
+    // Parse instructions into numbered steps
+    const parseInstructions = (instructions: string) => {
+        if (!instructions) return [];
+
+        // Split by numbered steps (1., 2., etc.) or periods for basic splitting
+        const steps = instructions
+            .split(/\d+\.\s+/)
+            .filter(step => step.trim().length > 0)
+            .map(step => step.trim());
+
+        // If no numbered steps found, try splitting by sentences
+        if (steps.length <= 1) {
+            return instructions
+                .split(/\.\s+/)
+                .filter(step => step.trim().length > 10)
+                .map(step => step.trim() + (step.endsWith('.') ? '' : '.'));
+        }
+
+        return steps;
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={styles.loadingContainer}>
@@ -107,13 +134,16 @@ export default function RecipeDetails() {
         );
     }
 
+    const instructionSteps = parseInstructions(recipe.instructions);
+
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Header with image and title */}
                 <View style={styles.header}>
                     <Image source={{ uri: recipe.image }} style={styles.headerImage} />
                     <LinearGradient
-                        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)']}
+                        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.9)']}
                         style={styles.headerGradient}
                     />
                     <TouchableOpacity
@@ -128,31 +158,42 @@ export default function RecipeDetails() {
                     >
                         <Ionicons name="share-outline" size={24} color={WHITE} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{recipe.title}</Text>
+                    <View style={styles.headerTitleContainer}>
+                        <Text style={styles.headerTitle}>{recipe.title}</Text>
+                        {recipe.summary && (
+                            <Text style={styles.headerSubtitle} numberOfLines={2}>
+                                {recipe.summary.replace(/<[^>]*>/g, '').substring(0, 100)}...
+                            </Text>
+                        )}
+                    </View>
                 </View>
 
                 <View style={styles.content}>
-                    <View style={styles.infoRow}>
-                        <View style={styles.infoItem}>
-                            <Ionicons name="time-outline" size={20} color={PURPLE_ACCENT} />
-                            <Text style={styles.infoLabel}>Time</Text>
+                    {/* Quick Info Cards */}
+                    <View style={styles.quickInfoContainer}>
+                        <View style={styles.infoCard}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="time-outline" size={24} color={PURPLE_ACCENT} />
+                            </View>
+                            <Text style={styles.infoLabel}>Cook Time</Text>
                             <Text style={styles.infoValue}>{recipe.readyInMinutes} min</Text>
                         </View>
-                        <View style={styles.infoItem}>
-                            <Ionicons name="people-outline" size={20} color={PURPLE_ACCENT} />
+                        <View style={styles.infoCard}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="people-outline" size={24} color={PURPLE_ACCENT} />
+                            </View>
                             <Text style={styles.infoLabel}>Servings</Text>
                             <Text style={styles.infoValue}>{recipe.servings}</Text>
                         </View>
-                        <View style={styles.infoItem}>
-                            <Ionicons name="heart-outline" size={20} color={PURPLE_ACCENT} />
-                            <Text style={styles.infoLabel}>Health</Text>
-                            <Text style={styles.infoValue}>{recipe.healthScore}/100</Text>
-                        </View>
                     </View>
 
-                    {recipe.diets.length > 0 && (
+                    {/* Dietary Tags */}
+                    {recipe.diets && recipe.diets.length > 0 && (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Dietary</Text>
+                            <Text style={styles.sectionTitle}>
+                                <Ionicons name="leaf-outline" size={20} color={PURPLE_ACCENT} />
+                                {' '}Dietary Information
+                            </Text>
                             <View style={styles.tagsContainer}>
                                 {recipe.diets.map((diet, index) => (
                                     <View key={index} style={styles.tag}>
@@ -163,39 +204,57 @@ export default function RecipeDetails() {
                         </View>
                     )}
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>About</Text>
-                        <Text style={styles.summaryText}>{recipe.summary}</Text>
+                    {/* Ingredients Section */}
+                    <View style={styles.wideSection}>
+                        <Text style={styles.sectionTitle}>
+                            <Ionicons name="list-outline" size={20} color={PURPLE_ACCENT} />
+                            {' '}Ingredients ({recipe.ingredients.length})
+                        </Text>
+                        <View style={styles.ingredientsContainer}>
+                            {recipe.ingredients.map((ingredient, index) => (
+                                <View key={index} style={styles.ingredientItem}>
+                                    <View style={styles.ingredientBullet} />
+                                    <Text style={styles.ingredientText}>{ingredient}</Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Ingredients</Text>
-                        {recipe.ingredients.map((ingredient, index) => (
-                            <View key={index} style={styles.ingredientItem}>
-                                <Ionicons name="ellipse" size={8} color={PURPLE_ACCENT} style={styles.bullet} />
-                                <Text style={styles.ingredientText}>{ingredient}</Text>
-                            </View>
-                        ))}
+                    {/* Instructions Section */}
+                    <View style={styles.wideSection}>
+                        <Text style={styles.sectionTitle}>
+                            <Ionicons name="book-outline" size={20} color={PURPLE_ACCENT} />
+                            {' '}Instructions
+                        </Text>
+                        <View style={styles.instructionsContainer}>
+                            {instructionSteps.map((step, index) => (
+                                <View key={index} style={styles.instructionStep}>
+                                    <View style={styles.stepNumber}>
+                                        <Text style={styles.stepNumberText}>{index + 1}</Text>
+                                    </View>
+                                    <Text style={styles.stepText}>{step}</Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Instructions</Text>
-                        <Text style={styles.instructionsText}>{recipe.instructions}</Text>
-                    </View>
+                    {/* Action Buttons */}
+                    <View style={styles.actionsContainer}>
+                        {recipe.sourceUrl && (
+                            <TouchableOpacity
+                                style={styles.sourceButton}
+                                onPress={handleOpenSource}
+                            >
+                                <Ionicons name="open-outline" size={18} color={PURPLE_ACCENT} />
+                                <Text style={styles.sourceButtonText}>View Original Recipe</Text>
+                            </TouchableOpacity>
+                        )}
 
-                    {recipe.sourceUrl && (
-                        <TouchableOpacity
-                            style={styles.sourceButton}
-                            onPress={handleOpenSource}
-                        >
-                            <Text style={styles.sourceButtonText}>View Original Recipe</Text>
-                            <Ionicons name="open-outline" size={18} color={WHITE} />
+                        <TouchableOpacity style={styles.logButton}>
+                            <Ionicons name="add-circle-outline" size={20} color={WHITE} />
+                            <Text style={styles.logButtonText}>Add to My Meals</Text>
                         </TouchableOpacity>
-                    )}
-
-                    <TouchableOpacity style={styles.logButton}>
-                        <Text style={styles.logButtonText}>Add to My Meals</Text>
-                    </TouchableOpacity>
+                    </View>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -223,171 +282,257 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 16,
         marginBottom: 20,
+        textAlign: 'center',
     },
     backButton: {
         backgroundColor: PURPLE_ACCENT,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 12,
     },
     backButtonText: {
         color: WHITE,
         fontWeight: 'bold',
+        fontSize: 16,
     },
     header: {
         position: 'relative',
-        height: 250,
+        height: 320,
     },
     headerImage: {
         width: '100%',
         height: '100%',
+        resizeMode: 'cover',
     },
     headerGradient: {
         position: 'absolute',
         left: 0,
         right: 0,
         bottom: 0,
-        height: 100,
+        height: 140,
+    },
+    headerTitleContainer: {
+        position: 'absolute',
+        bottom: 24,
+        left: 20,
+        right: 20,
     },
     headerTitle: {
-        position: 'absolute',
-        bottom: 16,
-        left: 16,
-        right: 16,
         color: WHITE,
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
+        marginBottom: 8,
+    },
+    headerSubtitle: {
+        color: 'rgba(255, 255, 255, 0.9)',
+        fontSize: 14,
+        lineHeight: 20,
+        textShadowColor: 'rgba(0, 0, 0, 0.7)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 3,
     },
     backIconButton: {
         position: 'absolute',
-        top: 16,
-        left: 16,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        top: 20,
+        left: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     shareIconButton: {
         position: 'absolute',
-        top: 16,
-        right: 16,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        top: 20,
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     content: {
-        padding: 16,
+        padding: 20,
     },
-    infoRow: {
+    quickInfoContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        backgroundColor: CARD_BG,
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 20,
+        marginBottom: 28,
+        gap: 12,
     },
-    infoItem: {
+    infoCard: {
+        flex: 1,
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 20,
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'rgba(170, 0, 255, 0.3)',
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: PURPLE_LIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
     },
     infoLabel: {
         color: SUBDUED,
-        fontSize: 12,
-        marginTop: 4,
+        fontSize: 13,
+        marginBottom: 4,
+        textAlign: 'center',
     },
     infoValue: {
         color: WHITE,
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginTop: 2,
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        color: PURPLE_ACCENT,
         fontSize: 18,
         fontWeight: 'bold',
-        marginBottom: 12,
+        textAlign: 'center',
     },
-    summaryText: {
+    section: {
+        marginBottom: 32,
+    },
+    sectionTitle: {
         color: WHITE,
-        fontSize: 14,
-        lineHeight: 22,
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     tagsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+        gap: 8,
     },
     tag: {
-        backgroundColor: 'rgba(170, 0, 255, 0.2)',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 6,
-        marginRight: 8,
-        marginBottom: 8,
+        backgroundColor: PURPLE_LIGHT,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: 'rgba(170, 0, 255, 0.4)',
     },
     tagText: {
         color: PURPLE_ACCENT,
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 13,
+        fontWeight: '600',
         textTransform: 'capitalize',
+    },
+    ingredientsContainer: {
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 24,
+        marginHorizontal: -10,
+        borderWidth: 2,
+        borderColor: 'rgba(170, 0, 255, 0.3)',
     },
     ingredientItem: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
+        alignItems: 'flex-start',
+        marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
     },
-    bullet: {
-        marginRight: 8,
+    ingredientBullet: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: PURPLE_ACCENT,
+        marginTop: 6,
+        marginRight: 16,
     },
     ingredientText: {
         color: WHITE,
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 15,
+        lineHeight: 22,
         flex: 1,
     },
-    instructionsText: {
+    instructionsContainer: {
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 24,
+        marginHorizontal: -10,
+        borderWidth: 2,
+        borderColor: 'rgba(170, 0, 255, 0.3)',
+    },
+    instructionStep: {
+        flexDirection: 'row',
+        marginBottom: 20,
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    stepNumber: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: PURPLE_ACCENT,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+        marginTop: 2,
+    },
+    stepNumberText: {
         color: WHITE,
         fontSize: 14,
-        lineHeight: 22,
+        fontWeight: 'bold',
+    },
+    stepText: {
+        color: WHITE,
+        fontSize: 15,
+        lineHeight: 24,
+        flex: 1,
+    },
+    actionsContainer: {
+        gap: 16,
+        marginBottom: 40,
     },
     sourceButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: CARD_BG,
-        borderRadius: 8,
-        paddingVertical: 12,
-        marginBottom: 16,
+        backgroundColor: SECONDARY_CARD_BG,
+        borderRadius: 16,
+        paddingVertical: 16,
+        borderWidth: 2,
+        borderColor: 'rgba(170, 0, 255, 0.4)',
+        gap: 8,
     },
     sourceButtonText: {
-        color: WHITE,
+        color: PURPLE_ACCENT,
         fontWeight: '600',
-        marginRight: 6,
+        fontSize: 16,
     },
     logButton: {
         backgroundColor: PURPLE_ACCENT,
-        borderRadius: 12,
-        paddingVertical: 16,
+        borderRadius: 16,
+        paddingVertical: 18,
         alignItems: 'center',
-        marginBottom: 30,
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+        borderWidth: 2,
+        borderColor: 'rgba(170, 0, 255, 0.6)',
         shadowColor: PURPLE_ACCENT,
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowRadius: 12,
+        elevation: 8,
     },
     logButtonText: {
         color: WHITE,
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
+    },
+    wideSection: {
+        marginBottom: 32,
     },
 });
