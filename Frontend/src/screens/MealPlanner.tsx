@@ -861,7 +861,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginTop: 24,
-        marginBottom: 12im,
+        marginBottom: 12,
     },
     toggleButton: {
         padding: 8,
