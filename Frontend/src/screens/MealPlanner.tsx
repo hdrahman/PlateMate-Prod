@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'android' ? 50 : 10,
+        paddingTop: Platform.OS === 'android' ? 20 : 5,
         paddingBottom: 0,
     },
     headerTitle: {
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: WHITE,
-        marginTop: 24,
+        marginTop: 20,
         marginBottom: 12,
     },
     dividerLine: {
