@@ -90,6 +90,9 @@ __pycache__/
 # Database files (if using SQLite for testing)
 *.sqlite3
 
+# Backend uploads folder (images stored locally on user devices)
+Backend/uploads/
+
 # VS Code settings (Optional)
 .vscode/
 
