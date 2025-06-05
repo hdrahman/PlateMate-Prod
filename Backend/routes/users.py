@@ -298,7 +298,7 @@ async def update_user_profile(
                     print(f"✅ Updated location in SQLite for user {firebase_uid}: {pa.location}")
             except Exception as e:
                 print(f"⚠️ Error updating SQLite location: {e}")
-                # Don't raise the exception - we still want to update PostgreSQL
+                # Don't raise the exception - we still want to update the database
     
     # Health goals
     if user_update.health_goals:

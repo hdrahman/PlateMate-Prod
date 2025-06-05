@@ -13,6 +13,7 @@ from models import FoodLog
 from datetime import datetime
 from typing import List
 from openai import AsyncOpenAI
+from utils.file_manager import FileManager
 
 # Toggle between mock and real API
 USE_MOCK_API = False  # Set to False to use the real OpenAI API
@@ -124,20 +125,41 @@ def parse_gpt4_response(response_text):
 
 @router.post("/upload-image")
 async def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
-    """Accepts a single image and processes it with OpenAI."""
+    """Accepts a single image, saves it to disk, and processes it with OpenAI."""
+    file_path = None
+    
     try:
         overall_start_time = time.time()
         print(f"📸 Received image upload from user {user_id}")
         
+        # Save image file to disk first
         try:
+            file_path, url_path = FileManager.save_image_file(image, user_id)
+            print(f"✅ Image saved to: {file_path}")
+            print(f"✅ Image URL: {url_path}")
+            
+            # Optimize the saved image
+            FileManager.optimize_image(file_path)
+            
+        except Exception as e:
+            print(f"❌ Error saving image file: {e}")
+            raise HTTPException(status_code=500, detail=f"Error saving image: {str(e)}")
+
+        # Encode image for OpenAI analysis
+        try:
+            # Reset file pointer and encode
+            await image.seek(0)
             image_data = encode_image(image.file)
-            print("✅ Image encoded successfully")
+            print("✅ Image encoded for OpenAI analysis")
         except Exception as e:
             print(f"❌ Error encoding image: {e}")
+            # Clean up saved file on encoding error
+            if file_path:
+                FileManager.delete_file(file_path)
             raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
 
         try:
-            # Define analyze_food_image function inline since it's missing
+            # Define analyze_food_image function inline
             async def analyze_food_image(image_data):
                 """Analyzes a food image using OpenAI's GPT-4o model."""
                 api_start_time = time.time()
@@ -207,7 +229,7 @@ Remember: Every food item should have all nutritional fields with numeric values
             # Parse the response
             parsed_foods = parse_gpt4_response(gpt_response)
             
-            # Save to database
+            # Save to database with proper image URL
             try:
                 db: Session = SessionLocal()
                 meal_id = int(datetime.utcnow().timestamp())
@@ -235,7 +257,7 @@ Remember: Every food item should have all nutritional fields with numeric values
                         iron=food.get("iron", 0),
                         weight=food.get("weight", 0),
                         weight_unit=food.get("weight_unit", "g"),
-                        image_url=image.filename,
+                        image_url=url_path,  # Store the proper URL path
                         file_key="default_file_key",
                         healthiness_rating=food.get("healthiness_rating", 0),
                         meal_type="lunch"
@@ -247,42 +269,73 @@ Remember: Every food item should have all nutritional fields with numeric values
             except Exception as e:
                 print(f"❌ Database Error: {e}")
                 db.rollback()
+                # Clean up saved file on database error
+                if file_path:
+                    FileManager.delete_file(file_path)
                 raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
                 
             overall_time = time.time() - overall_start_time
             print(f"✅ Total processing time: {overall_time:.2f} seconds")
-            return {"message": "✅ Image uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": parsed_foods}
+            return {
+                "message": "✅ Image uploaded and analyzed successfully", 
+                "meal_id": meal_id, 
+                "nutrition_data": parsed_foods,
+                "image_url": url_path
+            }
 
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
+            # Clean up saved file on analysis error
+            if file_path:
+                FileManager.delete_file(file_path)
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
 
     except Exception as e:
         error_trace = traceback.format_exc()
         print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
+        # Clean up saved file on any error
+        if file_path:
+            FileManager.delete_file(file_path)
         raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
 
 
 @router.post("/upload-multiple-images")
 async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFile] = File(...)):
-    """Accepts multiple images and processes them together with OpenAI."""
+    """Accepts multiple images, saves them to disk, and processes them together with OpenAI."""
+    saved_files = []
+    
     try:
         overall_start_time = time.time()
         print(f"📸 Received multiple image upload from user {user_id}")
         print(f"Number of images: {len(images)}")
         
-        # Encode all images
+        # Save all images to disk first
+        try:
+            saved_files = FileManager.save_multiple_images(images, user_id)
+            print(f"✅ Saved {len(saved_files)} images to disk")
+            
+            # Optimize all saved images
+            for file_path, _ in saved_files:
+                FileManager.optimize_image(file_path)
+                
+        except Exception as e:
+            print(f"❌ Error saving image files: {e}")
+            raise HTTPException(status_code=500, detail=f"Error saving images: {str(e)}")
+        
+        # Encode all images for OpenAI analysis
         encoding_start_time = time.time()
         encoded_images = []
-        for image in images:
+        for i, image in enumerate(images):
             try:
                 await image.seek(0)
                 image_data = encode_image(image.file)
                 encoded_images.append(image_data)
-                print("✅ Image encoded successfully")
+                print(f"✅ Image {i+1} encoded successfully")
             except Exception as e:
-                print(f"❌ Error encoding image: {e}")
-                raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
+                print(f"❌ Error encoding image {i+1}: {e}")
+                # Clean up all saved files on encoding error
+                FileManager.cleanup_files([fp for fp, _ in saved_files])
+                raise HTTPException(status_code=500, detail=f"Error encoding image {i+1}: {str(e)}")
         
         encoding_time = time.time() - encoding_start_time
         print(f"✅ All images encoded in {encoding_time:.2f} seconds")
@@ -370,7 +423,10 @@ Important:
             extracted_foods = parse_gpt4_response(gpt_response)
             print("✅ Successfully parsed GPT response")
             
-            # Save to database
+            # Get the primary image URL (first saved image)
+            primary_image_url = saved_files[0][1] if saved_files else ""
+            
+            # Save to database with proper image URLs
             try:
                 db: Session = SessionLocal()
                 meal_id = int(datetime.utcnow().timestamp())
@@ -398,7 +454,7 @@ Important:
                         iron=food.get("iron", 0),
                         weight=food.get("weight", 0),
                         weight_unit=food.get("weight_unit", "g"),
-                        image_url=",".join([img.filename for img in images]),
+                        image_url=primary_image_url,  # Store the primary image URL
                         file_key="default_file_key",
                         healthiness_rating=food.get("healthiness_rating", 0),
                         meal_type="meal"
@@ -410,18 +466,82 @@ Important:
             except Exception as e:
                 print(f"❌ Database Error: {e}")
                 db.rollback()
+                # Clean up saved files on database error
+                FileManager.cleanup_files([fp for fp, _ in saved_files])
                 raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
                 
             overall_time = time.time() - overall_start_time
             print(f"✅ Total processing time: {overall_time:.2f} seconds")
-            return {"message": "✅ Multiple images uploaded and analyzed successfully", "meal_id": meal_id, "nutrition_data": extracted_foods}
+            
+            # Prepare image URLs for response
+            image_urls = [url for _, url in saved_files]
+            
+            return {
+                "message": "✅ Multiple images uploaded and analyzed successfully", 
+                "meal_id": meal_id, 
+                "nutrition_data": extracted_foods,
+                "image_urls": image_urls,
+                "primary_image_url": primary_image_url
+            }
                 
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
+            # Clean up saved files on analysis error
+            FileManager.cleanup_files([fp for fp, _ in saved_files])
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
     
     except Exception as e:
         error_trace = traceback.format_exc()
         print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
+        # Clean up saved files on any error
+        FileManager.cleanup_files([fp for fp, _ in saved_files])
         raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
+
+
+@router.get("/storage-stats")
+async def get_storage_stats():
+    """Get storage statistics for uploaded images"""
+    try:
+        stats = FileManager.get_storage_stats()
+        return {"status": "success", "data": stats}
+    except Exception as e:
+        print(f"❌ Error getting storage stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting storage stats: {str(e)}")
+
+
+@router.post("/cleanup-old-files")
+async def cleanup_old_files(days_old: int = 30):
+    """Clean up image files older than specified days"""
+    try:
+        deleted_count = FileManager.cleanup_old_files(days_old)
+        return {
+            "status": "success", 
+            "message": f"Cleaned up {deleted_count} old files",
+            "deleted_count": deleted_count
+        }
+    except Exception as e:
+        print(f"❌ Error during cleanup: {e}")
+        raise HTTPException(status_code=500, detail=f"Error during cleanup: {str(e)}")
+
+
+@router.delete("/delete-file/{file_path:path}")
+async def delete_specific_file(file_path: str):
+    """Delete a specific image file"""
+    try:
+        # Ensure the file path is within the uploads directory for security
+        if not file_path.startswith("/static/images/"):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        
+        # Convert URL path to actual file path
+        actual_file_path = file_path.replace("/static/images/", "uploads/images/")
+        
+        success = FileManager.delete_file(actual_file_path)
+        if success:
+            return {"status": "success", "message": f"File {file_path} deleted successfully"}
+        else:
+            return {"status": "error", "message": f"File {file_path} not found or could not be deleted"}
+            
+    except Exception as e:
+        print(f"❌ Error deleting file: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 

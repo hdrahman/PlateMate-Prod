@@ -36,8 +36,6 @@ export const foodCategories = [
     { id: 'breakfast', name: 'Breakfast', icon: 'sunny-outline' },
     { id: 'lunch', name: 'Lunch', icon: 'fast-food-outline' },
     { id: 'dinner', name: 'Dinner', icon: 'restaurant-outline' },
-    { id: 'comfort', name: 'Comfort Food', icon: 'heart-outline' },
-    { id: 'mexican', name: 'Mexican', icon: 'flame-outline' },
     { id: 'italian', name: 'Italian', icon: 'pizza-outline' },
     { id: 'american', name: 'American', icon: 'flag-outline' },
     { id: 'quick', name: 'Quick & Easy', icon: 'timer-outline' },
@@ -314,17 +312,6 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
                 break;
             case 'dinner':
                 apiParams.type = 'main course';
-                break;
-            case 'comfort':
-                apiParams.type = 'main course';
-                apiParams.query = 'burger,pizza,nachos,quesadilla,mac and cheese,fried chicken,grilled cheese';
-                apiParams.cuisine = 'american,mexican,italian';
-                apiParams.minHealthScore = 35; // Lower for comfort foods
-                break;
-            case 'mexican':
-                apiParams.cuisine = 'mexican';
-                apiParams.query = 'taco,quesadilla,enchilada,burrito,nacho';
-                apiParams.minHealthScore = 40;
                 break;
             case 'italian':
                 apiParams.cuisine = 'italian';

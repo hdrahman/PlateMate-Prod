@@ -79,6 +79,8 @@ export default function RecipeResults() {
         navigation.navigate('RecipeDetails', { recipeId: recipe.id });
     };
 
+
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>

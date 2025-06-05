@@ -6,8 +6,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 
-# Get database configuration
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Get database configuration - keeping only SQLite
 LOCAL_DB_PATH = os.getenv("LOCAL_DB_PATH", "sqlite:///./platemate_local.db")
 
 # Always use SQLite as the primary database
@@ -20,11 +19,6 @@ engine = create_engine(
     echo=True  # Log SQL queries (optional)
 )
 
-# For auth-specific operations that might need PostgreSQL
-postgres_engine = None
-if DATABASE_URL:
-    postgres_engine = create_engine(DATABASE_URL, echo=False)
-
 # Create a SessionLocal class for session management
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -33,18 +27,6 @@ Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# For auth-specific operations that need PostgreSQL
-def get_postgres_db():
-    if postgres_engine is None:
-        raise ValueError("PostgreSQL database not configured")
-    
-    PostgresSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=postgres_engine)
-    db = PostgresSessionLocal()
     try:
         yield db
     finally:

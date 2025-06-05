@@ -167,7 +167,7 @@ export async function notifyDatabaseChangedManually(): Promise<void> {
 let lastLogs: Record<string, any[]> = {};
 
 // Polling interval (in milliseconds)
-const POLLING_INTERVAL = 5000; // 5 seconds, which is efficient but responsive
+const POLLING_INTERVAL = 10000; // 10 seconds, reduced frequency to prevent database locking conflicts
 
 // Track if polling is active
 let pollingInterval: NodeJS.Timeout | null = null;

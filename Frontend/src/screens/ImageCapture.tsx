@@ -24,10 +24,11 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { addFoodLog, addMultipleFoodLogs } from '../utils/database';
+import { addFoodLog, addMultipleFoodLogs, getCurrentUserId } from '../utils/database';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnalysisModal from '../components/AnalysisModal';
+import { saveImageLocally, saveMultipleImagesLocally } from '../utils/localFileStorage';
 
 const { width } = Dimensions.get('window');
 
@@ -105,25 +106,24 @@ const ImageCapture: React.FC = () => {
         })();
     }, []);
 
-    const compressImage = async (uri: string): Promise<string> => {
+    const optimizeImage = async (uri: string): Promise<string> => {
         try {
-            console.log('Compressing image...');
-            // Compress image while maintaining good quality for AI analysis
-            // 1200px width is sufficient for AI analysis while keeping file size manageable
+            console.log('Optimizing image for high quality...');
+            // Keep high quality - only resize if absolutely massive
             const manipResult = await ImageManipulator.manipulateAsync(
                 uri,
-                [{ resize: { width: 1200 } }],
-                { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+                [{ resize: { width: 1600 } }], // Higher resolution
+                { compress: 0.98, format: ImageManipulator.SaveFormat.JPEG } // Near lossless quality
             );
 
-            console.log('Image compressed successfully');
+            console.log('Image optimized successfully');
             console.log(`Original URI: ${uri}`);
-            console.log(`Compressed URI: ${manipResult.uri}`);
+            console.log(`Optimized URI: ${manipResult.uri}`);
 
             return manipResult.uri;
         } catch (error) {
-            console.error('Error compressing image:', error);
-            // Fall back to original image if compression fails
+            console.error('Error optimizing image:', error);
+            // Fall back to original image if optimization fails
             return uri;
         }
     };
@@ -137,13 +137,13 @@ const ImageCapture: React.FC = () => {
             });
 
             if (!result.canceled) {
-                // Compress image before storing it
-                const compressedUri = await compressImage(result.assets[0].uri);
+                // Optimize image while keeping high quality
+                const optimizedUri = await optimizeImage(result.assets[0].uri);
 
                 const newImages = [...images];
                 newImages[index] = {
                     ...newImages[index],
-                    uri: compressedUri,
+                    uri: optimizedUri,
                     uploaded: false
                 };
                 setImages(newImages);
@@ -163,13 +163,13 @@ const ImageCapture: React.FC = () => {
             });
 
             if (!result.canceled) {
-                // Compress image before storing it
-                const compressedUri = await compressImage(result.assets[0].uri);
+                // Optimize image while keeping high quality
+                const optimizedUri = await optimizeImage(result.assets[0].uri);
 
                 const newImages = [...images];
                 newImages[index] = {
                     ...newImages[index],
-                    uri: compressedUri,
+                    uri: optimizedUri,
                     uploaded: false
                 };
                 setImages(newImages);
@@ -292,39 +292,31 @@ const ImageCapture: React.FC = () => {
         }
     };
 
+    // Function to upload multiple images to backend and get ChatGPT analysis
     const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any }> => {
         try {
-            console.log('Starting multiple image upload...');
+            console.log('🚀 Uploading multiple images to backend with ChatGPT analysis...');
             const startTime = Date.now();
             setAnalysisStage('uploading');
 
             const formData = new FormData();
             formData.append('user_id', '1');
 
-            // Add all images to the form data
+            // Add all images to FormData
             for (let i = 0; i < imageUris.length; i++) {
                 const uri = imageUris[i];
-                const filename = uri.split('/').pop() || `image${i}.jpg`;
-
                 const fileInfo = await FileSystem.getInfoAsync(uri);
-                console.log(`Image ${i + 1} file info: ${fileInfo.exists ? 'File exists' : 'File does not exist'}`);
-                if (fileInfo.exists && 'size' in fileInfo) {
-                    console.log(`Image ${i + 1} file size: ${fileInfo.size} bytes`);
-                }
 
-                // Convert file:// URI to blob or base64 if needed
                 formData.append('images', {
-                    uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+                    uri,
                     type: 'image/jpeg',
-                    name: filename,
+                    name: fileInfo.uri.split('/').pop() || `image_${i}.jpg`,
                 } as any);
             }
 
-            console.log('📤 Uploading images to:', `${BACKEND_URL}/images/upload-multiple-images`);
-
-            // Update modal stage after images are prepared 
             setAnalysisStage('analyzing');
 
+            console.log('Sending request to backend for ChatGPT analysis...');
             const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
                 method: 'POST',
                 headers: {
@@ -334,26 +326,89 @@ const ImageCapture: React.FC = () => {
                 body: formData,
             });
 
-            // Update stage once we get response
-            setAnalysisStage('processing');
-
             const endTime = Date.now();
-            console.log(`Multiple uploads + Analysis time: ${(endTime - startTime) / 1000} seconds`);
+            console.log(`✅ Backend ChatGPT analysis completed in ${(endTime - startTime) / 1000} seconds`);
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Upload failed with status:', response.status);
-                console.error('❌ Error details:', errorText);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
+
+            if (!data.nutrition_data || !Array.isArray(data.nutrition_data)) {
+                throw new Error('Invalid nutrition data received from backend');
+            }
+
+            setAnalysisStage('processing');
+
+            console.log(`✅ Received ${data.nutrition_data.length} food items from ChatGPT analysis`);
+
             return {
                 meal_id: data.meal_id,
-                nutrition_data: data.nutrition_data || {}
+                nutrition_data: data.nutrition_data
             };
         } catch (error) {
-            console.error('Multiple image upload failed:', error);
+            console.error('❌ Backend ChatGPT analysis failed:', error);
+            throw error;
+        }
+    };
+
+    const processMultipleImagesLocally = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any }> => {
+        try {
+            console.log('📱 Processing multiple images locally...');
+            const startTime = Date.now();
+            setAnalysisStage('uploading');
+
+            // Get current user ID for local storage
+            const userId = getCurrentUserId();
+
+            // Save all images to local device storage
+            console.log(`💾 Saving ${imageUris.length} images locally...`);
+            const localPaths = await saveMultipleImagesLocally(imageUris, userId);
+
+            setAnalysisStage('analyzing');
+
+            // For local-only mode, we'll create mock nutrition data
+            // In a real app, you could integrate with an offline AI model or nutrition database
+            const mockNutritionData = imageUris.map((_, index) => ({
+                food_name: foodName || `Food Item ${index + 1}`,
+                calories: Math.floor(Math.random() * 400) + 100, // Random calories 100-500
+                proteins: Math.floor(Math.random() * 30) + 5,    // Random protein 5-35g
+                carbs: Math.floor(Math.random() * 50) + 10,      // Random carbs 10-60g
+                fats: Math.floor(Math.random() * 20) + 2,        // Random fats 2-22g
+                fiber: Math.floor(Math.random() * 10) + 1,       // Random fiber 1-11g
+                sugar: Math.floor(Math.random() * 20) + 1,       // Random sugar 1-21g
+                saturated_fat: Math.floor(Math.random() * 8) + 1,
+                polyunsaturated_fat: Math.floor(Math.random() * 5) + 1,
+                monounsaturated_fat: Math.floor(Math.random() * 8) + 1,
+                trans_fat: Math.floor(Math.random() * 2),
+                cholesterol: Math.floor(Math.random() * 50),
+                sodium: Math.floor(Math.random() * 500) + 50,
+                potassium: Math.floor(Math.random() * 300) + 100,
+                vitamin_a: Math.floor(Math.random() * 100),
+                vitamin_c: Math.floor(Math.random() * 50),
+                calcium: Math.floor(Math.random() * 200) + 50,
+                iron: Math.floor(Math.random() * 10) + 1,
+                weight: Math.floor(Math.random() * 200) + 50,    // Random weight 50-250g
+                weight_unit: "g",
+                healthiness_rating: Math.floor(Math.random() * 8) + 3, // Rating 3-10
+                image_url: localPaths[index] // Store local path
+            }));
+
+            setAnalysisStage('processing');
+
+            const endTime = Date.now();
+            console.log(`✅ Local processing time: ${(endTime - startTime) / 1000} seconds`);
+
+            // Generate unique meal ID
+            const mealId = Date.now();
+
+            return {
+                meal_id: mealId,
+                nutrition_data: mockNutritionData
+            };
+        } catch (error) {
+            console.error('❌ Local image processing failed:', error);
             throw error;
         }
     };
@@ -468,10 +523,10 @@ const ImageCapture: React.FC = () => {
             // Get all image URIs
             const imageUris = filledImages.map(img => img.uri);
 
-            // Upload all images at once
-            console.log('Uploading multiple images...');
+            // Use backend ChatGPT integration instead of local processing
+            console.log('🚀 Using backend ChatGPT integration for food analysis...');
             const result = await uploadMultipleImages(imageUris);
-            console.log('Multiple images uploaded successfully');
+            console.log('Backend ChatGPT analysis completed successfully');
 
             // Format current date as ISO string (YYYY-MM-DD)
             const today = new Date();

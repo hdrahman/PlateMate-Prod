@@ -244,6 +244,8 @@ export default function Manual() {
         <FoodItem item={item} onPress={handleFoodSelect} />
     );
 
+
+
     return (
         <SafeAreaView
             style={[

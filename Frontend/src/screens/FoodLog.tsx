@@ -56,6 +56,7 @@ const formatDateToString = (date: Date): string => {
 type RootStackParamList = {
     ImageCapture: { mealType: string; sourcePage?: string };
     Manual: { mealType: string; sourcePage?: string };
+    MealGallery: undefined;
     // Add other screens as needed
 };
 
@@ -1790,7 +1791,7 @@ const DiaryScreen: React.FC = () => {
                                     </View>
                                 )}
                                 {/* New icon button */}
-                                <TouchableOpacity onPress={() => console.log('OpenImage')} style={styles.iconButton}>
+                                <TouchableOpacity onPress={() => navigation.navigate('MealGallery' as never)} style={styles.iconButton}>
                                     <Ionicons name="image" size={22} color="#00BFFF" />
                                 </TouchableOpacity>
                                 {/* Updated pie chart icon color */}

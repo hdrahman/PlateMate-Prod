@@ -25,29 +25,14 @@ def create_weight_tables():
     
     # Create user_weights table for weight history if it doesn't exist
     if 'user_weights' not in inspector.get_table_names():
-        # Use different approach for PostgreSQL vs SQLite
-        if not USE_LOCAL_DB:
-            # PostgreSQL approach - use SQL directly
-            with engine.connect() as conn:
-                conn.execute(text('''
-                CREATE TABLE user_weights (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id),
-                    weight FLOAT NOT NULL,
-                    recorded_at TIMESTAMP DEFAULT NOW()
-                );
-                CREATE INDEX ix_user_weights_id ON user_weights (id);
-                '''))
-                conn.commit()
-        else:
-            # SQLite approach - use SQLAlchemy
-            weights_table = Table('user_weights', metadata,
-                Column('id', Integer, primary_key=True, index=True),
-                Column('user_id', Integer, ForeignKey("users.id"), nullable=False),
-                Column('weight', Float, nullable=False),
-                Column('recorded_at', DateTime, default=func.now())
-            )
-            weights_table.create(engine)
+        # SQLite approach - use SQLAlchemy
+        weights_table = Table('user_weights', metadata,
+            Column('id', Integer, primary_key=True, index=True),
+            Column('user_id', Integer, ForeignKey("users.id"), nullable=False),
+            Column('weight', Float, nullable=False),
+            Column('recorded_at', DateTime, default=func.now())
+        )
+        weights_table.create(engine)
         print("Created user_weights table")
     else:
         print("user_weights table already exists")

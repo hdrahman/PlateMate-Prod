@@ -116,7 +116,7 @@ export const hasLocalProfile = async (firebaseUid: string): Promise<boolean> => 
     }
 };
 
-// Check if user has profile in NeonDB backend
+// Check if user has profile in backend database
 export const hasBackendProfile = async (firebaseUid: string): Promise<boolean> => {
     try {
         // Check online status first
@@ -152,7 +152,7 @@ export const hasBackendProfile = async (firebaseUid: string): Promise<boolean> =
     }
 };
 
-// Sync user profile from NeonDB to SQLite
+// Sync user profile from backend to SQLite
 export const syncProfileFromBackendToLocal = async (firebaseUid: string): Promise<boolean> => {
     try {
         // Check online status first
@@ -242,7 +242,7 @@ export const syncProfileFromBackendToLocal = async (firebaseUid: string): Promis
     }
 };
 
-// Sync user profile from SQLite to NeonDB
+// Sync user profile from SQLite to backend
 export const syncProfileFromLocalToBackend = async (firebaseUid: string): Promise<boolean> => {
     try {
         // Check online status first

@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Request, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
 import time
 import asyncio
+from pathlib import Path
 from sqlalchemy.orm import Session
 
 # Import and run env_check before loading dotenv
@@ -34,6 +36,15 @@ from routes.fatsecret import router as fatsecret_router  # Include FatSecret rou
 from routes.profile import router as profile_router  # Include profile router
 
 app = FastAPI()
+
+# Create uploads directory if it doesn't exist
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+(UPLOAD_DIR / "images").mkdir(exist_ok=True)
+(UPLOAD_DIR / "temp").mkdir(exist_ok=True)
+
+# Mount static files for serving uploaded images
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 # Startup event to ensure Firebase admin SDK is initialized
 @app.on_event("startup")

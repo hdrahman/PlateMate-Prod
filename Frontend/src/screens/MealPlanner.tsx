@@ -34,7 +34,6 @@ interface GradientBorderCardProps {
     style?: any;
 }
 
-// Autocomplete suggestion types
 interface AutocompleteSuggestion {
     id: number;
     title?: string;
@@ -42,6 +41,109 @@ interface AutocompleteSuggestion {
     type: 'recipe' | 'ingredient';
     uniqueKey?: string;
 }
+
+// GradientBorderCard component moved outside to prevent re-creation
+const GradientBorderCard: React.FC<GradientBorderCardProps> = React.memo(({ children, style }) => {
+    return (
+        <View style={styles.gradientBorderContainer}>
+            <LinearGradient
+                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    borderRadius: 10,
+                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+            />
+            <View
+                style={{
+                    margin: 1,
+                    borderRadius: 9,
+                    backgroundColor: CARD_BG,
+                    padding: 16,
+                    ...(style || {})
+                }}
+            >
+                {children}
+            </View>
+        </View>
+    );
+});
+
+// Search Input Component moved outside and properly memoized
+const SearchInputComponent = React.memo(({
+    searchQuery,
+    onChangeText,
+    onSubmitEditing,
+    onFocus,
+    onBlur,
+    isLoadingSuggestions
+}: {
+    searchQuery: string;
+    onChangeText: (text: string) => void;
+    onSubmitEditing: () => void;
+    onFocus: () => void;
+    onBlur: () => void;
+    isLoadingSuggestions: boolean;
+}) => {
+    return (
+        <View style={styles.searchContainer}>
+            <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Search recipes, ingredients..."
+                placeholderTextColor={SUBDUED}
+                value={searchQuery}
+                onChangeText={onChangeText}
+                onSubmitEditing={onSubmitEditing}
+                onFocus={onFocus}
+                onBlur={onBlur}
+                returnKeyType="search"
+                autoCorrect={false}
+                autoCapitalize="none"
+                clearButtonMode="while-editing"
+            />
+            {isLoadingSuggestions && (
+                <ActivityIndicator
+                    size="small"
+                    color={PURPLE_ACCENT}
+                    style={styles.searchLoadingIcon}
+                />
+            )}
+        </View>
+    );
+});
+
+// Memoized suggestion item moved outside to prevent re-renders
+const SuggestionItem = React.memo(({
+    item,
+    onPress
+}: {
+    item: AutocompleteSuggestion;
+    onPress: (item: AutocompleteSuggestion) => void;
+}) => (
+    <TouchableOpacity
+        style={styles.suggestionItem}
+        onPress={() => onPress(item)}
+    >
+        <Ionicons
+            name={item.type === 'recipe' ? 'restaurant-outline' : 'leaf-outline'}
+            size={16}
+            color={SUBDUED}
+            style={styles.suggestionIcon}
+        />
+        <Text style={styles.suggestionText}>
+            {item.title || item.name || 'Unknown'}
+        </Text>
+        <Text style={styles.suggestionType}>
+            {item.type === 'recipe' ? 'Recipe' : 'Ingredient'}
+        </Text>
+    </TouchableOpacity>
+));
 
 export default function MealPlanner() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -351,109 +453,6 @@ export default function MealPlanner() {
         Alert.alert('Coming Soon', 'Pantry scanning feature is coming soon!');
     };
 
-    // Search Input Component - Separated to prevent re-renders
-    const SearchInputComponent = React.memo(({
-        searchQuery,
-        onChangeText,
-        onSubmitEditing,
-        onFocus,
-        onBlur,
-        isLoadingSuggestions
-    }: {
-        searchQuery: string;
-        onChangeText: (text: string) => void;
-        onSubmitEditing: () => void;
-        onFocus: () => void;
-        onBlur: () => void;
-        isLoadingSuggestions: boolean;
-    }) => {
-        return (
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search recipes, ingredients..."
-                    placeholderTextColor={SUBDUED}
-                    value={searchQuery}
-                    onChangeText={onChangeText}
-                    onSubmitEditing={onSubmitEditing}
-                    onFocus={onFocus}
-                    onBlur={onBlur}
-                    returnKeyType="search"
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    clearButtonMode="while-editing"
-                />
-                {isLoadingSuggestions && (
-                    <ActivityIndicator
-                        size="small"
-                        color={PURPLE_ACCENT}
-                        style={styles.searchLoadingIcon}
-                    />
-                )}
-            </View>
-        );
-    });
-
-    // Memoized suggestion item to prevent re-renders
-    const SuggestionItem = React.memo(({
-        item,
-        onPress
-    }: {
-        item: AutocompleteSuggestion;
-        onPress: (item: AutocompleteSuggestion) => void;
-    }) => (
-        <TouchableOpacity
-            style={styles.suggestionItem}
-            onPress={() => onPress(item)}
-        >
-            <Ionicons
-                name={item.type === 'recipe' ? 'restaurant-outline' : 'leaf-outline'}
-                size={16}
-                color={SUBDUED}
-                style={styles.suggestionIcon}
-            />
-            <Text style={styles.suggestionText}>
-                {item.title || item.name || 'Unknown'}
-            </Text>
-            <Text style={styles.suggestionType}>
-                {item.type === 'recipe' ? 'Recipe' : 'Ingredient'}
-            </Text>
-        </TouchableOpacity>
-    ));
-
-    // GradientBorderCard component for consistent card styling
-    const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
-        return (
-            <View style={styles.gradientBorderContainer}>
-                <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                    style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        borderRadius: 10,
-                    }}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                />
-                <View
-                    style={{
-                        margin: 1,
-                        borderRadius: 9,
-                        backgroundColor: CARD_BG,
-                        padding: 16,
-                        ...(style || {})
-                    }}
-                >
-                    {children}
-                </View>
-            </View>
-        );
-    };
-
     // Error banner component
     const renderErrorBanner = () => {
         if (!hasError) return null;
@@ -474,18 +473,18 @@ export default function MealPlanner() {
     return (
         <SafeAreaView style={styles.container}>
             {renderErrorBanner()}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Meal Planner</Text>
-                <Text style={styles.headerSub}>
-                    Get personalized meal plans and recipe ideas
-                </Text>
-            </View>
-
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollInner}
             >
+                {/* Header Section */}
+                <View style={styles.headerInContent}>
+                    <Text style={styles.headerTitle}>Meal Planner</Text>
+                    <Text style={styles.headerSub}>
+                        Get personalized meal plans and recipe ideas
+                    </Text>
+                </View>
                 {/* Search Box */}
                 <View style={styles.searchWrapper}>
                     <GradientBorderCard>
@@ -653,6 +652,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingTop: Platform.OS === 'android' ? 20 : 5,
         paddingBottom: 0,
+    },
+    headerInContent: {
+        paddingTop: Platform.OS === 'android' ? 20 : 10,
+        paddingBottom: 16,
     },
     headerTitle: {
         fontSize: 28,

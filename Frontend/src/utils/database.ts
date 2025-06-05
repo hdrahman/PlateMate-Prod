@@ -193,8 +193,14 @@ export const initDatabase = async () => {
             console.log('✅ All required tables exist and database is correctly initialized');
         }
 
-        // Enable WAL mode for better performance
+        // Enable WAL mode for better performance and concurrency
         await db.execAsync('PRAGMA journal_mode = WAL');
+
+        // Add additional SQLite optimizations to prevent locking
+        await db.execAsync('PRAGMA synchronous = NORMAL');
+        await db.execAsync('PRAGMA cache_size = 10000');
+        await db.execAsync('PRAGMA temp_store = MEMORY');
+        await db.execAsync('PRAGMA busy_timeout = 30000'); // 30 second timeout for locked database
 
         // Set the global flag to indicate database is initialized
         global.dbInitialized = true;
@@ -632,6 +638,60 @@ export const getLastSyncTime = async () => {
     }
 };
 
+// Get all meal images from food logs (LOCAL STORAGE)
+export const getAllMealImages = async () => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get meal images before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    console.log(`🔍 Looking for meal images for user_id=${firebaseUserId}`);
+
+    try {
+        // Get all food logs with valid LOCAL image paths for the current user
+        const result = await db.getAllAsync(
+            `SELECT id, food_name, image_url, date, meal_type, calories, meal_id
+             FROM food_logs 
+             WHERE user_id = ? 
+             AND image_url IS NOT NULL 
+             AND image_url != '' 
+             AND image_url != 'https://via.placeholder.com/150'
+             AND image_url != 'default.jpg'
+             AND image_url != 'image0.jpg'
+             AND image_url LIKE '%meal_images%'
+             ORDER BY date DESC, id DESC`,
+            [firebaseUserId]
+        );
+
+        console.log(`📊 Found ${result.length} meal images`);
+
+        // Group by meal_id to avoid duplicates and verify local files exist
+        const { checkImageExists } = await import('./localFileStorage');
+        const uniqueMeals = new Map();
+
+        for (const item of result) {
+            if (!uniqueMeals.has(item.meal_id)) {
+                // Check if the local file still exists
+                const fileExists = await checkImageExists(item.image_url);
+
+                if (fileExists) {
+                    uniqueMeals.set(item.meal_id, item);
+                } else {
+                    console.log(`⚠️ Local image file missing: ${item.image_url}`);
+                }
+            }
+        }
+
+        const uniqueResults = Array.from(uniqueMeals.values());
+        console.log(`📊 Returning ${uniqueResults.length} unique local meal images`);
+        return uniqueResults;
+    } catch (error) {
+        console.error('❌ Error getting meal images:', error);
+        throw error;
+    }
+};
+
 // Purge old data (keep at least one month)
 export const purgeOldData = async () => {
     if (!db) {
@@ -665,9 +725,18 @@ export const getExercisesByDate = async (date: string) => {
     const normalizedDate = date.split('T')[0]; // Remove any time component
 
     try {
+        // Query for user ID to match the same logic as addExercise
+        const userIdResult = await db.getFirstAsync<{ id: number }>(
+            `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUserId]
+        );
+
+        // If user not found, use default
+        const userId = userIdResult?.id || 1;
+
         const result = await db.getAllAsync(
             `SELECT * FROM exercises WHERE date = ? AND user_id = ? ORDER BY id DESC`,
-            [normalizedDate, firebaseUserId]
+            [normalizedDate, userId]
         );
         return result;
     } catch (error) {
@@ -768,18 +837,27 @@ export const deleteExercise = async (id: number) => {
 
     const firebaseUserId = getCurrentUserId();
 
-    // First verify that this exercise belongs to the current user
-    const exerciseEntry = await db.getFirstAsync(
-        `SELECT * FROM exercises WHERE id = ? AND user_id = ?`,
-        [id, firebaseUserId]
-    );
-
-    if (!exerciseEntry) {
-        console.error('❌ Attempting to delete exercise that does not belong to current user');
-        throw new Error('Exercise not found or unauthorized');
-    }
-
     try {
+        // Query for user ID to match the same logic as addExercise
+        const userIdResult = await db.getFirstAsync<{ id: number }>(
+            `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUserId]
+        );
+
+        // If user not found, use default
+        const userId = userIdResult?.id || 1;
+
+        // First verify that this exercise belongs to the current user
+        const exerciseEntry = await db.getFirstAsync(
+            `SELECT * FROM exercises WHERE id = ? AND user_id = ?`,
+            [id, userId]
+        );
+
+        if (!exerciseEntry) {
+            console.error('❌ Attempting to delete exercise that does not belong to current user');
+            throw new Error('Exercise not found or unauthorized');
+        }
+
         await db.runAsync('DELETE FROM exercises WHERE id = ?', [id]);
         return true;
     } catch (error) {
@@ -2407,10 +2485,19 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
     const timestamp = new Date().toISOString();
 
     try {
-        // Start a transaction for batch insert
-        await db.runAsync('BEGIN TRANSACTION');
+        // Start a transaction for batch insert with immediate mode for better locking behavior
+        await db.runAsync('BEGIN IMMEDIATE TRANSACTION');
 
         const insertedIds = [];
+
+        // Prepare the insert statement once for better performance
+        const insertSQL = `INSERT INTO food_logs 
+              (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
+               fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
+               trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
+               calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
+               brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         for (const foodLog of foodLogs) {
             // Format the meal data - Use Firebase UID directly as the user_id
@@ -2450,57 +2537,50 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
                 last_modified: timestamp
             };
 
-            // Log food entry data for debugging
-            console.log('📝 Food entry being added:', JSON.stringify(formattedData, null, 2));
+            // Log first food entry data for debugging (avoid spam)
+            if (insertedIds.length === 0) {
+                console.log('📝 First food entry being added:', JSON.stringify(formattedData, null, 2));
+            }
 
             // Insert into database within the transaction
-            const result = await db.runAsync(
-                `INSERT INTO food_logs 
-              (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
-               fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
-               trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
-               calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
-               brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    formattedData.meal_id,
-                    formattedData.user_id,
-                    formattedData.food_name,
-                    formattedData.calories,
-                    formattedData.proteins,
-                    formattedData.carbs,
-                    formattedData.fats,
-                    formattedData.fiber,
-                    formattedData.sugar,
-                    formattedData.saturated_fat,
-                    formattedData.polyunsaturated_fat,
-                    formattedData.monounsaturated_fat,
-                    formattedData.trans_fat,
-                    formattedData.cholesterol,
-                    formattedData.sodium,
-                    formattedData.potassium,
-                    formattedData.vitamin_a,
-                    formattedData.vitamin_c,
-                    formattedData.calcium,
-                    formattedData.iron,
-                    formattedData.image_url,
-                    formattedData.file_key,
-                    formattedData.healthiness_rating,
-                    formattedData.date,
-                    formattedData.meal_type,
-                    formattedData.brand_name,
-                    formattedData.quantity,
-                    formattedData.notes,
-                    formattedData.weight,
-                    formattedData.weight_unit,
-                    formattedData.synced,
-                    formattedData.sync_action,
-                    formattedData.last_modified
-                ]
-            );
+            const result = await db.runAsync(insertSQL, [
+                formattedData.meal_id,
+                formattedData.user_id,
+                formattedData.food_name,
+                formattedData.calories,
+                formattedData.proteins,
+                formattedData.carbs,
+                formattedData.fats,
+                formattedData.fiber,
+                formattedData.sugar,
+                formattedData.saturated_fat,
+                formattedData.polyunsaturated_fat,
+                formattedData.monounsaturated_fat,
+                formattedData.trans_fat,
+                formattedData.cholesterol,
+                formattedData.sodium,
+                formattedData.potassium,
+                formattedData.vitamin_a,
+                formattedData.vitamin_c,
+                formattedData.calcium,
+                formattedData.iron,
+                formattedData.image_url,
+                formattedData.file_key,
+                formattedData.healthiness_rating,
+                formattedData.date,
+                formattedData.meal_type,
+                formattedData.brand_name,
+                formattedData.quantity,
+                formattedData.notes,
+                formattedData.weight,
+                formattedData.weight_unit,
+                formattedData.synced,
+                formattedData.sync_action,
+                formattedData.last_modified
+            ]);
 
             insertedIds.push(result.lastInsertRowId);
-            console.log(`✅ Food log inserted with ID ${result.lastInsertRowId}`);
+            console.log(`✅ Food log ${insertedIds.length}/${foodLogs.length} inserted with ID ${result.lastInsertRowId}`);
         }
 
         // Commit the transaction
@@ -2508,15 +2588,31 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
         console.log(`✅ Successfully inserted ${insertedIds.length} food logs in transaction`);
 
         // Update user streak after logging food (only once after all inserts)
-        await checkAndUpdateStreak(firebaseUserId);
+        // Do this outside the transaction to avoid lock conflicts
+        try {
+            await checkAndUpdateStreak(firebaseUserId);
+        } catch (streakError) {
+            console.warn('⚠️ Failed to update streak, but food logs were saved:', streakError);
+        }
 
         // Notify listeners about the data change (only once after all inserts)
-        notifyDatabaseChanged();
+        // Use setTimeout to avoid blocking and potential deadlocks
+        setTimeout(async () => {
+            try {
+                await notifyDatabaseChanged();
+            } catch (notifyError) {
+                console.warn('⚠️ Failed to notify database listeners:', notifyError);
+            }
+        }, 100);
 
         return insertedIds;
     } catch (error) {
         // Rollback transaction on error
-        await db.runAsync('ROLLBACK');
+        try {
+            await db.runAsync('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('❌ Error during rollback:', rollbackError);
+        }
         console.error('❌ Error adding multiple food logs:', error);
         throw error;
     }

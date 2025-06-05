@@ -96,6 +96,21 @@ export default function SearchResults() {
         return params;
     };
 
+    const handleSearchSubmit = async () => {
+        if (!searchQuery.trim()) return;
+
+        try {
+            setFiltering(true);
+            const params = getSearchParams();
+            const results = await searchRecipes(params);
+            setRecipes(results);
+        } catch (error) {
+            console.error('Error searching for recipes:', error);
+        } finally {
+            setFiltering(false);
+        }
+    };
+
     useEffect(() => {
         const fetchRecipes = async () => {
             try {
@@ -113,24 +128,13 @@ export default function SearchResults() {
         fetchRecipes();
     }, [route.params]);
 
-    const handleSearch = async () => {
-        if (!searchQuery.trim()) return;
 
-        try {
-            setFiltering(true);
-            const params = getSearchParams();
-            const results = await searchRecipes(params);
-            setRecipes(results);
-        } catch (error) {
-            console.error('Error searching for recipes:', error);
-        } finally {
-            setFiltering(false);
-        }
-    };
 
     const handleRecipePress = (recipe: Recipe) => {
         navigation.navigate('RecipeDetails', { recipe });
     };
+
+
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
@@ -153,7 +157,7 @@ export default function SearchResults() {
                             placeholderTextColor={SUBDUED}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
-                            onSubmitEditing={handleSearch}
+                            onSubmitEditing={handleSearchSubmit}
                             returnKeyType="search"
                             autoFocus={!route.params?.query}
                         />
