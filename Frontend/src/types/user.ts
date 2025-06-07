@@ -5,6 +5,10 @@ export interface UserProfile {
     lastName: string;
     phoneNumber: string;
 
+    // Enhanced personal info
+    dateOfBirth: string | null;
+    location: string | null;
+
     // Physical attributes
     height: number | null;
     weight: number | null;
@@ -30,6 +34,29 @@ export interface UserProfile {
     // Cheat day preferences
     cheatDayEnabled?: boolean;
     cheatDayFrequency?: number; // days between cheat days
+
+    // Lifestyle and motivation data
+    sleepQuality?: string;
+    stressLevel?: string;
+    eatingPattern?: string;
+    motivations?: string[];
+    whyMotivation?: string;
+
+    // Enhanced fitness goals
+    stepGoal?: number;
+    waterGoal?: number;
+    workoutFrequency?: number;
+    sleepGoal?: number;
+
+    // Predictive insights
+    projectedCompletionDate?: string;
+    estimatedMetabolicAge?: number;
+    estimatedDurationWeeks?: number;
+
+    // Future Self Motivation System
+    futureSelfMessage?: string | null;
+    futureSelfMessageType?: string | null;
+    futureSelfMessageCreatedAt?: string | null;
 
     // Delivery preferences
     defaultAddress: string | null;

@@ -58,7 +58,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hello! I'm Dr. Rodriguez, your nutrition specialist. How can I help you today?",
+      text: "Hey there! I'm Coach Max, your AI Health Coach! Let's maximize your potential today - how can I help you crush your health goals?",
       sender: "bot",
       timestamp: new Date()
     }
@@ -168,7 +168,7 @@ export default function Chatbot() {
       return response.data.response;
     } catch (error) {
       console.error("Error calling Arli AI:", error);
-      throw new Error("Failed to get response from Dr. Rodriguez. Please try again.");
+      throw new Error("Failed to get response from Coach Max. Please try again.");
     }
   };
 
@@ -219,7 +219,7 @@ export default function Chatbot() {
 
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Sorry, I couldn't process your request. Please try again.",
+        text: "Hey, I'm having a little trouble connecting right now. Let's try again in a moment - I'm here to help you maximize your potential!",
         sender: "bot",
         timestamp: new Date()
       };
@@ -249,7 +249,7 @@ export default function Chatbot() {
           <MaskedView
             style={{ alignItems: "center", justifyContent: "center" }}
             maskElement={
-              <Text style={styles.headerTitle}>Doctor Rodriguez</Text>
+              <Text style={styles.headerTitle}>Coach Max</Text>
             }
           >
             <LinearGradient
@@ -263,7 +263,7 @@ export default function Chatbot() {
             />
           </MaskedView>
           <View style={styles.onlineStatusContainer}>
-            <Text style={styles.headerSubtitle}>Nutrition Specialist</Text>
+            <Text style={styles.headerSubtitle}>AI Health Coach</Text>
             <Text style={styles.dot}>•</Text>
             <View style={styles.onlineIndicator} />
             <Text style={styles.onlineText}>Online</Text>
@@ -276,7 +276,7 @@ export default function Chatbot() {
             end={{ x: 1, y: 1 }}
             style={styles.avatarGradient}
           >
-            <Text style={styles.avatarText}>DR</Text>
+            <Text style={styles.avatarText}>CM</Text>
           </LinearGradient>
         </View>
       </View>
@@ -344,7 +344,7 @@ export default function Chatbot() {
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Ask Dr. Rodriguez about your nutrition concerns..."
+            placeholder="Ask Coach Max about your health and fitness goals..."
             placeholderTextColor="#777"
             multiline
           />

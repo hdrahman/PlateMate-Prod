@@ -45,10 +45,10 @@ class ChatResponse(BaseModel):
 
 # Fallback responses if API fails
 NUTRITION_RESPONSES = [
-    "To build muscle, focus on consuming protein-rich foods like chicken, fish, eggs, and legumes. Aim for 1.6-2.2g of protein per kg of body weight daily.",
-    "For muscle growth, ensure you're in a slight caloric surplus and prioritize compound exercises like squats, deadlifts, and bench press.",
-    "Proper hydration is crucial for muscle growth. Drink at least 3-4 liters of water daily, especially around workout times.",
-    "Don't neglect carbohydrates when building muscle. They're essential for energy during workouts and recovery afterward."
+    "Hey there! Let's maximize your potential today! Focus on consuming protein-rich foods like chicken, fish, eggs, and legumes. Aim for 1.6-2.2g of protein per kg of body weight daily - your muscles will thank you!",
+    "Ready to take your gains to the next level? Ensure you're in a slight caloric surplus and prioritize compound exercises like squats, deadlifts, and bench press. I believe you've got this!",
+    "Hydration is your secret weapon for peak performance! Drink at least 3-4 liters of water daily, especially around workout times. Let's keep that energy flowing!",
+    "Here's a game-changer for you: don't neglect carbohydrates when building muscle. They're essential for energy during workouts and recovery afterward. Think of them as fuel for your fitness journey!"
 ]
 
 def clean_formatting(text):
@@ -101,7 +101,21 @@ async def chat_with_arli(request: ChatRequest):
         if not has_system_message:
             messages.insert(0, {
                 "role": "system", 
-                "content": "You are Dr. Rodriguez, a nutrition specialist. Keep your responses focused on nutrition advice. Avoid using markdown formatting like asterisks for bold or italic. Use plain text formatting."
+                "content": """You are Coach Max, an AI Health Coach with a motivational yet supportive personality. You're knowledgeable, adaptable, and results-focused, helping users maximize their health potential.
+
+PERSONALITY TRAITS:
+- Motivational: "Let's maximize your potential today!"
+- Knowledgeable: Provide science-backed advice in simple terms
+- Adaptable: Adjust your tone based on user needs (supportive vs. challenging)
+- Results-oriented: Focus on achieving user's specific goals
+
+SPEAKING STYLE:
+- Encouraging: "Great job logging that meal! Let's see how we can optimize your afternoon snack."
+- Educational: "Here's why protein timing matters for your goals..."
+- Personal: "Based on your progress, I think you're ready for the next level."
+- Actionable: "Here are 3 specific steps to improve your energy levels this week."
+
+Keep responses focused on health, nutrition, and fitness advice. Use a tone that's like an encouraging friend who happens to be a health expert. Avoid using markdown formatting. Use plain text formatting only."""
             })
         
         headers = {
@@ -196,7 +210,7 @@ async def chat_with_arli(request: ChatRequest):
             
             # Return a fallback response
             return {
-                "response": "I'm sorry, but I'm having trouble connecting to my knowledge base right now. Please try again later.",
+                "response": "Hey there! I'm having some technical difficulties connecting to my knowledge base right now, but I'm still here to help! Let's try again in a moment - we've got goals to crush!",
                 "conversation_id": conversation_id
             }
             

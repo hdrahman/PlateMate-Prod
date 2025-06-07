@@ -27,6 +27,20 @@ const SUBDUED = '#AAAAAA';
 const LIGHT_GRAY = '#2A2A2A';
 const PURPLE_ACCENT = '#AA00FF';
 
+// Nutrient category colors
+const MACRO_COLORS = {
+    carbs: '#4FC3F7',
+    protein: '#66BB6A',
+    fat: '#FFB74D'
+};
+
+const VITAMIN_COLORS = {
+    vitaminA: '#FF7043',
+    vitaminC: '#FFA726',
+    calcium: '#AB47BC',
+    iron: '#EF5350'
+};
+
 // Define navigation types
 type RootStackParamList = {
     FoodDetail: { foodId: number };
@@ -71,8 +85,6 @@ interface FoodLogEntry {
     sync_action: string;
     last_modified: string;
 }
-
-
 
 const FoodDetailScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
@@ -124,15 +136,69 @@ const FoodDetailScreen: React.FC = () => {
         };
     };
 
-    // Render nutrient row with integrated style
-    const renderNutrientRow = (label: string, value: number, unit: string = 'g', showBorder: boolean = true) => (
-        <View style={[styles.nutrientRow, !showBorder && { borderBottomWidth: 0 }]}>
-            <Text style={styles.nutrientLabel}>{label}</Text>
-            <Text style={styles.nutrientValue}>
-                {value.toFixed(value < 1 && value > 0 ? 1 : 0)}{unit}
-            </Text>
-        </View>
-    );
+    // Daily value percentages (simplified estimates)
+    const getDailyValuePercentage = (nutrient: string, value: number): number => {
+        const dailyValues: { [key: string]: number } = {
+            fiber: 25, // 25g daily value
+            sugar: 50, // 50g daily value (max recommended)
+            saturated_fat: 20, // 20g daily value
+            cholesterol: 300, // 300mg daily value
+            sodium: 2300, // 2300mg daily value
+            potassium: 3500, // 3500mg daily value
+            vitamin_a: 900, // 900mcg daily value
+            vitamin_c: 90, // 90mg daily value
+            calcium: 1000, // 1000mg daily value
+            iron: 18 // 18mg daily value
+        };
+
+        const dv = dailyValues[nutrient];
+        if (!dv) return 0;
+        return Math.min(Math.round((value / dv) * 100), 100);
+    };
+
+    // Render nutrient row with progress bar
+    const renderNutrientRowWithProgress = (
+        icon: string,
+        label: string,
+        value: number,
+        unit: string = 'g',
+        color: string = SUBDUED,
+        showProgress: boolean = false,
+        nutrientKey?: string
+    ) => {
+        const percentage = nutrientKey ? getDailyValuePercentage(nutrientKey, value) : 0;
+
+        return (
+            <View style={styles.nutrientRowWithProgress}>
+                <View style={styles.nutrientRowHeader}>
+                    <View style={styles.nutrientRowLeft}>
+                        <Ionicons name={icon as any} size={16} color={color} style={styles.nutrientIcon} />
+                        <Text style={styles.nutrientLabel}>{label}</Text>
+                    </View>
+                    <View style={styles.nutrientRowRight}>
+                        <Text style={styles.nutrientValue}>
+                            {value.toFixed(value < 1 && value > 0 ? 1 : 0)}{unit}
+                        </Text>
+                        {showProgress && percentage > 0 && (
+                            <Text style={styles.percentageText}>{percentage}%</Text>
+                        )}
+                    </View>
+                </View>
+                {showProgress && percentage > 0 && (
+                    <View style={styles.progressBarContainer}>
+                        <View style={styles.progressBarBackground}>
+                            <View
+                                style={[
+                                    styles.progressBarFill,
+                                    { width: `${percentage}%`, backgroundColor: color }
+                                ]}
+                            />
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     // Render macro circle
     const renderMacroCircle = (label: string, value: number, unit: string, percentage: number, color: string) => (
@@ -144,6 +210,9 @@ const FoodDetailScreen: React.FC = () => {
             <Text style={styles.macroLabel}>{label}</Text>
         </View>
     );
+
+    // Render compact nutrient grid
+
 
     if (loading) {
         return (
@@ -247,67 +316,91 @@ const FoodDetailScreen: React.FC = () => {
 
                     {/* Macros Visual Section */}
                     <View style={styles.macrosSection}>
-                        <Text style={styles.sectionTitle}>Macronutrients</Text>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="fitness" size={20} color={PURPLE_ACCENT} />
+                            <Text style={styles.sectionTitle}>Macronutrients</Text>
+                        </View>
                         <View style={styles.macrosRow}>
-                            {renderMacroCircle('Carbs', foodData.carbs, 'g', macroPercentages.carbs, '#4FC3F7')}
-                            {renderMacroCircle('Protein', foodData.proteins, 'g', macroPercentages.protein, '#66BB6A')}
-                            {renderMacroCircle('Fat', foodData.fats, 'g', macroPercentages.fat, '#FFB74D')}
+                            {renderMacroCircle('Carbs', foodData.carbs, 'g', macroPercentages.carbs, MACRO_COLORS.carbs)}
+                            {renderMacroCircle('Protein', foodData.proteins, 'g', macroPercentages.protein, MACRO_COLORS.protein)}
+                            {renderMacroCircle('Fat', foodData.fats, 'g', macroPercentages.fat, MACRO_COLORS.fat)}
                         </View>
                     </View>
 
-                    {/* Detailed Nutrients */}
+                    {/* Enhanced Nutrition Facts */}
                     <View style={styles.detailsSection}>
-                        <Text style={styles.sectionTitle}>Nutrition Facts</Text>
-
-                        {/* Main Macros */}
-                        <View style={styles.nutrientGroup}>
-                            {renderNutrientRow('Total Carbohydrates', foodData.carbs)}
-                            {renderNutrientRow('  Dietary Fiber', foodData.fiber)}
-                            {renderNutrientRow('  Total Sugars', foodData.sugar)}
-                            {renderNutrientRow('Protein', foodData.proteins)}
-                            {renderNutrientRow('Total Fat', foodData.fats, 'g', false)}
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="nutrition" size={20} color={PURPLE_ACCENT} />
+                            <Text style={styles.sectionTitle}>Nutrition Facts</Text>
                         </View>
 
-                        {/* Fat Details */}
+                        {/* Main Macros with Progress */}
                         <View style={styles.nutrientGroup}>
-                            <Text style={styles.subSectionTitle}>Fat Breakdown</Text>
-                            {renderNutrientRow('  Saturated Fat', foodData.saturated_fat)}
-                            {renderNutrientRow('  Trans Fat', foodData.trans_fat)}
-                            {renderNutrientRow('  Polyunsaturated Fat', foodData.polyunsaturated_fat)}
-                            {renderNutrientRow('  Monounsaturated Fat', foodData.monounsaturated_fat, 'g', false)}
+                            {renderNutrientRowWithProgress('leaf', 'Total Carbohydrates', foodData.carbs, 'g', MACRO_COLORS.carbs)}
+                            {renderNutrientRowWithProgress('git-branch', 'Dietary Fiber', foodData.fiber, 'g', '#8BC34A', true, 'fiber')}
+                            {renderNutrientRowWithProgress('cafe', 'Total Sugars', foodData.sugar, 'g', '#FF7043', true, 'sugar')}
+                            {renderNutrientRowWithProgress('fitness', 'Protein', foodData.proteins, 'g', MACRO_COLORS.protein)}
+                            {renderNutrientRowWithProgress('water', 'Total Fat', foodData.fats, 'g', MACRO_COLORS.fat)}
                         </View>
 
-                        {/* Vitamins & Minerals */}
+                        {/* Fat Breakdown */}
                         <View style={styles.nutrientGroup}>
-                            <Text style={styles.subSectionTitle}>Vitamins & Minerals</Text>
-                            {renderNutrientRow('Cholesterol', foodData.cholesterol, 'mg')}
-                            {renderNutrientRow('Sodium', foodData.sodium, 'mg')}
-                            {renderNutrientRow('Potassium', foodData.potassium, 'mg')}
-                            {renderNutrientRow('Vitamin A', foodData.vitamin_a, 'mcg')}
-                            {renderNutrientRow('Vitamin C', foodData.vitamin_c, 'mg')}
-                            {renderNutrientRow('Calcium', foodData.calcium, 'mg')}
-                            {renderNutrientRow('Iron', foodData.iron, 'mg', false)}
+                            <View style={styles.subSectionHeader}>
+                                <Ionicons name="ellipse" size={16} color={MACRO_COLORS.fat} />
+                                <Text style={styles.subSectionTitle}>Fat Breakdown</Text>
+                            </View>
+                            {renderNutrientRowWithProgress('warning', 'Saturated Fat', foodData.saturated_fat, 'g', '#FF5722', true, 'saturated_fat')}
+                            {renderNutrientRowWithProgress('close', 'Trans Fat', foodData.trans_fat, 'g', '#F44336')}
+                            {renderNutrientRowWithProgress('leaf', 'Polyunsaturated Fat', foodData.polyunsaturated_fat, 'g', '#FF9800')}
+                            {renderNutrientRowWithProgress('leaf-outline', 'Monounsaturated Fat', foodData.monounsaturated_fat, 'g', '#FFC107')}
+                        </View>
+
+                        {/* Vitamins & Minerals with Progress */}
+                        <View style={styles.nutrientGroup}>
+                            <View style={styles.subSectionHeader}>
+                                <Ionicons name="sparkles" size={16} color={VITAMIN_COLORS.vitaminC} />
+                                <Text style={styles.subSectionTitle}>Vitamins & Minerals</Text>
+                            </View>
+                            {renderNutrientRowWithProgress('heart', 'Cholesterol', foodData.cholesterol, 'mg', '#E91E63', true, 'cholesterol')}
+                            {renderNutrientRowWithProgress('water', 'Sodium', foodData.sodium, 'mg', '#2196F3', true, 'sodium')}
+                            {renderNutrientRowWithProgress('flash', 'Potassium', foodData.potassium, 'mg', '#9C27B0', true, 'potassium')}
+                            {renderNutrientRowWithProgress('eye', 'Vitamin A', foodData.vitamin_a, 'mcg', VITAMIN_COLORS.vitaminA, true, 'vitamin_a')}
+                            {renderNutrientRowWithProgress('sunny', 'Vitamin C', foodData.vitamin_c, 'mg', VITAMIN_COLORS.vitaminC, true, 'vitamin_c')}
+                            {renderNutrientRowWithProgress('diamond', 'Calcium', foodData.calcium, 'mg', VITAMIN_COLORS.calcium, true, 'calcium')}
+                            {renderNutrientRowWithProgress('magnet', 'Iron', foodData.iron, 'mg', VITAMIN_COLORS.iron, true, 'iron')}
                         </View>
 
                         {/* Additional Information */}
                         {(foodData.brand_name || foodData.weight || foodData.notes) && (
                             <View style={styles.additionalInfo}>
-                                <Text style={styles.subSectionTitle}>Additional Information</Text>
+                                <View style={styles.subSectionHeader}>
+                                    <Ionicons name="information-circle" size={16} color={PURPLE_ACCENT} />
+                                    <Text style={styles.subSectionTitle}>Additional Information</Text>
+                                </View>
                                 {foodData.brand_name && (
                                     <View style={styles.infoRow}>
-                                        <Text style={styles.infoLabel}>Brand</Text>
+                                        <View style={styles.infoRowLeft}>
+                                            <Ionicons name="business" size={14} color={SUBDUED} />
+                                            <Text style={styles.infoLabel}>Brand</Text>
+                                        </View>
                                         <Text style={styles.infoValue}>{foodData.brand_name}</Text>
                                     </View>
                                 )}
                                 {foodData.weight && (
                                     <View style={styles.infoRow}>
-                                        <Text style={styles.infoLabel}>Weight</Text>
+                                        <View style={styles.infoRowLeft}>
+                                            <Ionicons name="scale" size={14} color={SUBDUED} />
+                                            <Text style={styles.infoLabel}>Weight</Text>
+                                        </View>
                                         <Text style={styles.infoValue}>{foodData.weight}{foodData.weight_unit || 'g'}</Text>
                                     </View>
                                 )}
                                 {foodData.notes && (
                                     <View style={styles.notesContainer}>
-                                        <Text style={styles.infoLabel}>Notes</Text>
+                                        <View style={styles.infoRowLeft}>
+                                            <Ionicons name="document-text" size={14} color={SUBDUED} />
+                                            <Text style={styles.infoLabel}>Notes</Text>
+                                        </View>
                                         <Text style={styles.notesText}>{foodData.notes}</Text>
                                     </View>
                                 )}
@@ -474,13 +567,18 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     macrosSection: {
-        marginBottom: 40,
+        marginBottom: 32,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
     },
     sectionTitle: {
         fontSize: 20,
         fontWeight: '600',
         color: WHITE,
-        marginBottom: 20,
+        marginLeft: 8,
     },
     macrosRow: {
         flexDirection: 'row',
@@ -518,39 +616,85 @@ const styles = StyleSheet.create({
         marginBottom: 40,
     },
     nutrientGroup: {
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: 16,
         padding: 20,
         marginBottom: 16,
+        marginHorizontal: -4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
     },
-    nutrientRow: {
+    nutrientRowWithProgress: {
+        marginBottom: 12,
+    },
+    nutrientRowHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
+        paddingVertical: 8,
+    },
+    nutrientRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    nutrientIcon: {
+        marginRight: 8,
     },
     nutrientLabel: {
-        fontSize: 16,
+        fontSize: 15,
         color: WHITE,
         flex: 1,
     },
+    nutrientRowRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     nutrientValue: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: WHITE,
+        marginRight: 8,
+    },
+    percentageText: {
+        fontSize: 12,
+        color: SUBDUED,
+        minWidth: 35,
+        textAlign: 'right',
+    },
+    progressBarContainer: {
+        marginTop: 6,
+        marginLeft: 24,
+    },
+    progressBarBackground: {
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    subSectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
     },
     subSectionTitle: {
         fontSize: 16,
         fontWeight: '600',
         color: PURPLE_ACCENT,
-        marginBottom: 12,
+        marginLeft: 6,
     },
+
     additionalInfo: {
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: 16,
         padding: 20,
+        marginHorizontal: -4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
     },
     infoRow: {
         flexDirection: 'row',
@@ -558,23 +702,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 8,
     },
+    infoRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     infoLabel: {
-        fontSize: 16,
+        fontSize: 14,
         color: SUBDUED,
+        marginLeft: 6,
     },
     infoValue: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '500',
         color: WHITE,
     },
     notesContainer: {
-        marginTop: 12,
+        marginTop: 8,
     },
     notesText: {
         fontSize: 14,
         color: WHITE,
         lineHeight: 20,
         marginTop: 8,
+        marginLeft: 20,
     },
 });
 

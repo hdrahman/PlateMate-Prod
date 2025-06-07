@@ -31,6 +31,10 @@ interface UserProfile {
     lastName: string;
     phoneNumber: string;
 
+    // Enhanced personal info
+    dateOfBirth: string | null;
+    location: string | null;
+
     // Physical attributes
     height: number | null;
     weight: number | null;
@@ -47,9 +51,34 @@ interface UserProfile {
 
     // Health & fitness goals
     weightGoal: string | null;
+    targetWeight: number | null;
+    startingWeight: number | null;
     healthConditions: string[];
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
+
+    // Lifestyle and motivation data
+    sleepQuality?: string | null;
+    stressLevel?: string | null;
+    eatingPattern?: string | null;
+    motivations?: string[];
+    whyMotivation?: string | null;
+
+    // Enhanced fitness goals
+    stepGoal?: number | null;
+    waterGoal?: number | null;
+    workoutFrequency?: number | null;
+    sleepGoal?: number | null;
+
+    // Predictive insights
+    projectedCompletionDate?: string | null;
+    estimatedMetabolicAge?: number | null;
+    estimatedDurationWeeks?: number | null;
+
+    // Future Self Motivation System
+    futureSelfMessage?: string | null;
+    futureSelfMessageType?: string | null;
+    futureSelfMessageCreatedAt?: string | null;
 
     // Delivery preferences
     defaultAddress: string | null;
@@ -80,6 +109,10 @@ const defaultProfile: UserProfile = {
     lastName: '',
     phoneNumber: '',
 
+    // Enhanced personal info
+    dateOfBirth: null,
+    location: null,
+
     height: null,
     weight: null,
     age: null,
@@ -93,9 +126,34 @@ const defaultProfile: UserProfile = {
     spiceTolerance: null,
 
     weightGoal: null,
+    targetWeight: null,
+    startingWeight: null,
     healthConditions: [],
     dailyCalorieTarget: null,
     nutrientFocus: null,
+
+    // Lifestyle and motivation data
+    sleepQuality: null,
+    stressLevel: null,
+    eatingPattern: null,
+    motivations: [],
+    whyMotivation: null,
+
+    // Enhanced fitness goals
+    stepGoal: null,
+    waterGoal: null,
+    workoutFrequency: null,
+    sleepGoal: null,
+
+    // Predictive insights
+    projectedCompletionDate: null,
+    estimatedMetabolicAge: null,
+    estimatedDurationWeeks: null,
+
+    // Future Self Motivation System
+    futureSelfMessage: null,
+    futureSelfMessageType: null,
+    futureSelfMessageCreatedAt: null,
 
     defaultAddress: null,
     preferredDeliveryTimes: [],
@@ -149,6 +207,8 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         firstName: sqliteProfile.first_name || '',
         lastName: sqliteProfile.last_name || '',
         phoneNumber: sqliteProfile.phone_number || '',
+        dateOfBirth: sqliteProfile.date_of_birth,
+        location: sqliteProfile.location,
         height: sqliteProfile.height,
         weight: sqliteProfile.weight,
         age: sqliteProfile.age,
@@ -160,9 +220,26 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         cuisinePreferences: sqliteProfile.cuisine_preferences || [],
         spiceTolerance: sqliteProfile.spice_tolerance,
         weightGoal: sqliteProfile.weight_goal,
+        targetWeight: sqliteProfile.target_weight,
+        startingWeight: sqliteProfile.starting_weight,
         healthConditions: sqliteProfile.health_conditions || [],
         dailyCalorieTarget: sqliteProfile.daily_calorie_target,
         nutrientFocus: sqliteProfile.nutrient_focus,
+        sleepQuality: sqliteProfile.sleep_quality,
+        stressLevel: sqliteProfile.stress_level,
+        eatingPattern: sqliteProfile.eating_pattern,
+        motivations: sqliteProfile.motivations ? JSON.parse(sqliteProfile.motivations) : [],
+        whyMotivation: sqliteProfile.why_motivation,
+        stepGoal: sqliteProfile.step_goal,
+        waterGoal: sqliteProfile.water_goal,
+        workoutFrequency: sqliteProfile.workout_frequency,
+        sleepGoal: sqliteProfile.sleep_goal,
+        projectedCompletionDate: sqliteProfile.projected_completion_date,
+        estimatedMetabolicAge: sqliteProfile.estimated_metabolic_age,
+        estimatedDurationWeeks: sqliteProfile.estimated_duration_weeks,
+        futureSelfMessage: sqliteProfile.future_self_message,
+        futureSelfMessageType: sqliteProfile.future_self_message_type,
+        futureSelfMessageCreatedAt: sqliteProfile.future_self_message_created_at,
         defaultAddress: sqliteProfile.default_address,
         preferredDeliveryTimes: sqliteProfile.preferred_delivery_times || [],
         deliveryInstructions: sqliteProfile.delivery_instructions,
@@ -188,11 +265,15 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         first_name: frontendProfile.firstName,
         last_name: frontendProfile.lastName,
         phone_number: frontendProfile.phoneNumber,
+        date_of_birth: frontendProfile.dateOfBirth,
+        location: frontendProfile.location,
         height: frontendProfile.height,
         weight: frontendProfile.weight,
         age: frontendProfile.age,
         gender: frontendProfile.gender,
         activity_level: frontendProfile.activityLevel,
+        target_weight: frontendProfile.targetWeight,
+        starting_weight: frontendProfile.startingWeight,
         unit_preference: frontendProfile.unitPreference,
         dietary_restrictions: frontendProfile.dietaryRestrictions,
         food_allergies: frontendProfile.foodAllergies,
@@ -202,6 +283,21 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         health_conditions: frontendProfile.healthConditions,
         daily_calorie_target: frontendProfile.dailyCalorieTarget,
         nutrient_focus: frontendProfile.nutrientFocus,
+        sleep_quality: frontendProfile.sleepQuality,
+        stress_level: frontendProfile.stressLevel,
+        eating_pattern: frontendProfile.eatingPattern,
+        motivations: frontendProfile.motivations ? JSON.stringify(frontendProfile.motivations) : null,
+        why_motivation: frontendProfile.whyMotivation,
+        step_goal: frontendProfile.stepGoal,
+        water_goal: frontendProfile.waterGoal,
+        workout_frequency: frontendProfile.workoutFrequency,
+        sleep_goal: frontendProfile.sleepGoal,
+        projected_completion_date: frontendProfile.projectedCompletionDate,
+        estimated_metabolic_age: frontendProfile.estimatedMetabolicAge,
+        estimated_duration_weeks: frontendProfile.estimatedDurationWeeks,
+        future_self_message: frontendProfile.futureSelfMessage,
+        future_self_message_type: frontendProfile.futureSelfMessageType,
+        future_self_message_created_at: frontendProfile.futureSelfMessageCreatedAt,
         default_address: frontendProfile.defaultAddress,
         preferred_delivery_times: frontendProfile.preferredDeliveryTimes,
         delivery_instructions: frontendProfile.deliveryInstructions,
@@ -225,7 +321,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const { user } = useAuth();
     const [onboardingComplete, setOnboardingComplete] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
-    const totalSteps = 6; // Updated total number of onboarding steps
+    const totalSteps = 10; // Updated total number of onboarding steps
     const [profile, setProfile] = useState<UserProfile>(defaultProfile);
     const [isLoading, setIsLoading] = useState(true);
 

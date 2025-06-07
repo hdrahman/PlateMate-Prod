@@ -58,12 +58,15 @@ export const initDatabase = async () => {
         email TEXT UNIQUE NOT NULL,
         first_name TEXT NOT NULL,
         last_name TEXT,
+        date_of_birth TEXT,
+        location TEXT,
         height REAL,
         weight REAL,
         age INTEGER,
         gender TEXT,
         activity_level TEXT,
         target_weight REAL,
+        starting_weight REAL,
         dietary_restrictions TEXT,
         food_allergies TEXT,
         cuisine_preferences TEXT,
@@ -91,8 +94,18 @@ export const initDatabase = async () => {
         step_goal INTEGER,
         water_goal INTEGER,
         sleep_goal INTEGER,
-        starting_weight REAL,
-        location TEXT
+        workout_frequency INTEGER,
+        sleep_quality TEXT,
+        stress_level TEXT,
+        eating_pattern TEXT,
+        motivations TEXT,
+        why_motivation TEXT,
+        projected_completion_date TEXT,
+        estimated_metabolic_age INTEGER,
+        estimated_duration_weeks INTEGER,
+        future_self_message TEXT,
+        future_self_message_type TEXT,
+        future_self_message_created_at TEXT
       )
     `);
         console.log('✅ user_profiles table created successfully');
@@ -1246,12 +1259,15 @@ interface UserProfile {
     email: string;
     first_name: string;
     last_name?: string;
+    date_of_birth?: string;
+    location?: string;
     height?: number;
     weight?: number;
     age?: number;
     gender?: string;
     activity_level?: string;
     target_weight?: number;
+    starting_weight?: number;
     dietary_restrictions?: string;
     food_allergies?: string;
     cuisine_preferences?: string;
@@ -1278,8 +1294,18 @@ interface UserProfile {
     step_goal?: number;
     water_goal?: number;
     sleep_goal?: number;
-    starting_weight?: number;
-    location?: string;
+    workout_frequency?: number;
+    sleep_quality?: string;
+    stress_level?: string;
+    eating_pattern?: string;
+    motivations?: string;
+    why_motivation?: string;
+    projected_completion_date?: string;
+    estimated_metabolic_age?: number;
+    estimated_duration_weeks?: number;
+    future_self_message?: string;
+    future_self_message_type?: string;
+    future_self_message_created_at?: string;
 }
 
 // Get user profile from local SQLite by Firebase UID

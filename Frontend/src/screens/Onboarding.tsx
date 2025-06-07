@@ -24,8 +24,12 @@ import * as userApi from '../api/userApi';
 import WelcomeStep from '../components/onboarding/WelcomeStep';
 import BasicInfoStep from '../components/onboarding/BasicInfoStep';
 import PhysicalAttributesStep from '../components/onboarding/PhysicalAttributesStep';
+import PersonalizedInfoStep from '../components/onboarding/PersonalizedInfoStep';
 import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesStep';
+import LifestyleHabitsStep from '../components/onboarding/LifestyleHabitsStep';
 import HealthGoalsStep from '../components/onboarding/HealthGoalsStep';
+import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
+import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
 import SubscriptionStep from '../components/onboarding/SubscriptionStep';
 
 const { width, height } = Dimensions.get('window');
@@ -142,10 +146,18 @@ const Onboarding = () => {
             case 3:
                 return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 4:
-                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <PersonalizedInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 5:
-                return <HealthGoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 6:
+                return <LifestyleHabitsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 7:
+                return <HealthGoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 8:
+                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 9:
+                return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 10:
                 return <SubscriptionStep onComplete={handleCompleteOnboarding} />;
             default:
                 return <WelcomeStep onNext={handleNext} />;

@@ -196,7 +196,7 @@ async def upload_image(user_id: int = Form(...), image: UploadFile = File(...)):
                     messages=[
                         {
                             "role": "system",
-                            "content": """You are a nutrition assistant. Analyze the food in this image and identify each item appropriately.
+                            "content": """You are Coach Max, an AI Health Coach. Analyze the food in this image and identify each item appropriately.
 
 IMPORTANT FOOD GROUPING RULES:
 1. SINGLE ENTRY for composite foods like sandwiches, wraps, burgers, pizzas, etc. (e.g., "Turkey Sandwich", "Italian BMT Sub", "Cheeseburger")
@@ -389,7 +389,7 @@ async def upload_multiple_images(user_id: int = Form(...), images: List[UploadFi
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a nutrition assistant. Analyze the food in these images and identify each item appropriately.
+                        "content": """You are Coach Max, an AI Health Coach. Analyze the food in these images and identify each item appropriately.
 
 IMPORTANT FOOD GROUPING RULES:
 1. SINGLE ENTRY for composite foods like sandwiches, wraps, burgers, pizzas, etc. (e.g., "Turkey Sandwich", "Italian BMT Sub", "Cheeseburger")

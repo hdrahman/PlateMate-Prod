@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 8; // Increment this to version 8 for preferred day of week feature
+const CURRENT_VERSION = 9; // Increment this to version 9 for enhanced onboarding fields
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -224,6 +224,43 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             });
                         } catch (error) {
                             console.error(`❌ Error adding preferred_day_of_week column:`, error);
+                        }
+                    }
+                },
+                // Migration to version 9 - Add enhanced onboarding fields to user_profiles
+                async () => {
+                    if (currentVersion < 9) {
+                        console.log('Migrating to version 9: Adding enhanced onboarding fields to user_profiles');
+
+                        const enhancedOnboardingColumns = [
+                            'date_of_birth TEXT',
+                            'target_weight REAL',
+                            'workout_frequency INTEGER',
+                            'sleep_quality TEXT',
+                            'stress_level TEXT',
+                            'eating_pattern TEXT',
+                            'motivations TEXT',
+                            'why_motivation TEXT',
+                            'projected_completion_date TEXT',
+                            'estimated_metabolic_age INTEGER',
+                            'estimated_duration_weeks INTEGER',
+                            'future_self_message TEXT',
+                            'future_self_message_type TEXT',
+                            'future_self_message_created_at TEXT'
+                        ];
+
+                        for (const column of enhancedOnboardingColumns) {
+                            const columnName = column.split(' ')[0];
+                            try {
+                                // Check if column exists by trying to select it
+                                await db.execAsync(`SELECT ${columnName} FROM user_profiles LIMIT 1`).catch(async () => {
+                                    // Column doesn't exist, add it
+                                    await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN ${column}`);
+                                    console.log(`✅ Added column ${columnName} to user_profiles`);
+                                });
+                            } catch (error) {
+                                console.error(`❌ Error processing column ${columnName}:`, error);
+                            }
                         }
                     }
                 }
