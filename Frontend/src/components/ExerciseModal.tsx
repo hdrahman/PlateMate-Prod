@@ -47,6 +47,8 @@ interface ExerciseModalProps {
 const PRIMARY_BG = '#000000';
 const WHITE = '#FFFFFF';
 const PURPLE_ACCENT = '#AA00FF';
+const CARD_BG = '#1C1C1E';
+const SUBDUED = '#AAAAAA';
 
 const ExerciseModal: React.FC<ExerciseModalProps> = ({
     visible,
@@ -314,7 +316,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 <View style={styles.activityInfo}>
                     <Text style={[
                         styles.activityName,
-                        isSelected && { color: '#0074dd' }
+                        isSelected && { color: PURPLE_ACCENT }
                     ]}>
                         {item.name}
                     </Text>
@@ -324,7 +326,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 </View>
                 {selectedActivity?.name === item.name && (
                     <View style={styles.checkmarkContainer}>
-                        <Ionicons name="checkmark-circle" size={24} color="#0074dd" />
+                        <Ionicons name="checkmark-circle" size={24} color={PURPLE_ACCENT} />
                     </View>
                 )}
             </TouchableOpacity>
@@ -365,7 +367,10 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                             <View style={{ height: 15 }} />
 
                             {/* Make the content scrollable */}
-                            <ScrollView contentContainerStyle={styles.exerciseModalScrollContent}>
+                            <ScrollView
+                                contentContainerStyle={styles.exerciseModalScrollContent}
+                                showsVerticalScrollIndicator={false}
+                            >
                                 {!selectedActivity && !isManualEntry ? (
                                     <>
                                         {/* Manual Entry Card */}
@@ -374,7 +379,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             onPress={() => setIsManualEntry(true)}
                                         >
                                             <LinearGradient
-                                                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                                                 style={{
                                                     position: 'absolute',
                                                     left: 0,
@@ -388,7 +393,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             />
                                             <View style={styles.popularActivitiesContainer}>
                                                 <View style={styles.popularActivitiesHeader}>
-                                                    <Ionicons name="create-outline" size={20} color="#0074dd" />
+                                                    <Ionicons name="create-outline" size={20} color={PURPLE_ACCENT} />
                                                     <Text style={styles.popularActivitiesTitle}>Manual Entry</Text>
                                                 </View>
                                                 <Text style={[styles.activityMet, { marginBottom: 5 }]}>
@@ -400,11 +405,11 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                         width: '100%',
                                                         marginTop: 10,
                                                         borderWidth: 1,
-                                                        borderColor: '#8A2BE2'
+                                                        borderColor: PURPLE_ACCENT
                                                     }]}
                                                     onPress={() => setIsManualEntry(true)}
                                                 >
-                                                    <Text style={[styles.intensityButtonText, { color: '#AA00FF', fontWeight: 'bold' }]}>Enter Manually</Text>
+                                                    <Text style={[styles.intensityButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>Enter Manually</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         </TouchableOpacity>
@@ -433,7 +438,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             {searchQuery === '' ? (
                                                 <View style={styles.popularActivitiesWrapper}>
                                                     <LinearGradient
-                                                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                                                         style={{
                                                             position: 'absolute',
                                                             left: 0,
@@ -452,6 +457,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                             contentContainerStyle={{
                                                                 paddingBottom: 15
                                                             }}
+                                                            showsVerticalScrollIndicator={false}
                                                         >
                                                             <Text style={[styles.sectionHeader, {
                                                                 marginTop: 0,
@@ -493,6 +499,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                     renderItem={renderActivityItem}
                                                     keyExtractor={(item) => item.name}
                                                     nestedScrollEnabled={true}
+                                                    showsVerticalScrollIndicator={false}
                                                 />
                                             )}
                                         </View>
@@ -508,8 +515,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             }}
                                             onPress={() => setIsManualEntry(false)}
                                         >
-                                            <Ionicons name="arrow-back" size={20} color="#0074dd" />
-                                            <Text style={{ color: '#0074dd', marginLeft: 5 }}>Back to activity list</Text>
+                                            <Ionicons name="arrow-back" size={20} color={PURPLE_ACCENT} />
+                                            <Text style={{ color: PURPLE_ACCENT, marginLeft: 5 }}>Back to activity list</Text>
                                         </TouchableOpacity>
 
                                         <Text style={styles.inputLabel}>Activity Name:</Text>
@@ -616,110 +623,173 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     </View>
                                 ) : selectedActivity && (
                                     <>
-                                        {/* Selected Activity Display */}
-                                        <View style={{ marginTop: 10 }}>
-                                            <TouchableOpacity
-                                                style={{
-                                                    flexDirection: 'row',
-                                                    alignItems: 'center',
-                                                    marginBottom: 15
-                                                }}
-                                                onPress={() => setSelectedActivity(null)}
-                                            >
-                                                <Ionicons name="arrow-back" size={20} color="#0074dd" />
-                                                <Text style={{ color: '#0074dd', marginLeft: 5 }}>Back to activity list</Text>
-                                            </TouchableOpacity>
+                                        {/* Header with Back Button */}
+                                        <TouchableOpacity
+                                            style={styles.backButtonContainer}
+                                            onPress={() => setSelectedActivity(null)}
+                                        >
+                                            <Ionicons name="arrow-back" size={22} color={PURPLE_ACCENT} />
+                                            <Text style={styles.backButtonText}>Back to activities</Text>
+                                        </TouchableOpacity>
 
-                                            <View style={styles.selectedActivityItem}>
-                                                <Text style={[styles.activityName, { color: '#0074dd', fontSize: 18, fontWeight: 'bold' }]}>
-                                                    {selectedActivity.name}
-                                                </Text>
-                                                <Text style={[styles.activityMet, { marginBottom: 10 }]}>
-                                                    MET: {selectedActivity.met} ({selectedActivity.category})
-                                                </Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Divider before Duration section */}
-                                        <View style={styles.exerciseModalDivider} />
-
-                                        {/* Duration Input */}
-                                        <View style={styles.inputRow}>
-                                            <Text style={styles.inputLabel}>Duration (minutes):</Text>
-                                            <View style={styles.durationInputContainer}>
-                                                <TextInput
-                                                    style={styles.input}
-                                                    keyboardType="number-pad"
-                                                    value={exerciseDuration}
-                                                    onChangeText={setExerciseDuration}
+                                        {/* Exercise Header Card */}
+                                        <View style={styles.exerciseHeaderCard}>
+                                            <View style={styles.exerciseIconContainer}>
+                                                <Ionicons
+                                                    name={selectedActivity.category === 'light' ? 'walk' :
+                                                        selectedActivity.category === 'moderate' ? 'fitness' : 'flash'}
+                                                    size={32}
+                                                    color={PURPLE_ACCENT}
                                                 />
                                             </View>
+                                            <View style={styles.exerciseHeaderInfo}>
+                                                <Text style={styles.exerciseHeaderTitle}>{selectedActivity.name}</Text>
+                                                <View style={styles.exerciseMetBadge}>
+                                                    <Text style={styles.exerciseMetText}>
+                                                        {selectedActivity.met} MET • {selectedActivity.category.toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            </View>
                                         </View>
 
-                                        {/* Divider before Intensity */}
-                                        <View style={styles.exerciseModalDivider} />
-
-                                        {/* Intensity Selection */}
-                                        <View style={styles.inputRow}>
-                                            <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.intensityButton,
-                                                    { marginRight: 3 }
-                                                ]}
-                                                onPress={() => setExerciseIntensity('light')}
-                                            >
-                                                <Text style={[
-                                                    styles.intensityButtonText,
-                                                    exerciseIntensity === 'light' && styles.intensityButtonTextSelected
-                                                ]}>Light</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.intensityButton,
-                                                    { marginRight: 3 }
-                                                ]}
-                                                onPress={() => setExerciseIntensity('moderate')}
-                                            >
-                                                <Text style={[
-                                                    styles.intensityButtonText,
-                                                    exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
-                                                ]}>Moderate</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.intensityButton
-                                                ]}
-                                                onPress={() => setExerciseIntensity('vigorous')}
-                                            >
-                                                <Text style={[
-                                                    styles.intensityButtonText,
-                                                    exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
-                                                ]}>Vigorous</Text>
-                                            </TouchableOpacity>
+                                        {/* Duration Section */}
+                                        <View style={styles.configSection}>
+                                            <Text style={styles.configSectionTitle}>Duration</Text>
+                                            <View style={styles.durationCardWrapper}>
+                                                <LinearGradient
+                                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                                    style={styles.durationCardGradient}
+                                                    start={{ x: 0, y: 0 }}
+                                                    end={{ x: 1, y: 1 }}
+                                                />
+                                                <View style={styles.durationCard}>
+                                                    <View style={styles.durationInputWrapper}>
+                                                        <TextInput
+                                                            style={styles.durationInput}
+                                                            keyboardType="number-pad"
+                                                            value={exerciseDuration}
+                                                            onChangeText={setExerciseDuration}
+                                                            placeholderTextColor={SUBDUED}
+                                                            placeholder="30"
+                                                        />
+                                                        <Text style={styles.durationUnit}>minutes</Text>
+                                                    </View>
+                                                    <View style={styles.durationPresets}>
+                                                        {[15, 30, 45, 60].map((duration) => (
+                                                            <TouchableOpacity
+                                                                key={duration}
+                                                                style={[
+                                                                    styles.durationPreset,
+                                                                    exerciseDuration === duration.toString() && styles.durationPresetSelected
+                                                                ]}
+                                                                onPress={() => setExerciseDuration(duration.toString())}
+                                                            >
+                                                                <Text style={[
+                                                                    styles.durationPresetText,
+                                                                    exerciseDuration === duration.toString() && styles.durationPresetTextSelected
+                                                                ]}>
+                                                                    {duration}m
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        ))}
+                                                    </View>
+                                                </View>
+                                            </View>
                                         </View>
 
-                                        {/* Divider after Intensity */}
-                                        <View style={styles.exerciseModalDivider} />
+                                        {/* Intensity Section */}
+                                        <View style={styles.configSection}>
+                                            <Text style={styles.configSectionTitle}>Intensity Level</Text>
+                                            <View style={styles.intensityGrid}>
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.intensityCard,
+                                                        exerciseIntensity === 'light' && styles.intensityCardSelected
+                                                    ]}
+                                                    onPress={() => setExerciseIntensity('light')}
+                                                >
+                                                    <Ionicons
+                                                        name="leaf-outline"
+                                                        size={24}
+                                                        color={exerciseIntensity === 'light' ? PURPLE_ACCENT : SUBDUED}
+                                                    />
+                                                    <Text style={[
+                                                        styles.intensityCardTitle,
+                                                        exerciseIntensity === 'light' && styles.intensityCardTitleSelected
+                                                    ]}>Light</Text>
+                                                    <Text style={styles.intensityCardSubtitle}>0.8x multiplier</Text>
+                                                </TouchableOpacity>
 
-                                        {/* Calories Result */}
-                                        <View style={styles.caloriesResult}>
-                                            <Text style={styles.caloriesFormula}>
-                                                {exerciseIntensity === 'moderate' ? (
-                                                    `MET: ${selectedActivity.met} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
-                                                ) : exerciseIntensity === 'light' ? (
-                                                    `MET: ${selectedActivity.met} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
-                                                ) : (
-                                                    `MET: ${selectedActivity.met} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
-                                                )}
-                                            </Text>
-                                            <Text style={styles.caloriesResultText}>
-                                                = {calculateCaloriesBurned(
-                                                    selectedActivity,
-                                                    parseInt(exerciseDuration) || 30,
-                                                    userWeight
-                                                )} calories
-                                            </Text>
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.intensityCard,
+                                                        exerciseIntensity === 'moderate' && styles.intensityCardSelected
+                                                    ]}
+                                                    onPress={() => setExerciseIntensity('moderate')}
+                                                >
+                                                    <Ionicons
+                                                        name="fitness-outline"
+                                                        size={24}
+                                                        color={exerciseIntensity === 'moderate' ? PURPLE_ACCENT : SUBDUED}
+                                                    />
+                                                    <Text style={[
+                                                        styles.intensityCardTitle,
+                                                        exerciseIntensity === 'moderate' && styles.intensityCardTitleSelected
+                                                    ]}>Moderate</Text>
+                                                    <Text style={styles.intensityCardSubtitle}>1.0x multiplier</Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.intensityCard,
+                                                        exerciseIntensity === 'vigorous' && styles.intensityCardSelected
+                                                    ]}
+                                                    onPress={() => setExerciseIntensity('vigorous')}
+                                                >
+                                                    <Ionicons
+                                                        name="flash-outline"
+                                                        size={24}
+                                                        color={exerciseIntensity === 'vigorous' ? PURPLE_ACCENT : SUBDUED}
+                                                    />
+                                                    <Text style={[
+                                                        styles.intensityCardTitle,
+                                                        exerciseIntensity === 'vigorous' && styles.intensityCardTitleSelected
+                                                    ]}>Vigorous</Text>
+                                                    <Text style={styles.intensityCardSubtitle}>1.2x multiplier</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        {/* Calories Calculation Card */}
+                                        <View style={styles.caloriesCalculationCard}>
+                                            <View style={styles.caloriesHeader}>
+                                                <Ionicons name="calculator-outline" size={24} color={PURPLE_ACCENT} />
+                                                <Text style={styles.caloriesHeaderTitle}>Estimated Calories Burned</Text>
+                                            </View>
+
+                                            <View style={styles.caloriesMainResult}>
+                                                <Text style={styles.caloriesNumber}>
+                                                    {calculateCaloriesBurned(
+                                                        selectedActivity,
+                                                        parseInt(exerciseDuration) || 30,
+                                                        userWeight
+                                                    )}
+                                                </Text>
+                                                <Text style={styles.caloriesUnit}>calories</Text>
+                                            </View>
+
+                                            <View style={styles.formulaContainer}>
+                                                <Text style={styles.formulaLabel}>Calculation:</Text>
+                                                <Text style={styles.formulaText}>
+                                                    {exerciseIntensity === 'moderate' ? (
+                                                        `${selectedActivity.met} MET × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
+                                                    ) : exerciseIntensity === 'light' ? (
+                                                        `${selectedActivity.met} MET × 0.8 × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
+                                                    ) : (
+                                                        `${selectedActivity.met} MET × 1.2 × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
+                                                    )}
+                                                </Text>
+                                            </View>
                                         </View>
                                     </>
                                 )}
@@ -738,7 +808,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             backgroundColor: 'transparent',
                                             width: '100%',
                                             borderWidth: 1,
-                                            borderColor: '#C050FF', // Brighter purple for border
+                                            borderColor: PURPLE_ACCENT,
                                             shadowColor: 'transparent',
                                             shadowOffset: { width: 0, height: 0 },
                                             shadowOpacity: 0,
@@ -751,7 +821,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     onPress={addNewExercise}
                                     disabled={(!selectedActivity && !isManualEntry) || (isManualEntry && !manualActivityName.trim())}
                                 >
-                                    <Text style={[styles.modalButtonText, { color: '#D020FF', fontWeight: 'bold' }]}>ADD EXERCISE</Text>
+                                    <Text style={[styles.modalButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>ADD EXERCISE</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -772,7 +842,7 @@ const styles = StyleSheet.create({
     exerciseModalContent: {
         width: '95%',
         maxHeight: '90%',
-        backgroundColor: '#1e1e1e',
+        backgroundColor: CARD_BG,
         borderRadius: 10,
         padding: 20,
         elevation: 5,
@@ -813,7 +883,7 @@ const styles = StyleSheet.create({
     popularActivitiesContainer: {
         margin: 1,
         borderRadius: 9,
-        backgroundColor: '#121212',
+        backgroundColor: PRIMARY_BG,
         padding: 12,
     },
     popularActivitiesHeader: {
@@ -836,9 +906,6 @@ const styles = StyleSheet.create({
         color: PURPLE_ACCENT,
         marginTop: 10,
         marginBottom: 5,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0, 116, 221, 0.2)',
-        paddingTop: 8
     },
     orDivider: {
         flexDirection: 'row',
@@ -852,12 +919,12 @@ const styles = StyleSheet.create({
     },
     orText: {
         marginHorizontal: 10,
-        color: '#888',
+        color: SUBDUED,
         fontSize: 14,
     },
     searchInputContainer: {
         marginBottom: 15,
-        backgroundColor: '#333',
+        backgroundColor: '#2C2C2E',
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 8,
@@ -866,7 +933,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        color: 'white',
+        color: WHITE,
         marginLeft: 8,
         fontSize: 16
     },
@@ -884,7 +951,7 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },
     selectedActivityItem: {
-        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+        backgroundColor: 'rgba(170, 0, 255, 0.1)',
         borderRadius: 6,
     },
     activityInfo: {
@@ -893,30 +960,30 @@ const styles = StyleSheet.create({
     activityName: {
         fontSize: 16,
         fontWeight: '500',
-        color: '#fff',
+        color: WHITE,
         marginBottom: 2,
     },
     activityMet: {
         fontSize: 14,
-        color: '#aaa',
+        color: SUBDUED,
     },
     checkmarkContainer: {
         paddingHorizontal: 10,
     },
     inputLabel: {
         fontSize: 16,
-        color: '#fff',
+        color: WHITE,
         marginBottom: 8,
     },
     inputContainer: {
-        backgroundColor: '#333',
+        backgroundColor: '#2C2C2E',
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 8,
         marginBottom: 15,
     },
     input: {
-        color: 'white',
+        color: WHITE,
         fontSize: 16,
     },
     inputRow: {
@@ -926,7 +993,7 @@ const styles = StyleSheet.create({
     },
     durationInputContainer: {
         flex: 1,
-        backgroundColor: '#333',
+        backgroundColor: '#2C2C2E',
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 8,
@@ -938,31 +1005,31 @@ const styles = StyleSheet.create({
     },
     intensityButton: {
         flex: 1,
-        backgroundColor: '#333',
+        backgroundColor: '#2C2C2E',
         borderRadius: 6,
         paddingVertical: 8,
         alignItems: 'center',
     },
     intensityButtonText: {
-        color: '#888',
+        color: SUBDUED,
         fontWeight: '500',
     },
     intensityButtonTextSelected: {
-        color: '#0074dd',
+        color: PURPLE_ACCENT,
     },
     caloriesResult: {
-        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+        backgroundColor: 'rgba(170, 0, 255, 0.1)',
         padding: 15,
         borderRadius: 8,
         marginTop: 5,
     },
     caloriesFormula: {
-        color: '#888',
+        color: SUBDUED,
         marginBottom: 10,
         fontSize: 14,
     },
     caloriesResultText: {
-        color: '#fff',
+        color: WHITE,
         fontWeight: 'bold',
         fontSize: 18,
     },
@@ -972,7 +1039,7 @@ const styles = StyleSheet.create({
         marginTop: 15,
     },
     modalAddButton: {
-        backgroundColor: '#AA00FF',
+        backgroundColor: PURPLE_ACCENT,
         paddingVertical: 12,
         borderRadius: 8,
         alignItems: 'center',
@@ -984,9 +1051,216 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     modalButtonText: {
-        color: 'white',
+        color: WHITE,
         fontSize: 16,
         fontWeight: '500',
+    },
+    // New styles for the redesigned selected exercise screen
+    backButtonContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingVertical: 8,
+    },
+    backButtonText: {
+        color: PURPLE_ACCENT,
+        fontSize: 16,
+        marginLeft: 8,
+        fontWeight: '500',
+    },
+    exerciseHeaderCard: {
+        backgroundColor: 'rgba(170, 0, 255, 0.08)',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(170, 0, 255, 0.2)',
+    },
+    exerciseIconContainer: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: 'rgba(170, 0, 255, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    exerciseHeaderInfo: {
+        flex: 1,
+    },
+    exerciseHeaderTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 8,
+    },
+    exerciseMetBadge: {
+        backgroundColor: 'rgba(170, 0, 255, 0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    exerciseMetText: {
+        color: PURPLE_ACCENT,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    configSection: {
+        marginBottom: 24,
+    },
+    configSectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: WHITE,
+        marginBottom: 16,
+    },
+    durationCardWrapper: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    durationCardGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 12,
+    },
+    durationCard: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 12,
+        padding: 16,
+        margin: 1,
+    },
+    durationInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1C1C1E',
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        marginBottom: 16,
+    },
+    durationInput: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: '600',
+        flex: 1,
+        textAlign: 'center',
+    },
+    durationUnit: {
+        color: SUBDUED,
+        fontSize: 16,
+        marginLeft: 8,
+    },
+    durationPresets: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    durationPreset: {
+        flex: 1,
+        backgroundColor: '#1C1C1E',
+        borderRadius: 8,
+        paddingVertical: 12,
+        marginHorizontal: 2,
+        alignItems: 'center',
+    },
+    durationPresetSelected: {
+        backgroundColor: PURPLE_ACCENT,
+    },
+    durationPresetText: {
+        color: SUBDUED,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    durationPresetTextSelected: {
+        color: WHITE,
+        fontWeight: '600',
+    },
+    intensityGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    intensityCard: {
+        flex: 1,
+        backgroundColor: '#2C2C2E',
+        borderRadius: 12,
+        padding: 16,
+        marginHorizontal: 4,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    intensityCardSelected: {
+        backgroundColor: 'rgba(170, 0, 255, 0.1)',
+        borderColor: PURPLE_ACCENT,
+    },
+    intensityCardTitle: {
+        color: WHITE,
+        fontSize: 14,
+        fontWeight: '600',
+        marginTop: 8,
+        marginBottom: 4,
+    },
+    intensityCardTitleSelected: {
+        color: PURPLE_ACCENT,
+    },
+    intensityCardSubtitle: {
+        color: SUBDUED,
+        fontSize: 12,
+    },
+    caloriesCalculationCard: {
+        backgroundColor: 'rgba(170, 0, 255, 0.05)',
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(170, 0, 255, 0.2)',
+    },
+    caloriesHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    caloriesHeaderTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: WHITE,
+        marginLeft: 8,
+    },
+    caloriesMainResult: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    caloriesNumber: {
+        fontSize: 36,
+        fontWeight: 'bold',
+        color: PURPLE_ACCENT,
+    },
+    caloriesUnit: {
+        fontSize: 16,
+        color: SUBDUED,
+        marginTop: 4,
+    },
+    formulaContainer: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(170, 0, 255, 0.3)',
+    },
+    formulaLabel: {
+        fontSize: 12,
+        color: SUBDUED,
+        marginBottom: 4,
+    },
+    formulaText: {
+        fontSize: 14,
+        color: WHITE,
+        fontFamily: 'monospace',
     },
 });
 
