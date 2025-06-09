@@ -1091,7 +1091,7 @@ export default function Home() {
                     <Stop offset="100%" stopColor="#00CFFF" />
                   </SvgLinearGradient>
                   <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor="#8B0000" />
+                    <Stop offset="0%" stopColor="#B8860B" />
                     <Stop offset="100%" stopColor="#FFD700" />
                   </SvgLinearGradient>
                   <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
