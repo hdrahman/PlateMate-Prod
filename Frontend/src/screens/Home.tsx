@@ -1264,18 +1264,18 @@ export default function Home() {
           <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
 
-        {/* EXPLORE BUTTON */}
+        {/* ADVANCED ANALYTICS BUTTON */}
         <GradientBorderCard>
           <TouchableOpacity
             style={styles.exploreButtonInner}
-            onPress={() => navigation.navigate('Explore' as never)}
+            onPress={() => navigation.navigate('Analytics' as never)}
           >
             <MaskedView
               style={{ height: 30, width: '100%' }}
               maskElement={
                 <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                  <Ionicons name="compass" size={22} color="black" style={{ marginRight: 8 }} />
-                  <Text style={[styles.exploreButtonText, { color: 'black' }]}>Explore Content</Text>
+                  <Ionicons name="analytics" size={22} color="black" style={{ marginRight: 8 }} />
+                  <Text style={[styles.exploreButtonText, { color: 'black' }]}>Advanced Analytics</Text>
                 </View>
               }
             >
