@@ -4,8 +4,10 @@ import { updateDatabaseSchema } from './updateDatabase';
 import { auth } from './firebase/index';
 import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
 
-// Open the database
+// Database singleton and initialization tracking
 let db: SQLite.SQLiteDatabase;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let isInitializing = false;
 
 // Add a global flag for database initialization
 declare global {
@@ -15,9 +17,32 @@ declare global {
 // Set initial value
 global.dbInitialized = false;
 
+// Get or initialize the database with proper singleton pattern
+export const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
+    // If database is already initialized, return it
+    if (db && global.dbInitialized) {
+        return db;
+    }
+
+    // If initialization is in progress, wait for it
+    if (dbInitPromise) {
+        return dbInitPromise;
+    }
+
+    // Start initialization
+    dbInitPromise = initDatabase();
+    return dbInitPromise;
+};
+
 // Initialize the database
-export const initDatabase = async () => {
+export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     try {
+        // Prevent multiple concurrent initializations
+        if (isInitializing) {
+            throw new Error('Database initialization already in progress');
+        }
+
+        isInitializing = true;
         console.log('🔄 Initializing database...');
 
         // Open the database
@@ -217,12 +242,16 @@ export const initDatabase = async () => {
 
         // Set the global flag to indicate database is initialized
         global.dbInitialized = true;
+        isInitializing = false;
+        dbInitPromise = null; // Reset the promise for potential future re-initialization
         console.log('✅ Database initialized flag set to true');
 
         return db;
     } catch (error) {
         console.error('❌ Error initializing database:', error);
         global.dbInitialized = false;
+        isInitializing = false;
+        dbInitPromise = null; // Reset on error
         throw error;
     }
 };
@@ -261,19 +290,7 @@ export const unsubscribeFromFoodLogChanges = (callback: () => void | Promise<voi
 
 // Add a food log entry
 export const addFoodLog = async (foodLog: any) => {
-    if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to add food log before database initialization');
-        console.log('🔄 Attempting to initialize database automatically');
-        try {
-            await initDatabase();
-            if (!global.dbInitialized) {
-                throw new Error('Failed to initialize database');
-            }
-        } catch (initError) {
-            console.error('❌ Failed to auto-initialize database:', initError);
-            throw new Error('Database not initialized and auto-init failed');
-        }
-    }
+    const database = await getDatabase();
 
     // Get current user ID from Firebase
     const firebaseUserId = getCurrentUserId();
@@ -324,7 +341,7 @@ export const addFoodLog = async (foodLog: any) => {
         console.log('📝 Food entry being added:', JSON.stringify(formattedData, null, 2));
 
         // Insert into database
-        const result = await db.runAsync(
+        const result = await database.runAsync(
             `INSERT INTO food_logs 
           (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
            fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
@@ -371,7 +388,7 @@ export const addFoodLog = async (foodLog: any) => {
 
         // After insert, verify the entry was added by directly querying
         console.log(`✅ Food log inserted with ID ${result.lastInsertRowId}, verifying...`);
-        const verifyEntry = await db.getFirstAsync(
+        const verifyEntry = await database.getFirstAsync(
             `SELECT * FROM food_logs WHERE id = ?`,
             [result.lastInsertRowId]
         );
@@ -1348,7 +1365,7 @@ export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
 };
 
 // Update user profile in local SQLite
-export const updateUserProfile = async (firebaseUid: string, updates: any) => {
+export const updateUserProfile = async (firebaseUid: string, updates: any, isAutomatic: boolean = false) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to update user profile before database initialization');
         throw new Error('Database not initialized');
@@ -1935,11 +1952,8 @@ export const ensureLocationColumnExists = async (): Promise<boolean> => {
 // Weight History Functions
 
 // Add a weight entry to local SQLite database
-export const addWeightEntryLocal = async (firebaseUid: string, weight: number): Promise<void> => {
-    if (!db || !global.dbInitialized) {
-        console.log('🔄 Database not initialized, initializing now...');
-        await initDatabase();
-    }
+export const addWeightEntryLocal = async (firebaseUid: string, weight: number, isAutomatic: boolean = false): Promise<void> => {
+    const database = await getDatabase();
 
     try {
         const timestamp = new Date().toISOString();
@@ -1949,17 +1963,19 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number): 
         const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
         const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
 
-        const existingEntry = await db.getFirstAsync(
+        const existingEntry = await database.getFirstAsync(
             `SELECT id, weight FROM user_weights 
              WHERE firebase_uid = ? AND recorded_at >= ? AND recorded_at < ?
              ORDER BY recorded_at DESC LIMIT 1`,
             [firebaseUid, todayStart, todayEnd]
         ) as any;
 
+        let shouldNotify = false;
+
         if (existingEntry) {
             // Update existing entry for today if weight is different
             if (Math.abs(existingEntry.weight - weight) >= 0.01) {
-                await db.runAsync(
+                await database.runAsync(
                     `UPDATE user_weights SET 
                      weight = ?, 
                      synced = 0, 
@@ -1969,15 +1985,17 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number): 
                     [weight, timestamp, existingEntry.id]
                 );
                 console.log(`✅ Updated today's weight entry: ${weight}kg`);
+                shouldNotify = true;
             }
         } else {
             // Create new weight entry
-            await db.runAsync(
+            await database.runAsync(
                 `INSERT INTO user_weights (firebase_uid, weight, recorded_at, synced, sync_action, last_modified)
                  VALUES (?, ?, ?, 0, 'create', ?)`,
                 [firebaseUid, weight, timestamp, timestamp]
             );
             console.log(`✅ Added new weight entry: ${weight}kg`);
+            shouldNotify = true;
         }
 
         // Also update current weight in user profile
@@ -1986,9 +2004,12 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number): 
             synced: 0,
             sync_action: 'update',
             last_modified: timestamp
-        });
+        }, isAutomatic); // Pass the isAutomatic flag
 
-        notifyDatabaseChanged();
+        // Only notify if this is a manual weight entry or if there was an actual change
+        if (!isAutomatic && shouldNotify) {
+            notifyDatabaseChanged('weight_entry');
+        }
     } catch (error) {
         console.error('❌ Error adding weight entry:', error);
         throw error;
@@ -2489,19 +2510,7 @@ export const markCheatDayComplete = async (firebaseUid: string): Promise<void> =
 
 // Add multiple food log entries in a single transaction
 export const addMultipleFoodLogs = async (foodLogs: any[]) => {
-    if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to add food logs before database initialization');
-        console.log('🔄 Attempting to initialize database automatically');
-        try {
-            await initDatabase();
-            if (!global.dbInitialized) {
-                throw new Error('Failed to initialize database');
-            }
-        } catch (initError) {
-            console.error('❌ Failed to auto-initialize database:', initError);
-            throw new Error('Database not initialized and auto-init failed');
-        }
-    }
+    const database = await getDatabase();
 
     // Get current user ID from Firebase
     const firebaseUserId = getCurrentUserId();
@@ -2512,7 +2521,7 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
 
     try {
         // Start a transaction for batch insert with immediate mode for better locking behavior
-        await db.runAsync('BEGIN IMMEDIATE TRANSACTION');
+        await database.runAsync('BEGIN IMMEDIATE TRANSACTION');
 
         const insertedIds = [];
 
@@ -2569,7 +2578,7 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
             }
 
             // Insert into database within the transaction
-            const result = await db.runAsync(insertSQL, [
+            const result = await database.runAsync(insertSQL, [
                 formattedData.meal_id,
                 formattedData.user_id,
                 formattedData.food_name,
@@ -2610,7 +2619,7 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
         }
 
         // Commit the transaction
-        await db.runAsync('COMMIT');
+        await database.runAsync('COMMIT');
         console.log(`✅ Successfully inserted ${insertedIds.length} food logs in transaction`);
 
         // Update user streak after logging food (only once after all inserts)
@@ -2635,7 +2644,7 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
     } catch (error) {
         // Rollback transaction on error
         try {
-            await db.runAsync('ROLLBACK');
+            await database.runAsync('ROLLBACK');
         } catch (rollbackError) {
             console.error('❌ Error during rollback:', rollbackError);
         }

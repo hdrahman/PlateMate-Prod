@@ -9,21 +9,46 @@ type DatabaseChangeListener = () => void;
 // Store for all registered listeners
 const listeners: Set<DatabaseChangeListener> = new Set();
 
+// Debouncing and loop prevention
+let isNotifying = false;
+let notificationTimeout: NodeJS.Timeout | null = null;
+const DEBOUNCE_MS = 500; // 500ms debounce
+
 /**
  * Notify all registered listeners that the database has changed
  * This is called by database.ts functions after successful modifications
  */
-export const notifyDatabaseChanged = async (): Promise<void> => {
-    console.log(`🔔 Notifying ${listeners.size} database change listeners`);
+export const notifyDatabaseChanged = async (source?: string): Promise<void> => {
+    // Prevent infinite loops by debouncing notifications
+    if (isNotifying) {
+        console.log('🔄 Skipping notification - already in progress');
+        return;
+    }
 
-    // Execute all listeners
-    listeners.forEach(listener => {
+    // Clear any pending notification
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+    }
+
+    // Debounce notifications to prevent rapid-fire changes
+    notificationTimeout = setTimeout(async () => {
+        isNotifying = true;
+
         try {
-            listener();
-        } catch (error) {
-            console.error('❌ Error in database change listener:', error);
+            console.log(`🔔 Notifying ${listeners.size} database change listeners${source ? ` (source: ${source})` : ''}`);
+
+            // Execute all listeners
+            listeners.forEach(listener => {
+                try {
+                    listener();
+                } catch (error) {
+                    console.error('❌ Error in database change listener:', error);
+                }
+            });
+        } finally {
+            isNotifying = false;
         }
-    });
+    }, DEBOUNCE_MS);
 };
 
 /**

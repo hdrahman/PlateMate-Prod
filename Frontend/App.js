@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { handleTakePhoto } from './src/screens/Camera';
-import { initDatabase } from './src/utils/database';
+import { getDatabase } from './src/utils/database';
 import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
 import { StepProvider } from './src/context/StepContext';
 import { ThemeProvider } from './src/ThemeContext';
@@ -377,7 +377,7 @@ export default function App() {
   const initApp = async () => {
     try {
       // Initialize the database
-      await initDatabase();
+      await getDatabase();
       console.log("Database initialized successfully");
 
       // Start periodic sync

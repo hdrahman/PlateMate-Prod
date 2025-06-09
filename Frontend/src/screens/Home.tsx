@@ -796,9 +796,12 @@ export default function Home() {
     return weightHistory.some(entry => entry.date === todayString);
   };
 
-  // Update the automatic weight recording effect to be more reliable and include date checks
+  // Track if automatic weight recording has been done today
+  const [hasRecordedToday, setHasRecordedToday] = useState(false);
+
+  // Update the automatic weight recording effect - run only once when needed
   useEffect(() => {
-    if (!user || !currentWeight) return;
+    if (!user || !currentWeight || hasRecordedToday) return;
 
     // Function to record today's weight if it hasn't been recorded yet
     const recordTodayWeight = async () => {
@@ -814,10 +817,14 @@ export default function Home() {
         const hasEntryForToday = historyEntries && historyEntries.length > 0 &&
           historyEntries.some(entry => entry.recorded_at.startsWith(todayString));
 
-        // If no entry for today, record the current weight
+        // If no entry for today, record the current weight (WITHOUT triggering change notifications)
         if (!hasEntryForToday) {
-          await addWeightEntryLocal(user.uid, currentWeight);
+          // Use addWeightEntryLocal but prevent it from triggering database change notifications
+          await addWeightEntryLocal(user.uid, currentWeight, true); // Pass true for isAutomatic
           console.log('Daily weight recorded automatically');
+
+          // Mark as recorded to prevent repeated attempts
+          setHasRecordedToday(true);
 
           // Update the local weight history display
           const newEntry = {
@@ -825,17 +832,19 @@ export default function Home() {
             weight: currentWeight
           };
 
-          // Check if the last entry is from today, and if so, replace it instead of adding a new one
-          const updatedHistory = [...weightHistory];
-          const lastEntryIndex = updatedHistory.length - 1;
+          // Update weight history state
+          setWeightHistory(prev => {
+            const updatedHistory = [...prev];
+            const lastEntryIndex = updatedHistory.length - 1;
 
-          if (lastEntryIndex >= 0 && updatedHistory[lastEntryIndex].date === newEntry.date) {
-            updatedHistory[lastEntryIndex] = newEntry;
-          } else {
-            updatedHistory.push(newEntry);
-          }
+            if (lastEntryIndex >= 0 && updatedHistory[lastEntryIndex].date === newEntry.date) {
+              updatedHistory[lastEntryIndex] = newEntry;
+            } else {
+              updatedHistory.push(newEntry);
+            }
+            return updatedHistory;
+          });
 
-          setWeightHistory(updatedHistory);
           setShowTodayWeight(false);
 
           // Recalculate weight change
@@ -843,33 +852,37 @@ export default function Home() {
             const weightChange = startingWeight - currentWeight;
             setWeightLost(parseFloat(weightChange.toFixed(1)));
           }
+        } else {
+          // Mark as recorded since it already exists
+          setHasRecordedToday(true);
         }
       } catch (error) {
         console.error('Error in automatic weight recording:', error);
       }
     };
 
-    // Set up a timer to check at midnight and also check when the component mounts
+    // Run once when the component mounts to ensure today's weight is recorded
+    recordTodayWeight();
+
+    // Set up a timer to check at midnight only
     const checkTimeAndRecordWeight = () => {
       const now = new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
 
-      // Check if it's midnight (00:00)
+      // Check if it's midnight (00:00) - reset the daily recording flag
       if (hours === 0 && minutes === 0) {
+        setHasRecordedToday(false);
         recordTodayWeight();
       }
     };
-
-    // Run once when the component mounts to ensure today's weight is recorded
-    recordTodayWeight();
 
     // Check every minute for midnight trigger
     const interval = setInterval(checkTimeAndRecordWeight, 60000);
 
     // Clear interval on unmount
     return () => clearInterval(interval);
-  }, [user, currentWeight, weightHistory]);
+  }, [user, currentWeight, hasRecordedToday, startingWeight]); // Removed weightHistory from dependencies
 
   useEffect(() => {
     const setStartingWeightTo110 = async () => {
