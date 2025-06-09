@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
     Dimensions,
     ActivityIndicator,
     Platform,
@@ -15,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import {
     getFoodLogsByDate,
@@ -95,6 +95,7 @@ const GradientText: React.FC<{ text: string; style?: any; colors?: readonly [str
 const Analytics: React.FC = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
 
     const [loading, setLoading] = useState(true);
     const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d');
@@ -112,6 +113,8 @@ const Analytics: React.FC = () => {
         carbs: 0,
         fat: 0
     });
+    const [userProfile, setUserProfile] = useState<any>(null);
+    const [userGoals, setUserGoals] = useState<any>(null);
 
     useEffect(() => {
         if (user) {
@@ -127,8 +130,17 @@ const Analytics: React.FC = () => {
             const trends: MacroTrend[] = [];
             const today = new Date();
 
-            // Get user profile for calculations
+            // Get user profile and goals for calculations
             const profile = await getUserProfileByFirebaseUid(user?.uid || '');
+
+            // Calculate nutrition goals based on profile
+            let goals = null;
+            if (profile) {
+                setUserProfile(profile);
+                // Calculate TDEE and goals based on user data
+                goals = calculateTDEE(profile);
+                setUserGoals(goals);
+            }
 
             // Load nutrition data for the selected period
             for (let i = days - 1; i >= 0; i--) {
@@ -225,7 +237,8 @@ const Analytics: React.FC = () => {
 
         // Protein adequacy bonus (encourage adequate protein)
         const avgProteinGrams = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
-        const proteinAdequacyBonus = Math.min(20, (avgProteinGrams / 100) * 20); // Bonus up to 20 points for 100g+ protein
+        const proteinTarget = userGoals?.proteinGoal || 100;
+        const proteinAdequacyBonus = Math.min(20, (avgProteinGrams / proteinTarget) * 20); // Bonus up to 20 points for meeting protein goal
 
         const balanceScore = (Math.max(0, proteinScore) + Math.max(0, carbScore) + Math.max(0, fatScore)) / 3 + proteinAdequacyBonus;
 
@@ -266,7 +279,8 @@ const Analytics: React.FC = () => {
 
         // Calorie Analysis
         const avgCalories = validDays.reduce((sum, day) => sum + day.calories, 0) / validDays.length;
-        const estimatedTDEE = calculateTDEE(profile);
+        const goalData = calculateTDEE(profile);
+        const estimatedTDEE = goalData.tdee;
 
         if (avgCalories < estimatedTDEE * 0.8) {
             insights.push({
@@ -361,7 +375,19 @@ const Analytics: React.FC = () => {
         };
 
         const multiplier = activityMultipliers[profile?.activity_level as keyof typeof activityMultipliers] || 1.375;
-        return bmr * multiplier;
+        const tdee = Math.round(bmr * multiplier);
+
+        // Calculate protein goal (1.8-2.2g per kg body weight for active individuals)
+        const proteinGoal = Math.round((profile.weight || 70) * 2.0);
+
+        return {
+            tdee,
+            targetCalories: tdee, // Adjust based on goal (maintenance for now)
+            proteinGoal,
+            currentWeight: profile.weight || 70,
+            targetWeight: profile.target_weight || profile.weight || 70,
+            age: profile.age || 25
+        };
     };
 
     const formatPeriodLabel = (period: '7d' | '30d' | '90d') => {
@@ -397,7 +423,7 @@ const Analytics: React.FC = () => {
     };
 
     const renderHeader = () => (
-        <SafeAreaView style={styles.headerSafeArea}>
+        <View style={[styles.headerSafeArea, { paddingTop: insets.top }]}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="chevron-back" size={24} color={COLORS.WHITE} />
@@ -405,7 +431,7 @@ const Analytics: React.FC = () => {
                 <GradientText text="Advanced Analytics" style={styles.headerTitle} />
                 <View style={styles.placeholder} />
             </View>
-        </SafeAreaView>
+        </View>
     );
 
     const renderPeriodSelector = () => (
@@ -484,7 +510,7 @@ const Analytics: React.FC = () => {
 
         const recentWeek = macroTrends.slice(-7);
         const avgCalories = recentWeek.reduce((sum, day) => sum + day.calories, 0) / recentWeek.length;
-        const targetCalories = 2000; // This would come from user goals
+        const targetCalories = userGoals?.targetCalories || 2000;
         const daysOnTrack = recentWeek.filter(day =>
             day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
         ).length;
@@ -508,7 +534,7 @@ const Analytics: React.FC = () => {
                     </View>
                     <View style={styles.weeklyStat}>
                         <Text style={[styles.weeklyStatNumber, {
-                            color: Math.round(avgDailyNutrition.protein) >= 100 ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: Math.round(avgDailyNutrition.protein) >= (userGoals?.proteinGoal || 100) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
                         }]}>
                             {Math.round(avgDailyNutrition.protein)}g
                         </Text>
@@ -537,7 +563,8 @@ const Analytics: React.FC = () => {
     };
 
     const renderQuickWins = () => {
-        const needsMoreProtein = avgDailyNutrition.protein < 100;
+        const proteinGoal = userGoals?.proteinGoal || 100;
+        const needsMoreProtein = avgDailyNutrition.protein < proteinGoal;
         const inconsistentCalories = nutritionScore.consistency < 70;
         const macroImbalance = nutritionScore.balance < 70;
 
@@ -546,7 +573,7 @@ const Analytics: React.FC = () => {
             tips.push({
                 icon: '🥩',
                 title: 'Boost protein',
-                subtitle: `Add ${Math.round(100 - avgDailyNutrition.protein)}g more daily`
+                subtitle: `Add ${Math.round(proteinGoal - avgDailyNutrition.protein)}g more daily`
             });
         }
         if (inconsistentCalories) {
@@ -591,16 +618,18 @@ const Analytics: React.FC = () => {
     };
 
     const renderPredictiveInsights = () => {
-        // Get real user data (TODO: connect to actual user profile from database)
-        const currentWeight = 75; // Will be replaced with real data
-        const goalWeight = 90; // Fixed to use real goal weight (90kg for muscle building)
-        const userAge = 25; // Will be replaced with real data
-        const avgWeeklyDeficit = (avgDailyNutrition.calories - 2000) * 7;
+        // Get real user data from profile and goals
+        const currentWeight = userGoals?.currentWeight || userProfile?.weight || 75;
+        const goalWeight = userGoals?.targetWeight || userProfile?.target_weight || 90;
+        const userAge = userGoals?.age || userProfile?.age || 25;
+        const targetCalories = userGoals?.targetCalories || 2000;
+        const avgWeeklyDeficit = (avgDailyNutrition.calories - targetCalories) * 7;
         const weeksToGoal = avgWeeklyDeficit < -1000 ? Math.ceil(Math.abs(currentWeight - goalWeight) * 7700 / Math.abs(avgWeeklyDeficit)) : null;
 
         // Metabolic age estimation
+        const proteinGoal = userGoals?.proteinGoal || 100;
         const metabolicAgeModifiers = {
-            proteinIntake: avgDailyNutrition.protein >= 100 ? -2 : avgDailyNutrition.protein >= 80 ? 0 : 2,
+            proteinIntake: avgDailyNutrition.protein >= proteinGoal ? -2 : avgDailyNutrition.protein >= proteinGoal * 0.8 ? 0 : 2,
             calorieConsistency: nutritionScore.consistency >= 80 ? -1 : nutritionScore.consistency >= 60 ? 0 : 2,
             macroBalance: nutritionScore.balance >= 75 ? -1 : nutritionScore.balance >= 60 ? 0 : 1,
         };
@@ -719,13 +748,13 @@ const Analytics: React.FC = () => {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
+            <View style={styles.container}>
                 {renderHeader()}
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={COLORS.ACCENT_PURPLE} />
                     <Text style={styles.loadingText}>Analyzing your nutrition data...</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
