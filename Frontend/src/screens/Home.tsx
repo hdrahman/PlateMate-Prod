@@ -294,11 +294,12 @@ export default function Home() {
         const todayExerciseCals = await getTodayExerciseCalories();
         setExerciseCalories(todayExerciseCals);
 
-        // Calculate remaining calories
-        const remaining = dailyCalorieGoal - nutrientTotals.calories + todayExerciseCals;
+        // Calculate adjusted goal and remaining calories
+        const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
+        const remaining = adjustedDailyGoal - nutrientTotals.calories;
         setRemainingCals(Math.max(0, Math.round(remaining)));
 
-        // Calculate percent consumed
+        // Calculate percent consumed based on base goal (for legacy compatibility)
         const percentConsumed = (nutrientTotals.calories / dailyCalorieGoal) * 100;
         setPercentCons(Math.min(100, Math.round(percentConsumed)));
       } catch (error) {
@@ -518,16 +519,20 @@ export default function Home() {
     setActiveIndex(newIndex);
   };
 
-  // Calculate values for the main ring.
+  // Calculate adjusted goal (base + exercise calories)
+  const adjustedGoal = dailyCalorieGoal + exerciseCalories;
+
+  // Calculate values for the main ring based on adjusted goal.
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
-  const consumedStroke = (percentCons / 100) * circumference;
+  const adjustedPercentCons = adjustedGoal > 0 ? (consumedCalories / adjustedGoal) * 100 : 0;
+  const consumedStroke = (adjustedPercentCons / 100) * circumference;
 
   // Data for the right card with updated colors.
   const rightStats = [
     {
       label: 'Goal',
-      value: dailyCalorieGoal || '---',
+      value: adjustedGoal || '---',
       icon: 'flag-outline',
       color: '#FFB74D'
     },
@@ -1017,8 +1022,9 @@ export default function Home() {
         const todayExerciseCals = await getTodayExerciseCalories();
         setExerciseCalories(todayExerciseCals);
 
-        // Recalculate remaining calories
-        const remaining = dailyCalorieGoal - consumedCalories + todayExerciseCals;
+        // Recalculate remaining calories using adjusted goal
+        const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
+        const remaining = adjustedDailyGoal - consumedCalories;
         setRemainingCals(Math.max(0, Math.round(remaining)));
       } catch (error) {
         console.error('Error refreshing exercise data:', error);
@@ -1151,7 +1157,7 @@ export default function Home() {
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                   strokeDasharray={`${circumference} ${circumference}`}
-                  strokeDashoffset={circumference + (exerciseCalories / dailyCalorieGoal) * circumference}
+                  strokeDashoffset={circumference + (dailyCalorieGoal > 0 ? (exerciseCalories / dailyCalorieGoal) * circumference : 0)}
                   strokeLinecap="butt"
                   transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
                 />
@@ -1163,7 +1169,7 @@ export default function Home() {
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                   strokeDasharray={`${circumference} ${circumference}`}
-                  strokeDashoffset={circumference + (exerciseCalories / dailyCalorieGoal) * circumference}
+                  strokeDashoffset={circumference + (dailyCalorieGoal > 0 ? (exerciseCalories / dailyCalorieGoal) * circumference : 0)}
                   strokeLinecap="round"
                   transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
                 />
