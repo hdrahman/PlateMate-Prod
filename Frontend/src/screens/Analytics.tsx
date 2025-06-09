@@ -591,20 +591,21 @@ const Analytics: React.FC = () => {
     };
 
     const renderPredictiveInsights = () => {
-        const currentWeight = 75; // This would come from user data
-        const goalWeight = 68; // This would come from user goals
-        const avgWeeklyDeficit = (avgDailyNutrition.calories - 2000) * 7; // Rough calculation
-        const weeksToGoal = avgWeeklyDeficit < -1000 ? Math.ceil((currentWeight - goalWeight) * 7700 / Math.abs(avgWeeklyDeficit)) : null;
+        // Get real user data (TODO: connect to actual user profile from database)
+        const currentWeight = 75; // Will be replaced with real data
+        const goalWeight = 90; // Fixed to use real goal weight (90kg for muscle building)
+        const userAge = 25; // Will be replaced with real data
+        const avgWeeklyDeficit = (avgDailyNutrition.calories - 2000) * 7;
+        const weeksToGoal = avgWeeklyDeficit < -1000 ? Math.ceil(Math.abs(currentWeight - goalWeight) * 7700 / Math.abs(avgWeeklyDeficit)) : null;
 
-        // Metabolic age estimation based on nutrition patterns
-        const baseAge = 30; // This would come from user profile
+        // Metabolic age estimation
         const metabolicAgeModifiers = {
             proteinIntake: avgDailyNutrition.protein >= 100 ? -2 : avgDailyNutrition.protein >= 80 ? 0 : 2,
             calorieConsistency: nutritionScore.consistency >= 80 ? -1 : nutritionScore.consistency >= 60 ? 0 : 2,
             macroBalance: nutritionScore.balance >= 75 ? -1 : nutritionScore.balance >= 60 ? 0 : 1,
         };
 
-        const metabolicAge = Math.max(18, baseAge + Object.values(metabolicAgeModifiers).reduce((sum, mod) => sum + mod, 0));
+        const metabolicAge = Math.max(18, userAge + Object.values(metabolicAgeModifiers).reduce((sum, mod) => sum + mod, 0));
 
         return (
             <GradientCard style={styles.predictiveCard}>
@@ -618,7 +619,8 @@ const Analytics: React.FC = () => {
                     </View>
                     {weeksToGoal && weeksToGoal <= 52 ? (
                         <Text style={styles.predictionText}>
-                            📅 You should reach {goalWeight}kg by <Text style={styles.highlightText}>
+                            📅 You should reach {goalWeight}kg by{'\n'}
+                            <Text style={styles.highlightText}>
                                 {new Date(Date.now() + weeksToGoal * 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
                                     month: 'long',
                                     day: 'numeric'
@@ -627,7 +629,7 @@ const Analytics: React.FC = () => {
                         </Text>
                     ) : (
                         <Text style={styles.predictionText}>
-                            📈 Adjust your calorie deficit to see goal completion date
+                            📈 Adjust your calorie surplus to see goal completion date
                         </Text>
                     )}
                 </View>
@@ -639,11 +641,12 @@ const Analytics: React.FC = () => {
                         <Text style={styles.predictionTitle}>Metabolic Age</Text>
                     </View>
                     <Text style={styles.predictionText}>
-                        🧬 Your nutrition patterns suggest a metabolic age of <Text style={[styles.highlightText, {
-                            color: metabolicAge <= baseAge ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                        🧬 Your nutrition patterns suggest a{'\n'}metabolic age of{' '}
+                        <Text style={[styles.highlightText, {
+                            color: metabolicAge <= userAge ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
                         }]}>{metabolicAge} years</Text>
                     </Text>
-                    {metabolicAge > baseAge && (
+                    {metabolicAge > userAge && (
                         <Text style={styles.improvementTip}>
                             💡 Increase protein and meal consistency to improve
                         </Text>
@@ -661,21 +664,21 @@ const Analytics: React.FC = () => {
                             <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
                             <View style={styles.timelineContent}>
                                 <Text style={styles.timelineDate}>Week 1-2</Text>
-                                <Text style={styles.timelineDescription}>Initial water weight loss</Text>
+                                <Text style={styles.timelineDescription}>Initial weight gain</Text>
                             </View>
                         </View>
                         <View style={styles.timelineItem}>
                             <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
                             <View style={styles.timelineContent}>
                                 <Text style={styles.timelineDate}>Week 3-8</Text>
-                                <Text style={styles.timelineDescription}>Steady fat loss phase</Text>
+                                <Text style={styles.timelineDescription}>Steady muscle building</Text>
                             </View>
                         </View>
                         <View style={styles.timelineItem}>
                             <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
                             <View style={styles.timelineContent}>
                                 <Text style={styles.timelineDate}>Week 9+</Text>
-                                <Text style={styles.timelineDescription}>Body recomposition</Text>
+                                <Text style={styles.timelineDescription}>Strength & size gains</Text>
                             </View>
                         </View>
                     </View>
@@ -1039,58 +1042,71 @@ const styles = StyleSheet.create({
     },
     predictiveCard: {},
     predictionSection: {
-        marginBottom: 20,
+        marginBottom: 25,
+        paddingBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },
     predictionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 5,
+        marginBottom: 12,
     },
     predictionTitle: {
         color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: '600',
+        marginLeft: 8,
     },
     predictionText: {
         color: COLORS.SUBDUED,
         fontSize: 14,
-        lineHeight: 20,
+        lineHeight: 22,
+        marginBottom: 8,
     },
     highlightText: {
         color: COLORS.ACCENT_GREEN,
         fontWeight: '600',
+        fontSize: 16,
     },
     improvementTip: {
         color: COLORS.ACCENT_BLUE,
-        fontSize: 14,
+        fontSize: 13,
         fontStyle: 'italic',
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.05)',
     },
     timelineContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        marginTop: 10,
     },
     timelineItem: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+        paddingLeft: 5,
     },
     timelineDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        marginRight: 5,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 12,
+        marginTop: 2,
     },
     timelineContent: {
         flex: 1,
     },
     timelineDate: {
         color: COLORS.WHITE,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '600',
+        marginBottom: 2,
     },
     timelineDescription: {
         color: COLORS.SUBDUED,
-        fontSize: 10,
+        fontSize: 12,
+        lineHeight: 16,
     },
 });
 
