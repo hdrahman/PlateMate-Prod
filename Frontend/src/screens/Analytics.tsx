@@ -190,12 +190,19 @@ const Analytics: React.FC = () => {
             return;
         }
 
-        // Consistency Score (based on calorie variance)
+        // Enhanced Consistency Score (multiple factors)
         const avgCalories = validDays.reduce((sum, day) => sum + day.calories, 0) / validDays.length;
         const variance = validDays.reduce((sum, day) => sum + Math.pow(day.calories - avgCalories, 2), 0) / validDays.length;
-        const consistencyScore = Math.max(0, 100 - (Math.sqrt(variance) / avgCalories * 100));
+        const calorieConsistency = Math.max(0, 100 - (Math.sqrt(variance) / avgCalories * 100));
 
-        // Balance Score (macro distribution)
+        // Weekly pattern consistency (weekday vs weekend)
+        const weekdayAvg = validDays.slice(0, 5).reduce((sum, day) => sum + day.calories, 0) / Math.min(5, validDays.length);
+        const weekendAvg = validDays.slice(-2).reduce((sum, day) => sum + day.calories, 0) / Math.min(2, validDays.length);
+        const weeklyConsistency = 100 - Math.min(50, Math.abs(weekendAvg - weekdayAvg) / weekdayAvg * 100);
+
+        const consistencyScore = (calorieConsistency * 0.7 + weeklyConsistency * 0.3);
+
+        // Enhanced Balance Score (macro distribution + micronutrient diversity)
         const avgProteinPercent = validDays.reduce((sum, day) => {
             const totalCals = day.calories || 1;
             return sum + (day.protein * 4 / totalCals * 100);
@@ -211,21 +218,33 @@ const Analytics: React.FC = () => {
             return sum + (day.fat * 9 / totalCals * 100);
         }, 0) / validDays.length;
 
-        // Ideal ranges: Protein 25-30%, Carbs 45-50%, Fat 25-30%
-        const proteinScore = 100 - Math.abs(avgProteinPercent - 27.5) * 2;
-        const carbScore = 100 - Math.abs(avgCarbPercent - 47.5) * 2;
-        const fatScore = 100 - Math.abs(avgFatPercent - 27.5) * 2;
-        const balanceScore = (Math.max(0, proteinScore) + Math.max(0, carbScore) + Math.max(0, fatScore)) / 3;
+        // Ideal ranges: Protein 20-35%, Carbs 40-55%, Fat 20-35% (more flexible ranges)
+        const proteinScore = 100 - Math.max(0, Math.abs(avgProteinPercent - 27.5) - 7.5) * 3;
+        const carbScore = 100 - Math.max(0, Math.abs(avgCarbPercent - 47.5) - 7.5) * 3;
+        const fatScore = 100 - Math.max(0, Math.abs(avgFatPercent - 27.5) - 7.5) * 3;
 
-        // Timing Score (placeholder)
-        const timingScore = 75;
+        // Protein adequacy bonus (encourage adequate protein)
+        const avgProteinGrams = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
+        const proteinAdequacyBonus = Math.min(20, (avgProteinGrams / 100) * 20); // Bonus up to 20 points for 100g+ protein
 
-        const overallScore = (consistencyScore + balanceScore + timingScore) / 3;
+        const balanceScore = (Math.max(0, proteinScore) + Math.max(0, carbScore) + Math.max(0, fatScore)) / 3 + proteinAdequacyBonus;
+
+        // Enhanced Timing Score (meal distribution simulation)
+        // Simulate optimal meal timing based on calorie distribution
+        const dailyVariation = validDays.map(day => {
+            // Simulate that optimal eating has less extreme calorie days
+            const deviation = Math.abs(day.calories - avgCalories) / avgCalories;
+            return 100 - (deviation * 150); // Penalize extreme deviations
+        });
+        const timingScore = Math.max(50, dailyVariation.reduce((sum, score) => sum + score, 0) / dailyVariation.length);
+
+        // Enhanced Overall Score (weighted by importance)
+        const overallScore = (consistencyScore * 0.35 + balanceScore * 0.4 + timingScore * 0.25);
 
         setNutritionScore({
-            overall: Math.round(overallScore),
+            overall: Math.min(100, Math.round(overallScore)),
             consistency: Math.round(consistencyScore),
-            balance: Math.round(balanceScore),
+            balance: Math.min(100, Math.round(balanceScore)),
             timing: Math.round(timingScore)
         });
     };
@@ -378,13 +397,15 @@ const Analytics: React.FC = () => {
     };
 
     const renderHeader = () => (
-        <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons name="chevron-back" size={24} color={COLORS.WHITE} />
-            </TouchableOpacity>
-            <GradientText text="Advanced Analytics" style={styles.headerTitle} />
-            <View style={styles.placeholder} />
-        </View>
+        <SafeAreaView style={styles.headerSafeArea}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="chevron-back" size={24} color={COLORS.WHITE} />
+                </TouchableOpacity>
+                <GradientText text="Advanced Analytics" style={styles.headerTitle} />
+                <View style={styles.placeholder} />
+            </View>
+        </SafeAreaView>
     );
 
     const renderPeriodSelector = () => (
@@ -458,6 +479,211 @@ const Analytics: React.FC = () => {
         </GradientCard>
     );
 
+    const renderWeeklyProgress = () => {
+        if (macroTrends.length === 0) return null;
+
+        const recentWeek = macroTrends.slice(-7);
+        const avgCalories = recentWeek.reduce((sum, day) => sum + day.calories, 0) / recentWeek.length;
+        const targetCalories = 2000; // This would come from user goals
+        const daysOnTrack = recentWeek.filter(day =>
+            day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
+        ).length;
+
+        return (
+            <GradientCard style={styles.progressCard}>
+                <Text style={styles.cardTitle}>This Week's Progress</Text>
+
+                <View style={styles.weeklyStats}>
+                    <View style={styles.weeklyStat}>
+                        <Text style={styles.weeklyStatNumber}>{daysOnTrack}/7</Text>
+                        <Text style={styles.weeklyStatLabel}>Days on track</Text>
+                    </View>
+                    <View style={styles.weeklyStat}>
+                        <Text style={[styles.weeklyStatNumber, {
+                            color: avgCalories <= targetCalories ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                        }]}>
+                            {Math.round(avgCalories)}
+                        </Text>
+                        <Text style={styles.weeklyStatLabel}>Avg calories</Text>
+                    </View>
+                    <View style={styles.weeklyStat}>
+                        <Text style={[styles.weeklyStatNumber, {
+                            color: Math.round(avgDailyNutrition.protein) >= 100 ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                        }]}>
+                            {Math.round(avgDailyNutrition.protein)}g
+                        </Text>
+                        <Text style={styles.weeklyStatLabel}>Avg protein</Text>
+                    </View>
+                </View>
+
+                {/* Simple 7-day visual */}
+                <View style={styles.weekDaysContainer}>
+                    {recentWeek.map((day, index) => {
+                        const isOnTrack = day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1;
+                        return (
+                            <View key={index} style={styles.dayIndicator}>
+                                <View style={[styles.dayDot, {
+                                    backgroundColor: isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                }]} />
+                                <Text style={styles.dayAbbrev}>
+                                    {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })[0]}
+                                </Text>
+                            </View>
+                        );
+                    })}
+                </View>
+            </GradientCard>
+        );
+    };
+
+    const renderQuickWins = () => {
+        const needsMoreProtein = avgDailyNutrition.protein < 100;
+        const inconsistentCalories = nutritionScore.consistency < 70;
+        const macroImbalance = nutritionScore.balance < 70;
+
+        const tips = [];
+        if (needsMoreProtein) {
+            tips.push({
+                icon: '🥩',
+                title: 'Boost protein',
+                subtitle: `Add ${Math.round(100 - avgDailyNutrition.protein)}g more daily`
+            });
+        }
+        if (inconsistentCalories) {
+            tips.push({
+                icon: '📅',
+                title: 'Stay consistent',
+                subtitle: 'Aim for similar calories each day'
+            });
+        }
+        if (macroImbalance) {
+            tips.push({
+                icon: '⚖️',
+                title: 'Balance macros',
+                subtitle: 'Adjust protein/carb/fat ratios'
+            });
+        }
+
+        if (tips.length === 0) {
+            tips.push({
+                icon: '🎯',
+                title: 'Stay the course',
+                subtitle: 'Your nutrition is well balanced!'
+            });
+        }
+
+        return (
+            <GradientCard style={styles.quickWinsCard}>
+                <Text style={styles.cardTitle}>Quick Wins</Text>
+                <Text style={styles.quickWinsSubtitle}>Simple changes for better results</Text>
+
+                {tips.slice(0, 3).map((tip, index) => (
+                    <View key={index} style={styles.tipRow}>
+                        <Text style={styles.tipIcon}>{tip.icon}</Text>
+                        <View style={styles.tipContent}>
+                            <Text style={styles.tipTitle}>{tip.title}</Text>
+                            <Text style={styles.tipSubtitle}>{tip.subtitle}</Text>
+                        </View>
+                    </View>
+                ))}
+            </GradientCard>
+        );
+    };
+
+    const renderPredictiveInsights = () => {
+        const currentWeight = 75; // This would come from user data
+        const goalWeight = 68; // This would come from user goals
+        const avgWeeklyDeficit = (avgDailyNutrition.calories - 2000) * 7; // Rough calculation
+        const weeksToGoal = avgWeeklyDeficit < -1000 ? Math.ceil((currentWeight - goalWeight) * 7700 / Math.abs(avgWeeklyDeficit)) : null;
+
+        // Metabolic age estimation based on nutrition patterns
+        const baseAge = 30; // This would come from user profile
+        const metabolicAgeModifiers = {
+            proteinIntake: avgDailyNutrition.protein >= 100 ? -2 : avgDailyNutrition.protein >= 80 ? 0 : 2,
+            calorieConsistency: nutritionScore.consistency >= 80 ? -1 : nutritionScore.consistency >= 60 ? 0 : 2,
+            macroBalance: nutritionScore.balance >= 75 ? -1 : nutritionScore.balance >= 60 ? 0 : 1,
+        };
+
+        const metabolicAge = Math.max(18, baseAge + Object.values(metabolicAgeModifiers).reduce((sum, mod) => sum + mod, 0));
+
+        return (
+            <GradientCard style={styles.predictiveCard}>
+                <Text style={styles.cardTitle}>🔮 Predictive Insights</Text>
+
+                {/* Goal Projection */}
+                <View style={styles.predictionSection}>
+                    <View style={styles.predictionHeader}>
+                        <MaterialCommunityIcons name="target" size={20} color={COLORS.ACCENT_GREEN} />
+                        <Text style={styles.predictionTitle}>Goal Projection</Text>
+                    </View>
+                    {weeksToGoal && weeksToGoal <= 52 ? (
+                        <Text style={styles.predictionText}>
+                            📅 You should reach {goalWeight}kg by <Text style={styles.highlightText}>
+                                {new Date(Date.now() + weeksToGoal * 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+                                    month: 'long',
+                                    day: 'numeric'
+                                })}
+                            </Text>
+                        </Text>
+                    ) : (
+                        <Text style={styles.predictionText}>
+                            📈 Adjust your calorie deficit to see goal completion date
+                        </Text>
+                    )}
+                </View>
+
+                {/* Metabolic Age */}
+                <View style={styles.predictionSection}>
+                    <View style={styles.predictionHeader}>
+                        <MaterialCommunityIcons name="dna" size={20} color={COLORS.ACCENT_BLUE} />
+                        <Text style={styles.predictionTitle}>Metabolic Age</Text>
+                    </View>
+                    <Text style={styles.predictionText}>
+                        🧬 Your nutrition patterns suggest a metabolic age of <Text style={[styles.highlightText, {
+                            color: metabolicAge <= baseAge ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                        }]}>{metabolicAge} years</Text>
+                    </Text>
+                    {metabolicAge > baseAge && (
+                        <Text style={styles.improvementTip}>
+                            💡 Increase protein and meal consistency to improve
+                        </Text>
+                    )}
+                </View>
+
+                {/* Transformation Timeline */}
+                <View style={styles.predictionSection}>
+                    <View style={styles.predictionHeader}>
+                        <MaterialCommunityIcons name="timeline-text" size={20} color={COLORS.ACCENT_PURPLE} />
+                        <Text style={styles.predictionTitle}>Transformation Timeline</Text>
+                    </View>
+                    <View style={styles.timelineContainer}>
+                        <View style={styles.timelineItem}>
+                            <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                            <View style={styles.timelineContent}>
+                                <Text style={styles.timelineDate}>Week 1-2</Text>
+                                <Text style={styles.timelineDescription}>Initial water weight loss</Text>
+                            </View>
+                        </View>
+                        <View style={styles.timelineItem}>
+                            <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                            <View style={styles.timelineContent}>
+                                <Text style={styles.timelineDate}>Week 3-8</Text>
+                                <Text style={styles.timelineDescription}>Steady fat loss phase</Text>
+                            </View>
+                        </View>
+                        <View style={styles.timelineItem}>
+                            <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                            <View style={styles.timelineContent}>
+                                <Text style={styles.timelineDate}>Week 9+</Text>
+                                <Text style={styles.timelineDescription}>Body recomposition</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </GradientCard>
+        );
+    };
+
     const renderInsights = () => (
         <GradientCard style={styles.insightsCard}>
             <Text style={styles.cardTitle}>Personalized Insights</Text>
@@ -501,17 +727,20 @@ const Analytics: React.FC = () => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
             {renderHeader()}
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {renderPeriodSelector()}
                 {renderNutritionScore()}
                 {renderMacroBreakdown()}
+                {renderWeeklyProgress()}
+                {renderQuickWins()}
+                {renderPredictiveInsights()}
                 {renderInsights()}
 
                 {/* Goal Projections */}
                 <GradientCard style={styles.projectionsCard}>
-                    <Text style={styles.cardTitle}>Goal Projections</Text>
+                    <Text style={styles.cardTitle}>🎯 Goal Projections</Text>
                     <View style={styles.projectionItem}>
                         <MaterialCommunityIcons name="target" size={24} color={COLORS.ACCENT_GREEN} />
                         <View style={styles.projectionContent}>
@@ -534,7 +763,7 @@ const Analytics: React.FC = () => {
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 };
 
@@ -543,12 +772,15 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.PRIMARY_BG,
     },
+    headerSafeArea: {
+        backgroundColor: COLORS.PRIMARY_BG,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 0 : 20,
+        paddingTop: 15,
         paddingBottom: 15,
     },
     backButton: {
@@ -729,6 +961,136 @@ const styles = StyleSheet.create({
     },
     bottomSpacer: {
         height: 30,
+    },
+    // Progress card styles
+    progressCard: {},
+    weeklyStats: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginVertical: 15,
+    },
+    weeklyStat: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    weeklyStatNumber: {
+        color: COLORS.WHITE,
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    weeklyStatLabel: {
+        color: COLORS.SUBDUED,
+        fontSize: 12,
+        textAlign: 'center',
+    },
+    weekDaysContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        marginTop: 15,
+        paddingHorizontal: 10,
+    },
+    dayIndicator: {
+        alignItems: 'center',
+    },
+    dayDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginBottom: 4,
+    },
+    dayAbbrev: {
+        color: COLORS.SUBDUED,
+        fontSize: 10,
+    },
+    // Quick wins styles
+    quickWinsCard: {},
+    quickWinsSubtitle: {
+        color: COLORS.SUBDUED,
+        fontSize: 14,
+        marginBottom: 15,
+        fontStyle: 'italic',
+    },
+    tipRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        padding: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 8,
+    },
+    tipIcon: {
+        fontSize: 20,
+        marginRight: 12,
+    },
+    tipContent: {
+        flex: 1,
+    },
+    tipTitle: {
+        color: COLORS.WHITE,
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    tipSubtitle: {
+        color: COLORS.SUBDUED,
+        fontSize: 12,
+    },
+    predictiveCard: {},
+    predictionSection: {
+        marginBottom: 20,
+    },
+    predictionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
+    },
+    predictionTitle: {
+        color: COLORS.WHITE,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    predictionText: {
+        color: COLORS.SUBDUED,
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    highlightText: {
+        color: COLORS.ACCENT_GREEN,
+        fontWeight: '600',
+    },
+    improvementTip: {
+        color: COLORS.ACCENT_BLUE,
+        fontSize: 14,
+        fontStyle: 'italic',
+    },
+    timelineContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    timelineItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    timelineDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: 5,
+    },
+    timelineContent: {
+        flex: 1,
+    },
+    timelineDate: {
+        color: COLORS.WHITE,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    timelineDescription: {
+        color: COLORS.SUBDUED,
+        fontSize: 10,
     },
 });
 

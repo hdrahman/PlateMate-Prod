@@ -1058,7 +1058,7 @@ export const getTodayCalories = async () => {
         throw new Error('Database not initialized');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateToString(new Date());
     const firebaseUserId = getCurrentUserId();
 
     try {
@@ -1080,7 +1080,7 @@ export const getTodayProtein = async () => {
         throw new Error('Database not initialized');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateToString(new Date());
     const firebaseUserId = getCurrentUserId();
 
     try {
@@ -1102,7 +1102,7 @@ export const getTodayCarbs = async () => {
         throw new Error('Database not initialized');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateToString(new Date());
     const firebaseUserId = getCurrentUserId();
 
     try {
@@ -1124,7 +1124,7 @@ export const getTodayFats = async () => {
         throw new Error('Database not initialized');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateToString(new Date());
     const firebaseUserId = getCurrentUserId();
 
     try {
@@ -1139,6 +1139,14 @@ export const getTodayFats = async () => {
     }
 };
 
+// Helper function to format date as YYYY-MM-DD (matching FoodLog format)
+const formatDateToString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 // Get today's total exercise calories
 export const getTodayExerciseCalories = async () => {
     if (!db || !global.dbInitialized) {
@@ -1146,13 +1154,22 @@ export const getTodayExerciseCalories = async () => {
         throw new Error('Database not initialized');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateToString(new Date());
     const firebaseUserId = getCurrentUserId();
 
     try {
+        // Query for user ID to match the same logic as getExercisesByDate and addExercise
+        const userIdResult = await db.getFirstAsync<{ id: number }>(
+            `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUserId]
+        );
+
+        // If user not found, use default
+        const userId = userIdResult?.id || 1;
+
         const result = await db.getFirstAsync<{ total: number }>(
             `SELECT SUM(calories_burned) as total FROM exercises WHERE date = ? AND user_id = ?`,
-            [today, firebaseUserId]
+            [today, userId]
         );
         return result?.total || 0;
     } catch (error) {

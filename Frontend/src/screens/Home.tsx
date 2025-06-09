@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid, getUserGoals, updateUserProfile } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
+import { subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from '../utils/databaseWatcher';
 import {
   getWeightHistoryLocal,
   addWeightEntryLocal,
@@ -1002,6 +1003,34 @@ export default function Home() {
   const cheatDayProgress = cheatDayData.enabled && cheatDayData.totalDays > 0
     ? Math.max(5, (cheatDayData.daysCompleted / cheatDayData.totalDays) * 100) // Minimum 5% to show like a dot
     : 5; // Show 5% when disabled to maintain visual consistency
+
+  // Start watching food logs when the component mounts
+  useEffect(() => {
+    startWatchingFoodLogs();
+    return () => stopWatchingFoodLogs();
+  }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+
+  // Subscribe to database changes for exercise data updates
+  useEffect(() => {
+    const refreshExerciseData = async () => {
+      try {
+        const todayExerciseCals = await getTodayExerciseCalories();
+        setExerciseCalories(todayExerciseCals);
+
+        // Recalculate remaining calories
+        const remaining = dailyCalorieGoal - consumedCalories + todayExerciseCals;
+        setRemainingCals(Math.max(0, Math.round(remaining)));
+      } catch (error) {
+        console.error('Error refreshing exercise data:', error);
+      }
+    };
+
+    // Subscribe to database changes
+    const unsubscribe = subscribeToDatabaseChanges(refreshExerciseData);
+
+    // Clean up subscription on unmount
+    return unsubscribe;
+  }, [dailyCalorieGoal, consumedCalories]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
