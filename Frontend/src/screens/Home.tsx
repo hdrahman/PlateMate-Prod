@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
-import { getTodayExerciseCalories, getCheatDayProgress, CheatDayProgress } from '../utils/database';
+import { getTodayExerciseCalories, getCheatDayProgress, CheatDayProgress, getUserStreak, checkAndUpdateStreak, hasActivityForToday } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfileByFirebaseUid, getUserGoals, updateUserProfile } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
@@ -155,6 +155,9 @@ export default function Home() {
   const [weightLoading, setWeightLoading] = useState(true);
   const [weightModalVisible, setWeightModalVisible] = useState(false);
   const [newWeight, setNewWeight] = useState('');
+
+  // Add state for streak tracking
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [startingWeight, setStartingWeight] = useState<number | null>(null);
   const [targetWeight, setTargetWeight] = useState<number | null>(null);
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
@@ -270,6 +273,15 @@ export default function Home() {
     };
   }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
 
+  // Load user streak when component mounts
+  useEffect(() => {
+    if (user?.uid) {
+      getUserStreak(user.uid)
+        .then(streak => setCurrentStreak(streak))
+        .catch(error => console.error('Error loading streak:', error));
+    }
+  }, [user]);
+
   // Load today's nutrition data from the food log context
   useEffect(() => {
     const loadTodayNutrients = async () => {
@@ -302,6 +314,18 @@ export default function Home() {
         // Calculate percent consumed based on base goal (for legacy compatibility)
         const percentConsumed = (nutrientTotals.calories / dailyCalorieGoal) * 100;
         setPercentCons(Math.min(100, Math.round(percentConsumed)));
+
+        // Update streak when nutrition data changes
+        if (user?.uid) {
+          const hasActivity = await hasActivityForToday(user.uid);
+          if (hasActivity) {
+            const newStreak = await checkAndUpdateStreak(user.uid);
+            setCurrentStreak(newStreak);
+          } else {
+            const currentStreak = await getUserStreak(user.uid);
+            setCurrentStreak(currentStreak);
+          }
+        }
       } catch (error) {
         console.error('Error loading today nutrients:', error);
       } finally {
@@ -312,7 +336,7 @@ export default function Home() {
     };
 
     loadTodayNutrients();
-  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated]);
+  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user]);
 
   // Load weight history only once when the component mounts
   useEffect(() => {
@@ -1045,6 +1069,33 @@ export default function Home() {
         {/* CHEAT DAY CARD */}
         <GradientBorderCard>
           <View style={styles.cheatDayContainer}>
+            {/* STREAK INDICATOR - Top Right Corner */}
+            <View style={styles.streakContainer}>
+              <MaskedView
+                maskElement={<Text style={[styles.streakText, { opacity: 1 }]}>{currentStreak}</Text>}
+              >
+                <LinearGradient
+                  colors={["#0080FF", "#FF1493"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0.33, 0.8]}
+                >
+                  <Text style={[styles.streakText, { opacity: 0 }]}>{currentStreak}</Text>
+                </LinearGradient>
+              </MaskedView>
+              <MaskedView
+                maskElement={<MaterialCommunityIcons name="fire" size={28} color="#FFF" />}
+                style={{ marginLeft: 0 }}
+              >
+                <LinearGradient
+                  colors={["#0080FF", "#FF1493"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0.33, 0.8]}
+                  style={{ width: 28, height: 28 }}
+                />
+              </MaskedView>
+            </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={styles.cheatDayLabel}>
                 {!cheatDayData.enabled
@@ -2454,5 +2505,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+  // Streak indicator styles
+  streakContainer: {
+    position: 'absolute',
+    top: -18,
+    right: -12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    zIndex: 10, // Ensure it appears above other elements
+  },
+  streakText: {
+    color: '#FFF', // Changed to white since gradient will handle color
+    fontSize: 18,
+    fontWeight: 'bold'
   },
 });

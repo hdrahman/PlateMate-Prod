@@ -230,15 +230,32 @@ const Analytics: React.FC = () => {
             return sum + (day.fat * 9 / totalCals * 100);
         }, 0) / validDays.length;
 
-        // Ideal ranges: Protein 20-35%, Carbs 40-55%, Fat 20-35% (more flexible ranges)
-        const proteinScore = 100 - Math.max(0, Math.abs(avgProteinPercent - 27.5) - 7.5) * 3;
-        const carbScore = 100 - Math.max(0, Math.abs(avgCarbPercent - 47.5) - 7.5) * 3;
-        const fatScore = 100 - Math.max(0, Math.abs(avgFatPercent - 27.5) - 7.5) * 3;
+        // Dynamic macro ranges based on user goal (evidence-based 2024 guidelines)
+        const fitnessGoal = userProfile?.fitness_goal || 'maintain_weight';
+        let proteinTarget, carbTarget, fatTarget, proteinTolerance, carbTolerance, fatTolerance;
+
+        if (fitnessGoal === 'lose_weight') {
+            // Higher protein for muscle preservation during weight loss
+            proteinTarget = 30; carbTarget = 40; fatTarget = 30;
+            proteinTolerance = 5; carbTolerance = 10; fatTolerance = 5;
+        } else if (fitnessGoal === 'build_muscle' || fitnessGoal === 'gain_weight') {
+            // Moderate protein, higher carbs for energy and muscle building
+            proteinTarget = 25; carbTarget = 50; fatTarget = 25;
+            proteinTolerance = 5; carbTolerance = 10; fatTolerance = 5;
+        } else {
+            // Balanced approach for maintenance/general health
+            proteinTarget = 25; carbTarget = 45; fatTarget = 30;
+            proteinTolerance = 7; carbTolerance = 10; fatTolerance = 7;
+        }
+
+        const proteinScore = 100 - Math.max(0, Math.abs(avgProteinPercent - proteinTarget) - proteinTolerance) * 3;
+        const carbScore = 100 - Math.max(0, Math.abs(avgCarbPercent - carbTarget) - carbTolerance) * 2;
+        const fatScore = 100 - Math.max(0, Math.abs(avgFatPercent - fatTarget) - fatTolerance) * 3;
 
         // Protein adequacy bonus (encourage adequate protein)
         const avgProteinGrams = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
-        const proteinTarget = userGoals?.proteinGoal || 100;
-        const proteinAdequacyBonus = Math.min(20, (avgProteinGrams / proteinTarget) * 20); // Bonus up to 20 points for meeting protein goal
+        const proteinGoalGrams = userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal;
+        const proteinAdequacyBonus = Math.min(20, (avgProteinGrams / proteinGoalGrams) * 20); // Bonus up to 20 points for meeting protein goal
 
         const balanceScore = (Math.max(0, proteinScore) + Math.max(0, carbScore) + Math.max(0, fatScore)) / 3 + proteinAdequacyBonus;
 
@@ -300,16 +317,16 @@ const Analytics: React.FC = () => {
 
         // Protein Analysis
         const avgProtein = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
-        const proteinTarget = (profile?.weight || 70) * 1.6; // 1.6g per kg body weight
+        const proteinTargetInsights = calculateTDEE(profile).proteinGoal; // Use evidence-based calculation
 
-        if (avgProtein < proteinTarget * 0.8) {
+        if (avgProtein < proteinTargetInsights * 0.8) {
             insights.push({
                 type: 'warning',
                 title: 'Low Protein Intake',
-                description: `Average protein (${Math.round(avgProtein)}g) is below optimal range (${Math.round(proteinTarget)}g).`,
+                description: `Average protein (${Math.round(avgProtein)}g) is below optimal range (${Math.round(proteinTargetInsights)}g).`,
                 recommendation: 'Add lean proteins like chicken, fish, beans, or Greek yogurt to your meals.'
             });
-        } else if (avgProtein >= proteinTarget) {
+        } else if (avgProtein >= proteinTargetInsights) {
             insights.push({
                 type: 'success',
                 title: 'Excellent Protein Intake',
@@ -354,9 +371,12 @@ const Analytics: React.FC = () => {
     };
 
     const calculateBMR = (profile: any) => {
-        if (!profile?.weight || !profile?.height || !profile?.age) return 1800;
+        if (!profile?.weight || !profile?.height || !profile?.age) {
+            // Evidence-based average BMR estimates by gender if no profile data
+            return profile?.gender === 'male' ? 1800 : 1400;
+        }
 
-        // Mifflin-St Jeor Equation
+        // Mifflin-St Jeor Equation (most accurate for general population)
         if (profile.gender === 'male') {
             return 10 * profile.weight + 6.25 * profile.height - 5 * profile.age + 5;
         } else {
@@ -366,27 +386,52 @@ const Analytics: React.FC = () => {
 
     const calculateTDEE = (profile: any) => {
         const bmr = calculateBMR(profile);
+
+        // Evidence-based activity multipliers (updated 2024 research)
         const activityMultipliers = {
-            'sedentary': 1.2,
-            'light': 1.375,
-            'moderate': 1.55,
-            'active': 1.725,
-            'very_active': 1.9
+            'sedentary': 1.2,     // Desk job, little exercise
+            'light': 1.375,      // Light exercise 1-3 days/week
+            'moderate': 1.55,     // Moderate exercise 3-5 days/week
+            'active': 1.725,     // Heavy exercise 6-7 days/week
+            'very_active': 1.9   // Very heavy exercise, physical job
         };
 
         const multiplier = activityMultipliers[profile?.activity_level as keyof typeof activityMultipliers] || 1.375;
         const tdee = Math.round(bmr * multiplier);
 
-        // Calculate protein goal (1.8-2.2g per kg body weight for active individuals)
-        const proteinGoal = Math.round((profile.weight || 70) * 2.0);
+        // Evidence-based protein recommendations (2024 nutrition guidelines)
+        // 1.6-2.2g per kg for active individuals, 0.8-1.2g per kg for sedentary
+        const weight = profile?.weight || (profile?.gender === 'male' ? 80 : 65);
+        const activityLevel = profile?.activity_level || 'light';
+
+        let proteinMultiplier;
+        if (['sedentary', 'light'].includes(activityLevel)) {
+            proteinMultiplier = 1.2; // Lower end for less active
+        } else if (['moderate', 'active'].includes(activityLevel)) {
+            proteinMultiplier = 1.8; // Mid-range for moderately active
+        } else {
+            proteinMultiplier = 2.0; // Higher for very active
+        }
+
+        const proteinGoal = Math.round(weight * proteinMultiplier);
+
+        // Calculate target calories based on goal
+        let targetCalories = tdee; // Default to maintenance
+        if (profile?.fitness_goal === 'lose_weight') {
+            // 0.5-1kg per week = 500-750 calorie deficit (evidence-based safe range)
+            targetCalories = tdee - 500;
+        } else if (profile?.fitness_goal === 'gain_weight' || profile?.fitness_goal === 'build_muscle') {
+            // 0.25-0.5kg per week = 250-500 calorie surplus
+            targetCalories = tdee + 300;
+        }
 
         return {
             tdee,
-            targetCalories: tdee, // Adjust based on goal (maintenance for now)
+            targetCalories: Math.max(targetCalories, bmr * 1.2), // Never go below 1.2x BMR
             proteinGoal,
-            currentWeight: profile.weight || 70,
-            targetWeight: profile.target_weight || profile.weight || 70,
-            age: profile.age || 25
+            currentWeight: weight,
+            targetWeight: profile?.target_weight || weight,
+            age: profile?.age || (profile?.gender === 'male' ? 30 : 28) // Average age by gender
         };
     };
 
@@ -399,8 +444,13 @@ const Analytics: React.FC = () => {
     };
 
     const getScoreColor = (score: number) => {
-        if (score >= 80) return COLORS.ACCENT_GREEN;
-        if (score >= 60) return COLORS.ACCENT_ORANGE;
+        // Dynamic scoring thresholds based on user experience
+        const isNewbie = !userProfile?.experience_level || userProfile?.experience_level === 'beginner';
+        const excellentThreshold = isNewbie ? 75 : 85; // Lower bar for beginners
+        const goodThreshold = isNewbie ? 55 : 65; // More encouraging for beginners
+
+        if (score >= excellentThreshold) return COLORS.ACCENT_GREEN;
+        if (score >= goodThreshold) return COLORS.ACCENT_ORANGE;
         return COLORS.ACCENT_RED;
     };
 
@@ -510,7 +560,7 @@ const Analytics: React.FC = () => {
 
         const recentWeek = macroTrends.slice(-7);
         const avgCalories = recentWeek.reduce((sum, day) => sum + day.calories, 0) / recentWeek.length;
-        const targetCalories = userGoals?.targetCalories || 2000;
+        const targetCalories = userGoals?.targetCalories || calculateTDEE(userProfile).targetCalories;
         const daysOnTrack = recentWeek.filter(day =>
             day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
         ).length;
@@ -534,7 +584,7 @@ const Analytics: React.FC = () => {
                     </View>
                     <View style={styles.weeklyStat}>
                         <Text style={[styles.weeklyStatNumber, {
-                            color: Math.round(avgDailyNutrition.protein) >= (userGoals?.proteinGoal || 100) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: Math.round(avgDailyNutrition.protein) >= (userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
                         }]}>
                             {Math.round(avgDailyNutrition.protein)}g
                         </Text>
@@ -563,10 +613,14 @@ const Analytics: React.FC = () => {
     };
 
     const renderQuickWins = () => {
-        const proteinGoal = userGoals?.proteinGoal || 100;
+        const proteinGoal = userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal;
         const needsMoreProtein = avgDailyNutrition.protein < proteinGoal;
-        const inconsistentCalories = nutritionScore.consistency < 70;
-        const macroImbalance = nutritionScore.balance < 70;
+        // Dynamic thresholds based on user experience and goals
+        const consistencyThreshold = userProfile?.experience_level === 'beginner' ? 60 : 75; // More lenient for beginners
+        const balanceThreshold = userProfile?.fitness_goal === 'lose_weight' ? 65 : 70; // Slightly more lenient for weight loss
+
+        const inconsistentCalories = nutritionScore.consistency < consistencyThreshold;
+        const macroImbalance = nutritionScore.balance < balanceThreshold;
 
         const tips = [];
         if (needsMoreProtein) {
@@ -617,17 +671,109 @@ const Analytics: React.FC = () => {
         );
     };
 
+    const renderDynamicTimeline = (profile: any) => {
+        // Generate timeline based on user's goal and experience level
+        const fitnessGoal = profile?.fitness_goal || 'maintain_weight';
+        const isNewbie = !profile?.experience_level || profile?.experience_level === 'beginner';
+
+        if (fitnessGoal === 'lose_weight') {
+            return (
+                <>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 1-4</Text>
+                            <Text style={styles.timelineDescription}>Water weight loss (1-3kg)</Text>
+                        </View>
+                    </View>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 5-12</Text>
+                            <Text style={styles.timelineDescription}>Steady fat loss (0.5-1kg/week)</Text>
+                        </View>
+                    </View>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 13+</Text>
+                            <Text style={styles.timelineDescription}>Body recomposition</Text>
+                        </View>
+                    </View>
+                </>
+            );
+        } else if (fitnessGoal === 'build_muscle' || fitnessGoal === 'gain_weight') {
+            return (
+                <>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 1-4</Text>
+                            <Text style={styles.timelineDescription}>{isNewbie ? 'Strength gains' : 'Muscle pumps'}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 5-12</Text>
+                            <Text style={styles.timelineDescription}>Muscle growth phase</Text>
+                        </View>
+                    </View>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 13+</Text>
+                            <Text style={styles.timelineDescription}>Strength & definition</Text>
+                        </View>
+                    </View>
+                </>
+            );
+        } else {
+            // Maintenance or general health
+            return (
+                <>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 1-4</Text>
+                            <Text style={styles.timelineDescription}>Habit formation</Text>
+                        </View>
+                    </View>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 5-12</Text>
+                            <Text style={styles.timelineDescription}>Energy & vitality</Text>
+                        </View>
+                    </View>
+                    <View style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineDate}>Week 13+</Text>
+                            <Text style={styles.timelineDescription}>Long-term wellness</Text>
+                        </View>
+                    </View>
+                </>
+            );
+        }
+    };
+
     const renderPredictiveInsights = () => {
+        // Only render if we have real user data
+        if (!userProfile?.weight || !userProfile?.target_weight || !userProfile?.age || !userGoals?.targetCalories || !userGoals?.proteinGoal) {
+            return null;
+        }
+
         // Get real user data from profile and goals
-        const currentWeight = userGoals?.currentWeight || userProfile?.weight || 75;
-        const goalWeight = userGoals?.targetWeight || userProfile?.target_weight || 90;
-        const userAge = userGoals?.age || userProfile?.age || 25;
-        const targetCalories = userGoals?.targetCalories || 2000;
+        const currentWeight = userGoals?.currentWeight || userProfile?.weight;
+        const goalWeight = userGoals?.targetWeight || userProfile?.target_weight;
+        const userAge = userGoals?.age || userProfile?.age;
+        const targetCalories = userGoals?.targetCalories;
         const avgWeeklyDeficit = (avgDailyNutrition.calories - targetCalories) * 7;
         const weeksToGoal = avgWeeklyDeficit < -1000 ? Math.ceil(Math.abs(currentWeight - goalWeight) * 7700 / Math.abs(avgWeeklyDeficit)) : null;
 
         // Metabolic age estimation
-        const proteinGoal = userGoals?.proteinGoal || 100;
+        const proteinGoal = userGoals?.proteinGoal;
         const metabolicAgeModifiers = {
             proteinIntake: avgDailyNutrition.protein >= proteinGoal ? -2 : avgDailyNutrition.protein >= proteinGoal * 0.8 ? 0 : 2,
             calorieConsistency: nutritionScore.consistency >= 80 ? -1 : nutritionScore.consistency >= 60 ? 0 : 2,
@@ -689,27 +835,7 @@ const Analytics: React.FC = () => {
                         <Text style={styles.predictionTitle}>Transformation Timeline</Text>
                     </View>
                     <View style={styles.timelineContainer}>
-                        <View style={styles.timelineItem}>
-                            <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
-                            <View style={styles.timelineContent}>
-                                <Text style={styles.timelineDate}>Week 1-2</Text>
-                                <Text style={styles.timelineDescription}>Initial weight gain</Text>
-                            </View>
-                        </View>
-                        <View style={styles.timelineItem}>
-                            <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
-                            <View style={styles.timelineContent}>
-                                <Text style={styles.timelineDate}>Week 3-8</Text>
-                                <Text style={styles.timelineDescription}>Steady muscle building</Text>
-                            </View>
-                        </View>
-                        <View style={styles.timelineItem}>
-                            <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
-                            <View style={styles.timelineContent}>
-                                <Text style={styles.timelineDate}>Week 9+</Text>
-                                <Text style={styles.timelineDescription}>Strength & size gains</Text>
-                            </View>
-                        </View>
+                        {renderDynamicTimeline(userProfile)}
                     </View>
                 </View>
             </GradientCard>
@@ -770,28 +896,7 @@ const Analytics: React.FC = () => {
                 {renderPredictiveInsights()}
                 {renderInsights()}
 
-                {/* Goal Projections */}
-                <GradientCard style={styles.projectionsCard}>
-                    <Text style={styles.cardTitle}>🎯 Goal Projections</Text>
-                    <View style={styles.projectionItem}>
-                        <MaterialCommunityIcons name="target" size={24} color={COLORS.ACCENT_GREEN} />
-                        <View style={styles.projectionContent}>
-                            <Text style={styles.projectionTitle}>Weight Goal Progress</Text>
-                            <Text style={styles.projectionDescription}>
-                                Based on current patterns, you're on track to reach your goal by March 2025
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={styles.projectionItem}>
-                        <MaterialCommunityIcons name="chart-line" size={24} color={COLORS.ACCENT_BLUE} />
-                        <View style={styles.projectionContent}>
-                            <Text style={styles.projectionTitle}>Metabolic Health</Text>
-                            <Text style={styles.projectionDescription}>
-                                Your eating patterns suggest a metabolic age within healthy range for your age group
-                            </Text>
-                        </View>
-                    </View>
-                </GradientCard>
+
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
@@ -960,27 +1065,7 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         fontStyle: 'italic',
     },
-    projectionsCard: {},
-    projectionItem: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 15,
-    },
-    projectionContent: {
-        flex: 1,
-        marginLeft: 15,
-    },
-    projectionTitle: {
-        color: COLORS.WHITE,
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 5,
-    },
-    projectionDescription: {
-        color: COLORS.SUBDUED,
-        fontSize: 14,
-        lineHeight: 20,
-    },
+
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
