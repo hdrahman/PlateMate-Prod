@@ -15,7 +15,7 @@ import {
     Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,11 +27,15 @@ import { searchFood, getFoodDetails } from '../api/nutritionix';
 import { getRecentFoodEntries, addFoodEntryWithContext } from '../api/foodLog';
 import { debounce } from 'lodash';
 import { useFoodLog } from '../context/FoodLogContext';
+import * as ImagePicker from 'expo-image-picker';
 
 // Define navigation type
 type RootStackParamList = {
     FoodLog: { refresh?: number };
     Manual: { mealType?: string; sourcePage?: string };
+    Camera: undefined;
+    BarcodeScanner: undefined;
+    ImageCapture: { mealType: string; photoUri?: string; sourcePage?: string };
 };
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -96,9 +100,8 @@ export default function Manual() {
     const [selectedFood, setSelectedFood] = useState(null);
     const [showFoodDetails, setShowFoodDetails] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
-    const [foodCategories, setFoodCategories] = useState([
-        'Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Fruits', 'Vegetables', 'Protein'
-    ]);
+    const mealCategories = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+    const [selectedMealCategory, setSelectedMealCategory] = useState(defaultMealType);
 
     // Use the food log context
     const foodLogContext = useFoodLog();
@@ -192,7 +195,7 @@ export default function Manual() {
     const handleAddFood = async (food, mealType, quantity) => {
         try {
             // If no meal type was specified, use the default from route params
-            const finalMealType = mealType || defaultMealType;
+            const finalMealType = mealType || selectedMealCategory;
 
             setIsLoading(true);
 
@@ -225,10 +228,74 @@ export default function Manual() {
         }
     };
 
-    // Render food category item
-    const renderFoodCategory = ({ item }) => (
-        <TouchableOpacity style={styles.categoryItem}>
-            <Text style={styles.categoryText}>{item}</Text>
+    // Navigation functions for upload options
+    const openGallery = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 1,
+                allowsEditing: false,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                navigation.navigate('ImageCapture', {
+                    mealType: selectedMealCategory,
+                    photoUri: result.assets[0].uri,
+                    sourcePage: 'Manual'
+                });
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+        }
+    };
+
+    const openCamera = () => {
+        navigation.navigate('Camera');
+    };
+
+    const openBarcodeScanner = () => {
+        navigation.navigate('BarcodeScanner');
+    };
+
+    const openManualEntry = () => {
+        setShowManualEntry(true);
+    };
+
+    // Render upload option button
+    const renderUploadOption = (option: { name: string; icon: string; onPress: () => void; isActive?: boolean }) => (
+        <TouchableOpacity
+            style={[styles.uploadOption, option.isActive && styles.activeUploadOption]}
+            onPress={option.onPress}
+        >
+            <MaterialCommunityIcons
+                name={option.icon as any}
+                size={26}
+                color={option.isActive ? "#FF00F5" : WHITE}
+            />
+            <Text style={[styles.uploadOptionText, option.isActive && styles.activeUploadOptionText]}>
+                {option.name}
+            </Text>
+        </TouchableOpacity>
+    );
+
+    // Render meal category button
+    const renderMealCategory = (meal: string) => (
+        <TouchableOpacity
+            key={meal}
+            style={[
+                styles.mealCategoryButton,
+                selectedMealCategory === meal && styles.selectedMealCategory
+            ]}
+            onPress={() => setSelectedMealCategory(meal)}
+        >
+            <Text
+                style={[
+                    styles.mealCategoryText,
+                    selectedMealCategory === meal && styles.selectedMealCategoryText
+                ]}
+            >
+                {meal}
+            </Text>
         </TouchableOpacity>
     );
 
@@ -241,8 +308,6 @@ export default function Manual() {
     const renderSearchResult = ({ item }) => (
         <FoodItem item={item} onPress={handleFoodSelect} />
     );
-
-
 
     return (
         <SafeAreaView
@@ -301,16 +366,36 @@ export default function Manual() {
                 </TouchableOpacity>
             </View>
 
-            {/* Categories */}
-            <View style={styles.categoriesContainer}>
-                <FlatList
-                    horizontal
-                    data={foodCategories}
-                    renderItem={renderFoodCategory}
-                    keyExtractor={(item) => item}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.categoriesList}
-                />
+            {/* Meal Categories (moved from bottom) */}
+            <View style={styles.mealCategoriesContainer}>
+                <View style={styles.mealCategoriesList}>
+                    {mealCategories.map(renderMealCategory)}
+                </View>
+            </View>
+
+            {/* Upload Options (replaced Categories) */}
+            <View style={styles.uploadOptionsContainer}>
+                {renderUploadOption({
+                    name: 'Gallery',
+                    icon: 'image-outline',
+                    onPress: openGallery
+                })}
+                {renderUploadOption({
+                    name: 'Camera',
+                    icon: 'camera-outline',
+                    onPress: openCamera
+                })}
+                {renderUploadOption({
+                    name: 'Barcode',
+                    icon: 'barcode-scan',
+                    onPress: openBarcodeScanner
+                })}
+                {renderUploadOption({
+                    name: 'Manual',
+                    icon: 'text-box-outline',
+                    onPress: openManualEntry,
+                    isActive: true
+                })}
             </View>
 
             {/* Main Content */}
@@ -393,13 +478,15 @@ export default function Manual() {
                 )}
             </View>
 
+
+
             {/* Food Details Modal */}
             {selectedFood && (
                 <FoodDetails
                     visible={showFoodDetails}
                     food={selectedFood}
                     onClose={() => setShowFoodDetails(false)}
-                    onAddFood={handleAddFood}
+                    onAddFood={(food, mealType, quantity) => handleAddFood(food, mealType || selectedMealCategory, quantity)}
                 />
             )}
 
@@ -407,7 +494,7 @@ export default function Manual() {
             <ManualFoodEntry
                 visible={showManualEntry}
                 onClose={() => setShowManualEntry(false)}
-                onAddFood={handleAddFood}
+                onAddFood={(food, mealType, quantity) => handleAddFood(food, mealType || selectedMealCategory, quantity)}
             />
 
             {/* Loading Overlay */}
@@ -447,6 +534,30 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: WHITE,
     },
+    // Upload Options (replaced Categories)
+    uploadOptionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-evenly',
+        alignItems: 'center',
+        paddingVertical: 16,
+    },
+    uploadOption: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    activeUploadOption: {
+        // Additional styling for active option if needed
+    },
+    uploadOptionText: {
+        color: WHITE,
+        fontSize: 12,
+        marginTop: 4,
+        textAlign: 'center',
+    },
+    activeUploadOptionText: {
+        color: '#FF00F5',
+    },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -483,25 +594,6 @@ const styles = StyleSheet.create({
         height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    categoriesContainer: {
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    categoriesList: {
-        paddingHorizontal: 16,
-    },
-    categoryItem: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 20,
-        marginRight: 10,
-    },
-    categoryText: {
-        color: WHITE,
-        fontSize: 14,
     },
     content: {
         flex: 1,
@@ -579,5 +671,40 @@ const styles = StyleSheet.create({
     gradientBorderContainer: {
         borderRadius: 10,
         overflow: 'hidden',
+    },
+    // Meal Categories Control Bar (moved from top)
+    mealCategoriesContainer: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+    },
+    mealCategoriesTitle: {
+        color: WHITE,
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    mealCategoriesList: {
+        flexDirection: 'row',
+        justifyContent: 'space-evenly',
+    },
+    mealCategoryButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 20,
+        minWidth: 70,
+        alignItems: 'center',
+    },
+    selectedMealCategory: {
+        backgroundColor: PURPLE_ACCENT,
+    },
+    mealCategoryText: {
+        color: WHITE,
+        fontSize: 12,
+    },
+    selectedMealCategoryText: {
+        color: WHITE,
+        fontWeight: 'bold',
     },
 }); 

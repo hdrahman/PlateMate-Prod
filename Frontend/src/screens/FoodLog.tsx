@@ -644,11 +644,28 @@ const DiaryScreen: React.FC = () => {
         cancelButtonText: TextStyle;
         exitButton: ViewStyle;
         moveModalContent: ViewStyle;
+        moveModalGradient: ViewStyle;
+        moveModalHeader: ViewStyle;
+        moveModalTitleContainer: ViewStyle;
         moveModalTitle: TextStyle;
+        moveModalSubtitle: TextStyle;
+        modalCloseButton: ViewStyle;
+        mealTypeOptionsGrid: ViewStyle;
+        modernMealTypeButton: ViewStyle;
+        currentMealTypeButton: ViewStyle;
+        mealTypeButtonGradient: ViewStyle;
+        mealTypeIconContainer: ViewStyle;
+        modernMealTypeText: TextStyle;
+        currentMealTypeText: TextStyle;
+        currentMealBadge: ViewStyle;
+        currentMealBadgeText: TextStyle;
+        moveArrowContainer: ViewStyle;
+        moveModalActions: ViewStyle;
+        modernCancelButton: ViewStyle;
+        modernCancelButtonText: TextStyle;
         mealTypeButton: ViewStyle;
         currentMealType: ViewStyle;
         mealTypeButtonText: TextStyle;
-        currentMealTypeText: TextStyle;
         buttonText: TextStyle;
         weightText: TextStyle;
 
@@ -662,7 +679,7 @@ const DiaryScreen: React.FC = () => {
         macroGoalLabel: TextStyle;
     };
 
-    const styles = StyleSheet.create<StylesType>({
+    const styles = StyleSheet.create({
         container: {
             flex: 1,
             backgroundColor: PRIMARY_BG,
@@ -995,7 +1012,8 @@ const DiaryScreen: React.FC = () => {
             flex: 1,
             justifyContent: 'center' as const,
             alignItems: 'center' as const,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            paddingHorizontal: 16,
         },
         actionModalContent: {
             backgroundColor: '#1C1C1E',
@@ -1056,16 +1074,67 @@ const DiaryScreen: React.FC = () => {
         },
         moveModalContent: {
             backgroundColor: '#1C1C1E',
+            borderRadius: 12,
+            width: '85%',
+            maxWidth: 350,
             padding: 20,
-            borderRadius: 10,
-            width: '80%',
+        },
+        moveModalHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 20,
         },
         moveModalTitle: {
             fontSize: 18,
-            fontWeight: 'bold',
+            fontWeight: '600',
+            color: '#8A7AFF',
+            marginBottom: 2,
+        },
+        moveModalSubtitle: {
+            fontSize: 14,
+            color: '#999',
+            fontWeight: '400',
+        },
+        modalCloseButton: {
+            padding: 4,
+        },
+        mealTypeList: {
+            marginBottom: 16,
+        },
+        cleanMealTypeButton: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#2C2C2E',
+            padding: 16,
+            borderRadius: 8,
+            marginBottom: 8,
+        },
+        disabledMealTypeButton: {
+            backgroundColor: '#1A1A1A',
+            opacity: 0.6,
+        },
+        cleanMealTypeText: {
+            fontSize: 16,
             color: WHITE,
-            marginBottom: 15,
-            textAlign: 'center',
+            fontWeight: '500',
+        },
+        disabledMealTypeText: {
+            color: '#666',
+        },
+        cleanCancelButton: {
+            backgroundColor: '#333',
+            padding: 14,
+            borderRadius: 8,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: '#444',
+        },
+        cleanCancelButtonText: {
+            color: '#AAA',
+            fontSize: 16,
+            fontWeight: '500',
         },
         mealTypeButton: {
             padding: 15,
@@ -1082,9 +1151,6 @@ const DiaryScreen: React.FC = () => {
         mealTypeButtonText: {
             color: PURPLE_ACCENT,
             fontSize: 16,
-        },
-        currentMealTypeText: {
-            color: WHITE,
         },
         buttonText: {
             color: PURPLE_ACCENT,
@@ -1499,6 +1565,8 @@ const DiaryScreen: React.FC = () => {
                 const foodEntry = localMealDataRef.current.find(entry => entry.id === id);
 
                 if (foodEntry) {
+                    const originalMealType = foodEntry.meal_type;
+
                     // Update the meal type
                     await updateFoodLog(id, {
                         ...foodEntry,
@@ -1509,6 +1577,18 @@ const DiaryScreen: React.FC = () => {
                     // Close the modal and refresh data
                     setMoveModalVisible(false);
                     refreshMealData();
+
+                    // Show success feedback
+                    const foodName = foodEntry.food_name.length > 30
+                        ? foodEntry.food_name.substring(0, 30) + '...'
+                        : foodEntry.food_name;
+
+                    Alert.alert(
+                        'Moved Successfully',
+                        `"${foodName}" has been moved from ${originalMealType} to ${newMealType}.`,
+                        [{ text: 'OK', style: 'default' }],
+                        { cancelable: true }
+                    );
                 } else {
                     throw new Error('Food entry not found');
                 }
@@ -1517,6 +1597,7 @@ const DiaryScreen: React.FC = () => {
             }
         } catch (error) {
             console.error('Error moving food item:', error);
+            setMoveModalVisible(false);
             Alert.alert('Error', 'Failed to move food item. Please try again.');
         } finally {
             setLoading(false);
@@ -2129,50 +2210,76 @@ const DiaryScreen: React.FC = () => {
                 >
                     <TouchableWithoutFeedback onPress={() => setMoveModalVisible(false)}>
                         <View style={styles.modalOverlay}>
-                            <TouchableWithoutFeedback>
+                            <TouchableWithoutFeedback onPress={() => { }}>
                                 <View style={styles.moveModalContent}>
-                                    <Text style={styles.moveModalTitle}>Move to Meal</Text>
-
-                                    <TouchableOpacity
-                                        style={styles.exitButton}
-                                        onPress={() => setMoveModalVisible(false)}
-                                    >
-                                        <Ionicons name="close" size={28} color="#8A2BE2" />
-                                    </TouchableOpacity>
-
-                                    {mealTypes.map((type) => (
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.mealTypeButton,
-                                                selectedFoodItem?.meal === type && styles.currentMealType
-                                            ]}
-                                            key={type}
-                                            onPress={() => moveFood(selectedFoodItem?.id, type)}
-                                            disabled={selectedFoodItem?.meal === type}
-                                        >
-                                            <Text style={[
-                                                styles.mealTypeButtonText,
-                                                selectedFoodItem?.meal === type && styles.currentMealTypeText
-                                            ]}>
-                                                {type}
-                                                {selectedFoodItem?.meal === type ? ' (Current)' : ''}
+                                    {/* Modal Header */}
+                                    <View style={styles.moveModalHeader}>
+                                        <View>
+                                            <Text style={styles.moveModalTitle}>Move to Meal</Text>
+                                            <Text style={styles.moveModalSubtitle}>
+                                                {selectedFoodItem?.name || 'Food Item'}
                                             </Text>
-                                            {selectedFoodItem?.meal !== type && (
-                                                <Ionicons
-                                                    name="chevron-forward"
-                                                    size={18}
-                                                    color={PURPLE_ACCENT}
-                                                    style={{ position: 'absolute', right: 15 }}
-                                                />
-                                            )}
+                                        </View>
+                                        <TouchableOpacity
+                                            style={styles.modalCloseButton}
+                                            onPress={() => setMoveModalVisible(false)}
+                                        >
+                                            <Ionicons name="close" size={20} color="#999" />
                                         </TouchableOpacity>
-                                    ))}
+                                    </View>
 
+                                    {/* Meal Type Options */}
+                                    <View style={styles.mealTypeList}>
+                                        {mealTypes.map((type) => {
+                                            const isCurrentMeal = selectedFoodItem?.meal === type;
+
+                                            const mealColors = {
+                                                'Breakfast': '#FF8F4A',
+                                                'Lunch': '#4ECDC4',
+                                                'Dinner': '#6C7CE0',
+                                                'Snacks': '#FF6B9D'
+                                            };
+
+                                            const currentColor = mealColors[type] || '#666';
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={type}
+                                                    style={[
+                                                        styles.cleanMealTypeButton,
+                                                        isCurrentMeal && styles.disabledMealTypeButton,
+                                                        !isCurrentMeal && { borderLeftWidth: 3, borderLeftColor: currentColor }
+                                                    ]}
+                                                    onPress={() => moveFood(selectedFoodItem?.id, type)}
+                                                    disabled={isCurrentMeal}
+                                                    activeOpacity={isCurrentMeal ? 1 : 0.6}
+                                                >
+                                                    <Text style={[
+                                                        styles.cleanMealTypeText,
+                                                        isCurrentMeal && styles.disabledMealTypeText
+                                                    ]}>
+                                                        {type}
+                                                        {isCurrentMeal && ' (Current)'}
+                                                    </Text>
+
+                                                    {!isCurrentMeal && (
+                                                        <Ionicons
+                                                            name="chevron-forward"
+                                                            size={16}
+                                                            color={currentColor}
+                                                        />
+                                                    )}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+
+                                    {/* Cancel Button */}
                                     <TouchableOpacity
-                                        style={styles.cancelButton}
+                                        style={styles.cleanCancelButton}
                                         onPress={() => setMoveModalVisible(false)}
                                     >
-                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                        <Text style={styles.cleanCancelButtonText}>Cancel</Text>
                                     </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
