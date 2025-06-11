@@ -143,21 +143,24 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
 
         setCalculatedCalories(tdee);
 
-        // Calculate macronutrient distribution based on goal
+        // Evidence-based macronutrient distribution (2024 nutrition guidelines)
         let proteinPct, carbsPct, fatPct;
 
         if (mainGoal === 'lose') {
-            proteinPct = 0.30; // Higher protein for weight loss (preserve muscle)
-            carbsPct = 0.40;
-            fatPct = 0.30;
+            // Higher protein for muscle preservation during weight loss
+            proteinPct = 0.30; // 25-35% protein range for weight loss
+            carbsPct = 0.35; // Lower carbs to support fat loss
+            fatPct = 0.35;   // Adequate fat for hormone production
         } else if (mainGoal === 'gain') {
-            proteinPct = 0.25; // Balanced for muscle gain
-            carbsPct = 0.50; // Higher carbs for energy
-            fatPct = 0.25;
+            // Balanced for muscle gain with adequate energy
+            proteinPct = 0.25; // 20-30% protein for muscle building
+            carbsPct = 0.50;   // Higher carbs for training energy
+            fatPct = 0.25;     // Moderate fat for calorie density
         } else { // maintain
-            proteinPct = 0.25;
-            carbsPct = 0.45;
-            fatPct = 0.30;
+            // Balanced approach for general health
+            proteinPct = 0.25; // 20-35% protein for maintenance
+            carbsPct = 0.45;   // 45-65% carbs for energy
+            fatPct = 0.30;     // 20-35% fat for essential functions
         }
 
         // Calculate macros in grams
@@ -165,11 +168,22 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
         const proteinG = Math.round((tdee * proteinPct) / 4);
         const carbsG = Math.round((tdee * carbsPct) / 4);
         const fatG = Math.round((tdee * fatPct) / 9);
-        const fiberG = Math.round(14 * (tdee / 1000)); // ~14g per 1000 calories
 
-        // Calculate other nutrients
-        const sugarsG = Math.min(Math.round(tdee * 0.10 / 4), 50); // max 50g
-        const sodiumMg = 2300; // Standard recommendation
+        // Evidence-based fiber recommendations (2024 dietary guidelines)
+        // Men: 38g/day, Women: 25g/day (or 14g per 1000 calories)
+        const fiberG = profile.gender === 'male' ? 38 : 25;
+
+        // Added sugar recommendations (WHO/AHA guidelines)
+        // <10% of total calories from added sugars (WHO), <6% ideal (AHA)
+        const sugarsG = Math.round(tdee * 0.06 / 4); // 6% of calories as added sugars
+
+        // Sodium recommendations based on health conditions and age
+        let sodiumMg = 2300; // Standard adult recommendation
+        if (selectedConditions.includes('hypertension') || selectedConditions.includes('heart_disease')) {
+            sodiumMg = 1500; // Lower for cardiovascular conditions
+        } else if (profile.age && profile.age > 50) {
+            sodiumMg = 1500; // Lower for adults over 50
+        }
 
         setCalculatedNutrients({
             protein: proteinG,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem as FoodItemType } from '../api/nutritionix';
 
@@ -38,25 +38,13 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
         return `${proteinPct}P / ${carbsPct}C / ${fatsPct}F`;
     };
 
-    // Get default food image if none is provided
-    const getImage = () => {
-        if (item.image) return { uri: item.image };
-        return require('../../assets/default-food.png');
-    };
+
 
     return (
         <TouchableOpacity
             style={styles.container}
             onPress={() => onPress(item)}
         >
-            <View style={styles.imageContainer}>
-                <Image
-                    source={getImage()}
-                    style={styles.image}
-                    defaultSource={require('../../assets/default-food.png')}
-                />
-            </View>
-
             <View style={styles.detailsContainer}>
                 <Text style={styles.foodName}>{item.food_name}</Text>
                 {item.brand_name && (
@@ -107,19 +95,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
-    imageContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        overflow: 'hidden',
-        backgroundColor: LIGHT_GRAY,
-        marginRight: 12,
-    },
-    image: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
+
     detailsContainer: {
         flex: 1,
     },
