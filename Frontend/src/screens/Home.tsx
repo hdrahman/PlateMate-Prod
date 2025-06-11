@@ -1959,21 +1959,21 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
   const cappedPercent = Math.min(percent, 100);
   const fillStroke = (cappedPercent / 100) * circumference;
 
-  // More saturated, vibrant gradient colors for each macro.
-  let gradientColors = ['#FF00F5', '#9B00FF', '#00CFFF']; // default
+  // Custom solid colors for each macro ring
+  let solidColor = '#FF00F5'; // default
   let backgroundStrokeColor = 'rgba(80, 0, 133, 0.2)'; // default subdued background
   switch (label.toUpperCase()) {
     case 'PROTEIN':
-      gradientColors = ['#FF5252', '#FF1744', '#D50000'];
-      backgroundStrokeColor = 'rgba(213, 0, 0, 0.2)'; // subdued red
+      solidColor = '#DE0707'; // Custom red: rgb(222, 7, 7)
+      backgroundStrokeColor = 'rgba(222, 7, 7, 0.2)'; // subdued custom red
       break;
     case 'CARBS':
-      gradientColors = ['#29B6F6', '#03A9F4', '#0288D1'];
-      backgroundStrokeColor = 'rgba(2, 136, 209, 0.2)'; // subdued blue
+      solidColor = '#0052CC'; // Richer blue: rgb(0, 82, 204)
+      backgroundStrokeColor = 'rgba(0, 82, 204, 0.2)'; // subdued richer blue
       break;
     case 'FATS':
-      gradientColors = ['#66BB6A', '#43A047', '#18d621'];
-      backgroundStrokeColor = 'rgba(24, 214, 33, 0.2)'; // subdued green
+      solidColor = '#19BF32'; // Custom green: rgb(25, 191, 50)
+      backgroundStrokeColor = 'rgba(25, 191, 50, 0.2)'; // subdued custom green
       break;
     case 'OTHER':
       backgroundStrokeColor = 'rgba(80, 0, 133, 0.2)'; // subdued purple for OTHER
@@ -1994,22 +1994,16 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
       <Text style={styles.macroRingLabelTop}>{label}</Text>
       <View style={{ position: 'relative' }}>
         <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
-          <Defs>
-            {isOther ? (
+          {isOther && (
+            <Defs>
               <SvgLinearGradient id={`macroGradient-${label}`} {...gradientDirection}>
                 <Stop offset="0%" stopColor="#00A8FF" />
                 <Stop offset="10%" stopColor="#00A8FF" />
                 <Stop offset="60%" stopColor="#9B00FF" />
                 <Stop offset="100%" stopColor="#FF00F5" />
               </SvgLinearGradient>
-            ) : (
-              <SvgLinearGradient id={`macroGradient-${label}`} {...gradientDirection}>
-                <Stop offset="0%" stopColor={gradientColors[0]} />
-                <Stop offset="50%" stopColor={gradientColors[1]} />
-                <Stop offset="100%" stopColor={gradientColors[2]} />
-              </SvgLinearGradient>
-            )}
-          </Defs>
+            </Defs>
+          )}
           <Circle
             cx={MACRO_RING_SIZE / 2}
             cy={MACRO_RING_SIZE / 2}
@@ -2022,7 +2016,7 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
             cx={MACRO_RING_SIZE / 2}
             cy={MACRO_RING_SIZE / 2}
             r={radius}
-            stroke={`url(#macroGradient-${label})`}
+            stroke={isOther ? `url(#macroGradient-${label})` : solidColor}
             strokeWidth={MACRO_STROKE_WIDTH}
             fill="none"
             strokeDasharray={`${circumference} ${circumference}`}
@@ -2034,7 +2028,7 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
             cx={MACRO_RING_SIZE / 2}
             cy={MACRO_RING_SIZE / 2}
             r={radius}
-            stroke={`url(#macroGradient-${label})`}
+            stroke={isOther ? `url(#macroGradient-${label})` : solidColor}
             strokeWidth={MACRO_STROKE_WIDTH}
             fill="none"
             strokeDasharray={`${circumference} ${circumference}`}

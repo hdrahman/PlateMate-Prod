@@ -98,6 +98,16 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         return '#4CAF50'; // Green for healthy (8-10)
     };
 
+    // Get health rating label
+    const getHealthRatingLabel = (rating: number): string => {
+        if (rating <= 2) return 'Very Poor';
+        if (rating <= 4) return 'Poor';
+        if (rating <= 6) return 'Fair';
+        if (rating <= 7) return 'Good';
+        if (rating <= 8.5) return 'Very Good';
+        return 'Excellent';
+    };
+
     // Reset form
     const resetForm = () => {
         setFoodName('');
@@ -354,37 +364,81 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                     {/* Health Rating */}
                     <GradientBorderCard style={styles.section}>
                         <Text style={styles.sectionTitle}>Health Rating</Text>
+                        <Text style={styles.healthRatingSubtitle}>How nutritious is this food?</Text>
 
-                        {/* Current Rating Display */}
-                        <View style={styles.healthRatingDisplay}>
-                            <View style={[
-                                styles.healthRatingCircle,
-                                { borderColor: getHealthinessColor(healthRating) }
-                            ]}>
-                                <Text style={[styles.healthRatingValue, { color: getHealthinessColor(healthRating) }]}>
-                                    {Math.round(healthRating)}
-                                </Text>
+                        {/* Health Rating Card */}
+                        <View style={[styles.healthRatingCard, { backgroundColor: `${getHealthinessColor(healthRating)}15` }]}>
+                            {/* Rating Display Header */}
+                            <View style={styles.healthRatingHeader}>
+                                <View style={styles.healthRatingMainDisplay}>
+                                    <Text style={[styles.healthRatingScore, { color: getHealthinessColor(healthRating) }]}>
+                                        {Math.round(healthRating)}
+                                    </Text>
+                                    <Text style={styles.healthRatingMaxScore}>/10</Text>
+                                </View>
+                                <View style={styles.healthRatingStatus}>
+                                    <View style={[styles.healthRatingIndicator, { backgroundColor: getHealthinessColor(healthRating) }]} />
+                                    <Text style={[styles.healthRatingStatusText, { color: getHealthinessColor(healthRating) }]}>
+                                        {getHealthRatingLabel(healthRating)}
+                                    </Text>
+                                </View>
                             </View>
-                            <Text style={styles.healthRatingText}>
-                                {healthRating <= 4 ? 'Unhealthy' : healthRating <= 7 ? 'Moderate' : 'Healthy'}
-                            </Text>
-                        </View>
 
-                        {/* Slider */}
-                        <View style={styles.healthRatingContainer}>
-                            <Text style={styles.healthRatingLabel}>1</Text>
-                            <Slider
-                                style={styles.healthRatingSlider}
-                                minimumValue={1}
-                                maximumValue={10}
-                                value={healthRating}
-                                onValueChange={(value) => setHealthRating(value)}
-                                minimumTrackTintColor={getHealthinessColor(healthRating)}
-                                maximumTrackTintColor={GRAY}
-                                thumbTintColor={getHealthinessColor(healthRating)}
-                                step={0.5}
-                            />
-                            <Text style={styles.healthRatingLabel}>10</Text>
+                            {/* Visual Rating Bar */}
+                            <View style={styles.healthRatingBarContainer}>
+                                <TouchableOpacity
+                                    style={styles.healthRatingBarBackground}
+                                    activeOpacity={1}
+                                    onPress={(event) => {
+                                        const { locationX } = event.nativeEvent;
+                                        // Calculate rating based on touch position
+                                        // Assume bar width spans most of the container (accounting for padding)
+                                        const barWidth = 280; // Approximate width accounting for container padding
+                                        const percentage = Math.max(0, Math.min(1, locationX / barWidth));
+                                        // Map percentage to rating scale 1-10 and round to whole numbers
+                                        const rawRating = 1 + (percentage * 9);
+                                        const newRating = Math.max(1, Math.min(10, Math.round(rawRating)));
+                                        setHealthRating(newRating);
+                                    }}
+                                >
+                                    <LinearGradient
+                                        colors={['#FF5252', '#FFD740', '#4CAF50']}
+                                        style={styles.healthRatingBarGradient}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                    />
+                                    <View style={[
+                                        styles.healthRatingBarIndicator,
+                                        { left: `${((healthRating - 1) / 9) * 100}%` }
+                                    ]} />
+                                </TouchableOpacity>
+                                <View style={styles.healthRatingBarLabels}>
+                                    <Text style={styles.healthRatingBarLabel}>Poor</Text>
+                                    <Text style={styles.healthRatingBarLabel}>Good</Text>
+                                    <Text style={styles.healthRatingBarLabel}>Excellent</Text>
+                                </View>
+                            </View>
+
+
+
+                            {/* Rating Guidelines */}
+                            <View style={styles.healthRatingGuidelines}>
+                                <Text style={styles.healthRatingGuidelinesTitle}>Rating Guide</Text>
+                                <View style={styles.healthRatingGuidelinesList}>
+                                    <View style={styles.healthRatingGuideline}>
+                                        <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FF5252' }]} />
+                                        <Text style={styles.healthRatingGuidelineText}>1-4: Processed, high sugar/sodium</Text>
+                                    </View>
+                                    <View style={styles.healthRatingGuideline}>
+                                        <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FFD740' }]} />
+                                        <Text style={styles.healthRatingGuidelineText}>5-7: Moderate nutrition value</Text>
+                                    </View>
+                                    <View style={styles.healthRatingGuideline}>
+                                        <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#4CAF50' }]} />
+                                        <Text style={styles.healthRatingGuidelineText}>8-10: Whole foods, nutrient-dense</Text>
+                                    </View>
+                                </View>
+                            </View>
                         </View>
                     </GradientBorderCard>
 
@@ -529,42 +583,189 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 16,
     },
-    healthRatingContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-    },
-    healthRatingLabel: {
-        color: WHITE,
+    // Health Rating Styles
+    healthRatingSubtitle: {
         fontSize: 14,
-    },
-    healthRatingSlider: {
-        flex: 1,
-        marginHorizontal: 16,
-    },
-    healthRatingDisplay: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        color: GRAY,
         marginBottom: 16,
+        fontStyle: 'italic',
     },
-    healthRatingCircle: {
-        width: 32,
-        height: 32,
+    healthRatingCard: {
         borderRadius: 16,
-        borderWidth: 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
+        padding: 20,
+        marginTop: 8,
     },
-    healthRatingValue: {
-        fontSize: 14,
+    healthRatingHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    healthRatingMainDisplay: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
+    healthRatingScore: {
+        fontSize: 36,
         fontWeight: 'bold',
     },
-    healthRatingText: {
-        color: WHITE,
+    healthRatingMaxScore: {
+        fontSize: 18,
+        color: GRAY,
+        marginLeft: 4,
+    },
+    healthRatingStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    healthRatingIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 8,
+    },
+    healthRatingStatusText: {
         fontSize: 16,
         fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    healthRatingBarContainer: {
+        marginBottom: 24,
+    },
+    healthRatingBarBackground: {
+        height: 8,
+        borderRadius: 4,
+        position: 'relative',
+        marginBottom: 8,
+    },
+    healthRatingBarGradient: {
+        flex: 1,
+        borderRadius: 4,
+    },
+    healthRatingBarIndicator: {
+        position: 'absolute',
+        top: -4,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: WHITE,
+        borderWidth: 3,
+        borderColor: '#333',
+        marginLeft: -8,
+    },
+    healthRatingBarLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 4,
+    },
+    healthRatingBarLabel: {
+        fontSize: 12,
+        color: GRAY,
+        fontWeight: '500',
+    },
+    healthRatingSliderSection: {
+        marginBottom: 24,
+    },
+    healthRatingSliderTitle: {
+        fontSize: 14,
+        color: WHITE,
+        fontWeight: '600',
+        marginBottom: 16,
+    },
+    healthRatingSliderContainer: {
+        marginBottom: 16,
+    },
+    healthRatingSliderTrack: {
+        marginBottom: 16,
+    },
+    healthRatingSlider: {
+        width: '100%',
+        height: 40,
+    },
+    healthRatingSliderNumbers: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 8,
+    },
+    healthRatingNumber: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    healthRatingNumberActive: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    healthRatingNumberText: {
+        fontSize: 12,
+        color: GRAY,
+        fontWeight: '600',
+    },
+    healthRatingGuidelines: {
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.1)',
+        paddingTop: 16,
+    },
+    healthRatingGuidelinesTitle: {
+        fontSize: 14,
+        color: WHITE,
+        fontWeight: '600',
+        marginBottom: 12,
+    },
+    healthRatingGuidelinesList: {
+        gap: 8,
+    },
+    healthRatingGuideline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    healthRatingGuidelineDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 12,
+    },
+    healthRatingGuidelineText: {
+        fontSize: 13,
+        color: GRAY,
+        flex: 1,
+    },
+    sliderContainer: {
+        marginBottom: 8,
+    },
+    sliderWrapper: {
+        flex: 1,
+        marginHorizontal: 8,
+    },
+    sliderTrackBackground: {
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        right: 0,
+        height: 6,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 3,
+        marginTop: -3,
+        zIndex: 0,
+    },
+    sliderGradientTrack: {
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        height: 6,
+        borderRadius: 3,
+        marginTop: -3,
+        zIndex: 1,
+    },
+    sliderLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 8,
     },
     saveButton: {
         height: 50,
