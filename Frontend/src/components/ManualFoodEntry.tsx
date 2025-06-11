@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 import { FoodItem } from '../api/nutritionix';
 
 // Define theme colors
@@ -81,11 +82,21 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
     const [fiber, setFiber] = useState<string>('0');
     const [sugar, setSugar] = useState<string>('0');
 
+    // Health rating state
+    const [healthRating, setHealthRating] = useState<number>(5);
+
     // Check if form is valid (has food name and calories)
     const isFormValid = foodName.trim() !== '' && calories.trim() !== '' && parseFloat(calories) > 0;
 
     // Meal options
     const mealOptions = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+
+    // Get color based on healthiness rating
+    const getHealthinessColor = (rating: number): string => {
+        if (rating <= 4) return '#FF5252'; // Red for unhealthy (0-4)
+        if (rating <= 7) return '#FFD740'; // Yellow for moderate (5-7)
+        return '#4CAF50'; // Green for healthy (8-10)
+    };
 
     // Reset form
     const resetForm = () => {
@@ -99,6 +110,7 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         setSelectedMeal('Breakfast');
         setQuantity('1');
         setServingUnit('serving');
+        setHealthRating(5);
     };
 
     // Handle save
@@ -147,7 +159,7 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
             serving_unit: servingUnit,
             serving_weight_grams: 0,
             serving_qty: parsedQuantity,
-            healthiness_rating: 5, // Default middle value
+            healthiness_rating: healthRating, // Use selected health rating
         };
 
         // Add food to log
@@ -339,6 +351,43 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                         </View>
                     </GradientBorderCard>
 
+                    {/* Health Rating */}
+                    <GradientBorderCard style={styles.section}>
+                        <Text style={styles.sectionTitle}>Health Rating</Text>
+
+                        {/* Current Rating Display */}
+                        <View style={styles.healthRatingDisplay}>
+                            <View style={[
+                                styles.healthRatingCircle,
+                                { borderColor: getHealthinessColor(healthRating) }
+                            ]}>
+                                <Text style={[styles.healthRatingValue, { color: getHealthinessColor(healthRating) }]}>
+                                    {Math.round(healthRating)}
+                                </Text>
+                            </View>
+                            <Text style={styles.healthRatingText}>
+                                {healthRating <= 4 ? 'Unhealthy' : healthRating <= 7 ? 'Moderate' : 'Healthy'}
+                            </Text>
+                        </View>
+
+                        {/* Slider */}
+                        <View style={styles.healthRatingContainer}>
+                            <Text style={styles.healthRatingLabel}>1</Text>
+                            <Slider
+                                style={styles.healthRatingSlider}
+                                minimumValue={1}
+                                maximumValue={10}
+                                value={healthRating}
+                                onValueChange={(value) => setHealthRating(value)}
+                                minimumTrackTintColor={getHealthinessColor(healthRating)}
+                                maximumTrackTintColor={GRAY}
+                                thumbTintColor={getHealthinessColor(healthRating)}
+                                step={0.5}
+                            />
+                            <Text style={styles.healthRatingLabel}>10</Text>
+                        </View>
+                    </GradientBorderCard>
+
                     {/* Save Button */}
                     <TouchableOpacity
                         style={styles.saveButton}
@@ -479,6 +528,43 @@ const styles = StyleSheet.create({
         padding: 12,
         color: WHITE,
         fontSize: 16,
+    },
+    healthRatingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    healthRatingLabel: {
+        color: WHITE,
+        fontSize: 14,
+    },
+    healthRatingSlider: {
+        flex: 1,
+        marginHorizontal: 16,
+    },
+    healthRatingDisplay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    healthRatingCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    healthRatingValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    healthRatingText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: '600',
     },
     saveButton: {
         height: 50,
