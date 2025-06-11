@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 import logging
 
 from DB import get_db
-from models import Exercise
+from models import Exercise, User
+from services.gamification_service import GamificationService
+from auth.firebase_auth import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,13 +20,15 @@ async def create_exercise(
     duration: int,
     date: Optional[datetime] = None,
     notes: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new exercise entry"""
     if date is None:
         date = datetime.now()
     
     exercise = Exercise(
+        user_id=current_user.id,  # Associate with authenticated user
         exercise_name=exercise_name,
         calories_burned=calories_burned,
         duration=duration,
@@ -35,7 +39,21 @@ async def create_exercise(
     db.add(exercise)
     db.commit()
     db.refresh(exercise)
-    return exercise
+    
+    # Award XP for exercise logging and update streak
+    try:
+        gamification_result = GamificationService.award_xp(db, current_user.id, 'exercise_log')
+        streak_result = GamificationService.update_streak(db, current_user.id)
+        
+        return {
+            "exercise": exercise,
+            "gamification": gamification_result,
+            "streak": streak_result
+        }
+    except Exception as e:
+        # Don't fail the main operation if gamification fails
+        print(f"Gamification error: {e}")
+        return {"exercise": exercise}
 
 @router.get("/exercises/")
 async def get_exercises(

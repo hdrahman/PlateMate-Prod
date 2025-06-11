@@ -5,6 +5,9 @@ from models import FoodLog
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from services.gamification_service import GamificationService
+from auth.firebase_auth import get_current_user
+from models import User
 
 router = APIRouter()
 
@@ -101,7 +104,11 @@ def get_meal_data(db: Session = Depends(get_db)):
     return list(meal_dict.values())
 
 @router.post("/create", status_code=201)
-def create_food_log(food_log: FoodLogCreate, db: Session = Depends(get_db)):
+def create_food_log(
+    food_log: FoodLogCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Create a new food log entry"""
     try:
         # Convert string date to datetime if provided
@@ -116,7 +123,7 @@ def create_food_log(food_log: FoodLogCreate, db: Session = Depends(get_db)):
         # Create new food log entry
         db_food_log = FoodLog(
             meal_id=food_log.meal_id,
-            user_id=food_log.user_id,
+            user_id=current_user.id,  # Use authenticated user's ID
             food_name=food_log.food_name,
             calories=food_log.calories,
             proteins=food_log.proteins,
@@ -146,7 +153,21 @@ def create_food_log(food_log: FoodLogCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(db_food_log)
         
-        return {"id": db_food_log.id, "message": "Food log created successfully"}
+        # Award XP for food logging and update streak
+        try:
+            gamification_result = GamificationService.award_xp(db, current_user.id, 'food_log')
+            streak_result = GamificationService.update_streak(db, current_user.id)
+            
+            return {
+                "id": db_food_log.id, 
+                "message": "Food log created successfully",
+                "gamification": gamification_result,
+                "streak": streak_result
+            }
+        except Exception as e:
+            # Don't fail the main operation if gamification fails
+            print(f"Gamification error: {e}")
+            return {"id": db_food_log.id, "message": "Food log created successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create food log: {str(e)}")

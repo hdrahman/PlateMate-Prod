@@ -11,6 +11,7 @@ from DB import get_db
 from auth.firebase_auth import get_current_user
 from utils.weight_utils import add_weight_entry
 from utils.nutrition_utils import update_user_nutrition_goals, calculate_nutrition_goals
+from services.gamification_service import GamificationService
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -358,6 +359,26 @@ async def update_profile(
     
     # Commit all changes
     db.commit()
+    
+    # Award XP for profile updates and check achievements
+    try:
+        # Award XP for weight logging if weight was updated
+        if "profile" in profile_update and "weight" in profile_update["profile"] and not skip_weight_history:
+            GamificationService.award_xp(db, current_user.id, 'weight_log')
+        
+        # Check if profile is now complete and award XP
+        if GamificationService._check_profile_complete(db, current_user.id):
+            GamificationService.award_xp(db, current_user.id, 'profile_complete')
+        
+        # Check if goals are set and award XP
+        if GamificationService._check_goals_set(db, current_user.id):
+            GamificationService.award_xp(db, current_user.id, 'goal_setter')
+        
+        # Check for any new achievements
+        GamificationService.check_achievements(db, current_user.id)
+        
+    except Exception as e:
+        logger.error(f"Gamification error in profile update: {e}")
     
     # Get updated profile data
     profile_data = get_user_profile_data(db, current_user.id)
