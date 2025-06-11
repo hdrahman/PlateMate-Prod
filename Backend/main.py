@@ -34,6 +34,7 @@ from routes.arli_ai import router as arli_ai_router  # Include Arli AI router
 from routes.users import router as users_router  # Include users router
 from routes.fatsecret import router as fatsecret_router  # Include FatSecret router
 from routes.profile import router as profile_router  # Include profile router
+from routes.deepseek import router as deepseek_router  # Include DeepSeek router
 
 app = FastAPI()
 
@@ -105,6 +106,7 @@ app.include_router(arli_ai_router, prefix='/arli', tags=['arli_ai'])  # Include 
 app.include_router(users_router, prefix='/users', tags=['users'])  # Include users router
 app.include_router(fatsecret_router, prefix='/api', tags=['fatsecret'])  # Include FatSecret router
 app.include_router(profile_router, prefix='/profile', tags=['profile'])  # Include profile router
+app.include_router(deepseek_router, tags=['deepseek'])  # Include DeepSeek router
 
 @app.get("/")
 def home():
