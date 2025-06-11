@@ -1,4 +1,3 @@
-// Re-export from fatSecret.ts
-export { searchFatSecretFood, getFatSecretFoodDetails } from './fatSecret';
+// Re-exports for API modules
 
 // Other API exports can be added here as needed 

@@ -1,5 +1,4 @@
 import { fetchFoodByBarcode as fetchFromNutritionix } from '../api/nutritionix';
-import { fetchFoodByBarcode as fetchFromFatSecret } from '../api/fatSecret';
 import { FoodItem } from '../api/nutritionix';
 
 /**
@@ -34,22 +33,14 @@ export class BarcodeService {
                 return null;
             }
 
-            // Strategy 1: Nutritionix API (Primary)
+            // Strategy 1: Nutritionix API (Primary and Only)
             const nutritionixResult = await this.tryNutritionix(cleanBarcode);
             if (nutritionixResult) {
                 console.log('✅ Success with Nutritionix API');
                 return this.enhanceResult(nutritionixResult, 'nutritionix');
             }
 
-            // Strategy 2: FatSecret API (Fallback)
-            console.log('🔄 Trying FatSecret API as fallback...');
-            const fatSecretResult = await this.tryFatSecret(cleanBarcode);
-            if (fatSecretResult) {
-                console.log('✅ Success with FatSecret API');
-                return this.enhanceResult(fatSecretResult, 'fatsecret');
-            }
-
-            console.log('❌ No results from any API');
+            console.log('❌ No results found');
             return null;
 
         } catch (error) {
@@ -86,23 +77,12 @@ export class BarcodeService {
         }
     }
 
-    /**
-     * Try FatSecret API
-     */
-    private async tryFatSecret(barcode: string): Promise<FoodItem | null> {
-        try {
-            console.log('🍎 Trying FatSecret API...');
-            return await fetchFromFatSecret(barcode);
-        } catch (error) {
-            console.warn('⚠️ FatSecret API failed:', error);
-            return null;
-        }
-    }
+
 
     /**
      * Enhance result with metadata
      */
-    private enhanceResult(foodItem: FoodItem, source: 'nutritionix' | 'fatsecret'): FoodItem {
+    private enhanceResult(foodItem: FoodItem, source: 'nutritionix'): FoodItem {
         return {
             ...foodItem,
             notes: foodItem.notes ? `${foodItem.notes} | Source: ${source}` : `Source: ${source}`
