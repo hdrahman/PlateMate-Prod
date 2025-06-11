@@ -16,13 +16,14 @@ import {
   Alert
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { ThemeContext } from "../ThemeContext";
 import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth } from '../utils/firebase/index';
 
 // Get IP and port from the BACKEND_URL
 const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
@@ -53,6 +54,7 @@ interface Message {
 export default function Chatbot() {
   const { isDarkTheme } = useContext(ThemeContext);
   const navigation = useNavigation();
+  const route = useRoute();
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
@@ -71,6 +73,20 @@ export default function Chatbot() {
   const dot2Opacity = useRef(new Animated.Value(0.4)).current;
   const dot3Opacity = useRef(new Animated.Value(0.4)).current;
 
+  // Helper function to get Firebase authentication token
+  const getFirebaseToken = async (): Promise<string> => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+      return await currentUser.getIdToken(true);
+    } catch (error) {
+      console.error('Error getting Firebase token:', error);
+      throw new Error('Authentication failed. Please sign in again.');
+    }
+  };
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollViewRef.current) {
@@ -79,6 +95,86 @@ export default function Chatbot() {
       }, 100);
     }
   }, [messages]);
+
+  // Handle nutrition data from FoodLog screen
+  useEffect(() => {
+    const params = route.params as any;
+    if (params?.nutritionData && params?.autoStart) {
+      // Call DeepSeek V3 for nutrition analysis via secure backend
+      handleNutritionAnalysis(params.nutritionData);
+    }
+  }, [route.params]);
+
+  const handleNutritionAnalysis = async (nutritionData: any) => {
+    try {
+      setIsLoading(true);
+      setIsTyping(true);
+
+      // Add typing indicator
+      const typingIndicator: Message = {
+        id: 'typing-analysis-' + Date.now().toString(),
+        text: "",
+        sender: "bot",
+        timestamp: new Date(),
+        isTyping: true
+      };
+      setMessages([typingIndicator]);
+
+      // Get Firebase authentication token
+      const token = await getFirebaseToken();
+
+      // Call secure backend endpoint for DeepSeek V3 analysis
+      const response = await axios.post(
+        `${BACKEND_BASE_URL}/deepseek/nutrition-analysis`,
+        { nutritionData, autoStart: true },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // Remove typing indicator and add Coach Max's analysis
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+
+      const analysisMessage: Message = {
+        id: "nutrition-analysis-" + Date.now().toString(),
+        text: response.data.response,
+        sender: "bot",
+        timestamp: new Date()
+      };
+
+      setMessages([analysisMessage]);
+
+    } catch (error: any) {
+      console.error('Error getting nutrition analysis:', error);
+
+      // Remove typing indicator and add fallback message
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+
+      let errorMessage = "Hey there! I'm ready to help you with your nutrition goals today. What would you like to discuss about your health journey?";
+
+      // Handle specific authentication errors
+      if (error.message?.includes('Authentication failed') || error.message?.includes('User not authenticated')) {
+        errorMessage = "Looks like you need to sign in again to get your personalized nutrition analysis. Please check your authentication and try again!";
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        errorMessage = "I need you to be signed in to provide personalized nutrition coaching. Please check your login and try again!";
+      }
+
+      const fallbackMessage: Message = {
+        id: "fallback-" + Date.now().toString(),
+        text: errorMessage,
+        sender: "bot",
+        timestamp: new Date()
+      };
+
+      setMessages([fallbackMessage]);
+    } finally {
+      setIsLoading(false);
+      setIsTyping(false);
+    }
+  };
 
   useEffect(() => {
     const animateDots = () => {
@@ -133,15 +229,21 @@ export default function Chatbot() {
     }
   }, [isTyping, dot1Opacity, dot2Opacity, dot3Opacity]);
 
-  const chatWithArliAI = async (userMessage: string) => {
+  const chatWithCoachMax = async (userMessage: string) => {
     try {
-      // Format messages for Arli AI API
+      // Format messages for DeepSeek V3 API via secure backend
       const messageHistory = messages
         .filter(msg => !msg.isTyping)
         .map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.text
         }));
+
+      // Add system prompt for Coach Max personality
+      const systemPrompt = {
+        role: 'system',
+        content: 'You are Coach Max, an expert AI Health Coach and nutritionist. You\'re energetic, motivational, and provide practical, actionable advice. Keep your responses friendly, supportive, and informative.'
+      };
 
       // Add the new user message
       messageHistory.push({
@@ -150,24 +252,37 @@ export default function Chatbot() {
       });
 
       const payload = {
-        messages: messageHistory,
-        conversation_id: conversationId
+        messages: [systemPrompt, ...messageHistory],
+        temperature: 0.7,
+        max_tokens: 1000
       };
 
-      // Call the backend API
+      // Get Firebase authentication token
+      const token = await getFirebaseToken();
+
+      // Call the secure backend DeepSeek API
       const response = await axios.post(
-        `${BACKEND_BASE_URL}/arli/chat`,
-        payload
+        `${BACKEND_BASE_URL}/deepseek/chat`,
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
 
-      // Save the conversation ID for future messages
-      if (response.data.conversation_id) {
-        setConversationId(response.data.conversation_id);
+      return response.data.response;
+    } catch (error: any) {
+      console.error("Error calling DeepSeek via backend:", error);
+
+      // Handle specific authentication errors
+      if (error.message?.includes('Authentication failed') || error.message?.includes('User not authenticated')) {
+        throw new Error("You need to sign in again to chat with Coach Max. Please check your authentication.");
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        throw new Error("Authentication required to chat with Coach Max. Please sign in and try again.");
       }
 
-      return response.data.response;
-    } catch (error) {
-      console.error("Error calling Arli AI:", error);
       throw new Error("Failed to get response from Coach Max. Please try again.");
     }
   };
@@ -200,7 +315,7 @@ export default function Chatbot() {
 
     try {
       // Get AI response
-      const response = await chatWithArliAI(userMessage.text);
+      const response = await chatWithCoachMax(userMessage.text);
 
       // Remove typing indicator and add bot response
       setMessages(prev => prev.filter(msg => !msg.isTyping));
@@ -217,9 +332,16 @@ export default function Chatbot() {
       // Remove typing indicator and add error message
       setMessages(prev => prev.filter(msg => !msg.isTyping));
 
+      let botErrorText = "Hey, I'm having a little trouble connecting right now. Let's try again in a moment - I'm here to help you maximize your potential!";
+
+      // Handle authentication errors with specific messaging
+      if (error instanceof Error && (error.message.includes('Authentication') || error.message.includes('sign in'))) {
+        botErrorText = "Looks like you need to sign in again to continue our conversation. Please check your authentication and come back - I'll be here to help!";
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Hey, I'm having a little trouble connecting right now. Let's try again in a moment - I'm here to help you maximize your potential!",
+        text: botErrorText,
         sender: "bot",
         timestamp: new Date()
       };

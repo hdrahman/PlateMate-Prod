@@ -1760,6 +1760,53 @@ const DiaryScreen: React.FC = () => {
         }
     }, [refreshTrigger, user]);
 
+    // Handle Generate Report button - gather nutrition data and navigate to coach
+    const handleGenerateReport = () => {
+        try {
+            // Calculate totals for the day
+            const totalCalories = mealData.reduce((sum, meal) => sum + meal.total, 0);
+            const totalMacros = mealData.reduce((acc, meal) => ({
+                carbs: acc.carbs + meal.macros.carbs,
+                protein: acc.protein + meal.macros.protein,
+                fat: acc.fat + meal.macros.fat
+            }), { carbs: 0, protein: 0, fat: 0 });
+
+            // Prepare nutrition context for coach
+            const nutritionData = {
+                date: formatDate(currentDate),
+                calories: {
+                    consumed: totalCalories,
+                    goal: nutritionGoals.calories,
+                    remaining: nutritionGoals.calories - totalCalories
+                },
+                macros: {
+                    carbs: { consumed: totalMacros.carbs, goal: nutritionGoals.carbs },
+                    protein: { consumed: totalMacros.protein, goal: nutritionGoals.protein },
+                    fat: { consumed: totalMacros.fat, goal: nutritionGoals.fat }
+                },
+                meals: mealData.map(meal => ({
+                    name: meal.title,
+                    calories: meal.total,
+                    items: meal.items.map(item => item.name)
+                })),
+                exercise: {
+                    total: totalExerciseCalories,
+                    activities: exerciseList.map(ex => ex.exercise_name || 'Exercise')
+                }
+            };
+
+            // Navigate to coach with nutrition context
+            (navigation as any).navigate('Chatbot', {
+                nutritionData,
+                autoStart: true
+            });
+
+        } catch (error) {
+            console.error('Error generating report:', error);
+            Alert.alert('Error', 'Unable to generate report. Please try again.');
+        }
+    };
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={containerStyle}>
@@ -2014,13 +2061,11 @@ const DiaryScreen: React.FC = () => {
                                     >
                                         <Text style={styles.tabBtnText}>Nutrition</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.tabBtn, { flex: 1 }]}>
-                                        <Text style={styles.tabBtnText}>Complete Diary</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.bottomAnalyzeRow}>
-                                    <TouchableOpacity style={[styles.analyzeBtn, { flex: 1 }]}>
-                                        <Text style={styles.analyzeBtnText}>Analyze</Text>
+                                    <TouchableOpacity
+                                        style={[styles.analyzeBtn, { flex: 1 }]}
+                                        onPress={handleGenerateReport}
+                                    >
+                                        <Text style={styles.analyzeBtnText}>Generate Report</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>

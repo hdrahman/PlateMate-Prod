@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
-import { searchFatSecretFood, getFatSecretFoodDetails } from '../api';
+import { searchFood, getFoodDetails } from '../api/nutritionix';
 import { getRecentFoodEntries, addFoodEntryWithContext } from '../api/foodLog';
 import { debounce } from 'lodash';
 import { useFoodLog } from '../context/FoodLogContext';
@@ -137,8 +137,8 @@ export default function Manual() {
     const debouncedSearch = useCallback(
         debounce(async (query) => {
             try {
-                // Use FatSecret API for all searches
-                const results = await searchFatSecretFood(query);
+                // Use Nutritionix API for all searches (same as barcode scanner primary API)
+                const results = await searchFood(query);
                 console.log("Search results:", results.length);
                 setSearchResults(results);
             } catch (error) {
@@ -163,22 +163,20 @@ export default function Manual() {
         try {
             setIsLoading(true);
 
-            // If we have a FatSecret ID, get detailed info
-            if (food.notes?.includes('FatSecret')) {
-                const foodId = food.notes.split('FatSecret ID: ')[1];
-                if (foodId) {
-                    // Get detailed info from FatSecret API
-                    const detailedFood = await getFatSecretFoodDetails(foodId);
-                    if (detailedFood) {
-                        setSelectedFood(detailedFood);
-                        setShowFoodDetails(true);
-                        setIsLoading(false);
-                        return;
-                    }
+            // Try to get more detailed info from Nutritionix API
+            try {
+                const detailedFood = await getFoodDetails(food.food_name);
+                if (detailedFood) {
+                    setSelectedFood(detailedFood);
+                    setShowFoodDetails(true);
+                    setIsLoading(false);
+                    return;
                 }
+            } catch (detailError) {
+                console.log('Could not get detailed info, using search result data');
             }
 
-            // Use whatever info we have
+            // Use whatever info we have from search results
             setSelectedFood(food);
             setShowFoodDetails(true);
         } catch (error) {
