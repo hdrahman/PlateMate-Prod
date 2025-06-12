@@ -129,27 +129,27 @@ class NutritionixService:
         return {
             'food_name': food.get('food_name', ''),
             'brand_name': food.get('brand_name'),
-            'calories': round(food.get('nf_calories', 0)),
-            'proteins': round(food.get('nf_protein', 0)),
-            'carbs': round(food.get('nf_total_carbohydrate', 0)),
-            'fats': round(food.get('nf_total_fat', 0)),
-            'fiber': round(food.get('nf_dietary_fiber', 0)),
-            'sugar': round(food.get('nf_sugars', 0)),
-            'saturated_fat': round(food.get('nf_saturated_fat', 0)),
-            'polyunsaturated_fat': round(self._get_nutrient_value(food, 646)),
-            'monounsaturated_fat': round(self._get_nutrient_value(food, 645)),
-            'trans_fat': round(self._get_nutrient_value(food, 605)),
-            'cholesterol': round(food.get('nf_cholesterol', 0)),
-            'sodium': round(food.get('nf_sodium', 0)),
-            'potassium': round(food.get('nf_potassium', 0) or self._get_nutrient_value(food, 306)),
-            'vitamin_a': round(self._get_nutrient_value(food, 320)),
-            'vitamin_c': round(self._get_nutrient_value(food, 401)),
-            'calcium': round(self._get_nutrient_value(food, 301)),
-            'iron': round(self._get_nutrient_value(food, 303)),
+            'calories': round(food.get('nf_calories', 0) or 0),
+            'proteins': round(food.get('nf_protein', 0) or 0),
+            'carbs': round(food.get('nf_total_carbohydrate', 0) or 0),
+            'fats': round(food.get('nf_total_fat', 0) or 0),
+            'fiber': round(food.get('nf_dietary_fiber', 0) or 0),
+            'sugar': round(food.get('nf_sugars', 0) or 0),
+            'saturated_fat': round(food.get('nf_saturated_fat', 0) or 0),
+            'polyunsaturated_fat': round(self._get_nutrient_value(food, 646) or 0),
+            'monounsaturated_fat': round(self._get_nutrient_value(food, 645) or 0),
+            'trans_fat': round(self._get_nutrient_value(food, 605) or 0),
+            'cholesterol': round(food.get('nf_cholesterol', 0) or 0),
+            'sodium': round(food.get('nf_sodium', 0) or 0),
+            'potassium': round(food.get('nf_potassium', 0) or self._get_nutrient_value(food, 306) or 0),
+            'vitamin_a': round(self._get_nutrient_value(food, 320) or 0),
+            'vitamin_c': round(self._get_nutrient_value(food, 401) or 0),
+            'calcium': round(self._get_nutrient_value(food, 301) or 0),
+            'iron': round(self._get_nutrient_value(food, 303) or 0),
             'image': food.get('photo', {}).get('thumb', ''),
             'serving_unit': food.get('serving_unit', 'serving'),
-            'serving_weight_grams': food.get('serving_weight_grams', 0),
-            'serving_qty': food.get('serving_qty', 1),
+            'serving_weight_grams': food.get('serving_weight_grams', 0) or 0,
+            'serving_qty': food.get('serving_qty', 1) or 1,
             'healthiness_rating': self._calculate_healthiness_rating(food)
         }
     
@@ -171,6 +171,7 @@ class NutritionixService:
             response.raise_for_status()
             
             data = response.json()
+            logger.info(f"Instant search returned {len(data.get('branded', []))} branded and {len(data.get('common', []))} common foods")
             
             # Process branded foods with detailed nutrition
             detailed_results = []
@@ -178,19 +179,40 @@ class NutritionixService:
             
             for item in branded_foods:
                 nix_item_id = item.get('nix_item_id')
+                logger.info(f"Processing branded food: {item.get('food_name')} with nix_item_id: {nix_item_id}")
+                logger.info(f"Instant search branded data: nf_calories={item.get('nf_calories')}")
+                
                 if nix_item_id:
                     detailed_food = self._get_branded_food_details(nix_item_id)
                     if detailed_food:
+                        logger.info(f"Got detailed data for {detailed_food.get('food_name')}: calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
                         detailed_results.append(detailed_food)
+                    else:
+                        logger.warning(f"Failed to get detailed data for branded food: {item.get('food_name')}, using fallback")
+                        # Use basic data from instant search as fallback
+                        fallback_food = self._create_fallback_food_item(item)
+                        detailed_results.append(fallback_food)
+                else:
+                    logger.warning(f"No nix_item_id for branded food: {item.get('food_name')}")
+                    fallback_food = self._create_fallback_food_item(item)
+                    detailed_results.append(fallback_food)
             
             # Process common foods (these need natural language processing)
             common_foods = data.get('common', [])[:5]  # Limit to 5 common foods
             for item in common_foods:
                 food_name = item.get('food_name', '')
+                logger.info(f"Processing common food: {food_name}")
                 if food_name:
                     detailed_food = self.get_food_details(food_name)
                     if detailed_food:
+                        logger.info(f"Got detailed data for {detailed_food.get('food_name')}: calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
                         detailed_results.append(detailed_food)
+                    else:
+                        logger.warning(f"Failed to get detailed data for common food: {food_name}, using fallback")
+                        fallback_food = self._create_fallback_food_item(item)
+                        detailed_results.append(fallback_food)
+            
+            logger.info(f"Total detailed results: {len(detailed_results)}")
             
             # Filter by minimum healthiness if specified
             if min_healthiness > 0:
@@ -208,6 +230,35 @@ class NutritionixService:
             logger.error(f'Unexpected error searching for food: {e}')
             return []
 
+    def _create_fallback_food_item(self, item: Dict) -> Dict[str, Any]:
+        """Create a fallback food item from instant search data"""
+        return {
+            'food_name': item.get('food_name', ''),
+            'brand_name': item.get('brand_name'),
+            'calories': round(item.get('nf_calories', 0)),
+            'proteins': 0,  # Not available in instant search
+            'carbs': 0,     # Not available in instant search
+            'fats': 0,      # Not available in instant search
+            'fiber': 0,
+            'sugar': 0,
+            'saturated_fat': 0,
+            'polyunsaturated_fat': 0,
+            'monounsaturated_fat': 0,
+            'trans_fat': 0,
+            'cholesterol': 0,
+            'sodium': 0,
+            'potassium': 0,
+            'vitamin_a': 0,
+            'vitamin_c': 0,
+            'calcium': 0,
+            'iron': 0,
+            'image': item.get('photo', {}).get('thumb', '') if isinstance(item.get('photo'), dict) else '',
+            'serving_unit': item.get('serving_unit', 'serving'),
+            'serving_weight_grams': item.get('serving_weight_grams', 0),
+            'serving_qty': item.get('serving_qty', 1),
+            'healthiness_rating': 5  # Default rating when no nutrition data available
+        }
+
     def _get_branded_food_details(self, nix_item_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a branded food using nix_item_id"""
         if not self.is_configured:
@@ -221,6 +272,7 @@ class NutritionixService:
                 'x-app-key': self.api_key
             }
             
+            logger.info(f"Fetching branded food details for nix_item_id: {nix_item_id}")
             response = requests.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
             
@@ -228,8 +280,13 @@ class NutritionixService:
             foods = data.get('foods', [])
             
             if foods:
-                return self._map_to_food_item(foods[0])
+                food_data = foods[0]
+                logger.info(f"Raw API response for {food_data.get('food_name', 'unknown')}: nf_calories={food_data.get('nf_calories')}, nf_protein={food_data.get('nf_protein')}, nf_total_carbohydrate={food_data.get('nf_total_carbohydrate')}, nf_total_fat={food_data.get('nf_total_fat')}")
+                mapped_result = self._map_to_food_item(food_data)
+                logger.info(f"Mapped result: calories={mapped_result.get('calories')}, proteins={mapped_result.get('proteins')}, carbs={mapped_result.get('carbs')}, fats={mapped_result.get('fats')}")
+                return mapped_result
             
+            logger.warning(f"No foods found in API response for nix_item_id: {nix_item_id}")
             return None
             
         except requests.exceptions.RequestException as e:
@@ -254,6 +311,7 @@ class NutritionixService:
                 'Content-Type': 'application/json'
             }
             
+            logger.info(f"Fetching food details for: {food_name}")
             response = requests.post(url, json=payload, headers=headers, timeout=10)
             response.raise_for_status()
             
@@ -261,8 +319,13 @@ class NutritionixService:
             foods = data.get('foods', [])
             
             if foods:
-                return self._map_to_food_item(foods[0])
+                food_data = foods[0]
+                logger.info(f"Raw API response for {food_data.get('food_name', 'unknown')}: nf_calories={food_data.get('nf_calories')}, nf_protein={food_data.get('nf_protein')}, nf_total_carbohydrate={food_data.get('nf_total_carbohydrate')}, nf_total_fat={food_data.get('nf_total_fat')}")
+                mapped_result = self._map_to_food_item(food_data)
+                logger.info(f"Mapped result: calories={mapped_result.get('calories')}, proteins={mapped_result.get('proteins')}, carbs={mapped_result.get('carbs')}, fats={mapped_result.get('fats')}")
+                return mapped_result
             
+            logger.warning(f"No foods found in API response for: {food_name}")
             return None
             
         except requests.exceptions.RequestException as e:
