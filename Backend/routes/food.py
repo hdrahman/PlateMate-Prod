@@ -3,20 +3,21 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
 
-from services.nutritionix_service import NutritionixService
 from auth.firebase_auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
-# Initialize service with error handling
-try:
-    nutritionix_service = NutritionixService()
-    logger.info("Nutritionix service initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize Nutritionix service: {e}")
-    nutritionix_service = None
-
 router = APIRouter()
+
+# Lazy initialization of nutritionix service
+def get_nutritionix_service():
+    """Get nutritionix service with lazy initialization"""
+    try:
+        from services.nutritionix_service import nutritionix_service
+        return nutritionix_service
+    except Exception as e:
+        logger.error(f"Failed to get Nutritionix service: {e}")
+        return None
 
 class FoodSearchRequest(BaseModel):
     query: str
@@ -46,6 +47,7 @@ async def search_food(
     try:
         logger.info(f"Food search request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {request.query}")
         
+        nutritionix_service = get_nutritionix_service()
         if not nutritionix_service:
             raise HTTPException(status_code=503, detail="Nutritionix service is not available")
         
@@ -82,6 +84,7 @@ async def get_food_details(
     try:
         logger.info(f"Food details request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {request.food_name}")
         
+        nutritionix_service = get_nutritionix_service()
         if not nutritionix_service:
             raise HTTPException(status_code=503, detail="Nutritionix service is not available")
         
@@ -121,6 +124,7 @@ async def search_by_barcode(
         user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
         logger.info(f"Barcode search request from user {user_id}: {barcode}")
         
+        nutritionix_service = get_nutritionix_service()
         if not nutritionix_service:
             logger.error("Nutritionix service is not available")
             raise HTTPException(status_code=503, detail="Nutritionix service is not available")
@@ -165,6 +169,7 @@ async def search_by_barcode_post(
         user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
         logger.info(f"Barcode search request from user {user_id}: {request.barcode}")
         
+        nutritionix_service = get_nutritionix_service()
         if not nutritionix_service:
             raise HTTPException(status_code=503, detail="Nutritionix service is not available")
         
@@ -193,6 +198,7 @@ async def food_service_health():
     Returns:
         Status of the food service and Nutritionix API configuration
     """
+    nutritionix_service = get_nutritionix_service()
     return {
         "status": "ok",
         "nutritionix_configured": nutritionix_service.is_configured if nutritionix_service else False,

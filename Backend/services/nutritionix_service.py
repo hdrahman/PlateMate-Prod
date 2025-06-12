@@ -3,6 +3,7 @@ import requests
 import logging
 from typing import Dict, List, Optional, Any
 from math import floor
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +11,20 @@ class NutritionixService:
     """Service class for handling Nutritionix API interactions"""
     
     def __init__(self):
+        self._load_credentials()
+    
+    def _load_credentials(self):
+        """Load API credentials, with fallback to reload .env if not found"""
         self.app_id = os.getenv('NUTRITIONIX_APP_ID')
         self.api_key = os.getenv('NUTRITIONIX_API_KEY')
+        
+        # If credentials are not found, try loading .env file
+        if not self.app_id or not self.api_key:
+            logger.info("Nutritionix credentials not found, attempting to load .env file...")
+            load_dotenv()
+            self.app_id = os.getenv('NUTRITIONIX_APP_ID')
+            self.api_key = os.getenv('NUTRITIONIX_API_KEY')
+        
         self.base_url = 'https://trackapi.nutritionix.com/v2'
         
         if not self.app_id or not self.api_key:
@@ -24,8 +37,13 @@ class NutritionixService:
             logger.info(f"NUTRITIONIX_APP_ID: {self.app_id}")
             logger.info(f"NUTRITIONIX_API_KEY: {'*' * len(self.api_key)}")
             self.is_configured = True
-    
 
+    def _ensure_configured(self):
+        """Ensure the service is configured, retry loading credentials if not"""
+        if not self.is_configured:
+            logger.info("Service not configured, retrying credential loading...")
+            self._load_credentials()
+        return self.is_configured
     
     def _get_nutrient_value(self, food: Dict, attr_id: int) -> float:
         """Get a specific nutrient value from the full_nutrients array"""
@@ -155,7 +173,7 @@ class NutritionixService:
     
     def search_food(self, query: str, min_healthiness: int = 0) -> List[Dict[str, Any]]:
         """Search for foods using the Nutritionix API"""
-        if not self.is_configured:
+        if not self._ensure_configured():
             logger.warning('Nutritionix API credentials not configured')
             return []
         
@@ -261,7 +279,7 @@ class NutritionixService:
 
     def _get_branded_food_details(self, nix_item_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a branded food using nix_item_id"""
-        if not self.is_configured:
+        if not self._ensure_configured():
             return None
         
         try:
@@ -298,7 +316,7 @@ class NutritionixService:
     
     def get_food_details(self, food_name: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a food"""
-        if not self.is_configured:
+        if not self._ensure_configured():
             logger.warning('Nutritionix API credentials not configured')
             return None
         
@@ -337,7 +355,7 @@ class NutritionixService:
     
     def search_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
         """Search for food by barcode using Nutritionix API"""
-        if not self.is_configured:
+        if not self._ensure_configured():
             logger.warning('Nutritionix API credentials not configured')
             return None
         

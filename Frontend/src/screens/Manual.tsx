@@ -23,8 +23,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
-import { searchFood, getFoodDetails } from '../api/nutritionix';
-import { getRecentFoodEntries, addFoodEntryWithContext } from '../api/foodLog';
+import { searchFood, getFoodDetails, FoodItem as FoodItemType } from '../api/nutritionix';
+import { getRecentFoodEntries, addFoodEntryWithContext, FoodLogEntry } from '../api/foodLog';
 import { debounce } from 'lodash';
 import { useFoodLog } from '../context/FoodLogContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -85,6 +85,36 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
     );
 };
 
+// Convert FoodLogEntry to FoodItem for display purposes
+const convertFoodLogEntryToFoodItem = (entry: FoodLogEntry): FoodItemType => {
+    return {
+        food_name: entry.food_name,
+        brand_name: entry.brand_name || undefined,
+        calories: entry.calories,
+        proteins: entry.proteins,
+        carbs: entry.carbs,
+        fats: entry.fats,
+        fiber: entry.fiber,
+        sugar: entry.sugar,
+        saturated_fat: entry.saturated_fat,
+        polyunsaturated_fat: entry.polyunsaturated_fat,
+        monounsaturated_fat: entry.monounsaturated_fat,
+        trans_fat: entry.trans_fat,
+        cholesterol: entry.cholesterol,
+        sodium: entry.sodium,
+        potassium: entry.potassium,
+        vitamin_a: entry.vitamin_a,
+        vitamin_c: entry.vitamin_c,
+        calcium: entry.calcium,
+        iron: entry.iron,
+        image: entry.image_url || '', // Map image_url to image
+        serving_unit: entry.quantity?.split(' ').slice(1).join(' ') || 'serving',
+        serving_weight_grams: 0, // Not available in FoodLogEntry
+        serving_qty: parseFloat(entry.quantity?.split(' ')[0] || '1'),
+        healthiness_rating: entry.healthiness_rating
+    };
+};
+
 export default function Manual() {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
@@ -92,15 +122,14 @@ export default function Manual() {
     const defaultMealType = params?.mealType || 'Breakfast';
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
-    const [recentEntries, setRecentEntries] = useState([]);
+    const [searchResults, setSearchResults] = useState<FoodItemType[]>([]);
+    const [recentEntries, setRecentEntries] = useState<FoodItemType[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [selectedFood, setSelectedFood] = useState(null);
+    const [selectedFood, setSelectedFood] = useState<FoodItemType | null>(null);
     const [showFoodDetails, setShowFoodDetails] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
-    const mealCategories = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
     const [selectedMealCategory, setSelectedMealCategory] = useState(defaultMealType);
 
     // Use the food log context
@@ -116,7 +145,9 @@ export default function Manual() {
         setIsLoading(true);
         try {
             const entries = await getRecentFoodEntries(10);
-            setRecentEntries(entries);
+            // Convert FoodLogEntry to FoodItem for display
+            const convertedEntries = entries.map(convertFoodLogEntryToFoodItem);
+            setRecentEntries(convertedEntries);
         } catch (error) {
             console.error('Error loading recent entries:', error);
         } finally {
@@ -266,27 +297,6 @@ export default function Manual() {
         </TouchableOpacity>
     );
 
-    // Render meal category button
-    const renderMealCategory = (meal: string) => (
-        <TouchableOpacity
-            key={meal}
-            style={[
-                styles.mealCategoryButton,
-                selectedMealCategory === meal && styles.selectedMealCategory
-            ]}
-            onPress={() => setSelectedMealCategory(meal)}
-        >
-            <Text
-                style={[
-                    styles.mealCategoryText,
-                    selectedMealCategory === meal && styles.selectedMealCategoryText
-                ]}
-            >
-                {meal}
-            </Text>
-        </TouchableOpacity>
-    );
-
     // Render recent entry item
     const renderRecentEntry = ({ item }) => (
         <FoodItem item={item} onPress={handleFoodSelect} />
@@ -352,13 +362,6 @@ export default function Manual() {
                         <Ionicons name="add" size={24} color={WHITE} />
                     </LinearGradient>
                 </TouchableOpacity>
-            </View>
-
-            {/* Meal Categories (moved from bottom) */}
-            <View style={styles.mealCategoriesContainer}>
-                <View style={styles.mealCategoriesList}>
-                    {mealCategories.map(renderMealCategory)}
-                </View>
             </View>
 
             {/* Upload Options (replaced Categories) */}
@@ -466,8 +469,6 @@ export default function Manual() {
                 )}
             </View>
 
-
-
             {/* Food Details Modal */}
             {selectedFood && (
                 <FoodDetails
@@ -554,7 +555,7 @@ const styles = StyleSheet.create({
     },
     searchInputWrapper: {
         flex: 1,
-        height: 50,
+        height: 56,
         padding: 0,
         marginRight: 12,
     },
@@ -563,6 +564,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 12,
+        height: '100%',
     },
     searchInput: {
         flex: 1,
@@ -570,6 +572,7 @@ const styles = StyleSheet.create({
         color: WHITE,
         marginLeft: 8,
         fontSize: 16,
+        textAlignVertical: 'center',
     },
     addManualButton: {
         width: 50,
@@ -659,40 +662,5 @@ const styles = StyleSheet.create({
     gradientBorderContainer: {
         borderRadius: 10,
         overflow: 'hidden',
-    },
-    // Meal Categories Control Bar (moved from top)
-    mealCategoriesContainer: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-    },
-    mealCategoriesTitle: {
-        color: WHITE,
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    mealCategoriesList: {
-        flexDirection: 'row',
-        justifyContent: 'space-evenly',
-    },
-    mealCategoryButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 20,
-        minWidth: 70,
-        alignItems: 'center',
-    },
-    selectedMealCategory: {
-        backgroundColor: PURPLE_ACCENT,
-    },
-    mealCategoryText: {
-        color: WHITE,
-        fontSize: 12,
-    },
-    selectedMealCategoryText: {
-        color: WHITE,
-        fontWeight: 'bold',
     },
 }); 

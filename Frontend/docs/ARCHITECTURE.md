@@ -178,9 +178,8 @@ interface NutritionData {
 ### Environment Variables
 ```typescript
 // src/utils/config.ts
-export const NUTRITIONIX_APP_ID = '81f05703';
-export const NUTRITIONIX_API_KEY = '9fa47f35bdb53d11c6a06b14b63af07c';
-export const FATSECRET_CLIENT_ID = 'eba202cd16c84c98acd0905484d7138d';
+// API credentials moved to backend for security
+export const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 ```
 
 ### Feature Flags
