@@ -140,7 +140,7 @@ export default function Manual() {
     const debouncedSearch = useCallback(
         debounce(async (query) => {
             try {
-                // Use Nutritionix API for all searches (same as barcode scanner primary API)
+                // Use Backend API for all searches (moved from direct Nutritionix API)
                 const results = await searchFood(query);
                 console.log("Search results:", results.length);
                 setSearchResults(results);
@@ -166,7 +166,7 @@ export default function Manual() {
         try {
             setIsLoading(true);
 
-            // Try to get more detailed info from Nutritionix API
+            // Try to get more detailed info from Backend API
             try {
                 const detailedFood = await getFoodDetails(food.food_name);
                 if (detailedFood) {

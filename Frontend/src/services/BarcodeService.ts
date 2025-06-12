@@ -1,4 +1,4 @@
-import { fetchFoodByBarcode as fetchFromNutritionix } from '../api/nutritionix';
+import { fetchFoodByBarcode as fetchFromBackend } from '../api/nutritionix';
 import { FoodItem } from '../api/nutritionix';
 
 /**
@@ -33,11 +33,11 @@ export class BarcodeService {
                 return null;
             }
 
-            // Strategy 1: Nutritionix API (Primary and Only)
-            const nutritionixResult = await this.tryNutritionix(cleanBarcode);
-            if (nutritionixResult) {
-                console.log('✅ Success with Nutritionix API');
-                return this.enhanceResult(nutritionixResult, 'nutritionix');
+            // Strategy 1: Backend API (Primary and Only)
+            const backendResult = await this.tryBackend(cleanBarcode);
+            if (backendResult) {
+                console.log('✅ Success with Backend API');
+                return this.enhanceResult(backendResult, 'backend');
             }
 
             console.log('❌ No results found');
@@ -65,14 +65,14 @@ export class BarcodeService {
     }
 
     /**
-     * Try Nutritionix API
+     * Try Backend API
      */
-    private async tryNutritionix(barcode: string): Promise<FoodItem | null> {
+    private async tryBackend(barcode: string): Promise<FoodItem | null> {
         try {
-            console.log('🥗 Trying Nutritionix API...');
-            return await fetchFromNutritionix(barcode);
+            console.log('🥗 Trying Backend API...');
+            return await fetchFromBackend(barcode);
         } catch (error) {
-            console.warn('⚠️ Nutritionix API failed:', error);
+            console.warn('⚠️ Backend API failed:', error);
             return null;
         }
     }
@@ -82,7 +82,7 @@ export class BarcodeService {
     /**
      * Enhance result with metadata
      */
-    private enhanceResult(foodItem: FoodItem, source: 'nutritionix'): FoodItem {
+    private enhanceResult(foodItem: FoodItem, source: 'backend'): FoodItem {
         return {
             ...foodItem,
             notes: foodItem.notes ? `${foodItem.notes} | Source: ${source}` : `Source: ${source}`

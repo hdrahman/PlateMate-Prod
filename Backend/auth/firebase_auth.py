@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from DB import get_db
 from models import User
+import logging
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -64,12 +68,29 @@ def initialize_firebase_admin():
 # Try to initialize Firebase Admin SDK
 initialize_firebase_admin()
 
+# Custom security scheme that doesn't auto-fail on missing headers
+class OptionalHTTPBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super().__init__(auto_error=auto_error)
+
+    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
+        try:
+            return await super().__call__(request)
+        except HTTPException as e:
+            logger.warning(f"Authorization header missing or invalid: {e.detail}")
+            if self.auto_error:
+                raise
+            return None
+
 # Security scheme for extracting the JWT token
-security = HTTPBearer()
+security = OptionalHTTPBearer(auto_error=True)
 
 # Function to verify Firebase ID token
 async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    logger.info("Starting Firebase token verification")
+    
     if not firebase_initialized:
+        logger.error("Firebase Admin SDK not initialized")
         # Try to initialize again if it failed earlier
         if not initialize_firebase_admin():
             raise HTTPException(
@@ -77,14 +98,24 @@ async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depe
                 detail="Firebase Admin SDK is not initialized. Please check server configuration."
             )
     
+    if not credentials:
+        logger.error("No credentials provided to verify_firebase_token")
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header missing"
+        )
+    
     token = credentials.credentials
+    logger.info(f"Received token: {token[:10]}...")  # Log first 10 chars for debugging
+    
     try:
         # Verify the ID token with a clock tolerance of 5 seconds to handle minor time sync issues
         decoded_token = auth.verify_id_token(token, check_revoked=True, clock_skew_seconds=5)
+        logger.info(f"Token verified successfully for user: {decoded_token.get('uid')}")
         # Return the decoded token for further use
         return decoded_token
     except Exception as e:
-        print(f"❌ Error verifying Firebase token: {e}")
+        logger.error(f"Error verifying Firebase token: {e}")
         raise HTTPException(
             status_code=401,
             detail=f"Invalid authentication credentials: {str(e)}"
@@ -96,18 +127,22 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ):
     try:
+        logger.info("Getting current user from token data")
         firebase_uid = token_data.get("uid")
         if not firebase_uid:
+            logger.error("Firebase UID not found in token")
             raise HTTPException(
                 status_code=401, 
                 detail="Firebase UID not found in token"
             )
             
+        logger.info(f"Looking up user with Firebase UID: {firebase_uid}")
+        
         # Check if user exists in primary database
         user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
         
         if not user:
-            print(f"User with Firebase UID {firebase_uid} not found in primary database, checking alternative sources")
+            logger.info(f"User with Firebase UID {firebase_uid} not found in primary database, creating temporary user")
             
             # At this point, we have a valid Firebase authenticated user but they're not in our database yet
             # Instead of throwing an error, we'll return a minimal user object for authenticated endpoints
@@ -132,13 +167,17 @@ async def get_current_user(
             # Note: This user object is not saved to the database
             # The frontend should handle properly creating the user record
             
-            print(f"Created temporary user object for Firebase UID {firebase_uid}")
+            logger.info(f"Created temporary user object for Firebase UID {firebase_uid}")
+        else:
+            logger.info(f"Found existing user in database: {user.email}")
         
         return user
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in get_current_user: {str(e)}")
+        logger.error(f"Error in get_current_user: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500, 
             detail=f"Error fetching user: {str(e)}"

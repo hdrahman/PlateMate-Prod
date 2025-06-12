@@ -28,10 +28,8 @@ export const isDebug = __DEV__;
 export const APP_VERSION = '1.0.0';
 export const DEFAULT_USER_ID = 1;
 
-// Nutritionix API credentials - replace with your actual credentials
-// To get your own credentials, sign up at https://developer.nutritionix.com/
-export const NUTRITIONIX_APP_ID = '81f05703';
-export const NUTRITIONIX_API_KEY = '9fa47f35bdb53d11c6a06b14b63af07c';
+// Nutritionix API credentials moved to backend for security
+// Frontend now uses backend endpoints instead of direct API calls
 
 // Spoonacular API credentials - replace with your actual credentials
 // To get your own credentials, sign up at https://spoonacular.com/food-api
