@@ -166,24 +166,12 @@ export default function Manual() {
         try {
             setIsLoading(true);
 
-            // Try to get more detailed info from Backend API
-            try {
-                const detailedFood = await getFoodDetails(food.food_name);
-                if (detailedFood) {
-                    setSelectedFood(detailedFood);
-                    setShowFoodDetails(true);
-                    setIsLoading(false);
-                    return;
-                }
-            } catch (detailError) {
-                console.log('Could not get detailed info, using search result data');
-            }
-
-            // Use whatever info we have from search results
+            // Since our backend now returns detailed nutrition info for search results,
+            // we can use the food data directly without additional API calls
             setSelectedFood(food);
             setShowFoodDetails(true);
         } catch (error) {
-            console.error('Error getting food details:', error);
+            console.error('Error selecting food:', error);
             setSelectedFood(food);
             setShowFoodDetails(true);
         } finally {

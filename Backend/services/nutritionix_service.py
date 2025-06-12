@@ -171,19 +171,35 @@ class NutritionixService:
             response.raise_for_status()
             
             data = response.json()
-            combined_results = data.get('common', []) + data.get('branded', [])
             
-            # Map to FoodItem and calculate healthiness rating
-            food_items = [self._map_to_food_item(item) for item in combined_results]
+            # Process branded foods with detailed nutrition
+            detailed_results = []
+            branded_foods = data.get('branded', [])[:5]  # Limit to 5 branded foods
+            
+            for item in branded_foods:
+                nix_item_id = item.get('nix_item_id')
+                if nix_item_id:
+                    detailed_food = self._get_branded_food_details(nix_item_id)
+                    if detailed_food:
+                        detailed_results.append(detailed_food)
+            
+            # Process common foods (these need natural language processing)
+            common_foods = data.get('common', [])[:5]  # Limit to 5 common foods
+            for item in common_foods:
+                food_name = item.get('food_name', '')
+                if food_name:
+                    detailed_food = self.get_food_details(food_name)
+                    if detailed_food:
+                        detailed_results.append(detailed_food)
             
             # Filter by minimum healthiness if specified
             if min_healthiness > 0:
-                food_items = [item for item in food_items if item.get('healthiness_rating', 0) >= min_healthiness]
+                detailed_results = [item for item in detailed_results if item.get('healthiness_rating', 0) >= min_healthiness]
             
             # Sort by healthiness rating (highest first)
-            food_items.sort(key=lambda x: x.get('healthiness_rating', 0), reverse=True)
+            detailed_results.sort(key=lambda x: x.get('healthiness_rating', 0), reverse=True)
             
-            return food_items[:20]  # Return top 20 results
+            return detailed_results[:20]  # Return top 20 results
             
         except requests.exceptions.RequestException as e:
             logger.error(f'Error searching for food: {e}')
@@ -191,6 +207,37 @@ class NutritionixService:
         except Exception as e:
             logger.error(f'Unexpected error searching for food: {e}')
             return []
+
+    def _get_branded_food_details(self, nix_item_id: str) -> Optional[Dict[str, Any]]:
+        """Get detailed nutrition information for a branded food using nix_item_id"""
+        if not self.is_configured:
+            return None
+        
+        try:
+            url = f'{self.base_url}/search/item'
+            params = {'nix_item_id': nix_item_id}
+            headers = {
+                'x-app-id': self.app_id,
+                'x-app-key': self.api_key
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            foods = data.get('foods', [])
+            
+            if foods:
+                return self._map_to_food_item(foods[0])
+            
+            return None
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f'Error getting branded food details for {nix_item_id}: {e}')
+            return None
+        except Exception as e:
+            logger.error(f'Unexpected error getting branded food details for {nix_item_id}: {e}')
+            return None
     
     def get_food_details(self, food_name: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a food"""
