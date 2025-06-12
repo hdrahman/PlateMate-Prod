@@ -3,14 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem as FoodItemType } from '../api/nutritionix';
 
-// Define theme colors
+// Define theme colors - professional palette
 const WHITE = '#FFFFFF';
-const GRAY = '#AAAAAA';
-const LIGHT_GRAY = '#333333';
+const GRAY = '#8E8E93';
+const LIGHT_GRAY = '#48484A';
 const CARD_BG = '#1C1C1E';
-const GREEN = '#4CAF50';
-const YELLOW = '#FFC107';
-const RED = '#F44336';
+const GREEN = '#30D158';
+const BLUE = '#64D2FF';
+const ORANGE = '#FF9F0A';
 
 interface FoodItemProps {
     item: FoodItemType;
@@ -18,146 +18,121 @@ interface FoodItemProps {
 }
 
 export default function FoodItem({ item, onPress }: FoodItemProps) {
-    // Get healthiness color
-    const getHealthinessColor = (rating?: number) => {
-        if (!rating) return GRAY;
-        if (rating >= 8.5) return GREEN; // Only truly healthy foods get green
-        if (rating >= 7) return YELLOW;  // Moderately healthy foods get yellow
-        return RED;                      // Everything else is red
-    };
-
-    // Get macro percentage string
-    const getMacroPercentage = () => {
-        const totalMacros = item.proteins + item.carbs + item.fats;
-        if (totalMacros === 0) return '';
-
-        const proteinPct = Math.round((item.proteins / totalMacros) * 100);
-        const carbsPct = Math.round((item.carbs / totalMacros) * 100);
-        const fatsPct = Math.round((item.fats / totalMacros) * 100);
-
-        return `${proteinPct}P / ${carbsPct}C / ${fatsPct}F`;
-    };
-
-
-
     return (
         <TouchableOpacity
             style={styles.container}
             onPress={() => onPress(item)}
+            activeOpacity={0.8}
         >
-            <View style={styles.detailsContainer}>
-                <Text style={styles.foodName}>{item.food_name}</Text>
-                {item.brand_name && (
-                    <Text style={styles.brandName}>{item.brand_name}</Text>
-                )}
-                <View style={styles.nutritionInfo}>
-                    <Text style={styles.caloriesText}>
-                        {item.calories} <Text style={styles.caloriesLabel}>cal</Text>
-                    </Text>
-                    <Text style={styles.servingText}>
-                        {item.serving_qty} {item.serving_unit} {item.serving_weight_grams > 0 ? `(${item.serving_weight_grams}g)` : ''}
-                    </Text>
+            {/* Main Row */}
+            <View style={styles.mainRow}>
+                <View style={styles.titleContainer}>
+                    <Text style={styles.foodName} numberOfLines={1}>{item.food_name}</Text>
+                    {item.brand_name && (
+                        <Text style={styles.brandName} numberOfLines={1}>{item.brand_name}</Text>
+                    )}
                 </View>
-                <View style={styles.macrosContainer}>
+
+                <View style={styles.rightSection}>
+                    <Text style={styles.caloriesText}>{item.calories} cal</Text>
+                    <Ionicons name="chevron-forward" size={14} color={GRAY} />
+                </View>
+            </View>
+
+            {/* Bottom Row */}
+            <View style={styles.bottomRow}>
+                <Text style={styles.servingText}>
+                    {item.serving_qty} {item.serving_unit}
+                    {item.serving_weight_grams > 0 ? ` (${item.serving_weight_grams}g)` : ''}
+                </Text>
+
+                <View style={styles.macrosRow}>
                     <View style={styles.macroItem}>
-                        <Text style={styles.macroValue}>{item.proteins}g</Text>
-                        <Text style={styles.macroLabel}>Protein</Text>
+                        <View style={[styles.macroDot, { backgroundColor: GREEN }]} />
+                        <Text style={styles.macroText}>{item.proteins}g P</Text>
                     </View>
                     <View style={styles.macroItem}>
-                        <Text style={styles.macroValue}>{item.carbs}g</Text>
-                        <Text style={styles.macroLabel}>Carbs</Text>
+                        <View style={[styles.macroDot, { backgroundColor: BLUE }]} />
+                        <Text style={styles.macroText}>{item.carbs}g C</Text>
                     </View>
                     <View style={styles.macroItem}>
-                        <Text style={styles.macroValue}>{item.fats}g</Text>
-                        <Text style={styles.macroLabel}>Fat</Text>
-                    </View>
-                    <View style={[styles.healthinessIndicator, { backgroundColor: getHealthinessColor(item.healthiness_rating) }]}>
-                        <Text style={styles.healthinessText}>{item.healthiness_rating || '?'}</Text>
+                        <View style={[styles.macroDot, { backgroundColor: ORANGE }]} />
+                        <Text style={styles.macroText}>{item.fats}g F</Text>
                     </View>
                 </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={GRAY} />
         </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        flexDirection: 'row',
         backgroundColor: CARD_BG,
-        borderRadius: 12,
+        borderRadius: 8,
         padding: 12,
-        marginBottom: 10,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        marginBottom: 6,
+        borderWidth: 0.5,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
     },
-
-    detailsContainer: {
-        flex: 1,
-    },
-    foodName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: WHITE,
-        marginBottom: 2,
-    },
-    brandName: {
-        fontSize: 12,
-        color: GRAY,
-        marginBottom: 4,
-    },
-    nutritionInfo: {
+    mainRow: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 4,
+        marginBottom: 6,
     },
-    caloriesText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: WHITE,
-    },
-    caloriesLabel: {
-        fontSize: 12,
-        fontWeight: 'normal',
-        color: GRAY,
-    },
-    servingText: {
-        fontSize: 12,
-        color: GRAY,
-    },
-    macrosContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    macroItem: {
+    titleContainer: {
+        flex: 1,
         marginRight: 12,
     },
-    macroValue: {
-        fontSize: 12,
+    foodName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: WHITE,
+        marginBottom: 1,
+    },
+    brandName: {
+        fontSize: 11,
+        color: GRAY,
+        fontWeight: '500',
+    },
+    rightSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    caloriesText: {
+        fontSize: 13,
         fontWeight: '600',
         color: WHITE,
     },
-    macroLabel: {
-        fontSize: 10,
-        color: GRAY,
-    },
-    healthinessIndicator: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: GREEN,
+    bottomRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 'auto',
+        justifyContent: 'space-between',
     },
-    healthinessText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: WHITE,
+    servingText: {
+        fontSize: 11,
+        color: GRAY,
+        fontWeight: '500',
+    },
+    macrosRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    macroItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    macroDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+    },
+    macroText: {
+        fontSize: 11,
+        fontWeight: '500',
+        color: GRAY,
     },
 }); 
