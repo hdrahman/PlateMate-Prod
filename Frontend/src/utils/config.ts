@@ -31,6 +31,5 @@ export const DEFAULT_USER_ID = 1;
 // Nutritionix API credentials moved to backend for security
 // Frontend now uses backend endpoints instead of direct API calls
 
-// Spoonacular API credentials - replace with your actual credentials
-// To get your own credentials, sign up at https://spoonacular.com/food-api
-export const SPOONACULAR_API_KEY = '01c80e4d89704df2bdaa51ce8f2372f4'; 
+// Spoonacular API credentials moved to backend for security
+// Frontend now uses backend endpoints instead of direct API calls 

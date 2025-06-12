@@ -1,11 +1,6 @@
-import { SPOONACULAR_API_KEY, BACKEND_URL } from '../utils/config';
+import { BACKEND_URL } from '../utils/config';
 import axios from 'axios';
 import { auth } from '../utils/firebase/index';
-
-const isSpoonacularConfigured = !!SPOONACULAR_API_KEY;
-
-// Spoonacular API base URL
-const SPOONACULAR_BASE_URL = 'https://api.spoonacular.com';
 
 // Backend API base URL
 const BACKEND_BASE_URL = BACKEND_URL;
@@ -200,39 +195,14 @@ export const getFoodDetails = async (query: string): Promise<FoodItem | null> =>
 
 /**
  * Enhance a food item with a better image from Spoonacular if available
+ * Note: Spoonacular API calls moved to backend for security
  * @param foodItem - The food item to enhance
- * @returns The food item with an enhanced image if available
+ * @returns The food item unchanged (image enhancement disabled for security)
  */
 export const enhanceFoodImage = async (foodItem: FoodItem): Promise<FoodItem> => {
-    if (!isSpoonacularConfigured || !foodItem.food_name) {
-        return foodItem;
-    }
-
-    try {
-        const response = await axios.get(`${SPOONACULAR_BASE_URL}/food/ingredients/search`, {
-            params: {
-                query: foodItem.food_name,
-                number: 1,
-                apiKey: SPOONACULAR_API_KEY
-            }
-        });
-
-        if (response.data && response.data.results && response.data.results.length > 0) {
-            const ingredientId = response.data.results[0].id;
-            const imageUrl = `${SPOONACULAR_BASE_URL}/cdn/ingredients_250x250/${ingredientId}.jpg`;
-
-            // Only update if we actually get a valid image URL
-            return {
-                ...foodItem,
-                image: imageUrl
-            };
-        }
-
-        return foodItem;
-    } catch (error) {
-        console.error('Error enhancing food image:', error);
-        return foodItem;
-    }
+    // Spoonacular API calls moved to backend for security
+    // Image enhancement is disabled in frontend
+    return foodItem;
 };
 
 /**

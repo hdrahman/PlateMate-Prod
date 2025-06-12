@@ -37,6 +37,7 @@ from routes.profile import router as profile_router  # Include profile router
 from routes.deepseek import router as deepseek_router  # Include DeepSeek router
 from routes.gamification import router as gamification_router  # Include gamification router
 from routes.food import router as food_router  # Include food router
+from routes.recipes import router as recipes_router  # Include recipes router
 
 app = FastAPI()
 
@@ -111,6 +112,7 @@ app.include_router(profile_router, prefix='/profile', tags=['profile'])  # Inclu
 app.include_router(deepseek_router, tags=['deepseek'])  # Include DeepSeek router
 app.include_router(gamification_router, prefix='/gamification', tags=['gamification'])  # Include gamification router
 app.include_router(food_router, prefix='/food', tags=['food'])  # Include food router
+app.include_router(recipes_router, prefix='/recipes', tags=['recipes'])  # Include recipes router
 
 @app.get("/")
 def home():
