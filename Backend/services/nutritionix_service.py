@@ -362,36 +362,8 @@ class NutritionixService:
                         logger.info(f"Got detailed branded data for {formatted_food_name} ({formatted_brand}): calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
                         detailed_results.append(detailed_food)
                     else:
-                        # If detailed food fails, create a basic entry from the search result
-                        logger.warning(f"Failed to get branded food details for {food_name} with nix_item_id: {nix_item_id}, creating basic entry")
-                        formatted_brand, formatted_food_name = self._format_food_display_names(food_name, brand_name)
-                        basic_food = {
-                            'food_name': formatted_food_name,
-                            'brand_name': formatted_brand,
-                            'calories': item.get('nf_calories', 0) or 0,
-                            'proteins': item.get('nf_protein', 0) or 0,
-                            'carbs': item.get('nf_total_carbohydrate', 0) or 0,
-                            'fats': item.get('nf_total_fat', 0) or 0,
-                            'fiber': item.get('nf_dietary_fiber', 0) or 0,
-                            'sugar': item.get('nf_sugars', 0) or 0,
-                            'saturated_fat': item.get('nf_saturated_fat', 0) or 0,
-                            'polyunsaturated_fat': 0,
-                            'monounsaturated_fat': 0,
-                            'trans_fat': 0,
-                            'cholesterol': item.get('nf_cholesterol', 0) or 0,
-                            'sodium': item.get('nf_sodium', 0) or 0,
-                            'potassium': item.get('nf_potassium', 0) or 0,
-                            'vitamin_a': 0,
-                            'vitamin_c': 0,
-                            'calcium': 0,
-                            'iron': 0,
-                            'image': item.get('photo', {}).get('thumb', '') if item.get('photo') else '',
-                            'serving_unit': item.get('serving_unit', 'serving'),
-                            'serving_weight_grams': item.get('serving_weight_grams', 0) or 0,
-                            'serving_qty': item.get('serving_qty', 1) or 1,
-                            'healthiness_rating': 5  # Default neutral rating
-                        }
-                        detailed_results.append(basic_food)
+                        logger.warning(f"Failed to get branded food details for {food_name} with nix_item_id: {nix_item_id}, skipping")
+                        continue
                 else:
                     logger.warning(f"No nix_item_id found for branded food: {food_name}, skipping")
                     continue

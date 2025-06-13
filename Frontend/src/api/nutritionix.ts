@@ -20,7 +20,7 @@ const getAuthHeaders = async () => {
 
             try {
                 const token = await user.getIdToken(true);
-                console.log('Got Firebase token:', token ? `${token.substring(0, 10)}...` : 'null');
+                // Token logging removed for production security
                 return {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'

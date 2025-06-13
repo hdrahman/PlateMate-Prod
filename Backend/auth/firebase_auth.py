@@ -106,7 +106,7 @@ async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depe
         )
     
     token = credentials.credentials
-    logger.info(f"Received token: {token[:10]}...")  # Log first 10 chars for debugging
+    logger.info("Token verification requested")  # Removed token logging for production security
     
     try:
         # Verify the ID token with a clock tolerance of 5 seconds to handle minor time sync issues
