@@ -1131,6 +1131,25 @@ export default function Home() {
 
         {/* GOAL CARD (Unified circular bar + stats overlay) */}
         <GradientBorderCard>
+          {/* Analytics Button - Top Left Corner */}
+          <TouchableOpacity
+            style={styles.goalCardAnalyticsButton}
+            onPress={() => navigation.navigate('Analytics' as never)}
+          >
+            <MaskedView
+              style={styles.goalCardAnalyticsMask}
+              maskElement={
+                <Ionicons name="analytics" size={22} color="black" />
+              }
+            >
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={styles.goalCardAnalyticsGradient}
+              />
+            </MaskedView>
+          </TouchableOpacity>
           <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
             <View style={styles.ringContainer}>
               <View style={styles.ringGlow} />
@@ -1349,31 +1368,6 @@ export default function Home() {
           <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
           <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
-
-        {/* ADVANCED ANALYTICS BUTTON */}
-        <GradientBorderCard>
-          <TouchableOpacity
-            style={styles.exploreButtonInner}
-            onPress={() => navigation.navigate('Analytics' as never)}
-          >
-            <MaskedView
-              style={{ height: 30, width: '100%' }}
-              maskElement={
-                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                  <Ionicons name="analytics" size={22} color="black" style={{ marginRight: 8 }} />
-                  <Text style={[styles.exploreButtonText, { color: 'black' }]}>Advanced Analytics</Text>
-                </View>
-              }
-            >
-              <LinearGradient
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                style={{ flex: 1 }}
-              />
-            </MaskedView>
-          </TouchableOpacity>
-        </GradientBorderCard>
       </ScrollView>
       {renderWeightModal()}
     </SafeAreaView>
@@ -2516,5 +2510,28 @@ const styles = StyleSheet.create({
     color: '#FFF', // Changed to white since gradient will handle color
     fontSize: 18,
     fontWeight: 'bold'
+  },
+  // Goal card analytics button styles
+  goalCardAnalyticsButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(155, 0, 255, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(155, 0, 255, 0.3)',
+    zIndex: 10,
+  },
+  goalCardAnalyticsMask: {
+    width: 22,
+    height: 22,
+  },
+  goalCardAnalyticsGradient: {
+    width: 22,
+    height: 22,
   },
 });
