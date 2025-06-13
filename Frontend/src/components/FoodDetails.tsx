@@ -112,6 +112,7 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
                     <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                         <Ionicons name="close" size={24} color={WHITE} />
                     </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Nutrition Facts</Text>
                     <View style={styles.placeholder} />
                 </View>
 
@@ -119,8 +120,6 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
                     {/* Combined Food Info & Controls Card */}
                     <GradientBorderCard style={styles.cardMargin}>
                         <View style={styles.combinedSection}>
-                            {/* Header */}
-                            <Text style={styles.headerTitle}>Nutrition Facts</Text>
 
                             {/* Food Info */}
                             <View style={styles.foodInfoSection}>
@@ -402,8 +401,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 20,
+        paddingTop: 50,
+        paddingBottom: 10,
     },
     closeButton: {
         width: 36,
@@ -419,6 +418,7 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
         paddingHorizontal: 16,
+        paddingTop: 10,
     },
     cardMargin: {
         marginBottom: 16,
@@ -445,10 +445,11 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
         color: WHITE,
         textAlign: 'center',
+        flex: 1,
     },
     foodInfoSection: {
         alignItems: 'center',
