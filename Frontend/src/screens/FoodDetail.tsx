@@ -452,10 +452,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '600',
+        fontSize: 30,
+        fontWeight: '800',
         color: WHITE,
         marginLeft: 8,
+        letterSpacing: 0.5,
     },
     scrollView: {
         flex: 1,

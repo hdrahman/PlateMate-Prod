@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
 import { FoodItem } from './nutritionix';
-import { addFoodLog, getFoodLogsByDate as getLocalFoodLogsByDate } from '../utils/database';
+import { addFoodLog, getFoodLogsByDate as getLocalFoodLogsByDate, getRecentFoodLogs } from '../utils/database';
 import { formatDateToYYYYMMDD, getCurrentDate } from '../utils/helpers';
 import { FoodLogEntry as ContextFoodLogEntry } from '../context/FoodLogContext';
 
@@ -190,27 +190,17 @@ export const getFoodLogsByDate = async (date: Date): Promise<FoodLogEntry[]> => 
 };
 
 /**
- * Get recent food entries
+ * Get recent food entries - returns the last 25 most recently added foods
  */
 export const getRecentFoodEntries = async (limit: number = 10): Promise<FoodLogEntry[]> => {
     try {
-        // Since there's no direct endpoint for recent entries, we'll get today's entries
-        const today = new Date();
-        const formattedDate = formatDateToYYYYMMDD(today);
+        // Get the most recent food entries from the database (up to 25)
+        // This maintains a rolling list of recent foods regardless of date
+        const recentEntries = await getRecentFoodLogs(25) as unknown as FoodLogEntry[];
+        console.log('Found recent entries:', recentEntries?.length || 0);
 
-        // Get from local database only
-        try {
-            const localEntries = await getLocalFoodLogsByDate(formattedDate) as unknown as FoodLogEntry[];
-            console.log('Found local entries:', localEntries?.length || 0);
-
-            // Sort by most recent first and limit the number of results
-            return (localEntries || [])
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, limit);
-        } catch (localError) {
-            console.error('Error fetching local entries:', localError);
-            return [];
-        }
+        // Return the requested number of entries (default 10 for display)
+        return (recentEntries || []).slice(0, limit);
     } catch (error) {
         console.error('Error fetching recent food entries:', error);
         return [];

@@ -570,6 +570,35 @@ export const getFoodLogsByDate = async (date: string) => {
     }
 };
 
+// Get most recent food entries (up to limit, regardless of date)
+export const getRecentFoodLogs = async (limit: number = 25) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get recent food logs before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    console.log(`🔍 Looking for ${limit} most recent food logs for user_id=${firebaseUserId}`);
+
+    try {
+        // Get the most recent food logs ordered by id (insertion order) descending
+        // This ensures we get the most recently added foods regardless of their date
+        const result = await db.getAllAsync(
+            `SELECT * FROM food_logs 
+             WHERE user_id = ? 
+             ORDER BY id DESC 
+             LIMIT ?`,
+            [firebaseUserId, limit]
+        );
+
+        console.log(`📊 Found ${result.length} recent food logs`);
+        return result;
+    } catch (error) {
+        console.error('❌ Error getting recent food logs:', error);
+        throw error;
+    }
+};
+
 // Get unsynced food logs
 export const getUnsyncedFoodLogs = async () => {
     if (!db || !global.dbInitialized) {

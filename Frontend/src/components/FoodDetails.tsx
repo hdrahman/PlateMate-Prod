@@ -101,7 +101,7 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
         <Modal
             visible={visible}
             animationType="slide"
-            presentationStyle="pageSheet"
+            presentationStyle="fullScreen"
         >
             <LinearGradient
                 colors={[PRIMARY_BG, CARD_BG]}
@@ -116,7 +116,11 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
                     <View style={styles.placeholder} />
                 </View>
 
-                <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollViewContent}
+                    showsVerticalScrollIndicator={false}
+                >
                     {/* Combined Food Info & Controls Card */}
                     <GradientBorderCard style={styles.cardMargin}>
                         <View style={styles.combinedSection}>
@@ -401,7 +405,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 50,
+        paddingTop: 20,
         paddingBottom: 10,
     },
     closeButton: {
@@ -419,6 +423,10 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 16,
         paddingTop: 10,
+    },
+    scrollViewContent: {
+        paddingBottom: 60,
+        flexGrow: 1,
     },
     cardMargin: {
         marginBottom: 16,
@@ -445,11 +453,12 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '800',
         color: WHITE,
         textAlign: 'center',
         flex: 1,
+        letterSpacing: 0.5,
     },
     foodInfoSection: {
         alignItems: 'center',
@@ -504,22 +513,23 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     quantityButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: LIGHT_GRAY,
         alignItems: 'center',
         justifyContent: 'center',
     },
     quantityInput: {
-        width: 50,
-        height: 32,
+        width: 70,
+        height: 36,
         backgroundColor: LIGHT_GRAY,
-        borderRadius: 16,
+        borderRadius: 18,
         textAlign: 'center',
         fontSize: 14,
         fontWeight: '600',
         color: WHITE,
+        paddingHorizontal: 8,
     },
     mealContainer: {
         flexDirection: 'row',
