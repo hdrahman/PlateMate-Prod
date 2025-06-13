@@ -196,23 +196,25 @@ class NutritionixService:
             branded_foods = data.get('branded', [])[:5]  # Limit to 5 branded foods
             
             for item in branded_foods:
-                nix_item_id = item.get('nix_item_id')
-                logger.info(f"Processing branded food: {item.get('food_name')} with nix_item_id: {nix_item_id}")
-                logger.info(f"Instant search branded data: nf_calories={item.get('nf_calories')}")
+                food_name = item.get('food_name', '')
+                brand_name = item.get('brand_name', '')
                 
-                if nix_item_id:
-                    detailed_food = self._get_branded_food_details(nix_item_id)
-                    if detailed_food:
-                        logger.info(f"Got detailed data for {detailed_food.get('food_name')}: calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
-                        detailed_results.append(detailed_food)
-                    else:
-                        logger.warning(f"Failed to get detailed data for branded food: {item.get('food_name')}, using fallback")
-                        # Use basic data from instant search as fallback
-                        fallback_food = self._create_fallback_food_item(item)
-                        detailed_results.append(fallback_food)
+                # Create a search query with brand name for better results
+                search_query = f"{brand_name} {food_name}" if brand_name else food_name
+                logger.info(f"Processing branded food: {food_name} (brand: {brand_name}) - searching with query: {search_query}")
+                
+                # Try to get detailed nutrition using natural/nutrients endpoint
+                detailed_food = self.get_food_details(search_query)
+                if detailed_food:
+                    # Update the food name and brand from the original search result
+                    detailed_food['food_name'] = food_name
+                    detailed_food['brand_name'] = brand_name
+                    logger.info(f"Got detailed data for {food_name}: calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
+                    detailed_results.append(detailed_food)
                 else:
-                    logger.warning(f"No nix_item_id for branded food: {item.get('food_name')}")
-                    fallback_food = self._create_fallback_food_item(item)
+                    logger.warning(f"Failed to get detailed data for branded food: {food_name}, using enhanced fallback")
+                    # Use enhanced fallback with estimation
+                    fallback_food = self._create_enhanced_fallback_food_item(item)
                     detailed_results.append(fallback_food)
             
             # Process common foods (these need natural language processing)
@@ -226,8 +228,8 @@ class NutritionixService:
                         logger.info(f"Got detailed data for {detailed_food.get('food_name')}: calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
                         detailed_results.append(detailed_food)
                     else:
-                        logger.warning(f"Failed to get detailed data for common food: {food_name}, using fallback")
-                        fallback_food = self._create_fallback_food_item(item)
+                        logger.warning(f"Failed to get detailed data for common food: {food_name}, using enhanced fallback")
+                        fallback_food = self._create_enhanced_fallback_food_item(item)
                         detailed_results.append(fallback_food)
             
             logger.info(f"Total detailed results: {len(detailed_results)}")
@@ -276,6 +278,108 @@ class NutritionixService:
             'serving_qty': item.get('serving_qty', 1),
             'healthiness_rating': 5  # Default rating when no nutrition data available
         }
+
+    def _create_enhanced_fallback_food_item(self, item: Dict) -> Dict[str, Any]:
+        """Create an enhanced fallback food item with estimated macros based on calories"""
+        calories = round(item.get('nf_calories', 0))
+        food_name = item.get('food_name', '').lower()
+        
+        # Estimate macros based on food type and calories
+        # These are rough estimates based on typical food compositions
+        proteins = 0
+        carbs = 0
+        fats = 0
+        
+        if calories > 0:
+            # Default balanced macro distribution if we can't determine food type
+            protein_ratio = 0.15  # 15% of calories from protein
+            carb_ratio = 0.55     # 55% of calories from carbs
+            fat_ratio = 0.30      # 30% of calories from fat
+            
+            # Adjust ratios based on food type keywords
+            if any(keyword in food_name for keyword in ['meat', 'chicken', 'beef', 'fish', 'protein', 'egg']):
+                protein_ratio = 0.40
+                carb_ratio = 0.20
+                fat_ratio = 0.40
+            elif any(keyword in food_name for keyword in ['bread', 'pasta', 'rice', 'cereal', 'grain']):
+                protein_ratio = 0.12
+                carb_ratio = 0.75
+                fat_ratio = 0.13
+            elif any(keyword in food_name for keyword in ['oil', 'butter', 'nuts', 'avocado', 'cheese']):
+                protein_ratio = 0.15
+                carb_ratio = 0.15
+                fat_ratio = 0.70
+            elif any(keyword in food_name for keyword in ['fruit', 'apple', 'banana', 'orange']):
+                protein_ratio = 0.05
+                carb_ratio = 0.90
+                fat_ratio = 0.05
+            elif any(keyword in food_name for keyword in ['vegetable', 'salad', 'lettuce', 'spinach']):
+                protein_ratio = 0.20
+                carb_ratio = 0.70
+                fat_ratio = 0.10
+            
+            # Calculate macros from calories
+            proteins = round((calories * protein_ratio) / 4)  # 4 calories per gram of protein
+            carbs = round((calories * carb_ratio) / 4)        # 4 calories per gram of carbs
+            fats = round((calories * fat_ratio) / 9)          # 9 calories per gram of fat
+            
+        return {
+            'food_name': item.get('food_name', ''),
+            'brand_name': item.get('brand_name'),
+            'calories': calories,
+            'proteins': proteins,
+            'carbs': carbs,
+            'fats': fats,
+            'fiber': round(carbs * 0.1) if carbs > 0 else 0,  # Estimate fiber as 10% of carbs
+            'sugar': round(carbs * 0.3) if carbs > 0 else 0,  # Estimate sugar as 30% of carbs
+            'saturated_fat': round(fats * 0.3) if fats > 0 else 0,  # Estimate saturated fat as 30% of total fat
+            'polyunsaturated_fat': 0,
+            'monounsaturated_fat': 0,
+            'trans_fat': 0,
+            'cholesterol': 0,
+            'sodium': 0,
+            'potassium': 0,
+            'vitamin_a': 0,
+            'vitamin_c': 0,
+            'calcium': 0,
+            'iron': 0,
+            'image': item.get('photo', {}).get('thumb', '') if isinstance(item.get('photo'), dict) else '',
+            'serving_unit': item.get('serving_unit', 'serving'),
+            'serving_weight_grams': item.get('serving_weight_grams', 0),
+            'serving_qty': item.get('serving_qty', 1),
+            'healthiness_rating': self._estimate_healthiness_from_macros(calories, proteins, carbs, fats)
+        }
+
+    def _estimate_healthiness_from_macros(self, calories: int, proteins: int, carbs: int, fats: int) -> int:
+        """Estimate healthiness rating based on macro distribution"""
+        if calories == 0:
+            return 5
+        
+        # Calculate ratios
+        protein_pct = (proteins * 4) / calories if calories > 0 else 0
+        fat_pct = (fats * 9) / calories if calories > 0 else 0
+        
+        score = 5  # Start with neutral
+        
+        # Higher protein is generally better
+        if protein_pct > 0.25:
+            score += 2
+        elif protein_pct > 0.15:
+            score += 1
+        
+        # Moderate fat is good, too high is bad
+        if 0.20 <= fat_pct <= 0.35:
+            score += 1
+        elif fat_pct > 0.50:
+            score -= 2
+        
+        # Lower calorie density can be better (for whole foods)
+        if calories < 200:
+            score += 1
+        elif calories > 400:
+            score -= 1
+        
+        return max(1, min(10, score))
 
     def _get_branded_food_details(self, nix_item_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a branded food using nix_item_id"""

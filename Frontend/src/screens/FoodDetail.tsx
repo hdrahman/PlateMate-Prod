@@ -242,8 +242,8 @@ const FoodDetailScreen: React.FC = () => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
 
-            {/* Floating Header */}
-            <SafeAreaView style={styles.floatingHeader}>
+            {/* Header with Navigation and Title */}
+            <SafeAreaView style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.headerButton}
@@ -252,6 +252,7 @@ const FoodDetailScreen: React.FC = () => {
                         <Ionicons name="chevron-back" size={24} color={WHITE} />
                     </View>
                 </TouchableOpacity>
+                <Text style={styles.headerTitle}>Nutrition Facts</Text>
                 <TouchableOpacity style={styles.headerButton}>
                     <View style={styles.headerButtonBackground}>
                         <Ionicons name="heart-outline" size={22} color={WHITE} />
@@ -264,29 +265,12 @@ const FoodDetailScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 bounces={false}
             >
-                {/* Hero Section with Image */}
-                <View style={styles.heroSection}>
-                    {!imageError && foodData.image_url ? (
-                        <Image
-                            source={{ uri: foodData.image_url }}
-                            style={styles.heroImage}
-                            onError={() => setImageError(true)}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <View style={styles.placeholderHero}>
-                            <Ionicons name="restaurant" size={80} color={SUBDUED} />
-                        </View>
-                    )}
-
-                    {/* Gradient Overlay */}
-                    <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.9)']}
-                        style={styles.heroGradient}
-                    />
-
-                    {/* Hero Content */}
-                    <View style={styles.heroContent}>
+                {/* Main Content Container */}
+                <View style={styles.contentContainer}>
+                    {/* Food Name and Basic Info */}
+                    <View style={styles.foodInfoSection}>
+                        <Text style={styles.foodName}>{foodData.food_name}</Text>
+                        <Text style={styles.foodMeta}>{foodData.meal_type} • {new Date(foodData.date).toLocaleDateString()}</Text>
                         {foodData.healthiness_rating && (
                             <View style={[
                                 styles.healthinessBadge,
@@ -297,13 +281,7 @@ const FoodDetailScreen: React.FC = () => {
                                 </Text>
                             </View>
                         )}
-                        <Text style={styles.heroTitle}>{foodData.food_name}</Text>
-                        <Text style={styles.heroMealType}>{foodData.meal_type} • {new Date(foodData.date).toLocaleDateString()}</Text>
                     </View>
-                </View>
-
-                {/* Main Content Container */}
-                <View style={styles.contentContainer}>
 
                     {/* Calories Section */}
                     <View style={styles.calorieSection}>
@@ -329,11 +307,6 @@ const FoodDetailScreen: React.FC = () => {
 
                     {/* Enhanced Nutrition Facts */}
                     <View style={styles.detailsSection}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="nutrition" size={20} color={PURPLE_ACCENT} />
-                            <Text style={styles.sectionTitle}>Nutrition Facts</Text>
-                        </View>
-
                         {/* Main Macros with Progress */}
                         <View style={styles.nutrientGroup}>
                             {renderNutrientRowWithProgress('leaf', 'Total Carbohydrates', foodData.carbs, 'g', MACRO_COLORS.carbs)}
@@ -454,16 +427,15 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    floatingHeader: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
+    header: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 50,
-        zIndex: 100,
+        paddingVertical: 16,
+        backgroundColor: PRIMARY_BG,
+        borderBottomWidth: 1,
+        borderBottomColor: LIGHT_GRAY,
     },
     headerButton: {
         width: 44,
@@ -479,36 +451,37 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: WHITE,
+        marginLeft: 8,
+    },
     scrollView: {
         flex: 1,
     },
-    heroSection: {
-        height: screenHeight * 0.45,
-        position: 'relative',
+    contentContainer: {
+        backgroundColor: PRIMARY_BG,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        flex: 1,
     },
-    heroImage: {
-        width: '100%',
-        height: '100%',
-    },
-    placeholderHero: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: LIGHT_GRAY,
+    foodInfoSection: {
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingVertical: 16,
+        marginBottom: 24,
     },
-    heroGradient: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '70%',
+    foodName: {
+        fontSize: 32,
+        fontWeight: '700',
+        color: WHITE,
+        marginBottom: 8,
+        lineHeight: 38,
     },
-    heroContent: {
-        position: 'absolute',
-        bottom: 30,
-        left: 20,
-        right: 20,
+    foodMeta: {
+        fontSize: 16,
+        color: SUBDUED,
+        textTransform: 'capitalize',
     },
     healthinessBadge: {
         alignSelf: 'flex-start',
@@ -522,33 +495,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
     },
-    heroTitle: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: WHITE,
-        marginBottom: 8,
-        lineHeight: 38,
-    },
-    heroMealType: {
-        fontSize: 16,
-        color: SUBDUED,
-        textTransform: 'capitalize',
-    },
-    contentContainer: {
-        backgroundColor: PRIMARY_BG,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        marginTop: -24,
-        paddingTop: 24,
-        paddingHorizontal: 20,
-        minHeight: screenHeight * 0.6,
-    },
     calorieSection: {
         alignItems: 'center',
-        paddingVertical: 24,
+        paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: LIGHT_GRAY,
-        marginBottom: 32,
+        marginBottom: 24,
     },
     calorieNumber: {
         fontSize: 64,
@@ -567,7 +519,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     macrosSection: {
-        marginBottom: 32,
+        marginBottom: 24,
     },
     sectionHeader: {
         flexDirection: 'row',
