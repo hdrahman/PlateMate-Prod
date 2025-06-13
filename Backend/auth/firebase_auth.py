@@ -142,32 +142,16 @@ async def get_current_user(
         user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
         
         if not user:
-            logger.info(f"User with Firebase UID {firebase_uid} not found in primary database, creating temporary user")
+            logger.error(f"User with Firebase UID {firebase_uid} not found in database")
             
-            # At this point, we have a valid Firebase authenticated user but they're not in our database yet
-            # Instead of throwing an error, we'll return a minimal user object for authenticated endpoints
-            # This allows API endpoints to work with Firebase-authenticated users even if they haven't completed onboarding
+            # PRODUCTION FIX: Instead of creating temporary users that cause data integrity issues,
+            # we require that users must be properly created in the database before accessing protected endpoints.
+            # This prevents food logs and other data from being assigned to non-existent users.
             
-            # Create a minimal user object (not persisted to database)
-            from models import User as UserModel
-            
-            # Extract user info from Firebase token
-            name = token_data.get("name", "").split(" ", 1)
-            first_name = name[0] if name else ""
-            last_name = name[1] if len(name) > 1 else ""
-            
-            user = UserModel(
-                firebase_uid=firebase_uid,
-                email=token_data.get("email", ""),
-                first_name=first_name,
-                last_name=last_name,
-                onboarding_complete=False
+            raise HTTPException(
+                status_code=403,
+                detail="User account not found. Please complete registration or contact support."
             )
-            
-            # Note: This user object is not saved to the database
-            # The frontend should handle properly creating the user record
-            
-            logger.info(f"Created temporary user object for Firebase UID {firebase_uid}")
         else:
             logger.info(f"Found existing user in database: {user.email}")
         
@@ -181,6 +165,63 @@ async def get_current_user(
         raise HTTPException(
             status_code=500, 
             detail=f"Error fetching user: {str(e)}"
+        )
+
+# Dependency that auto-creates users if they don't exist (for onboarding endpoints)
+async def get_or_create_user(
+    token_data: dict = Depends(verify_firebase_token),
+    db: Session = Depends(get_db)
+):
+    try:
+        logger.info("Getting or creating user from token data")
+        firebase_uid = token_data.get("uid")
+        if not firebase_uid:
+            logger.error("Firebase UID not found in token")
+            raise HTTPException(
+                status_code=401, 
+                detail="Firebase UID not found in token"
+            )
+            
+        logger.info(f"Looking up user with Firebase UID: {firebase_uid}")
+        
+        # Check if user exists in primary database
+        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        
+        if not user:
+            logger.info(f"User with Firebase UID {firebase_uid} not found, creating new user")
+            
+            # Extract user info from Firebase token
+            name = token_data.get("name", "").split(" ", 1)
+            first_name = name[0] if name else token_data.get("email", "").split("@")[0]
+            last_name = name[1] if len(name) > 1 else ""
+            
+            # Create new user in database
+            user = User(
+                firebase_uid=firebase_uid,
+                email=token_data.get("email", ""),
+                first_name=first_name,
+                last_name=last_name,
+                onboarding_complete=False
+            )
+            
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
+            logger.info(f"Created new user in database: {user.email} (ID: {user.id})")
+        else:
+            logger.info(f"Found existing user in database: {user.email} (ID: {user.id})")
+        
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_or_create_user: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error fetching or creating user: {str(e)}"
         )
 
 # Optional dependency to get current user if it exists, but don't require it

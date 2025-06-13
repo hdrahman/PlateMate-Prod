@@ -68,6 +68,9 @@ export default function Chatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [contextActive, setContextActive] = useState(false);
+  const [contextData, setContextData] = useState<string | null>(null);
+  const [isLoadingContext, setIsLoadingContext] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const dot1Opacity = useRef(new Animated.Value(0.4)).current;
   const dot2Opacity = useRef(new Animated.Value(0.4)).current;
@@ -85,6 +88,118 @@ export default function Chatbot() {
       console.error('Error getting Firebase token:', error);
       throw new Error('Authentication failed. Please sign in again.');
     }
+  };
+
+  // Load user context for personalized coaching
+  const loadUserContext = async () => {
+    try {
+      setIsLoadingContext(true);
+      console.log('🔄 Loading user context...');
+
+      const token = await getFirebaseToken();
+      console.log('✅ Firebase token obtained');
+
+      const url = `${BACKEND_BASE_URL}/deepseek/user-context?days_back=30`;
+      console.log('📡 Calling context endpoint:', url);
+
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000 // 15 second timeout
+      });
+
+      console.log('✅ Context response received:', response.status);
+      console.log('📊 Context data preview:', response.data.summary);
+
+      setContextData(response.data.context);
+      setContextActive(true);
+
+      // Add system message about context being enabled
+      const contextMessage: Message = {
+        id: "context-enabled-" + Date.now(),
+        text: `🧠 Perfect! I now have access to your recent activity data and can provide personalized advice based on your actual nutrition, exercise patterns, and progress. ${response.data.summary.message}`,
+        sender: "bot",
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, contextMessage]);
+
+    } catch (error: any) {
+      console.error('❌ Error loading context:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+
+      let errorText = "I couldn't load your activity data right now. This might be because you haven't logged any food or exercise data yet, or there's a connection issue. Let's chat without context for now!";
+
+      if (error.message?.includes('Authentication failed') || error.message?.includes('User not authenticated')) {
+        errorText = "You need to sign in again to access your personalized data. Let's continue with general coaching!";
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        errorText = "I need you to be signed in to access your activity data. Let's continue with general coaching!";
+      } else if (error.response?.status === 404) {
+        errorText = "I couldn't find your profile data. Make sure you've completed your profile setup and logged some food or exercise data first!";
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorText = "The request timed out. Please check your internet connection and try again!";
+      }
+
+      // Add error message to chat instead of alert
+      const errorMessage: Message = {
+        id: "context-error-" + Date.now(),
+        text: `⚠️ ${errorText}`,
+        sender: "bot",
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoadingContext(false);
+    }
+  };
+
+  // Clear context
+  const clearContext = () => {
+    setContextActive(false);
+    setContextData(null);
+
+    const clearMessage: Message = {
+      id: "context-cleared-" + Date.now(),
+      text: "🔄 I've cleared your activity data. I'm back to general coaching mode. You can re-enable context anytime!",
+      sender: "bot",
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, clearMessage]);
+  };
+
+  // Smart context suggestion based on user input
+  const shouldSuggestContext = (userMessage: string): boolean => {
+    if (contextActive) return false;
+
+    const contextKeywords = [
+      'my progress', 'my goal', 'my diet', 'my workout', 'my calories',
+      'my nutrition', 'my exercise', 'my food', 'my weight', 'my intake',
+      'how am i doing', 'am i meeting', 'track my', 'my recent', 'my habit',
+      'plan my meals', 'my eating', 'my fitness', 'my activity'
+    ];
+
+    const message = userMessage.toLowerCase();
+    return contextKeywords.some(keyword => message.includes(keyword));
+  };
+
+  // Suggest context loading
+  const suggestContext = () => {
+    const suggestionMessage: Message = {
+      id: "context-suggestion-" + Date.now(),
+      text: "💡 I could give you much more personalized advice if you enable the 'Get Personalized Advice' feature below! It lets me access your recent nutrition and exercise data so I can give you specific recommendations based on your actual patterns and progress.",
+      sender: "bot",
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, suggestionMessage]);
   };
 
   // Auto-scroll to bottom when new messages arrive
@@ -231,19 +346,13 @@ export default function Chatbot() {
 
   const chatWithCoachMax = async (userMessage: string) => {
     try {
-      // Format messages for DeepSeek V3 API via secure backend
+      // Format messages for API (exclude context system messages)
       const messageHistory = messages
-        .filter(msg => !msg.isTyping)
+        .filter(msg => !msg.isTyping && !msg.text.includes("🧠 I now have access") && !msg.text.includes("🔄 I've cleared"))
         .map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.text
         }));
-
-      // Add system prompt for Coach Max personality
-      const systemPrompt = {
-        role: 'system',
-        content: 'You are Coach Max, an expert AI Health Coach and nutritionist. You\'re energetic, motivational, and provide practical, actionable advice. Keep your responses friendly, supportive, and informative.'
-      };
 
       // Add the new user message
       messageHistory.push({
@@ -251,26 +360,54 @@ export default function Chatbot() {
         content: userMessage
       });
 
-      const payload = {
-        messages: [systemPrompt, ...messageHistory],
-        temperature: 0.7,
-        max_tokens: 1000
-      };
-
       // Get Firebase authentication token
       const token = await getFirebaseToken();
 
-      // Call the secure backend DeepSeek API
-      const response = await axios.post(
-        `${BACKEND_BASE_URL}/deepseek/chat`,
-        payload,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+      let response;
+
+      if (contextActive && contextData) {
+        // Use context-aware endpoint
+        const payload = {
+          messages: messageHistory,
+          days_back: 30,
+          temperature: 0.7,
+          max_tokens: 1000
+        };
+
+        response = await axios.post(
+          `${BACKEND_BASE_URL}/deepseek/chat-with-context`,
+          payload,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
+      } else {
+        // Use regular endpoint
+        const systemPrompt = {
+          role: 'system',
+          content: 'You are Coach Max, an expert AI Health Coach and nutritionist. You\'re energetic, motivational, and provide practical, actionable advice. Keep your responses friendly, supportive, and informative.'
+        };
+
+        const payload = {
+          messages: [systemPrompt, ...messageHistory],
+          temperature: 0.7,
+          max_tokens: 1000
+        };
+
+        response = await axios.post(
+          `${BACKEND_BASE_URL}/deepseek/chat`,
+          payload,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
 
       return response.data.response;
     } catch (error: any) {
@@ -290,10 +427,12 @@ export default function Chatbot() {
   const handleSend = async () => {
     if (input.trim() === "") return;
 
+    const userInputText = input.trim();
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: input.trim(),
+      text: userInputText,
       sender: "user",
       timestamp: new Date()
     };
@@ -328,6 +467,13 @@ export default function Chatbot() {
       };
 
       setMessages(prev => [...prev, botMessage]);
+
+      // Check if we should suggest context (after a short delay)
+      if (shouldSuggestContext(userInputText)) {
+        setTimeout(() => {
+          suggestContext();
+        }, 2000);
+      }
     } catch (error) {
       // Remove typing indicator and add error message
       setMessages(prev => prev.filter(msg => !msg.isTyping));
@@ -460,6 +606,80 @@ export default function Chatbot() {
           ))}
         </ScrollView>
 
+        {/* Context Banner */}
+        {!contextActive && (
+          <View style={styles.contextBanner}>
+            <LinearGradient
+              colors={["rgba(90, 96, 234, 0.1)", "rgba(255, 0, 245, 0.1)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.contextBannerGradient}
+            >
+              <View style={styles.contextBannerContent}>
+                <View style={styles.contextBannerLeft}>
+                  <Ionicons name="analytics" size={20} color="#5A60EA" />
+                  <View style={styles.contextBannerText}>
+                    <Text style={styles.contextBannerTitle}>Get Personalized Advice</Text>
+                    <Text style={styles.contextBannerSubtitle}>
+                      Let Coach Max access your activity data for specific recommendations
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={loadUserContext}
+                  style={styles.contextBannerButton}
+                  disabled={isLoadingContext}
+                >
+                  <LinearGradient
+                    colors={["#5A60EA", "#FF00F5"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.contextBannerButtonGradient}
+                  >
+                    {isLoadingContext ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={styles.contextBannerButtonText}>Enable</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+
+        {/* Context Active Banner */}
+        {contextActive && (
+          <View style={styles.contextActiveBanner}>
+            <LinearGradient
+              colors={["rgba(76, 175, 80, 0.1)", "rgba(69, 160, 73, 0.1)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.contextBannerGradient}
+            >
+              <View style={styles.contextBannerContent}>
+                <View style={styles.contextBannerLeft}>
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <View style={styles.contextBannerText}>
+                    <Text style={[styles.contextBannerTitle, { color: "#4CAF50" }]}>
+                      Personalized Mode Active
+                    </Text>
+                    <Text style={styles.contextBannerSubtitle}>
+                      Coach Max has access to your recent activity data
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={clearContext}
+                  style={styles.contextClearButton}
+                >
+                  <Text style={styles.contextClearButtonText}>Disable</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+
         {/* Input Area */}
         <View style={styles.inputContainer}>
           <TextInput
@@ -470,6 +690,7 @@ export default function Chatbot() {
             placeholderTextColor="#777"
             multiline
           />
+
           <TouchableOpacity
             onPress={handleSend}
             style={styles.sendButton}
@@ -685,5 +906,77 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "white",
     margin: 2,
+  },
+  contextBanner: {
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  contextActiveBanner: {
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  contextBannerGradient: {
+    padding: 1,
+  },
+  contextBannerContent: {
+    backgroundColor: "#1A1A1A",
+    borderRadius: 11,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  contextBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  contextBannerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  contextBannerTitle: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  contextBannerSubtitle: {
+    color: "#AAA",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  contextBannerButton: {
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  contextBannerButtonGradient: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contextBannerButtonText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  contextClearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(244, 67, 54, 0.3)",
+  },
+  contextClearButtonText: {
+    color: "#F44336",
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

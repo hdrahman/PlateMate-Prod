@@ -5,9 +5,12 @@ from models import FoodLog
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+import logging
 from services.gamification_service import GamificationService
 from auth.firebase_auth import get_current_user
 from models import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -111,6 +114,16 @@ def create_food_log(
 ):
     """Create a new food log entry"""
     try:
+        # PRODUCTION FIX: Validate that user has a valid database ID
+        if not current_user.id:
+            logger.error(f"User {current_user.firebase_uid} has no database ID")
+            raise HTTPException(
+                status_code=500,
+                detail="User account not properly initialized. Please log out and log back in."
+            )
+        
+        logger.info(f"Creating food log for user {current_user.id} ({current_user.email})")
+        
         # Convert string date to datetime if provided
         date_obj = None
         if food_log.date:
