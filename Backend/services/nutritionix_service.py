@@ -55,30 +55,178 @@ class NutritionixService:
                 return nutrient.get('value', 0)
         return 0
     
+    def _format_food_display_names(self, food_name: str, brand_name: str) -> tuple:
+        """
+        Format food name and brand name for better display
+        
+        Args:
+            food_name: Original food name from API
+            brand_name: Original brand name from API
+            
+        Returns:
+            Tuple of (formatted_brand, formatted_food_name)
+        """
+        if not food_name:
+            return brand_name or '', ''
+        
+        # Convert to lowercase for processing
+        food_lower = food_name.lower()
+        brand_lower = (brand_name or '').lower()
+        
+        # Special handling for common brands that have line extensions
+        formatted_brand = brand_name or ''
+        formatted_food = food_name
+        
+        # Core Power specific formatting
+        if 'core power' in brand_lower and 'elite' in food_lower:
+            # Brand should be "Core Power Elite"
+            formatted_brand = 'Core Power Elite'
+            
+            # Clean up the food name by removing redundant brand info and reorganizing
+            formatted_food = food_name
+            
+            # Remove brand mentions from food name
+            formatted_food = formatted_food.replace('Core Power Elite', '').strip()
+            formatted_food = formatted_food.replace('Core Power', '').strip()
+            
+            # Clean up any remaining punctuation and split into words
+            formatted_food = formatted_food.replace(',', ' ').replace('.', ' ')
+            words = [w.strip() for w in formatted_food.split() if w.strip()]
+            
+            # Extract key components (clean each word of punctuation)
+            protein_terms = [w.strip('.,') for w in words if 'protein' in w.lower()]
+            flavor_terms = [w.strip('.,') for w in words if w.lower().strip('.,') in ['chocolate', 'vanilla', 'strawberry', 'banana']]
+            product_terms = [w.strip('.,') for w in words if w.lower().strip('.,') in ['shake', 'milk', 'drink', 'beverage']]
+            descriptor_terms = [w.strip('.,') for w in words if w.lower().strip('.,') in ['high', 'premium', 'rich', 'creamy']]
+            
+            # Build a cleaner name
+            clean_parts = []
+            
+            # Add descriptors first
+            if descriptor_terms:
+                clean_parts.extend(descriptor_terms)
+            
+            # Add protein terms
+            if protein_terms:
+                clean_parts.extend(protein_terms)
+            else:
+                clean_parts.append('Protein')
+            
+            # Add product type as compound terms
+            if 'milk' in food_lower and 'shake' in food_lower:
+                clean_parts.append('Milk Shake')
+            elif any(term in product_terms for term in ['shake', 'drink', 'beverage']):
+                # Use the first matching product term
+                for term in ['shake', 'drink', 'beverage']:
+                    if term in [p.lower() for p in product_terms]:
+                        clean_parts.append(term.title())
+                        break
+            else:
+                clean_parts.append('Shake')
+            
+            # Add flavor at the end in parentheses if present
+            if flavor_terms:
+                formatted_food = ' '.join(clean_parts) + f" ({', '.join(flavor_terms).title()})"
+            else:
+                formatted_food = ' '.join(clean_parts)
+                
+        # Other Core Power products (non-elite)
+        elif 'core power' in brand_lower:
+            # Keep brand as "Core Power"
+            formatted_brand = 'Core Power'
+            
+            # Clean up the food name
+            formatted_food = food_name.replace('Core Power', '').strip()
+            formatted_food = formatted_food.replace(',', ' ').replace('.', ' ')
+            words = [w.strip() for w in formatted_food.split() if w.strip()]
+            
+            # Extract key components (clean each word of punctuation)
+            protein_terms = [w.strip('.,') for w in words if 'protein' in w.lower()]
+            flavor_terms = [w.strip('.,') for w in words if w.lower().strip('.,') in ['chocolate', 'vanilla', 'strawberry', 'banana']]
+            product_terms = [w.strip('.,') for w in words if w.lower().strip('.,') in ['shake', 'milk', 'drink', 'beverage']]
+            descriptor_terms = [w.strip('.,') for w in words if w.lower().strip('.,') in ['high', 'premium', 'rich', 'creamy']]
+            
+            # Build a cleaner name
+            clean_parts = []
+            
+            if descriptor_terms:
+                clean_parts.extend(descriptor_terms)
+            
+            if protein_terms:
+                clean_parts.extend(protein_terms)
+            else:
+                clean_parts.append('Protein')
+            
+            if 'milk' in food_lower and 'shake' in food_lower:
+                clean_parts.append('Milk Shake')
+            elif any(term in product_terms for term in ['shake', 'drink', 'beverage']):
+                # Use the first matching product term
+                for term in ['shake', 'drink', 'beverage']:
+                    if term in [p.lower() for p in product_terms]:
+                        clean_parts.append(term.title())
+                        break
+            else:
+                clean_parts.append('Shake')
+            
+            if flavor_terms:
+                formatted_food = ' '.join(clean_parts) + f" ({', '.join(flavor_terms).title()})"
+            else:
+                formatted_food = ' '.join(clean_parts)
+                
+        # General protein product formatting
+        elif 'protein' in food_lower and brand_name:
+            # For other protein products, try to clean up redundant brand mentions
+            formatted_food = food_name
+            if brand_lower in food_lower:
+                # Remove exact brand matches
+                formatted_food = formatted_food.replace(brand_name, '').strip()
+                # Remove common variations
+                for word in brand_name.split():
+                    if len(word) > 2:  # Don't remove very short words
+                        formatted_food = formatted_food.replace(word, '').strip()
+            
+            # Clean up multiple spaces and commas
+            formatted_food = ' '.join(formatted_food.split())
+            formatted_food = formatted_food.replace(' ,', ',').replace(',,', ',')
+            formatted_food = formatted_food.strip(' ,')
+            
+            # If we removed too much, fall back to original
+            if len(formatted_food) < 5:
+                formatted_food = food_name
+        
+        # Final cleanup
+        formatted_food = ' '.join(formatted_food.split())  # Normalize spaces
+        formatted_food = formatted_food.strip(' ,-')  # Remove trailing punctuation
+        
+        # Capitalize properly
+        formatted_food = formatted_food.title()
+        
+        return formatted_brand, formatted_food
+    
     def _calculate_healthiness_rating(self, food: Dict) -> int:
         """Calculate a comprehensive healthiness rating based on nutritional content"""
-        # Extract nutrient values with defaults
-        calories = food.get('nf_calories', 0)
-        protein = food.get('nf_protein', 0)
-        carbs = food.get('nf_total_carbohydrate', 0)
-        fat = food.get('nf_total_fat', 0)
-        fiber = food.get('nf_dietary_fiber', 0)
-        sugar = food.get('nf_sugars', 0)
-        saturated_fat = food.get('nf_saturated_fat', 0)
-        cholesterol = food.get('nf_cholesterol', 0)
-        sodium = food.get('nf_sodium', 0)
+        # Extract nutrient values with defaults (ensure no None values)
+        calories = food.get('nf_calories') or 0
+        protein = food.get('nf_protein') or 0
+        carbs = food.get('nf_total_carbohydrate') or 0
+        fat = food.get('nf_total_fat') or 0
+        fiber = food.get('nf_dietary_fiber') or 0
+        sugar = food.get('nf_sugars') or 0
+        saturated_fat = food.get('nf_saturated_fat') or 0
+        cholesterol = food.get('nf_cholesterol') or 0
+        sodium = food.get('nf_sodium') or 0
 
         # Start with a lower base score so only truly healthy foods get high ratings
         score = 4.0  # Start lower than neutral
 
         # Protein is generally good (up to a point)
-        if protein > 0:
+        if protein > 0 and calories > 0:
             # Protein quality score: higher is better
             protein_quality = protein / calories * 400  # Scaled to ~0-4 range
             score += min(2, protein_quality)
 
         # Fiber is good
-        if fiber > 0:
+        if fiber > 0 and calories > 0:
             # Fiber quality score: higher is better
             fiber_quality = fiber / calories * 400  # Scaled to ~0-2 range
             score += min(1.5, fiber_quality)
@@ -144,9 +292,10 @@ class NutritionixService:
     
     def _map_to_food_item(self, food: Dict) -> Dict[str, Any]:
         """Map Nutritionix API response to our FoodItem format"""
+        formatted_brand, formatted_food_name = self._format_food_display_names(food.get('food_name', ''), food.get('brand_name', ''))
         return {
-            'food_name': food.get('food_name', ''),
-            'brand_name': food.get('brand_name'),
+            'food_name': formatted_food_name,
+            'brand_name': formatted_brand,
             'calories': round(food.get('nf_calories', 0) or 0),
             'proteins': round(food.get('nf_protein', 0) or 0),
             'carbs': round(food.get('nf_total_carbohydrate', 0) or 0),
@@ -206,14 +355,43 @@ class NutritionixService:
                 if nix_item_id:
                     detailed_food = self._get_branded_food_details(nix_item_id)
                     if detailed_food:
-                        # Update the food name and brand from the original search result to maintain consistency
-                        detailed_food['food_name'] = food_name
-                        detailed_food['brand_name'] = brand_name
-                        logger.info(f"Got detailed branded data for {food_name}: calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
+                        # Apply formatting to the original search result names for better display
+                        formatted_brand, formatted_food_name = self._format_food_display_names(food_name, brand_name)
+                        detailed_food['food_name'] = formatted_food_name
+                        detailed_food['brand_name'] = formatted_brand
+                        logger.info(f"Got detailed branded data for {formatted_food_name} ({formatted_brand}): calories={detailed_food.get('calories')}, proteins={detailed_food.get('proteins')}, carbs={detailed_food.get('carbs')}, fats={detailed_food.get('fats')}")
                         detailed_results.append(detailed_food)
                     else:
-                        logger.warning(f"Failed to get branded food details for {food_name} with nix_item_id: {nix_item_id}, skipping")
-                        continue
+                        # If detailed food fails, create a basic entry from the search result
+                        logger.warning(f"Failed to get branded food details for {food_name} with nix_item_id: {nix_item_id}, creating basic entry")
+                        formatted_brand, formatted_food_name = self._format_food_display_names(food_name, brand_name)
+                        basic_food = {
+                            'food_name': formatted_food_name,
+                            'brand_name': formatted_brand,
+                            'calories': item.get('nf_calories', 0) or 0,
+                            'proteins': item.get('nf_protein', 0) or 0,
+                            'carbs': item.get('nf_total_carbohydrate', 0) or 0,
+                            'fats': item.get('nf_total_fat', 0) or 0,
+                            'fiber': item.get('nf_dietary_fiber', 0) or 0,
+                            'sugar': item.get('nf_sugars', 0) or 0,
+                            'saturated_fat': item.get('nf_saturated_fat', 0) or 0,
+                            'polyunsaturated_fat': 0,
+                            'monounsaturated_fat': 0,
+                            'trans_fat': 0,
+                            'cholesterol': item.get('nf_cholesterol', 0) or 0,
+                            'sodium': item.get('nf_sodium', 0) or 0,
+                            'potassium': item.get('nf_potassium', 0) or 0,
+                            'vitamin_a': 0,
+                            'vitamin_c': 0,
+                            'calcium': 0,
+                            'iron': 0,
+                            'image': item.get('photo', {}).get('thumb', '') if item.get('photo') else '',
+                            'serving_unit': item.get('serving_unit', 'serving'),
+                            'serving_weight_grams': item.get('serving_weight_grams', 0) or 0,
+                            'serving_qty': item.get('serving_qty', 1) or 1,
+                            'healthiness_rating': 5  # Default neutral rating
+                        }
+                        detailed_results.append(basic_food)
                 else:
                     logger.warning(f"No nix_item_id found for branded food: {food_name}, skipping")
                     continue
@@ -249,12 +427,6 @@ class NutritionixService:
         except Exception as e:
             logger.error(f'Unexpected error searching for food: {e}')
             return []
-
-
-
-
-
-
 
     def _get_branded_food_details(self, nix_item_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a branded food using nix_item_id"""

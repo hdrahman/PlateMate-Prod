@@ -1,33 +1,11 @@
 /**
- * Utility to get a Firebase authentication token for testing
- * 
- * Run this in your React Native app's development environment to 
- * get a token you can use to test the backend authentication.
+ * This utility was removed for security reasons.
+ * Token logging can expose sensitive authentication data in production.
  */
 
-import { auth } from './firebase';
+console.warn('⚠️ Token logging utility has been disabled for security.');
 
-const getFirebaseToken = async () => {
-    try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-            console.error('No user is currently signed in');
-            return null;
-        }
-
-        const token = await currentUser.getIdToken(true);
-        console.log('====== FIREBASE AUTH TOKEN ======');
-        console.log(token);
-        console.log('================================');
-        console.log('You can use this token to test your backend authentication with:');
-        console.log(`python test_firebase_auth.py --token "${token}"`);
-
-        return token;
-    } catch (error) {
-        console.error('Error getting token:', error);
-        return null;
-    }
-};
-
-// Export for use in the dev environment
-export default getFirebaseToken; 
+export default () => {
+    console.error('🚫 Token logging disabled for production security.');
+    return null;
+}; 
