@@ -137,7 +137,6 @@ def parse_gpt4_response(response_text):
 
 @router.post("/upload-image")
 async def upload_image(
-    user_id: int = Form(...), 
     image: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
