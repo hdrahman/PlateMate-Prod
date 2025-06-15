@@ -240,55 +240,87 @@ const FoodDetailScreen: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-
-            {/* Header with Navigation and Title */}
-            <SafeAreaView style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.headerButton}
-                >
-                    <View style={styles.headerButtonBackground}>
-                        <Ionicons name="chevron-back" size={24} color={WHITE} />
-                    </View>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Nutrition Facts</Text>
-                <TouchableOpacity style={styles.headerButton}>
-                    <View style={styles.headerButtonBackground}>
-                        <Ionicons name="heart-outline" size={22} color={WHITE} />
-                    </View>
-                </TouchableOpacity>
-            </SafeAreaView>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 bounces={false}
             >
+                {/* Image Background with Overlay */}
+                <View style={styles.imageSection}>
+                    {!loading && foodData?.image_url && !imageError ? (
+                        <Image
+                            source={{ uri: foodData.image_url }}
+                            style={styles.foodImage}
+                            resizeMode="cover"
+                            onError={() => setImageError(true)}
+                        />
+                    ) : (
+                        <View style={styles.placeholderImage} />
+                    )}
+
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']}
+                        style={styles.headerGradient}
+                    />
+
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', PRIMARY_BG]}
+                        style={styles.bottomGradient}
+                    />
+
+                    {/* Header with safe area padding */}
+                    <SafeAreaView style={styles.headerContainer}>
+                        <View style={styles.header}>
+                            <TouchableOpacity
+                                onPress={() => navigation.goBack()}
+                                style={styles.headerButton}
+                            >
+                                <View style={styles.headerButtonBackground}>
+                                    <Ionicons name="chevron-back" size={24} color={WHITE} />
+                                </View>
+                            </TouchableOpacity>
+                            <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                            <TouchableOpacity style={styles.headerButton}>
+                                <View style={styles.headerButtonBackground}>
+                                    <Ionicons name="heart-outline" size={22} color={WHITE} />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    </SafeAreaView>
+
+                    {/* Food Details Overlay */}
+                    <View style={styles.foodInfoOverlay}>
+                        <Text style={styles.foodName}>{foodData?.food_name}</Text>
+                        <Text style={styles.foodMeta}>{foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}</Text>
+                    </View>
+                </View>
+
                 {/* Main Content Container */}
                 <View style={styles.contentContainer}>
-                    {/* Food Name and Basic Info */}
-                    <View style={styles.foodInfoSection}>
-                        <Text style={styles.foodName}>{foodData.food_name}</Text>
-                        <Text style={styles.foodMeta}>{foodData.meal_type} • {new Date(foodData.date).toLocaleDateString()}</Text>
-                        {foodData.healthiness_rating && (
+                    {/* Calories Section */}
+                    <View style={styles.calorieSection}>
+                        <Text style={styles.calorieNumber}>{foodData?.calories}</Text>
+                        <Text style={styles.calorieLabel}>calories</Text>
+                        {foodData?.healthiness_rating && (
                             <View style={[
                                 styles.healthinessBadge,
-                                { backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20', borderColor: getHealthinessColor(foodData.healthiness_rating) }
+                                {
+                                    backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
+                                    borderColor: getHealthinessColor(foodData.healthiness_rating),
+                                    position: 'relative',
+                                    top: 0,
+                                    right: 0,
+                                    alignSelf: 'center',
+                                    marginTop: 10,
+                                    marginBottom: 0
+                                }
                             ]}>
                                 <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
                                     Health Score: {Math.round(foodData.healthiness_rating)}
                                 </Text>
                             </View>
-                        )}
-                    </View>
-
-                    {/* Calories Section */}
-                    <View style={styles.calorieSection}>
-                        <Text style={styles.calorieNumber}>{foodData.calories}</Text>
-                        <Text style={styles.calorieLabel}>calories</Text>
-                        {foodData.quantity && (
-                            <Text style={styles.servingText}>per {foodData.quantity}</Text>
                         )}
                     </View>
 
@@ -427,50 +459,68 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
+    headerContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        paddingTop: 20, // Add padding to handle notch area
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingVertical: 16,
-        backgroundColor: PRIMARY_BG,
-        borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
-    },
-    headerButton: {
-        width: 44,
-        height: 44,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerButtonBackground: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerTitle: {
-        fontSize: 30,
-        fontWeight: '800',
-        color: WHITE,
-        marginLeft: 8,
-        letterSpacing: 0.5,
     },
     scrollView: {
         flex: 1,
     },
-    contentContainer: {
-        backgroundColor: PRIMARY_BG,
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        flex: 1,
+    imageSection: {
+        height: 450, // Increased height to show more of the image
+        position: 'relative',
+        width: screenWidth,
+        overflow: 'hidden',
     },
-    foodInfoSection: {
-        alignItems: 'center',
-        paddingVertical: 16,
-        marginBottom: 24,
+    foodImage: {
+        width: screenWidth,
+        height: 450, // Increased height to match
+        position: 'absolute',
+    },
+    placeholderImage: {
+        width: screenWidth,
+        height: 450, // Increased height to match
+        backgroundColor: CARD_BG,
+    },
+    headerGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 150,
+    },
+    bottomGradient: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 200, // Increased height for better blending
+    },
+    foodInfoOverlay: {
+        position: 'absolute',
+        bottom: 80, // Moved down to better position over the gradient
+        left: 0,
+        right: 0,
+        paddingHorizontal: 20,
+    },
+    contentContainer: {
+        paddingHorizontal: 20,
+        backgroundColor: PRIMARY_BG,
+        marginTop: -25, // Less overlap to show more of the image
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingTop: 5, // Minimal padding
     },
     foodName: {
         fontSize: 32,
@@ -481,26 +531,13 @@ const styles = StyleSheet.create({
     },
     foodMeta: {
         fontSize: 16,
-        color: SUBDUED,
+        color: WHITE,
         textTransform: 'capitalize',
-    },
-    healthinessBadge: {
-        alignSelf: 'flex-start',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        borderWidth: 1,
-        marginBottom: 12,
-    },
-    healthinessBadgeText: {
-        fontSize: 12,
-        fontWeight: '600',
     },
     calorieSection: {
         alignItems: 'center',
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
+        paddingTop: 20, // Increased from 10 to 20
+        paddingBottom: 5,
         marginBottom: 24,
     },
     calorieNumber: {
@@ -514,10 +551,21 @@ const styles = StyleSheet.create({
         color: SUBDUED,
         marginTop: -8,
     },
-    servingText: {
-        fontSize: 14,
-        color: SUBDUED,
-        marginTop: 8,
+    healthinessBadge: {
+        alignSelf: 'flex-start', // Position at left side
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        marginTop: 10,  // Add some space from top
+        marginBottom: 5, // Less bottom margin
+        position: 'absolute',
+        top: -10, // Position it at the top of content
+        right: 20, // Position at right side
+    },
+    healthinessBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
     macrosSection: {
         marginBottom: 24,
@@ -678,6 +726,26 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         marginTop: 8,
         marginLeft: 20,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: WHITE,
+        letterSpacing: 0.5,
+    },
+    headerButton: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerButtonBackground: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 
