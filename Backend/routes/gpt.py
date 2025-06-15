@@ -1,7 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from DB import get_db
-from models import FoodLog
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional, Union
 import requests
@@ -9,6 +6,7 @@ import os
 import logging
 from dotenv import load_dotenv
 import httpx
+from auth.firebase_auth import get_current_user
 
 # Load environment variables
 load_dotenv()
@@ -30,13 +28,21 @@ class FoodAnalysisRequest(BaseModel):
     food_name: str
     meal_type: str
 
+# Pydantic model for meal analysis request
+class MealAnalysisRequest(BaseModel):
+    food_items: List[dict]  # List of food items with nutritional data
+    meal_type: Optional[str] = "meal"
+
 # Pydantic model for response
 class FoodAnalysisResponse(BaseModel):
     description: str
     healthiness_rating: Optional[int] = None
 
 @router.post("/analyze-food", response_model=FoodAnalysisResponse)
-async def analyze_food(request: FoodAnalysisRequest):
+async def analyze_food(
+    request: FoodAnalysisRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Analyze food images using GPT-4 Vision and provide a description and healthiness rating.
     """
@@ -44,7 +50,7 @@ async def analyze_food(request: FoodAnalysisRequest):
         raise HTTPException(status_code=500, detail="OpenAI API key not configured")
     
     try:
-        logger.info(f"Analyzing food: {request.food_name} for meal type: {request.meal_type}")
+        logger.info(f"Analyzing food: {request.food_name} for meal type: {request.meal_type} (user: {current_user['firebase_uid']})")
         logger.info(f"Received {len(request.image_urls)} image URLs")
         
         # Validate image URLs
@@ -160,28 +166,31 @@ async def analyze_food(request: FoodAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Error analyzing food: {str(e)}")
 
 
-@router.get("/analyze-meal/{meal_id}")
-async def analyze_meal(meal_id: int, db: Session = Depends(get_db)):
+@router.post("/analyze-meal", response_model=FoodAnalysisResponse)
+async def analyze_meal(
+    request: MealAnalysisRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Analyze a full meal by its meal_id and provide a comprehensive analysis
+    Analyze a full meal from provided food items data and provide a comprehensive analysis.
+    This is a stateless service - no database lookup required.
     """
     try:
-        # Query the database for all food items in this meal
-        food_items = db.query(FoodLog).filter(FoodLog.meal_id == meal_id).all()
+        if not request.food_items:
+            raise HTTPException(status_code=400, detail="No food items provided for analysis")
         
-        if not food_items:
-            raise HTTPException(status_code=404, detail=f"No food items found for meal_id {meal_id}")
+        logger.info(f"Analyzing meal with {len(request.food_items)} food items (user: {current_user['firebase_uid']})")
         
-        # Extract meal information
-        food_names = [item.food_name for item in food_items]
-        total_calories = sum(item.calories for item in food_items)
-        total_protein = sum(item.proteins for item in food_items)
-        total_carbs = sum(item.carbs for item in food_items)
-        total_fat = sum(item.fats for item in food_items)
+        # Extract meal information from provided data
+        food_names = [item.get('food_name', 'Unknown food') for item in request.food_items]
+        total_calories = sum(item.get('calories', 0) for item in request.food_items)
+        total_protein = sum(item.get('proteins', 0) for item in request.food_items)
+        total_carbs = sum(item.get('carbs', 0) for item in request.food_items)
+        total_fat = sum(item.get('fats', 0) for item in request.food_items)
         
         # Prepare prompt for GPT
         prompt = f"""
-        Please analyze this meal consisting of: {', '.join(food_names)}.
+        Please analyze this {request.meal_type} consisting of: {', '.join(food_names)}.
         
         Total nutritional information:
         - Calories: {total_calories}
@@ -195,11 +204,15 @@ async def analyze_meal(meal_id: int, db: Session = Depends(get_db)):
         3. Any nutrition concerns or imbalances
         4. Suggestions for improving the meal
         5. How well this meal aligns with a balanced diet
+        6. A healthiness rating from 1-10
         
         Keep your response concise and informative, around 200-250 words.
         """
         
-        # Request analysis from OpenAI
+        if not OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+        
+        # Make the API request to OpenAI
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -211,13 +224,18 @@ async def analyze_meal(meal_id: int, db: Session = Depends(get_db)):
                     "model": "gpt-4o",
                     "messages": [
                         {
+                            "role": "system",
+                            "content": "You are a nutrition expert providing meal analysis and health recommendations."
+                        },
+                        {
                             "role": "user",
                             "content": prompt
                         }
                     ],
                     "max_tokens": 1000,
                     "temperature": 0.7
-                }
+                },
+                timeout=30.0
             )
         
         if response.status_code != 200:
@@ -227,19 +245,21 @@ async def analyze_meal(meal_id: int, db: Session = Depends(get_db)):
         response_data = response.json()
         analysis_text = response_data["choices"][0]["message"]["content"]
         
-        # Return the meal analysis
-        return {
-            "meal_id": meal_id,
-            "food_items": food_names,
-            "total_calories": total_calories,
-            "total_protein": total_protein,
-            "total_carbs": total_carbs,
-            "total_fat": total_fat,
-            "analysis": analysis_text
-        }
+        # Extract healthiness rating if present
+        healthiness_rating = None
+        rating_lines = [line for line in analysis_text.split('\n') if 'healthiness rating' in line.lower() or 'rating' in line.lower()]
+        if rating_lines:
+            import re
+            rating_match = re.search(r'(\d+)/10', rating_lines[0], re.IGNORECASE)
+            if rating_match:
+                healthiness_rating = int(rating_match.group(1))
+                logger.info(f"Extracted healthiness rating: {healthiness_rating}/10")
         
-    except HTTPException:
-        raise
+        return FoodAnalysisResponse(
+            description=analysis_text,
+            healthiness_rating=healthiness_rating
+        )
+        
     except Exception as e:
         logger.error(f"Error analyzing meal: {str(e)}")
         import traceback

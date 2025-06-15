@@ -1,7 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
-from DB import get_db
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 import httpx
 import os
@@ -32,6 +30,22 @@ DEEPSEEK_MODEL = "deepseek-chat"  # This is DeepSeek V3
 class ChatMessage(BaseModel):
     role: str  # "system", "user", or "assistant"
     content: str
+    
+    @validator('content')
+    def content_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Message content cannot be empty')
+        return v.strip()
+    
+    @validator('role')
+    def role_must_be_valid(cls, v):
+        if v not in ['system', 'user', 'assistant']:
+            raise ValueError('Role must be one of: system, user, assistant')
+        return v
+    
+    class Config:
+        # Allow extra fields to be ignored
+        extra = "ignore"
 
 class NutritionAnalysisRequest(BaseModel):
     nutritionData: dict
@@ -46,18 +60,26 @@ class ChatResponse(BaseModel):
     response: str
     usage: Optional[dict] = None
 
+class ChatWithContextRequest(BaseModel):
+    messages: List[ChatMessage]
+    user_context: Optional[str] = None  # Frontend can provide context data as a string
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 1000
+
 @router.post("/nutrition-analysis", response_model=ChatResponse)
 async def analyze_nutrition(
     request: NutritionAnalysisRequest,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Analyze nutrition data and provide coaching insights using DeepSeek V3.
     This endpoint is called when user taps 'Generate Report' in food log.
+    Stateless service - no database access required.
     """
     try:
         nutrition_data = request.nutritionData
+        
+        logger.info(f"Nutrition analysis requested for user {current_user['firebase_uid']}")
         
         # Create context message for Coach Max
         system_prompt = """You are Coach Max, an expert AI Health Coach and nutritionist. You're energetic, motivational, and provide practical, actionable advice. Analyze the user's nutrition data and provide personalized insights, recommendations, and encouragement. Keep your tone friendly and supportive while being informative."""
@@ -111,7 +133,7 @@ Let me give you personalized insights and recommendations to help you reach your
             result = response.json()
             coach_response = result["choices"][0]["message"]["content"]
             
-            logger.info(f"Nutrition analysis completed for user {current_user.get('uid')}")
+            logger.info(f"Nutrition analysis completed for user {current_user['firebase_uid']}")
             
             return ChatResponse(
                 response=coach_response,
@@ -128,13 +150,15 @@ Let me give you personalized insights and recommendations to help you reach your
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_coach(
     request: ChatRequest,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     General chat endpoint for ongoing conversations with Coach Max.
+    Stateless service - no database access required.
     """
     try:
+        logger.info(f"Chat request from user {current_user['firebase_uid']}")
+        
         # Call DeepSeek API securely from backend
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -172,4 +196,76 @@ async def chat_with_coach(
         raise HTTPException(status_code=504, detail="AI coach is taking too long to respond")
     except Exception as e:
         logger.error(f"Error in chat: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to chat with AI coach")
+
+
+
+@router.post("/chat-with-context", response_model=ChatResponse)
+async def chat_with_context(
+    request: ChatWithContextRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Chat with Coach Max using provided user context data.
+    Frontend can provide context data from local SQLite database.
+    Stateless service - no database access required.
+    """
+    try:
+        logger.info(f"Context chat request from user {current_user['firebase_uid']}")
+        logger.info(f"Request messages count: {len(request.messages)}")
+        logger.info(f"Request user_context provided: {bool(request.user_context)}")
+        logger.info(f"Request temperature: {request.temperature}")
+        logger.info(f"Request max_tokens: {request.max_tokens}")
+        
+        # Build context-aware system prompt
+        system_prompt = """You are Coach Max, an expert AI Health Coach and nutritionist. You're energetic, motivational, and provide practical, actionable advice. Use the provided user context to give personalized recommendations. Keep your tone friendly and supportive while being informative."""
+        
+        # Prepare messages with context
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add context if provided
+        if request.user_context:
+            context_message = f"Here's some context about the user: {request.user_context}"
+            messages.append({"role": "system", "content": context_message})
+        
+        # Add user messages
+        messages.extend([msg.dict() for msg in request.messages])
+        
+        # Call DeepSeek API
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                DEEPSEEK_API_URL,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+                },
+                json={
+                    "model": DEEPSEEK_MODEL,
+                    "messages": messages,
+                    "temperature": request.temperature,
+                    "max_tokens": request.max_tokens
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"DeepSeek API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to get response from AI coach"
+                )
+            
+            result = response.json()
+            coach_response = result["choices"][0]["message"]["content"]
+            
+            return ChatResponse(
+                response=coach_response,
+                usage=result.get("usage")
+            )
+            
+    except httpx.TimeoutException:
+        logger.error("DeepSeek API timeout")
+        raise HTTPException(status_code=504, detail="AI coach is taking too long to respond")
+    except Exception as e:
+        logger.error(f"Error in context chat: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to chat with AI coach") 

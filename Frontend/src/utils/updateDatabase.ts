@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 9; // Increment this to version 9 for enhanced onboarding fields
+const CURRENT_VERSION = 11; // Increment this to version 11 for fitness_goal column
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -261,6 +261,40 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             } catch (error) {
                                 console.error(`❌ Error processing column ${columnName}:`, error);
                             }
+                        }
+                    }
+                },
+                // Migration to version 10 - Add weight_goal column to user_profiles
+                async () => {
+                    if (currentVersion < 10) {
+                        console.log('Migrating to version 10: Adding weight_goal column to user_profiles');
+
+                        try {
+                            // Check if column exists by trying to select it
+                            await db.execAsync(`SELECT weight_goal FROM user_profiles LIMIT 1`).catch(async () => {
+                                // Column doesn't exist, add it
+                                await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN weight_goal TEXT`);
+                                console.log(`✅ Added weight_goal column to user_profiles`);
+                            });
+                        } catch (error) {
+                            console.error(`❌ Error adding weight_goal column:`, error);
+                        }
+                    }
+                },
+                // Migration to version 11 - Add fitness_goal column to user_profiles
+                async () => {
+                    if (currentVersion < 11) {
+                        console.log('Migrating to version 11: Adding fitness_goal column to user_profiles');
+
+                        try {
+                            // Check if column exists by trying to select it
+                            await db.execAsync(`SELECT fitness_goal FROM user_profiles LIMIT 1`).catch(async () => {
+                                // Column doesn't exist, add it
+                                await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN fitness_goal TEXT`);
+                                console.log(`✅ Added fitness_goal column to user_profiles`);
+                            });
+                        } catch (error) {
+                            console.error(`❌ Error adding fitness_goal column:`, error);
                         }
                     }
                 }

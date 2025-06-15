@@ -3,7 +3,6 @@ export interface UserProfile {
     // Basic info
     firstName: string;
     lastName: string;
-    phoneNumber: string;
 
     // Enhanced personal info
     dateOfBirth: string | null;
@@ -34,6 +33,7 @@ export interface UserProfile {
     // Cheat day preferences
     cheatDayEnabled?: boolean;
     cheatDayFrequency?: number; // days between cheat days
+    preferredCheatDayOfWeek?: number; // 0-6, where 0 = Sunday, 1 = Monday, etc.
 
     // Lifestyle and motivation data
     sleepQuality?: string;

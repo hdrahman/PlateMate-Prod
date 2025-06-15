@@ -1,6 +1,4 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
-from DB import get_db
 from pydantic import BaseModel
 from typing import List, Optional
 import requests
@@ -9,6 +7,7 @@ import logging
 import re
 from dotenv import load_dotenv
 import httpx
+from auth.firebase_auth import get_current_user
 
 # Load environment variables
 load_dotenv()
@@ -83,15 +82,19 @@ def format_as_system_message(text):
     return cleaned_text
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_with_arli(request: ChatRequest):
+async def chat_with_arli(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Chat with Arli AI with conversation history support.
+    Stateless service - no database access required.
     """
     if not ARLI_AI_API_KEY:
         raise HTTPException(status_code=500, detail="Arli AI API key not configured")
     
     try:
-        logger.info(f"Sending chat request to Arli AI with conversation ID: {request.conversation_id}")
+        logger.info(f"Sending chat request to Arli AI for user {current_user['firebase_uid']} with conversation ID: {request.conversation_id}")
         
         # Add a system message asking for plain text responses if not already present
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
@@ -197,38 +200,32 @@ Keep responses focused on health, nutrition, and fitness advice. Use a tone that
             
             # Fallback to local response if API fails
             logger.info("Falling back to local response due to API error")
+            import random
+            fallback_response = random.choice(NUTRITION_RESPONSES)
             
-            # Get last user message for context
-            user_message = ""
-            for msg in reversed(request.messages):
-                if msg.role == "user":
-                    user_message = msg.content.lower()
-                    break
-                    
-            # Use existing conversation_id or generate a new one
-            conversation_id = request.conversation_id or "fallback-session"
-            
-            # Return a fallback response
             return {
-                "response": "Hey there! I'm having some technical difficulties connecting to my knowledge base right now, but I'm still here to help! Let's try again in a moment - we've got goals to crush!",
-                "conversation_id": conversation_id
+                "response": fallback_response,
+                "conversation_id": request.conversation_id or "fallback"
             }
             
-    except requests.exceptions.Timeout:
-        logger.error("Timeout connecting to Arli AI API")
-        raise HTTPException(
-            status_code=504,
-            detail="Connection to Arli AI timed out. Please try again later."
-        )
-    except requests.exceptions.ConnectionError:
-        logger.error("Connection error with Arli AI API")
-        raise HTTPException(
-            status_code=503,
-            detail="Could not connect to Arli AI API. Please check your internet connection."
-        )
+    except httpx.TimeoutError:
+        logger.error("Arli AI API timeout")
+        # Fallback to local response on timeout
+        import random
+        fallback_response = random.choice(NUTRITION_RESPONSES)
+        
+        return {
+            "response": fallback_response,
+            "conversation_id": request.conversation_id or "timeout"
+        }
+        
     except Exception as e:
-        logger.error(f"Error chatting with Arli AI: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error chatting with Arli AI: {str(e)}"
-        ) 
+        logger.error(f"Error in Arli AI chat: {str(e)}")
+        # Fallback to local response on any error
+        import random
+        fallback_response = random.choice(NUTRITION_RESPONSES)
+        
+        return {
+            "response": fallback_response,
+            "conversation_id": request.conversation_id or "error"
+        } 

@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { updateDatabaseSchema } from './updateDatabase';
 import { auth } from './firebase/index';
 import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
@@ -97,6 +97,8 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         cuisine_preferences TEXT,
         spice_tolerance TEXT,
         health_conditions TEXT,
+        fitness_goal TEXT,
+        weight_goal TEXT,
         daily_calorie_target INTEGER,
         nutrient_focus TEXT,
         unit_preference TEXT DEFAULT 'metric',
@@ -656,9 +658,7 @@ export const updateLastSyncTime = async (status: string = 'success') => {
         );
         console.log('✅ Last sync time updated successfully');
 
-        // Also store in AsyncStorage for quick access
-        await AsyncStorage.setItem('lastSyncTime', now);
-        await AsyncStorage.setItem('syncStatus', status);
+        // Sync time stored in SQLite database only
     } catch (error) {
         console.error('❌ Error updating last sync time:', error);
         throw error;
@@ -668,24 +668,14 @@ export const updateLastSyncTime = async (status: string = 'success') => {
 // Get last sync time
 export const getLastSyncTime = async () => {
     try {
-        // First try to get from AsyncStorage for speed
-        const results = await AsyncStorage.multiGet(['lastSyncTime', 'syncStatus']);
-        const lastSync = results[0][1];
-        const syncStatus = results[1][1];
-
-        if (lastSync && syncStatus) {
-            return { lastSync, syncStatus };
-        } else if (db) {
-            // If not in AsyncStorage, get from database
+        if (db) {
+            // Get from SQLite database only
             const result = await db.getFirstAsync<{ last_sync: string, sync_status: string }>(
                 `SELECT last_sync, sync_status FROM sync_log WHERE id = 1`
             );
 
             if (result) {
                 const { last_sync, sync_status } = result;
-                // Update AsyncStorage for next time
-                await AsyncStorage.setItem('lastSyncTime', last_sync);
-                await AsyncStorage.setItem('syncStatus', sync_status);
                 return { lastSync: last_sync, syncStatus: sync_status };
             }
         }
@@ -1219,6 +1209,7 @@ export const addUserProfile = async (profile: any) => {
         email,
         first_name,
         last_name = null,
+        date_of_birth = null,
         height = null,
         weight = null,
         age = null,
@@ -1231,6 +1222,7 @@ export const addUserProfile = async (profile: any) => {
         cuisine_preferences = [],
         spice_tolerance = null,
         health_conditions = [],
+        fitness_goal = null,
         daily_calorie_target = null,
         nutrient_focus = null,
         unit_preference = 'metric',
@@ -1257,18 +1249,19 @@ export const addUserProfile = async (profile: any) => {
 
         const result = await db.runAsync(
             `INSERT INTO user_profiles (
-                firebase_uid, email, first_name, last_name, height, weight, age, gender, 
+                firebase_uid, email, first_name, last_name, date_of_birth, height, weight, age, gender, 
                 activity_level, weight_goal, target_weight, dietary_restrictions, food_allergies, 
-                cuisine_preferences, spice_tolerance, health_conditions, daily_calorie_target, 
+                cuisine_preferences, spice_tolerance, health_conditions, fitness_goal, daily_calorie_target, 
                 nutrient_focus, unit_preference, push_notifications_enabled, email_notifications_enabled, 
                 sms_notifications_enabled, marketing_emails_enabled, preferred_language, timezone, 
                 dark_mode, sync_data_offline, onboarding_complete, synced, last_modified
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 firebase_uid,
                 email,
                 first_name,
                 last_name,
+                date_of_birth,
                 height,
                 weight,
                 age,
@@ -1281,6 +1274,7 @@ export const addUserProfile = async (profile: any) => {
                 JSON.stringify(cuisine_preferences),
                 spice_tolerance,
                 JSON.stringify(health_conditions),
+                fitness_goal,
                 daily_calorie_target,
                 nutrient_focus ? JSON.stringify(nutrient_focus) : null,
                 unit_preference,
@@ -1336,6 +1330,8 @@ interface UserProfile {
     cuisine_preferences?: string;
     spice_tolerance?: string;
     health_conditions?: string;
+    fitness_goal?: string;
+    weight_goal?: string;
     daily_calorie_target?: number;
     nutrient_focus?: string;
     unit_preference?: string;
@@ -1533,6 +1529,55 @@ export const markUserProfileSynced = async (firebaseUid: string) => {
     }
 };
 
+// Reset onboarding status for a user
+export const resetOnboardingStatus = async (firebaseUid: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to reset onboarding before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        console.log(`🔄 Resetting onboarding status for user: ${firebaseUid}`);
+
+        const result = await db.runAsync(
+            `UPDATE user_profiles SET 
+             onboarding_complete = 0, 
+             synced = 0, 
+             sync_action = 'update',
+             last_modified = ?
+             WHERE firebase_uid = ?`,
+            [new Date().toISOString(), firebaseUid]
+        );
+
+        console.log('✅ Onboarding status reset successfully', result.changes);
+        return result.changes;
+    } catch (error) {
+        console.error('❌ Error resetting onboarding status:', error);
+        throw error;
+    }
+};
+
+// Complete onboarding reset (SQLite only)
+export const resetOnboardingCompletely = async (firebaseUid: string) => {
+    if (!db || !global.dbInitialized) {
+        console.log('🔄 Database not initialized, initializing now...');
+        await initDatabase();
+    }
+
+    try {
+        console.log(`🔄 Performing complete onboarding reset for user: ${firebaseUid}`);
+
+        // Reset onboarding status in SQLite database
+        await resetOnboardingStatus(firebaseUid);
+
+        console.log('✅ Complete onboarding reset successful');
+        return true;
+    } catch (error) {
+        console.error('❌ Error performing complete onboarding reset:', error);
+        throw error;
+    }
+};
+
 export { db };
 
 // Export wrappers with simpler names for backward compatibility
@@ -1644,6 +1689,44 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
         if (goals.fitnessGoal || goals.activityLevel || goals.calorieGoal || goals.proteinGoal || goals.carbGoal || goals.fatGoal) {
             const timestamp = new Date().toISOString();
 
+            // Map fitnessGoal to weight_goal constraint values
+            const mapFitnessGoalToWeightGoal = (fitnessGoal?: string): string | null => {
+                if (!fitnessGoal) return null;
+
+                // Direct mapping for new format values
+                const validWeightGoals = ['lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5'];
+                if (validWeightGoals.includes(fitnessGoal)) {
+                    return fitnessGoal;
+                }
+
+                // Legacy mapping for old values
+                switch (fitnessGoal) {
+                    case 'lose':
+                    case 'lose_moderate':
+                    case 'fat_loss':
+                        return 'lose_0_5';
+                    case 'lose_light':
+                        return 'lose_0_25';
+                    case 'lose_heavy':
+                    case 'lose_extreme':
+                        return 'lose_0_75';
+                    case 'lose_aggressive':
+                        return 'lose_1';
+                    case 'gain':
+                    case 'gain_moderate':
+                    case 'muscle_gain':
+                        return 'gain_0_5';
+                    case 'gain_light':
+                        return 'gain_0_25';
+                    case 'maintain':
+                    case 'balanced':
+                    default:
+                        return 'maintain';
+                }
+            };
+
+            const mappedWeightGoal = mapFitnessGoalToWeightGoal(goals.fitnessGoal);
+
             // Check if nutrition goals record exists
             const existingNutritionGoals = await db.getFirstAsync(
                 `SELECT id FROM nutrition_goals WHERE firebase_uid = ?`,
@@ -1671,7 +1754,7 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
                         goals.proteinGoal,
                         goals.carbGoal,
                         goals.fatGoal,
-                        goals.fitnessGoal,
+                        mappedWeightGoal,
                         goals.activityLevel,
                         timestamp,
                         firebaseUid
@@ -1690,7 +1773,7 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
                         goals.proteinGoal,
                         goals.carbGoal,
                         goals.fatGoal,
-                        goals.fitnessGoal,
+                        mappedWeightGoal,
                         goals.activityLevel,
                         timestamp
                     ]

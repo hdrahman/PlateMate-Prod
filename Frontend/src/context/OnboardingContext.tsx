@@ -1,8 +1,7 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { createUser, getUserProfile, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
-import { syncUserProfile, syncProfileFromLocalToBackend } from '../utils/profileSyncService';
+import { syncUserProfile } from '../utils/profileSyncService';
 import { getUserProfileByFirebaseUid, addUserProfile, updateUserProfile as updateLocalUserProfile } from '../utils/database';
 
 interface OnboardingContextType {
@@ -29,7 +28,6 @@ interface UserProfile {
     // Basic info
     firstName: string;
     lastName: string;
-    phoneNumber: string;
 
     // Enhanced personal info
     dateOfBirth: string | null;
@@ -54,6 +52,7 @@ interface UserProfile {
     targetWeight: number | null;
     startingWeight: number | null;
     healthConditions: string[];
+    fitnessGoal: string | null;
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
 
@@ -107,7 +106,6 @@ interface UserProfile {
 const defaultProfile: UserProfile = {
     firstName: '',
     lastName: '',
-    phoneNumber: '',
 
     // Enhanced personal info
     dateOfBirth: null,
@@ -129,6 +127,7 @@ const defaultProfile: UserProfile = {
     targetWeight: null,
     startingWeight: null,
     healthConditions: [],
+    fitnessGoal: null,
     dailyCalorieTarget: null,
     nutrientFocus: null,
 
@@ -178,7 +177,7 @@ const defaultProfile: UserProfile = {
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 6,
+    totalSteps: 11,
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -189,16 +188,6 @@ const OnboardingContext = createContext<OnboardingContextType>({
     isLoading: true,
 });
 
-// Storage keys - make them user-specific to prevent data leakage between accounts
-const ONBOARDING_COMPLETE_KEY = 'onboarding_complete';
-const ONBOARDING_STEP_KEY = 'onboarding_step';
-const ONBOARDING_PROFILE_KEY = 'onboarding_profile';
-
-const getUserSpecificKey = (key: string, userId?: string) => {
-    if (!userId) return key;
-    return `${key}_${userId}`;
-};
-
 // Helper to convert SQLite profile to frontend format
 const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile => {
     if (!sqliteProfile) return defaultProfile;
@@ -206,7 +195,6 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
     return {
         firstName: sqliteProfile.first_name || '',
         lastName: sqliteProfile.last_name || '',
-        phoneNumber: sqliteProfile.phone_number || '',
         dateOfBirth: sqliteProfile.date_of_birth,
         location: sqliteProfile.location,
         height: sqliteProfile.height,
@@ -223,6 +211,7 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         targetWeight: sqliteProfile.target_weight,
         startingWeight: sqliteProfile.starting_weight,
         healthConditions: sqliteProfile.health_conditions || [],
+        fitnessGoal: sqliteProfile.fitness_goal,
         dailyCalorieTarget: sqliteProfile.daily_calorie_target,
         nutrientFocus: sqliteProfile.nutrient_focus,
         sleepQuality: sqliteProfile.sleep_quality,
@@ -240,16 +229,16 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         futureSelfMessage: sqliteProfile.future_self_message,
         futureSelfMessageType: sqliteProfile.future_self_message_type,
         futureSelfMessageCreatedAt: sqliteProfile.future_self_message_created_at,
-        defaultAddress: sqliteProfile.default_address,
-        preferredDeliveryTimes: sqliteProfile.preferred_delivery_times || [],
-        deliveryInstructions: sqliteProfile.delivery_instructions,
+        defaultAddress: null, // Not stored in database
+        preferredDeliveryTimes: [], // Not stored in database
+        deliveryInstructions: null, // Not stored in database
         pushNotificationsEnabled: Boolean(sqliteProfile.push_notifications_enabled),
         emailNotificationsEnabled: Boolean(sqliteProfile.email_notifications_enabled),
         smsNotificationsEnabled: Boolean(sqliteProfile.sms_notifications_enabled),
         marketingEmailsEnabled: Boolean(sqliteProfile.marketing_emails_enabled),
-        paymentMethods: sqliteProfile.payment_methods || [],
-        billingAddress: sqliteProfile.billing_address,
-        defaultPaymentMethodId: sqliteProfile.default_payment_method_id,
+        paymentMethods: [], // Not stored in database
+        billingAddress: null, // Not stored in database
+        defaultPaymentMethodId: null, // Not stored in database
         preferredLanguage: sqliteProfile.preferred_language || 'en',
         timezone: sqliteProfile.timezone || 'UTC',
         darkMode: Boolean(sqliteProfile.dark_mode),
@@ -264,7 +253,6 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         email: email,
         first_name: frontendProfile.firstName,
         last_name: frontendProfile.lastName,
-        phone_number: frontendProfile.phoneNumber,
         date_of_birth: frontendProfile.dateOfBirth,
         location: frontendProfile.location,
         height: frontendProfile.height,
@@ -281,6 +269,7 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         spice_tolerance: frontendProfile.spiceTolerance,
         weight_goal: frontendProfile.weightGoal,
         health_conditions: frontendProfile.healthConditions,
+        fitness_goal: frontendProfile.fitnessGoal,
         daily_calorie_target: frontendProfile.dailyCalorieTarget,
         nutrient_focus: frontendProfile.nutrientFocus,
         sleep_quality: frontendProfile.sleepQuality,
@@ -298,16 +287,10 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         future_self_message: frontendProfile.futureSelfMessage,
         future_self_message_type: frontendProfile.futureSelfMessageType,
         future_self_message_created_at: frontendProfile.futureSelfMessageCreatedAt,
-        default_address: frontendProfile.defaultAddress,
-        preferred_delivery_times: frontendProfile.preferredDeliveryTimes,
-        delivery_instructions: frontendProfile.deliveryInstructions,
         push_notifications_enabled: frontendProfile.pushNotificationsEnabled,
         email_notifications_enabled: frontendProfile.emailNotificationsEnabled,
         sms_notifications_enabled: frontendProfile.smsNotificationsEnabled,
         marketing_emails_enabled: frontendProfile.marketingEmailsEnabled,
-        payment_methods: frontendProfile.paymentMethods,
-        billing_address: frontendProfile.billingAddress,
-        default_payment_method_id: frontendProfile.defaultPaymentMethodId,
         preferred_language: frontendProfile.preferredLanguage,
         timezone: frontendProfile.timezone,
         dark_mode: frontendProfile.darkMode,
@@ -321,12 +304,20 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const { user } = useAuth();
     const [onboardingComplete, setOnboardingComplete] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
-    const totalSteps = 10; // Updated total number of onboarding steps
     const [profile, setProfile] = useState<UserProfile>(defaultProfile);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Reset the state when user changes to prevent data leakage between accounts
+    const totalSteps = 11;
+
+    // Reset state when user changes
     useEffect(() => {
+        if (!user?.uid) {
+            setOnboardingComplete(false);
+            setCurrentStep(1);
+            setProfile(defaultProfile);
+            return;
+        }
+
         // Reset state when user changes
         setOnboardingComplete(false);
         setCurrentStep(1);
@@ -334,7 +325,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         setIsLoading(true);
     }, [user?.uid]);
 
-    // Load saved onboarding state from AsyncStorage and backend
+    // Load saved onboarding state from SQLite database only
     useEffect(() => {
         const loadOnboardingState = async () => {
             if (!user) {
@@ -344,117 +335,35 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
             try {
                 setIsLoading(true);
-                console.log(`Loading onboarding state for user: ${user.uid}`);
+                console.log(`🔍 Loading onboarding state for user: ${user.uid}`);
 
-                // First try to load from AsyncStorage for faster response
-                let shouldUseAsyncStorage = false;
-                const asyncStorageOnboardingComplete = await AsyncStorage.getItem(
-                    getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
-                );
+                // Check SQLite database for user profile
+                const sqliteProfile = await getUserProfileByFirebaseUid(user.uid);
 
-                if (asyncStorageOnboardingComplete === 'true') {
-                    console.log('Found onboarding complete flag in AsyncStorage');
-                    shouldUseAsyncStorage = true;
-                }
+                if (sqliteProfile) {
+                    console.log('✅ Found profile in SQLite database');
+                    setOnboardingComplete(sqliteProfile.onboarding_complete || false);
+                    setProfile(convertSQLiteProfileToFrontendFormat(sqliteProfile));
 
-                if (shouldUseAsyncStorage) {
-                    // Fast path: already completed onboarding according to AsyncStorage
-                    setOnboardingComplete(true);
-
-                    // Load profile data from AsyncStorage
-                    const profileStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid)
-                    );
-
-                    if (profileStr) {
-                        console.log('Loaded profile from AsyncStorage');
-                        const asyncStorageProfile = JSON.parse(profileStr);
-                        setProfile(asyncStorageProfile);
-                        setIsLoading(false);
-
-                        // Start sync in background but don't block UI
-                        syncUserProfile(user.uid)
-                            .then(({ profile }) => {
-                                if (profile) {
-                                    // Update with latest profile data from sync
-                                    setProfile(convertSQLiteProfileToFrontendFormat(profile));
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Background sync error:', error);
-                            });
-
-                        return;
+                    // Set current step based on onboarding completion
+                    if (sqliteProfile.onboarding_complete) {
+                        setCurrentStep(totalSteps); // Completed
+                    } else {
+                        // If not complete, start from step 1 or resume from where they left off
+                        setCurrentStep(1);
                     }
-                }
-
-                // Use our new sync mechanism
-                const { shouldShowOnboarding, profile: syncedProfile } = await syncUserProfile(user.uid);
-
-                if (!shouldShowOnboarding && syncedProfile) {
-                    console.log('✅ Profile found through sync mechanism');
-                    // User has a profile, use it
-                    setOnboardingComplete(true);
-                    setProfile(convertSQLiteProfileToFrontendFormat(syncedProfile));
-
-                    // Save to AsyncStorage for future fast loading
-                    await AsyncStorage.setItem(
-                        getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid),
-                        'true'
-                    );
-
-                    await AsyncStorage.setItem(
-                        getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
-                        JSON.stringify(convertSQLiteProfileToFrontendFormat(syncedProfile))
-                    );
                 } else {
-                    console.log('⚠️ No synced profile found, checking AsyncStorage for onboarding progress');
-                    // No synced profile, check AsyncStorage for any onboarding progress
-                    const onboardingCompleteStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
-                    );
-                    const complete = onboardingCompleteStr === 'true';
-                    setOnboardingComplete(complete);
-
-                    // Load current step
-                    const stepStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid)
-                    );
-                    if (stepStr) {
-                        setCurrentStep(parseInt(stepStr, 10));
-                    }
-
-                    // Load profile data from AsyncStorage
-                    const profileStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid)
-                    );
-                    if (profileStr) {
-                        const asyncStorageProfile = JSON.parse(profileStr);
-                        setProfile(asyncStorageProfile);
-                    }
+                    console.log('ℹ️ No profile found in SQLite, user needs onboarding');
+                    setOnboardingComplete(false);
+                    setCurrentStep(1);
+                    setProfile(defaultProfile);
                 }
             } catch (error) {
-                console.error('Error loading onboarding state:', error);
-
-                // Fallback to AsyncStorage if sync mechanism fails completely
-                try {
-                    const onboardingCompleteStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid)
-                    );
-                    const complete = onboardingCompleteStr === 'true';
-                    setOnboardingComplete(complete);
-
-                    // Load profile data from AsyncStorage as fallback
-                    const profileStr = await AsyncStorage.getItem(
-                        getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid)
-                    );
-                    if (profileStr) {
-                        const asyncStorageProfile = JSON.parse(profileStr);
-                        setProfile(asyncStorageProfile);
-                    }
-                } catch (fallbackError) {
-                    console.error('Fallback to AsyncStorage also failed:', fallbackError);
-                }
+                console.error('❌ Error loading onboarding state from SQLite:', error);
+                // Set defaults on error
+                setOnboardingComplete(false);
+                setCurrentStep(1);
+                setProfile(defaultProfile);
             } finally {
                 setIsLoading(false);
             }
@@ -463,33 +372,18 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         loadOnboardingState();
     }, [user]);
 
-    // Update profile data
+    // Update profile data (only in memory during onboarding)
     const updateProfile = async (data: Partial<UserProfile>) => {
         const updatedProfile = { ...profile, ...data };
         setProfile(updatedProfile);
-
-        // Save to AsyncStorage for session persistence
-        if (user) {
-            await AsyncStorage.setItem(
-                getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
-                JSON.stringify(updatedProfile)
-            );
-        }
+        // No need to save to storage during onboarding - only save when complete
     };
 
-    // Save progress to AsyncStorage
+    // Save progress (no-op since we only save to SQLite on completion)
     const saveOnboardingProgress = async () => {
-        if (!user) return;
-
-        // Save current step and profile to AsyncStorage
-        await AsyncStorage.setItem(
-            getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid),
-            currentStep.toString()
-        );
-        await AsyncStorage.setItem(
-            getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
-            JSON.stringify(profile)
-        );
+        // During onboarding, we keep everything in memory
+        // Only save to SQLite when onboarding is completed
+        console.log('📝 Onboarding progress saved in memory');
     };
 
     // Go to next step
@@ -515,46 +409,66 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
         try {
             setIsLoading(true);
+            console.log('🔄 Starting onboarding completion...');
 
             // Mark onboarding as complete
             setOnboardingComplete(true);
-
-            // Save to AsyncStorage
-            await AsyncStorage.setItem(
-                getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid),
-                'true'
-            );
-
-            // Save profile to AsyncStorage
-            await AsyncStorage.setItem(
-                getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid),
-                JSON.stringify(profile)
-            );
 
             // Convert frontend profile to SQLite format
             const sqliteProfile = convertFrontendProfileToSQLiteFormat(profile, user.uid, user.email);
             sqliteProfile.onboarding_complete = true;
 
-            // Save to local SQLite database
-            await addUserProfile(sqliteProfile);
+            console.log('📋 Profile data to save:', {
+                daily_calorie_target: sqliteProfile.daily_calorie_target,
+                fitness_goal: sqliteProfile.fitness_goal,
+                weight_goal: sqliteProfile.weight_goal,
+                target_weight: sqliteProfile.target_weight
+            });
 
-            console.log('✅ Profile saved to local SQLite database');
-
-            // Sync the profile to backend
+            // Save to local SQLite database with better error handling
             try {
-                const result = await syncProfileFromLocalToBackend(user.uid);
-                if (result) {
-                    console.log('✅ Profile successfully synced to backend');
-                } else {
-                    console.warn('⚠️ Profile sync to backend failed, but local profile is saved');
-                }
-            } catch (syncError) {
-                console.error('❌ Error syncing profile to backend:', syncError);
-                // We continue even if the sync fails, as local profile is now saved
+                await addUserProfile(sqliteProfile);
+                console.log('✅ Profile saved to local SQLite database');
+            } catch (profileError) {
+                console.error('❌ Error saving user profile:', profileError);
+                throw new Error(`Failed to save user profile: ${profileError}`);
             }
 
+            // Also save nutrition goals to nutrition_goals table if we have the data
+            if (profile.dailyCalorieTarget || profile.weightGoal || profile.targetWeight) {
+                try {
+                    console.log('🔄 Saving nutrition goals...');
+                    const { updateUserGoals } = await import('../utils/database');
+
+                    const goalsToSave = {
+                        targetWeight: profile.targetWeight,
+                        calorieGoal: profile.dailyCalorieTarget,
+                        proteinGoal: profile.nutrientFocus?.protein,
+                        carbGoal: profile.nutrientFocus?.carbs,
+                        fatGoal: profile.nutrientFocus?.fat,
+                        fitnessGoal: profile.fitnessGoal || profile.weightGoal, // Use fitnessGoal first, fallback to weightGoal
+                        activityLevel: profile.activityLevel,
+                    };
+
+                    console.log('📋 Nutrition goals to save:', goalsToSave);
+
+                    await updateUserGoals(user.uid, goalsToSave);
+                    console.log('✅ Nutrition goals saved to nutrition_goals table');
+                } catch (nutritionError) {
+                    console.error('❌ Error saving nutrition goals:', nutritionError);
+                    // Don't throw here - profile is already saved, this is supplementary
+                    console.warn('⚠️ Continuing despite nutrition goals save error');
+                }
+            } else {
+                console.log('ℹ️ No nutrition goals to save (missing required data)');
+            }
+
+            console.log('✅ Onboarding completion successful');
         } catch (error) {
-            console.error('Error completing onboarding:', error);
+            console.error('❌ Error completing onboarding:', error);
+            // Reset onboarding complete status on error
+            setOnboardingComplete(false);
+            throw error;
         } finally {
             setIsLoading(false);
         }
@@ -565,20 +479,20 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         if (!user) return;
 
         try {
+            console.log('🔄 Resetting onboarding for user:', user.uid);
+
             // Reset state
             setOnboardingComplete(false);
             setCurrentStep(1);
             setProfile(defaultProfile);
 
-            // Clear AsyncStorage
-            await AsyncStorage.removeItem(getUserSpecificKey(ONBOARDING_COMPLETE_KEY, user.uid));
-            await AsyncStorage.removeItem(getUserSpecificKey(ONBOARDING_STEP_KEY, user.uid));
-            await AsyncStorage.removeItem(getUserSpecificKey(ONBOARDING_PROFILE_KEY, user.uid));
+            // Reset onboarding status in SQLite database
+            const { resetOnboardingStatus } = await import('../utils/database');
+            await resetOnboardingStatus(user.uid);
 
-            // Note: We're not deleting from SQLite or backend here
-            // as that would require additional functionality
+            console.log('✅ Onboarding reset completed successfully');
         } catch (error) {
-            console.error('Error resetting onboarding:', error);
+            console.error('❌ Error resetting onboarding:', error);
         }
     };
 

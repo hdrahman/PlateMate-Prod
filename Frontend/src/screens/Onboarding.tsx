@@ -12,10 +12,12 @@ import {
     StatusBar,
     BackHandler,
     Platform,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import * as userApi from '../api/userApi';
@@ -25,6 +27,7 @@ import WelcomeStep from '../components/onboarding/WelcomeStep';
 import BasicInfoStep from '../components/onboarding/BasicInfoStep';
 import PhysicalAttributesStep from '../components/onboarding/PhysicalAttributesStep';
 import PersonalizedInfoStep from '../components/onboarding/PersonalizedInfoStep';
+import GoalsStep from '../components/onboarding/GoalsStep';
 import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesStep';
 import LifestyleHabitsStep from '../components/onboarding/LifestyleHabitsStep';
 import HealthGoalsStep from '../components/onboarding/HealthGoalsStep';
@@ -37,6 +40,7 @@ const { width, height } = Dimensions.get('window');
 const Onboarding = () => {
     const navigation = useNavigation();
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
     const {
         currentStep,
         totalSteps,
@@ -67,73 +71,99 @@ const Onboarding = () => {
         }, [currentStep])
     );
 
-    // Submit profile to backend when onboarding is complete
-    const handleCompleteOnboarding = async () => {
-        if (!user) return;
+    // Handle next step
+    const handleNext = async () => {
+        setError(null);
+        try {
+            await goToNextStep();
+        } catch (error) {
+            console.error('Error going to next step:', error);
+            setError('Failed to proceed to next step. Please try again.');
+        }
+    };
 
+    // Handle previous step
+    const handleBack = () => {
+        setError(null);
+        goToPreviousStep();
+    };
+
+    // Complete onboarding
+    const handleCompleteOnboarding = async () => {
         setIsLoading(true);
         setError(null);
 
         try {
-            // Check if user already exists in backend
-            const existingUser = await userApi.getUserProfile(user.uid);
+            console.log('🎯 Starting onboarding completion process...');
 
-            if (existingUser) {
-                // Update existing user
-                const backendData = userApi.convertProfileToBackendFormat(profile);
-                await userApi.updateUserProfile(user.uid, backendData);
-            } else {
-                // Create new user
-                await userApi.createUser({
-                    email: user.email || '',
-                    firebase_uid: user.uid,
-                    first_name: profile.firstName,
-                    last_name: profile.lastName,
-                    phone_number: '', // Removed phone number field
-                });
-
-                // Then update with full profile data
-                const backendData = userApi.convertProfileToBackendFormat(profile);
-                await userApi.updateUserProfile(user.uid, backendData);
-            }
-
-            // Mark onboarding as complete
+            // Complete onboarding in context (saves to local database)
             await completeOnboarding();
+
+            // Backend sync disabled - app runs in offline-only mode
+            console.log('✅ Profile saved locally - backend sync disabled for offline mode');
 
             // Navigate to home screen
             navigation.reset({
                 index: 0,
                 routes: [{ name: 'Home' as never }],
             });
-        } catch (err: any) {
-            setError(err.message || 'An error occurred while saving your profile');
+
+        } catch (error) {
+            console.error('❌ Error completing onboarding:', error);
+            setError('Failed to complete onboarding. Please try again.');
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Handle next step button
-    const handleNext = () => {
-        if (currentStep < totalSteps) {
-            goToNextStep();
-        } else {
-            handleCompleteOnboarding();
-        }
-    };
-
-    // Handle back button
-    const handleBack = () => {
-        if (currentStep > 1) {
-            goToPreviousStep();
-        }
-    };
-
     // Skip onboarding for now
-    const handleSkip = () => {
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Home' as never }],
-        });
+    const handleSkip = async () => {
+        try {
+            setIsLoading(true);
+            console.log('🔄 Skipping onboarding - saving minimal profile...');
+            console.log('Current user:', user?.uid);
+            console.log('Current profile before update:', profile);
+
+            // Create a minimal profile with default values
+            const minimalProfile = {
+                firstName: 'User',
+                lastName: '',
+                height: 170, // Default height in cm
+                weight: 70,  // Default weight in kg
+                age: 25,     // Default age
+                gender: 'prefer_not_to_say',
+                activityLevel: 'moderate',
+                unitPreference: 'metric',
+                weightGoal: 'maintain',
+                dailyCalorieTarget: 2000, // Default calorie target
+            };
+
+            console.log('Minimal profile to save:', minimalProfile);
+
+            // Update profile with minimal data
+            console.log('📝 Updating profile...');
+            await updateProfile(minimalProfile);
+            console.log('✅ Profile updated successfully');
+
+            // Complete onboarding
+            console.log('🏁 Completing onboarding...');
+            await completeOnboarding();
+            console.log('✅ Onboarding completed successfully');
+
+            console.log('✅ Onboarding skipped successfully with minimal profile');
+
+            // Navigate to home screen
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'Home' as never }],
+            });
+        } catch (error) {
+            console.error('❌ Error skipping onboarding:', error);
+            console.error('Error details:', error.message, error.stack);
+            setError('Failed to skip onboarding. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Render current step
@@ -148,16 +178,18 @@ const Onboarding = () => {
             case 4:
                 return <PersonalizedInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 5:
-                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 6:
-                return <LifestyleHabitsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 7:
-                return <HealthGoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <LifestyleHabitsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 8:
-                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <HealthGoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 9:
-                return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 10:
+                return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 11:
                 return <SubscriptionStep onComplete={handleCompleteOnboarding} />;
             default:
                 return <WelcomeStep onNext={handleNext} />;
@@ -173,7 +205,7 @@ const Onboarding = () => {
                 style={styles.background}
             />
 
-            <View style={[styles.header, Platform.OS === 'ios' && styles.iosHeader]}>
+            <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
                 <View style={styles.progressContainer}>
                     {Array.from({ length: totalSteps }).map((_, index) => (
                         <View
@@ -190,7 +222,7 @@ const Onboarding = () => {
 
                 {currentStep > 1 && (
                     <TouchableOpacity
-                        style={styles.backButton}
+                        style={[styles.backButton, { top: Math.max(insets.top + 10, 20) }]}
                         onPress={handleBack}
                         activeOpacity={0.7}
                     >
@@ -203,7 +235,7 @@ const Onboarding = () => {
 
                 {currentStep < totalSteps && (
                     <TouchableOpacity
-                        style={styles.skipButton}
+                        style={[styles.skipButton, { top: Math.max(insets.top + 10, 20) }]}
                         onPress={handleSkip}
                         activeOpacity={0.7}
                     >
@@ -212,13 +244,18 @@ const Onboarding = () => {
                 )}
             </View>
 
-            <ScrollView
-                contentContainerStyle={styles.content}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
             >
-                {renderCurrentStep()}
-            </ScrollView>
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {renderCurrentStep()}
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             {error && (
                 <View style={styles.errorContainer}>
@@ -250,19 +287,18 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingTop: 20,
+        paddingBottom: 20,
         flexDirection: 'row',
         justifyContent: 'center',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: 20,
-    },
-    iosHeader: {
-        paddingTop: 10, // Less padding for iOS since SafeAreaView already provides space
+        position: 'relative',
     },
     progressContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 10,
     },
     progressDot: {
         width: 8,
@@ -284,7 +320,6 @@ const styles = StyleSheet.create({
     backButton: {
         position: 'absolute',
         left: 20,
-        top: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 20,
         paddingHorizontal: 12,
@@ -303,7 +338,6 @@ const styles = StyleSheet.create({
     skipButton: {
         position: 'absolute',
         right: 20,
-        top: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 20,
         paddingHorizontal: 16,
@@ -316,7 +350,6 @@ const styles = StyleSheet.create({
     },
     content: {
         flexGrow: 1,
-        paddingHorizontal: 20,
         paddingBottom: 40,
     },
     errorContainer: {

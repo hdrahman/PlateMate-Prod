@@ -194,23 +194,44 @@ export default function Home() {
 
           // Get user goals for calorie goal
           const userGoals = await getUserGoals(user.uid);
+          console.log('📋 Loaded user goals from database:', {
+            calorieGoal: userGoals?.calorieGoal,
+            fitnessGoal: userGoals?.fitnessGoal,
+            targetWeight: userGoals?.targetWeight
+          });
+
+          console.log('📋 User profile data:', {
+            daily_calorie_target: profile.daily_calorie_target,
+            fitness_goal: profile.fitness_goal,
+            weight_goal: profile.weight_goal,
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            activity_level: profile.activity_level
+          });
 
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
             firstName: profile.first_name,
             lastName: profile.last_name,
-            phoneNumber: '',
+            dateOfBirth: profile.date_of_birth,
+            location: profile.location,
             height: profile.height,
             weight: profile.weight,
             age: profile.age,
             gender: profile.gender,
             activityLevel: profile.activity_level,
+            unitPreference: profile.unit_preference || 'metric',
             dietaryRestrictions: profile.dietary_restrictions || [],
             foodAllergies: profile.food_allergies || [],
             cuisinePreferences: profile.cuisine_preferences || [],
             spiceTolerance: profile.spice_tolerance,
             weightGoal: userGoals?.fitnessGoal || 'maintain', // Get from nutrition_goals table instead
+            targetWeight: profile.target_weight,
+            startingWeight: profile.starting_weight,
             healthConditions: profile.health_conditions || [],
+            fitnessGoal: profile.fitness_goal,
             dailyCalorieTarget: profile.daily_calorie_target,
             nutrientFocus: profile.nutrient_focus,
             defaultAddress: null,
@@ -225,15 +246,22 @@ export default function Home() {
             defaultPaymentMethodId: null,
             preferredLanguage: profile.preferred_language || 'en',
             timezone: profile.timezone || 'UTC',
-            unitPreference: profile.unit_preference || 'metric',
             darkMode: profile.dark_mode,
-            syncDataOffline: profile.sync_data_offline,
-            targetWeight: profile.target_weight,
-            startingWeight: profile.starting_weight
+            syncDataOffline: profile.sync_data_offline
+          });
+
+          console.log('📋 Calculated nutrition goals:', {
+            calories: goals.calories,
+            protein: goals.protein,
+            carbs: goals.carbs,
+            fat: goals.fat
           });
 
           // Update state with calculated goals, prioritizing the database value
-          setDailyCalorieGoal(userGoals?.calorieGoal || goals.calories);
+          const finalCalorieGoal = userGoals?.calorieGoal || goals.calories;
+          console.log('📋 Final calorie goal selected:', finalCalorieGoal);
+
+          setDailyCalorieGoal(finalCalorieGoal);
           setMacroGoals({
             protein: userGoals?.proteinGoal || goals.protein,
             carbs: userGoals?.carbGoal || goals.carbs,
@@ -1131,6 +1159,25 @@ export default function Home() {
 
         {/* GOAL CARD (Unified circular bar + stats overlay) */}
         <GradientBorderCard>
+          {/* Analytics Button - Top Left Corner */}
+          <TouchableOpacity
+            style={styles.goalCardAnalyticsButton}
+            onPress={() => navigation.navigate('Analytics' as never)}
+          >
+            <MaskedView
+              style={styles.goalCardAnalyticsMask}
+              maskElement={
+                <Ionicons name="analytics" size={22} color="black" />
+              }
+            >
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={styles.goalCardAnalyticsGradient}
+              />
+            </MaskedView>
+          </TouchableOpacity>
           <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
             <View style={styles.ringContainer}>
               <View style={styles.ringGlow} />
@@ -1349,31 +1396,6 @@ export default function Home() {
           <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
           <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
-
-        {/* ADVANCED ANALYTICS BUTTON */}
-        <GradientBorderCard>
-          <TouchableOpacity
-            style={styles.exploreButtonInner}
-            onPress={() => navigation.navigate('Analytics' as never)}
-          >
-            <MaskedView
-              style={{ height: 30, width: '100%' }}
-              maskElement={
-                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                  <Ionicons name="analytics" size={22} color="black" style={{ marginRight: 8 }} />
-                  <Text style={[styles.exploreButtonText, { color: 'black' }]}>Advanced Analytics</Text>
-                </View>
-              }
-            >
-              <LinearGradient
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-                style={{ flex: 1 }}
-              />
-            </MaskedView>
-          </TouchableOpacity>
-        </GradientBorderCard>
       </ScrollView>
       {renderWeightModal()}
     </SafeAreaView>
@@ -2516,5 +2538,28 @@ const styles = StyleSheet.create({
     color: '#FFF', // Changed to white since gradient will handle color
     fontSize: 18,
     fontWeight: 'bold'
+  },
+  // Goal card analytics button styles
+  goalCardAnalyticsButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(155, 0, 255, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(155, 0, 255, 0.3)',
+    zIndex: 10,
+  },
+  goalCardAnalyticsMask: {
+    width: 22,
+    height: 22,
+  },
+  goalCardAnalyticsGradient: {
+    width: 22,
+    height: 22,
   },
 });

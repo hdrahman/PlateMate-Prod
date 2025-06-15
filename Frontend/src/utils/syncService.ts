@@ -57,158 +57,10 @@ export const isOnline = (): boolean => {
     return isConnected;
 };
 
-// Main data sync function
+// Main data sync function - DISABLED FOR OFFLINE MODE
 export const syncData = async (): Promise<boolean> => {
-    // Check online status
-    if (!isOnline()) {
-        console.log('🔄 Device offline, skipping sync');
-        return false;
-    }
-
-    // Check if user is authenticated
-    const user = auth.currentUser;
-    if (!user) {
-        console.log('🔄 User not authenticated, skipping sync');
-        return false;
-    }
-
-    console.log('🔄 Starting data sync');
-
-    try {
-        // Get access token
-        const accessToken = await user.getIdToken();
-
-        // Create axios instance with auth header
-        const api = axios.create({
-            baseURL: BACKEND_URL,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-
-        // Debug: Log details if in debug mode
-        if (isDebug) {
-            console.log('🔄 Sync using URL:', BACKEND_URL);
-            console.log('🔄 Auth token received:', accessToken ? '✅ YES' : '❌ NO');
-        }
-
-        // Track if any sync operations were attempted
-        let syncAttempted = false;
-
-        // 1. Sync user profiles
-        const unsyncedProfiles = await getUnsyncedUserProfiles();
-        if (unsyncedProfiles.length > 0) {
-            syncAttempted = true;
-            console.log(`🔄 Syncing ${unsyncedProfiles.length} user profiles`);
-
-            for (const profile of unsyncedProfiles) {
-                if (profile.firebase_uid) {
-                    try {
-                        await api.post('/users/sync-profile', {
-                            profile
-                        });
-
-                        // Mark as synced locally
-                        await markUserProfileSynced(profile.firebase_uid);
-                        console.log(`✅ User profile synced: ${profile.firebase_uid}`);
-                    } catch (error) {
-                        console.error('❌ Error syncing user profile:', error);
-                    }
-                }
-            }
-        }
-
-        // 2. Sync food logs
-        const unsyncedFoodLogs = await getUnsyncedFoodLogs();
-        if (unsyncedFoodLogs.length > 0) {
-            syncAttempted = true;
-            console.log(`🔄 Syncing ${unsyncedFoodLogs.length} food logs`);
-
-            const response = await api.post('/food-logs/sync', {
-                logs: unsyncedFoodLogs
-            });
-
-            if (response.data && response.data.success) {
-                // Mark food logs as synced
-                for (const log of unsyncedFoodLogs) {
-                    if (log.id) {
-                        await markFoodLogAsSynced(log.id, log.id);
-                    }
-                }
-                console.log(`✅ ${unsyncedFoodLogs.length} food logs synced`);
-            }
-        } else {
-            console.log('✅ No unsynced food logs to sync');
-        }
-
-        // 3. Sync step data
-        const unsyncedSteps = await getUnsyncedSteps();
-        if (unsyncedSteps.length > 0) {
-            syncAttempted = true;
-            console.log(`🔄 Syncing ${unsyncedSteps.length} step records`);
-
-            try {
-                const response = await api.post('/steps/sync', {
-                    steps: unsyncedSteps
-                });
-
-                if (response.data && response.data.success) {
-                    // Mark steps as synced
-                    const stepIds = unsyncedSteps.map(s => s.id).filter(id => id !== undefined);
-                    await markStepsSynced(stepIds);
-                    console.log(`✅ ${unsyncedSteps.length} step records synced`);
-                }
-            } catch (error) {
-                console.error('❌ Error syncing steps:', error);
-            }
-        } else {
-            console.log('✅ No unsynced step data to sync');
-        }
-
-        // 4. Sync streak data
-        const unsyncedStreaks = await getUnsyncedStreaks();
-        if (unsyncedStreaks.length > 0) {
-            syncAttempted = true;
-            console.log(`🔄 Syncing ${unsyncedStreaks.length} streak records`);
-
-            try {
-                const response = await api.post('/streaks/sync', {
-                    streaks: unsyncedStreaks
-                });
-
-                if (response.data && response.data.success) {
-                    // Mark streaks as synced
-                    for (const streak of unsyncedStreaks) {
-                        if (streak.firebase_uid) {
-                            await markStreakSynced(streak.firebase_uid);
-                        }
-                    }
-                    console.log(`✅ ${unsyncedStreaks.length} streak records synced`);
-                }
-            } catch (error) {
-                console.error('❌ Error syncing streaks:', error);
-            }
-        } else {
-            console.log('✅ No unsynced streak data to sync');
-        }
-
-        // Update last sync time if any sync was attempted
-        if (syncAttempted) {
-            await updateLastSyncTime('success');
-            console.log('✅ Sync completed successfully');
-        } else {
-            console.log('✅ No data to sync');
-        }
-
-        return true;
-    } catch (error) {
-        console.error('❌ Error during sync process:', error);
-
-        // Update sync status with error
-        await updateLastSyncTime('error');
-        return false;
-    }
+    console.log('🚫 Sync disabled - app running in offline mode');
+    return true; // Return true to indicate "success" (no sync needed)
 };
 
 // Returns true if a sync is needed based on time threshold
@@ -217,13 +69,13 @@ export const shouldSync = async (): Promise<boolean> => {
         // Get last sync time
         const lastSync = await getLastSyncTime();
 
-        if (!lastSync || !lastSync.last_sync) {
+        if (!lastSync || !lastSync.lastSync) {
             // Never synced before or no sync record
             return true;
         }
 
         // Parse last sync time
-        const lastSyncTime = new Date(lastSync.last_sync).getTime();
+        const lastSyncTime = new Date(lastSync.lastSync).getTime();
         const now = new Date().getTime();
 
         // Calculate difference in minutes
@@ -298,94 +150,28 @@ const syncFoodLog = async (foodLog: FoodLogEntry): Promise<number> => {
     }
 };
 
-// Sync all unsynced food logs
+// Sync all unsynced food logs - DISABLED FOR OFFLINE MODE
 export const syncFoodLogs = async (): Promise<{ success: number, failed: number }> => {
-    try {
-        // Check if online
-        const online = await isOnline();
-        if (!online) {
-            console.log('📡 Device is offline, skipping sync');
-            return { success: 0, failed: 0 };
-        }
-
-        // Get all unsynced food logs
-        const unsyncedLogs = await getUnsyncedFoodLogs() as FoodLogEntry[];
-        console.log(`📊 Found ${unsyncedLogs.length} unsynced food logs`);
-
-        if (unsyncedLogs.length === 0) {
-            console.log('✅ No unsynced food logs to sync');
-            await updateLastSyncTime('success');
-            return { success: 0, failed: 0 };
-        }
-
-        console.log(`🔄 Syncing ${unsyncedLogs.length} food logs...`);
-
-        // Sync each food log
-        let success = 0;
-        let failed = 0;
-        const maxRetries = 3;
-
-        for (const log of unsyncedLogs) {
-            let retries = 0;
-            let synced = false;
-
-            while (retries < maxRetries && !synced) {
-                try {
-                    const result = await syncFoodLog(log);
-                    if (result === 1) {
-                        success++;
-                        synced = true;
-                    } else {
-                        retries++;
-                        console.log(`⚠️ Retry ${retries}/${maxRetries} for food log ID ${log.id}`);
-                        // Wait a bit before retrying
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                } catch (error) {
-                    retries++;
-                    console.error(`❌ Error on retry ${retries}/${maxRetries} for food log ID ${log.id}:`, error);
-                    // Wait a bit before retrying
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-            }
-
-            if (!synced) {
-                failed++;
-                console.error(`❌ Failed to sync food log ID ${log.id} after ${maxRetries} retries`);
-            }
-        }
-
-        // Update last sync time
-        const status = failed === 0 ? 'success' : 'partial';
-        await updateLastSyncTime(status);
-
-        console.log(`✅ Sync completed: ${success} succeeded, ${failed} failed`);
-
-        // Purge old data
-        await purgeOldData();
-
-        return { success, failed };
-    } catch (error) {
-        console.error('❌ Error syncing food logs:', error);
-        await updateLastSyncTime('failed');
-        return { success: 0, failed: 0 };
-    }
+    console.log('🚫 Food log sync disabled - app running in offline mode');
+    return { success: 0, failed: 0 };
 };
 
-// Start periodic sync
+// Start periodic sync - DISABLED FOR OFFLINE MODE
 export const startPeriodicSync = async () => {
-    // Sync immediately when app starts
-    await syncFoodLogs();
+    console.log('🚫 Sync disabled - app running in offline mode');
 
-    // Set up periodic sync
-    const intervalId = setInterval(async () => {
-        await syncFoodLogs();
-    }, SYNC_INTERVAL);
+    // Don't sync immediately when app starts
+    // await syncFoodLogs();
 
-    // Store interval ID in AsyncStorage
-    await AsyncStorage.setItem('syncIntervalId', intervalId.toString());
+    // Don't set up periodic sync
+    // const intervalId = setInterval(async () => {
+    //     await syncFoodLogs();
+    // }, SYNC_INTERVAL);
 
-    return intervalId;
+    // Store a dummy interval ID
+    await AsyncStorage.setItem('syncIntervalId', '0');
+
+    return 0; // Return dummy interval ID
 };
 
 // Stop periodic sync
@@ -398,12 +184,13 @@ export const stopPeriodicSync = async () => {
     }
 };
 
-// Sync when the app comes online
+// Sync when the app comes online - DISABLED FOR OFFLINE MODE
 export const setupOnlineSync = () => {
-    NetInfo.addEventListener(state => {
-        if (state.isConnected && state.isInternetReachable) {
-            console.log('📡 Device is now online, starting sync...');
-            syncFoodLogs();
-        }
-    });
+    console.log('🚫 Online sync disabled - app running in offline mode');
+    // NetInfo.addEventListener(state => {
+    //     if (state.isConnected && state.isInternetReachable) {
+    //         console.log('📡 Device is now online, starting sync...');
+    //         syncFoodLogs();
+    //     }
+    // });
 }; 
