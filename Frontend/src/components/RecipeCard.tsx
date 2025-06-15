@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, GestureResponderEvent } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, GestureResponderEvent, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
@@ -26,7 +26,7 @@ const getHealthScoreColor = (score: number): string => {
     return '#F44336'; // Red for poor
 };
 
-// Function to determine health score label
+// Function to get a human-readable health score label
 const getHealthScoreLabel = (score: number): string => {
     if (score >= 80) return 'Excellent';
     if (score >= 60) return 'Good';
@@ -35,17 +35,44 @@ const getHealthScoreLabel = (score: number): string => {
     return 'Poor';
 };
 
-// Function to format number of likes (1000 -> 1K)
+// Function to format the likes count
 const formatLikes = (likes: number): string => {
-    if (!likes) return '0';
-    if (likes >= 1000000) return `${(likes / 1000000).toFixed(1)}M`;
-    if (likes >= 1000) return `${(likes / 1000).toFixed(1)}K`;
+    if (likes >= 1000000) return (likes / 1000000).toFixed(1) + 'M';
+    if (likes >= 1000) return (likes / 1000).toFixed(1) + 'K';
     return likes.toString();
+};
+
+// Fallback food images for different meal types
+const getFallbackImage = (title: string): string => {
+    const titleLower = title.toLowerCase();
+
+    if (titleLower.includes('breakfast') || titleLower.includes('pancake') || titleLower.includes('egg') || titleLower.includes('oatmeal')) {
+        return 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('salad') || titleLower.includes('vegetable') || titleLower.includes('green')) {
+        return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('pasta') || titleLower.includes('spaghetti') || titleLower.includes('noodle')) {
+        return 'https://images.unsplash.com/photo-1551892589-865f69869476?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('chicken') || titleLower.includes('meat') || titleLower.includes('beef')) {
+        return 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('soup') || titleLower.includes('broth')) {
+        return 'https://images.unsplash.com/photo-1547592180-85f7d2b5c2b8?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('pizza')) {
+        return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('burger') || titleLower.includes('sandwich')) {
+        return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('dessert') || titleLower.includes('cake') || titleLower.includes('sweet')) {
+        return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=300&fit=crop&crop=center';
+    }
+
+    // Default fallback
+    return 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&crop=center';
 };
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = false }) => {
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
     const isFav = isFavorite(recipe.id);
+    const [imageLoading, setImageLoading] = useState(true);
+    const [imageError, setImageError] = useState(false);
 
     const handleFavoritePress = async (e: GestureResponderEvent) => {
         e.stopPropagation();
@@ -56,6 +83,23 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
         }
     };
 
+    const handleImageLoad = () => {
+        setImageLoading(false);
+    };
+
+    const handleImageError = () => {
+        setImageLoading(false);
+        setImageError(true);
+    };
+
+    // Determine which image to show
+    const getImageSource = () => {
+        if (imageError || !recipe.image) {
+            return getFallbackImage(recipe.title);
+        }
+        return recipe.image;
+    };
+
     return (
         <TouchableOpacity
             style={[styles.card, compact && styles.compactCard]}
@@ -63,14 +107,34 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
             activeOpacity={0.7}
         >
             <View style={styles.imageContainer}>
+                {imageLoading && (
+                    <View style={[
+                        styles.imageLoadingContainer,
+                        compact && styles.compactImageLoadingContainer
+                    ]}>
+                        <ActivityIndicator size="small" color={PURPLE_ACCENT} />
+                    </View>
+                )}
                 <Image
-                    source={{ uri: recipe.image }}
-                    style={[styles.image, compact && styles.compactImage]}
+                    source={{ uri: getImageSource() }}
+                    style={[
+                        styles.image,
+                        compact && styles.compactImage,
+                        { opacity: imageLoading ? 0 : 1 }
+                    ]}
                     resizeMode="cover"
-                    onError={() => console.log('Failed to load recipe image')}
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
                     fadeDuration={200}
-                    loadingIndicatorSource={{ uri: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }}
                 />
+                {!recipe.image && !imageLoading && (
+                    <View style={[
+                        styles.placeholderOverlay,
+                        compact && styles.compactPlaceholderOverlay
+                    ]}>
+                        <Ionicons name="restaurant" size={compact ? 16 : 24} color={WHITE} style={{ opacity: 0.6 }} />
+                    </View>
+                )}
                 <TouchableOpacity
                     style={styles.favoriteButton}
                     onPress={handleFavoritePress}
@@ -191,6 +255,36 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: '#1a1a1a', // Background color for image loading
         borderRadius: 8,
+    },
+    imageLoadingContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    compactImageLoadingContainer: {
+        width: 80,
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    placeholderOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    compactPlaceholderOverlay: {
+        width: 80,
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     favoriteButton: {
         position: 'absolute',

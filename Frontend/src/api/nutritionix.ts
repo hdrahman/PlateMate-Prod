@@ -150,7 +150,15 @@ export const searchFood = async (query: string, minHealthiness: number = 0): Pro
             { headers }
         );
 
-        return response.data || [];
+        // Extract results from the wrapped response format
+        const data = response.data;
+        if (data && data.results && Array.isArray(data.results)) {
+            console.log(`Found ${data.results.length} food items for query: ${query}`);
+            return data.results;
+        } else {
+            console.log(`No results found in response:`, data);
+            return [];
+        }
     } catch (error) {
         console.error('Error searching for food:', error);
         if (axios.isAxiosError(error)) {
@@ -234,6 +242,40 @@ export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | nu
                 console.error('Authentication failed - please log in again');
                 console.error('Error details:', error.response?.data);
             } else if (error.response?.status === 404) {
+                const errorData = error.response?.data;
+                if (errorData && typeof errorData === 'object' && 'detail' in errorData) {
+                    if (errorData.detail.includes('Premier subscription')) {
+                        console.log('Barcode scanning requires FatSecret Premier subscription');
+                        // Return a special object to indicate premium subscription required
+                        return {
+                            food_name: 'Premium Feature Required',
+                            brand_name: 'Barcode Scanning',
+                            calories: 0,
+                            proteins: 0,
+                            carbs: 0,
+                            fats: 0,
+                            fiber: 0,
+                            sugar: 0,
+                            saturated_fat: 0,
+                            polyunsaturated_fat: 0,
+                            monounsaturated_fat: 0,
+                            trans_fat: 0,
+                            cholesterol: 0,
+                            sodium: 0,
+                            potassium: 0,
+                            vitamin_a: 0,
+                            vitamin_c: 0,
+                            calcium: 0,
+                            iron: 0,
+                            image: '',
+                            serving_unit: 'subscription',
+                            serving_weight_grams: 0,
+                            serving_qty: 0,
+                            healthiness_rating: 0,
+                            notes: 'Barcode scanning requires FatSecret Premier subscription. Please add this item manually or search by name.'
+                        };
+                    }
+                }
                 console.log('Barcode not found in database');
             } else if (error.response?.status === 500) {
                 console.error('Server error:', error.response?.data);

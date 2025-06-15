@@ -109,8 +109,15 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[
             { headers }
         );
 
-        console.log(`Found ${response.data.length} recipes for query: ${params.query}`);
-        return response.data || [];
+        // Extract results from the wrapped response format
+        const data = response.data;
+        if (data && data.results && Array.isArray(data.results)) {
+            console.log(`Found ${data.results.length} recipes for query: ${params.query}`);
+            return data.results;
+        } else {
+            console.log(`No recipes found in response:`, data);
+            return [];
+        }
     } catch (error) {
         console.error('Error searching recipes:', error);
         if (axios.isAxiosError(error)) {
@@ -156,7 +163,15 @@ export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => 
             { headers }
         );
 
-        return response.data || [];
+        // Extract recipes from the wrapped response format
+        const data = response.data;
+        if (data && data.recipes && Array.isArray(data.recipes)) {
+            console.log(`Found ${data.recipes.length} random recipes`);
+            return data.recipes;
+        } else {
+            console.log(`No recipes found in response:`, data);
+            return [];
+        }
     } catch (error) {
         console.error('Error getting random recipes:', error);
         if (axios.isAxiosError(error)) {
@@ -182,7 +197,15 @@ export const getRecipesByMealType = async (mealType: string, count: number = 3):
             { headers }
         );
 
-        return response.data || [];
+        // Handle direct array response (backend returns array directly for this endpoint)
+        const data = response.data;
+        if (Array.isArray(data)) {
+            console.log(`Found ${data.length} recipes for meal type: ${mealType}`);
+            return data;
+        } else {
+            console.log(`No recipes found for meal type ${mealType}:`, data);
+            return [];
+        }
     } catch (error) {
         console.error('Error getting recipes by meal type:', error);
         if (axios.isAxiosError(error)) {

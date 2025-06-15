@@ -29,6 +29,43 @@ class FoodDetailsRequest(BaseModel):
 class BarcodeSearchRequest(BaseModel):
     barcode: str
 
+@router.post("/search")
+async def search_food_post(
+    request: FoodSearchRequest,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Search for foods using query string (POST method)
+    
+    Args:
+        request: FoodSearchRequest containing query and min_healthiness
+        current_user: Current authenticated user
+        
+    Returns:
+        List of food items matching the search query
+    """
+    try:
+        logger.info(f"Food search request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {request.query}")
+        
+        fatsecret_service = get_fatsecret_service()
+        if not fatsecret_service:
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
+        
+        if not request.query or len(request.query.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Query must be at least 2 characters long")
+        
+        results = fatsecret_service.search_food(
+            query=request.query.strip(),
+            min_healthiness=request.min_healthiness or 0
+        )
+        
+        logger.info(f"Found {len(results)} food items for query: {request.query}")
+        return {"results": results}
+        
+    except Exception as e:
+        logger.error(f"Error in food search: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to search for food: {str(e)}")
+
 @router.get("/search")
 async def search_food(
     query: str,
@@ -67,6 +104,45 @@ async def search_food(
     except Exception as e:
         logger.error(f"Error in food search: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to search for food: {str(e)}")
+
+@router.post("/details")
+async def get_food_details_post(
+    request: FoodDetailsRequest,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get detailed nutrition information for a specific food (POST method)
+    
+    Args:
+        request: FoodDetailsRequest containing food_name
+        current_user: Current authenticated user
+        
+    Returns:
+        Detailed food item information
+    """
+    try:
+        logger.info(f"Food details request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {request.food_name}")
+        
+        fatsecret_service = get_fatsecret_service()
+        if not fatsecret_service:
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
+        
+        if not request.food_name or len(request.food_name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Food name must be at least 2 characters long")
+        
+        result = fatsecret_service.get_food_details(request.food_name.strip())
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Food not found")
+        
+        logger.info(f"Found food details for: {request.food_name}")
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting food details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get food details: {str(e)}")
 
 @router.get("/details")
 async def get_food_details(
@@ -135,14 +211,15 @@ async def search_by_barcode(
             logger.error(f"Invalid barcode length: {barcode}")
             raise HTTPException(status_code=400, detail="Barcode must be at least 8 characters long")
         
-        result = fatsecret_service.search_by_barcode(barcode.strip())
+        # FatSecret Basic scope doesn't support barcode scanning
+        logger.info(f"Barcode scanning not available with basic scope - barcode: {barcode}")
+        raise HTTPException(
+            status_code=404, 
+            detail="Barcode scanning requires FatSecret Premier subscription. Currently using Basic scope."
+        )
         
-        if not result:
-            logger.info(f"No product found for barcode: {barcode}")
-            raise HTTPException(status_code=404, detail="Product not found for this barcode")
-        
-        logger.info(f"Found product for barcode {barcode}: {result.get('food_name', 'Unknown')}")
-        return result
+        # This code won't be reached due to the exception above
+        return {}
         
     except HTTPException:
         raise

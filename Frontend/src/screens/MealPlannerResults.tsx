@@ -32,6 +32,32 @@ interface MealPlannerResultsParams {
     nutrients: Nutrients;
 }
 
+// Fallback food images for different meal types
+const getFallbackImage = (title: string): string => {
+    const titleLower = title.toLowerCase();
+
+    if (titleLower.includes('breakfast') || titleLower.includes('pancake') || titleLower.includes('egg') || titleLower.includes('oatmeal')) {
+        return 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('salad') || titleLower.includes('vegetable') || titleLower.includes('green')) {
+        return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('pasta') || titleLower.includes('spaghetti') || titleLower.includes('noodle')) {
+        return 'https://images.unsplash.com/photo-1551892589-865f69869476?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('chicken') || titleLower.includes('meat') || titleLower.includes('beef')) {
+        return 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('soup') || titleLower.includes('broth')) {
+        return 'https://images.unsplash.com/photo-1547592180-85f7d2b5c2b8?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('pizza')) {
+        return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('burger') || titleLower.includes('sandwich')) {
+        return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('dessert') || titleLower.includes('cake') || titleLower.includes('sweet')) {
+        return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=300&fit=crop&crop=center';
+    }
+
+    // Default fallback
+    return 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&crop=center';
+};
+
 export default function MealPlannerResults() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
     const route = useRoute<RouteProp<Record<string, MealPlannerResultsParams>, string>>();
@@ -43,6 +69,8 @@ export default function MealPlannerResults() {
         fat: 0,
         carbohydrates: 0
     });
+    const [imageLoadingStates, setImageLoadingStates] = useState<{ [key: string]: boolean }>({});
+    const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
     useEffect(() => {
         // Get meal plan data from navigation params
@@ -51,6 +79,14 @@ export default function MealPlannerResults() {
 
             if (mealPlanData) {
                 setMealPlan(mealPlanData);
+                // Initialize image loading states
+                const loadingStates: { [key: string]: boolean } = {};
+                mealPlanData.forEach((recipe) => {
+                    if (recipe.id) {
+                        loadingStates[recipe.id.toString()] = true;
+                    }
+                });
+                setImageLoadingStates(loadingStates);
             }
 
             if (nutrientsData) {
@@ -60,6 +96,51 @@ export default function MealPlannerResults() {
             setLoading(false);
         }
     }, [route.params]);
+
+    const handleImageLoad = (recipeId: string) => {
+        setImageLoadingStates(prev => ({ ...prev, [recipeId]: false }));
+    };
+
+    const handleImageError = (recipeId: string) => {
+        setImageLoadingStates(prev => ({ ...prev, [recipeId]: false }));
+        setImageErrors(prev => ({ ...prev, [recipeId]: true }));
+    };
+
+    const renderMealImage = (recipe: Recipe) => {
+        const recipeId = recipe.id?.toString() || 'unknown';
+        const isLoading = imageLoadingStates[recipeId];
+        const hasError = imageErrors[recipeId];
+
+        // Determine which image to show
+        let imageSource = '';
+        if (hasError || !recipe.image) {
+            imageSource = getFallbackImage(recipe.title);
+        } else {
+            imageSource = recipe.image;
+        }
+
+        return (
+            <View style={styles.imageContainer}>
+                {isLoading && (
+                    <View style={styles.imageLoadingContainer}>
+                        <ActivityIndicator size="small" color={PURPLE_ACCENT} />
+                    </View>
+                )}
+                <Image
+                    source={{ uri: imageSource }}
+                    style={[styles.mealImage, { opacity: isLoading ? 0 : 1 }]}
+                    resizeMode="cover"
+                    onLoad={() => handleImageLoad(recipeId)}
+                    onError={() => handleImageError(recipeId)}
+                />
+                {!recipe.image && !isLoading && (
+                    <View style={styles.placeholderOverlay}>
+                        <Ionicons name="restaurant" size={24} color={WHITE} style={{ opacity: 0.6 }} />
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     // GradientBorderCard component for consistent card styling
     const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
@@ -149,13 +230,7 @@ export default function MealPlannerResults() {
                     {mealPlan.length > 0 ? (
                         mealPlan.map((recipe, index) => (
                             <GradientBorderCard key={recipe.id || index}>
-                                {recipe.image && (
-                                    <Image
-                                        source={{ uri: recipe.image }}
-                                        style={styles.mealImage}
-                                        resizeMode="cover"
-                                    />
-                                )}
+                                {renderMealImage(recipe)}
                                 <View style={styles.mealInfo}>
                                     <Text style={styles.mealName}>{recipe.title}</Text>
 
@@ -381,5 +456,34 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    imageContainer: {
+        position: 'relative',
+        width: '100%',
+        height: 180,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    imageLoadingContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    placeholderOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 }); 

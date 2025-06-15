@@ -113,6 +113,46 @@ async def search_recipes(
         logger.error(f"Error in recipe search: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to search for recipes: {str(e)}")
 
+@router.get("/random")
+async def get_random_recipes(
+    number: Optional[int] = Query(default=None, ge=1, le=20, alias="number"),
+    count: Optional[int] = Query(default=None, ge=1, le=20, alias="count"),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get random recipes
+    
+    Args:
+        number: Number of random recipes to return
+        count: Alternative parameter name for number of random recipes to return
+        current_user: Current authenticated user
+        
+    Returns:
+        List of random recipes
+    """
+    try:
+        # Use either count or number parameter, defaulting to 5
+        recipe_count = count or number or 5
+        
+        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        logger.info(f"Random recipes request from user {user_id}: count={recipe_count}")
+        
+        fatsecret_service = get_fatsecret_service()
+        if not fatsecret_service:
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
+        
+        if not fatsecret_service.is_configured:
+            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
+        
+        results = fatsecret_service.get_random_recipes(recipe_count)
+        
+        logger.info(f"Found {len(results)} random recipes")
+        return {"recipes": results}
+        
+    except Exception as e:
+        logger.error(f"Error getting random recipes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get random recipes: {str(e)}")
+
 @router.get("/{recipe_id}")
 async def get_recipe_by_id(
     recipe_id: str,
@@ -155,41 +195,6 @@ async def get_recipe_by_id(
     except Exception as e:
         logger.error(f"Error getting recipe by ID: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get recipe by ID: {str(e)}")
-
-@router.get("/random")
-async def get_random_recipes(
-    number: int = Query(default=5, ge=1, le=20),
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Get random recipes
-    
-    Args:
-        number: Number of random recipes to return
-        current_user: Current authenticated user
-        
-    Returns:
-        List of random recipes
-    """
-    try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
-        logger.info(f"Random recipes request from user {user_id}: count={number}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            raise HTTPException(status_code=503, detail="FatSecret service is not available")
-        
-        if not fatsecret_service.is_configured:
-            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
-        
-        results = fatsecret_service.get_random_recipes(number)
-        
-        logger.info(f"Found {len(results)} random recipes")
-        return {"recipes": results}
-        
-    except Exception as e:
-        logger.error(f"Error getting random recipes: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get random recipes: {str(e)}")
 
 @router.post("/by-meal-type")
 async def get_recipes_by_meal_type(

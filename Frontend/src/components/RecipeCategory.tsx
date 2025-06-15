@@ -21,12 +21,37 @@ const getHealthScoreColor = (score: number): string => {
     return '#F44336'; // Red for poor
 };
 
-// Function to format number of likes (1000 -> 1K)
+// Function to format the likes count
 const formatLikes = (likes: number): string => {
-    if (!likes) return '0';
-    if (likes >= 1000000) return `${(likes / 1000000).toFixed(1)}M`;
-    if (likes >= 1000) return `${(likes / 1000).toFixed(1)}K`;
+    if (likes >= 1000000) return (likes / 1000000).toFixed(1) + 'M';
+    if (likes >= 1000) return (likes / 1000).toFixed(1) + 'K';
     return likes.toString();
+};
+
+// Fallback food images for different meal types
+const getFallbackImage = (title: string): string => {
+    const titleLower = title.toLowerCase();
+
+    if (titleLower.includes('breakfast') || titleLower.includes('pancake') || titleLower.includes('egg') || titleLower.includes('oatmeal')) {
+        return 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('salad') || titleLower.includes('vegetable') || titleLower.includes('green')) {
+        return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('pasta') || titleLower.includes('spaghetti') || titleLower.includes('noodle')) {
+        return 'https://images.unsplash.com/photo-1551892589-865f69869476?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('chicken') || titleLower.includes('meat') || titleLower.includes('beef')) {
+        return 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('soup') || titleLower.includes('broth')) {
+        return 'https://images.unsplash.com/photo-1547592180-85f7d2b5c2b8?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('pizza')) {
+        return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('burger') || titleLower.includes('sandwich')) {
+        return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&crop=center';
+    } else if (titleLower.includes('dessert') || titleLower.includes('cake') || titleLower.includes('sweet')) {
+        return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=300&fit=crop&crop=center';
+    }
+
+    // Default fallback
+    return 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&crop=center';
 };
 
 interface RecipeCategoryProps {
@@ -44,6 +69,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
 }) => {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
+    const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
     useEffect(() => {
         const fetchRecipes = async () => {
@@ -81,17 +107,29 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
         fetchRecipes();
     }, [categoryId]);
 
+    const handleImageError = (recipeId: string) => {
+        setImageErrors(prev => ({ ...prev, [recipeId]: true }));
+    };
+
+    const getImageSource = (recipe: Recipe): string => {
+        const recipeId = recipe.id?.toString() || 'unknown';
+        if (imageErrors[recipeId] || !recipe.image) {
+            return getFallbackImage(recipe.title);
+        }
+        return recipe.image;
+    };
+
     if (loading) {
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
                     <View style={styles.iconContainer}>
-                        <Ionicons name={icon as any} size={16} color={WHITE} />
+                        <Ionicons name={icon as any} size={20} color={WHITE} />
                     </View>
                     <Text style={styles.title}>{title}</Text>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={PURPLE_ACCENT} />
+                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
                 </View>
             </View>
         );
@@ -105,7 +143,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
         <View style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.iconContainer}>
-                    <Ionicons name={icon as any} size={16} color={WHITE} />
+                    <Ionicons name={icon as any} size={20} color={WHITE} />
                 </View>
                 <Text style={styles.title}>{title}</Text>
                 <TouchableOpacity style={styles.seeAllButton}>
@@ -134,10 +172,11 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                 style={styles.cardGradient}
                             >
                                 <ImageBackground
-                                    source={{ uri: recipe.image }}
+                                    source={{ uri: getImageSource(recipe) }}
                                     style={styles.recipeImage}
                                     imageStyle={styles.recipeImageStyle}
                                     resizeMode="cover"
+                                    onError={() => handleImageError(recipe.id?.toString() || 'unknown')}
                                 >
                                     <LinearGradient
                                         colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -168,7 +207,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                                         </Text>
                                                     </View>
 
-                                                    {recipe.aggregateLikes && recipe.aggregateLikes > 0 && (
+                                                    {(recipe.aggregateLikes && recipe.aggregateLikes > 0) && (
                                                         <View style={styles.likesContainer}>
                                                             <Ionicons name="thumbs-up" size={14} color="#2196F3" />
                                                             <Text style={[styles.metaText, { color: '#2196F3' }]}>
@@ -180,6 +219,11 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                             </View>
                                         </View>
                                     </LinearGradient>
+                                    {(!recipe.image || imageErrors[recipe.id?.toString() || 'unknown']) && (
+                                        <View style={styles.placeholderOverlay}>
+                                            <Ionicons name="restaurant" size={24} color={WHITE} style={{ opacity: 0.6 }} />
+                                        </View>
+                                    )}
                                 </ImageBackground>
                             </LinearGradient>
                         </View>
@@ -323,6 +367,16 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         borderRadius: 12,
         marginHorizontal: 10,
+    },
+    placeholderOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
 });
 

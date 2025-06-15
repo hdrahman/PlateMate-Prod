@@ -137,7 +137,7 @@ class FatSecretService:
                 
                 # Handle specific error cases
                 if error_code == 21:  # IP address error
-                    logger.error("IP address not whitelisted. Using fallback data.")
+                    logger.error("IP address not whitelisted.")
                     self._api_available = False
                     return None
                     
@@ -153,178 +153,24 @@ class FatSecretService:
         except Exception as e:
             logger.error(f'Unexpected error making FatSecret API request: {e}')
             return None
-    
-    def _get_mock_food_data(self, query: str) -> List[Dict[str, Any]]:
-        """Generate mock food data when API is unavailable"""
-        mock_foods = {
-            'apple': {
-                'food_name': 'Apple',
-                'brand_name': '',
-                'calories': 52,
-                'proteins': 0,
-                'carbs': 14,
-                'fats': 0,
-                'fiber': 2,
-                'sugar': 10,
-                'saturated_fat': 0,
-                'polyunsaturated_fat': 0,
-                'monounsaturated_fat': 0,
-                'trans_fat': 0,
-                'cholesterol': 0,
-                'sodium': 1,
-                'potassium': 107,
-                'vitamin_a': 3,
-                'vitamin_c': 5,
-                'calcium': 6,
-                'iron': 0,
-                'image': '',
-                'serving_unit': '1 medium',
-                'serving_weight_grams': 182,
-                'serving_qty': 1,
-                'healthiness_rating': 8
-            },
-            'chicken': {
-                'food_name': 'Chicken Breast',
-                'brand_name': '',
-                'calories': 165,
-                'proteins': 31,
-                'carbs': 0,
-                'fats': 4,
-                'fiber': 0,
-                'sugar': 0,
-                'saturated_fat': 1,
-                'polyunsaturated_fat': 1,
-                'monounsaturated_fat': 1,
-                'trans_fat': 0,
-                'cholesterol': 85,
-                'sodium': 74,
-                'potassium': 256,
-                'vitamin_a': 0,
-                'vitamin_c': 0,
-                'calcium': 15,
-                'iron': 1,
-                'image': '',
-                'serving_unit': '100g',
-                'serving_weight_grams': 100,
-                'serving_qty': 1,
-                'healthiness_rating': 9
-            },
-            'bread': {
-                'food_name': 'Whole Wheat Bread',
-                'brand_name': '',
-                'calories': 69,
-                'proteins': 4,
-                'carbs': 12,
-                'fats': 1,
-                'fiber': 2,
-                'sugar': 1,
-                'saturated_fat': 0,
-                'polyunsaturated_fat': 0,
-                'monounsaturated_fat': 0,
-                'trans_fat': 0,
-                'cholesterol': 0,
-                'sodium': 133,
-                'potassium': 69,
-                'vitamin_a': 0,
-                'vitamin_c': 0,
-                'calcium': 24,
-                'iron': 1,
-                'image': '',
-                'serving_unit': '1 slice',
-                'serving_weight_grams': 25,
-                'serving_qty': 1,
-                'healthiness_rating': 6
-            }
-        }
-        
-        # Find best match or return generic item
-        query_lower = query.lower()
-        for key, food_data in mock_foods.items():
-            if key in query_lower or query_lower in key:
-                logger.info(f"Using mock data for: {food_data['food_name']}")
-                return [food_data]
-        
-        # Generic fallback
-        generic_food = {
-            'food_name': f"Generic {query.title()}",
-            'brand_name': '',
-            'calories': 100,
-            'proteins': 5,
-            'carbs': 15,
-            'fats': 3,
-            'fiber': 2,
-            'sugar': 5,
-            'saturated_fat': 1,
-            'polyunsaturated_fat': 1,
-            'monounsaturated_fat': 1,
-            'trans_fat': 0,
-            'cholesterol': 0,
-            'sodium': 50,
-            'potassium': 100,
-            'vitamin_a': 5,
-            'vitamin_c': 10,
-            'calcium': 20,
-            'iron': 1,
-            'image': '',
-            'serving_unit': '100g',
-            'serving_weight_grams': 100,
-            'serving_qty': 1,
-            'healthiness_rating': 5
-        }
-        
-        logger.info(f"Using generic mock data for: {query}")
-        return [generic_food]
-    
-    def _get_mock_recipe_data(self, query: str) -> List[Dict[str, Any]]:
-        """Generate mock recipe data when API is unavailable"""
-        mock_recipes = [
-            {
-                'id': '1001',
-                'title': f'{query.title()} Recipe',
-                'image': 'https://via.placeholder.com/312x231.png?text=Recipe',
-                'readyInMinutes': 30,
-                'servings': 4,
-                'sourceUrl': 'https://example.com/recipe',
-                'summary': f'A delicious {query} recipe that\'s easy to make and nutritious.',
-                'healthScore': 75,
-                'ingredients': [f'{query}', 'Salt', 'Pepper', 'Oil'],
-                'instructions': f'1. Prepare the {query}. 2. Season with salt and pepper. 3. Cook until done.',
-                'diets': ['healthy'],
-                'cuisines': ['American'],
-                'aggregateLikes': 100
-            },
-            {
-                'id': '1002',
-                'title': f'Easy {query.title()} Dish',
-                'image': 'https://via.placeholder.com/312x231.png?text=Recipe',
-                'readyInMinutes': 20,
-                'servings': 2,
-                'sourceUrl': 'https://example.com/recipe2',
-                'summary': f'Quick and easy {query} dish perfect for busy weekdays.',
-                'healthScore': 65,
-                'ingredients': [f'{query}', 'Herbs', 'Spices'],
-                'instructions': f'1. Clean the {query}. 2. Add seasonings. 3. Serve immediately.',
-                'diets': ['quick'],
-                'cuisines': ['International'],
-                'aggregateLikes': 85
-            }
-        ]
-        
-        logger.info(f"Using mock recipe data for: {query}")
-        return mock_recipes
-    
+
     def _calculate_healthiness_rating(self, food: Dict) -> int:
         """Calculate a comprehensive healthiness rating based on nutritional content"""
-        # Extract nutrient values with defaults (ensure no None values)
-        calories = food.get('calories') or 0
-        protein = food.get('protein') or 0
-        carbs = food.get('carbohydrate') or 0
-        fat = food.get('fat') or 0
-        fiber = food.get('fiber') or 0
-        sugar = food.get('sugar') or 0
-        saturated_fat = food.get('saturated_fat') or 0
-        cholesterol = food.get('cholesterol') or 0
-        sodium = food.get('sodium') or 0
+        # Extract nutrient values with defaults (ensure no None values) and convert to float
+        try:
+            calories = float(food.get('calories') or 0)
+            protein = float(food.get('protein') or 0)
+            carbs = float(food.get('carbohydrate') or 0)
+            fat = float(food.get('fat') or 0)
+            fiber = float(food.get('fiber') or 0)
+            sugar = float(food.get('sugar') or 0)
+            saturated_fat = float(food.get('saturated_fat') or 0)
+            cholesterol = float(food.get('cholesterol') or 0)
+            sodium = float(food.get('sodium') or 0)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Error converting nutritional values to float: {e}")
+            # Return a neutral score if we can't parse the data
+            return 5
 
         # Start with a lower base score so only truly healthy foods get high ratings
         score = 4.0  # Start lower than neutral
@@ -355,49 +201,47 @@ class FatSecretService:
             saturated_fat_ratio = (saturated_fat * 9) / calories  # 9 calories per gram of fat
             score -= saturated_fat_ratio * 4  # Up to -4 points for high saturated fat
 
-        # Sodium penalty (more aggressive)
-        if sodium > 500:  # Lowered threshold
-            score -= min(2.5, (sodium - 500) / 1000)  # Up to -2.5 points for very high sodium
-
         # Cholesterol penalty
-        if cholesterol > 100:  # Reasonable daily limit consideration
-            score -= min(1.5, (cholesterol - 100) / 200)  # Up to -1.5 points
+        if cholesterol > 50:
+            score -= min(1.5, cholesterol / 100)  # Up to -1.5 points for high cholesterol
 
-        # Calorie density penalty (for very high-calorie foods)
-        if calories > 400:  # Per serving
-            score -= min(1.5, (calories - 400) / 200)  # Penalty for very high calorie foods
+        # Sodium penalty - more aggressive
+        if sodium > 400:  # WHO recommends <2000mg/day, so >400mg per food item is concerning
+            score -= min(2, (sodium - 400) / 600)  # Up to -2 points for very high sodium
+
+        # Very high calorie penalty for small serving sizes
+        if calories > 300:
+            score -= min(1, (calories - 300) / 200)  # Penalty for very calorie-dense foods
 
         # Ensure score is between 1 and 10
         final_score = max(1, min(10, round(score)))
         
         return final_score
-    
+
     def _map_fatsecret_food_to_food_item(self, food_data: Dict) -> Dict[str, Any]:
-        """Map FatSecret API food response to our FoodItem format"""
-        # Handle different response formats from different endpoints
+        """Map FatSecret food response to our FoodItem format"""
         if 'food' in food_data:
             food = food_data['food']
         else:
             food = food_data
-            
+
         # Extract basic food information
         food_name = food.get('food_name', '')
         brand_name = food.get('brand_name', '')
         
-        # Get nutrition data - FatSecret returns servings array
+        # Extract serving information
         servings = food.get('servings', {})
         if isinstance(servings, dict) and 'serving' in servings:
             serving_list = servings['serving']
-            # Handle both single serving and multiple servings
+            # Use the first serving if it's a list, otherwise use the single serving
             if isinstance(serving_list, list):
-                # Use the first serving (usually per 100g or default serving)
-                serving = serving_list[0]
+                serving = serving_list[0] if serving_list else {}
             else:
                 serving = serving_list
         else:
             serving = {}
-        
-        # Extract nutritional values
+
+        # Extract nutrition values
         calories = float(serving.get('calories', 0) or 0)
         protein = float(serving.get('protein', 0) or 0)
         carbs = float(serving.get('carbohydrate', 0) or 0)
@@ -405,6 +249,8 @@ class FatSecretService:
         fiber = float(serving.get('fiber', 0) or 0)
         sugar = float(serving.get('sugar', 0) or 0)
         saturated_fat = float(serving.get('saturated_fat', 0) or 0)
+        
+        # Additional nutrients (may not be available for all foods)
         polyunsaturated_fat = float(serving.get('polyunsaturated_fat', 0) or 0)
         monounsaturated_fat = float(serving.get('monounsaturated_fat', 0) or 0)
         trans_fat = float(serving.get('trans_fat', 0) or 0)
@@ -415,58 +261,46 @@ class FatSecretService:
         vitamin_c = float(serving.get('vitamin_c', 0) or 0)
         calcium = float(serving.get('calcium', 0) or 0)
         iron = float(serving.get('iron', 0) or 0)
-        
-        # Get serving information
-        serving_description = serving.get('serving_description', 'serving')
-        metric_serving_amount = float(serving.get('metric_serving_amount', 1) or 1)
+
+        # Serving information
+        serving_description = serving.get('serving_description', '1 serving')
+        metric_serving_amount = float(serving.get('metric_serving_amount', 100) or 100)
         metric_serving_unit = serving.get('metric_serving_unit', 'g')
-        serving_id = serving.get('serving_id', '0')
-        
-        # Create the mapped food item
-        mapped_item = {
+
+        # Calculate healthiness rating
+        healthiness_rating = self._calculate_healthiness_rating(serving)
+
+        return {
             'food_name': food_name,
             'brand_name': brand_name,
-            'calories': round(calories),
-            'proteins': round(protein),
-            'carbs': round(carbs),
-            'fats': round(fat),
-            'fiber': round(fiber),
-            'sugar': round(sugar),
-            'saturated_fat': round(saturated_fat),
-            'polyunsaturated_fat': round(polyunsaturated_fat),
-            'monounsaturated_fat': round(monounsaturated_fat),
-            'trans_fat': round(trans_fat),
-            'cholesterol': round(cholesterol),
-            'sodium': round(sodium),
-            'potassium': round(potassium),
-            'vitamin_a': round(vitamin_a),
-            'vitamin_c': round(vitamin_c),
-            'calcium': round(calcium),
-            'iron': round(iron),
-            'image': '',  # FatSecret provides food images in a different way
+            'calories': calories,
+            'proteins': protein,
+            'carbs': carbs,
+            'fats': fat,
+            'fiber': fiber,
+            'sugar': sugar,
+            'saturated_fat': saturated_fat,
+            'polyunsaturated_fat': polyunsaturated_fat,
+            'monounsaturated_fat': monounsaturated_fat,
+            'trans_fat': trans_fat,
+            'cholesterol': cholesterol,
+            'sodium': sodium,
+            'potassium': potassium,
+            'vitamin_a': vitamin_a,
+            'vitamin_c': vitamin_c,
+            'calcium': calcium,
+            'iron': iron,
+            'image': '',  # FatSecret doesn't provide images for most foods
             'serving_unit': serving_description,
-            'serving_weight_grams': metric_serving_amount if metric_serving_unit == 'g' else 0,
+            'serving_weight_grams': metric_serving_amount if metric_serving_unit == 'g' else 100,
             'serving_qty': 1,
-            'healthiness_rating': self._calculate_healthiness_rating({
-                'calories': calories,
-                'protein': protein,
-                'carbohydrate': carbs,
-                'fat': fat,
-                'fiber': fiber,
-                'sugar': sugar,
-                'saturated_fat': saturated_fat,
-                'cholesterol': cholesterol,
-                'sodium': sodium
-            })
+            'healthiness_rating': healthiness_rating
         }
-        
-        return mapped_item
-    
+
     def search_food(self, query: str, min_healthiness: int = 0) -> List[Dict[str, Any]]:
-        """Search for foods using the FatSecret API or fallback data"""
+        """Search for foods using the FatSecret API"""
         if not self._ensure_configured():
-            logger.warning('FatSecret API credentials not configured')
-            return []
+            raise Exception('FatSecret API credentials not configured')
         
         try:
             params = {
@@ -475,49 +309,43 @@ class FatSecretService:
                 'format': 'json'
             }
             
-            # Try FatSecret API first
+            # Try FatSecret API 
             response = self._make_request('GET', 'foods/search/v1', params)
             
-            if response:
-                foods_data = response.get('foods', {})
-                if isinstance(foods_data, dict) and 'food' in foods_data:
-                    foods_list = foods_data['food']
-                    # Handle both single food and multiple foods
-                    if not isinstance(foods_list, list):
-                        foods_list = [foods_list]
-                else:
-                    foods_list = []
+            if not response:
+                raise Exception(f"FatSecret API request failed for query: {query}")
                 
-                logger.info(f"FatSecret search returned {len(foods_list)} foods for query: {query}")
-                
-                # Get detailed nutrition for each food
-                detailed_results = []
-                for food_item in foods_list[:10]:  # Limit to top 10 for performance
-                    food_id = food_item.get('food_id')
-                    if food_id:
-                        detailed_food = self.get_food_details_by_id(food_id)
-                        if detailed_food:
-                            # Apply minimum healthiness filter
-                            if detailed_food.get('healthiness_rating', 0) >= min_healthiness:
-                                detailed_results.append(detailed_food)
-                
-                # Sort by healthiness rating (highest first)
-                detailed_results.sort(key=lambda x: x.get('healthiness_rating', 0), reverse=True)
-                
-                return detailed_results
+            foods_data = response.get('foods', {})
+            if isinstance(foods_data, dict) and 'food' in foods_data:
+                foods_list = foods_data['food']
+                # Handle both single food and multiple foods
+                if not isinstance(foods_list, list):
+                    foods_list = [foods_list]
             else:
-                # API unavailable, use fallback data
-                logger.info(f"Using fallback data for food search: {query}")
-                mock_results = self._get_mock_food_data(query)
-                # Apply minimum healthiness filter
-                filtered_results = [item for item in mock_results if item.get('healthiness_rating', 0) >= min_healthiness]
-                return filtered_results
+                foods_list = []
+            
+            logger.info(f"FatSecret search returned {len(foods_list)} foods for query: {query}")
+            
+            # Get detailed nutrition for each food
+            detailed_results = []
+            for food_item in foods_list[:10]:  # Limit to top 10 for performance
+                food_id = food_item.get('food_id')
+                if food_id:
+                    detailed_food = self.get_food_details_by_id(food_id)
+                    if detailed_food:
+                        # Apply minimum healthiness filter
+                        if detailed_food.get('healthiness_rating', 0) >= min_healthiness:
+                            detailed_results.append(detailed_food)
+            
+            # Sort by healthiness rating (highest first)
+            detailed_results.sort(key=lambda x: x.get('healthiness_rating', 0), reverse=True)
+            
+            return detailed_results
             
         except Exception as e:
-            logger.error(f'Unexpected error searching for food: {e}')
-            # Return fallback data on error
-            return self._get_mock_food_data(query)
-    
+            logger.error(f'Error searching for food: {e}')
+            raise Exception(f'Failed to search for food "{query}": {str(e)}')
+
     def get_food_details_by_id(self, food_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a food by ID"""
         if not self._ensure_configured():
@@ -540,7 +368,7 @@ class FatSecretService:
         except Exception as e:
             logger.error(f'Unexpected error getting food details for ID {food_id}: {e}')
             return None
-    
+
     def get_food_details(self, food_name: str) -> Optional[Dict[str, Any]]:
         """Get detailed nutrition information for a food by name"""
         # First search for the food, then get details of the best match
@@ -548,32 +376,32 @@ class FatSecretService:
         if search_results:
             return search_results[0]  # Return the best match
         return None
-    
+
     def search_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
         """Search for food by barcode - not available with basic scope"""
         logger.info(f'Barcode scanning not available with basic scope - barcode: {barcode}')
         return None
-    
+
     def _map_fatsecret_recipe_to_recipe(self, recipe_data: Dict) -> Dict[str, Any]:
         """Map FatSecret recipe response to our Recipe format"""
         if 'recipe' in recipe_data:
             recipe = recipe_data['recipe']
         else:
             recipe = recipe_data
-        
+
         # Extract basic recipe information
         recipe_id = str(recipe.get('recipe_id', ''))
         recipe_name = recipe.get('recipe_name', '')
         recipe_description = recipe.get('recipe_description', '')
         recipe_image = recipe.get('recipe_image', '')
-        
+
         # Extract nutrition information
         nutrition = recipe.get('recipe_nutrition', {})
         calories = float(nutrition.get('calories', 0) or 0)
         protein = float(nutrition.get('protein', 0) or 0)
         carbs = float(nutrition.get('carbohydrate', 0) or 0)
         fat = float(nutrition.get('fat', 0) or 0)
-        
+
         # Extract ingredients
         ingredients_data = recipe.get('recipe_ingredients', {})
         if isinstance(ingredients_data, dict) and 'ingredient' in ingredients_data:
@@ -582,7 +410,7 @@ class FatSecretService:
                 ingredients_list = [ingredients_list]
         else:
             ingredients_list = []
-        
+
         # Extract recipe types
         types_data = recipe.get('recipe_types', {})
         if isinstance(types_data, dict) and 'recipe_type' in types_data:
@@ -591,7 +419,7 @@ class FatSecretService:
                 types_list = [types_list]
         else:
             types_list = []
-        
+
         return {
             'id': recipe_id,
             'title': recipe_name,
@@ -607,12 +435,11 @@ class FatSecretService:
             'cuisines': [],  # FatSecret doesn't provide cuisine classification in basic search
             'aggregateLikes': 0  # Not available in FatSecret
         }
-    
+
     def search_recipes(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Search for recipes using the FatSecret API or fallback data"""
+        """Search for recipes using the FatSecret API"""
         if not self._ensure_configured():
-            logger.warning('FatSecret API key not configured')
-            return []
+            raise Exception('FatSecret API key not configured')
         
         query = params.get('query', 'recipe')
         
@@ -627,34 +454,31 @@ class FatSecretService:
             if params.get('query'):
                 api_params['search_expression'] = params['query']
             
-            # Try FatSecret API first
+            # Try FatSecret API
             response = self._make_request('GET', 'recipes/search/v3', api_params)
             
-            if response:
-                recipes_data = response.get('recipes', {})
-                if isinstance(recipes_data, dict) and 'recipe' in recipes_data:
-                    recipes_list = recipes_data['recipe']
-                    if not isinstance(recipes_list, list):
-                        recipes_list = [recipes_list]
-                else:
-                    recipes_list = []
+            if not response:
+                raise Exception(f"FatSecret API request failed for recipe search: {query}")
                 
-                logger.info(f"Found {len(recipes_list)} recipes for search")
-                return [self._map_fatsecret_recipe_to_recipe(recipe) for recipe in recipes_list]
+            recipes_data = response.get('recipes', {})
+            if isinstance(recipes_data, dict) and 'recipe' in recipes_data:
+                recipes_list = recipes_data['recipe']
+                if not isinstance(recipes_list, list):
+                    recipes_list = [recipes_list]
             else:
-                # API unavailable, use fallback data
-                logger.info(f"Using fallback data for recipe search: {query}")
-                return self._get_mock_recipe_data(query)
+                recipes_list = []
+            
+            logger.info(f"Found {len(recipes_list)} recipes for search")
+            return [self._map_fatsecret_recipe_to_recipe(recipe) for recipe in recipes_list]
             
         except Exception as e:
-            logger.error(f'Unexpected error searching recipes: {e}')
-            return self._get_mock_recipe_data(query)
-    
+            logger.error(f'Error searching recipes: {e}')
+            raise Exception(f'Failed to search for recipes "{query}": {str(e)}')
+
     def get_recipe_by_id(self, recipe_id: str) -> Optional[Dict[str, Any]]:
         """Get recipe details by ID"""
         if not self._ensure_configured():
-            logger.warning('FatSecret API key not configured')
-            return None
+            raise Exception('FatSecret API key not configured')
         
         try:
             params = {
@@ -664,26 +488,19 @@ class FatSecretService:
             
             response = self._make_request('GET', 'recipe/v2', params)
             
-            if response:
-                return self._map_fatsecret_recipe_to_recipe(response)
-            
-            # Fallback for mock data
-            mock_recipes = self._get_mock_recipe_data('recipe')
-            for recipe in mock_recipes:
-                if recipe['id'] == recipe_id:
-                    return recipe
-            
-            return None
+            if not response:
+                raise Exception(f"FatSecret API request failed for recipe ID: {recipe_id}")
+                
+            return self._map_fatsecret_recipe_to_recipe(response)
             
         except Exception as e:
-            logger.error(f'Unexpected error getting recipe by ID: {e}')
-            return None
-    
+            logger.error(f'Error getting recipe by ID: {e}')
+            raise Exception(f'Failed to get recipe with ID "{recipe_id}": {str(e)}')
+
     def get_random_recipes(self, count: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Get random recipes"""
         if not self._ensure_configured():
-            logger.warning('FatSecret API key not configured')
-            return []
+            raise Exception('FatSecret API key not configured')
         
         try:
             # Try different search terms for variety
@@ -707,18 +524,12 @@ class FatSecretService:
             
         except Exception as e:
             logger.error(f'Error getting random recipes: {e}')
-            # Return multiple different mock recipes
-            all_mock_recipes = []
-            for term in ['chicken', 'pasta', 'salad'][:count]:
-                all_mock_recipes.extend(self._get_mock_recipe_data(term))
-            random.shuffle(all_mock_recipes)
-            return all_mock_recipes[:count]
-    
+            raise Exception(f'Failed to get random recipes: {str(e)}')
+
     def get_recipes_by_meal_type(self, meal_type: str, count: int = 3) -> List[Dict[str, Any]]:
         """Get recipes filtered by meal type"""
         if not self._ensure_configured():
-            logger.warning('FatSecret API key not configured')
-            return []
+            raise Exception('FatSecret API key not configured')
         
         try:
             # Map meal types to search terms
@@ -748,25 +559,16 @@ class FatSecretService:
             return results
             
         except Exception as e:
-            logger.error(f'Unexpected error getting recipes by meal type: {e}')
-            return self._get_mock_recipe_data(meal_type)
-    
+            logger.error(f'Error getting recipes by meal type: {e}')
+            raise Exception(f'Failed to get recipes for meal type "{meal_type}": {str(e)}')
+
     def generate_meal_plan(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate a meal plan using FatSecret recipes or fallback data"""
+        """Generate a meal plan using FatSecret recipes"""
         if not self._ensure_configured():
-            logger.warning('FatSecret API key not configured')
-            return {
-                'meals': [],
-                'nutrients': {
-                    'calories': 0,
-                    'protein': 0,
-                    'fat': 0,
-                    'carbohydrates': 0
-                }
-            }
+            raise Exception('FatSecret API key not configured')
         
         try:
-            # Generate meal plan regardless of API availability
+            # Generate meal plan
             time_frame = params.get('timeFrame', 'day')
             target_calories = params.get('targetCalories', 2000)
             
@@ -813,21 +615,16 @@ class FatSecretService:
             }
             
         except Exception as e:
-            logger.error(f'Unexpected error generating meal plan: {e}')
-            return {
-                'meals': [],
-                'nutrients': {
-                    'calories': 0,
-                    'protein': 0,
-                    'fat': 0,
-                    'carbohydrates': 0
-                }
-            }
-    
+            logger.error(f'Error generating meal plan: {e}')
+            raise Exception(f'Failed to generate meal plan: {str(e)}')
+
     def autocomplete_recipes(self, query: str) -> List[Dict[str, Any]]:
         """Autocomplete recipe search - simplified implementation"""
-        if not self._ensure_configured() or not query.strip():
-            return []
+        if not self._ensure_configured():
+            raise Exception('FatSecret API key not configured')
+            
+        if not query.strip():
+            raise Exception('Query cannot be empty for recipe autocomplete')
         
         try:
             # Use regular recipe search with limited results for autocomplete
@@ -841,12 +638,15 @@ class FatSecretService:
             
         except Exception as e:
             logger.error(f'Error getting recipe autocomplete: {e}')
-            return []
-    
+            raise Exception(f'Failed to get recipe autocomplete for "{query}": {str(e)}')
+
     def autocomplete_ingredients(self, query: str) -> List[Dict[str, Any]]:
         """Autocomplete ingredient search - using food search"""
-        if not self._ensure_configured() or not query.strip():
-            return []
+        if not self._ensure_configured():
+            raise Exception('FatSecret API key not configured')
+            
+        if not query.strip():
+            raise Exception('Query cannot be empty for ingredient autocomplete')
         
         try:
             # Use food search for ingredient autocomplete
@@ -855,7 +655,7 @@ class FatSecretService:
             
         except Exception as e:
             logger.error(f'Error getting ingredient autocomplete: {e}')
-            return []
+            raise Exception(f'Failed to get ingredient autocomplete for "{query}": {str(e)}')
 
 # Singleton instance
 fatsecret_service = FatSecretService() 
