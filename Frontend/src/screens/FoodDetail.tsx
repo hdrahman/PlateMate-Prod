@@ -294,27 +294,13 @@ const FoodDetailScreen: React.FC = () => {
                     <View style={styles.foodInfoOverlay}>
                         <Text style={styles.foodName}>{foodData?.food_name}</Text>
                         <Text style={styles.foodMeta}>{foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}</Text>
-                    </View>
-                </View>
-
-                {/* Main Content Container */}
-                <View style={styles.contentContainer}>
-                    {/* Calories Section */}
-                    <View style={styles.calorieSection}>
-                        <Text style={styles.calorieNumber}>{foodData?.calories}</Text>
-                        <Text style={styles.calorieLabel}>calories</Text>
                         {foodData?.healthiness_rating && (
                             <View style={[
                                 styles.healthinessBadge,
                                 {
                                     backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
                                     borderColor: getHealthinessColor(foodData.healthiness_rating),
-                                    position: 'relative',
-                                    top: 0,
-                                    right: 0,
-                                    alignSelf: 'center',
-                                    marginTop: 10,
-                                    marginBottom: 0
+                                    marginTop: 8,
                                 }
                             ]}>
                                 <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
@@ -322,6 +308,21 @@ const FoodDetailScreen: React.FC = () => {
                                 </Text>
                             </View>
                         )}
+                    </View>
+                </View>
+
+                {/* Main Content Container */}
+                <View style={styles.contentContainer}>
+                    {/* Calories Section */}
+                    <View style={styles.calorieSection}>
+                        <View style={styles.calorieAlignmentContainer}>
+                            <View style={styles.calorieRow}>
+                                <Text style={styles.calorieNumber}>{foodData?.calories}</Text>
+                                <Text style={styles.calorieLabel}>calories</Text>
+                            </View>
+
+                            {/* Health score has been moved to the overlay */}
+                        </View>
                     </View>
 
                     {/* Macros Visual Section */}
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     },
     foodInfoOverlay: {
         position: 'absolute',
-        bottom: 80, // Moved down to better position over the gradient
+        bottom: 20, // Moved even further down to be very close to edge of the blend
         left: 0,
         right: 0,
         paddingHorizontal: 20,
@@ -517,7 +518,7 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingHorizontal: 20,
         backgroundColor: PRIMARY_BG,
-        marginTop: -25, // Less overlap to show more of the image
+        marginTop: -20, // Less overlap to prevent cutting off content
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
         paddingTop: 5, // Minimal padding
@@ -540,16 +541,27 @@ const styles = StyleSheet.create({
         paddingBottom: 5,
         marginBottom: 24,
     },
+    calorieAlignmentContainer: {
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    calorieRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-start',
+        width: '60%', // Control the width to align with health score
+    },
     calorieNumber: {
         fontSize: 64,
         fontWeight: '300',
         color: WHITE,
         lineHeight: 70,
+        marginRight: 5,
     },
     calorieLabel: {
-        fontSize: 16,
+        fontSize: 20,
         color: SUBDUED,
-        marginTop: -8,
+        marginBottom: 12,
     },
     healthinessBadge: {
         alignSelf: 'flex-start', // Position at left side
@@ -557,11 +569,8 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 20,
         borderWidth: 1,
-        marginTop: 10,  // Add some space from top
-        marginBottom: 5, // Less bottom margin
-        position: 'absolute',
-        top: -10, // Position it at the top of content
-        right: 20, // Position at right side
+        marginTop: 8,
+        marginBottom: 0,
     },
     healthinessBadgeText: {
         fontSize: 12,
