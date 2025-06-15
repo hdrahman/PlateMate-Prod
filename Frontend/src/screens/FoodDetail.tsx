@@ -293,21 +293,30 @@ const FoodDetailScreen: React.FC = () => {
                     {/* Food Details Overlay */}
                     <View style={styles.foodInfoOverlay}>
                         <Text style={styles.foodName}>{foodData?.food_name}</Text>
-                        <Text style={styles.foodMeta}>{foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}</Text>
-                        {foodData?.healthiness_rating && (
-                            <View style={[
-                                styles.healthinessBadge,
-                                {
-                                    backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
-                                    borderColor: getHealthinessColor(foodData.healthiness_rating),
-                                    marginTop: 8,
-                                }
-                            ]}>
-                                <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
-                                    Health Score: {Math.round(foodData.healthiness_rating)}
-                                </Text>
-                            </View>
-                        )}
+
+                        {/* Row container for health score and meal info */}
+                        <View style={styles.infoRow}>
+                            {/* Health Score on the left */}
+                            {foodData?.healthiness_rating && (
+                                <View style={[
+                                    styles.healthinessBadge,
+                                    {
+                                        backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
+                                        borderColor: getHealthinessColor(foodData.healthiness_rating),
+                                        marginTop: 0,
+                                    }
+                                ]}>
+                                    <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
+                                        Health Score: {Math.round(foodData.healthiness_rating)}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {/* Meal type and date on the right */}
+                            <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 
@@ -534,6 +543,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: WHITE,
         textTransform: 'capitalize',
+    },
+    foodMetaRight: {
+        color: 'rgba(255, 255, 255, 0.85)', // Slightly grayed out but still predominantly white
+        textAlign: 'right',
+        flex: 1,
     },
     calorieSection: {
         alignItems: 'center',
