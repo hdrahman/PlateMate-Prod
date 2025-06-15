@@ -24,23 +24,22 @@ import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../utils/firebase/index';
+import {
+  getUserProfileByFirebaseUid,
+  getRecentFoodLogs,
+  getFoodLogsByDate,
+  getTodayCalories,
+  getTodayProtein,
+  getTodayCarbs,
+  getTodayFats,
+  getTodayExerciseCalories,
+  getUserStreak
+} from '../utils/database';
 
 // Get IP and port from the BACKEND_URL
 const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
 
 const { width } = Dimensions.get("window");
-
-// User profile - initialized with empty values
-const userProfile = {
-  name: "",
-  age: 0,
-  weight: 0, // kg
-  height: 0, // cm
-  goals: "",
-  recentWorkouts: [],
-  dietaryPreferences: [],
-  lastActive: ""
-};
 
 // Types for the chat messages
 interface Message {
@@ -49,6 +48,21 @@ interface Message {
   sender: 'user' | 'bot';
   timestamp: Date;
   isTyping?: boolean;
+}
+
+// User context interface
+interface UserContext {
+  profile: any;
+  recentNutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    exerciseCalories: number;
+  };
+  recentFoodLogs: any[];
+  streak: number;
+  summary: string;
 }
 
 export default function Chatbot() {
@@ -69,7 +83,7 @@ export default function Chatbot() {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [contextActive, setContextActive] = useState(false);
-  const [contextData, setContextData] = useState<string | null>(null);
+  const [contextData, setContextData] = useState<UserContext | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const dot1Opacity = useRef(new Animated.Value(0.4)).current;
@@ -90,36 +104,65 @@ export default function Chatbot() {
     }
   };
 
-  // Load user context for personalized coaching
+  // Helper function to format date for database queries
+  const formatDateForDatabase = (date: Date): string => {
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+  };
+
+  // Load user context from local SQLite database
   const loadUserContext = async () => {
     try {
       setIsLoadingContext(true);
-      console.log('🔄 Loading user context...');
+      console.log('🔄 Loading user context from local database...');
 
-      const token = await getFirebaseToken();
-      console.log('✅ Firebase token obtained');
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
 
-      const url = `${BACKEND_BASE_URL}/deepseek/user-context?days_back=30`;
-      console.log('📡 Calling context endpoint:', url);
+      // Get user profile
+      const profile = await getUserProfileByFirebaseUid(currentUser.uid);
 
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      // Get recent nutrition data (today)
+      const todayCalories = await getTodayCalories();
+      const todayProtein = await getTodayProtein();
+      const todayCarbs = await getTodayCarbs();
+      const todayFats = await getTodayFats();
+      const todayExerciseCalories = await getTodayExerciseCalories();
+
+      // Get recent food logs (last 25 entries)
+      const recentFoodLogs = await getRecentFoodLogs(15);
+
+      // Get user streak
+      const userStreak = await getUserStreak(currentUser.uid);
+
+      // Create context summary
+      const contextSummary = `Recent activity: ${todayCalories} calories consumed today, ${recentFoodLogs.length} recent meals logged, ${userStreak} day streak`;
+
+      const userContext: UserContext = {
+        profile,
+        recentNutrition: {
+          calories: todayCalories,
+          protein: todayProtein,
+          carbs: todayCarbs,
+          fats: todayFats,
+          exerciseCalories: todayExerciseCalories
         },
-        timeout: 15000 // 15 second timeout
-      });
+        recentFoodLogs: recentFoodLogs.slice(0, 10), // Limit to 10 most recent for context
+        streak: userStreak,
+        summary: contextSummary
+      };
 
-      console.log('✅ Context response received:', response.status);
-      console.log('📊 Context data preview:', response.data.summary);
+      console.log('✅ User context loaded successfully');
+      console.log('📊 Context summary:', contextSummary);
 
-      setContextData(response.data.context);
+      setContextData(userContext);
       setContextActive(true);
 
       // Add system message about context being enabled
       const contextMessage: Message = {
         id: "context-enabled-" + Date.now(),
-        text: `🧠 Perfect! I now have access to your recent activity data and can provide personalized advice based on your actual nutrition, exercise patterns, and progress. ${response.data.summary.message}`,
+        text: `🧠 Perfect! I now have access to your recent activity data and can provide personalized advice based on your actual nutrition, exercise patterns, and progress. ${contextSummary}`,
         sender: "bot",
         timestamp: new Date()
       };
@@ -138,12 +181,8 @@ export default function Chatbot() {
 
       if (error.message?.includes('Authentication failed') || error.message?.includes('User not authenticated')) {
         errorText = "You need to sign in again to access your personalized data. Let's continue with general coaching!";
-      } else if (error.response?.status === 401 || error.response?.status === 403) {
-        errorText = "I need you to be signed in to access your activity data. Let's continue with general coaching!";
-      } else if (error.response?.status === 404) {
-        errorText = "I couldn't find your profile data. Make sure you've completed your profile setup and logged some food or exercise data first!";
-      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        errorText = "The request timed out. Please check your internet connection and try again!";
+      } else if (error.message?.includes('Database not initialized')) {
+        errorText = "Your local data isn't ready yet. Please try again in a moment!";
       }
 
       // Add error message to chat instead of alert
@@ -351,8 +390,9 @@ export default function Chatbot() {
         .filter(msg => !msg.isTyping && !msg.text.includes("🧠 I now have access") && !msg.text.includes("🔄 I've cleared"))
         .map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.text
-        }));
+          content: msg.text.trim()
+        }))
+        .filter(msg => msg.content.length > 0); // Remove empty messages
 
       // Add the new user message
       messageHistory.push({
@@ -366,13 +406,27 @@ export default function Chatbot() {
       let response;
 
       if (contextActive && contextData) {
-        // Use context-aware endpoint
+        // Use context-aware endpoint with user context data from local database
+        const contextString = `User Profile: ${contextData.profile?.first_name || 'User'} (${contextData.profile?.age || 'unknown age'}, ${contextData.profile?.gender || 'unknown gender'}, ${contextData.profile?.activity_level || 'unknown activity level'}). 
+        Goals: ${contextData.profile?.fitness_goal || 'not specified'}, target weight: ${contextData.profile?.target_weight || 'not set'}, daily calorie target: ${contextData.profile?.daily_calorie_target || 'not set'}.
+        Today's Nutrition: ${contextData.recentNutrition.calories} calories, ${contextData.recentNutrition.protein}g protein, ${contextData.recentNutrition.carbs}g carbs, ${contextData.recentNutrition.fats}g fats, ${contextData.recentNutrition.exerciseCalories} exercise calories burned.
+        Recent Activity: ${contextData.recentFoodLogs.length} recent meals logged, current streak: ${contextData.streak} days.
+        Recent Foods: ${contextData.recentFoodLogs.slice(0, 5).map(log => log.food_name).join(', ')}.`;
+
         const payload = {
           messages: messageHistory,
-          days_back: 30,
+          user_context: contextString,
           temperature: 0.7,
           max_tokens: 1000
         };
+
+        console.log('🚀 Sending context chat request:', {
+          endpoint: `${BACKEND_BASE_URL}/deepseek/chat-with-context`,
+          messageCount: messageHistory.length,
+          hasContext: !!contextString,
+          firstMessage: messageHistory[0],
+          lastMessage: messageHistory[messageHistory.length - 1]
+        });
 
         response = await axios.post(
           `${BACKEND_BASE_URL}/deepseek/chat-with-context`,
@@ -397,6 +451,14 @@ export default function Chatbot() {
           max_tokens: 1000
         };
 
+        console.log('🚀 Sending regular chat request:', {
+          endpoint: `${BACKEND_BASE_URL}/deepseek/chat`,
+          messageCount: payload.messages.length,
+          systemPrompt: systemPrompt,
+          firstUserMessage: messageHistory[0],
+          lastUserMessage: messageHistory[messageHistory.length - 1]
+        });
+
         response = await axios.post(
           `${BACKEND_BASE_URL}/deepseek/chat`,
           payload,
@@ -413,11 +475,21 @@ export default function Chatbot() {
     } catch (error: any) {
       console.error("Error calling DeepSeek via backend:", error);
 
+      // Log more detailed error information
+      if (error.response) {
+        console.error("Error response status:", error.response.status);
+        console.error("Error response data:", error.response.data);
+        console.error("Error response headers:", error.response.headers);
+      }
+
       // Handle specific authentication errors
       if (error.message?.includes('Authentication failed') || error.message?.includes('User not authenticated')) {
         throw new Error("You need to sign in again to chat with Coach Max. Please check your authentication.");
       } else if (error.response?.status === 401 || error.response?.status === 403) {
         throw new Error("Authentication required to chat with Coach Max. Please sign in and try again.");
+      } else if (error.response?.status === 422) {
+        console.error("Validation error details:", error.response.data);
+        throw new Error("There was an issue with the message format. Please try again.");
       }
 
       throw new Error("Failed to get response from Coach Max. Please try again.");

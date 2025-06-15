@@ -29,6 +29,7 @@ import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnalysisModal from '../components/AnalysisModal';
 import { saveImageLocally, saveMultipleImagesLocally } from '../utils/localFileStorage';
+import { auth } from '../utils/firebase/index';
 
 const { width } = Dimensions.get('window');
 
@@ -199,12 +200,19 @@ const ImageCapture: React.FC = () => {
                 name: fileInfo.uri.split('/').pop(),
             } as any);
 
+            // Get Firebase auth token
+            const token = await auth.currentUser?.getIdToken(true);
+            if (!token) {
+                throw new Error('User not authenticated. Please sign in again.');
+            }
+
             console.log('Sending request to backend...');
             const response = await fetch(`${BACKEND_URL}/images/upload-image`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: formData,
             });
@@ -265,10 +273,17 @@ const ImageCapture: React.FC = () => {
 
             console.log('Processed image URLs:', fullImageUrls);
 
+            // Get Firebase auth token
+            const token = await auth.currentUser?.getIdToken(true);
+            if (!token) {
+                throw new Error('User not authenticated. Please sign in again.');
+            }
+
             const response = await fetch(`${BACKEND_URL}/gpt/analyze-food`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                     image_urls: fullImageUrls,
@@ -324,12 +339,19 @@ const ImageCapture: React.FC = () => {
 
             setAnalysisStage('analyzing');
 
+            // Get Firebase auth token
+            const token = await auth.currentUser?.getIdToken(true);
+            if (!token) {
+                throw new Error('User not authenticated. Please sign in again.');
+            }
+
             console.log('Sending request to backend for ChatGPT analysis...');
             const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: formData,
             });

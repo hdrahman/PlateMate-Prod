@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 import httpx
 import os
@@ -30,6 +30,22 @@ DEEPSEEK_MODEL = "deepseek-chat"  # This is DeepSeek V3
 class ChatMessage(BaseModel):
     role: str  # "system", "user", or "assistant"
     content: str
+    
+    @validator('content')
+    def content_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Message content cannot be empty')
+        return v.strip()
+    
+    @validator('role')
+    def role_must_be_valid(cls, v):
+        if v not in ['system', 'user', 'assistant']:
+            raise ValueError('Role must be one of: system, user, assistant')
+        return v
+    
+    class Config:
+        # Allow extra fields to be ignored
+        extra = "ignore"
 
 class NutritionAnalysisRequest(BaseModel):
     nutritionData: dict
@@ -46,7 +62,7 @@ class ChatResponse(BaseModel):
 
 class ChatWithContextRequest(BaseModel):
     messages: List[ChatMessage]
-    user_context: Optional[dict] = None  # Frontend can provide context data
+    user_context: Optional[str] = None  # Frontend can provide context data as a string
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 1000
 
@@ -182,6 +198,8 @@ async def chat_with_coach(
         logger.error(f"Error in chat: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to chat with AI coach")
 
+
+
 @router.post("/chat-with-context", response_model=ChatResponse)
 async def chat_with_context(
     request: ChatWithContextRequest,
@@ -194,6 +212,10 @@ async def chat_with_context(
     """
     try:
         logger.info(f"Context chat request from user {current_user['firebase_uid']}")
+        logger.info(f"Request messages count: {len(request.messages)}")
+        logger.info(f"Request user_context provided: {bool(request.user_context)}")
+        logger.info(f"Request temperature: {request.temperature}")
+        logger.info(f"Request max_tokens: {request.max_tokens}")
         
         # Build context-aware system prompt
         system_prompt = """You are Coach Max, an expert AI Health Coach and nutritionist. You're energetic, motivational, and provide practical, actionable advice. Use the provided user context to give personalized recommendations. Keep your tone friendly and supportive while being informative."""
