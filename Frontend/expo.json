@@ -1,0 +1,18 @@
+{
+    "expo": {
+        "cli": {
+            "appVersionSource": "remote"
+        },
+        "doctor": {
+            "reactNativeDirectoryCheck": {
+                "exclude": [
+                    "expo-barcode-scanner",
+                    "react-native-sqlite-storage"
+                ],
+                "listUnknownPackages": false
+            },
+            "checkNpmPackages": false,
+            "checkExpoSdkVersions": false
+        }
+    }
+}
