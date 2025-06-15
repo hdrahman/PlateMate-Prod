@@ -194,23 +194,44 @@ export default function Home() {
 
           // Get user goals for calorie goal
           const userGoals = await getUserGoals(user.uid);
+          console.log('📋 Loaded user goals from database:', {
+            calorieGoal: userGoals?.calorieGoal,
+            fitnessGoal: userGoals?.fitnessGoal,
+            targetWeight: userGoals?.targetWeight
+          });
+
+          console.log('📋 User profile data:', {
+            daily_calorie_target: profile.daily_calorie_target,
+            fitness_goal: profile.fitness_goal,
+            weight_goal: profile.weight_goal,
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            activity_level: profile.activity_level
+          });
 
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
             firstName: profile.first_name,
             lastName: profile.last_name,
-            phoneNumber: '',
+            dateOfBirth: profile.date_of_birth,
+            location: profile.location,
             height: profile.height,
             weight: profile.weight,
             age: profile.age,
             gender: profile.gender,
             activityLevel: profile.activity_level,
+            unitPreference: profile.unit_preference || 'metric',
             dietaryRestrictions: profile.dietary_restrictions || [],
             foodAllergies: profile.food_allergies || [],
             cuisinePreferences: profile.cuisine_preferences || [],
             spiceTolerance: profile.spice_tolerance,
             weightGoal: userGoals?.fitnessGoal || 'maintain', // Get from nutrition_goals table instead
+            targetWeight: profile.target_weight,
+            startingWeight: profile.starting_weight,
             healthConditions: profile.health_conditions || [],
+            fitnessGoal: profile.fitness_goal,
             dailyCalorieTarget: profile.daily_calorie_target,
             nutrientFocus: profile.nutrient_focus,
             defaultAddress: null,
@@ -225,15 +246,22 @@ export default function Home() {
             defaultPaymentMethodId: null,
             preferredLanguage: profile.preferred_language || 'en',
             timezone: profile.timezone || 'UTC',
-            unitPreference: profile.unit_preference || 'metric',
             darkMode: profile.dark_mode,
-            syncDataOffline: profile.sync_data_offline,
-            targetWeight: profile.target_weight,
-            startingWeight: profile.starting_weight
+            syncDataOffline: profile.sync_data_offline
+          });
+
+          console.log('📋 Calculated nutrition goals:', {
+            calories: goals.calories,
+            protein: goals.protein,
+            carbs: goals.carbs,
+            fat: goals.fat
           });
 
           // Update state with calculated goals, prioritizing the database value
-          setDailyCalorieGoal(userGoals?.calorieGoal || goals.calories);
+          const finalCalorieGoal = userGoals?.calorieGoal || goals.calories;
+          console.log('📋 Final calorie goal selected:', finalCalorieGoal);
+
+          setDailyCalorieGoal(finalCalorieGoal);
           setMacroGoals({
             protein: userGoals?.proteinGoal || goals.protein,
             carbs: userGoals?.carbGoal || goals.carbs,

@@ -5,9 +5,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import json
 from dotenv import load_dotenv
-from sqlalchemy.orm import Session
-from DB import get_db
-from models import User
 import logging
 
 # Setup logging
@@ -121,11 +118,12 @@ async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depe
             detail=f"Invalid authentication credentials: {str(e)}"
         )
 
-# Dependency to get the current authenticated user
-async def get_current_user(
-    token_data: dict = Depends(verify_firebase_token),
-    db: Session = Depends(get_db)
-):
+# Dependency to get the current authenticated user (stateless - returns token data only)
+async def get_current_user(token_data: dict = Depends(verify_firebase_token)):
+    """
+    Stateless authentication dependency that returns Firebase token data.
+    No database lookups are performed - all user data is stored in frontend SQLite.
+    """
     try:
         logger.info("Getting current user from token data")
         firebase_uid = token_data.get("uid")
@@ -136,26 +134,17 @@ async def get_current_user(
                 detail="Firebase UID not found in token"
             )
             
-        logger.info(f"Looking up user with Firebase UID: {firebase_uid}")
+        logger.info(f"Authenticated user with Firebase UID: {firebase_uid}")
         
-        # Check if user exists in primary database
-        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        # Return a simple user object with Firebase token data
+        # No database lookup needed since backend is stateless
+        return {
+            "firebase_uid": firebase_uid,
+            "email": token_data.get("email"),
+            "name": token_data.get("name"),
+            "email_verified": token_data.get("email_verified", False)
+        }
         
-        if not user:
-            logger.error(f"User with Firebase UID {firebase_uid} not found in database")
-            
-            # PRODUCTION FIX: Instead of creating temporary users that cause data integrity issues,
-            # we require that users must be properly created in the database before accessing protected endpoints.
-            # This prevents food logs and other data from being assigned to non-existent users.
-            
-            raise HTTPException(
-                status_code=403,
-                detail="User account not found. Please complete registration or contact support."
-            )
-        else:
-            logger.info(f"Found existing user in database: {user.email}")
-        
-        return user
     except HTTPException:
         raise
     except Exception as e:
@@ -164,91 +153,5 @@ async def get_current_user(
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500, 
-            detail=f"Error fetching user: {str(e)}"
-        )
-
-# Dependency that auto-creates users if they don't exist (for onboarding endpoints)
-async def get_or_create_user(
-    token_data: dict = Depends(verify_firebase_token),
-    db: Session = Depends(get_db)
-):
-    try:
-        logger.info("Getting or creating user from token data")
-        firebase_uid = token_data.get("uid")
-        if not firebase_uid:
-            logger.error("Firebase UID not found in token")
-            raise HTTPException(
-                status_code=401, 
-                detail="Firebase UID not found in token"
-            )
-            
-        logger.info(f"Looking up user with Firebase UID: {firebase_uid}")
-        
-        # Check if user exists in primary database
-        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-        
-        if not user:
-            logger.info(f"User with Firebase UID {firebase_uid} not found, creating new user")
-            
-            # Extract user info from Firebase token
-            name = token_data.get("name", "").split(" ", 1)
-            first_name = name[0] if name else token_data.get("email", "").split("@")[0]
-            last_name = name[1] if len(name) > 1 else ""
-            
-            # Create new user in database
-            user = User(
-                firebase_uid=firebase_uid,
-                email=token_data.get("email", ""),
-                first_name=first_name,
-                last_name=last_name,
-                onboarding_complete=False
-            )
-            
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            
-            logger.info(f"Created new user in database: {user.email} (ID: {user.id})")
-        else:
-            logger.info(f"Found existing user in database: {user.email} (ID: {user.id})")
-        
-        return user
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in get_or_create_user: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error fetching or creating user: {str(e)}"
-        )
-
-# Optional dependency to get current user if it exists, but don't require it
-async def get_optional_current_user(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    if not firebase_initialized:
-        # Try to initialize again if it failed earlier
-        if not initialize_firebase_admin():
-            return None
-    
-    # Extract authorization header
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return None
-    
-    token = auth_header.replace("Bearer ", "")
-    try:
-        # Verify the ID token with a clock tolerance of 5 seconds
-        decoded_token = auth.verify_id_token(token, check_revoked=True, clock_skew_seconds=5)
-        firebase_uid = decoded_token.get("uid")
-        if not firebase_uid:
-            return None
-            
-        # Check if user exists in database
-        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
-        return user
-    except Exception:
-        return None 
+            detail=f"Error processing authentication: {str(e)}"
+        ) 

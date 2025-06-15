@@ -106,6 +106,42 @@ export default function EditGoals() {
     const [isFetchingData, setIsFetchingData] = useState(true);
     const [isImperialUnits, setIsImperialUnits] = useState(false);
 
+    // Helper function to map fitnessGoal to weight_goal constraint values
+    const mapFitnessGoalToWeightGoal = (fitnessGoal?: string): string => {
+        if (!fitnessGoal) return 'maintain';
+
+        // Direct mapping for new format values
+        const validWeightGoals = ['lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5'];
+        if (validWeightGoals.includes(fitnessGoal)) {
+            return fitnessGoal;
+        }
+
+        // Legacy mapping for old values
+        switch (fitnessGoal) {
+            case 'lose':
+            case 'lose_moderate':
+            case 'fat_loss':
+                return 'lose_0_5';
+            case 'lose_light':
+                return 'lose_0_25';
+            case 'lose_heavy':
+            case 'lose_extreme':
+                return 'lose_0_75';
+            case 'lose_aggressive':
+                return 'lose_1';
+            case 'gain':
+            case 'gain_moderate':
+            case 'muscle_gain':
+                return 'gain_0_5';
+            case 'gain_light':
+                return 'gain_0_25';
+            case 'maintain':
+            case 'balanced':
+            default:
+                return 'maintain';
+        }
+    };
+
     // Animation values
     const slideAnim = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -396,59 +432,8 @@ export default function EditGoals() {
                 }
             }
 
-            // SECONDARY: Try to sync to backend for cloud backup (non-blocking)
-            try {
-                console.log('Syncing goals to backend for cloud backup...');
-
-                if (activeTab === 'nutrition') {
-                    // Format nutrition goals for the API
-                    const nutritionGoals = {
-                        daily_calorie_target: formValues.calorieGoal,
-                        protein_goal: formValues.proteinGoal,
-                        carb_goal: formValues.carbGoal,
-                        fat_goal: formValues.fatGoal,
-                        target_weight: targetWeightKg,
-                        weight_goal: formValues.fitnessGoal as any,
-                    };
-
-                    // Handle the case where calorieGoal is explicitly undefined (user cleared the field)
-                    if (formValues.calorieGoal === undefined) {
-                        nutritionGoals.daily_calorie_target = 0;
-                    }
-
-                    // Also update the profile with the target weight
-                    try {
-                        const profileData = await getProfile();
-                        if (profileData && profileData.profile) {
-                            // Update the profile with the new target weight
-                            await updateProfile({
-                                ...profileData.profile,
-                                target_weight: targetWeightKg || undefined
-                            });
-                        }
-                    } catch (profileError) {
-                        console.warn('⚠️ Error updating profile target weight, continuing with nutrition goals sync', profileError);
-                    }
-
-                    await updateNutritionGoals(nutritionGoals);
-                } else {
-                    // Format fitness goals for the API (only fields supported by backend)
-                    const fitnessGoals = {
-                        weekly_workouts: formValues.weeklyWorkouts,
-                        daily_step_goal: formValues.stepGoal,
-                        water_intake_goal: formValues.waterGoal,
-                        // Note: sleep_goal is not supported by backend FitnessGoals model,
-                        // it's stored in SQLite user_profiles table only
-                    };
-
-                    await updateFitnessGoals(fitnessGoals);
-                }
-
-                console.log('✅ Goals synced to backend successfully');
-            } catch (backendError) {
-                console.warn('⚠️ Backend sync failed (non-critical), goals saved locally:', backendError);
-                // This is non-critical since SQLite (primary) save was successful
-            }
+            // Backend sync disabled - app runs in offline-only mode
+            console.log('✅ Goals saved locally - backend sync disabled for offline mode');
 
             Alert.alert('Success', 'Fitness goals updated successfully');
             navigation.goBack();
@@ -505,7 +490,7 @@ export default function EditGoals() {
                     // Use current form values for calculation
                     const profileForCalculation = {
                         ...userProfile,
-                        weight_goal: formValues.fitnessGoal || 'maintain', // default to maintain if no fitness goal set
+                        weight_goal: mapFitnessGoalToWeightGoal(formValues.fitnessGoal), // map to constraint values
                         activity_level: formValues.activityLevel || userProfile.activity_level,
                         target_weight: targetWeightKg || userProfile.target_weight
                     };
@@ -633,7 +618,7 @@ export default function EditGoals() {
                                 // Use current form values for calculation
                                 const profileForCalculation = {
                                     ...userProfile,
-                                    weight_goal: formValues.fitnessGoal || 'maintain', // default to maintain if no fitness goal set
+                                    weight_goal: mapFitnessGoalToWeightGoal(formValues.fitnessGoal), // map to constraint values
                                     activity_level: formValues.activityLevel || userProfile.activity_level,
                                     target_weight: formValues.targetWeight ? (isImperialUnits ? lbsToKg(formValues.targetWeight) : formValues.targetWeight) : userProfile.target_weight
                                 };

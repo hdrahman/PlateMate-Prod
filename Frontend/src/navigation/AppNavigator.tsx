@@ -15,6 +15,7 @@ import Settings from '../screens/Settings';
 import NotificationsScreen from '../screens/Notifications';
 import DataSharing from '../screens/DataSharing';
 import PrivacyPolicy from '../screens/PrivacyPolicy';
+import DebugOnboarding from '../components/DebugOnboarding';
 // Import other screens as needed - these would be your existing screens
 // import HomeScreen from '../screens/HomeScreen';
 // import MealLogScreen from '../screens/MealLogScreen';
@@ -33,6 +34,7 @@ type RootStackParamList = {
     Notifications: undefined;
     DataSharing: undefined;
     PrivacyPolicy: undefined;
+    DebugOnboarding: undefined;
     // Add other screens as needed
 };
 
@@ -102,6 +104,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="DataSharing" component={DataSharing} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+                <Stack.Screen name="DebugOnboarding" component={DebugOnboarding} />
                 {/* Add your other screens here */}
             </Stack.Navigator>
         </NavigationContainer>

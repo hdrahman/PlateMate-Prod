@@ -85,6 +85,25 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
     // Cheat day preferences state
     const [cheatDayEnabled, setCheatDayEnabled] = useState<boolean>(profile.cheatDayEnabled ?? false);
     const [cheatDayFrequency, setCheatDayFrequency] = useState<number>(profile.cheatDayFrequency ?? 7);
+    const [preferredCheatDayOfWeek, setPreferredCheatDayOfWeek] = useState<number | undefined>(profile.preferredCheatDayOfWeek);
+    const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
+    const [showPreferredDayPicker, setShowPreferredDayPicker] = useState(false);
+
+    // Frequency options
+    const frequencyOptions = [
+        { id: 'weekly', label: 'Weekly', days: 7 },
+        { id: 'biweekly', label: 'Biweekly', days: 14 },
+        { id: 'monthly', label: 'Monthly', days: 30 },
+    ];
+
+    // Day names
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Create picker data with "From Today" as first option
+    const dayPickerData = [
+        { value: undefined, label: 'From Today (Flexible)' },
+        ...dayNames.map((day, index) => ({ value: index, label: day }))
+    ];
 
     // Calculate recommended calories and nutrients based on profile and goals
     useEffect(() => {
@@ -228,6 +247,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             nutrientFocus: calculatedNutrients,
             cheatDayEnabled: cheatDayEnabled,
             cheatDayFrequency: cheatDayFrequency,
+            preferredCheatDayOfWeek: preferredCheatDayOfWeek,
         });
 
         // Initialize cheat day settings in database if enabled
@@ -499,22 +519,22 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                     <View style={styles.cheatDayFrequencyContainer}>
                         <Text style={styles.cheatDayFrequencyTitle}>Cheat Day Frequency</Text>
                         <View style={styles.frequencyOptions}>
-                            {[5, 7, 10, 14].map((days) => (
+                            {frequencyOptions.map((option) => (
                                 <TouchableOpacity
-                                    key={days}
+                                    key={option.id}
                                     style={[
                                         styles.frequencyOption,
-                                        cheatDayFrequency === days && styles.selectedFrequencyOption
+                                        cheatDayFrequency === option.days && styles.selectedFrequencyOption
                                     ]}
-                                    onPress={() => setCheatDayFrequency(days)}
+                                    onPress={() => setCheatDayFrequency(option.days)}
                                 >
                                     <Text
                                         style={[
                                             styles.frequencyOptionText,
-                                            cheatDayFrequency === days && styles.selectedFrequencyOptionText
+                                            cheatDayFrequency === option.days && styles.selectedFrequencyOptionText
                                         ]}
                                     >
-                                        Every {days} days
+                                        {option.label}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -522,6 +542,28 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                         <Text style={styles.cheatDayFrequencyDescription}>
                             You'll have a cheat day every {cheatDayFrequency} days
                         </Text>
+
+                        <View style={styles.preferredDayContainer}>
+                            <Text style={styles.cheatDayFrequencyTitle}>Preferred Cheat Day</Text>
+                            <TouchableOpacity
+                                style={styles.daySelector}
+                                onPress={() => setShowPreferredDayPicker(true)}
+                            >
+                                <Text style={styles.daySelectorText}>
+                                    {preferredCheatDayOfWeek !== undefined
+                                        ? dayNames[preferredCheatDayOfWeek]
+                                        : 'From Today (Flexible)'
+                                    }
+                                </Text>
+                                <Ionicons name="chevron-down" size={20} color="#fff" />
+                            </TouchableOpacity>
+                            <Text style={styles.dayHintText}>
+                                {preferredCheatDayOfWeek !== undefined
+                                    ? `Your cheat days will always fall on ${dayNames[preferredCheatDayOfWeek]}s`
+                                    : 'Choose a specific day of the week for your cheat days, or leave flexible'
+                                }
+                            </Text>
+                        </View>
                     </View>
                 )}
             </View>
@@ -543,6 +585,45 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
+
+            {/* Preferred Day Picker Modal */}
+            <Modal
+                visible={showPreferredDayPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowPreferredDayPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Preferred Cheat Day</Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowPreferredDayPicker(false)}
+                            >
+                                <Ionicons name="close" size={24} color="#999" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.dayList}>
+                            {dayPickerData.map((day, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[styles.dayOption, preferredCheatDayOfWeek === day.value && styles.selectedDay]}
+                                    onPress={() => {
+                                        setPreferredCheatDayOfWeek(day.value);
+                                        setShowPreferredDayPicker(false);
+                                    }}
+                                >
+                                    <Text style={[styles.dayText, preferredCheatDayOfWeek === day.value && styles.selectedDayText]}>
+                                        {day.label}
+                                    </Text>
+                                    {preferredCheatDayOfWeek === day.value && <Ionicons name="checkmark" size={20} color="#0074dd" />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </ScrollView>
     );
 };
@@ -917,6 +998,55 @@ const styles = StyleSheet.create({
         color: '#aaa',
         marginTop: 8,
         textAlign: 'center',
+    },
+    preferredDayContainer: {
+        marginTop: 16,
+    },
+    daySelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    daySelectorText: {
+        fontSize: 16,
+        color: '#fff',
+        fontWeight: '500',
+    },
+    dayHintText: {
+        fontSize: 12,
+        color: '#aaa',
+        marginTop: 8,
+        textAlign: 'center',
+    },
+    dayList: {
+        maxHeight: 300,
+    },
+    dayOption: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    selectedDay: {
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
+        borderBottomColor: '#0074dd',
+    },
+    dayText: {
+        color: '#fff',
+        fontSize: 16,
+        flex: 1,
+    },
+    selectedDayText: {
+        color: '#0074dd',
+        fontWeight: '600',
     },
 });
 

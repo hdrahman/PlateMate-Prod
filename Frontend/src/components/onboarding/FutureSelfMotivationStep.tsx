@@ -49,6 +49,15 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
     const [customMessage, setCustomMessage] = useState('');
     const [isCustomMode, setIsCustomMode] = useState(false);
+    const [messageType, setMessageType] = useState<'text' | 'voice' | 'video'>('text');
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingUri, setRecordingUri] = useState<string | null>(null);
+
+    const messageTypeOptions = [
+        { id: 'text', label: 'Text Message', icon: 'document-text-outline', description: 'Write a personal message' },
+        { id: 'voice', label: 'Voice Message', icon: 'mic-outline', description: 'Record an audio message' },
+        { id: 'video', label: 'Video Message', icon: 'videocam-outline', description: 'Record a video message' },
+    ];
 
     const handleTemplateSelect = (templateId: string) => {
         const template = motivationTemplates.find(t => t.id === templateId);
@@ -56,6 +65,7 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
             setSelectedTemplate(templateId);
             setCustomMessage(template.template);
             setIsCustomMode(false);
+            setMessageType('text'); // Reset to text when selecting template
         }
     };
 
@@ -63,6 +73,34 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
         setIsCustomMode(true);
         setSelectedTemplate(null);
         setCustomMessage('');
+        setRecordingUri(null);
+    };
+
+    const handleMessageTypeChange = (type: 'text' | 'voice' | 'video') => {
+        setMessageType(type);
+        setCustomMessage('');
+        setRecordingUri(null);
+        setIsRecording(false);
+    };
+
+    const startRecording = async () => {
+        // This would integrate with expo-av or react-native-audio-recorder-player
+        // For now, we'll simulate the recording process
+        setIsRecording(true);
+
+        // Simulate recording for demo purposes
+        setTimeout(() => {
+            setIsRecording(false);
+            setRecordingUri(`${messageType}_recording_${Date.now()}.${messageType === 'voice' ? 'm4a' : 'mp4'}`);
+        }, 3000);
+    };
+
+    const stopRecording = () => {
+        setIsRecording(false);
+    };
+
+    const deleteRecording = () => {
+        setRecordingUri(null);
     };
 
     const handleSkip = async () => {
@@ -74,20 +112,32 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
     };
 
     const handleSave = async () => {
-        if (!customMessage.trim()) {
-            Alert.alert('Message Required', 'Please write a message for your future self');
-            return;
+        let messageContent = '';
+        let messageTypeToSave = messageType;
+
+        if (messageType === 'text') {
+            if (!customMessage.trim()) {
+                Alert.alert('Message Required', 'Please write a message for your future self');
+                return;
+            }
+            messageContent = customMessage.trim();
+        } else {
+            if (!recordingUri) {
+                Alert.alert('Recording Required', `Please record a ${messageType} message for your future self`);
+                return;
+            }
+            messageContent = recordingUri;
         }
 
         await updateProfile({
-            futureSelfMessage: customMessage.trim(),
-            futureSelfMessageType: selectedTemplate || 'custom',
+            futureSelfMessage: messageContent,
+            futureSelfMessageType: messageTypeToSave,
             futureSelfMessageCreatedAt: new Date().toISOString(),
         });
 
         Alert.alert(
             'Message Saved! 💝',
-            'Your message has been saved and will be available as your personal motivation tool whenever you need it.',
+            `Your ${messageType} message has been saved and will be available as your personal motivation tool whenever you need it.`,
             [{ text: 'Continue', onPress: onNext }]
         );
     };
@@ -161,8 +211,43 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
 
             <View style={styles.customSection}>
                 <Text style={styles.sectionTitle}>
-                    {isCustomMode ? 'Your Personal Message' : 'Or Write Your Own'}
+                    {isCustomMode ? 'Your Personal Message' : 'Or Create Your Own'}
                 </Text>
+
+                {/* Message Type Selection */}
+                <View style={styles.messageTypeContainer}>
+                    <Text style={styles.messageTypeTitle}>Choose Message Type</Text>
+                    <View style={styles.messageTypeOptions}>
+                        {messageTypeOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option.id}
+                                style={[
+                                    styles.messageTypeButton,
+                                    messageType === option.id && styles.selectedMessageType
+                                ]}
+                                onPress={() => handleMessageTypeChange(option.id as 'text' | 'voice' | 'video')}
+                            >
+                                <Ionicons
+                                    name={option.icon as any}
+                                    size={24}
+                                    color={messageType === option.id ? '#0074dd' : '#999'}
+                                />
+                                <Text style={[
+                                    styles.messageTypeLabel,
+                                    messageType === option.id && styles.selectedMessageTypeLabel
+                                ]}>
+                                    {option.label}
+                                </Text>
+                                <Text style={[
+                                    styles.messageTypeDescription,
+                                    messageType === option.id && styles.selectedMessageTypeDescription
+                                ]}>
+                                    {option.description}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
 
                 {!isCustomMode && (
                     <TouchableOpacity
@@ -170,11 +255,12 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
                         onPress={handleCustomMode}
                     >
                         <Ionicons name="create-outline" size={20} color="#0074dd" />
-                        <Text style={styles.customButtonText}>Write Custom Message</Text>
+                        <Text style={styles.customButtonText}>Create Custom Message</Text>
                     </TouchableOpacity>
                 )}
 
-                {(isCustomMode || selectedTemplate) && (
+                {/* Text Message Input */}
+                {(isCustomMode || selectedTemplate) && messageType === 'text' && (
                     <View style={styles.messageContainer}>
                         <TextInput
                             style={styles.messageInput}
@@ -187,6 +273,68 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
                             textAlignVertical="top"
                         />
                         <Text style={styles.characterCount}>{customMessage.length}/500</Text>
+                    </View>
+                )}
+
+                {/* Voice/Video Recording Interface */}
+                {(isCustomMode || selectedTemplate) && (messageType === 'voice' || messageType === 'video') && (
+                    <View style={styles.recordingContainer}>
+                        {!recordingUri ? (
+                            <View style={styles.recordingControls}>
+                                <TouchableOpacity
+                                    style={[styles.recordButton, isRecording && styles.recordingActive]}
+                                    onPress={isRecording ? stopRecording : startRecording}
+                                    disabled={isRecording}
+                                >
+                                    <Ionicons
+                                        name={isRecording ? 'stop' : (messageType === 'voice' ? 'mic' : 'videocam')}
+                                        size={32}
+                                        color="#fff"
+                                    />
+                                </TouchableOpacity>
+                                <Text style={styles.recordingInstructions}>
+                                    {isRecording
+                                        ? `Recording ${messageType}... (3s demo)`
+                                        : `Tap to start recording your ${messageType} message`
+                                    }
+                                </Text>
+                                {isRecording && (
+                                    <View style={styles.recordingIndicator}>
+                                        <View style={styles.recordingDot} />
+                                        <Text style={styles.recordingText}>Recording...</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ) : (
+                            <View style={styles.recordingPreview}>
+                                <View style={styles.recordingInfo}>
+                                    <Ionicons
+                                        name={messageType === 'voice' ? 'musical-notes' : 'videocam'}
+                                        size={24}
+                                        color="#0074dd"
+                                    />
+                                    <Text style={styles.recordingFileName}>
+                                        {messageType === 'voice' ? 'Voice Message' : 'Video Message'} Recorded
+                                    </Text>
+                                </View>
+                                <View style={styles.recordingActions}>
+                                    <TouchableOpacity
+                                        style={styles.recordingActionButton}
+                                        onPress={() => handleMessageTypeChange(messageType)}
+                                    >
+                                        <Ionicons name="refresh" size={20} color="#0074dd" />
+                                        <Text style={styles.recordingActionText}>Re-record</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.recordingActionButton}
+                                        onPress={deleteRecording}
+                                    >
+                                        <Ionicons name="trash" size={20} color="#ff3b30" />
+                                        <Text style={[styles.recordingActionText, { color: '#ff3b30' }]}>Delete</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
                     </View>
                 )}
             </View>
@@ -207,12 +355,12 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.saveButton, (!customMessage.trim()) && styles.disabledButton]}
+                    style={[styles.saveButton, (!customMessage.trim() && !recordingUri) && styles.disabledButton]}
                     onPress={handleSave}
-                    disabled={!customMessage.trim()}
+                    disabled={!customMessage.trim() && !recordingUri}
                 >
                     <LinearGradient
-                        colors={customMessage.trim() ? ["#0074dd", "#5c00dd", "#dd0095"] : ["#666", "#666"]}
+                        colors={(customMessage.trim() || recordingUri) ? ["#0074dd", "#5c00dd", "#dd0095"] : ["#666", "#666"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.saveButtonGradient}
@@ -424,6 +572,119 @@ const styles = StyleSheet.create({
         color: '#999',
         fontSize: 12,
         marginLeft: 8,
+    },
+    messageTypeContainer: {
+        marginBottom: 24,
+    },
+    messageTypeTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 8,
+    },
+    messageTypeOptions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    messageTypeButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    selectedMessageType: {
+        borderColor: '#0074dd',
+        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+    },
+    messageTypeLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 8,
+    },
+    selectedMessageTypeLabel: {
+        color: '#0074dd',
+    },
+    messageTypeDescription: {
+        fontSize: 12,
+        color: '#999',
+    },
+    selectedMessageTypeDescription: {
+        color: '#999',
+    },
+    recordingContainer: {
+        marginBottom: 24,
+    },
+    recordingControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+    },
+    recordButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    recordingActive: {
+        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+    },
+    recordingInstructions: {
+        color: '#fff',
+        fontSize: 14,
+        marginLeft: 12,
+    },
+    recordingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 12,
+    },
+    recordingDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#fff',
+        marginRight: 8,
+    },
+    recordingText: {
+        color: '#fff',
+        fontSize: 14,
+    },
+    recordingPreview: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        padding: 16,
+    },
+    recordingInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    recordingFileName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+        marginLeft: 12,
+    },
+    recordingActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    recordingActionButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    recordingActionText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

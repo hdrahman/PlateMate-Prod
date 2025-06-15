@@ -195,6 +195,23 @@ const EditProfile = () => {
     // Add a state to track unsaved changes
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+    // Add age calculation function (same logic as BasicInfoStep.tsx)
+    const calculateAge = (dob: string): number | null => {
+        if (!dob || !/^\d{2}-\d{2}-\d{4}$/.test(dob)) return null;
+
+        const [day, month, year] = dob.split('-').map(Number);
+        const birthDate = new Date(year, month - 1, day);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+
+        return age;
+    };
+
     // Helper function to check if user has made changes to their profile
     const checkForChanges = (key: string, value: any) => {
         setHasUnsavedChanges(true);
@@ -277,6 +294,16 @@ const EditProfile = () => {
                     setSex(profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : '---');
                     setDateOfBirth(profile.date_of_birth || '---');
 
+                    // Calculate and set age from date_of_birth or use stored age
+                    if (profile.date_of_birth) {
+                        const calculatedAge = calculateAge(profile.date_of_birth);
+                        setAge(calculatedAge || profile.age || 0);
+                    } else if (profile.age) {
+                        setAge(profile.age);
+                    } else {
+                        setAge(0);
+                    }
+
                     // Set timezone
                     setTimeZone(profile.timezone || 'UTC');
 
@@ -313,10 +340,10 @@ const EditProfile = () => {
 
                 // Set gamification data
                 // Currently we don't have this in the SQLite database directly, so use default/placeholder values
-                setLevel(profile?.level || 1);
-                setXp(profile?.xp || 0);
-                setXpToNextLevel(profile?.xp_to_next_level || 100);
-                setRank(profile?.rank || 'Beginner');
+                setLevel(1);
+                setXp(0);
+                setXpToNextLevel(100);
+                setRank('Beginner');
                 setStreakDays(streak || 0);
 
                 // Set achievements (placeholder data for now)

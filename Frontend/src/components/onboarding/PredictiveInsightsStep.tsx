@@ -61,34 +61,50 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
 
         // Calculate metabolic age based on multiple factors
         const baseAge = profile.age;
-        let metabolicAgeModifier = 0;
+        let metabolicAgeAdjustment = 0;
 
-        // Activity level adjustment
-        if (profile.activityLevel === 'sedentary') metabolicAgeModifier += 5;
-        else if (profile.activityLevel === 'light') metabolicAgeModifier += 2;
-        else if (profile.activityLevel === 'moderate') metabolicAgeModifier += 0;
-        else if (profile.activityLevel === 'active') metabolicAgeModifier -= 3;
-        else if (profile.activityLevel === 'extreme') metabolicAgeModifier -= 5;
+        // BMI assessment (simplified approach for onboarding)
+        if (profile.height && profile.weight) {
+            const heightInMeters = profile.height / 100;
+            const bmi = profile.weight / (heightInMeters * heightInMeters);
 
-        // BMI adjustment
-        if (profile.height) {
-            const bmi = profile.weight / Math.pow(profile.height / 100, 2);
-            if (bmi < 18.5) metabolicAgeModifier += 2;
-            else if (bmi > 25 && bmi < 30) metabolicAgeModifier += 3;
-            else if (bmi >= 30) metabolicAgeModifier += 7;
+            if (bmi < 18.5) {
+                metabolicAgeAdjustment -= 2; // Underweight may indicate faster metabolism
+            } else if (bmi >= 25 && bmi < 30) {
+                metabolicAgeAdjustment += 3; // Overweight
+            } else if (bmi >= 30) {
+                metabolicAgeAdjustment += 6; // Obese
+            }
         }
 
-        // Sleep quality adjustment (if available)
-        if (profile.sleepQuality === 'poor') metabolicAgeModifier += 4;
-        else if (profile.sleepQuality === 'fair') metabolicAgeModifier += 2;
-        else if (profile.sleepQuality === 'excellent') metabolicAgeModifier -= 2;
+        // Activity level impact
+        switch (profile.activityLevel) {
+            case 'sedentary':
+                metabolicAgeAdjustment += 5;
+                break;
+            case 'light':
+                metabolicAgeAdjustment += 2;
+                break;
+            case 'moderate':
+                metabolicAgeAdjustment += 0; // Baseline
+                break;
+            case 'active':
+                metabolicAgeAdjustment -= 3;
+                break;
+            case 'extreme':
+                metabolicAgeAdjustment -= 5;
+                break;
+        }
 
-        // Stress level adjustment (if available)
-        if (profile.stressLevel === 'high') metabolicAgeModifier += 3;
-        else if (profile.stressLevel === 'low') metabolicAgeModifier -= 1;
+        // Weight goal consideration
+        if (profile.weightGoal?.includes('lose')) {
+            metabolicAgeAdjustment += 1; // Slight increase as we're working to improve it
+        } else if (profile.weightGoal?.includes('gain') && profile.weight && profile.targetWeight && profile.targetWeight > profile.weight) {
+            metabolicAgeAdjustment -= 1; // Trying to gain suggests healthy metabolism
+        }
 
-        const calculatedMetabolicAge = Math.max(18, baseAge + metabolicAgeModifier);
-        setMetabolicAge(Math.round(calculatedMetabolicAge));
+        const calculatedMetabolicAge = Math.max(baseAge + metabolicAgeAdjustment, 18);
+        setMetabolicAge(calculatedMetabolicAge);
     };
 
     const getMotivationalMessage = () => {
