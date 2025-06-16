@@ -9,13 +9,16 @@ import {
     Image,
     Dimensions,
     ActivityIndicator,
+    Alert,
+    Modal,
+    TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFoodLogById } from '../utils/database';
+import { getFoodLogById, updateFoodLog } from '../utils/database';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -24,6 +27,7 @@ const PRIMARY_BG = '#000000';
 const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
+const GRAY = '#8E8E93';
 const LIGHT_GRAY = '#2A2A2A';
 const PURPLE_ACCENT = '#AA00FF';
 
@@ -94,6 +98,8 @@ const FoodDetailScreen: React.FC = () => {
     const [foodData, setFoodData] = useState<FoodLogEntry | null>(null);
     const [loading, setLoading] = useState(true);
     const [imageError, setImageError] = useState(false);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editedFoodData, setEditedFoodData] = useState<Partial<FoodLogEntry>>({});
 
     useEffect(() => {
         loadFoodData();
@@ -211,8 +217,50 @@ const FoodDetailScreen: React.FC = () => {
         </View>
     );
 
-    // Render compact nutrient grid
+    // Handle edit button press
+    const handleEditPress = () => {
+        if (foodData) {
+            setEditedFoodData({
+                food_name: foodData.food_name,
+                calories: foodData.calories,
+                proteins: foodData.proteins,
+                carbs: foodData.carbs,
+                fats: foodData.fats,
+                quantity: foodData.quantity,
+                meal_type: foodData.meal_type,
+                notes: foodData.notes || '',
+            });
+            setEditModalVisible(true);
+        }
+    };
 
+    // Handle saving edited food data
+    const handleSaveEdit = async () => {
+        if (!foodData || !editedFoodData) return;
+
+        try {
+            setLoading(true);
+
+            // Update the food log entry in the database
+            await updateFoodLog(foodId, {
+                ...foodData,
+                ...editedFoodData,
+                sync_action: 'UPDATE',
+            });
+
+            // Reload the food data to show updated values
+            const updatedData = await getFoodLogById(foodId);
+            setFoodData(updatedData);
+
+            setEditModalVisible(false);
+            Alert.alert('Success', 'Food log entry updated successfully');
+        } catch (error) {
+            console.error('Error updating food log:', error);
+            Alert.alert('Error', 'Failed to update food log entry');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -309,10 +357,19 @@ const FoodDetailScreen: React.FC = () => {
                                     </View>
                                 )}
 
-                                {/* Meal type and date on the right */}
-                                <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                    {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
-                                </Text>
+                                {/* Meal type and date with edit button on the right */}
+                                <View style={styles.metaContainer}>
+                                    <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                        {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={styles.editButton}
+                                        onPress={handleEditPress}
+                                    >
+                                        <Ionicons name="pencil" size={18} color={WHITE} />
+                                        <Text style={styles.editButtonText}>Edit</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
                     </View>
@@ -357,10 +414,19 @@ const FoodDetailScreen: React.FC = () => {
                                         </View>
                                     )}
 
-                                    {/* Meal type and date on the right */}
-                                    <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                        {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
-                                    </Text>
+                                    {/* Meal type and date with edit button on the right */}
+                                    <View style={styles.metaContainer}>
+                                        <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                            {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.editButton}
+                                            onPress={handleEditPress}
+                                        >
+                                            <Ionicons name="pencil" size={18} color={WHITE} />
+                                            <Text style={styles.editButtonText}>Edit</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
                         </SafeAreaView>
@@ -477,6 +543,170 @@ const FoodDetailScreen: React.FC = () => {
                     <View style={{ height: 60 }} />
                 </View>
             </ScrollView>
+
+            {/* Edit Modal */}
+            <Modal
+                visible={editModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setEditModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Food Log</Text>
+                            <TouchableOpacity
+                                onPress={() => setEditModalVisible(false)}
+                                style={styles.modalCloseButton}
+                            >
+                                <Ionicons name="close" size={24} color={WHITE} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalContent}>
+                            {/* Food Name */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Food Name</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editedFoodData.food_name}
+                                    onChangeText={(text) => setEditedFoodData({ ...editedFoodData, food_name: text })}
+                                    placeholder="Food name"
+                                    placeholderTextColor={SUBDUED}
+                                />
+                            </View>
+
+                            {/* Calories */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Calories</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={String(editedFoodData.calories || '')}
+                                    onChangeText={(text) => setEditedFoodData({ ...editedFoodData, calories: Number(text) || 0 })}
+                                    keyboardType="numeric"
+                                    placeholder="Calories"
+                                    placeholderTextColor={SUBDUED}
+                                />
+                            </View>
+
+                            {/* Macros Row */}
+                            <View style={styles.macrosInputRow}>
+                                {/* Protein */}
+                                <View style={styles.macroInputGroup}>
+                                    <Text style={styles.inputLabel}>Protein (g)</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={String(editedFoodData.proteins || '')}
+                                        onChangeText={(text) => setEditedFoodData({ ...editedFoodData, proteins: Number(text) || 0 })}
+                                        keyboardType="numeric"
+                                        placeholder="Protein"
+                                        placeholderTextColor={SUBDUED}
+                                    />
+                                </View>
+
+                                {/* Carbs */}
+                                <View style={styles.macroInputGroup}>
+                                    <Text style={styles.inputLabel}>Carbs (g)</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={String(editedFoodData.carbs || '')}
+                                        onChangeText={(text) => setEditedFoodData({ ...editedFoodData, carbs: Number(text) || 0 })}
+                                        keyboardType="numeric"
+                                        placeholder="Carbs"
+                                        placeholderTextColor={SUBDUED}
+                                    />
+                                </View>
+
+                                {/* Fat */}
+                                <View style={styles.macroInputGroup}>
+                                    <Text style={styles.inputLabel}>Fat (g)</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={String(editedFoodData.fats || '')}
+                                        onChangeText={(text) => setEditedFoodData({ ...editedFoodData, fats: Number(text) || 0 })}
+                                        keyboardType="numeric"
+                                        placeholder="Fat"
+                                        placeholderTextColor={SUBDUED}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Quantity */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Quantity</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editedFoodData.quantity}
+                                    onChangeText={(text) => setEditedFoodData({ ...editedFoodData, quantity: text })}
+                                    placeholder="e.g., 1 serving"
+                                    placeholderTextColor={SUBDUED}
+                                />
+                            </View>
+
+                            {/* Meal Type Picker */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Meal</Text>
+                                <View style={styles.mealTypeContainer}>
+                                    {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map((meal) => (
+                                        <TouchableOpacity
+                                            key={meal}
+                                            style={[
+                                                styles.mealTypeButton,
+                                                editedFoodData.meal_type === meal && styles.mealTypeButtonActive
+                                            ]}
+                                            onPress={() => setEditedFoodData({ ...editedFoodData, meal_type: meal })}
+                                        >
+                                            <Text style={[
+                                                styles.mealTypeButtonText,
+                                                editedFoodData.meal_type === meal && styles.mealTypeButtonTextActive
+                                            ]}>
+                                                {meal}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Notes */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Notes</Text>
+                                <TextInput
+                                    style={[styles.textInput, styles.textAreaInput]}
+                                    value={editedFoodData.notes}
+                                    onChangeText={(text) => setEditedFoodData({ ...editedFoodData, notes: text })}
+                                    placeholder="Add any notes about this food"
+                                    placeholderTextColor={SUBDUED}
+                                    multiline
+                                    numberOfLines={4}
+                                    textAlignVertical="top"
+                                />
+                            </View>
+                        </ScrollView>
+
+                        {/* Save Button */}
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={handleSaveEdit}
+                        >
+                            <LinearGradient
+                                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                style={styles.saveButtonGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                            >
+                                <Text style={styles.saveButtonText}>Save Changes</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Loading Overlay */}
+            {loading && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                </View>
+            )}
         </View>
     );
 };
@@ -833,6 +1063,141 @@ const styles = StyleSheet.create({
         marginTop: 0,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
+    },
+    metaContainer: {
+        flex: 1,
+        alignItems: 'flex-end',
+    },
+    editButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        padding: 6,
+        borderRadius: 16,
+        backgroundColor: 'rgba(170, 0, 255, 0.3)',
+    },
+    editButtonText: {
+        color: WHITE,
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    modalContainer: {
+        width: '100%',
+        maxHeight: '80%',
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: LIGHT_GRAY,
+    },
+    modalTitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    modalCloseButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        padding: 16,
+    },
+    inputGroup: {
+        marginBottom: 16,
+    },
+    inputLabel: {
+        color: WHITE,
+        fontSize: 14,
+        marginBottom: 8,
+    },
+    textInput: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        color: WHITE,
+        fontSize: 16,
+    },
+    textAreaInput: {
+        height: 100,
+        paddingTop: 12,
+    },
+    macrosInputRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    macroInputGroup: {
+        width: '31%',
+    },
+    mealTypeContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    mealTypeButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        marginBottom: 8,
+        width: '48%',
+        alignItems: 'center',
+    },
+    mealTypeButtonActive: {
+        backgroundColor: PURPLE_ACCENT,
+    },
+    mealTypeButtonText: {
+        color: GRAY,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    mealTypeButtonTextActive: {
+        color: WHITE,
+        fontWeight: '600',
+    },
+    saveButton: {
+        margin: 16,
+    },
+    saveButtonGradient: {
+        borderRadius: 8,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveButtonText: {
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    loadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
     },
 });
 
