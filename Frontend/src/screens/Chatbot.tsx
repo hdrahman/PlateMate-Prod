@@ -19,7 +19,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
-import Markdown from 'react-native-markdown-display';
 import { ThemeContext } from "../ThemeContext";
 import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
@@ -709,28 +708,7 @@ export default function Chatbot() {
                     end={{ x: 1, y: 0 }}
                     style={styles.botBubbleGradient}
                   >
-                    <Markdown
-                      style={{
-                        body: styles.messageText,
-                        heading1: { ...styles.messageText, fontWeight: 'bold', fontSize: 22, marginBottom: 8, marginTop: 8 },
-                        heading2: { ...styles.messageText, fontWeight: 'bold', fontSize: 20, marginBottom: 8, marginTop: 8 },
-                        heading3: { ...styles.messageText, fontWeight: 'bold', fontSize: 18, marginBottom: 6, marginTop: 6 },
-                        heading4: { ...styles.messageText, fontWeight: 'bold', fontSize: 16, marginBottom: 4, marginTop: 4 },
-                        heading5: { ...styles.messageText, fontWeight: 'bold', fontSize: 15, marginBottom: 2, marginTop: 2 },
-                        heading6: { ...styles.messageText, fontWeight: 'bold', fontSize: 15 },
-                        paragraph: styles.messageText,
-                        strong: { ...styles.messageText, fontWeight: 'bold' },
-                        em: { ...styles.messageText, fontStyle: 'italic' },
-                        bullet_list: { marginVertical: 8 },
-                        ordered_list: { marginVertical: 8 },
-                        list_item: { flexDirection: 'row', marginVertical: 4 },
-                        bullet_list_icon: { marginRight: 6, marginTop: 5, color: 'white' },
-                        ordered_list_icon: { marginRight: 6, marginTop: 2, color: 'white' },
-                        hr: { backgroundColor: 'rgba(255,255,255,0.3)', height: 1, marginVertical: 8 }
-                      }}
-                    >
-                      {message.text}
-                    </Markdown>
+                    <Text style={styles.messageText}>{message.text}</Text>
                   </LinearGradient>
                 </View>
               ) : (
