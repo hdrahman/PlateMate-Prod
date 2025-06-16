@@ -72,9 +72,10 @@ class FatSecretService:
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
             
+            # Request the barcode scope for barcode scanning functionality
             data = {
                 'grant_type': 'client_credentials',
-                'scope': 'basic'  # Only basic scope is available
+                'scope': 'basic premier barcode'  # Including barcode scope for barcode scanning
             }
             
             logger.info(f"Requesting OAuth token with client_id: {self.client_id}")
@@ -378,9 +379,81 @@ class FatSecretService:
         return None
 
     def search_by_barcode(self, barcode: str) -> Optional[Dict[str, Any]]:
-        """Search for food by barcode - not available with basic scope"""
-        logger.info(f'Barcode scanning not available with basic scope - barcode: {barcode}')
-        return None
+        """Search for food by barcode using FatSecret Premium API"""
+        if not self._ensure_configured():
+            raise Exception('FatSecret API key not configured')
+
+        logger.info(f'Searching for food by barcode: {barcode}')
+        
+        try:
+            # Clean and validate the barcode
+            clean_barcode = barcode.strip()
+            if not clean_barcode or len(clean_barcode) < 8 or not clean_barcode.isdigit():
+                raise ValueError(f"Invalid barcode format: {barcode}")
+
+            # Ensure barcode is properly formatted as GTIN-13
+            # If it's less than 13 digits, pad with leading zeros
+            if len(clean_barcode) < 13:
+                clean_barcode = clean_barcode.zfill(13)
+            
+            # Using the new URL-based structure for barcode API as recommended in docs
+            url = f"{self.base_url}/food/barcode/find-by-id/v1"
+            
+            # Parameters for the barcode API call
+            params = {
+                'barcode': clean_barcode,
+                'format': 'json'
+            }
+            
+            # Call FatSecret barcode API endpoint using proper OAuth 2.0 authentication
+            headers = {
+                'Authorization': f'Bearer {self._get_access_token()}',
+                'Content-Type': 'application/json'
+            }
+            
+            logger.info(f"Making barcode API request to {url} for barcode: {clean_barcode}")
+            response = requests.get(url, params=params, headers=headers, timeout=15)
+            
+            logger.info(f"Barcode API response status: {response.status_code}")
+            
+            # Parse response data
+            response_data = response.json()
+            logger.info(f"Barcode API response: {json.dumps(response_data)}")
+                
+            # Check for FatSecret API errors and raise exceptions
+            if 'error' in response_data:
+                error_code = response_data['error'].get('code')
+                error_message = response_data['error'].get('message')
+                logger.error(f"FatSecret API error {error_code}: {error_message}")
+                
+                # Raise specific error for IP whitelist issue
+                if error_code == 21 and 'Invalid IP address detected' in error_message:
+                    ip_address = error_message.split("'")[1].strip() if "'" in error_message else "unknown"
+                    raise Exception(f"IP address {ip_address} not whitelisted in FatSecret API. Please add this IP to your whitelist.")
+                
+                raise Exception(f"FatSecret API error: {error_message} (code: {error_code})")
+            
+            # Extract the food_id from the response
+            food_id = None
+            if 'food_id' in response_data:
+                # Handle different response formats
+                if isinstance(response_data['food_id'], dict) and 'value' in response_data['food_id']:
+                    food_id = response_data['food_id']['value']
+                else:
+                    food_id = str(response_data['food_id'])
+            
+            if not food_id:
+                logger.warning(f"Could not extract food_id from response for barcode: {clean_barcode}")
+                return None
+            
+            logger.info(f"Found food_id: {food_id} for barcode: {clean_barcode}")
+            
+            # Get detailed food information using the food_id
+            return self.get_food_details_by_id(food_id)
+            
+        except Exception as e:
+            logger.error(f"Error searching by barcode: {str(e)}")
+            raise
 
     def _map_fatsecret_recipe_to_recipe(self, recipe_data: Dict) -> Dict[str, Any]:
         """Map FatSecret recipe response to our Recipe format"""

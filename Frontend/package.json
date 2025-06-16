@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
+    "start": "cross-env EXPO_NO_DOCTOR=1 expo start",
     "start-online": "cross-env EXPO_NO_DOCTOR=1 expo start",
     "start-dev": "expo start",
     "android": "expo start --android",
@@ -28,7 +28,9 @@
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/native-stack": "^7.2.0",
     "@react-navigation/stack": "^7.1.2",
+    "@types/base-64": "^1.0.2",
     "axios": "^1.7.9",
+    "base-64": "^1.0.0",
     "buffer": "^6.0.3",
     "d3-scale": "^4.0.2",
     "d3-shape": "^3.2.0",
@@ -60,6 +62,7 @@
     "react-native-gesture-handler": "~2.24.0",
     "react-native-get-random-values": "^1.11.0",
     "react-native-linear-gradient": "^2.8.3",
+    "react-native-markdown-display": "^7.0.2",
     "react-native-paper": "^5.13.1",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
@@ -121,7 +124,11 @@
         "listUnknownPackages": false
       },
       "checkNpmPackages": false,
-      "checkExpoSdkVersions": false
+      "checkExpoSdkVersions": false,
+      "checkVirtualizedLists": false,
+      "checkMissingDependencies": false,
+      "checkDependencyVersions": false,
+      "checkNativeModules": false
     },
     "install": {
       "exclude": [

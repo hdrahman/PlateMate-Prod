@@ -36,7 +36,7 @@ const { width, height } = Dimensions.get('window');
 
 // Navigation types
 type RootStackParamList = {
-    FoodLog: { refresh?: number };
+    'Food Log': { refresh?: number };
     BarcodeResults: { foodData: any; mealType?: string };
     BarcodeScanner: undefined;
     Manual: undefined;
@@ -288,21 +288,8 @@ const BarcodeResults: React.FC = () => {
             const result = await addFoodLog(foodLogEntry);
 
             if (result) {
-                Alert.alert(
-                    'Added Successfully!',
-                    `${foodData.food_name} has been added to your ${mealType.toLowerCase()}.`,
-                    [
-                        {
-                            text: 'View Food Log',
-                            onPress: () => navigation.navigate('FoodLog', { refresh: Date.now() })
-                        },
-                        {
-                            text: 'Scan Another',
-                            onPress: () => navigation.navigate('BarcodeScanner'),
-                            style: 'default'
-                        }
-                    ]
-                );
+                // Automatically navigate to Food Log
+                navigation.navigate('Food Log', { refresh: Date.now() });
             } else {
                 throw new Error('Failed to add food log entry');
             }

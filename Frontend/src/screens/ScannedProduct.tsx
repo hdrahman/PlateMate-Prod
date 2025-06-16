@@ -256,21 +256,8 @@ const ScannedProduct: React.FC = () => {
                 // Success haptic
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-                Alert.alert(
-                    '✅ Added Successfully!',
-                    `${foodData.food_name} has been added to your ${mealType.toLowerCase()}.`,
-                    [
-                        {
-                            text: 'View Food Log',
-                            onPress: () => navigation.navigate('Food Log', { refresh: Date.now() })
-                        },
-                        {
-                            text: 'Scan Another',
-                            onPress: () => navigation.navigate('BarcodeScanner'),
-                            style: 'default'
-                        }
-                    ]
-                );
+                // Automatically navigate to Food Log
+                navigation.navigate('Food Log', { refresh: Date.now() });
             } else {
                 throw new Error('Failed to add food log entry');
             }

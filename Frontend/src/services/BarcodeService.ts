@@ -1,5 +1,6 @@
 import { fetchFoodByBarcode as fetchFromBackend } from '../api/nutritionix';
 import { FoodItem } from '../api/nutritionix';
+import axios from 'axios';
 
 /**
  * Centralized Barcode Service
@@ -33,11 +34,61 @@ export class BarcodeService {
                 return null;
             }
 
-            // Strategy 1: Backend API (Primary and Only)
-            const backendResult = await this.tryBackend(cleanBarcode);
-            if (backendResult) {
-                console.log('✅ Success with Backend API');
-                return this.enhanceResult(backendResult, 'backend');
+            // Add a retry mechanism for network reliability
+            const maxRetries = 2;
+            let currentRetry = 0;
+            let lastError = null;
+
+            while (currentRetry <= maxRetries) {
+                try {
+                    if (currentRetry > 0) {
+                        console.log(`Retry attempt ${currentRetry} of ${maxRetries}...`);
+                        // Short delay between retries
+                        await new Promise(resolve => setTimeout(resolve, 1000 * currentRetry));
+                    }
+
+                    // Strategy: Backend API
+                    console.log('🥗 Trying Backend API...');
+                    const backendResult = await fetchFromBackend(cleanBarcode);
+
+                    if (backendResult) {
+                        console.log('✅ Success with Backend API');
+                        return backendResult;
+                    }
+
+                    // If we get here without an exception but no result, we got a proper 404
+                    // No need to retry in this case
+                    break;
+
+                } catch (error) {
+                    lastError = error;
+
+                    // Special handling for IP whitelist errors - don't retry these
+                    const errorMsg = error.message || '';
+                    if (errorMsg.includes('not whitelisted in FatSecret API') ||
+                        errorMsg.includes('IP whitelist error')) {
+                        console.error('⚠️ FatSecret API IP whitelist error - need to whitelist server IP');
+                        throw new Error('The barcode scanning service requires IP whitelisting. Please contact your administrator.');
+                    }
+
+                    if (axios.isAxiosError(error)) {
+                        // Don't retry for certain error codes
+                        if (error.response?.status === 404) {
+                            console.log('Barcode not found (404) - no need to retry');
+                            break;
+                        }
+                        if (error.response?.status === 400) {
+                            console.log('Bad request (400) - no need to retry');
+                            break;
+                        }
+                    }
+
+                    currentRetry++;
+                    if (currentRetry > maxRetries) {
+                        console.warn(`⚠️ All retry attempts failed`);
+                        break;
+                    }
+                }
             }
 
             console.log('❌ No results found');
@@ -45,6 +96,16 @@ export class BarcodeService {
 
         } catch (error) {
             console.error('💥 BarcodeService error:', error);
+
+            // Re-throw IP whitelist errors so they can be displayed to the user
+            if (error.message && (
+                error.message.includes('not whitelisted in FatSecret API') ||
+                error.message.includes('IP whitelist error') ||
+                error.message.includes('requires IP whitelisting')
+            )) {
+                throw error;
+            }
+
             return null;
         }
     }
@@ -62,31 +123,6 @@ export class BarcodeService {
     private isValidBarcode(barcode: string): boolean {
         // UPC-A (12 digits), EAN-13 (13 digits), etc.
         return barcode.length >= 8 && barcode.length <= 14 && /^\d+$/.test(barcode);
-    }
-
-    /**
-     * Try Backend API
-     */
-    private async tryBackend(barcode: string): Promise<FoodItem | null> {
-        try {
-            console.log('🥗 Trying Backend API...');
-            return await fetchFromBackend(barcode);
-        } catch (error) {
-            console.warn('⚠️ Backend API failed:', error);
-            return null;
-        }
-    }
-
-
-
-    /**
-     * Enhance result with metadata
-     */
-    private enhanceResult(foodItem: FoodItem, source: 'backend'): FoodItem {
-        return {
-            ...foodItem,
-            notes: foodItem.notes ? `${foodItem.notes} | Source: ${source}` : `Source: ${source}`
-        };
     }
 
     /**

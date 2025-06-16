@@ -472,6 +472,14 @@ const Analytics: React.FC = () => {
         }
     };
 
+    const getProgressTitle = (period: '7d' | '30d' | '90d') => {
+        switch (period) {
+            case '7d': return "This Week's Progress";
+            case '30d': return "This Month's Progress";
+            case '90d': return "Last Quarter's Progress";
+        }
+    };
+
     const renderHeader = () => (
         <View style={[styles.headerSafeArea, { paddingTop: insets.top }]}>
             <View style={styles.header}>
@@ -555,23 +563,242 @@ const Analytics: React.FC = () => {
         </GradientCard>
     );
 
+    const renderNutritionTrendsChart = () => {
+        if (macroTrends.length === 0) return null;
+
+        // Get the full period data
+        const periodLength = selectedPeriod === '7d' ? 7 : selectedPeriod === '30d' ? 30 : 90;
+        const periodData = macroTrends.slice(-periodLength);
+
+        // Determine how to sample data based on period
+        let sampledData;
+        let labelFormat;
+
+        if (selectedPeriod === '7d') {
+            // For 7-day view, show all daily data points
+            sampledData = periodData;
+            labelFormat = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' })[0];
+        } else if (selectedPeriod === '30d') {
+            // For 30-day view, use fixed weekly points
+            sampledData = [];
+
+            // Get number of weeks (roughly 4)
+            const numWeeks = Math.ceil(periodData.length / 7);
+
+            // For each week, calculate the average
+            for (let i = 0; i < numWeeks; i++) {
+                const weekStart = periodData.length - (i + 1) * 7;  // Start from the end
+                const weekEnd = periodData.length - i * 7 - 1;
+
+                // Ensure valid indices
+                const validStart = Math.max(0, weekStart);
+                const validEnd = Math.min(weekEnd, periodData.length - 1);
+
+                const weekData = periodData.slice(validStart, validEnd + 1);
+
+                // Only add if we have data
+                if (weekData.length > 0) {
+                    // Calculate averages for the week
+                    const avgCalories = weekData.reduce((sum, day) => sum + (day.calories || 0), 0) / weekData.length;
+                    const avgProtein = weekData.reduce((sum, day) => sum + (day.protein || 0), 0) / weekData.length;
+                    const avgCarbs = weekData.reduce((sum, day) => sum + (day.carbs || 0), 0) / weekData.length;
+                    const avgFat = weekData.reduce((sum, day) => sum + (day.fat || 0), 0) / weekData.length;
+
+                    // Use the middle of the week for the date
+                    const dateIndex = Math.floor((validStart + validEnd) / 2);
+                    const weekDate = periodData[dateIndex]?.date || periodData[validStart]?.date;
+
+                    sampledData.unshift({  // Add to beginning to keep chronological order
+                        date: weekDate,
+                        calories: avgCalories,
+                        protein: avgProtein,
+                        carbs: avgCarbs,
+                        fat: avgFat,
+                        exerciseCalories: 0
+                    });
+                }
+            }
+
+            // Simple week numbers for labels
+            labelFormat = (_, index) => `W${index + 1}`;
+
+        } else {
+            // For 90-day view, use monthly samples
+            sampledData = [];
+
+            // Determine unique months in the data
+            const months = new Set();
+
+            // Group by month
+            periodData.forEach(day => {
+                const date = new Date(day.date);
+                const monthYear = `${date.getFullYear()}-${date.getMonth()}`;
+                months.add(monthYear);
+            });
+
+            // Process each unique month
+            const monthsArray = Array.from(months);
+            monthsArray.forEach(monthYear => {
+                // Get all days in this month
+                const monthData = periodData.filter(day => {
+                    const date = new Date(day.date);
+                    return `${date.getFullYear()}-${date.getMonth()}` === monthYear;
+                });
+
+                if (monthData.length > 0) {
+                    // Calculate averages for the month
+                    const avgCalories = monthData.reduce((sum, day) => sum + (day.calories || 0), 0) / monthData.length;
+                    const avgProtein = monthData.reduce((sum, day) => sum + (day.protein || 0), 0) / monthData.length;
+                    const avgCarbs = monthData.reduce((sum, day) => sum + (day.carbs || 0), 0) / monthData.length;
+                    const avgFat = monthData.reduce((sum, day) => sum + (day.fat || 0), 0) / monthData.length;
+
+                    sampledData.push({
+                        date: monthData[0].date, // Use the first day of the month for the date
+                        calories: avgCalories,
+                        protein: avgProtein,
+                        carbs: avgCarbs,
+                        fat: avgFat,
+                        exerciseCalories: 0
+                    });
+                }
+            });
+
+            // Sort by date
+            sampledData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+            // For 90-day period, use month abbreviations
+            labelFormat = (dateStr: string) => {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', { month: 'short' });
+            };
+        }
+
+        // Safety check - if we don't have any data after sampling, use original data points
+        if (sampledData.length === 0 && periodData.length > 0) {
+            // Fall back to showing all the data we have
+            sampledData = periodData;
+            labelFormat = (dateStr: string) => {
+                const date = new Date(dateStr);
+                return date.getDate().toString();
+            };
+        }
+
+        // Make sure we have at least one valid data point
+        if (sampledData.length === 0) return null;
+
+        // Find the max value for scaling
+        const maxCalories = Math.max(...sampledData.map(t => t.calories || 0), 1);  // Minimum of 1 to avoid division by zero
+        const chartHeight = 150;
+
+        return (
+            <GradientCard style={styles.cardContainer}>
+                <Text style={styles.cardTitle}>Nutrition Trends</Text>
+                <Text style={styles.chartSubtitle}>
+                    {selectedPeriod === '7d' ? 'Daily averages' :
+                        selectedPeriod === '30d' ? 'Weekly averages' : 'Monthly averages'}
+                </Text>
+
+                <View style={styles.chartLegend}>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <Text style={styles.legendText}>Calories</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <Text style={styles.legendText}>Protein</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <Text style={styles.legendText}>Carbs</Text>
+                    </View>
+                </View>
+
+                <View style={styles.chartContainer}>
+                    {/* Bar chart visualization with appropriate sampling */}
+                    <View style={styles.chartBars}>
+                        {sampledData.map((day, index) => {
+                            const calorieHeight = ((day.calories || 0) / maxCalories) * chartHeight;
+                            const proteinHeight = ((day.protein || 0) * 4 / maxCalories) * chartHeight; // Convert to calories
+                            const carbsHeight = ((day.carbs || 0) * 4 / maxCalories) * chartHeight;     // Convert to calories
+
+                            return (
+                                <View key={index} style={styles.barGroup}>
+                                    <View style={styles.barContainer}>
+                                        {/* Calories bar */}
+                                        <View
+                                            style={[
+                                                styles.bar,
+                                                {
+                                                    height: Math.max(calorieHeight, 1), // Minimum height of 1
+                                                    backgroundColor: COLORS.ACCENT_PURPLE
+                                                }
+                                            ]}
+                                        />
+                                        {/* Protein bar */}
+                                        <View
+                                            style={[
+                                                styles.bar,
+                                                {
+                                                    height: Math.max(proteinHeight, 1), // Minimum height of 1
+                                                    backgroundColor: COLORS.ACCENT_GREEN,
+                                                    width: 4,
+                                                    marginLeft: 2
+                                                }
+                                            ]}
+                                        />
+                                        {/* Carbs bar */}
+                                        <View
+                                            style={[
+                                                styles.bar,
+                                                {
+                                                    height: Math.max(carbsHeight, 1), // Minimum height of 1
+                                                    backgroundColor: COLORS.ACCENT_BLUE,
+                                                    width: 4,
+                                                    marginLeft: 1
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.barLabel}>
+                                        {typeof labelFormat === 'function' ?
+                                            (selectedPeriod === '30d' ? labelFormat(day.date, index) : labelFormat(day.date)) :
+                                            `W${index + 1}`}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                </View>
+            </GradientCard>
+        );
+    };
+
     const renderWeeklyProgress = () => {
         if (macroTrends.length === 0) return null;
 
-        const recentWeek = macroTrends.slice(-7);
-        const avgCalories = recentWeek.reduce((sum, day) => sum + day.calories, 0) / recentWeek.length;
+        // Get the appropriate data based on selected period
+        const periodLength = selectedPeriod === '7d' ? 7 : selectedPeriod === '30d' ? 30 : 90;
+        const periodData = macroTrends.slice(-periodLength);
+
+        // Calculate days on track for the selected period
         const targetCalories = userGoals?.targetCalories || calculateTDEE(userProfile).targetCalories;
-        const daysOnTrack = recentWeek.filter(day =>
+        const daysOnTrack = periodData.filter(day =>
             day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
         ).length;
 
+        // Calculate average calories for the selected period
+        const avgCalories = periodData.reduce((sum, day) => sum + day.calories, 0) / periodData.length;
+
+        // Calculate average protein for the selected period
+        const avgProtein = periodData.reduce((sum, day) => sum + day.protein, 0) / periodData.length;
+
         return (
             <GradientCard style={styles.progressCard}>
-                <Text style={styles.cardTitle}>This Week's Progress</Text>
+                <Text style={styles.cardTitle}>{getProgressTitle(selectedPeriod)}</Text>
 
                 <View style={styles.weeklyStats}>
                     <View style={styles.weeklyStat}>
-                        <Text style={styles.weeklyStatNumber}>{daysOnTrack}/7</Text>
+                        <Text style={styles.weeklyStatNumber}>{daysOnTrack}/{periodLength}</Text>
                         <Text style={styles.weeklyStatLabel}>Days on track</Text>
                     </View>
                     <View style={styles.weeklyStat}>
@@ -584,30 +811,105 @@ const Analytics: React.FC = () => {
                     </View>
                     <View style={styles.weeklyStat}>
                         <Text style={[styles.weeklyStatNumber, {
-                            color: Math.round(avgDailyNutrition.protein) >= (userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: Math.round(avgProtein) >= (userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
                         }]}>
-                            {Math.round(avgDailyNutrition.protein)}g
+                            {Math.round(avgProtein)}g
                         </Text>
                         <Text style={styles.weeklyStatLabel}>Avg protein</Text>
                     </View>
                 </View>
 
-                {/* Simple 7-day visual */}
-                <View style={styles.weekDaysContainer}>
-                    {recentWeek.map((day, index) => {
-                        const isOnTrack = day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1;
-                        return (
-                            <View key={index} style={styles.dayIndicator}>
-                                <View style={[styles.dayDot, {
-                                    backgroundColor: isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
-                                }]} />
-                                <Text style={styles.dayAbbrev}>
-                                    {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })[0]}
-                                </Text>
-                            </View>
-                        );
-                    })}
-                </View>
+                {/* Determine number of indicators based on period */}
+                {selectedPeriod === '7d' ? (
+                    // For 7-day view, show daily indicators
+                    <View style={styles.weekDaysContainer}>
+                        {periodData.map((day, index) => {
+                            const isLogged = day.calories > 0;
+                            const isOnTrack = day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1;
+
+                            return (
+                                <View key={index} style={styles.dayIndicator}>
+                                    <View style={[styles.dayDot, {
+                                        backgroundColor: !isLogged ? COLORS.LIGHT_GRAY :
+                                            isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                    }]} />
+                                    <Text style={styles.dayAbbrev}>
+                                        {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })[0]}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                ) : selectedPeriod === '30d' ? (
+                    // For 30-day view, show 4 weekly indicators
+                    <View style={styles.longPeriodDotsContainer}>
+                        {Array.from({ length: 4 }).map((_, i) => {
+                            // Each dot represents 1 week (7 days)
+                            const startIdx = i * 7;
+                            const endIdx = Math.min((i + 1) * 7 - 1, periodData.length - 1);
+
+                            // Get data for this week
+                            const weekData = periodData.slice(startIdx, endIdx + 1);
+                            const hasLoggedDays = weekData.some(day => day.calories > 0);
+
+                            // Calculate if this week is on track (more than 50% of logged days on target)
+                            const loggedDays = weekData.filter(day => day.calories > 0);
+                            const onTrackDays = loggedDays.filter(day =>
+                                day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
+                            );
+
+                            const isOnTrack = loggedDays.length > 0 &&
+                                (onTrackDays.length / loggedDays.length) >= 0.5;
+
+                            return (
+                                <View key={i} style={styles.dayIndicator}>
+                                    <View style={[styles.dayDot, {
+                                        backgroundColor: !hasLoggedDays ? COLORS.LIGHT_GRAY :
+                                            isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                    }]} />
+                                    <Text style={styles.dayAbbrev}>
+                                        W{i + 1}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                ) : (
+                    // For 90-day view, show 12 weekly indicators (approximately 3 months)
+                    <View style={styles.longPeriodDotsContainer}>
+                        {Array.from({ length: 12 }).map((_, i) => {
+                            // For 90 days (approximately 13 weeks), each dot represents roughly 1 week
+                            const weeksPerDot = 90 / 12 / 7;
+                            const startIdx = Math.floor(i * 7 * weeksPerDot);
+                            const endIdx = Math.min(Math.floor((i + 1) * 7 * weeksPerDot) - 1, periodData.length - 1);
+
+                            // Get data for this week segment
+                            const weekData = periodData.slice(startIdx, endIdx + 1);
+                            const hasLoggedDays = weekData.some(day => day.calories > 0);
+
+                            // Calculate if this week is on track (more than 50% of logged days on target)
+                            const loggedDays = weekData.filter(day => day.calories > 0);
+                            const onTrackDays = loggedDays.filter(day =>
+                                day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
+                            );
+
+                            const isOnTrack = loggedDays.length > 0 &&
+                                (onTrackDays.length / loggedDays.length) >= 0.5;
+
+                            return (
+                                <View key={i} style={styles.dayIndicator}>
+                                    <View style={[styles.dayDot, {
+                                        backgroundColor: !hasLoggedDays ? COLORS.LIGHT_GRAY :
+                                            isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                    }]} />
+                                    <Text style={styles.dayAbbrev}>
+                                        W{i + 1}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
             </GradientCard>
         );
     };
@@ -891,12 +1193,11 @@ const Analytics: React.FC = () => {
                 {renderPeriodSelector()}
                 {renderNutritionScore()}
                 {renderMacroBreakdown()}
+                {renderNutritionTrendsChart()}
                 {renderWeeklyProgress()}
                 {renderQuickWins()}
                 {renderPredictiveInsights()}
                 {renderInsights()}
-
-
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
@@ -1110,6 +1411,7 @@ const styles = StyleSheet.create({
     },
     dayIndicator: {
         alignItems: 'center',
+        minWidth: 30,
     },
     dayDot: {
         width: 12,
@@ -1221,6 +1523,101 @@ const styles = StyleSheet.create({
         color: COLORS.SUBDUED,
         fontSize: 12,
         lineHeight: 16,
+    },
+    // Chart styles
+    chartSubtitle: {
+        color: COLORS.SUBDUED,
+        fontSize: 14,
+        marginTop: -10,
+        marginBottom: 15,
+    },
+    chartContainer: {
+        height: 180,
+        marginTop: 10,
+    },
+    chartBars: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: 150,
+    },
+    barGroup: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    barContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        height: 150,
+    },
+    bar: {
+        width: 6,
+        borderRadius: 3,
+        backgroundColor: COLORS.ACCENT_PURPLE,
+    },
+    barLabel: {
+        color: COLORS.SUBDUED,
+        fontSize: 10,
+        marginTop: 4,
+    },
+    chartLegend: {
+        flexDirection: 'row',
+        marginBottom: 10,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    legendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 5,
+    },
+    legendText: {
+        color: COLORS.SUBDUED,
+        fontSize: 12,
+    },
+
+    // Progress styles
+    progressBar: {
+        height: 20,
+        backgroundColor: COLORS.CARD_BG,
+        borderRadius: 10,
+        marginVertical: 10,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 10,
+    },
+    progressSummary: {
+        color: COLORS.SUBDUED,
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 5,
+    },
+    progressSummaryContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    longPeriodDotsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 10,
+        flexWrap: 'wrap',
+        marginTop: 20,
+        marginBottom: 10,
+    },
+    longPeriodDayIndicator: {
+        alignItems: 'center',
+        marginHorizontal: 2,
+        marginVertical: 5,
     },
 });
 

@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
+import Markdown from 'react-native-markdown-display';
 import { ThemeContext } from "../ThemeContext";
 import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
@@ -85,6 +86,7 @@ export default function Chatbot() {
   const [contextActive, setContextActive] = useState(false);
   const [contextData, setContextData] = useState<UserContext | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
+  const [isNutritionistMode, setIsNutritionistMode] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const dot1Opacity = useRef(new Animated.Value(0.4)).current;
   const dot2Opacity = useRef(new Animated.Value(0.4)).current;
@@ -246,12 +248,22 @@ export default function Chatbot() {
   useEffect(() => {
     const params = route.params as any;
     if (params?.nutritionData && params?.autoStart) {
+      // Set nutritionist mode if specified
+      if (params?.isNutritionistMode) {
+        setIsNutritionistMode(true);
+        // Reset messages to start a clean nutritionist session
+        setMessages([]);
+      }
+
+      // Turn on context mode
+      setContextActive(true);
+
       // Call DeepSeek V3 for nutrition analysis via secure backend
-      handleNutritionAnalysis(params.nutritionData);
+      handleNutritionAnalysis(params.nutritionData, params.nutritionAnalysisPrompt);
     }
   }, [route.params]);
 
-  const handleNutritionAnalysis = async (nutritionData: any) => {
+  const handleNutritionAnalysis = async (nutritionData: any, customPrompt?: string) => {
     try {
       setIsLoading(true);
       setIsTyping(true);
@@ -272,12 +284,17 @@ export default function Chatbot() {
       // Call secure backend endpoint for DeepSeek V3 analysis
       const response = await axios.post(
         `${BACKEND_BASE_URL}/deepseek/nutrition-analysis`,
-        { nutritionData, autoStart: true },
+        {
+          nutritionData,
+          autoStart: true,
+          customPrompt: customPrompt || ""
+        },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 65000  // Set 65-second timeout to match backend's 60s timeout with a buffer
         }
       );
 
@@ -301,11 +318,14 @@ export default function Chatbot() {
 
       let errorMessage = "Hey there! I'm ready to help you with your nutrition goals today. What would you like to discuss about your health journey?";
 
-      // Handle specific authentication errors
+      // Handle specific error types
       if (error.message?.includes('Authentication failed') || error.message?.includes('User not authenticated')) {
         errorMessage = "Looks like you need to sign in again to get your personalized nutrition analysis. Please check your authentication and try again!";
       } else if (error.response?.status === 401 || error.response?.status === 403) {
         errorMessage = "I need you to be signed in to provide personalized nutrition coaching. Please check your login and try again!";
+      } else if (error.response?.status === 504 || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        // Handle timeout errors specifically
+        errorMessage = "I'm sorry, but generating your nutrition analysis is taking longer than expected. This might happen with complex food logs. Please try again or simplify your request if this persists.";
       }
 
       const fallbackMessage: Message = {
@@ -427,7 +447,8 @@ export default function Chatbot() {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
-            }
+            },
+            timeout: 65000  // Set 65-second timeout to match backend's 60s timeout with a buffer
           }
         );
       } else {
@@ -458,7 +479,8 @@ export default function Chatbot() {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
-            }
+            },
+            timeout: 65000  // Set 65-second timeout to match backend's 60s timeout with a buffer
           }
         );
       }
@@ -544,9 +566,12 @@ export default function Chatbot() {
 
       let botErrorText = "Hey, I'm having a little trouble connecting right now. Let's try again in a moment - I'm here to help you maximize your potential!";
 
-      // Handle authentication errors with specific messaging
+      // Handle different error types with specific messaging
       if (error instanceof Error && (error.message.includes('Authentication') || error.message.includes('sign in'))) {
         botErrorText = "Looks like you need to sign in again to continue our conversation. Please check your authentication and come back - I'll be here to help!";
+      } else if (error.response?.status === 504 || error.code === 'ECONNABORTED' || (error instanceof Error && error.message.includes('timeout'))) {
+        // Handle timeout errors specifically
+        botErrorText = "I'm sorry, but my response is taking longer than expected to generate. This can happen with complex questions. Please try again with a simpler query if this persists.";
       }
 
       const errorMessage: Message = {
@@ -684,7 +709,28 @@ export default function Chatbot() {
                     end={{ x: 1, y: 0 }}
                     style={styles.botBubbleGradient}
                   >
-                    <Text style={styles.messageText}>{message.text}</Text>
+                    <Markdown
+                      style={{
+                        body: styles.messageText,
+                        heading1: { ...styles.messageText, fontWeight: 'bold', fontSize: 22, marginBottom: 8, marginTop: 8 },
+                        heading2: { ...styles.messageText, fontWeight: 'bold', fontSize: 20, marginBottom: 8, marginTop: 8 },
+                        heading3: { ...styles.messageText, fontWeight: 'bold', fontSize: 18, marginBottom: 6, marginTop: 6 },
+                        heading4: { ...styles.messageText, fontWeight: 'bold', fontSize: 16, marginBottom: 4, marginTop: 4 },
+                        heading5: { ...styles.messageText, fontWeight: 'bold', fontSize: 15, marginBottom: 2, marginTop: 2 },
+                        heading6: { ...styles.messageText, fontWeight: 'bold', fontSize: 15 },
+                        paragraph: styles.messageText,
+                        strong: { ...styles.messageText, fontWeight: 'bold' },
+                        em: { ...styles.messageText, fontStyle: 'italic' },
+                        bullet_list: { marginVertical: 8 },
+                        ordered_list: { marginVertical: 8 },
+                        list_item: { flexDirection: 'row', marginVertical: 4 },
+                        bullet_list_icon: { marginRight: 6, marginTop: 5, color: 'white' },
+                        ordered_list_icon: { marginRight: 6, marginTop: 2, color: 'white' },
+                        hr: { backgroundColor: 'rgba(255,255,255,0.3)', height: 1, marginVertical: 8 }
+                      }}
+                    >
+                      {message.text}
+                    </Markdown>
                   </LinearGradient>
                 </View>
               ) : (

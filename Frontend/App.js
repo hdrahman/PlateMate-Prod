@@ -20,6 +20,8 @@ import { FoodLogProvider } from './src/context/FoodLogContext';
 
 // Import Firebase to ensure it's properly recognized
 import { app, auth } from './src/utils/firebase/index';
+// Import token manager for optimized authentication
+import tokenManager from './src/utils/firebase/tokenManager';
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
@@ -369,64 +371,60 @@ function AppNavigator() {
 }
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
+  const [appIsReady, setAppIsReady] = useState(false);
 
-  // Initialize app data
   useEffect(() => {
+    // Initialize token manager for optimized authentication
+    tokenManager.initBackgroundRefresh();
+
+    // Initialize other app components
+    const initApp = async () => {
+      try {
+        // Initialize SQLite database
+        await getDatabase();
+
+        // Start background sync service
+        startPeriodicSync();
+
+        // Setup online sync
+        setupOnlineSync();
+
+        // App is ready
+        setAppIsReady(true);
+      } catch (e) {
+        console.error("Initialization error:", e);
+        setAppIsReady(true); // Set ready anyway to avoid blocking UI
+      }
+    };
+
     initApp();
   }, []);
 
-  const initApp = async () => {
-    try {
-      // Initialize the database
-      await getDatabase();
-      console.log("Database initialized successfully");
-
-      // Start periodic sync
-      startPeriodicSync();
-      console.log("Periodic sync started");
-
-      // Setup online sync
-      setupOnlineSync();
-      console.log("Online sync setup complete");
-
-      // App is ready
-      setIsReady(true);
-    } catch (error) {
-      console.error("Error initializing app:", error);
-      // Still mark as ready to avoid getting stuck
-      setIsReady(true);
-    }
-  };
-
-  if (!isReady) {
+  if (!appIsReady) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#0074dd" />
-        <Text style={{ color: '#fff', marginTop: 10 }}>Loading...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator color="#FF00F5" size="large" />
       </View>
     );
   }
 
   return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <SafeAreaProvider>
-        <AuthProvider>
-          <OnboardingProvider>
-            <ThemeProvider>
-              <StepProvider>
-                <FavoritesProvider>
-                  <FoodLogProvider>
-                    <AppNavigator />
-                  </FoodLogProvider>
-                </FavoritesProvider>
-              </StepProvider>
-            </ThemeProvider>
-          </OnboardingProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <OnboardingProvider>
+          <ThemeProvider>
+            <StepProvider>
+              <FavoritesProvider>
+                <FoodLogProvider>
+                  <StatusBar barStyle="light-content" backgroundColor="black" />
+                  <AppNavigator />
+                </FoodLogProvider>
+              </FavoritesProvider>
+            </StepProvider>
+          </ThemeProvider>
+        </OnboardingProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

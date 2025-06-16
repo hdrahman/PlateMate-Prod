@@ -22,8 +22,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.platemate.app",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.platemate.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,6 +41,14 @@
       "eas": {
         "projectId": "platemate-e8f63"
       }
+    },
+    "doctor": {
+      "checkNpmPackages": false,
+      "checkExpoSdkVersions": false,
+      "checkVirtualizedLists": false,
+      "checkMissingDependencies": false,
+      "checkDependencyVersions": false,
+      "checkNativeModules": false
     }
   }
 }

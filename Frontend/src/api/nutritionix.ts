@@ -1,6 +1,7 @@
 import { BACKEND_URL } from '../utils/config';
 import axios from 'axios';
 import { auth } from '../utils/firebase/index';
+import tokenManager from '../utils/firebase/tokenManager';
 
 // Backend API base URL
 const BACKEND_BASE_URL = BACKEND_URL;
@@ -11,6 +12,8 @@ const BACKEND_BASE_URL = BACKEND_URL;
 const getAuthHeaders = async () => {
     try {
         console.log('Getting auth headers...');
+
+        // First, try to get user from auth
         const user = auth.currentUser;
         console.log('Current user:', user ? 'Authenticated' : 'Not authenticated');
 
@@ -19,8 +22,11 @@ const getAuthHeaders = async () => {
             console.log('User email:', user.email);
 
             try {
-                const token = await user.getIdToken(true);
-                // Token logging removed for production security
+                // Use tokenManager for faster token retrieval
+                console.time('tokenRetrieval');
+                const token = await tokenManager.getToken();
+                console.timeEnd('tokenRetrieval');
+
                 return {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -228,59 +234,65 @@ export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | nu
         const headers = await getAuthHeaders();
         console.log('Using headers:', Object.keys(headers));
 
-        const response = await axios.get(
-            `${BACKEND_BASE_URL}/food/barcode/${cleanBarcode}`,
-            { headers }
-        );
+        // Try POST method first for more reliable handling
+        try {
+            console.log(`Attempting POST request to ${BACKEND_BASE_URL}/food/barcode`);
 
-        console.log('Backend barcode response:', response.data);
-        return response.data || null;
+            const response = await axios.post(
+                `${BACKEND_BASE_URL}/food/barcode`,
+                {
+                    barcode: cleanBarcode
+                },
+                { headers }
+            );
+
+            console.log('Backend barcode POST response success:', response.status);
+            return response.data;
+
+        } catch (postError) {
+            console.log('POST request failed, falling back to GET endpoint');
+
+            // Check if this is an IP whitelist error
+            if (axios.isAxiosError(postError) && postError.response?.status === 403) {
+                const errorMsg = postError.response?.data?.detail || '';
+                if (errorMsg.includes('not whitelisted in FatSecret API')) {
+                    console.error('FatSecret API IP whitelist error:', errorMsg);
+                    throw new Error(`IP whitelist error: ${errorMsg}`);
+                }
+            }
+
+            // Fall back to GET method if POST fails
+            const response = await axios.get(
+                `${BACKEND_BASE_URL}/food/barcode/${cleanBarcode}`,
+                { headers }
+            );
+
+            console.log('Backend barcode GET response status:', response.status);
+            return response.data;
+        }
     } catch (error) {
         console.error('Error searching for barcode:', error);
+
         if (axios.isAxiosError(error)) {
             if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
-                console.error('Error details:', error.response?.data);
-            } else if (error.response?.status === 404) {
-                const errorData = error.response?.data;
-                if (errorData && typeof errorData === 'object' && 'detail' in errorData) {
-                    if (errorData.detail.includes('Premier subscription')) {
-                        console.log('Barcode scanning requires FatSecret Premier subscription');
-                        // Return a special object to indicate premium subscription required
-                        return {
-                            food_name: 'Premium Feature Required',
-                            brand_name: 'Barcode Scanning',
-                            calories: 0,
-                            proteins: 0,
-                            carbs: 0,
-                            fats: 0,
-                            fiber: 0,
-                            sugar: 0,
-                            saturated_fat: 0,
-                            polyunsaturated_fat: 0,
-                            monounsaturated_fat: 0,
-                            trans_fat: 0,
-                            cholesterol: 0,
-                            sodium: 0,
-                            potassium: 0,
-                            vitamin_a: 0,
-                            vitamin_c: 0,
-                            calcium: 0,
-                            iron: 0,
-                            image: '',
-                            serving_unit: 'subscription',
-                            serving_weight_grams: 0,
-                            serving_qty: 0,
-                            healthiness_rating: 0,
-                            notes: 'Barcode scanning requires FatSecret Premier subscription. Please add this item manually or search by name.'
-                        };
-                    }
+                // Special handling for IP whitelist errors
+                const errorMsg = error.response?.data?.detail || '';
+                if (errorMsg.includes('not whitelisted in FatSecret API')) {
+                    console.error('FatSecret API IP whitelist error. Contact administrator to whitelist server IP.');
+                    throw new Error('The server\'s IP address is not whitelisted in FatSecret API. Please contact your administrator to add the server\'s IP to the FatSecret whitelist.');
+                } else {
+                    console.error('Authentication failed - please log in again');
                 }
+            } else if (error.response?.status === 404) {
                 console.log('Barcode not found in database');
             } else if (error.response?.status === 500) {
                 console.error('Server error:', error.response?.data);
+            } else if (error.code === 'ECONNABORTED') {
+                console.error('Request timeout - network may be slow');
+            } else if (!error.response) {
+                console.error('Network error - please check your connection');
             }
         }
-        return null;
+        throw error;  // Rethrow so caller can handle
     }
 }; 

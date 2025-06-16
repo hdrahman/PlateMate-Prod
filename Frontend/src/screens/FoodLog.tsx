@@ -139,6 +139,7 @@ const DiaryScreen: React.FC = () => {
     const [nutritionGoals, setNutritionGoals] = useState(getDefaultNutritionGoals());
     const [profileLoading, setProfileLoading] = useState(true);
     const [userStreak, setUserStreak] = useState(0);
+    const [userProfile, setUserProfile] = useState<any>(null);
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -463,41 +464,66 @@ const DiaryScreen: React.FC = () => {
                 setProfileLoading(true);
                 // Get user profile from local database
                 const profile = await getUserProfileByFirebaseUid(user.uid);
+                setUserProfile(profile); // Store the profile data for use elsewhere
 
                 if (profile) {
                     // Calculate nutrition goals based on user profile
                     const goals = calculateNutritionGoals({
                         firstName: profile.first_name,
-                        lastName: profile.last_name,
-                        phoneNumber: '',
-                        height: profile.height,
-                        weight: profile.weight,
-                        age: profile.age,
-                        gender: profile.gender,
-                        activityLevel: profile.activity_level,
-                        dietaryRestrictions: profile.dietary_restrictions || [],
-                        foodAllergies: profile.food_allergies || [],
-                        cuisinePreferences: profile.cuisine_preferences || [],
-                        spiceTolerance: profile.spice_tolerance,
-                        weightGoal: profile.weight_goal,
-                        healthConditions: profile.health_conditions || [],
-                        dailyCalorieTarget: profile.daily_calorie_target,
-                        nutrientFocus: profile.nutrient_focus,
+                        lastName: profile.last_name || '',
+                        dateOfBirth: null,
+                        location: null,
+                        height: profile.height || null,
+                        weight: profile.weight || null,
+                        age: profile.age || null,
+                        gender: profile.gender || null,
+                        activityLevel: profile.activity_level || null,
+                        dietaryRestrictions: profile.dietary_restrictions ? profile.dietary_restrictions.split(',') : [],
+                        foodAllergies: profile.food_allergies ? profile.food_allergies.split(',') : [],
+                        cuisinePreferences: profile.cuisine_preferences ? profile.cuisine_preferences.split(',') : [],
+                        spiceTolerance: profile.spice_tolerance || null,
+                        weightGoal: profile.weight_goal || null,
+                        targetWeight: profile.target_weight || null,
+                        startingWeight: profile.starting_weight || null,
+                        healthConditions: profile.health_conditions ? profile.health_conditions.split(',') : [],
+                        dailyCalorieTarget: profile.daily_calorie_target || null,
+                        nutrientFocus: null,
+                        fitnessGoal: profile.fitness_goal || null,
+                        // Optional properties
+                        cheatDayEnabled: false,
+                        cheatDayFrequency: 7,
+                        preferredCheatDayOfWeek: 6,
+                        sleepQuality: null,
+                        stressLevel: null,
+                        eatingPattern: null,
+                        motivations: [],
+                        whyMotivation: null,
+                        stepGoal: null,
+                        waterGoal: null,
+                        workoutFrequency: null,
+                        sleepGoal: null,
+                        projectedCompletionDate: null,
+                        estimatedMetabolicAge: null,
+                        estimatedDurationWeeks: null,
+                        futureSelfMessage: null,
+                        futureSelfMessageType: null,
+                        futureSelfMessageCreatedAt: null,
+                        // Required properties
                         defaultAddress: null,
                         preferredDeliveryTimes: [],
                         deliveryInstructions: null,
-                        pushNotificationsEnabled: profile.push_notifications_enabled,
-                        emailNotificationsEnabled: profile.email_notifications_enabled,
-                        smsNotificationsEnabled: profile.sms_notifications_enabled,
-                        marketingEmailsEnabled: profile.marketing_emails_enabled,
+                        pushNotificationsEnabled: Boolean(profile.push_notifications_enabled),
+                        emailNotificationsEnabled: Boolean(profile.email_notifications_enabled),
+                        smsNotificationsEnabled: Boolean(profile.sms_notifications_enabled),
+                        marketingEmailsEnabled: Boolean(profile.marketing_emails_enabled),
                         paymentMethods: [],
                         billingAddress: null,
                         defaultPaymentMethodId: null,
                         preferredLanguage: profile.preferred_language || 'en',
                         timezone: profile.timezone || 'UTC',
                         unitPreference: profile.unit_preference || 'metric',
-                        darkMode: profile.dark_mode,
-                        syncDataOffline: profile.sync_data_offline
+                        darkMode: Boolean(profile.dark_mode),
+                        syncDataOffline: Boolean(profile.sync_data_offline)
                     });
 
                     setNutritionGoals(goals);
@@ -1734,6 +1760,14 @@ const DiaryScreen: React.FC = () => {
                 fat: acc.fat + meal.macros.fat
             }), { carbs: 0, protein: 0, fat: 0 });
 
+            // Get detailed food items from all meals
+            const foodItems = mealData.map(meal => {
+                return {
+                    mealName: meal.title,
+                    foods: meal.items.map(item => item.name.split('\n')[0])  // Get just the food name part
+                };
+            });
+
             // Prepare nutrition context for coach
             const nutritionData = {
                 date: formatDate(currentDate),
@@ -1755,19 +1789,70 @@ const DiaryScreen: React.FC = () => {
                 exercise: {
                     total: totalExerciseCalories,
                     activities: exerciseList.map(ex => ex.exercise_name || 'Exercise')
-                }
+                },
+                detailedFoods: foodItems
             };
 
-            // Navigate to coach with nutrition context
+            // Create a nutrition analysis prompt for the coach
+            const nutritionAnalysisPrompt = `You are a professional nutritionist reviewing my food log for ${formatDate(currentDate)}. 
+Please give me a comprehensive nutritional consultation based on my data. 
+
+First, give me a brief introduction as my personal nutritionist.
+Then analyze my overall calorie intake and if it aligns with my goals.
+Break down my macronutrient distribution and whether my balance is appropriate.
+Identify specific strengths in my diet (what I'm doing well).
+Point out areas for improvement or potential nutritional gaps.
+Suggest specific actionable recommendations for my next meals.
+Discuss how my current eating pattern aligns with my fitness goals.
+Provide a brief summary of key takeaways as my nutritionist.
+
+Be conversational but thorough, as if we're having an in-person session. Focus on being educational, specific, and actionable.`;
+
+            // Navigate to coach with nutrition context and analysis prompt
             (navigation as any).navigate('Chatbot', {
                 nutritionData,
-                autoStart: true
+                nutritionAnalysisPrompt,
+                autoStart: true,
+                isNutritionistMode: true
             });
 
         } catch (error) {
             console.error('Error generating report:', error);
             Alert.alert('Error', 'Unable to generate report. Please try again.');
         }
+    };
+
+    // Add this function before the return statement
+    const calculateWeightPrediction = () => {
+        // Get total calories for the day
+        const dailyCalories = mealData.reduce((sum, meal) => sum + meal.total, 0);
+
+        // Check if profile data exists and has necessary values
+        if (!user || profileLoading) return null;
+
+        // Calculate calorie difference from maintenance
+        const maintenanceCalories = nutritionGoals.calories;
+        const dailyDifference = dailyCalories - maintenanceCalories;
+
+        // 1 kg of weight is approximately 7700 calories
+        const caloriesPerKg = 7700;
+
+        // Calculate projected weight change over 30 days
+        const projectedWeightChangeKg = (dailyDifference * 30) / caloriesPerKg;
+
+        // Use the minimum calories from nutrition calculator
+        const minMaleCalories = 1500;
+        const minFemaleCalories = 1200;
+        const defaultMinCalories = nutritionGoals.calories * 0.75; // Default to 75% of calories if gender unknown
+
+        // We'll determine gender-based minimum while rendering, since we have the profile data there
+
+        return {
+            meetsMinimumRequirement: dailyCalories >= defaultMinCalories, // At least 75% of needed calories
+            projectedWeightChangeKg,
+            minMaleCalories,
+            minFemaleCalories
+        };
     };
 
     return (
@@ -2031,6 +2116,47 @@ const DiaryScreen: React.FC = () => {
                                         <Text style={styles.analyzeBtnText}>Generate Report</Text>
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* Weight Prediction Display - Single Line */}
+                                {(() => {
+                                    const prediction = calculateWeightPrediction();
+                                    if (!prediction || !userProfile) return null;
+
+                                    // Get daily calories and prepare data
+                                    const dailyCalories = mealData.reduce((sum, meal) => sum + meal.total, 0);
+                                    const baseWeight = userProfile?.weight || 70;
+                                    const estimatedWeight = baseWeight + prediction.projectedWeightChangeKg;
+
+                                    // Default message is weight prediction
+                                    let displayText = `If you eat like this every day, in 1 month you're estimated to weigh ${estimatedWeight.toFixed(1)}kg.`;
+                                    let textColor = '#AAAAAA';
+
+                                    // Check gender-specific minimum requirements
+                                    if (userProfile?.gender) {
+                                        const isMale = userProfile.gender === 'male';
+                                        const minimumCalories = isMale ? prediction.minMaleCalories : prediction.minFemaleCalories;
+
+                                        if (dailyCalories < minimumCalories) {
+                                            displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
+                                            textColor = '#FF5252';
+                                        }
+                                    }
+
+                                    // Check if below 75% of target calories
+                                    if (!prediction.meetsMinimumRequirement && textColor !== '#FF5252') {
+                                        displayText = 'Warning: Eating significantly below your daily requirements may affect your health goals.';
+                                        textColor = '#FF5252';
+                                    }
+
+                                    // Single line for all cases
+                                    return (
+                                        <View style={{ marginTop: 8 }}>
+                                            <Text style={{ color: textColor, fontSize: 12, textAlign: 'center' }}>
+                                                {displayText}
+                                            </Text>
+                                        </View>
+                                    );
+                                })()}
                             </View>
                             <View style={{ height: 2 }} />
                         </ScrollView>

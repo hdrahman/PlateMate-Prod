@@ -31,7 +31,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 // Define navigation type
 type RootStackParamList = {
-    FoodLog: { refresh?: number };
+    'Food Log': { refresh?: number };
     Manual: { mealType?: string; sourcePage?: string };
     Camera: undefined;
     BarcodeScanner: undefined;
@@ -234,8 +234,8 @@ export default function Manual() {
                         // Hide food details modal
                         setShowFoodDetails(false);
 
-                        // Navigate back to FoodLog with refresh parameter
-                        navigation.navigate('FoodLog', { refresh: Date.now() });
+                        // Navigate back to Food Log with refresh parameter
+                        navigation.navigate('Food Log', { refresh: Date.now() });
                     }
                 }
             ]);

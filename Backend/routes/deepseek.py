@@ -50,6 +50,7 @@ class ChatMessage(BaseModel):
 class NutritionAnalysisRequest(BaseModel):
     nutritionData: dict
     autoStart: bool = True
+    customPrompt: Optional[str] = None
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
@@ -81,18 +82,51 @@ async def analyze_nutrition(
         
         logger.info(f"Nutrition analysis requested for user {current_user['firebase_uid']}")
         
-        # Create context message for Coach Max
-        system_prompt = """You are Coach Max, an expert AI Health Coach and nutritionist. You're energetic, motivational, and provide practical, actionable advice. Analyze the user's nutrition data and provide personalized insights, recommendations, and encouragement. Keep your tone friendly and supportive while being informative."""
-        
-        # Build nutrition context message
-        context_message = f"""I've analyzed your nutrition data for {nutrition_data.get('date', 'today')}. Here's what I found:
+        # Create context message for Coach Max - use custom prompt if provided
+        if request.customPrompt:
+            system_prompt = """You are Coach Max, a professional nutritionist providing a detailed analysis of a user's food log. 
+Be thorough, educational, and conversational as if you're conducting an in-person nutrition consultation.
+Use the nutrition data provided to give personalized insights and specific recommendations.
+This is an initial consultation, so give a comprehensive analysis before waiting for user questions."""
+            
+            # Use the custom prompt as the user message
+            context_message = request.customPrompt
+            
+            # Add nutrition data for context
+            detailed_data = f"""
+Here's my nutrition data for {nutrition_data.get('date', 'today')}:
+
+CALORIES: {nutrition_data.get('calories', {}).get('consumed', 0)} consumed out of {nutrition_data.get('calories', {}).get('goal', 0)} goal ({nutrition_data.get('calories', {}).get('remaining', 0)} remaining)
+
+MACROS:
+- Protein: {nutrition_data.get('macros', {}).get('protein', {}).get('consumed', 0)}g consumed, {nutrition_data.get('macros', {}).get('protein', {}).get('goal', 0)}g goal
+- Carbs: {nutrition_data.get('macros', {}).get('carbs', {}).get('consumed', 0)}g consumed, {nutrition_data.get('macros', {}).get('carbs', {}).get('goal', 0)}g goal  
+- Fat: {nutrition_data.get('macros', {}).get('fat', {}).get('consumed', 0)}g consumed, {nutrition_data.get('macros', {}).get('fat', {}).get('goal', 0)}g goal
+
+FOODS EATEN:
+"""
+            # Add detailed foods information
+            for meal in nutrition_data.get('detailedFoods', []):
+                detailed_data += f"- {meal.get('mealName', 'Meal')}: {', '.join(meal.get('foods', []))}\n"
+            
+            detailed_data += f"\nEXERCISE: {nutrition_data.get('exercise', {}).get('total', 0)} calories burned"
+            
+            # Combine custom prompt with detailed data
+            context_message = f"{context_message}\n\n{detailed_data}"
+            
+        else:
+            # Default system prompt for regular nutrition analysis
+            system_prompt = """You are Coach Max, an expert AI Health Coach and nutritionist. You're energetic, motivational, and provide practical, actionable advice. Analyze the user's nutrition data and provide personalized insights, recommendations, and encouragement. Keep your tone friendly and supportive while being informative."""
+            
+            # Build nutrition context message
+            context_message = f"""I've analyzed your nutrition data for {nutrition_data.get('date', 'today')}. Here's what I found:
 
 CALORIES: {nutrition_data.get('calories', {}).get('consumed', 0)} consumed out of {nutrition_data.get('calories', {}).get('goal', 0)} goal
 
 MACROS:
-- Protein: {nutrition_data.get('macros', {}).get('protein', 0)}g
-- Carbs: {nutrition_data.get('macros', {}).get('carbs', 0)}g  
-- Fat: {nutrition_data.get('macros', {}).get('fat', 0)}g
+- Protein: {nutrition_data.get('macros', {}).get('protein', {}).get('consumed', 0)}g
+- Carbs: {nutrition_data.get('macros', {}).get('carbs', {}).get('consumed', 0)}g  
+- Fat: {nutrition_data.get('macros', {}).get('fat', {}).get('consumed', 0)}g
 
 MEALS: {', '.join([meal.get('name', 'Unknown meal') for meal in nutrition_data.get('meals', [])])}
 
@@ -120,7 +154,7 @@ Let me give you personalized insights and recommendations to help you reach your
                     "temperature": 0.7,
                     "max_tokens": 1000
                 },
-                timeout=30.0
+                timeout=60.0
             )
             
             if response.status_code != 200:
@@ -173,7 +207,7 @@ async def chat_with_coach(
                     "temperature": request.temperature,
                     "max_tokens": request.max_tokens
                 },
-                timeout=30.0
+                timeout=60.0  # Increased timeout from 30s to 60s
             )
             
             if response.status_code != 200:
@@ -245,7 +279,7 @@ async def chat_with_context(
                     "temperature": request.temperature,
                     "max_tokens": request.max_tokens
                 },
-                timeout=30.0
+                timeout=60.0  # Increased timeout from 30s to 60s
             )
             
             if response.status_code != 200:
