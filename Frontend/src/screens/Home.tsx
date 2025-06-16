@@ -337,11 +337,14 @@ export default function Home() {
         // Calculate adjusted goal and remaining calories
         const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
         const remaining = adjustedDailyGoal - nutrientTotals.calories;
-        setRemainingCals(Math.max(0, Math.round(remaining)));
+
+        // Instead of capping at 0, show actual value (negative if over)
+        setRemainingCals(Math.round(remaining));
 
         // Calculate percent consumed based on base goal (for legacy compatibility)
+        // Ensure we don't cap at 100% so the progress bar doesn't unwind
         const percentConsumed = (nutrientTotals.calories / dailyCalorieGoal) * 100;
-        setPercentCons(Math.min(100, Math.round(percentConsumed)));
+        setPercentCons(Math.round(percentConsumed));
 
         // Update streak when nutrition data changes
         if (user?.uid) {
@@ -578,7 +581,8 @@ export default function Home() {
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const adjustedPercentCons = adjustedGoal > 0 ? (consumedCalories / adjustedGoal) * 100 : 0;
-  const consumedStroke = (adjustedPercentCons / 100) * circumference;
+  // Don't allow progress to exceed 100% of the circle circumference
+  const consumedStroke = Math.min(circumference, circumference * (Math.min(100, adjustedPercentCons) / 100));
 
   // Data for the right card with updated colors.
   const rightStats = [
@@ -1077,7 +1081,8 @@ export default function Home() {
         // Recalculate remaining calories using adjusted goal
         const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
         const remaining = adjustedDailyGoal - consumedCalories;
-        setRemainingCals(Math.max(0, Math.round(remaining)));
+        // Don't cap at zero to allow "X over" display
+        setRemainingCals(Math.round(remaining));
       } catch (error) {
         console.error('Error refreshing exercise data:', error);
       }
@@ -1297,8 +1302,12 @@ export default function Home() {
                 />
               </Svg>
               <View style={styles.centerTextContainer}>
-                <Text style={styles.remainingValue}>{remainingCals}</Text>
-                <Text style={styles.remainingLabel}>REMAINING</Text>
+                <Text style={styles.remainingValue}>
+                  {remainingCals < 0 ? Math.abs(remainingCals) + ' over' : remainingCals}
+                </Text>
+                <Text style={styles.remainingLabel}>
+                  {remainingCals < 0 ? '' : 'REMAINING'}
+                </Text>
               </View>
             </View>
             <View style={[styles.rightCardVertical, { marginTop: 13 }]}>
@@ -1330,9 +1339,9 @@ export default function Home() {
         {/* MACROS CARD */}
         <GradientBorderCard>
           <View style={styles.macrosRow}>
-            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : Math.min(100, (protein / macroGoals.protein) * 100)} current={macrosLoading ? 0 : protein} goal={macroGoals.protein} />
-            <MacroRing label="CARBS" percent={macrosLoading ? 0 : Math.min(100, (carbs / macroGoals.carbs) * 100)} current={macrosLoading ? 0 : carbs} goal={macroGoals.carbs} />
-            <MacroRing label="FATS" percent={macrosLoading ? 0 : Math.min(100, (fats / macroGoals.fat) * 100)} current={macrosLoading ? 0 : fats} goal={macroGoals.fat} />
+            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : (protein / macroGoals.protein) * 100} current={macrosLoading ? 0 : protein} goal={macroGoals.protein} />
+            <MacroRing label="CARBS" percent={macrosLoading ? 0 : (carbs / macroGoals.carbs) * 100} current={macrosLoading ? 0 : carbs} goal={macroGoals.carbs} />
+            <MacroRing label="FATS" percent={macrosLoading ? 0 : (fats / macroGoals.fat) * 100} current={macrosLoading ? 0 : fats} goal={macroGoals.fat} />
             <MacroRing
               label="OTHER"
               percent={100}
@@ -1977,9 +1986,9 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
 
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
-  // Ensure percent doesn't exceed 100
-  const cappedPercent = Math.min(percent, 100);
-  const fillStroke = (cappedPercent / 100) * circumference;
+  // Don't cap the percent for display, but cap the fill stroke to not exceed the circumference
+  const cappedPercent = percent;
+  const fillStroke = Math.min(circumference, (percent / 100) * circumference);
 
   // Custom solid colors for each macro ring
   let solidColor = '#FF00F5'; // default
