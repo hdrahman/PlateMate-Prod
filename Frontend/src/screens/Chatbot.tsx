@@ -312,9 +312,32 @@ export default function Chatbot() {
       // Remove typing indicator and add Coach Max's analysis
       setMessages(prev => prev.filter(msg => !msg.isTyping));
 
+      // Get AI response and add our own introduction rather than letting AI generate one each time
+      let aiResponse = response.data.response;
+
+      // Replace intro section with our hardcoded version if this is a nutrition report
+      if (customPrompt && customPrompt.includes("First, give me a brief introduction as my personal nutritionist")) {
+        // Define a custom, professional-looking introduction
+        const customIntro = `# Nutrition Analysis Report
+
+I've reviewed your nutrition data and prepared a detailed analysis of your food log. Here's what I found:`;
+
+        // Try to identify and remove AI-generated introduction which can be inconsistent
+        aiResponse = aiResponse
+          // Remove quoted text at the beginning
+          .replace(/^["'](.+?)["']\s*/i, '')
+          // Remove any intro paragraph containing "nutritionist"
+          .replace(/^(Hi|Hello|Hey|Greetings).*?(nutrition|diet|meal|food|eat).*?\n\n/i, '')
+          // Remove introduction label
+          .replace(/^(Introduction|Intro):\s*/i, '');
+
+        // Combine our intro with cleaned AI response
+        aiResponse = customIntro + '\n\n' + aiResponse;
+      }
+
       const analysisMessage: Message = {
         id: "nutrition-analysis-" + Date.now().toString(),
-        text: response.data.response,
+        text: aiResponse,
         sender: "bot",
         timestamp: new Date()
       };

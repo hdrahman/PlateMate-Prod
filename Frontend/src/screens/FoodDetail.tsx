@@ -5,12 +5,12 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
     StatusBar,
     Image,
     Dimensions,
     ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -248,80 +248,130 @@ const FoodDetailScreen: React.FC = () => {
                 bounces={false}
             >
                 {/* Image Background with Overlay */}
-                <View style={styles.imageSection}>
-                    {!loading && foodData?.image_url && !imageError ? (
+                {!loading && foodData?.image_url && !imageError ? (
+                    <View style={styles.imageSection}>
                         <Image
                             source={{ uri: foodData.image_url }}
                             style={styles.foodImage}
                             resizeMode="cover"
                             onError={() => setImageError(true)}
                         />
-                    ) : (
-                        <View style={styles.placeholderImage} />
-                    )}
 
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']}
-                        style={styles.headerGradient}
-                    />
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']}
+                            style={styles.headerGradient}
+                        />
 
-                    <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', PRIMARY_BG]}
-                        style={styles.bottomGradient}
-                    />
+                        <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', PRIMARY_BG]}
+                            style={styles.bottomGradient}
+                        />
 
-                    {/* Header with safe area padding */}
-                    <SafeAreaView style={styles.headerContainer}>
-                        <View style={styles.header}>
-                            <TouchableOpacity
-                                onPress={() => navigation.goBack()}
-                                style={styles.headerButton}
-                            >
-                                <View style={styles.headerButtonBackground}>
-                                    <Ionicons name="chevron-back" size={24} color={WHITE} />
-                                </View>
-                            </TouchableOpacity>
-                            <Text style={styles.headerTitle}>Nutrition Facts</Text>
-                            <TouchableOpacity style={styles.headerButton}>
-                                <View style={styles.headerButtonBackground}>
-                                    <Ionicons name="heart-outline" size={22} color={WHITE} />
-                                </View>
-                            </TouchableOpacity>
-                        </View>
-                    </SafeAreaView>
+                        {/* Header with safe area padding */}
+                        <SafeAreaView style={styles.headerContainer} edges={['top']}>
+                            <View style={styles.header}>
+                                <TouchableOpacity
+                                    onPress={() => navigation.goBack()}
+                                    style={styles.headerButton}
+                                >
+                                    <View style={styles.headerButtonBackground}>
+                                        <Ionicons name="chevron-back" size={24} color={WHITE} />
+                                    </View>
+                                </TouchableOpacity>
+                                <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                                <TouchableOpacity style={styles.headerButton}>
+                                    <View style={styles.headerButtonBackground}>
+                                        <Ionicons name="heart-outline" size={22} color={WHITE} />
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </SafeAreaView>
 
-                    {/* Food Details Overlay */}
-                    <View style={styles.foodInfoOverlay}>
-                        <Text style={styles.foodName}>{foodData?.food_name}</Text>
+                        {/* Food Details Overlay */}
+                        <View style={styles.foodInfoOverlay}>
+                            <Text style={styles.foodName}>{foodData?.food_name}</Text>
 
-                        {/* Row container for health score and meal info */}
-                        <View style={styles.infoRow}>
-                            {/* Health Score on the left */}
-                            {foodData?.healthiness_rating && (
-                                <View style={[
-                                    styles.healthinessBadge,
-                                    {
-                                        backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
-                                        borderColor: getHealthinessColor(foodData.healthiness_rating),
-                                        marginTop: 0,
-                                    }
-                                ]}>
-                                    <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
-                                        Health Score: {Math.round(foodData.healthiness_rating)}
-                                    </Text>
-                                </View>
-                            )}
+                            {/* Row container for health score and meal info */}
+                            <View style={styles.infoRow}>
+                                {/* Health Score on the left */}
+                                {foodData?.healthiness_rating && (
+                                    <View style={[
+                                        styles.healthinessBadge,
+                                        {
+                                            backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
+                                            borderColor: getHealthinessColor(foodData.healthiness_rating),
+                                            marginTop: 0,
+                                        }
+                                    ]}>
+                                        <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
+                                            Health Score: {Math.round(foodData.healthiness_rating)}
+                                        </Text>
+                                    </View>
+                                )}
 
-                            {/* Meal type and date on the right */}
-                            <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
-                            </Text>
+                                {/* Meal type and date on the right */}
+                                <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                    {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                                </Text>
+                            </View>
                         </View>
                     </View>
-                </View>
+                ) : (
+                    <View style={styles.noImageHeader}>
+                        <SafeAreaView edges={['top']}>
+                            <View style={styles.header}>
+                                <TouchableOpacity
+                                    onPress={() => navigation.goBack()}
+                                    style={styles.headerButton}
+                                >
+                                    <View style={styles.headerButtonBackground}>
+                                        <Ionicons name="chevron-back" size={24} color={WHITE} />
+                                    </View>
+                                </TouchableOpacity>
+                                <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                                <TouchableOpacity style={styles.headerButton}>
+                                    <View style={styles.headerButtonBackground}>
+                                        <Ionicons name="heart-outline" size={22} color={WHITE} />
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Basic food info without image */}
+                            <View style={styles.noImageFoodInfo}>
+                                <Text style={styles.foodName}>{foodData?.food_name}</Text>
+
+                                <View style={styles.infoRow}>
+                                    {/* Health Score on the left */}
+                                    {foodData?.healthiness_rating && (
+                                        <View style={[
+                                            styles.healthinessBadge,
+                                            {
+                                                backgroundColor: getHealthinessColor(foodData.healthiness_rating) + '20',
+                                                borderColor: getHealthinessColor(foodData.healthiness_rating),
+                                                marginTop: 0,
+                                            }
+                                        ]}>
+                                            <Text style={[styles.healthinessBadgeText, { color: getHealthinessColor(foodData.healthiness_rating) }]}>
+                                                Health Score: {Math.round(foodData.healthiness_rating)}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* Meal type and date on the right */}
+                                    <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                        {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                            </View>
+                        </SafeAreaView>
+                    </View>
+                )}
 
                 {/* Main Content Container */}
-                <View style={styles.contentContainer}>
+                <View style={[
+                    styles.contentContainer,
+                    (!foodData?.image_url || imageError) && styles.contentContainerNoImage
+                ]}>
                     {/* Calories Section */}
                     <View style={styles.calorieSection}>
                         <View style={styles.calorieAlignmentContainer}>
@@ -769,6 +819,20 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.6)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    noImageHeader: {
+        backgroundColor: PRIMARY_BG,
+        paddingBottom: 10,
+    },
+    noImageFoodInfo: {
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 5,
+    },
+    contentContainerNoImage: {
+        marginTop: 0,
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
     },
 });
 

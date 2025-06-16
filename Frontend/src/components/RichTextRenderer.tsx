@@ -13,17 +13,21 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
     // Pre-process text to remove common issues
     let processedText = text;
 
-    // Remove "Introduction:" at the beginning (case-insensitive)
-    processedText = processedText.replace(/^(introduction:|introduction)\s*/i, '');
+    // Remove "Introduction:" at the beginning (case-insensitive) with more patterns
+    processedText = processedText.replace(/^(introduction:|introduction|intro:|intro)(\s*)/i, '');
+    processedText = processedText.replace(/^\s*["'](.+)["']\s*$/, '$1'); // Remove surrounding quotes from entire text
+
+    // Remove quotes around text that wrap entire paragraphs
+    processedText = processedText.replace(/^"(.+)"$/gm, '$1');
+    processedText = processedText.replace(/^"(.+)$/gm, '$1');
+    processedText = processedText.replace(/^(.+)"$/gm, '$1');
+    processedText = processedText.replace(/^'(.+)'$/gm, '$1');
 
     // Replace "---" with empty line
     processedText = processedText.replace(/\n---\n/g, '\n\n');
     processedText = processedText.replace(/^---\n/g, '\n');
     processedText = processedText.replace(/\n---$/g, '\n');
     processedText = processedText.replace(/^---$/g, '');
-
-    // Remove quotes around text that wrap entire paragraphs
-    processedText = processedText.replace(/^"(.+)"$/gm, '$1');
 
     // Process headings, bold, italics, and lists
     const processText = () => {
@@ -58,6 +62,11 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
             // Check for headings
             if (line.startsWith('# ')) {
                 finishList();
+                // Clean up the heading text by removing extra asterisks
+                let headingText = line.substring(2);
+                // Remove surrounding asterisks from headings (e.g., "**Heading**" -> "Heading")
+                headingText = headingText.replace(/^\*\*(.*)\*\*$/, '$1');
+
                 elements.push(
                     <View key={`h1-${i}`} style={styles.headingContainer}>
                         <LinearGradient
@@ -67,7 +76,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                             style={styles.headingGradient}
                         >
                             <Text style={styles.heading1}>
-                                {line.substring(2)}
+                                {headingText}
                             </Text>
                         </LinearGradient>
                     </View>
@@ -77,9 +86,13 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
 
             if (line.startsWith('## ')) {
                 finishList();
+                // Clean up the heading text
+                let headingText = line.substring(3);
+                headingText = headingText.replace(/^\*\*(.*)\*\*$/, '$1');
+
                 elements.push(
                     <Text key={`h2-${i}`} style={styles.heading2}>
-                        {line.substring(3)}
+                        {headingText}
                     </Text>
                 );
                 return;
@@ -87,9 +100,13 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
 
             if (line.startsWith('### ')) {
                 finishList();
+                // Clean up the heading text
+                let headingText = line.substring(4);
+                headingText = headingText.replace(/^\*\*(.*)\*\*$/, '$1');
+
                 elements.push(
                     <Text key={`h3-${i}`} style={styles.heading3}>
-                        {line.substring(4)}
+                        {headingText}
                     </Text>
                 );
                 return;
@@ -150,28 +167,116 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
         return elements;
     };
 
-    // Process inline styles (bold, italic, etc.)
+    // Completely revamped inline style processing function
     const processInlineStyles = (text: string) => {
-        // Improved regex for bold text that matches non-greedily
-        let parts = text.split(/(\*\*[^*]+\*\*)/g);
-        return parts.map((part, i) => {
-            if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-                return <Text key={i} style={styles.bold}>{part.substring(2, part.length - 2)}</Text>;
-            }
+        // Step 1: Create a function to process bold text first
+        const processBoldText = (inputText: string) => {
+            // If no ** is found, return the text as is
+            if (!inputText.includes('**')) return inputText;
 
-            // Process italics in the remaining text with improved regex
-            let italicParts = part.split(/(\*[^*]+\*)/g);
-            if (italicParts.length === 1) {
-                return part;
-            }
+            const result: React.ReactNode[] = [];
+            let currentText = inputText;
+            let startIndex = 0;
+            let openTagIndex = -1;
 
-            return italicParts.map((italicPart, j) => {
-                if (italicPart.startsWith('*') && italicPart.endsWith('*') && italicPart.length > 2) {
-                    return <Text key={`${i}-${j}`} style={styles.italic}>{italicPart.substring(1, italicPart.length - 1)}</Text>;
+            // Process the string character by character to find matching ** pairs
+            while (startIndex < currentText.length) {
+                const nextTagIndex = currentText.indexOf('**', startIndex);
+
+                // No more ** found
+                if (nextTagIndex === -1) {
+                    result.push(currentText.substring(startIndex));
+                    break;
                 }
-                return italicPart;
+
+                // Found a **
+                if (openTagIndex === -1) {
+                    // This is an opening tag
+                    result.push(currentText.substring(startIndex, nextTagIndex));
+                    openTagIndex = nextTagIndex;
+                    startIndex = nextTagIndex + 2; // Move past the **
+                } else {
+                    // This is a closing tag - we have a complete bold section
+                    const boldContent = currentText.substring(openTagIndex + 2, nextTagIndex);
+                    if (boldContent) { // Only add if there's actual content
+                        result.push(
+                            <Text key={`bold-${openTagIndex}`} style={styles.bold}>
+                                {boldContent}
+                            </Text>
+                        );
+                    }
+                    openTagIndex = -1; // Reset to look for next opening tag
+                    startIndex = nextTagIndex + 2; // Move past the closing **
+                }
+            }
+
+            return result;
+        };
+
+        // Step 2: Create a function to process italic text
+        const processItalicText = (inputNode: React.ReactNode): React.ReactNode => {
+            if (typeof inputNode !== 'string') {
+                return inputNode;
+            }
+
+            const inputText = inputNode as string;
+            // If no * is found, return the text as is
+            if (!inputText.includes('*')) return inputText;
+
+            const result: React.ReactNode[] = [];
+            let currentText = inputText;
+            let startIndex = 0;
+            let openTagIndex = -1;
+
+            // Process the string character by character
+            while (startIndex < currentText.length) {
+                const nextTagIndex = currentText.indexOf('*', startIndex);
+
+                // No more * found
+                if (nextTagIndex === -1) {
+                    result.push(currentText.substring(startIndex));
+                    break;
+                }
+
+                // Found a *
+                if (openTagIndex === -1) {
+                    // This is an opening tag
+                    result.push(currentText.substring(startIndex, nextTagIndex));
+                    openTagIndex = nextTagIndex;
+                    startIndex = nextTagIndex + 1; // Move past the *
+                } else {
+                    // This is a closing tag - we have a complete italic section
+                    const italicContent = currentText.substring(openTagIndex + 1, nextTagIndex);
+                    if (italicContent) { // Only add if there's actual content
+                        result.push(
+                            <Text key={`italic-${openTagIndex}`} style={styles.italic}>
+                                {italicContent}
+                            </Text>
+                        );
+                    }
+                    openTagIndex = -1; // Reset to look for next opening tag
+                    startIndex = nextTagIndex + 1; // Move past the closing *
+                }
+            }
+
+            return result;
+        };
+
+        // Step 3: Process bold text first, then process italic text within the remaining parts
+        const boldProcessed = processBoldText(text);
+
+        // Step 4: If boldProcessed is a string, process it for italics, otherwise process each element
+        if (typeof boldProcessed === 'string') {
+            return processItalicText(boldProcessed);
+        } else {
+            // Process each element in the boldProcessed array
+            return boldProcessed.map((item, index) => {
+                if (typeof item === 'string') {
+                    return processItalicText(item);
+                }
+                return item; // Already a React element
             });
-        });
+        }
     };
 
     return <View style={styles.container}>{processText()}</View>;

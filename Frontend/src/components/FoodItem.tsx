@@ -34,7 +34,10 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
 
     return (
         <TouchableOpacity
-            style={[styles.container, hasLocalImage && styles.containerWithImage]}
+            style={[
+                styles.container,
+                hasLocalImage ? styles.containerWithImage : styles.containerNoImage
+            ]}
             onPress={() => onPress(item)}
             activeOpacity={0.8}
         >
@@ -50,7 +53,10 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
             )}
 
             {/* Content section */}
-            <View style={[styles.contentContainer, hasLocalImage && styles.contentWithImage]}>
+            <View style={[
+                styles.contentContainer,
+                hasLocalImage ? styles.contentWithImage : styles.contentNoImage
+            ]}>
                 {/* Main Row */}
                 <View style={styles.mainRow}>
                     <View style={styles.titleContainer}>
@@ -97,10 +103,12 @@ const styles = StyleSheet.create({
     container: {
         backgroundColor: CARD_BG,
         borderRadius: 8,
-        padding: 12,
         marginBottom: 6,
         borderWidth: 0.5,
         borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    containerNoImage: {
+        padding: 12,
     },
     containerWithImage: {
         flexDirection: 'row',
@@ -119,6 +127,9 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
+    },
+    contentNoImage: {
+        // No special styling needed for this case
     },
     contentWithImage: {
         paddingHorizontal: 4,

@@ -36,6 +36,7 @@ type RootStackParamList = {
     Camera: undefined;
     BarcodeScanner: undefined;
     ImageCapture: { mealType: string; photoUri?: string; sourcePage?: string };
+    FoodDetail: { foodId: number };
 };
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -86,8 +87,10 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 };
 
 // Convert FoodLogEntry to FoodItem for display purposes
-const convertFoodLogEntryToFoodItem = (entry: FoodLogEntry): FoodItemType => {
+// Add ID so we can navigate to the food detail screen
+const convertFoodLogEntryToFoodItem = (entry: FoodLogEntry): FoodItemType & { id?: number } => {
     return {
+        id: entry.id, // Include the ID for navigation
         food_name: entry.food_name,
         brand_name: entry.brand_name || undefined,
         calories: entry.calories,
@@ -195,10 +198,14 @@ export default function Manual() {
     // Handle selecting a food item
     const handleFoodSelect = async (food) => {
         try {
-            setIsLoading(true);
+            // For recent food entries (from food log), navigate to FoodDetail screen
+            if (food.id) {
+                navigation.navigate('FoodDetail', { foodId: food.id });
+                return;
+            }
 
-            // Since our backend now returns detailed nutrition info for search results,
-            // we can use the food data directly without additional API calls
+            // For search results, show the modal
+            setIsLoading(true);
             setSelectedFood(food);
             setShowFoodDetails(true);
         } catch (error) {
