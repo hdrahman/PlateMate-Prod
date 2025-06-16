@@ -159,15 +159,7 @@ export default function Chatbot() {
       setContextData(userContext);
       setContextActive(true);
 
-      // Add system message about context being enabled
-      const contextMessage: Message = {
-        id: "context-enabled-" + Date.now(),
-        text: `🧠 Perfect! I now have access to your recent activity data and can provide personalized advice based on your actual nutrition, exercise patterns, and progress. ${contextSummary}`,
-        sender: "bot",
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, contextMessage]);
+      // No longer adding a system message, using the banner instead
 
     } catch (error: any) {
       console.error('❌ Error loading context:', error);
@@ -589,7 +581,7 @@ export default function Chatbot() {
           <MaskedView
             style={{ alignItems: "center", justifyContent: "center" }}
             maskElement={
-              <Text style={styles.headerTitle}>Coach Max</Text>
+              <Text style={styles.headerTitle}>Coach</Text>
             }
           >
             <LinearGradient
@@ -620,6 +612,33 @@ export default function Chatbot() {
           </LinearGradient>
         </View>
       </View>
+
+      {/* Context Banner at Top */}
+      {contextActive && (
+        <View style={styles.topContextBanner}>
+          <LinearGradient
+            colors={["rgba(76, 175, 80, 0.1)", "rgba(69, 160, 73, 0.1)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.topContextBannerGradient}
+          >
+            <View style={styles.topContextBannerContent}>
+              <View style={styles.topContextBannerLeft}>
+                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                <Text style={styles.topContextBannerText}>
+                  Context Mode Active
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={clearContext}
+                style={styles.topContextClearButton}
+              >
+                <Text style={styles.topContextClearButtonText}>Disable</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
 
       {/* Chat Messages */}
       <KeyboardAvoidingView
@@ -678,7 +697,7 @@ export default function Chatbot() {
           ))}
         </ScrollView>
 
-        {/* Context Banner */}
+        {/* Context Banner for enabling context (only shown when context is not active) */}
         {!contextActive && (
           <View style={styles.contextBanner}>
             <LinearGradient
@@ -691,7 +710,7 @@ export default function Chatbot() {
                 <View style={styles.contextBannerLeft}>
                   <Ionicons name="analytics" size={20} color="#5A60EA" />
                   <View style={styles.contextBannerText}>
-                    <Text style={styles.contextBannerTitle}>Get Personalized Advice</Text>
+                    <Text style={styles.contextBannerTitle}>Get Context-Aware Advice</Text>
                     <Text style={styles.contextBannerSubtitle}>
                       Let Coach Max access your activity data for specific recommendations
                     </Text>
@@ -714,38 +733,6 @@ export default function Chatbot() {
                       <Text style={styles.contextBannerButtonText}>Enable</Text>
                     )}
                   </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-          </View>
-        )}
-
-        {/* Context Active Banner */}
-        {contextActive && (
-          <View style={styles.contextActiveBanner}>
-            <LinearGradient
-              colors={["rgba(76, 175, 80, 0.1)", "rgba(69, 160, 73, 0.1)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.contextBannerGradient}
-            >
-              <View style={styles.contextBannerContent}>
-                <View style={styles.contextBannerLeft}>
-                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                  <View style={styles.contextBannerText}>
-                    <Text style={[styles.contextBannerTitle, { color: "#4CAF50" }]}>
-                      Personalized Mode Active
-                    </Text>
-                    <Text style={styles.contextBannerSubtitle}>
-                      Coach Max has access to your recent activity data
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={clearContext}
-                  style={styles.contextClearButton}
-                >
-                  <Text style={styles.contextClearButtonText}>Disable</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -875,7 +862,7 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
     padding: 12,
     borderRadius: 20,
-    marginVertical: 8,
+    marginVertical: 4,
   },
   userBubble: {
     backgroundColor: "#333",
@@ -985,12 +972,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
   },
-  contextActiveBanner: {
-    marginHorizontal: 10,
-    marginBottom: 10,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
   contextBannerGradient: {
     padding: 1,
   },
@@ -1038,15 +1019,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  contextClearButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  topContextBanner: {
+    marginHorizontal: 0,
+    marginBottom: 5,
+    marginTop: 1,
+    overflow: "hidden",
+    borderWidth: 0,
+  },
+  topContextBannerGradient: {
+    padding: 0,
+  },
+  topContextBannerContent: {
+    backgroundColor: "rgba(26, 26, 26, 0.7)",
+    padding: 6,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(76, 175, 80, 0.3)",
+  },
+  topContextBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  topContextBannerText: {
+    marginLeft: 8,
+    color: "#4CAF50",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  topContextClearButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
     backgroundColor: "rgba(244, 67, 54, 0.1)",
     borderWidth: 1,
     borderColor: "rgba(244, 67, 54, 0.3)",
   },
-  contextClearButtonText: {
+  topContextClearButtonText: {
     color: "#F44336",
     fontSize: 12,
     fontWeight: "500",
