@@ -24,6 +24,7 @@ import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../utils/firebase/index';
+import RichTextRenderer from "../components/RichTextRenderer";
 import {
   getUserProfileByFirebaseUid,
   getRecentFoodLogs,
@@ -708,7 +709,10 @@ export default function Chatbot() {
                     end={{ x: 1, y: 0 }}
                     style={styles.botBubbleGradient}
                   >
-                    <Text style={styles.messageText}>{message.text}</Text>
+                    <RichTextRenderer
+                      text={message.text}
+                      baseStyle={styles.messageText}
+                    />
                   </LinearGradient>
                 </View>
               ) : (

@@ -26,13 +26,12 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday } from '../utils/database';
+import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileByFirebaseUid, getUserGoals } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ExerciseModal from '../components/ExerciseModal';
 import { useAuth } from '../context/AuthContext';
-import { getUserProfileByFirebaseUid } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -466,70 +465,75 @@ const DiaryScreen: React.FC = () => {
                 const profile = await getUserProfileByFirebaseUid(user.uid);
                 setUserProfile(profile); // Store the profile data for use elsewhere
 
-                if (profile) {
-                    // Calculate nutrition goals based on user profile
-                    const goals = calculateNutritionGoals({
-                        firstName: profile.first_name,
-                        lastName: profile.last_name || '',
-                        dateOfBirth: null,
-                        location: null,
-                        height: profile.height || null,
-                        weight: profile.weight || null,
-                        age: profile.age || null,
-                        gender: profile.gender || null,
-                        activityLevel: profile.activity_level || null,
-                        dietaryRestrictions: profile.dietary_restrictions ? profile.dietary_restrictions.split(',') : [],
-                        foodAllergies: profile.food_allergies ? profile.food_allergies.split(',') : [],
-                        cuisinePreferences: profile.cuisine_preferences ? profile.cuisine_preferences.split(',') : [],
-                        spiceTolerance: profile.spice_tolerance || null,
-                        weightGoal: profile.weight_goal || null,
-                        targetWeight: profile.target_weight || null,
-                        startingWeight: profile.starting_weight || null,
-                        healthConditions: profile.health_conditions ? profile.health_conditions.split(',') : [],
-                        dailyCalorieTarget: profile.daily_calorie_target || null,
-                        nutrientFocus: null,
-                        fitnessGoal: profile.fitness_goal || null,
-                        // Optional properties
-                        cheatDayEnabled: false,
-                        cheatDayFrequency: 7,
-                        preferredCheatDayOfWeek: 6,
-                        sleepQuality: null,
-                        stressLevel: null,
-                        eatingPattern: null,
-                        motivations: [],
-                        whyMotivation: null,
-                        stepGoal: null,
-                        waterGoal: null,
-                        workoutFrequency: null,
-                        sleepGoal: null,
-                        projectedCompletionDate: null,
-                        estimatedMetabolicAge: null,
-                        estimatedDurationWeeks: null,
-                        futureSelfMessage: null,
-                        futureSelfMessageType: null,
-                        futureSelfMessageCreatedAt: null,
-                        // Required properties
-                        defaultAddress: null,
-                        preferredDeliveryTimes: [],
-                        deliveryInstructions: null,
-                        pushNotificationsEnabled: Boolean(profile.push_notifications_enabled),
-                        emailNotificationsEnabled: Boolean(profile.email_notifications_enabled),
-                        smsNotificationsEnabled: Boolean(profile.sms_notifications_enabled),
-                        marketingEmailsEnabled: Boolean(profile.marketing_emails_enabled),
-                        paymentMethods: [],
-                        billingAddress: null,
-                        defaultPaymentMethodId: null,
-                        preferredLanguage: profile.preferred_language || 'en',
-                        timezone: profile.timezone || 'UTC',
-                        unitPreference: profile.unit_preference || 'metric',
-                        darkMode: Boolean(profile.dark_mode),
-                        syncDataOffline: Boolean(profile.sync_data_offline)
-                    });
+                // Get the user's goals directly from the database (including nutrition goals)
+                const userGoals = await getUserGoals(user.uid);
 
-                    setNutritionGoals(goals);
+                if (userGoals) {
+                    // Map the database goals to our nutrition goals format
+                    const dbGoals = {
+                        calories: userGoals.calorieGoal || 0,
+                        protein: userGoals.proteinGoal || 0,
+                        carbs: userGoals.carbGoal || 0,
+                        fat: userGoals.fatGoal || 0,
+                        fiber: 30, // Default values for fields not in userGoals
+                        sugar: 50,
+                        sodium: 2300
+                    };
+
+                    // Only use calculated goals if we don't have stored goals in the database
+                    if (dbGoals.calories > 0) {
+                        setNutritionGoals(dbGoals);
+                        console.log('📊 Using nutrition goals from database:', dbGoals);
+                    } else if (profile) {
+                        // Create a properly formatted UserProfile object for the calculator
+                        const userProfileForCalc = {
+                            firstName: profile.first_name,
+                            lastName: profile.last_name || '',
+                            dateOfBirth: null,
+                            location: null,
+                            height: profile.height || null,
+                            weight: profile.weight || null,
+                            age: profile.age || null,
+                            gender: profile.gender || null,
+                            activityLevel: profile.activity_level || null,
+                            dietaryRestrictions: profile.dietary_restrictions ? profile.dietary_restrictions.split(',') : [],
+                            foodAllergies: profile.food_allergies ? profile.food_allergies.split(',') : [],
+                            cuisinePreferences: profile.cuisine_preferences ? profile.cuisine_preferences.split(',') : [],
+                            spiceTolerance: profile.spice_tolerance || null,
+                            weightGoal: profile.weight_goal || null,
+                            targetWeight: profile.target_weight || null,
+                            startingWeight: profile.starting_weight || null,
+                            healthConditions: profile.health_conditions ? profile.health_conditions.split(',') : [],
+                            dailyCalorieTarget: profile.daily_calorie_target || null,
+                            nutrientFocus: null,
+                            fitnessGoal: profile.fitness_goal || null,
+                            // Set required properties from UserProfile type
+                            defaultAddress: null,
+                            preferredDeliveryTimes: [],
+                            deliveryInstructions: null,
+                            pushNotificationsEnabled: Boolean(profile.push_notifications_enabled),
+                            emailNotificationsEnabled: Boolean(profile.email_notifications_enabled),
+                            smsNotificationsEnabled: Boolean(profile.sms_notifications_enabled),
+                            marketingEmailsEnabled: Boolean(profile.marketing_emails_enabled),
+                            paymentMethods: [],
+                            billingAddress: null,
+                            defaultPaymentMethodId: null,
+                            preferredLanguage: profile.preferred_language || 'en',
+                            timezone: profile.timezone || 'UTC',
+                            unitPreference: profile.unit_preference || 'metric',
+                            darkMode: Boolean(profile.dark_mode),
+                            syncDataOffline: Boolean(profile.sync_data_offline)
+                        };
+
+                        // Calculate nutrition goals based on profile
+                        const calculatedGoals = calculateNutritionGoals(userProfileForCalc);
+
+                        setNutritionGoals(calculatedGoals);
+                        console.log('📊 Using calculated nutrition goals:', calculatedGoals);
+                    }
                 }
             } catch (error) {
-                console.error('Error loading user profile:', error);
+                console.error('Error loading user profile or goals:', error);
             } finally {
                 setProfileLoading(false);
             }
