@@ -10,9 +10,24 @@ interface RichTextRendererProps {
 const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {} }) => {
     if (!text) return null;
 
+    // Pre-process text to remove common issues
+    let processedText = text;
+
+    // Remove "Introduction:" at the beginning (case-insensitive)
+    processedText = processedText.replace(/^(introduction:|introduction)\s*/i, '');
+
+    // Replace "---" with empty line
+    processedText = processedText.replace(/\n---\n/g, '\n\n');
+    processedText = processedText.replace(/^---\n/g, '\n');
+    processedText = processedText.replace(/\n---$/g, '\n');
+    processedText = processedText.replace(/^---$/g, '');
+
+    // Remove quotes around text that wrap entire paragraphs
+    processedText = processedText.replace(/^"(.+)"$/gm, '$1');
+
     // Process headings, bold, italics, and lists
     const processText = () => {
-        const lines = text.split('\n');
+        const lines = processedText.split('\n');
         const elements: ReactNode[] = [];
 
         let inList = false;
@@ -137,21 +152,21 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
 
     // Process inline styles (bold, italic, etc.)
     const processInlineStyles = (text: string) => {
-        // Replace ** for bold
-        let parts = text.split(/(\*\*.*?\*\*)/g);
+        // Improved regex for bold text that matches non-greedily
+        let parts = text.split(/(\*\*[^*]+\*\*)/g);
         return parts.map((part, i) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
+            if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
                 return <Text key={i} style={styles.bold}>{part.substring(2, part.length - 2)}</Text>;
             }
 
-            // Process italics in the remaining text
-            let italicParts = part.split(/(\*.*?\*)/g);
+            // Process italics in the remaining text with improved regex
+            let italicParts = part.split(/(\*[^*]+\*)/g);
             if (italicParts.length === 1) {
                 return part;
             }
 
             return italicParts.map((italicPart, j) => {
-                if (italicPart.startsWith('*') && italicPart.endsWith('*')) {
+                if (italicPart.startsWith('*') && italicPart.endsWith('*') && italicPart.length > 2) {
                     return <Text key={`${i}-${j}`} style={styles.italic}>{italicPart.substring(1, italicPart.length - 1)}</Text>;
                 }
                 return italicPart;

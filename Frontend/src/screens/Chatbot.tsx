@@ -25,6 +25,7 @@ import { BACKEND_URL } from '../utils/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../utils/firebase/index';
 import RichTextRenderer from "../components/RichTextRenderer";
+import tokenManager from '../utils/firebase/tokenManager';
 import {
   getUserProfileByFirebaseUid,
   getRecentFoodLogs,
@@ -92,19 +93,27 @@ export default function Chatbot() {
   const dot2Opacity = useRef(new Animated.Value(0.4)).current;
   const dot3Opacity = useRef(new Animated.Value(0.4)).current;
 
-  // Helper function to get Firebase authentication token
+  // Helper function to get Firebase authentication token using TokenManager
   const getFirebaseToken = async (): Promise<string> => {
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('User not authenticated');
-      }
-      return await currentUser.getIdToken(true);
+      // Use the cached token system for better performance
+      const token = await tokenManager.getToken();
+      return token;
     } catch (error) {
       console.error('Error getting Firebase token:', error);
       throw new Error('Authentication failed. Please sign in again.');
     }
   };
+
+  // Prefetch token when component mounts
+  useEffect(() => {
+    // Prefetch authentication token to speed up first message
+    tokenManager.getToken().then(() => {
+      console.log('Auth token prefetched for Coach Max chat');
+    }).catch(error => {
+      console.error('Failed to prefetch auth token:', error);
+    });
+  }, []);
 
   // Helper function to format date for database queries
   const formatDateForDatabase = (date: Date): string => {
@@ -161,7 +170,8 @@ export default function Chatbot() {
       setContextData(userContext);
       setContextActive(true);
 
-      // No longer adding a system message, using the banner instead
+      // Prefetch token while user is reviewing their context data
+      tokenManager.refreshTokenInBackground();
 
     } catch (error: any) {
       console.error('❌ Error loading context:', error);
@@ -278,10 +288,11 @@ export default function Chatbot() {
       };
       setMessages([typingIndicator]);
 
-      // Get Firebase authentication token
-      const token = await getFirebaseToken();
+      // Start token fetch early in the process
+      const tokenPromise = getFirebaseToken();
 
       // Call secure backend endpoint for DeepSeek V3 analysis
+      const token = await tokenPromise;
       const response = await axios.post(
         `${BACKEND_BASE_URL}/deepseek/nutrition-analysis`,
         {
@@ -309,6 +320,9 @@ export default function Chatbot() {
       };
 
       setMessages([analysisMessage]);
+
+      // Prefetch next token in background after success
+      tokenManager.refreshTokenInBackground();
 
     } catch (error: any) {
       console.error('Error getting nutrition analysis:', error);
@@ -412,10 +426,9 @@ export default function Chatbot() {
         content: userMessage
       });
 
-      // Get Firebase authentication token
-      const token = await getFirebaseToken();
-
-      let response;
+      // Start token fetch early and prepare the payload in parallel
+      const tokenPromise = getFirebaseToken();
+      let payload, endpoint;
 
       if (contextActive && contextData) {
         // Use context-aware endpoint with user context data from local database
@@ -425,32 +438,19 @@ export default function Chatbot() {
         Recent Activity: ${contextData.recentFoodLogs.length} recent meals logged, current streak: ${contextData.streak} days.
         Recent Foods: ${contextData.recentFoodLogs.slice(0, 5).map(log => log.food_name).join(', ')}.`;
 
-        const payload = {
+        payload = {
           messages: messageHistory,
           user_context: contextString,
           temperature: 0.7,
           max_tokens: 1000
         };
+        endpoint = `${BACKEND_BASE_URL}/deepseek/chat-with-context`;
 
-        console.log('🚀 Sending context chat request:', {
-          endpoint: `${BACKEND_BASE_URL}/deepseek/chat-with-context`,
+        console.log('🚀 Preparing context chat request:', {
+          endpoint,
           messageCount: messageHistory.length,
-          hasContext: !!contextString,
-          firstMessage: messageHistory[0],
-          lastMessage: messageHistory[messageHistory.length - 1]
+          hasContext: true
         });
-
-        response = await axios.post(
-          `${BACKEND_BASE_URL}/deepseek/chat-with-context`,
-          payload,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 65000  // Set 65-second timeout to match backend's 60s timeout with a buffer
-          }
-        );
       } else {
         // Use regular endpoint
         const systemPrompt = {
@@ -458,32 +458,36 @@ export default function Chatbot() {
           content: 'You are Coach Max, an expert AI Health Coach and nutritionist. You\'re energetic, motivational, and provide practical, actionable advice. Keep your responses friendly, supportive, and informative.'
         };
 
-        const payload = {
+        payload = {
           messages: [systemPrompt, ...messageHistory],
           temperature: 0.7,
           max_tokens: 1000
         };
+        endpoint = `${BACKEND_BASE_URL}/deepseek/chat`;
 
-        console.log('🚀 Sending regular chat request:', {
-          endpoint: `${BACKEND_BASE_URL}/deepseek/chat`,
-          messageCount: payload.messages.length,
-          systemPrompt: systemPrompt,
-          firstUserMessage: messageHistory[0],
-          lastUserMessage: messageHistory[messageHistory.length - 1]
+        console.log('🚀 Preparing regular chat request:', {
+          endpoint,
+          messageCount: payload.messages.length
         });
-
-        response = await axios.post(
-          `${BACKEND_BASE_URL}/deepseek/chat`,
-          payload,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 65000  // Set 65-second timeout to match backend's 60s timeout with a buffer
-          }
-        );
       }
+
+      // Now get the token and make the request
+      const token = await tokenPromise;
+
+      // Prefetch next token in background after using this one
+      setTimeout(() => tokenManager.refreshTokenInBackground(), 0);
+
+      const response = await axios.post(
+        endpoint,
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 65000
+        }
+      );
 
       return response.data.response;
     } catch (error: any) {

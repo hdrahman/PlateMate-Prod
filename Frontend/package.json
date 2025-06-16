@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "cross-env EXPO_NO_DOCTOR=1 expo start",
-    "start-online": "cross-env EXPO_NO_DOCTOR=1 expo start",
+    "start": "cross-env EXPO_CLI_NO_DOCTOR=1 expo start",
+    "start-online": "cross-env EXPO_CLI_NO_DOCTOR=1 expo start",
     "start-dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

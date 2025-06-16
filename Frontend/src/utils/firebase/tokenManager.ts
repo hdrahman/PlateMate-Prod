@@ -218,6 +218,17 @@ class TokenManager {
             console.error('Background token refresh failed:', error);
         }
     }
+
+    /**
+     * Public method to trigger a background token refresh
+     * Can be safely called from anywhere to ensure a fresh token is available
+     */
+    public refreshTokenInBackground(): void {
+        setTimeout(() => {
+            this.checkAndRefreshToken()
+                .catch(error => console.error('Error in refreshTokenInBackground:', error));
+        }, 0);
+    }
 }
 
 export const tokenManager = TokenManager.getInstance();
