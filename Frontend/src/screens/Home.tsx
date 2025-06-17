@@ -1303,10 +1303,10 @@ export default function Home() {
               </Svg>
               <View style={styles.centerTextContainer}>
                 <Text style={styles.remainingValue}>
-                  {remainingCals < 0 ? Math.abs(remainingCals) + ' over' : remainingCals}
+                  {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
                 </Text>
                 <Text style={styles.remainingLabel}>
-                  {remainingCals < 0 ? '' : 'REMAINING'}
+                  {remainingCals < 0 ? 'OVER' : 'REMAINING'}
                 </Text>
               </View>
             </View>
