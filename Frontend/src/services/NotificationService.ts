@@ -106,37 +106,89 @@ class NotificationService {
 
     // Schedule all notifications based on settings
     async scheduleAllNotifications(): Promise<void> {
-        const settings = await SettingsService.getNotificationSettings();
+        try {
+            const settings = await SettingsService.getNotificationSettings();
 
-        if (!settings.generalSettings.enabled) {
-            console.log('Notifications disabled, skipping scheduling');
-            return;
+            if (!settings.generalSettings.enabled) {
+                console.log('Notifications disabled, skipping scheduling');
+                return;
+            }
+
+            const hasPermission = await this.requestPermissions();
+            if (!hasPermission) {
+                console.warn('No notification permission, skipping scheduling');
+                return;
+            }
+
+            // Cancel all existing notifications first
+            await this.cancelAllNotifications();
+
+            // Schedule meal reminders
+            if (settings.mealReminders.enabled) {
+                await this.scheduleMealReminders(settings);
+            }
+
+            // Schedule water reminders
+            if (settings.waterReminders.enabled) {
+                await this.scheduleWaterReminders(settings);
+            }
+
+            // Schedule status notifications
+            await this.scheduleStatusNotifications(settings);
+
+            // Schedule engagement notifications
+            await this.scheduleEngagementNotifications(settings);
+        } catch (error) {
+            console.error('Error scheduling notifications:', error);
+            throw error;
         }
+    }
 
-        const hasPermission = await this.requestPermissions();
-        if (!hasPermission) {
-            console.warn('No notification permission, skipping scheduling');
-            return;
+    private getNotificationTrigger(hour: number, minute: number, repeats: boolean = true, weekday?: number) {
+        // For Android, use daily trigger because calendar trigger is not supported
+        if (Platform.OS === 'android') {
+            const now = new Date();
+            const scheduledTime = new Date();
+            scheduledTime.setHours(hour, minute, 0, 0);
+
+            // If the scheduled time has already passed today, set it for tomorrow
+            if (scheduledTime <= now) {
+                scheduledTime.setDate(scheduledTime.getDate() + 1);
+            }
+
+            // For weekly notifications (e.g. Sunday)
+            if (weekday !== undefined) {
+                const currentDay = scheduledTime.getDay();
+                if (currentDay !== weekday) {
+                    const daysToAdd = (weekday - currentDay + 7) % 7;
+                    scheduledTime.setDate(scheduledTime.getDate() + daysToAdd);
+                }
+            }
+
+            // Calculate seconds from now
+            const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
+
+            return {
+                type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+                seconds: secondsFromNow,
+                repeats: repeats
+            };
+        } else {
+            // For iOS, we can use calendar trigger
+            const trigger: any = {
+                type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+                hour: hour,
+                minute: minute,
+                repeats: repeats
+            };
+
+            // Add weekday if specified (for weekly notifications)
+            if (weekday !== undefined) {
+                trigger.weekday = weekday;
+            }
+
+            return trigger;
         }
-
-        // Cancel all existing notifications first
-        await this.cancelAllNotifications();
-
-        // Schedule meal reminders
-        if (settings.mealReminders.enabled) {
-            await this.scheduleMealReminders(settings);
-        }
-
-        // Schedule water reminders
-        if (settings.waterReminders.enabled) {
-            await this.scheduleWaterReminders(settings);
-        }
-
-        // Schedule status notifications
-        await this.scheduleStatusNotifications(settings);
-
-        // Schedule engagement notifications
-        await this.scheduleEngagementNotifications(settings);
     }
 
     private async scheduleMealReminders(settings: NotificationSettings): Promise<void> {
@@ -156,12 +208,7 @@ class NotificationService {
                         body: `Don't forget to log your ${meal.name.toLowerCase()}`,
                         data: { type: 'meal_reminder', meal: meal.name.toLowerCase() },
                     },
-                    trigger: {
-                        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-                        hour: hours,
-                        minute: minutes,
-                        repeats: true,
-                    },
+                    trigger: this.getNotificationTrigger(hours, minutes),
                 });
 
                 await this.saveScheduledNotification({
@@ -190,12 +237,7 @@ class NotificationService {
                             body: 'Remember to log any snacks you have',
                             data: { type: 'snack_reminder' },
                         },
-                        trigger: {
-                            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-                            hour: hours,
-                            minute: minutes,
-                            repeats: true,
-                        },
+                        trigger: this.getNotificationTrigger(hours, minutes),
                     });
 
                     await this.saveScheduledNotification({
@@ -225,12 +267,7 @@ class NotificationService {
                         body: 'Time for a glass of water. Your body will thank you!',
                         data: { type: 'water_reminder' },
                     },
-                    trigger: {
-                        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-                        hour: hour,
-                        minute: 0,
-                        repeats: true,
-                    },
+                    trigger: this.getNotificationTrigger(hour, 0),
                 });
 
                 await this.saveScheduledNotification({
@@ -255,12 +292,7 @@ class NotificationService {
                     body: 'Check out your progress for today!',
                     data: { type: 'daily_progress' },
                 },
-                trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-                    hour: 19, // 7 PM
-                    minute: 0,
-                    repeats: true,
-                },
+                trigger: this.getNotificationTrigger(19, 0), // 7 PM
             });
 
             await this.saveScheduledNotification({
@@ -282,13 +314,7 @@ class NotificationService {
                     body: 'See how you did this week and plan for the next!',
                     data: { type: 'weekly_progress' },
                 },
-                trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-                    weekday: 1, // Sunday
-                    hour: 18,
-                    minute: 0,
-                    repeats: true,
-                },
+                trigger: this.getNotificationTrigger(18, 0, true, 1), // Sunday at 6 PM
             });
 
             await this.saveScheduledNotification({
@@ -353,7 +379,7 @@ class NotificationService {
             const stored = await AsyncStorage.getItem(this.SCHEDULED_NOTIFICATIONS_KEY);
             return stored ? JSON.parse(stored) : [];
         } catch (error) {
-            console.error('Error loading scheduled notifications:', error);
+            console.error('Error getting scheduled notifications:', error);
             return [];
         }
     }
@@ -364,62 +390,43 @@ class NotificationService {
     }
 
     async cancelNotification(notificationId: string): Promise<void> {
-        await Notifications.cancelScheduledNotificationAsync(notificationId);
-
-        // Remove from stored notifications
         try {
-            const stored = await AsyncStorage.getItem(this.SCHEDULED_NOTIFICATIONS_KEY);
-            if (stored) {
-                const notifications = JSON.parse(stored);
-                const filtered = notifications.filter((n: NotificationSchedule) => n.id !== notificationId);
-                await AsyncStorage.setItem(this.SCHEDULED_NOTIFICATIONS_KEY, JSON.stringify(filtered));
-            }
+            await Notifications.cancelScheduledNotificationAsync(notificationId);
+
+            // Also remove from our local storage
+            const notifications = await this.getScheduledNotifications();
+            const updatedNotifications = notifications.filter(n => n.id !== notificationId);
+            await AsyncStorage.setItem(this.SCHEDULED_NOTIFICATIONS_KEY, JSON.stringify(updatedNotifications));
         } catch (error) {
-            console.error('Error removing cancelled notification from storage:', error);
+            console.error('Error canceling notification:', error);
         }
     }
 
-    // Immediate notifications
+    // Method for showing immediate notifications (not scheduled)
     async showImmediateNotification(title: string, body: string, data?: any): Promise<void> {
         await Notifications.scheduleNotificationAsync({
             content: {
                 title,
                 body,
-                data,
+                data: data || {},
             },
-            trigger: null, // Show immediately
+            trigger: null,
         });
     }
 
-    // Achievement notification
     async showAchievementNotification(achievement: string): Promise<void> {
         await this.showImmediateNotification(
-            '🎉 Achievement Unlocked!',
-            achievement,
-            { type: 'achievement' }
+            '🏆 Achievement Unlocked!',
+            `Congratulations! You've earned: ${achievement}`,
+            { type: 'achievement', name: achievement }
         );
     }
 
-    // Calorie status notification
     async showCalorieStatusNotification(remaining: number, target: number): Promise<void> {
-        let title = '📊 Calorie Update';
-        let body = '';
-        let emoji = '';
-
-        if (remaining > target * 0.5) {
-            emoji = '✅';
-            body = `You have ${remaining} calories left for today. Great progress!`;
-        } else if (remaining > 0) {
-            emoji = '⚠️';
-            body = `Only ${remaining} calories left for today. Choose wisely!`;
-        } else {
-            emoji = '🚨';
-            body = `You've exceeded your daily goal by ${Math.abs(remaining)} calories.`;
-        }
-
+        const percentComplete = Math.round(((target - remaining) / target) * 100);
         await this.showImmediateNotification(
-            `${emoji} ${title}`,
-            body,
+            '📊 Calorie Update',
+            `You've consumed ${percentComplete}% of your daily calorie goal.`,
             { type: 'calorie_status', remaining, target }
         );
     }

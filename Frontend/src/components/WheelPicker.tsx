@@ -6,6 +6,9 @@ import {
     ScrollView,
     Dimensions,
     TouchableOpacity,
+    Platform,
+    NativeSyntheticEvent,
+    NativeScrollEvent
 } from 'react-native';
 
 interface WheelPickerProps {
@@ -32,48 +35,63 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
     const scrollViewRef = useRef<ScrollView>(null);
     const [initialized, setInitialized] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [scrollPosition, setScrollPosition] = useState(0);
 
     // Find index of selected value
     useEffect(() => {
-        const index = data.findIndex(item => item.id === selectedValue);
-        if (index !== -1 && index !== currentIndex) {
+        const index = Math.max(0, data.findIndex(item => item.id === selectedValue));
+        if (index !== currentIndex) {
             setCurrentIndex(index);
+
+            // Only scroll if already initialized
             if (initialized && scrollViewRef.current) {
-                scrollToIndex(index);
+                scrollToIndex(index, true);
             }
         }
     }, [selectedValue, data]);
 
-    // Scroll to initial position
+    // Scroll to initial position after component mounts
     useEffect(() => {
-        if (scrollViewRef.current && !initialized) {
-            const initialIndex = data.findIndex(item => item.id === selectedValue);
-            setCurrentIndex(initialIndex !== -1 ? initialIndex : 0);
-            setTimeout(() => {
+        if (!initialized && data.length > 0) {
+            const initialIndex = Math.max(0, data.findIndex(item => item.id === selectedValue));
+            setCurrentIndex(initialIndex);
+
+            // Use a longer timeout for initial rendering
+            const timer = setTimeout(() => {
                 if (scrollViewRef.current) {
-                    scrollToIndex(initialIndex !== -1 ? initialIndex : 0);
+                    scrollToIndex(initialIndex, false);
                     setInitialized(true);
                 }
-            }, 10);
-        }
-    }, [scrollViewRef.current]);
+            }, 100);
 
-    const scrollToIndex = (index: number) => {
+            return () => clearTimeout(timer);
+        }
+    }, [data]);
+
+    const scrollToIndex = (index: number, animated: boolean = true) => {
         if (scrollViewRef.current) {
+            const y = index * itemHeight;
             scrollViewRef.current.scrollTo({
-                y: index * itemHeight,
-                animated: true,
+                y,
+                animated,
             });
         }
     };
 
-    const handleMomentumScrollEnd = (event: any) => {
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const y = event.nativeEvent.contentOffset.y;
+        setScrollPosition(y);
+    };
+
+    const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const y = event.nativeEvent.contentOffset.y;
         const index = Math.round(y / itemHeight);
 
-        if (index >= 0 && index < data.length && scrollViewRef.current) {
-            // Snap to the closest item
-            scrollToIndex(index);
+        if (index >= 0 && index < data.length) {
+            // Ensure we snap to the exact position
+            if (Math.abs(y - (index * itemHeight)) > 0.5) {
+                scrollToIndex(index);
+            }
 
             // Only update if value changed
             if (index !== currentIndex) {
@@ -81,6 +99,12 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                 onValueChange(data[index].id);
             }
         }
+    };
+
+    const handleItemPress = (index: number) => {
+        scrollToIndex(index);
+        setCurrentIndex(index);
+        onValueChange(data[index].id);
     };
 
     // Add padding to top and bottom so center item is centered
@@ -98,34 +122,53 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                 ref={scrollViewRef}
                 showsVerticalScrollIndicator={false}
                 snapToInterval={itemHeight}
-                decelerationRate="fast"
+                decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.85}
+                onScroll={handleScroll}
                 onMomentumScrollEnd={handleMomentumScrollEnd}
                 scrollEventThrottle={16}
                 contentContainerStyle={{ paddingTop, paddingBottom }}
+                keyboardShouldPersistTaps="always"
             >
-                {data.map((item, index) => (
-                    <TouchableOpacity
-                        key={item.id}
-                        style={[styles.item, { height: itemHeight }]}
-                        onPress={() => {
-                            scrollToIndex(index);
-                            setCurrentIndex(index);
-                            onValueChange(item.id);
-                        }}
-                    >
-                        <Text
-                            style={[
-                                styles.text,
-                                textStyle,
-                                index === currentIndex && styles.selectedText,
-                                index === currentIndex && selectedTextStyle,
-                            ]}
-                            numberOfLines={1}
+                {data.map((item, index) => {
+                    const itemPosition = index * itemHeight;
+                    const distanceFromCenter = Math.abs(scrollPosition - itemPosition);
+                    const isSelected = index === currentIndex;
+
+                    // Scale and opacity based on distance from center
+                    const maxDistance = containerHeight / 2;
+                    const scale = isSelected ? 1.1 : Math.max(0.8, 1 - distanceFromCenter / maxDistance * 0.2);
+                    const opacity = Math.max(0.4, 1 - distanceFromCenter / maxDistance * 0.6);
+
+                    return (
+                        <TouchableOpacity
+                            key={item.id}
+                            style={[styles.item, { height: itemHeight }]}
+                            onPress={() => handleItemPress(index)}
+                            activeOpacity={0.7}
                         >
-                            {item.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <View style={{
+                                transform: [{ scale }],
+                                opacity,
+                                flex: 1,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                width: '100%'
+                            }}>
+                                <Text
+                                    style={[
+                                        styles.text,
+                                        textStyle,
+                                        isSelected && styles.selectedText,
+                                        isSelected && selectedTextStyle,
+                                    ]}
+                                    numberOfLines={1}
+                                >
+                                    {item.label}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
             </ScrollView>
         </View>
     );

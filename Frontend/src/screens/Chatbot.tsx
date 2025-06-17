@@ -316,23 +316,27 @@ export default function Chatbot() {
       let aiResponse = response.data.response;
 
       // Replace intro section with our hardcoded version if this is a nutrition report
-      if (customPrompt && customPrompt.includes("First, give me a brief introduction as my personal nutritionist")) {
-        // Define a custom, professional-looking introduction
-        const customIntro = `# Nutrition Analysis Report
+      if (customPrompt && customPrompt.includes("nutritional consultation")) {
+        // Define a custom introduction that doesn't waste tokens
+        const customIntro = `Thanks for sharing your food log! Let's break this down together and see where we can optimize your nutrition to better support your goals. I'll walk through the key areas: calories, macros, strengths, and gaps, and give you some clear next steps.`;
 
-I've reviewed your nutrition data and prepared a detailed analysis of your food log. Here's what I found:`;
-
-        // Try to identify and remove AI-generated introduction which can be inconsistent
+        // Clean up the AI response to remove any introduction sections
         aiResponse = aiResponse
-          // Remove quoted text at the beginning
+          // Remove comprehensive nutrition consultation intro
+          .replace(/^(Comprehensive Nutrition Consultation|Nutrition Analysis|Nutritional Analysis)(.*?)(:\s*|\n+)/i, '')
+          // Remove any greeting or intro paragraph
+          .replace(/^(Hi|Hello|Hey|Greetings|Thank you|Thanks)(.*?)(for sharing|for logging|for recording|for tracking)(.*?)(\.|!)\s*/i, '')
+          // Remove "Coach Max" and similar intros
+          .replace(/^(Coach Max|As your nutritionist|As your health coach|As your personal nutritionist)(.*?)(\n+|\.|!)\s*/i, '')
+          // Remove superfluous whitespace at the beginning
+          .replace(/^\s+/, '')
+          // Remove any quoted text at the beginning
           .replace(/^["'](.+?)["']\s*/i, '')
-          // Remove any intro paragraph containing "nutritionist"
-          .replace(/^(Hi|Hello|Hey|Greetings).*?(nutrition|diet|meal|food|eat).*?\n\n/i, '')
-          // Remove introduction label
+          // Remove introduction labels
           .replace(/^(Introduction|Intro):\s*/i, '');
 
         // Combine our intro with cleaned AI response
-        aiResponse = customIntro + '\n\n' + aiResponse;
+        aiResponse = customIntro + "\n\n" + aiResponse;
       }
 
       const analysisMessage: Message = {

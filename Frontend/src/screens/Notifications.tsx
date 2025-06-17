@@ -21,6 +21,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NotificationSettings } from '../types/notifications';
 import SettingsService from '../services/SettingsService';
 import NotificationService from '../services/NotificationService';
+import WheelPicker from '../components/WheelPicker';
+
+// Define theme colors - matching the app's dark theme
+const PRIMARY_BG = '#000000';
+const CARD_BG = '#1C1C1E';
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
+const ACCENT_BLUE = '#2196F3';
+const ACCENT_RED = '#FF6B6B';
+const ACCENT_TEAL = '#4ECDC4';
+const ACCENT_ORANGE = '#F39C12';
+const ACCENT_PURPLE = '#8E44AD';
 
 interface NotificationSetting {
     id: string;
@@ -29,6 +41,42 @@ interface NotificationSetting {
     enabled: boolean;
     time?: string;
 }
+
+// Gradient border card wrapper component
+interface GradientBorderCardProps {
+    children: React.ReactNode;
+    style?: any;
+}
+
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+    return (
+        <View style={styles.gradientBorderContainer}>
+            <LinearGradient
+                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    borderRadius: 10,
+                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+            />
+            <View
+                style={{
+                    margin: 1,
+                    borderRadius: 9,
+                    backgroundColor: style?.backgroundColor || CARD_BG,
+                    padding: 16,
+                }}
+            >
+                {children}
+            </View>
+        </View>
+    );
+};
 
 export default function NotificationsScreen() {
     const navigation = useNavigation<any>();
@@ -78,6 +126,21 @@ export default function NotificationsScreen() {
         currentTime: string;
     }>({ visible: false, type: '', currentTime: '' });
 
+    // States for time picker
+    const [selectedHour, setSelectedHour] = useState('08');
+    const [selectedMinute, setSelectedMinute] = useState('00');
+
+    // Generate hour and minute data for wheel picker
+    const hourData = Array.from({ length: 24 }, (_, i) => ({
+        id: i.toString().padStart(2, '0'),
+        label: i.toString().padStart(2, '0'),
+    }));
+
+    const minuteData = Array.from({ length: 60 }, (_, i) => ({
+        id: i.toString().padStart(2, '0'),
+        label: i.toString().padStart(2, '0'),
+    }));
+
     useEffect(() => {
         // Check notification permissions when component mounts
         checkNotificationPermissions();
@@ -117,6 +180,10 @@ export default function NotificationsScreen() {
                             { text: 'Open Settings', onPress: () => Linking.openSettings() },
                         ]
                     );
+                } else {
+                    // If permission is granted, schedule notifications
+                    await NotificationService.scheduleAllNotifications();
+                    Alert.alert('Success', 'Notification permissions granted');
                 }
             }
         } catch (error) {
@@ -187,6 +254,7 @@ export default function NotificationsScreen() {
 
     const handleToggle = async (path: string, value: boolean) => {
         try {
+            setIsSaving(true);
             const updatedSettings = await SettingsService.updateNotificationSetting(path, value);
             setSettings(updatedSettings);
 
@@ -198,44 +266,68 @@ export default function NotificationsScreen() {
             } else if (value) {
                 await NotificationService.scheduleAllNotifications();
             }
+
+            Alert.alert('Success', 'Settings updated successfully');
         } catch (error) {
             console.error('Error updating notification setting:', error);
             Alert.alert('Error', 'Failed to update notification setting');
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleNumberSetting = async (path: string, value: number) => {
         try {
+            setIsSaving(true);
             const updatedSettings = await SettingsService.updateNotificationSetting(path, value);
             setSettings(updatedSettings);
             await NotificationService.scheduleAllNotifications();
+            Alert.alert('Success', 'Frequency updated successfully');
         } catch (error) {
             console.error('Error updating notification setting:', error);
             Alert.alert('Error', 'Failed to update notification setting');
+        } finally {
+            setIsSaving(false);
         }
     };
 
-    const handleTimeChange = async (selectedTime: Date) => {
-        if (!settings) return;
-
-        const timeString = selectedTime.toTimeString().slice(0, 5); // HH:MM format
+    const handleTimeChange = async (selectedTime: string) => {
+        if (!settings || !showTimePicker.type) return;
 
         try {
+            setIsSaving(true);
+
+            // Make sure the selectedTime is properly formatted (HH:MM)
+            const formattedTime = selectedTime.padStart(5, '0');
+
             const updatedSettings = await SettingsService.updateNotificationSetting(
                 showTimePicker.type,
-                timeString
+                formattedTime
             );
             setSettings(updatedSettings);
-            await NotificationService.scheduleAllNotifications();
+
+            // Reschedule notifications with error handling
+            try {
+                await NotificationService.scheduleAllNotifications();
+                Alert.alert('Success', 'Time updated successfully');
+            } catch (error) {
+                console.error('Error scheduling notifications after time update:', error);
+                Alert.alert('Warning', 'Time was saved but there was an issue scheduling notifications. Try toggling notifications off and on.');
+            }
         } catch (error) {
             console.error('Error updating time:', error);
             Alert.alert('Error', 'Failed to update time');
+        } finally {
+            setIsSaving(false);
+            setShowTimePicker({ visible: false, type: '', currentTime: '' });
         }
-
-        setShowTimePicker({ visible: false, type: '', currentTime: '' });
     };
 
     const showTimePickerModal = (type: string, currentTime: string) => {
+        // Parse the current time
+        const [hours, minutes] = currentTime.split(':');
+        setSelectedHour(hours);
+        setSelectedMinute(minutes);
         setShowTimePicker({ visible: true, type, currentTime });
     };
 
@@ -250,6 +342,7 @@ export default function NotificationsScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
+                            setIsSaving(true);
                             const defaultSettings = await SettingsService.resetNotificationSettings();
                             setSettings(defaultSettings);
                             await NotificationService.scheduleAllNotifications();
@@ -257,6 +350,8 @@ export default function NotificationsScreen() {
                         } catch (error) {
                             console.error('Error resetting settings:', error);
                             Alert.alert('Error', 'Failed to reset settings');
+                        } finally {
+                            setIsSaving(false);
                         }
                     },
                 },
@@ -266,365 +361,450 @@ export default function NotificationsScreen() {
 
     if (isLoading || !settings) {
         return (
-            <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+            <View style={styles.container}>
                 <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={ACCENT_BLUE} />
                     <Text style={styles.loadingText}>Loading...</Text>
                 </View>
-            </LinearGradient>
+            </View>
         );
     }
 
     return (
-        <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                <View style={styles.content}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Notifications</Text>
+        <View style={styles.container}>
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={28} color={WHITE} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Notifications</Text>
+                </View>
+                <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                    <View style={styles.content}>
+                        {/* Subtitle */}
                         <Text style={styles.subtitle}>
                             Customize your notification preferences
                         </Text>
-                    </View>
 
-                    {/* Permission Status */}
-                    {permissionStatus !== 'granted' && (
-                        <View style={styles.permissionCard}>
-                            <Ionicons name="warning" size={24} color="#FF6B6B" />
-                            <View style={styles.permissionText}>
-                                <Text style={styles.permissionTitle}>Permission Required</Text>
-                                <Text style={styles.permissionSubtitle}>
-                                    Enable notifications to receive reminders and updates
-                                </Text>
-                            </View>
-                            <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
-                                <Text style={styles.permissionButtonText}>Enable</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {/* Master Toggle */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="notifications" size={24} color="#667eea" />
-                            <Text style={styles.sectionTitle}>Master Control</Text>
-                        </View>
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Enable Notifications</Text>
-                                <Text style={styles.settingDescription}>
-                                    Turn all notifications on or off
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.generalSettings.enabled}
-                                onValueChange={(value) => handleToggle('generalSettings.enabled', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#667eea' }}
-                                thumbColor={settings.generalSettings.enabled ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-                    </View>
-
-                    {/* Meal Reminders */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="restaurant" size={24} color="#FF6B6B" />
-                            <Text style={styles.sectionTitle}>Meal Reminders</Text>
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Meal Reminders</Text>
-                                <Text style={styles.settingDescription}>
-                                    Get reminded to log your meals
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.mealReminders.enabled}
-                                onValueChange={(value) => handleToggle('mealReminders.enabled', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#FF6B6B' }}
-                                thumbColor={settings.mealReminders.enabled ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-
-                        {settings.mealReminders.enabled && (
-                            <>
-                                <TouchableOpacity
-                                    style={styles.timeRow}
-                                    onPress={() => showTimePickerModal('mealReminders.breakfast', settings.mealReminders.breakfast)}
-                                >
-                                    <Text style={styles.timeLabel}>🍳 Breakfast</Text>
-                                    <Text style={styles.timeValue}>{settings.mealReminders.breakfast}</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.timeRow}
-                                    onPress={() => showTimePickerModal('mealReminders.lunch', settings.mealReminders.lunch)}
-                                >
-                                    <Text style={styles.timeLabel}>🥗 Lunch</Text>
-                                    <Text style={styles.timeValue}>{settings.mealReminders.lunch}</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.timeRow}
-                                    onPress={() => showTimePickerModal('mealReminders.dinner', settings.mealReminders.dinner)}
-                                >
-                                    <Text style={styles.timeLabel}>🍽️ Dinner</Text>
-                                    <Text style={styles.timeValue}>{settings.mealReminders.dinner}</Text>
-                                </TouchableOpacity>
-
-                                <View style={styles.settingRow}>
-                                    <View style={styles.settingInfo}>
-                                        <Text style={styles.settingLabel}>Snack Reminders</Text>
-                                        <Text style={styles.settingDescription}>
-                                            Get reminded to log snacks too
+                        {/* Permission Status */}
+                        {permissionStatus !== 'granted' && (
+                            <GradientBorderCard>
+                                <View style={styles.permissionContent}>
+                                    <Ionicons name="warning" size={24} color={ACCENT_RED} />
+                                    <View style={styles.permissionText}>
+                                        <Text style={styles.permissionTitle}>Permission Required</Text>
+                                        <Text style={styles.permissionSubtitle}>
+                                            Enable notifications to receive reminders and updates
                                         </Text>
                                     </View>
-                                    <Switch
-                                        value={settings.mealReminders.snacks}
-                                        onValueChange={(value) => handleToggle('mealReminders.snacks', value)}
-                                        trackColor={{ false: '#E5E5E5', true: '#FF6B6B' }}
-                                        thumbColor={settings.mealReminders.snacks ? '#fff' : '#f4f3f4'}
-                                    />
+                                    <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
+                                        <Text style={styles.permissionButtonText}>Enable</Text>
+                                    </TouchableOpacity>
                                 </View>
-                            </>
+                            </GradientBorderCard>
                         )}
-                    </View>
 
-                    {/* Water Reminders */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="water" size={24} color="#4ECDC4" />
-                            <Text style={styles.sectionTitle}>Water Reminders</Text>
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Water Reminders</Text>
-                                <Text style={styles.settingDescription}>
-                                    Stay hydrated throughout the day
-                                </Text>
+                        {isSaving && (
+                            <View style={styles.savingIndicator}>
+                                <ActivityIndicator size="small" color={ACCENT_BLUE} />
+                                <Text style={styles.savingText}>Saving changes...</Text>
                             </View>
-                            <Switch
-                                value={settings.waterReminders.enabled}
-                                onValueChange={(value) => handleToggle('waterReminders.enabled', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#4ECDC4' }}
-                                thumbColor={settings.waterReminders.enabled ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
+                        )}
 
-                        {settings.waterReminders.enabled && (
+                        {/* Master Toggle */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="notifications" size={24} color={ACCENT_BLUE} />
+                                <Text style={styles.sectionTitle}>Master Control</Text>
+                            </View>
                             <View style={styles.settingRow}>
                                 <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Frequency</Text>
+                                    <Text style={styles.settingLabel}>Enable Notifications</Text>
                                     <Text style={styles.settingDescription}>
-                                        Every {settings.waterReminders.frequency} hours
+                                        Turn all notifications on or off
                                     </Text>
                                 </View>
-                                <View style={styles.frequencyButtons}>
-                                    {[1, 2, 3, 4].map((hours) => (
-                                        <TouchableOpacity
-                                            key={hours}
-                                            style={[
-                                                styles.frequencyButton,
-                                                settings.waterReminders.frequency === hours && styles.frequencyButtonActive,
-                                            ]}
-                                            onPress={() => handleNumberSetting('waterReminders.frequency', hours)}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.frequencyButtonText,
-                                                    settings.waterReminders.frequency === hours && styles.frequencyButtonTextActive,
-                                                ]}
-                                            >
-                                                {hours}h
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                <Switch
+                                    value={settings.generalSettings.enabled}
+                                    onValueChange={(value) => handleToggle('generalSettings.enabled', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                    thumbColor={settings.generalSettings.enabled ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+                        </GradientBorderCard>
+
+                        {/* Meal Reminders */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="restaurant" size={24} color={ACCENT_RED} />
+                                <Text style={styles.sectionTitle}>Meal Reminders</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Meal Reminders</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Get reminded to log your meals
+                                    </Text>
                                 </View>
+                                <Switch
+                                    value={settings.mealReminders.enabled}
+                                    onValueChange={(value) => handleToggle('mealReminders.enabled', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
+                                    thumbColor={settings.mealReminders.enabled ? '#fff' : '#f4f3f4'}
+                                />
                             </View>
-                        )}
+
+                            {settings.mealReminders.enabled && (
+                                <>
+                                    <TouchableOpacity
+                                        style={styles.timeRow}
+                                        onPress={() => showTimePickerModal('mealReminders.breakfast', settings.mealReminders.breakfast)}
+                                    >
+                                        <Text style={styles.timeLabel}>🍳 Breakfast</Text>
+                                        <Text style={styles.timeValue}>{settings.mealReminders.breakfast}</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.timeRow}
+                                        onPress={() => showTimePickerModal('mealReminders.lunch', settings.mealReminders.lunch)}
+                                    >
+                                        <Text style={styles.timeLabel}>🥗 Lunch</Text>
+                                        <Text style={styles.timeValue}>{settings.mealReminders.lunch}</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.timeRow}
+                                        onPress={() => showTimePickerModal('mealReminders.dinner', settings.mealReminders.dinner)}
+                                    >
+                                        <Text style={styles.timeLabel}>🍽️ Dinner</Text>
+                                        <Text style={styles.timeValue}>{settings.mealReminders.dinner}</Text>
+                                    </TouchableOpacity>
+
+                                    <View style={styles.settingRow}>
+                                        <View style={styles.settingInfo}>
+                                            <Text style={styles.settingLabel}>Snack Reminders</Text>
+                                            <Text style={styles.settingDescription}>
+                                                Get reminded to log snacks too
+                                            </Text>
+                                        </View>
+                                        <Switch
+                                            value={settings.mealReminders.snacks}
+                                            onValueChange={(value) => handleToggle('mealReminders.snacks', value)}
+                                            trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
+                                            thumbColor={settings.mealReminders.snacks ? '#fff' : '#f4f3f4'}
+                                        />
+                                    </View>
+                                </>
+                            )}
+                        </GradientBorderCard>
+
+                        {/* Water Reminders */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="water" size={24} color={ACCENT_TEAL} />
+                                <Text style={styles.sectionTitle}>Water Reminders</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Water Reminders</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Stay hydrated throughout the day
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.waterReminders.enabled}
+                                    onValueChange={(value) => handleToggle('waterReminders.enabled', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_TEAL }}
+                                    thumbColor={settings.waterReminders.enabled ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            {settings.waterReminders.enabled && (
+                                <View style={styles.settingRow}>
+                                    <View style={styles.settingInfo}>
+                                        <Text style={styles.settingLabel}>Frequency</Text>
+                                        <Text style={styles.settingDescription}>
+                                            Every {settings.waterReminders.frequency} hours
+                                        </Text>
+                                    </View>
+                                    <View style={styles.frequencyButtons}>
+                                        {[1, 2, 3, 4].map((hours) => (
+                                            <TouchableOpacity
+                                                key={hours}
+                                                style={[
+                                                    styles.frequencyButton,
+                                                    settings.waterReminders.frequency === hours && styles.frequencyButtonActive,
+                                                ]}
+                                                onPress={() => handleNumberSetting('waterReminders.frequency', hours)}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.frequencyButtonText,
+                                                        settings.waterReminders.frequency === hours && styles.frequencyButtonTextActive,
+                                                    ]}
+                                                >
+                                                    {hours}h
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                        </GradientBorderCard>
+
+                        {/* Status Notifications */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="stats-chart" size={24} color={ACCENT_BLUE} />
+                                <Text style={styles.sectionTitle}>Progress Updates</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Daily Progress</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Evening updates on your daily goals
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.statusNotifications.dailyProgress}
+                                    onValueChange={(value) => handleToggle('statusNotifications.dailyProgress', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                    thumbColor={settings.statusNotifications.dailyProgress ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Goal Achievements</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Celebrate when you hit your targets
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.statusNotifications.goalAchievements}
+                                    onValueChange={(value) => handleToggle('statusNotifications.goalAchievements', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                    thumbColor={settings.statusNotifications.goalAchievements ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Weekly Summary</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Sunday evening progress review
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.statusNotifications.weeklyProgress}
+                                    onValueChange={(value) => handleToggle('statusNotifications.weeklyProgress', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                    thumbColor={settings.statusNotifications.weeklyProgress ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+                        </GradientBorderCard>
+
+                        {/* Engagement Notifications */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="trophy" size={24} color={ACCENT_ORANGE} />
+                                <Text style={styles.sectionTitle}>Motivation & Updates</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Achievements</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Celebrate your fitness milestones
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.engagementNotifications.achievements}
+                                    onValueChange={(value) => handleToggle('engagementNotifications.achievements', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
+                                    thumbColor={settings.engagementNotifications.achievements ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>New Features</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Learn about app updates and improvements
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.engagementNotifications.newFeatures}
+                                    onValueChange={(value) => handleToggle('engagementNotifications.newFeatures', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
+                                    thumbColor={settings.engagementNotifications.newFeatures ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Weekly Reports</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Detailed insights and tips
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.engagementNotifications.weeklyReports}
+                                    onValueChange={(value) => handleToggle('engagementNotifications.weeklyReports', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
+                                    thumbColor={settings.engagementNotifications.weeklyReports ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+                        </GradientBorderCard>
+
+                        {/* Quiet Hours */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="moon" size={24} color={ACCENT_PURPLE} />
+                                <Text style={styles.sectionTitle}>Quiet Hours</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Enable Quiet Hours</Text>
+                                    <Text style={styles.settingDescription}>
+                                        No notifications during sleep time
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.generalSettings.quietHours}
+                                    onValueChange={(value) => handleToggle('generalSettings.quietHours', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                    thumbColor={settings.generalSettings.quietHours ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            {settings.generalSettings.quietHours && (
+                                <>
+                                    <TouchableOpacity
+                                        style={styles.timeRow}
+                                        onPress={() => showTimePickerModal('generalSettings.quietStart', settings.generalSettings.quietStart)}
+                                    >
+                                        <Text style={styles.timeLabel}>🌙 Start Time</Text>
+                                        <Text style={styles.timeValue}>{settings.generalSettings.quietStart}</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.timeRow}
+                                        onPress={() => showTimePickerModal('generalSettings.quietEnd', settings.generalSettings.quietEnd)}
+                                    >
+                                        <Text style={styles.timeLabel}>🌅 End Time</Text>
+                                        <Text style={styles.timeValue}>{settings.generalSettings.quietEnd}</Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+                        </GradientBorderCard>
+
+                        {/* Reset Button */}
+                        <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
+                            <Ionicons name="refresh" size={20} color={ACCENT_RED} />
+                            <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.bottomSpacer} />
                     </View>
+                </ScrollView>
 
-                    {/* Status Notifications */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="stats-chart" size={24} color="#45B7D1" />
-                            <Text style={styles.sectionTitle}>Progress Updates</Text>
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Daily Progress</Text>
-                                <Text style={styles.settingDescription}>
-                                    Evening updates on your daily goals
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.statusNotifications.dailyProgress}
-                                onValueChange={(value) => handleToggle('statusNotifications.dailyProgress', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#45B7D1' }}
-                                thumbColor={settings.statusNotifications.dailyProgress ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Goal Achievements</Text>
-                                <Text style={styles.settingDescription}>
-                                    Celebrate when you hit your targets
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.statusNotifications.goalAchievements}
-                                onValueChange={(value) => handleToggle('statusNotifications.goalAchievements', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#45B7D1' }}
-                                thumbColor={settings.statusNotifications.goalAchievements ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Weekly Summary</Text>
-                                <Text style={styles.settingDescription}>
-                                    Sunday evening progress review
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.statusNotifications.weeklyProgress}
-                                onValueChange={(value) => handleToggle('statusNotifications.weeklyProgress', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#45B7D1' }}
-                                thumbColor={settings.statusNotifications.weeklyProgress ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-                    </View>
-
-                    {/* Engagement Notifications */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="trophy" size={24} color="#F39C12" />
-                            <Text style={styles.sectionTitle}>Motivation & Updates</Text>
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Achievements</Text>
-                                <Text style={styles.settingDescription}>
-                                    Celebrate your fitness milestones
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.engagementNotifications.achievements}
-                                onValueChange={(value) => handleToggle('engagementNotifications.achievements', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#F39C12' }}
-                                thumbColor={settings.engagementNotifications.achievements ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>New Features</Text>
-                                <Text style={styles.settingDescription}>
-                                    Learn about app updates and improvements
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.engagementNotifications.newFeatures}
-                                onValueChange={(value) => handleToggle('engagementNotifications.newFeatures', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#F39C12' }}
-                                thumbColor={settings.engagementNotifications.newFeatures ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Weekly Reports</Text>
-                                <Text style={styles.settingDescription}>
-                                    Detailed insights and tips
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.engagementNotifications.weeklyReports}
-                                onValueChange={(value) => handleToggle('engagementNotifications.weeklyReports', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#F39C12' }}
-                                thumbColor={settings.engagementNotifications.weeklyReports ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-                    </View>
-
-                    {/* Quiet Hours */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="moon" size={24} color="#8E44AD" />
-                            <Text style={styles.sectionTitle}>Quiet Hours</Text>
-                        </View>
-
-                        <View style={styles.settingRow}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Enable Quiet Hours</Text>
-                                <Text style={styles.settingDescription}>
-                                    No notifications during sleep time
-                                </Text>
-                            </View>
-                            <Switch
-                                value={settings.generalSettings.quietHours}
-                                onValueChange={(value) => handleToggle('generalSettings.quietHours', value)}
-                                trackColor={{ false: '#E5E5E5', true: '#8E44AD' }}
-                                thumbColor={settings.generalSettings.quietHours ? '#fff' : '#f4f3f4'}
-                            />
-                        </View>
-
-                        {settings.generalSettings.quietHours && (
-                            <>
+                {/* Time Picker Modal */}
+                {showTimePicker.visible && (
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.timePickerModal}>
+                            <LinearGradient
+                                colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.pickerHeader}
+                            >
+                                <Text style={styles.pickerTitle}>Set Time</Text>
                                 <TouchableOpacity
-                                    style={styles.timeRow}
-                                    onPress={() => showTimePickerModal('generalSettings.quietStart', settings.generalSettings.quietStart)}
+                                    onPress={() => setShowTimePicker({ visible: false, type: '', currentTime: '' })}
+                                    style={styles.pickerCloseIcon}
                                 >
-                                    <Text style={styles.timeLabel}>🌙 Start Time</Text>
-                                    <Text style={styles.timeValue}>{settings.generalSettings.quietStart}</Text>
+                                    <Ionicons name="close" size={24} color={WHITE} />
                                 </TouchableOpacity>
+                            </LinearGradient>
+
+                            <View style={styles.timePickerContent}>
+                                <View style={styles.timePickerRow}>
+                                    <View style={styles.timePickerColumn}>
+                                        <Text style={styles.timePickerLabel}>Hour</Text>
+                                        <WheelPicker
+                                            data={hourData}
+                                            selectedValue={selectedHour}
+                                            onValueChange={(value) => setSelectedHour(value)}
+                                            itemHeight={40}
+                                            containerHeight={160}
+                                            containerStyle={{ width: 100 }}
+                                        />
+                                    </View>
+
+                                    <Text style={styles.timePickerSeparator}>:</Text>
+
+                                    <View style={styles.timePickerColumn}>
+                                        <Text style={styles.timePickerLabel}>Minute</Text>
+                                        <WheelPicker
+                                            data={minuteData}
+                                            selectedValue={selectedMinute}
+                                            onValueChange={(value) => setSelectedMinute(value)}
+                                            itemHeight={40}
+                                            containerHeight={160}
+                                            containerStyle={{ width: 100 }}
+                                        />
+                                    </View>
+                                </View>
 
                                 <TouchableOpacity
-                                    style={styles.timeRow}
-                                    onPress={() => showTimePickerModal('generalSettings.quietEnd', settings.generalSettings.quietEnd)}
+                                    style={styles.timePickerSave}
+                                    onPress={() => handleTimeChange(`${selectedHour}:${selectedMinute}`)}
+                                    disabled={isSaving}
                                 >
-                                    <Text style={styles.timeLabel}>🌅 End Time</Text>
-                                    <Text style={styles.timeValue}>{settings.generalSettings.quietEnd}</Text>
+                                    {isSaving ? (
+                                        <ActivityIndicator size="small" color={WHITE} />
+                                    ) : (
+                                        <Text style={styles.timePickerSaveText}>Save</Text>
+                                    )}
                                 </TouchableOpacity>
-                            </>
-                        )}
+                            </View>
+                        </View>
                     </View>
-
-                    {/* Reset Button */}
-                    <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
-                        <Ionicons name="refresh" size={20} color="#FF6B6B" />
-                        <Text style={styles.resetButtonText}>Reset to Defaults</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.bottomSpacer} />
-                </View>
-            </ScrollView>
-
-            {/* Time Picker Modal */}
-            {showTimePicker.visible && (
-                <View style={styles.timePickerModal}>
-                    <Text style={styles.timePickerText}>
-                        Time picker functionality will be implemented based on your preferred date/time library
-                    </Text>
-                    <TouchableOpacity
-                        style={styles.timePickerClose}
-                        onPress={() => setShowTimePicker({ visible: false, type: '', currentTime: '' })}
-                    >
-                        <Text style={styles.timePickerCloseText}>Close</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-        </LinearGradient>
+                )}
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: PRIMARY_BG,
+    },
+    safeArea: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        height: 60,
+        paddingHorizontal: 16,
+        backgroundColor: PRIMARY_BG,
+        marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
+    backButton: {
+        padding: 8,
+        marginRight: 8,
+    },
+    headerTitle: {
+        color: WHITE,
+        fontSize: 22,
+        fontWeight: "bold",
     },
     loadingContainer: {
         flex: 1,
@@ -633,36 +813,30 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 18,
-        color: '#FFFFFF',
+        color: WHITE,
         fontWeight: '600',
+        marginTop: 10,
     },
     scrollView: {
         flex: 1,
     },
     content: {
         paddingHorizontal: 20,
-        paddingTop: 60,
-    },
-    header: {
-        marginBottom: 30,
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
-        marginBottom: 8,
+        paddingTop: 10,
     },
     subtitle: {
         fontSize: 16,
-        color: '#E8E8E8',
+        color: SUBDUED,
         textAlign: 'center',
-    },
-    permissionCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        padding: 20,
         marginBottom: 20,
+    },
+    // Gradient border container
+    gradientBorderContainer: {
+        marginBottom: 16,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    permissionContent: {
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -673,29 +847,38 @@ const styles = StyleSheet.create({
     permissionTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: WHITE,
         marginBottom: 4,
     },
     permissionSubtitle: {
         fontSize: 14,
-        color: '#E8E8E8',
+        color: SUBDUED,
     },
     permissionButton: {
-        backgroundColor: '#FF6B6B',
+        backgroundColor: ACCENT_RED,
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 20,
     },
     permissionButtonText: {
-        color: '#FFFFFF',
+        color: WHITE,
         fontWeight: '600',
         fontSize: 14,
     },
-    section: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        padding: 20,
-        marginBottom: 20,
+    savingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+        marginBottom: 16,
+        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+        borderRadius: 10,
+    },
+    savingText: {
+        color: ACCENT_BLUE,
+        marginLeft: 10,
+        fontSize: 14,
+        fontWeight: '500',
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -705,7 +888,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: WHITE,
         marginLeft: 12,
     },
     settingRow: {
@@ -721,12 +904,12 @@ const styles = StyleSheet.create({
     settingLabel: {
         fontSize: 16,
         fontWeight: '500',
-        color: '#FFFFFF',
+        color: WHITE,
         marginBottom: 4,
     },
     settingDescription: {
         fontSize: 14,
-        color: '#E8E8E8',
+        color: SUBDUED,
     },
     timeRow: {
         flexDirection: 'row',
@@ -738,12 +921,12 @@ const styles = StyleSheet.create({
     },
     timeLabel: {
         fontSize: 16,
-        color: '#FFFFFF',
+        color: WHITE,
         fontWeight: '500',
     },
     timeValue: {
         fontSize: 16,
-        color: '#E8E8E8',
+        color: SUBDUED,
         fontWeight: '600',
     },
     frequencyButtons: {
@@ -754,24 +937,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 15,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
     frequencyButtonActive: {
-        backgroundColor: '#4ECDC4',
+        backgroundColor: ACCENT_TEAL,
     },
     frequencyButtonText: {
         fontSize: 14,
-        color: '#E8E8E8',
+        color: SUBDUED,
         fontWeight: '600',
     },
     frequencyButtonTextActive: {
-        color: '#FFFFFF',
+        color: WHITE,
     },
     resetButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(255, 107, 107, 0.2)',
+        backgroundColor: 'rgba(255, 107, 107, 0.1)',
         borderRadius: 15,
         padding: 15,
         marginTop: 10,
@@ -779,36 +962,75 @@ const styles = StyleSheet.create({
     resetButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FF6B6B',
+        color: ACCENT_RED,
         marginLeft: 8,
     },
     bottomSpacer: {
         height: 100,
     },
-    timePickerModal: {
+    modalOverlay: {
         position: 'absolute',
-        top: '50%',
-        left: 20,
-        right: 20,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
-        borderRadius: 15,
-        padding: 20,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
         alignItems: 'center',
     },
-    timePickerText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        textAlign: 'center',
+    timePickerModal: {
+        width: '85%',
+        backgroundColor: CARD_BG,
+        borderRadius: 15,
+        overflow: 'hidden',
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 15,
+    },
+    pickerTitle: {
+        color: WHITE,
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    pickerCloseIcon: {
+        padding: 5,
+    },
+    timePickerContent: {
+        padding: 20,
+    },
+    timePickerRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
         marginBottom: 20,
     },
-    timePickerClose: {
-        backgroundColor: '#667eea',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
+    timePickerColumn: {
+        alignItems: 'center',
     },
-    timePickerCloseText: {
-        color: '#FFFFFF',
+    timePickerLabel: {
+        color: SUBDUED,
+        fontSize: 14,
+        marginBottom: 10,
+    },
+    timePickerSeparator: {
+        color: WHITE,
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginHorizontal: 10,
+    },
+    timePickerSave: {
+        backgroundColor: ACCENT_BLUE,
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    timePickerSaveText: {
+        color: WHITE,
+        fontSize: 16,
         fontWeight: '600',
     },
 }); 

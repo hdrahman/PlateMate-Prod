@@ -1799,10 +1799,11 @@ const DiaryScreen: React.FC = () => {
 
             // Create a nutrition analysis prompt for the coach
             const nutritionAnalysisPrompt = `You are a professional nutritionist reviewing my food log for ${formatDate(currentDate)}. 
-Please give me a comprehensive nutritional consultation based on my data. 
+Please give me a comprehensive nutritional consultation based on my data.
 
-First, give me a brief introduction as my personal nutritionist.
-Then analyze my overall calorie intake and if it aligns with my goals.
+IMPORTANT: Skip any introduction - do not introduce yourself or provide greeting text. Start directly with your analysis.
+
+Analyze my overall calorie intake and if it aligns with my goals.
 Break down my macronutrient distribution and whether my balance is appropriate.
 Identify specific strengths in my diet (what I'm doing well).
 Point out areas for improvement or potential nutritional gaps.
@@ -1810,7 +1811,7 @@ Suggest specific actionable recommendations for my next meals.
 Discuss how my current eating pattern aligns with my fitness goals.
 Provide a brief summary of key takeaways as my nutritionist.
 
-Be conversational but thorough, as if we're having an in-person session. Focus on being educational, specific, and actionable.`;
+Be conversational but thorough, as if we're having an in-person session. Focus on being educational, specific, and actionable. Use numbered sections.`;
 
             // Navigate to coach with nutrition context and analysis prompt
             (navigation as any).navigate('Chatbot', {

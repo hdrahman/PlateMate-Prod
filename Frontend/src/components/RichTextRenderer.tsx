@@ -23,11 +23,20 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
     processedText = processedText.replace(/^(.+)"$/gm, '$1');
     processedText = processedText.replace(/^'(.+)'$/gm, '$1');
 
-    // Replace "---" with empty line
-    processedText = processedText.replace(/\n---\n/g, '\n\n');
-    processedText = processedText.replace(/^---\n/g, '\n');
-    processedText = processedText.replace(/\n---$/g, '\n');
-    processedText = processedText.replace(/^---$/g, '');
+    // Remove quotes from short comments/notes
+    processedText = processedText.replace(/(?:^|\n)"([^"]+?)"(?=\n|$)/g, '$1');
+    processedText = processedText.replace(/(?:^|\n)'([^']+?)'(?=\n|$)/g, '$1');
+
+    // Enhanced replacement of "---" with empty lines
+    processedText = processedText.replace(/\n---\n/g, '\n\n');  // Between paragraphs
+    processedText = processedText.replace(/^---\n/g, '\n');     // At beginning
+    processedText = processedText.replace(/\n---$/g, '\n');     // At end  
+    processedText = processedText.replace(/^---$/g, '');        // Entire content is just ---
+    processedText = processedText.replace(/\n\s*---\s*\n/g, '\n\n'); // With whitespace
+    processedText = processedText.replace(/(?<=\n)---(?=\n)/g, '');  // Standalone line
+
+    // Add extra spacing after section titles
+    processedText = processedText.replace(/^(.*:)$/gm, '$1\n');
 
     // Process headings, bold, italics, and lists
     const processText = () => {
@@ -37,6 +46,8 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
         let inList = false;
         let listItems: ReactNode[] = [];
         let listType: 'bullet' | 'ordered' | null = null;
+        let inSection = false;
+        let lastLineWasHeader = false;
 
         const finishList = () => {
             if (inList && listItems.length > 0) {
@@ -55,7 +66,27 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
             line = line.trim();
             if (!line) {
                 finishList();
-                elements.push(<View key={`space-${i}`} style={styles.paragraphSpace} />);
+                // Add more space after headers
+                if (lastLineWasHeader) {
+                    lastLineWasHeader = false;
+                } else {
+                    elements.push(<View key={`space-${i}`} style={styles.paragraphSpace} />);
+                }
+                return;
+            }
+
+            // Check for section headers (lines ending with colon)
+            if (line.endsWith(':') && !line.includes('://')) {
+                finishList();
+
+                // This is a section header
+                elements.push(
+                    <Text key={`section-${i}`} style={styles.sectionHeader}>
+                        {line}
+                    </Text>
+                );
+                lastLineWasHeader = true;
+                inSection = true;
                 return;
             }
 
@@ -81,6 +112,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                         </LinearGradient>
                     </View>
                 );
+                lastLineWasHeader = true;
                 return;
             }
 
@@ -95,6 +127,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                         {headingText}
                     </Text>
                 );
+                lastLineWasHeader = true;
                 return;
             }
 
@@ -109,6 +142,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                         {headingText}
                     </Text>
                 );
+                lastLineWasHeader = true;
                 return;
             }
 
@@ -131,6 +165,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                         </Text>
                     </View>
                 );
+                lastLineWasHeader = false;
                 return;
             }
 
@@ -151,16 +186,22 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                         </Text>
                     </View>
                 );
+                lastLineWasHeader = false;
                 return;
             }
 
-            // Regular paragraph
+            // Regular paragraph - add indentation if we're inside a section
             finishList();
+
+            // Add indentation for lines after a section header
+            const textStyle = inSection ? [styles.paragraph, styles.indentedParagraph, baseStyle] : [styles.paragraph, baseStyle];
+
             elements.push(
-                <Text key={`p-${i}`} style={[styles.paragraph, baseStyle]}>
+                <Text key={`p-${i}`} style={textStyle}>
                     {processInlineStyles(line)}
                 </Text>
             );
+            lastLineWasHeader = false;
         });
 
         finishList();
@@ -287,13 +328,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     headingContainer: {
-        marginVertical: 8,
+        marginVertical: 12,
         borderRadius: 8,
         overflow: 'hidden',
     },
     headingGradient: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
         borderRadius: 8,
     },
     heading1: {
@@ -305,24 +346,36 @@ const styles = StyleSheet.create({
         fontSize: 20,
         color: 'white',
         fontWeight: 'bold',
-        marginBottom: 6,
-        marginTop: 10,
+        marginBottom: 8,
+        marginTop: 12,
     },
     heading3: {
         fontSize: 18,
         color: 'white',
         fontWeight: 'bold',
-        marginBottom: 5,
-        marginTop: 8,
+        marginBottom: 6,
+        marginTop: 10,
+    },
+    sectionHeader: {
+        fontSize: 18,
+        color: 'white',
+        fontWeight: 'bold',
+        marginTop: 16,
+        marginBottom: 4,
     },
     paragraph: {
         fontSize: 16,
         color: 'white',
         lineHeight: 22,
-        marginBottom: 8,
+        marginBottom: 4,
+    },
+    indentedParagraph: {
+        paddingLeft: 8,
+        marginBottom: 4,
+        marginTop: 0,
     },
     paragraphSpace: {
-        height: 8,
+        height: 6,
     },
     bold: {
         fontWeight: 'bold',
@@ -333,19 +386,20 @@ const styles = StyleSheet.create({
         color: 'white',
     },
     list: {
-        marginBottom: 8,
+        marginBottom: 12,
         marginTop: 4,
     },
     listItem: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 6,
+        marginBottom: 8,
+        paddingLeft: 8,
     },
     bulletPoint: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#5A60EA',
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FF00F5',
         marginTop: 8,
         marginRight: 8,
     },
