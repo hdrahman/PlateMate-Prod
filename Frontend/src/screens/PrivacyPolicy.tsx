@@ -6,13 +6,70 @@ import {
     ScrollView,
     TouchableOpacity,
     Alert,
-    Linking
+    Linking,
+    StatusBar,
+    SafeAreaView,
+    Dimensions,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PrivacyPolicySection } from '../types/notifications';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Define theme colors
+const PRIMARY_BG = '#000000';
+const CARD_BG = '#1C1C1E';
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
+const ACCENT_BLUE = '#2196F3';
+const ACCENT_RED = '#FF6B6B';
+const ACCENT_TEAL = '#4ECDC4';
+const ACCENT_ORANGE = '#F39C12';
+const ACCENT_PURPLE = '#8E44AD';
+
+// Gradient border card wrapper component
+interface GradientBorderCardProps {
+    children: React.ReactNode;
+    style?: any;
+}
+
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+    return (
+        <View style={styles.gradientBorderContainer}>
+            <LinearGradient
+                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    borderRadius: 16,
+                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+            />
+            <View
+                style={{
+                    margin: 1.5,
+                    borderRadius: 15,
+                    backgroundColor: style?.backgroundColor || CARD_BG,
+                    padding: 16,
+                    ...style
+                }}
+            >
+                {children}
+            </View>
+        </View>
+    );
+};
 
 export default function PrivacyPolicy() {
+    const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
     const [lastUpdated] = useState(new Date('2024-01-15'));
 
@@ -139,7 +196,7 @@ We're here to help you understand and control your privacy.`,
             case 'data_settings':
             case 'data_sharing':
                 if (screen) {
-                    Alert.alert('Navigation', `Would navigate to ${screen} screen`);
+                    navigation.navigate(screen as never);
                 }
                 break;
             case 'export_data':
@@ -172,6 +229,12 @@ We're here to help you understand and control your privacy.`,
             case 'request_deletion':
                 Linking.openURL('mailto:privacy@platemate.app?subject=Data Deletion Request');
                 break;
+            case 'security_settings':
+                Alert.alert('Security Settings', 'Security settings feature coming soon.');
+                break;
+            case 'user_rights':
+                Alert.alert('Your Rights', 'Detailed rights management features coming soon.');
+                break;
             default:
                 Alert.alert('Action', `${action} feature coming soon`);
         }
@@ -179,9 +242,9 @@ We're here to help you understand and control your privacy.`,
 
     const getImportanceColor = (importance: 'high' | 'medium' | 'low') => {
         switch (importance) {
-            case 'high': return '#F44336';
-            case 'medium': return '#FF9800';
-            case 'low': return '#4CAF50';
+            case 'high': return '#FF6B6B';
+            case 'medium': return '#F39C12';
+            case 'low': return '#4ECDC4';
         }
     };
 
@@ -193,174 +256,301 @@ We're here to help you understand and control your privacy.`,
         }
     };
 
+    // Create gradient text component
+    const GradientText = ({ text, style }: { text: string, style?: any }) => {
+        return (
+            <MaskedView
+                maskElement={<Text style={[styles.title, style]}>{text}</Text>}
+            >
+                <LinearGradient
+                    colors={['#0074dd', '#5c00dd', '#dd0095']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                >
+                    <Text style={[styles.title, style, { opacity: 0 }]}>{text}</Text>
+                </LinearGradient>
+            </MaskedView>
+        );
+    };
+
     return (
-        <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                <View style={styles.content}>
-                    {/* Header */}
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                    paddingTop: insets.top,
+                    paddingBottom: insets.bottom,
+                    paddingHorizontal: 20
+                }}
+            >
+                {/* Header with Back Button */}
+                <View style={styles.headerContainer}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Ionicons name="chevron-back" size={24} color={WHITE} />
+                    </TouchableOpacity>
                     <View style={styles.header}>
-                        <Text style={styles.title}>Privacy Policy</Text>
+                        <GradientText text="Privacy Policy" />
                         <Text style={styles.subtitle}>
                             Transparent about how we handle your data
                         </Text>
                         <View style={styles.lastUpdatedContainer}>
-                            <Ionicons name="calendar" size={16} color="#E8E8E8" />
+                            <Ionicons name="calendar" size={16} color={SUBDUED} />
                             <Text style={styles.lastUpdatedText}>
                                 Last updated: {lastUpdated.toLocaleDateString()}
                             </Text>
                         </View>
                     </View>
+                </View>
 
-                    {/* Quick Summary */}
+                {/* New Privacy Emphasis Card */}
+                <GradientBorderCard>
+                    <View style={styles.privacyEmphasisCard}>
+                        <LinearGradient
+                            colors={['#0074dd', '#5c00dd', '#dd0095']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.emphasisIconContainer}
+                        >
+                            <Ionicons name="shield-checkmark-outline" size={32} color={WHITE} />
+                        </LinearGradient>
+                        <View style={styles.emphasisContent}>
+                            <Text style={styles.emphasisTitle}>Your Data Stays on Your Device</Text>
+                            <Text style={styles.emphasisText}>
+                                <Text style={styles.emphasisBold}>PlateMate stores all your nutrition, fitness, and health data locally.</Text> We
+                                only store basic profile information from settings. Everything else never leaves your
+                                device — we have no access to your personal data.
+                            </Text>
+                        </View>
+                    </View>
+                </GradientBorderCard>
+
+                {/* Quick Summary */}
+                <GradientBorderCard>
                     <View style={styles.summaryCard}>
-                        <Ionicons name="shield-checkmark" size={32} color="#4CAF50" />
+                        <LinearGradient
+                            colors={['#4ECDC4', '#26A69A']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.shieldIconContainer}
+                        >
+                            <Ionicons name="shield-checkmark" size={32} color={WHITE} />
+                        </LinearGradient>
                         <View style={styles.summaryContent}>
-                            <Text style={styles.summaryTitle}>🔒 Privacy At a Glance</Text>
+                            <Text style={styles.summaryTitle}>Privacy At a Glance</Text>
                             <Text style={styles.summaryText}>
                                 Your data stays on your device. We don't collect, share, or sell your personal information.
                                 You have complete control over your health and fitness data.
                             </Text>
                         </View>
                     </View>
+                </GradientBorderCard>
 
-                    {/* Quick Navigation */}
-                    <View style={styles.quickNavSection}>
-                        <Text style={styles.quickNavTitle}>Quick Access</Text>
-                        <View style={styles.quickNavGrid}>
-                            <TouchableOpacity
-                                style={styles.quickNavItem}
-                                onPress={() => handleUserAction('data_settings', 'DataSharing')}
+                {/* Quick Navigation */}
+                <View style={styles.quickNavSection}>
+                    <Text style={styles.sectionHeaderText}>Quick Access</Text>
+                    <View style={styles.quickNavGrid}>
+                        <TouchableOpacity
+                            style={styles.quickNavItem}
+                            onPress={() => handleUserAction('data_settings', 'DataSharing')}
+                        >
+                            <LinearGradient
+                                colors={['#2196F3', '#1976D2']}
+                                style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="settings" size={24} color="#667eea" />
-                                <Text style={styles.quickNavText}>Data Settings</Text>
-                            </TouchableOpacity>
+                                <Ionicons name="settings" size={24} color={WHITE} />
+                            </LinearGradient>
+                            <Text style={styles.quickNavText}>Data Settings</Text>
+                        </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.quickNavItem}
-                                onPress={() => handleUserAction('export_data')}
+                        <TouchableOpacity
+                            style={styles.quickNavItem}
+                            onPress={() => handleUserAction('export_data')}
+                        >
+                            <LinearGradient
+                                colors={['#4ECDC4', '#26A69A']}
+                                style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="download" size={24} color="#667eea" />
-                                <Text style={styles.quickNavText}>Export Data</Text>
-                            </TouchableOpacity>
+                                <Ionicons name="download" size={24} color={WHITE} />
+                            </LinearGradient>
+                            <Text style={styles.quickNavText}>Export Data</Text>
+                        </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.quickNavItem}
-                                onPress={() => handleUserAction('contact_support')}
+                        <TouchableOpacity
+                            style={styles.quickNavItem}
+                            onPress={() => handleUserAction('contact_support')}
+                        >
+                            <LinearGradient
+                                colors={['#8E44AD', '#9B59B6']}
+                                style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="mail" size={24} color="#667eea" />
-                                <Text style={styles.quickNavText}>Contact Us</Text>
-                            </TouchableOpacity>
+                                <Ionicons name="mail" size={24} color={WHITE} />
+                            </LinearGradient>
+                            <Text style={styles.quickNavText}>Contact Us</Text>
+                        </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.quickNavItem}
-                                onPress={() => handleUserAction('delete_data')}
+                        <TouchableOpacity
+                            style={styles.quickNavItem}
+                            onPress={() => handleUserAction('delete_data')}
+                        >
+                            <LinearGradient
+                                colors={['#FF6B6B', '#E74C3C']}
+                                style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="trash" size={24} color="#F44336" />
-                                <Text style={[styles.quickNavText, { color: '#F44336' }]}>Delete Data</Text>
-                            </TouchableOpacity>
-                        </View>
+                                <Ionicons name="trash" size={24} color={WHITE} />
+                            </LinearGradient>
+                            <Text style={styles.quickNavText}>Delete Data</Text>
+                        </TouchableOpacity>
                     </View>
+                </View>
 
-                    {/* Privacy Policy Sections */}
-                    <View style={styles.sectionsContainer}>
-                        <Text style={styles.sectionsTitle}>Full Privacy Policy</Text>
+                {/* Privacy Policy Sections */}
+                <View style={styles.sectionsContainer}>
+                    <Text style={styles.sectionHeaderText}>Full Privacy Policy</Text>
 
-                        {privacyPolicySections.map((section) => (
-                            <View key={section.id} style={styles.section}>
-                                <TouchableOpacity
-                                    style={styles.sectionHeader}
-                                    onPress={() => toggleSection(section.id)}
-                                >
-                                    <View style={styles.sectionTitleContainer}>
+                    {privacyPolicySections.map((section) => (
+                        <GradientBorderCard key={section.id} style={styles.sectionCardInner}>
+                            <TouchableOpacity
+                                style={styles.sectionHeader}
+                                onPress={() => toggleSection(section.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.sectionTitleContainer}>
+                                    <View style={[
+                                        styles.importanceIconContainer,
+                                        { backgroundColor: getImportanceColor(section.importance) + '20' }
+                                    ]}>
                                         <Ionicons
                                             name={getImportanceIcon(section.importance)}
                                             size={20}
                                             color={getImportanceColor(section.importance)}
                                         />
-                                        <Text style={styles.sectionTitle}>{section.title}</Text>
                                     </View>
+                                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                                </View>
+                                <View style={styles.chevronContainer}>
                                     <Ionicons
                                         name={expandedSections.has(section.id) ? 'chevron-up' : 'chevron-down'}
                                         size={20}
-                                        color="#E8E8E8"
+                                        color={SUBDUED}
                                     />
-                                </TouchableOpacity>
+                                </View>
+                            </TouchableOpacity>
 
-                                {expandedSections.has(section.id) && (
-                                    <View style={styles.sectionContent}>
-                                        <Text style={styles.sectionText}>{section.content}</Text>
+                            {expandedSections.has(section.id) && (
+                                <View style={styles.sectionContent}>
+                                    <Text style={styles.sectionText}>{section.content}</Text>
 
-                                        {section.userActions && section.userActions.length > 0 && (
-                                            <View style={styles.userActionsContainer}>
-                                                <Text style={styles.userActionsTitle}>Available Actions:</Text>
-                                                {section.userActions.map((userAction, index) => (
-                                                    <TouchableOpacity
-                                                        key={index}
-                                                        style={styles.userActionButton}
-                                                        onPress={() => handleUserAction(userAction.action, userAction.screen)}
+                                    {section.userActions && section.userActions.length > 0 && (
+                                        <View style={styles.userActionsContainer}>
+                                            <Text style={styles.userActionsTitle}>Available Actions:</Text>
+                                            {section.userActions.map((userAction, index) => (
+                                                <TouchableOpacity
+                                                    key={index}
+                                                    style={styles.userActionButton}
+                                                    onPress={() => handleUserAction(userAction.action, userAction.screen)}
+                                                >
+                                                    <LinearGradient
+                                                        colors={['#0074dd', '#5c00dd']}
+                                                        style={styles.actionButtonGradient}
+                                                        start={{ x: 0, y: 0 }}
+                                                        end={{ x: 1, y: 0 }}
                                                     >
-                                                        <Ionicons name="arrow-forward" size={16} color="#667eea" />
+                                                        <Ionicons name="arrow-forward" size={16} color={WHITE} />
                                                         <Text style={styles.userActionText}>{userAction.label}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-                        ))}
-                    </View>
+                                                    </LinearGradient>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+                        </GradientBorderCard>
+                    ))}
+                </View>
 
-                    {/* Footer Actions */}
-                    <View style={styles.footerActions}>
-                        <TouchableOpacity
-                            style={styles.footerButton}
-                            onPress={() => handleUserAction('contact_support')}
+                {/* Footer Actions */}
+                <View style={styles.footerActions}>
+                    <TouchableOpacity
+                        style={styles.footerButton}
+                        onPress={() => handleUserAction('contact_support')}
+                    >
+                        <LinearGradient
+                            colors={['#0074dd', '#5c00dd']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.footerButtonGradient}
                         >
-                            <Ionicons name="help-circle" size={20} color="#667eea" />
+                            <Ionicons name="help-circle" size={20} color={WHITE} />
                             <Text style={styles.footerButtonText}>Have Questions?</Text>
-                        </TouchableOpacity>
+                        </LinearGradient>
+                    </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={styles.footerButton}
-                            onPress={() => Alert.alert('Download', 'Privacy policy PDF will be downloaded')}
+                    <TouchableOpacity
+                        style={styles.footerButton}
+                        onPress={() => Alert.alert('Download', 'Privacy policy PDF will be downloaded')}
+                    >
+                        <LinearGradient
+                            colors={['#5c00dd', '#dd0095']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.footerButtonGradient}
                         >
-                            <Ionicons name="document" size={20} color="#667eea" />
+                            <Ionicons name="document" size={20} color={WHITE} />
                             <Text style={styles.footerButtonText}>Download PDF</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.bottomSpacer} />
+                        </LinearGradient>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
-        </LinearGradient>
+        </View>
     );
 }
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: PRIMARY_BG,
+    },
+    headerContainer: {
+        paddingVertical: 20,
+        position: 'relative',
+        marginTop: 10,
+    },
+    backButton: {
+        position: 'absolute',
+        left: 0,
+        top: 20,
+        zIndex: 10,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     scrollView: {
         flex: 1,
     },
-    content: {
-        paddingHorizontal: 20,
-        paddingTop: 60,
-    },
     header: {
-        marginBottom: 30,
         alignItems: 'center',
+        marginBottom: 15,
+        paddingHorizontal: 40,
     },
     title: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: WHITE,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#E8E8E8',
+        color: SUBDUED,
         textAlign: 'center',
         marginBottom: 15,
     },
@@ -374,18 +564,52 @@ const styles = StyleSheet.create({
     },
     lastUpdatedText: {
         fontSize: 14,
-        color: '#E8E8E8',
+        color: SUBDUED,
         marginLeft: 6,
     },
-    summaryCard: {
-        backgroundColor: 'rgba(76, 175, 80, 0.15)',
-        borderRadius: 15,
-        padding: 20,
-        marginBottom: 25,
+    privacyEmphasisCard: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        borderWidth: 1,
-        borderColor: 'rgba(76, 175, 80, 0.3)',
+        padding: 10,
+        backgroundColor: 'rgba(33, 150, 243, 0.05)', // Subtle blue tint
+    },
+    emphasisIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emphasisContent: {
+        flex: 1,
+        marginLeft: 15,
+    },
+    emphasisTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: WHITE,
+        marginBottom: 8,
+    },
+    emphasisText: {
+        fontSize: 15,
+        color: SUBDUED,
+        lineHeight: 22,
+    },
+    emphasisBold: {
+        fontWeight: 'bold',
+        color: WHITE,
+    },
+    shieldIconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    summaryCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: 10,
     },
     summaryContent: {
         flex: 1,
@@ -394,22 +618,23 @@ const styles = StyleSheet.create({
     summaryTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: WHITE,
         marginBottom: 8,
     },
     summaryText: {
-        fontSize: 16,
-        color: '#E8E8E8',
+        fontSize: 15,
+        color: SUBDUED,
         lineHeight: 22,
     },
     quickNavSection: {
-        marginBottom: 30,
+        marginVertical: 24,
     },
-    quickNavTitle: {
-        fontSize: 20,
+    sectionHeaderText: {
+        fontSize: 18,
         fontWeight: '600',
-        color: '#FFFFFF',
-        marginBottom: 15,
+        color: WHITE,
+        marginBottom: 16,
+        paddingLeft: 5,
     },
     quickNavGrid: {
         flexDirection: 'row',
@@ -417,32 +642,41 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     quickNavItem: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        padding: 20,
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
+        padding: 16,
         alignItems: 'center',
         width: '48%',
         marginBottom: 15,
     },
+    quickNavIconContainer: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     quickNavText: {
         fontSize: 14,
-        color: '#FFFFFF',
+        color: WHITE,
         fontWeight: '500',
         marginTop: 8,
         textAlign: 'center',
     },
     sectionsContainer: {
-        marginBottom: 30,
+        marginBottom: 24,
     },
-    sectionsTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#FFFFFF',
-        marginBottom: 20,
+    gradientBorderContainer: {
+        marginVertical: 10,
+        borderRadius: 16,
+    },
+    sectionCardInner: {
+        padding: 0,
     },
     section: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
+        backgroundColor: CARD_BG,
+        borderRadius: 16,
         marginBottom: 15,
         overflow: 'hidden',
     },
@@ -450,49 +684,65 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 20,
+        padding: 16,
     },
     sectionTitleContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
     },
+    importanceIconContainer: {
+        padding: 8,
+        borderRadius: 12,
+    },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: WHITE,
         marginLeft: 12,
     },
+    chevronContainer: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     sectionContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.1)',
     },
     sectionText: {
         fontSize: 15,
-        color: '#E8E8E8',
+        color: SUBDUED,
         lineHeight: 22,
-        marginBottom: 15,
+        marginVertical: 12,
     },
     userActionsContainer: {
-        marginTop: 10,
+        marginTop: 16,
     },
     userActionsTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
-        marginBottom: 10,
+        color: WHITE,
+        marginBottom: 12,
     },
     userActionButton: {
+        marginBottom: 8,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    actionButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(102, 126, 234, 0.2)',
-        borderRadius: 10,
         padding: 12,
-        marginBottom: 8,
     },
     userActionText: {
         fontSize: 14,
-        color: '#667eea',
+        color: WHITE,
         fontWeight: '500',
         marginLeft: 8,
     },
@@ -502,21 +752,23 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     footerButton: {
+        flex: 0.48,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    footerButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        padding: 15,
-        flex: 0.48,
         justifyContent: 'center',
+        padding: 15,
     },
     footerButtonText: {
         fontSize: 14,
-        color: '#FFFFFF',
+        color: WHITE,
         fontWeight: '500',
         marginLeft: 8,
     },
     bottomSpacer: {
-        height: 100,
+        height: 40,
     },
 }); 

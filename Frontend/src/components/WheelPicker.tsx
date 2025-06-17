@@ -62,7 +62,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                     scrollToIndex(initialIndex, false);
                     setInitialized(true);
                 }
-            }, 100);
+            }, 150);
 
             return () => clearTimeout(timer);
         }
@@ -88,9 +88,13 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
         const index = Math.round(y / itemHeight);
 
         if (index >= 0 && index < data.length) {
-            // Ensure we snap to the exact position
-            if (Math.abs(y - (index * itemHeight)) > 0.5) {
-                scrollToIndex(index);
+            // Ensure we snap to the exact position with precision
+            const exactPosition = index * itemHeight;
+            if (Math.abs(y - exactPosition) > 1) {
+                // Re-align to exact position
+                setTimeout(() => {
+                    scrollToIndex(index, true);
+                }, 10);
             }
 
             // Only update if value changed
@@ -115,19 +119,28 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
 
     return (
         <View style={[styles.container, { height: containerHeight }, containerStyle]}>
-            {/* Highlight for the selected item */}
-            <View style={[styles.highlightView, { top: containerHeight / 2 - itemHeight / 2, height: itemHeight }]} />
+            {/* Highlight for the selected item - adjusted for better centering */}
+            <View
+                style={[
+                    styles.highlightView,
+                    {
+                        top: (containerHeight - itemHeight) / 2,
+                        height: itemHeight
+                    }
+                ]}
+            />
 
             <ScrollView
                 ref={scrollViewRef}
                 showsVerticalScrollIndicator={false}
                 snapToInterval={itemHeight}
-                decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.85}
+                decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.9}
                 onScroll={handleScroll}
                 onMomentumScrollEnd={handleMomentumScrollEnd}
                 scrollEventThrottle={16}
                 contentContainerStyle={{ paddingTop, paddingBottom }}
                 keyboardShouldPersistTaps="always"
+                snapToAlignment="center"
             >
                 {data.map((item, index) => {
                     const itemPosition = index * itemHeight;

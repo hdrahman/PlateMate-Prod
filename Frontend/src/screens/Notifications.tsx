@@ -129,17 +129,26 @@ export default function NotificationsScreen() {
     // States for time picker
     const [selectedHour, setSelectedHour] = useState('08');
     const [selectedMinute, setSelectedMinute] = useState('00');
+    const [selectedAmPm, setSelectedAmPm] = useState('AM');
 
     // Generate hour and minute data for wheel picker
-    const hourData = Array.from({ length: 24 }, (_, i) => ({
-        id: i.toString().padStart(2, '0'),
-        label: i.toString().padStart(2, '0'),
-    }));
+    const hourData = Array.from({ length: 12 }, (_, i) => {
+        const hour = i === 0 ? 12 : i;
+        return {
+            id: i === 0 ? '00' : i.toString().padStart(2, '0'),
+            label: hour.toString().padStart(2, '0'),
+        };
+    });
 
     const minuteData = Array.from({ length: 60 }, (_, i) => ({
         id: i.toString().padStart(2, '0'),
         label: i.toString().padStart(2, '0'),
     }));
+
+    const amPmData = [
+        { id: 'AM', label: 'AM' },
+        { id: 'PM', label: 'PM' }
+    ];
 
     useEffect(() => {
         // Check notification permissions when component mounts
@@ -297,8 +306,18 @@ export default function NotificationsScreen() {
         try {
             setIsSaving(true);
 
-            // Make sure the selectedTime is properly formatted (HH:MM)
-            const formattedTime = selectedTime.padStart(5, '0');
+            // Convert from 12-hour format to 24-hour format
+            let hours = parseInt(selectedHour);
+            const minutes = selectedMinute;
+
+            if (selectedAmPm === 'PM' && hours < 12) {
+                hours += 12;
+            } else if (selectedAmPm === 'AM' && hours === 12) {
+                hours = 0;
+            }
+
+            // Format in 24-hour format for storage (HH:MM)
+            const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}`;
 
             const updatedSettings = await SettingsService.updateNotificationSetting(
                 showTimePicker.type,
@@ -325,9 +344,17 @@ export default function NotificationsScreen() {
 
     const showTimePickerModal = (type: string, currentTime: string) => {
         // Parse the current time
-        const [hours, minutes] = currentTime.split(':');
-        setSelectedHour(hours);
-        setSelectedMinute(minutes);
+        const [hoursStr, minutesStr] = currentTime.split(':');
+        let hours = parseInt(hoursStr);
+
+        // Convert from 24-hour to 12-hour format
+        let amPm = hours >= 12 ? 'PM' : 'AM';
+        const displayHour = hours % 12;
+        hours = displayHour === 0 ? 12 : displayHour;
+
+        setSelectedHour(hours.toString().padStart(2, '0'));
+        setSelectedMinute(minutesStr);
+        setSelectedAmPm(amPm);
         setShowTimePicker({ visible: true, type, currentTime });
     };
 
@@ -357,6 +384,19 @@ export default function NotificationsScreen() {
                 },
             ]
         );
+    };
+
+    // Helper function to format time in 12-hour format for display
+    const formatTime = (time24: string): string => {
+        const [hoursStr, minutesStr] = time24.split(':');
+        let hours = parseInt(hoursStr);
+
+        // Convert from 24-hour to 12-hour format
+        let amPm = hours >= 12 ? 'PM' : 'AM';
+        const displayHour = hours % 12;
+        hours = displayHour === 0 ? 12 : displayHour;
+
+        return `${hours}:${minutesStr} ${amPm}`;
     };
 
     if (isLoading || !settings) {
@@ -462,7 +502,7 @@ export default function NotificationsScreen() {
                                         onPress={() => showTimePickerModal('mealReminders.breakfast', settings.mealReminders.breakfast)}
                                     >
                                         <Text style={styles.timeLabel}>🍳 Breakfast</Text>
-                                        <Text style={styles.timeValue}>{settings.mealReminders.breakfast}</Text>
+                                        <Text style={styles.timeValue}>{formatTime(settings.mealReminders.breakfast)}</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -470,7 +510,7 @@ export default function NotificationsScreen() {
                                         onPress={() => showTimePickerModal('mealReminders.lunch', settings.mealReminders.lunch)}
                                     >
                                         <Text style={styles.timeLabel}>🥗 Lunch</Text>
-                                        <Text style={styles.timeValue}>{settings.mealReminders.lunch}</Text>
+                                        <Text style={styles.timeValue}>{formatTime(settings.mealReminders.lunch)}</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -478,7 +518,7 @@ export default function NotificationsScreen() {
                                         onPress={() => showTimePickerModal('mealReminders.dinner', settings.mealReminders.dinner)}
                                     >
                                         <Text style={styles.timeLabel}>🍽️ Dinner</Text>
-                                        <Text style={styles.timeValue}>{settings.mealReminders.dinner}</Text>
+                                        <Text style={styles.timeValue}>{formatTime(settings.mealReminders.dinner)}</Text>
                                     </TouchableOpacity>
 
                                     <View style={styles.settingRow}>
@@ -689,7 +729,7 @@ export default function NotificationsScreen() {
                                         onPress={() => showTimePickerModal('generalSettings.quietStart', settings.generalSettings.quietStart)}
                                     >
                                         <Text style={styles.timeLabel}>🌙 Start Time</Text>
-                                        <Text style={styles.timeValue}>{settings.generalSettings.quietStart}</Text>
+                                        <Text style={styles.timeValue}>{formatTime(settings.generalSettings.quietStart)}</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -697,7 +737,7 @@ export default function NotificationsScreen() {
                                         onPress={() => showTimePickerModal('generalSettings.quietEnd', settings.generalSettings.quietEnd)}
                                     >
                                         <Text style={styles.timeLabel}>🌅 End Time</Text>
-                                        <Text style={styles.timeValue}>{settings.generalSettings.quietEnd}</Text>
+                                        <Text style={styles.timeValue}>{formatTime(settings.generalSettings.quietEnd)}</Text>
                                     </TouchableOpacity>
                                 </>
                             )}
@@ -742,7 +782,7 @@ export default function NotificationsScreen() {
                                             onValueChange={(value) => setSelectedHour(value)}
                                             itemHeight={40}
                                             containerHeight={160}
-                                            containerStyle={{ width: 100 }}
+                                            containerStyle={{ width: 80 }}
                                         />
                                     </View>
 
@@ -756,14 +796,26 @@ export default function NotificationsScreen() {
                                             onValueChange={(value) => setSelectedMinute(value)}
                                             itemHeight={40}
                                             containerHeight={160}
-                                            containerStyle={{ width: 100 }}
+                                            containerStyle={{ width: 80 }}
+                                        />
+                                    </View>
+
+                                    <View style={styles.timePickerColumn}>
+                                        <Text style={styles.timePickerLabel}>AM/PM</Text>
+                                        <WheelPicker
+                                            data={amPmData}
+                                            selectedValue={selectedAmPm}
+                                            onValueChange={(value) => setSelectedAmPm(value)}
+                                            itemHeight={40}
+                                            containerHeight={160}
+                                            containerStyle={{ width: 80 }}
                                         />
                                     </View>
                                 </View>
 
                                 <TouchableOpacity
                                     style={styles.timePickerSave}
-                                    onPress={() => handleTimeChange(`${selectedHour}:${selectedMinute}`)}
+                                    onPress={() => handleTimeChange(`${selectedHour}:${selectedMinute} ${selectedAmPm}`)}
                                     disabled={isSaving}
                                 >
                                     {isSaving ? (

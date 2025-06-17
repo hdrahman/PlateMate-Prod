@@ -123,29 +123,57 @@ class NotificationService {
             // Cancel all existing notifications first
             await this.cancelAllNotifications();
 
+            // Track any scheduling errors
+            const errors = [];
+
             // Schedule meal reminders
             if (settings.mealReminders.enabled) {
-                await this.scheduleMealReminders(settings);
+                try {
+                    await this.scheduleMealReminders(settings);
+                } catch (error) {
+                    console.error('Error scheduling meal reminders:', error);
+                    errors.push('meal reminders');
+                }
             }
 
             // Schedule water reminders
             if (settings.waterReminders.enabled) {
-                await this.scheduleWaterReminders(settings);
+                try {
+                    await this.scheduleWaterReminders(settings);
+                } catch (error) {
+                    console.error('Error scheduling water reminders:', error);
+                    errors.push('water reminders');
+                }
             }
 
             // Schedule status notifications
-            await this.scheduleStatusNotifications(settings);
+            try {
+                await this.scheduleStatusNotifications(settings);
+            } catch (error) {
+                console.error('Error scheduling status notifications:', error);
+                errors.push('status notifications');
+            }
 
             // Schedule engagement notifications
-            await this.scheduleEngagementNotifications(settings);
+            try {
+                await this.scheduleEngagementNotifications(settings);
+            } catch (error) {
+                console.error('Error scheduling engagement notifications:', error);
+                errors.push('engagement notifications');
+            }
+
+            // If there were any errors, still return success but log them
+            if (errors.length > 0) {
+                console.warn(`Completed scheduling with errors in: ${errors.join(', ')}`);
+            }
         } catch (error) {
             console.error('Error scheduling notifications:', error);
             throw error;
         }
     }
 
-    private getNotificationTrigger(hour: number, minute: number, repeats: boolean = true, weekday?: number) {
-        // For Android, use daily trigger because calendar trigger is not supported
+    private getNotificationTrigger(hour: number, minute: number, repeats: boolean = true, weekday?: number): Notifications.NotificationTriggerInput {
+        // For Android, use seconds-based trigger because calendar trigger is not supported
         if (Platform.OS === 'android') {
             const now = new Date();
             const scheduledTime = new Date();
@@ -168,26 +196,21 @@ class NotificationService {
             // Calculate seconds from now
             const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
 
+            // Use seconds type explicitly on Android (TimeIntervalTriggerInput)
             return {
-                type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
                 seconds: secondsFromNow,
                 repeats: repeats
             };
         } else {
-            // For iOS, we can use calendar trigger
-            const trigger: any = {
+            // For iOS, we can use calendar trigger (CalendarTriggerInput)
+            return {
                 type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
                 hour: hour,
                 minute: minute,
-                repeats: repeats
+                repeats: repeats,
+                ...(weekday !== undefined ? { weekday } : {})
             };
-
-            // Add weekday if specified (for weekly notifications)
-            if (weekday !== undefined) {
-                trigger.weekday = weekday;
-            }
-
-            return trigger;
         }
     }
 
@@ -202,24 +225,29 @@ class NotificationService {
             const [hours, minutes] = meal.time.split(':').map(Number);
 
             if (!this.isInQuietHours(hours, minutes, settings)) {
-                const id = await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: `${meal.emoji} ${meal.name} Time!`,
-                        body: `Don't forget to log your ${meal.name.toLowerCase()}`,
-                        data: { type: 'meal_reminder', meal: meal.name.toLowerCase() },
-                    },
-                    trigger: this.getNotificationTrigger(hours, minutes),
-                });
+                try {
+                    const id = await Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: `${meal.emoji} ${meal.name} Time!`,
+                            body: `Don't forget to log your ${meal.name.toLowerCase()}`,
+                            data: { type: 'meal_reminder', meal: meal.name.toLowerCase() },
+                            sound: true,
+                        },
+                        trigger: this.getNotificationTrigger(hours, minutes),
+                    });
 
-                await this.saveScheduledNotification({
-                    id,
-                    type: 'meal',
-                    title: `${meal.name} Reminder`,
-                    body: `Time to log your ${meal.name.toLowerCase()}`,
-                    scheduledTime: meal.time,
-                    repeats: true,
-                    enabled: true,
-                });
+                    await this.saveScheduledNotification({
+                        id,
+                        type: 'meal',
+                        title: `${meal.name} Reminder`,
+                        body: `Time to log your ${meal.name.toLowerCase()}`,
+                        scheduledTime: meal.time,
+                        repeats: true,
+                        enabled: true,
+                    });
+                } catch (error) {
+                    console.error(`Error scheduling ${meal.name} reminder:`, error);
+                }
             }
         }
 
@@ -231,24 +259,29 @@ class NotificationService {
                 const [hours, minutes] = time.split(':').map(Number);
 
                 if (!this.isInQuietHours(hours, minutes, settings)) {
-                    const id = await Notifications.scheduleNotificationAsync({
-                        content: {
-                            title: '🍎 Snack Time!',
-                            body: 'Remember to log any snacks you have',
-                            data: { type: 'snack_reminder' },
-                        },
-                        trigger: this.getNotificationTrigger(hours, minutes),
-                    });
+                    try {
+                        const id = await Notifications.scheduleNotificationAsync({
+                            content: {
+                                title: '🍎 Snack Time!',
+                                body: 'Remember to log any snacks you have',
+                                data: { type: 'snack_reminder' },
+                                sound: true,
+                            },
+                            trigger: this.getNotificationTrigger(hours, minutes),
+                        });
 
-                    await this.saveScheduledNotification({
-                        id,
-                        type: 'meal',
-                        title: 'Snack Reminder',
-                        body: 'Log your snacks',
-                        scheduledTime: time,
-                        repeats: true,
-                        enabled: true,
-                    });
+                        await this.saveScheduledNotification({
+                            id,
+                            type: 'meal',
+                            title: 'Snack Reminder',
+                            body: 'Log your snacks',
+                            scheduledTime: time,
+                            repeats: true,
+                            enabled: true,
+                        });
+                    } catch (error) {
+                        console.error(`Error scheduling snack reminder for ${time}:`, error);
+                    }
                 }
             }
         }
@@ -261,24 +294,29 @@ class NotificationService {
 
         for (let hour = startHour; hour < endHour; hour += frequency) {
             if (!this.isInQuietHours(hour, 0, settings)) {
-                const id = await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: '💧 Stay Hydrated!',
-                        body: 'Time for a glass of water. Your body will thank you!',
-                        data: { type: 'water_reminder' },
-                    },
-                    trigger: this.getNotificationTrigger(hour, 0),
-                });
+                try {
+                    const id = await Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: '💧 Stay Hydrated!',
+                            body: 'Time for a glass of water. Your body will thank you!',
+                            data: { type: 'water_reminder' },
+                            sound: true,
+                        },
+                        trigger: this.getNotificationTrigger(hour, 0),
+                    });
 
-                await this.saveScheduledNotification({
-                    id,
-                    type: 'water',
-                    title: 'Water Reminder',
-                    body: 'Stay hydrated',
-                    scheduledTime: `${hour.toString().padStart(2, '0')}:00`,
-                    repeats: true,
-                    enabled: true,
-                });
+                    await this.saveScheduledNotification({
+                        id,
+                        type: 'water',
+                        title: 'Water Reminder',
+                        body: 'Stay hydrated',
+                        scheduledTime: `${hour.toString().padStart(2, '0')}:00`,
+                        repeats: true,
+                        enabled: true,
+                    });
+                } catch (error) {
+                    console.error(`Error scheduling water reminder for ${hour}:00:`, error);
+                }
             }
         }
     }
@@ -286,46 +324,56 @@ class NotificationService {
     private async scheduleStatusNotifications(settings: NotificationSettings): Promise<void> {
         if (settings.statusNotifications.dailyProgress) {
             // Evening progress notification
-            const id = await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: '📊 Daily Progress Update',
-                    body: 'Check out your progress for today!',
-                    data: { type: 'daily_progress' },
-                },
-                trigger: this.getNotificationTrigger(19, 0), // 7 PM
-            });
+            try {
+                const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: '📊 Daily Progress Update',
+                        body: 'Check out your progress for today!',
+                        data: { type: 'daily_progress' },
+                        sound: true,
+                    },
+                    trigger: this.getNotificationTrigger(19, 0), // 7 PM
+                });
 
-            await this.saveScheduledNotification({
-                id,
-                type: 'status',
-                title: 'Daily Progress',
-                body: 'Progress update',
-                scheduledTime: '19:00',
-                repeats: true,
-                enabled: true,
-            });
+                await this.saveScheduledNotification({
+                    id,
+                    type: 'status',
+                    title: 'Daily Progress',
+                    body: 'Progress update',
+                    scheduledTime: '19:00',
+                    repeats: true,
+                    enabled: true,
+                });
+            } catch (error) {
+                console.error('Error scheduling daily progress notification:', error);
+            }
         }
 
         if (settings.statusNotifications.weeklyProgress) {
             // Weekly progress notification (Sunday evening)
-            const id = await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: '📈 Weekly Progress Summary',
-                    body: 'See how you did this week and plan for the next!',
-                    data: { type: 'weekly_progress' },
-                },
-                trigger: this.getNotificationTrigger(18, 0, true, 1), // Sunday at 6 PM
-            });
+            try {
+                const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: '📈 Weekly Progress Summary',
+                        body: 'See how you did this week and plan for the next!',
+                        data: { type: 'weekly_progress' },
+                        sound: true,
+                    },
+                    trigger: this.getNotificationTrigger(18, 0, true, 1), // Sunday at 6 PM
+                });
 
-            await this.saveScheduledNotification({
-                id,
-                type: 'status',
-                title: 'Weekly Progress',
-                body: 'Weekly summary',
-                scheduledTime: 'Sunday 18:00',
-                repeats: true,
-                enabled: true,
-            });
+                await this.saveScheduledNotification({
+                    id,
+                    type: 'status',
+                    title: 'Weekly Progress',
+                    body: 'Weekly summary',
+                    scheduledTime: 'Sunday 18:00',
+                    repeats: true,
+                    enabled: true,
+                });
+            } catch (error) {
+                console.error('Error scheduling weekly progress notification:', error);
+            }
         }
     }
 
