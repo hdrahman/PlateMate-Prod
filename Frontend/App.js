@@ -54,6 +54,7 @@ import FoodDetail from "./src/screens/FoodDetail";
 import Auth from "./src/screens/Auth";
 import Onboarding from "./src/screens/Onboarding";
 import Analytics from "./src/screens/Analytics";
+import PremiumSubscription from './src/screens/PremiumSubscription';
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -362,6 +363,7 @@ function AppNavigator() {
             <Stack.Screen name="Notifications" component={Notifications} />
             <Stack.Screen name="DataSharing" component={DataSharing} />
             <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+            <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
             <Stack.Screen name="Analytics" component={Analytics} />
           </>
         )}

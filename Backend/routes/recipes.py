@@ -113,6 +113,44 @@ async def search_recipes(
         logger.error(f"Error in recipe search: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to search for recipes: {str(e)}")
 
+@router.post("/search")
+async def search_recipes_post(
+    request: RecipeSearchRequest,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    POST endpoint for searching recipes using query and filters
+    
+    Args:
+        request: RecipeSearchRequest containing search parameters
+        current_user: Current authenticated user
+        
+    Returns:
+        List of recipes matching the search criteria
+    """
+    try:
+        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        logger.info(f"Recipe search POST request from user {user_id}: {request.query}")
+        
+        fatsecret_service = get_fatsecret_service()
+        if not fatsecret_service:
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
+        
+        if not fatsecret_service.is_configured:
+            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
+        
+        # Build params dict from request model
+        params = request.dict(exclude_none=True)
+        
+        results = fatsecret_service.search_recipes(params)
+        
+        logger.info(f"Found {len(results)} recipes for query: {request.query}")
+        return {"results": results}
+        
+    except Exception as e:
+        logger.error(f"Error in recipe search (POST): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to search for recipes: {str(e)}")
+
 @router.get("/random")
 async def get_random_recipes(
     number: Optional[int] = Query(default=None, ge=1, le=20, alias="number"),
@@ -152,49 +190,6 @@ async def get_random_recipes(
     except Exception as e:
         logger.error(f"Error getting random recipes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get random recipes: {str(e)}")
-
-@router.get("/{recipe_id}")
-async def get_recipe_by_id(
-    recipe_id: str,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Get recipe details by ID
-    
-    Args:
-        recipe_id: Recipe ID to fetch
-        current_user: Current authenticated user
-        
-    Returns:
-        Recipe details
-    """
-    try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
-        logger.info(f"Recipe details request from user {user_id}: {recipe_id}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            raise HTTPException(status_code=503, detail="FatSecret service is not available")
-        
-        if not fatsecret_service.is_configured:
-            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
-        
-        if not recipe_id or len(recipe_id.strip()) < 1:
-            raise HTTPException(status_code=400, detail="Recipe ID is required")
-        
-        result = fatsecret_service.get_recipe_by_id(recipe_id.strip())
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Recipe not found")
-        
-        logger.info(f"Found recipe details for: {recipe_id}")
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting recipe by ID: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get recipe by ID: {str(e)}")
 
 @router.post("/by-meal-type")
 async def get_recipes_by_meal_type(
@@ -323,14 +318,23 @@ async def autocomplete_recipes(
         if not fatsecret_service.is_configured:
             raise HTTPException(status_code=503, detail="FatSecret service is not configured")
         
-        results = fatsecret_service.autocomplete_recipes(query.strip())
+        try:
+            results = fatsecret_service.autocomplete_recipes(query.strip())
+            logger.info(f"Found {len(results)} recipe suggestions for: {query}")
+            return results
+        except Exception as service_error:
+            # Handle errors from the service
+            logger.error(f"FatSecret service error during recipe autocomplete: {service_error}")
+            # Return empty array instead of 500 error to maintain API contract
+            return []
         
-        logger.info(f"Found {len(results)} recipe suggestions for: {query}")
-        return results
-        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 401, 403, etc.)
+        raise
     except Exception as e:
         logger.error(f"Error getting recipe autocomplete: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get recipe autocomplete: {str(e)}")
+        # Return empty array instead of 500 error to maintain API contract
+        return []
 
 @router.get("/ingredients/autocomplete")
 async def autocomplete_ingredients(
@@ -358,14 +362,66 @@ async def autocomplete_ingredients(
         if not fatsecret_service.is_configured:
             raise HTTPException(status_code=503, detail="FatSecret service is not configured")
         
-        results = fatsecret_service.autocomplete_ingredients(query.strip())
+        try:
+            results = fatsecret_service.autocomplete_ingredients(query.strip())
+            logger.info(f"Found {len(results)} ingredient suggestions for: {query}")
+            return results
+        except Exception as service_error:
+            # Handle errors from the service
+            logger.error(f"FatSecret service error during ingredient autocomplete: {service_error}")
+            # Return empty array instead of 500 error to maintain API contract
+            return []
         
-        logger.info(f"Found {len(results)} ingredient suggestions for: {query}")
-        return results
-        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 401, 403, etc.)
+        raise
     except Exception as e:
         logger.error(f"Error getting ingredient autocomplete: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get ingredient autocomplete: {str(e)}")
+        # Return empty array instead of 500 error to maintain API contract
+        return []
+
+@router.get("/{recipe_id}")
+async def get_recipe_by_id(
+    recipe_id: str,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get recipe details by ID
+    
+    Args:
+        recipe_id: Recipe ID to fetch
+        current_user: Current authenticated user
+        
+    Returns:
+        Recipe details
+    """
+    try:
+        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        logger.info(f"Recipe details request from user {user_id}: {recipe_id}")
+        
+        fatsecret_service = get_fatsecret_service()
+        if not fatsecret_service:
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
+        
+        if not fatsecret_service.is_configured:
+            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
+        
+        if not recipe_id or len(recipe_id.strip()) < 1:
+            raise HTTPException(status_code=400, detail="Recipe ID is required")
+        
+        result = fatsecret_service.get_recipe_by_id(recipe_id.strip())
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        
+        logger.info(f"Found recipe details for: {recipe_id}")
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recipe by ID: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get recipe by ID: {str(e)}")
 
 @router.get("/health")
 async def recipe_service_health():

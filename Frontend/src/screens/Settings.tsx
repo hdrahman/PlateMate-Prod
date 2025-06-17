@@ -114,7 +114,13 @@ const SettingsScreen = () => {
                             <Text style={styles.itemText}>Edit Goals</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PremiumSubscription")}>
+                        <TouchableOpacity
+                            style={styles.item}
+                            onPress={() => {
+                                // Navigate using full type and options to avoid navigation errors
+                                navigation.navigate('PremiumSubscription' as never);
+                            }}
+                        >
                             <View style={[styles.iconBubble, { backgroundColor: '#FFD70030' }]}>
                                 <Ionicons name="star-outline" size={20} color="#FFD700" />
                             </View>

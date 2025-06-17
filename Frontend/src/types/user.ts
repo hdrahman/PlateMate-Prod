@@ -103,7 +103,17 @@ export interface AuthState {
 }
 
 // User subscription types
-export type SubscriptionStatus = 'free' | 'free_trial' | 'premium' | 'premium_annual';
+export type SubscriptionStatus = 'free' | 'free_trial' | 'standard' | 'premium' | 'premium_annual' | 'lifetime';
+
+export interface SubscriptionDetails {
+    status: SubscriptionStatus;
+    startDate: string;
+    endDate?: string | null;
+    autoRenew: boolean;
+    paymentMethod?: string;
+    trialEndsAt?: string | null;
+    canceledAt?: string | null;
+}
 
 // User notification types
 export interface Notification {

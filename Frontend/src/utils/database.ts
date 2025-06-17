@@ -4,6 +4,9 @@ import { updateDatabaseSchema } from './updateDatabase';
 import { auth } from './firebase/index';
 import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
 
+// Import subscription types
+import { SubscriptionStatus, SubscriptionDetails } from '../types/user';
+
 // Database singleton and initialization tracking
 let db: SQLite.SQLiteDatabase;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -74,6 +77,29 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       )
     `);
         console.log('✅ food_logs table created successfully');
+
+        // Create user_subscriptions table for subscription management
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS user_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT UNIQUE NOT NULL,
+        subscription_status TEXT NOT NULL DEFAULT 'free',
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        auto_renew INTEGER DEFAULT 0,
+        payment_method TEXT,
+        subscription_id TEXT,
+        trial_ends_at TEXT,
+        canceled_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
+      )
+    `);
+        console.log('✅ user_subscriptions table created successfully');
 
         // Create user_profiles table
         await db.execAsync(`
@@ -2863,4 +2889,172 @@ export const getFoodLogById = async (id: number): Promise<any> => {
         console.error('❌ Error retrieving food log by ID:', error);
         throw error;
     }
-}; 
+};
+
+// Get user's subscription status and details
+export const getSubscriptionStatus = async (firebaseUid: string): Promise<SubscriptionDetails | null> => {
+    try {
+        const db = await getDatabase();
+        const result = await db.getFirstAsync(
+            `SELECT subscription_status, start_date, end_date, auto_renew, payment_method, 
+       trial_ends_at, canceled_at
+       FROM user_subscriptions
+       WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        if (!result) return null;
+
+        return {
+            status: result.subscription_status as SubscriptionStatus,
+            startDate: result.start_date,
+            endDate: result.end_date,
+            autoRenew: !!result.auto_renew,
+            paymentMethod: result.payment_method,
+            trialEndsAt: result.trial_ends_at,
+            canceledAt: result.canceled_at
+        };
+    } catch (error) {
+        console.error('Error getting subscription status:', error);
+        return null;
+    }
+};
+
+// Create or update subscription
+export const updateSubscriptionStatus = async (
+    firebaseUid: string,
+    details: Partial<SubscriptionDetails>
+): Promise<boolean> => {
+    try {
+        const db = await getDatabase();
+        const now = new Date().toISOString();
+
+        // Check if subscription exists
+        const existingSubscription = await db.getFirstAsync(
+            `SELECT id FROM user_subscriptions WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        if (!existingSubscription) {
+            // Create new subscription
+            await db.runAsync(
+                `INSERT INTO user_subscriptions (
+          firebase_uid, subscription_status, start_date, end_date,
+          auto_renew, payment_method, trial_ends_at, last_modified
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    firebaseUid,
+                    details.status || 'free',
+                    details.startDate || now,
+                    details.endDate || null,
+                    details.autoRenew ? 1 : 0,
+                    details.paymentMethod || null,
+                    details.trialEndsAt || null,
+                    now
+                ]
+            );
+        } else {
+            // Update existing subscription
+            const updateFields = [];
+            const updateValues = [];
+
+            if (details.status !== undefined) {
+                updateFields.push('subscription_status = ?');
+                updateValues.push(details.status);
+            }
+
+            if (details.startDate !== undefined) {
+                updateFields.push('start_date = ?');
+                updateValues.push(details.startDate);
+            }
+
+            if (details.endDate !== undefined) {
+                updateFields.push('end_date = ?');
+                updateValues.push(details.endDate);
+            }
+
+            if (details.autoRenew !== undefined) {
+                updateFields.push('auto_renew = ?');
+                updateValues.push(details.autoRenew ? 1 : 0);
+            }
+
+            if (details.paymentMethod !== undefined) {
+                updateFields.push('payment_method = ?');
+                updateValues.push(details.paymentMethod);
+            }
+
+            if (details.trialEndsAt !== undefined) {
+                updateFields.push('trial_ends_at = ?');
+                updateValues.push(details.trialEndsAt);
+            }
+
+            if (details.canceledAt !== undefined) {
+                updateFields.push('canceled_at = ?');
+                updateValues.push(details.canceledAt);
+            }
+
+            // Always update modified timestamp
+            updateFields.push('last_modified = ?');
+            updateValues.push(now);
+            updateFields.push('updated_at = ?');
+            updateValues.push(now);
+            updateFields.push('synced = ?');
+            updateValues.push(0); // Mark as needing sync
+
+            if (updateFields.length > 0) {
+                await db.runAsync(
+                    `UPDATE user_subscriptions 
+           SET ${updateFields.join(', ')} 
+           WHERE firebase_uid = ?`,
+                    [...updateValues, firebaseUid]
+                );
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error updating subscription:', error);
+        return false;
+    }
+};
+
+// Cancel subscription
+export const cancelSubscription = async (
+    firebaseUid: string,
+    keepUntilEnd: boolean = true
+): Promise<boolean> => {
+    try {
+        const db = await getDatabase();
+        const now = new Date().toISOString();
+
+        await db.runAsync(
+            `UPDATE user_subscriptions 
+             SET auto_renew = 0, 
+                 canceled_at = ?,
+                 last_modified = ?,
+                 updated_at = ?,
+                 synced = 0
+             WHERE firebase_uid = ?`,
+            [now, now, now, firebaseUid]
+        );
+
+        if (!keepUntilEnd) {
+            // Immediately end subscription
+            await db.runAsync(
+                `UPDATE user_subscriptions 
+                 SET subscription_status = 'free',
+                     end_date = ?,
+                     last_modified = ?,
+                     updated_at = ?,
+                     synced = 0
+                 WHERE firebase_uid = ?`,
+                [now, now, now, firebaseUid]
+            );
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error canceling subscription:', error);
+        return false;
+    }
+};

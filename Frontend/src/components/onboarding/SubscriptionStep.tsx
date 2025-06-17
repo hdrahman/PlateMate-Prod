@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Image,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -73,11 +74,38 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ onComplete }) => {
         // Mark onboarding as complete in context
         await completeOnboarding();
 
-        // Skip backend communication and directly proceed to home screen
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Home' as never }],
-        });
+        if (selectedPlan !== 'free_trial') {
+            // Show confirmation dialog to go to premium screen
+            Alert.alert(
+                'Upgrade to Premium',
+                'Would you like to view premium subscription options now?',
+                [
+                    {
+                        text: 'Not Now',
+                        onPress: () => navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Home' as never }],
+                        })
+                    },
+                    {
+                        text: 'View Options',
+                        onPress: () => navigation.reset({
+                            index: 0,
+                            routes: [
+                                { name: 'Home' as never },
+                                { name: 'PremiumSubscription' as never }
+                            ],
+                        })
+                    },
+                ]
+            );
+        } else {
+            // Skip premium subscription and proceed to home screen
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'Home' as never }],
+            });
+        }
     };
 
     return (

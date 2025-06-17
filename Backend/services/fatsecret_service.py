@@ -707,7 +707,27 @@ class FatSecretService:
             }
             
             results = self.search_recipes(params)
-            return [{'id': int(recipe['id']) if recipe['id'].isdigit() else hash(recipe['id']) % 10000, 'title': recipe['title']} for recipe in results]
+            
+            # Safely convert IDs to integers for autocomplete response
+            autocomplete_results = []
+            for recipe in results:
+                recipe_id = recipe['id']
+                # Generate a numeric ID safely
+                try:
+                    numeric_id = int(recipe_id) if isinstance(recipe_id, str) and recipe_id.isdigit() else abs(hash(str(recipe_id))) % 10000000
+                    autocomplete_results.append({
+                        'id': numeric_id, 
+                        'title': recipe['title']
+                    })
+                except (ValueError, TypeError):
+                    # If any conversion issues, use hash of the title as ID
+                    fallback_id = abs(hash(recipe['title'])) % 10000000
+                    autocomplete_results.append({
+                        'id': fallback_id,
+                        'title': recipe['title']
+                    })
+                    
+            return autocomplete_results
             
         except Exception as e:
             logger.error(f'Error getting recipe autocomplete: {e}')

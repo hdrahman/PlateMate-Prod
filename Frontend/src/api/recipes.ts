@@ -103,20 +103,52 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[
         console.log('Searching recipes with params:', params);
         const headers = await getAuthHeaders();
 
-        const response = await axios.post(
-            `${BACKEND_BASE_URL}/recipes/search`,
-            params,
-            { headers }
-        );
+        // Try the POST endpoint first
+        try {
+            const response = await axios.post(
+                `${BACKEND_BASE_URL}/recipes/search`,
+                params,
+                { headers }
+            );
 
-        // Extract results from the wrapped response format
-        const data = response.data;
-        if (data && data.results && Array.isArray(data.results)) {
-            console.log(`Found ${data.results.length} recipes for query: ${params.query}`);
-            return data.results;
-        } else {
-            console.log(`No recipes found in response:`, data);
-            return [];
+            // Extract results from the wrapped response format
+            const data = response.data;
+            if (data && data.results && Array.isArray(data.results)) {
+                console.log(`Found ${data.results.length} recipes for query: ${params.query}`);
+                return data.results;
+            } else {
+                console.log(`No recipes found in response:`, data);
+                return [];
+            }
+        } catch (postError) {
+            console.error('POST search failed, trying GET endpoint as fallback:', postError);
+
+            // Fallback to GET endpoint with query params if POST fails
+            const queryParams = new URLSearchParams();
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    if (Array.isArray(value)) {
+                        queryParams.append(key, value.join(','));
+                    } else {
+                        queryParams.append(key, value.toString());
+                    }
+                }
+            });
+
+            const response = await axios.get(
+                `${BACKEND_BASE_URL}/recipes/search?${queryParams.toString()}`,
+                { headers }
+            );
+
+            // Extract results from the wrapped response format
+            const data = response.data;
+            if (data && data.results && Array.isArray(data.results)) {
+                console.log(`Found ${data.results.length} recipes for query: ${params.query}`);
+                return data.results;
+            } else {
+                console.log(`No recipes found in response:`, data);
+                return [];
+            }
         }
     } catch (error) {
         console.error('Error searching recipes:', error);
@@ -290,7 +322,22 @@ export const autocompleteRecipes = async (query: string): Promise<{ id: number; 
             { headers }
         );
 
-        return response.data || [];
+        // Ensure we have a valid response array
+        const data = response.data;
+        if (Array.isArray(data)) {
+            // Validate each item has the expected format
+            return data.filter(item =>
+                item &&
+                typeof item === 'object' &&
+                'id' in item &&
+                'title' in item &&
+                typeof item.title === 'string'
+            ).map(item => ({
+                id: typeof item.id === 'number' ? item.id : parseInt(String(item.id), 10) || Math.abs(hashCode(item.title)),
+                title: item.title
+            }));
+        }
+        return [];
     } catch (error) {
         console.error('Error getting recipe autocomplete:', error);
         if (axios.isAxiosError(error)) {
@@ -316,7 +363,22 @@ export const autocompleteIngredients = async (query: string): Promise<{ id: numb
             { headers }
         );
 
-        return response.data || [];
+        // Ensure we have a valid response array
+        const data = response.data;
+        if (Array.isArray(data)) {
+            // Validate each item has the expected format
+            return data.filter(item =>
+                item &&
+                typeof item === 'object' &&
+                'id' in item &&
+                'name' in item &&
+                typeof item.name === 'string'
+            ).map(item => ({
+                id: typeof item.id === 'number' ? item.id : parseInt(String(item.id), 10) || Math.abs(hashCode(item.name)),
+                name: item.name
+            }));
+        }
+        return [];
     } catch (error) {
         console.error('Error getting ingredient autocomplete:', error);
         if (axios.isAxiosError(error)) {
@@ -326,4 +388,15 @@ export const autocompleteIngredients = async (query: string): Promise<{ id: numb
         }
         return [];
     }
+};
+
+// Simple string hash function for generating numeric IDs
+const hashCode = (str: string): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
 };
