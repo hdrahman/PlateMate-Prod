@@ -23,11 +23,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
-import { searchFood, getFoodDetails, FoodItem as FoodItemType } from '../api/nutritionix';
+import { FoodItem as FoodItemType } from '../services/BarcodeService';
 import { getRecentFoodEntries, addFoodEntryWithContext, FoodLogEntry } from '../api/foodLog';
 import { debounce } from 'lodash';
 import { useFoodLog } from '../context/FoodLogContext';
 import * as ImagePicker from 'expo-image-picker';
+import axios from 'axios';
+import { BACKEND_URL } from '../utils/config';
+import { auth } from '../utils/firebase/index';
 
 // Define navigation type
 type RootStackParamList = {
@@ -39,6 +42,106 @@ type RootStackParamList = {
     FoodDetail: { foodId: number };
 };
 type NavigationProp = StackNavigationProp<RootStackParamList>;
+
+// Backend API base URL
+const BACKEND_BASE_URL = BACKEND_URL;
+
+/**
+ * Get authorization headers for backend API calls
+ */
+const getAuthHeaders = async () => {
+    try {
+        const user = auth.currentUser;
+
+        if (user) {
+            try {
+                const token = await user.getIdToken(true);
+                return {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                };
+            } catch (tokenError) {
+                console.error('Error getting Firebase token:', tokenError);
+                throw tokenError;
+            }
+        }
+    } catch (error) {
+        console.error('Error getting auth token:', error);
+    }
+    return {
+        'Content-Type': 'application/json'
+    };
+};
+
+/**
+ * Search for foods using the backend API
+ * @param query - The search query
+ * @param minHealthiness - Minimum healthiness rating to include (1-10)
+ * @returns An array of food items
+ */
+const searchFood = async (query: string, minHealthiness: number = 0): Promise<FoodItemType[]> => {
+    try {
+        const headers = await getAuthHeaders();
+
+        const response = await axios.post(
+            `${BACKEND_BASE_URL}/food/search`,
+            {
+                query: query,
+                min_healthiness: minHealthiness
+            },
+            { headers }
+        );
+
+        // Extract results from the wrapped response format
+        const data = response.data;
+        if (data && data.results && Array.isArray(data.results)) {
+            console.log(`Found ${data.results.length} food items for query: ${query}`);
+            return data.results;
+        } else {
+            console.log(`No results found in response:`, data);
+            return [];
+        }
+    } catch (error) {
+        console.error('Error searching for food:', error);
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                console.error('Authentication failed - please log in again');
+            }
+        }
+        return [];
+    }
+};
+
+/**
+ * Get detailed nutrition information for a food using the backend API
+ * @param query - The food name
+ * @returns Detailed nutrition information
+ */
+const getFoodDetails = async (query: string): Promise<FoodItemType | null> => {
+    try {
+        const headers = await getAuthHeaders();
+
+        const response = await axios.post(
+            `${BACKEND_BASE_URL}/food/details`,
+            {
+                food_name: query
+            },
+            { headers }
+        );
+
+        return response.data || null;
+    } catch (error) {
+        console.error('Error getting food details:', error);
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                console.error('Authentication failed - please log in again');
+            } else if (error.response?.status === 404) {
+                console.log('Food not found');
+            }
+        }
+        return null;
+    }
+};
 
 // Define theme colors
 const PRIMARY_BG = '#000000';

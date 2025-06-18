@@ -94,6 +94,18 @@ export default function RecipeDetails() {
     const parseInstructions = (instructions: string) => {
         if (!instructions) return [];
 
+        // Check if instructions are already in numbered format (1. Step one\n2. Step two)
+        if (instructions.match(/^\d+\.\s+/m)) {
+            // Split by newlines and filter out empty lines
+            return instructions
+                .split('\n')
+                .filter(step => step.trim().length > 0)
+                .map(step => {
+                    // Remove the number prefix if it exists
+                    return step.replace(/^\d+\.\s+/, '').trim();
+                });
+        }
+
         // Split by numbered steps (1., 2., etc.) or periods for basic splitting
         const steps = instructions
             .split(/\d+\.\s+/)

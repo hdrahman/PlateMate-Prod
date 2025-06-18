@@ -1,402 +1,285 @@
-import axios from 'axios';
-import { BACKEND_URL } from '../utils/config';
-import { auth } from '../utils/firebase/index';
+import apiService from '../utils/apiService';
+import { ServiceTokenType } from '../utils/tokenManager';
+import RecipeCacheService from '../services/RecipeCacheService';
 
-// Types for Recipe Data
+// Recipe API interface
 export interface Recipe {
-    id: string;
+    id: number;
     title: string;
     image: string;
-    readyInMinutes: number;
-    servings: number;
-    sourceUrl: string;
-    summary: string;
-    healthScore: number;
-    ingredients: string[];
-    instructions: string;
-    diets: string[];
-    cuisines: string[];
-    aggregateLikes?: number;
+    imageType?: string;
+    servings?: number;
+    readyInMinutes?: number;
+    sourceName?: string;
+    sourceUrl?: string;
+    spoonacularSourceUrl?: string;
+    healthScore?: number;
+    spoonacularScore?: number;
+    pricePerServing?: number;
+    analyzedInstructions?: any[];
+    cheap?: boolean;
+    creditsText?: string;
+    cuisines?: string[];
+    dairyFree?: boolean;
+    diets?: string[];
+    gaps?: string;
+    glutenFree?: boolean;
+    instructions?: string;
+    ketogenic?: boolean;
+    lowFodmap?: boolean;
+    occasions?: string[];
+    sustainable?: boolean;
+    vegan?: boolean;
+    vegetarian?: boolean;
+    veryHealthy?: boolean;
+    veryPopular?: boolean;
+    whole30?: boolean;
+    weightWatcherSmartPoints?: number;
+    summary?: string;
+    dishTypes?: string[];
+    extendedIngredients?: any[];
+    nutrition?: any;
 }
 
-export interface RecipeSearchParams {
-    query?: string;
-    cuisine?: string;
-    diet?: string;
-    intolerances?: string;
-    includeIngredients?: string[];
-    maxReadyTime?: number;
-    sort?: string;
-    sortDirection?: string;
-    offset?: number;
-    number?: number;
-}
-
-// Food Recipe Categories
-export const foodCategories = [
-    { id: 'breakfast', name: 'Breakfast', icon: 'sunny-outline' },
-    { id: 'lunch', name: 'Lunch', icon: 'fast-food-outline' },
-    { id: 'dinner', name: 'Dinner', icon: 'restaurant-outline' },
-    { id: 'italian', name: 'Italian', icon: 'pizza-outline' },
-    { id: 'american', name: 'American', icon: 'flag-outline' },
-    { id: 'quick', name: 'Quick & Easy', icon: 'timer-outline' },
-    { id: 'snack', name: 'Snacks', icon: 'cafe-outline' },
-    { id: 'healthy', name: 'Healthy', icon: 'fitness-outline' },
-    { id: 'vegetarian', name: 'Vegetarian', icon: 'leaf-outline' },
-];
-
-// Food Cuisine Categories
-export const cuisineCategories = [
-    { id: 'italian', name: 'Italian' },
-    { id: 'mexican', name: 'Mexican' },
-    { id: 'asian', name: 'Asian' },
-    { id: 'american', name: 'American' },
-    { id: 'mediterranean', name: 'Mediterranean' },
-    { id: 'indian', name: 'Indian' },
-    { id: 'french', name: 'French' },
-    { id: 'thai', name: 'Thai' },
-    { id: 'greek', name: 'Greek' },
-    { id: 'chinese', name: 'Chinese' },
-];
-
-// Backend API base URL
-const BACKEND_BASE_URL = BACKEND_URL;
-
-/**
- * Get authorization headers for backend API calls
- */
-const getAuthHeaders = async () => {
+// Get random recipes
+export const getRandomRecipes = async (count: number = 10): Promise<Recipe[]> => {
     try {
-        console.log('Getting auth headers...');
-        const user = auth.currentUser;
-        console.log('Current user:', user ? 'Authenticated' : 'Not authenticated');
+        const response = await apiService.get('/recipes/random', { count }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
 
-        if (user) {
-            console.log('User UID:', user.uid);
-            console.log('User email:', user.email);
-
-            try {
-                const token = await user.getIdToken(true);
-                // Token logging removed for production security
-                return {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                };
-            } catch (tokenError) {
-                console.error('Error getting Firebase token:', tokenError);
-                throw tokenError;
-            }
-        } else {
-            console.warn('No authenticated user found');
+        // Cache the recipes for offline use
+        if (response.recipes && Array.isArray(response.recipes)) {
+            await RecipeCacheService.cacheRecipes(response.recipes);
         }
+
+        return response.recipes || [];
     } catch (error) {
-        console.error('Error getting auth token:', error);
+        console.error('Error fetching random recipes:', error);
+
+        // Try to get cached recipes if network request fails
+        try {
+            const cachedRecipes = await RecipeCacheService.getRandomCachedRecipes(count);
+            if (cachedRecipes.length > 0) {
+                console.log(`Retrieved ${cachedRecipes.length} cached recipes`);
+                return cachedRecipes;
+            }
+        } catch (cacheError) {
+            console.error('Error retrieving cached recipes:', cacheError);
+        }
+
+        throw error;
     }
-    return {
-        'Content-Type': 'application/json'
-    };
 };
 
-// Function to search for recipes by query
-export const searchRecipes = async (params: RecipeSearchParams): Promise<Recipe[]> => {
+// Search recipes
+export const searchRecipes = async (query: string, number: number = 10, offset: number = 0): Promise<any> => {
     try {
-        console.log('Searching recipes with params:', params);
-        const headers = await getAuthHeaders();
+        const response = await apiService.get('/recipes/search', {
+            query,
+            number,
+            offset
+        }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
 
-        // Try the POST endpoint first
-        try {
-            const response = await axios.post(
-                `${BACKEND_BASE_URL}/recipes/search`,
-                params,
-                { headers }
-            );
-
-            // Extract results from the wrapped response format
-            const data = response.data;
-            if (data && data.results && Array.isArray(data.results)) {
-                console.log(`Found ${data.results.length} recipes for query: ${params.query}`);
-                return data.results;
-            } else {
-                console.log(`No recipes found in response:`, data);
-                return [];
-            }
-        } catch (postError) {
-            console.error('POST search failed, trying GET endpoint as fallback:', postError);
-
-            // Fallback to GET endpoint with query params if POST fails
-            const queryParams = new URLSearchParams();
-            Object.entries(params).forEach(([key, value]) => {
-                if (value !== undefined && value !== null) {
-                    if (Array.isArray(value)) {
-                        queryParams.append(key, value.join(','));
-                    } else {
-                        queryParams.append(key, value.toString());
-                    }
-                }
-            });
-
-            const response = await axios.get(
-                `${BACKEND_BASE_URL}/recipes/search?${queryParams.toString()}`,
-                { headers }
-            );
-
-            // Extract results from the wrapped response format
-            const data = response.data;
-            if (data && data.results && Array.isArray(data.results)) {
-                console.log(`Found ${data.results.length} recipes for query: ${params.query}`);
-                return data.results;
-            } else {
-                console.log(`No recipes found in response:`, data);
-                return [];
-            }
+        // Cache the recipes for offline use
+        if (response.results && Array.isArray(response.results)) {
+            await RecipeCacheService.cacheRecipes(response.results);
         }
+
+        return response;
     } catch (error) {
         console.error('Error searching recipes:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
+
+        // Try to get cached recipes if network request fails
+        try {
+            const cachedRecipes = await RecipeCacheService.searchCachedRecipes(query, number);
+            if (cachedRecipes.length > 0) {
+                console.log(`Retrieved ${cachedRecipes.length} cached recipes matching "${query}"`);
+                return {
+                    results: cachedRecipes,
+                    totalResults: cachedRecipes.length,
+                    offset: 0,
+                    number: cachedRecipes.length
+                };
             }
+        } catch (cacheError) {
+            console.error('Error searching cached recipes:', cacheError);
         }
-        return [];
+
+        throw error;
     }
 };
 
-// Function to get recipe details by ID
-export const getRecipeById = async (id: string): Promise<Recipe | null> => {
+// Get recipe by ID
+export const getRecipeById = async (id: number): Promise<Recipe> => {
     try {
-        const headers = await getAuthHeaders();
+        const response = await apiService.get(`/recipes/${id}`, undefined, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
 
-        const response = await axios.get(
-            `${BACKEND_BASE_URL}/recipes/${id}`,
-            { headers }
-        );
-
-        return response.data || null;
-    } catch (error) {
-        console.error('Error getting recipe details:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
-            } else if (error.response?.status === 404) {
-                console.log('Recipe not found');
-            }
+        // Cache the recipe for offline use
+        if (response) {
+            await RecipeCacheService.cacheRecipe(response);
         }
-        return null;
+
+        return response;
+    } catch (error) {
+        console.error(`Error fetching recipe with ID ${id}:`, error);
+
+        // Try to get cached recipe if network request fails
+        try {
+            const cachedRecipe = await RecipeCacheService.getCachedRecipeById(id);
+            if (cachedRecipe) {
+                console.log(`Retrieved cached recipe with ID ${id}`);
+                return cachedRecipe;
+            }
+        } catch (cacheError) {
+            console.error('Error retrieving cached recipe:', cacheError);
+        }
+
+        throw error;
     }
 };
 
-// Function to get random recipes
-export const getRandomRecipes = async (count: number = 5): Promise<Recipe[]> => {
+// Get recipe information by ID
+export const getRecipeInformation = async (id: number): Promise<Recipe> => {
+    return getRecipeById(id);
+};
+
+// Get similar recipes
+export const getSimilarRecipes = async (id: number, number: number = 5): Promise<Recipe[]> => {
     try {
-        const headers = await getAuthHeaders();
+        const response = await apiService.get(`/recipes/${id}/similar`, { number }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
 
-        const response = await axios.get(
-            `${BACKEND_BASE_URL}/recipes/random?count=${count}`,
-            { headers }
-        );
-
-        // Extract recipes from the wrapped response format
-        const data = response.data;
-        if (data && data.recipes && Array.isArray(data.recipes)) {
-            console.log(`Found ${data.recipes.length} random recipes`);
-            return data.recipes;
-        } else {
-            console.log(`No recipes found in response:`, data);
-            return [];
+        // Cache the recipes for offline use
+        if (Array.isArray(response)) {
+            await RecipeCacheService.cacheRecipes(response);
         }
+
+        return response || [];
     } catch (error) {
-        console.error('Error getting random recipes:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
-            }
-        }
-        return [];
+        console.error(`Error fetching similar recipes for ID ${id}:`, error);
+        throw error;
     }
 };
 
-// Function to get recipes by meal type
-export const getRecipesByMealType = async (mealType: string, count: number = 3): Promise<Recipe[]> => {
+// Get recipes by meal type
+export const getRecipesByMealType = async (mealType: string, number: number = 10): Promise<Recipe[]> => {
     try {
-        const headers = await getAuthHeaders();
+        const response = await apiService.get('/recipes/search', {
+            query: mealType,
+            number
+        }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
 
-        const response = await axios.post(
-            `${BACKEND_BASE_URL}/recipes/by-meal-type`,
-            {
-                meal_type: mealType,
-                count: count
-            },
-            { headers }
-        );
-
-        // Handle direct array response (backend returns array directly for this endpoint)
-        const data = response.data;
-        if (Array.isArray(data)) {
-            console.log(`Found ${data.length} recipes for meal type: ${mealType}`);
-            return data;
-        } else {
-            console.log(`No recipes found for meal type ${mealType}:`, data);
-            return [];
+        // Cache the recipes for offline use
+        if (response.results && Array.isArray(response.results)) {
+            await RecipeCacheService.cacheRecipes(response.results);
         }
+
+        return response.results || [];
     } catch (error) {
-        console.error('Error getting recipes by meal type:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
+        console.error(`Error fetching recipes for meal type ${mealType}:`, error);
+
+        // Try to get cached recipes if network request fails
+        try {
+            const cachedRecipes = await RecipeCacheService.searchCachedRecipes(mealType, number);
+            if (cachedRecipes.length > 0) {
+                console.log(`Retrieved ${cachedRecipes.length} cached recipes for meal type "${mealType}"`);
+                return cachedRecipes;
             }
+        } catch (cacheError) {
+            console.error('Error retrieving cached recipes:', cacheError);
         }
-        return [];
+
+        throw error;
     }
 };
 
-// Generate a meal plan using backend API
-export const generateMealPlan = async (params: {
-    timeFrame?: 'day' | 'week',
-    targetCalories?: number,
+// Get recipes by diet
+export const getRecipesByDiet = async (diet: string, number: number = 10): Promise<Recipe[]> => {
+    try {
+        const response = await apiService.get('/recipes/search', {
+            diet,
+            number
+        }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
+
+        // Cache the recipes for offline use
+        if (response.results && Array.isArray(response.results)) {
+            await RecipeCacheService.cacheRecipes(response.results);
+        }
+
+        return response.results || [];
+    } catch (error) {
+        console.error(`Error fetching recipes for diet ${diet}:`, error);
+
+        // Try to get cached recipes if network request fails
+        try {
+            const cachedRecipes = await RecipeCacheService.searchCachedRecipes(diet, number);
+            if (cachedRecipes.length > 0) {
+                console.log(`Retrieved ${cachedRecipes.length} cached recipes for diet "${diet}"`);
+                return cachedRecipes;
+            }
+        } catch (cacheError) {
+            console.error('Error retrieving cached recipes:', cacheError);
+        }
+
+        throw error;
+    }
+};
+
+// Generate meal plan
+export const generateMealPlan = async (
+    timeFrame: 'day' | 'week',
+    targetCalories: number,
     diet?: string,
-    exclude?: string[],
-    type?: string,
-    cuisine?: string,
-    maxReadyTime?: number,
-    minProtein?: number,
-    maxCarbs?: number
-}): Promise<any> => {
+    exclude?: string
+): Promise<any> => {
     try {
-        const headers = await getAuthHeaders();
-
-        const response = await axios.post(
-            `${BACKEND_BASE_URL}/recipes/meal-plan`,
-            params,
-            { headers }
-        );
-
-        return response.data || {
-            meals: [],
-            nutrients: {
-                calories: 0,
-                protein: 0,
-                fat: 0,
-                carbohydrates: 0
-            }
+        const params: any = {
+            timeFrame,
+            targetCalories
         };
+
+        if (diet) params.diet = diet;
+        if (exclude) params.exclude = exclude;
+
+        const response = await apiService.get('/recipes/mealplan', params, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
+
+        return response;
     } catch (error) {
         console.error('Error generating meal plan:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
-            }
-        }
-        return {
-            meals: [],
-            nutrients: {
-                calories: 0,
-                protein: 0,
-                fat: 0,
-                carbohydrates: 0
-            }
-        };
+        throw error;
     }
 };
 
-// Helper function to shuffle array (kept for compatibility)
-const shuffleArray = <T>(array: T[]): T[] => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-};
-
-// Function to autocomplete recipe search
-export const autocompleteRecipes = async (query: string): Promise<{ id: number; title: string }[]> => {
-    if (!query.trim()) {
-        return [];
-    }
-
+// Get recipe nutrition information
+export const getRecipeNutrition = async (id: number): Promise<any> => {
     try {
-        const headers = await getAuthHeaders();
+        const response = await apiService.get(`/recipes/${id}/nutritionWidget`, undefined, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            useCache: true
+        });
 
-        const response = await axios.get(
-            `${BACKEND_BASE_URL}/recipes/autocomplete?query=${encodeURIComponent(query.trim())}`,
-            { headers }
-        );
-
-        // Ensure we have a valid response array
-        const data = response.data;
-        if (Array.isArray(data)) {
-            // Validate each item has the expected format
-            return data.filter(item =>
-                item &&
-                typeof item === 'object' &&
-                'id' in item &&
-                'title' in item &&
-                typeof item.title === 'string'
-            ).map(item => ({
-                id: typeof item.id === 'number' ? item.id : parseInt(String(item.id), 10) || Math.abs(hashCode(item.title)),
-                title: item.title
-            }));
-        }
-        return [];
+        return response;
     } catch (error) {
-        console.error('Error getting recipe autocomplete:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
-            }
-        }
-        return [];
+        console.error(`Error fetching nutrition for recipe ${id}:`, error);
+        throw error;
     }
-};
-
-// Function to autocomplete ingredient search
-export const autocompleteIngredients = async (query: string): Promise<{ id: number; name: string }[]> => {
-    if (!query.trim()) {
-        return [];
-    }
-
-    try {
-        const headers = await getAuthHeaders();
-
-        const response = await axios.get(
-            `${BACKEND_BASE_URL}/recipes/ingredients/autocomplete?query=${encodeURIComponent(query.trim())}`,
-            { headers }
-        );
-
-        // Ensure we have a valid response array
-        const data = response.data;
-        if (Array.isArray(data)) {
-            // Validate each item has the expected format
-            return data.filter(item =>
-                item &&
-                typeof item === 'object' &&
-                'id' in item &&
-                'name' in item &&
-                typeof item.name === 'string'
-            ).map(item => ({
-                id: typeof item.id === 'number' ? item.id : parseInt(String(item.id), 10) || Math.abs(hashCode(item.name)),
-                name: item.name
-            }));
-        }
-        return [];
-    } catch (error) {
-        console.error('Error getting ingredient autocomplete:', error);
-        if (axios.isAxiosError(error)) {
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                console.error('Authentication failed - please log in again');
-            }
-        }
-        return [];
-    }
-};
-
-// Simple string hash function for generating numeric IDs
-const hashCode = (str: string): number => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash);
 };

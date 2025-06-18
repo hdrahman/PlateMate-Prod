@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FoodItem as FoodItemType } from '../api/nutritionix';
+import { FoodItem as FoodItemType } from '../services/BarcodeService';
 
 // Define theme colors - professional palette
 const WHITE = '#FFFFFF';

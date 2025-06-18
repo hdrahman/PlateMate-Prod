@@ -1,11 +1,15 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
 import requests
 from datetime import datetime
+import time
+import os
+import json
 
 from auth.firebase_auth import get_current_user
+from services import fatsecret_api
 
 logger = logging.getLogger(__name__)
 
@@ -32,339 +36,101 @@ class BarcodeSearchRequest(BaseModel):
     barcode: str
 
 @router.post("/search")
-async def search_food_post(
-    request: FoodSearchRequest,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Search for foods using query string (POST method)
-    
-    Args:
-        request: FoodSearchRequest containing query and min_healthiness
-        current_user: Current authenticated user
-        
-    Returns:
-        List of food items matching the search query
-    """
-    try:
-        logger.info(f"Food search request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {request.query}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            raise HTTPException(status_code=503, detail="FatSecret service is not available")
-        
-        if not request.query or len(request.query.strip()) < 2:
-            raise HTTPException(status_code=400, detail="Query must be at least 2 characters long")
-        
-        results = fatsecret_service.search_food(
-            query=request.query.strip(),
-            min_healthiness=request.min_healthiness or 0
-        )
-        
-        logger.info(f"Found {len(results)} food items for query: {request.query}")
-        return {"results": results}
-        
-    except Exception as e:
-        logger.error(f"Error in food search: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to search for food: {str(e)}")
-
-@router.get("/search")
 async def search_food(
-    query: str,
-    min_healthiness: int = 0,
+    request: Dict[str, Any] = Body(...),
     current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
+):
     """
-    Search for foods using query string
-    
-    Args:
-        query: Search query string
-        min_healthiness: Minimum healthiness rating (0-10)
-        current_user: Current authenticated user
-        
-    Returns:
-        List of food items matching the search query
+    Search for foods in the FatSecret API
     """
     try:
-        logger.info(f"Food search request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {query}")
+        query = request.get("query", "")
+        max_results = int(request.get("max_results", 50))
         
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            raise HTTPException(status_code=503, detail="FatSecret service is not available")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
         
-        if not query or len(query.strip()) < 2:
-            raise HTTPException(status_code=400, detail="Query must be at least 2 characters long")
+        results = await fatsecret_api.search_food(query, max_results)
         
-        results = fatsecret_service.search_food(
-            query=query.strip(),
-            min_healthiness=min_healthiness or 0
-        )
-        
-        logger.info(f"Found {len(results)} food items for query: {query}")
-        return {"results": results}
-        
+        return {
+            "success": True,
+            "results": results
+        }
     except Exception as e:
-        logger.error(f"Error in food search: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to search for food: {str(e)}")
+        logger.error(f"Error searching foods: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error searching foods: {str(e)}")
 
 @router.post("/details")
-async def get_food_details_post(
-    request: FoodDetailsRequest,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Get detailed nutrition information for a specific food (POST method)
-    
-    Args:
-        request: FoodDetailsRequest containing food_name
-        current_user: Current authenticated user
-        
-    Returns:
-        Detailed food item information
-    """
-    try:
-        logger.info(f"Food details request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {request.food_name}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            raise HTTPException(status_code=503, detail="FatSecret service is not available")
-        
-        if not request.food_name or len(request.food_name.strip()) < 2:
-            raise HTTPException(status_code=400, detail="Food name must be at least 2 characters long")
-        
-        result = fatsecret_service.get_food_details(request.food_name.strip())
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Food not found")
-        
-        logger.info(f"Found food details for: {request.food_name}")
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting food details: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get food details: {str(e)}")
-
-@router.get("/details")
 async def get_food_details(
-    food_name: str,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Get detailed nutrition information for a specific food
-    
-    Args:
-        food_name: Name of the food to get details for
-        current_user: Current authenticated user
-        
-    Returns:
-        Detailed food item information
-    """
-    try:
-        logger.info(f"Food details request from user {current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')}: {food_name}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            raise HTTPException(status_code=503, detail="FatSecret service is not available")
-        
-        if not food_name or len(food_name.strip()) < 2:
-            raise HTTPException(status_code=400, detail="Food name must be at least 2 characters long")
-        
-        result = fatsecret_service.get_food_details(food_name.strip())
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Food not found")
-        
-        logger.info(f"Found food details for: {food_name}")
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting food details: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get food details: {str(e)}")
-
-@router.get("/barcode/{barcode}")
-async def search_by_barcode(
-    barcode: str,
+    request: Dict[str, Any] = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Search for food by barcode/UPC
-    
-    Parameters:
-    -----------
-    barcode: The barcode/UPC to search for
-    
-    Returns:
-    --------
-    Food item information for the barcode
+    Get detailed information about a specific food
     """
-    user_id = current_user.get('firebase_uid', 'unknown')
-    logger.info(f"Barcode search request from user {user_id}: {barcode}")
-    
-    # Initialize FatSecret service
-    fatsecret_service = get_fatsecret_service()
-    if not fatsecret_service:
-        raise HTTPException(status_code=503, detail="FatSecret service is not available")
-    
     try:
-        if not barcode or len(barcode.strip()) < 8:
-            logger.error(f"Invalid barcode length: {barcode}")
-            raise HTTPException(status_code=400, detail="Barcode must be at least 8 characters long")
+        food_id = request.get("food_id")
         
-        # Now using Premium FatSecret API for barcode scanning
-        result = fatsecret_service.search_by_barcode(barcode.strip())
+        if not food_id:
+            raise HTTPException(status_code=400, detail="Food ID is required")
         
-        if not result:
-            # No result found, but API call was successful
-            logger.info(f"No food found for barcode: {barcode}")
-            raise HTTPException(status_code=404, detail=f"No food found for barcode: {barcode}")
-            
-        logger.info(f"Successfully found food for barcode: {barcode}")
-        return result
+        food = await fatsecret_api.get_food_details(food_id)
         
-    except HTTPException:
-        raise
+        if not food:
+            raise HTTPException(status_code=404, detail="Food not found")
+        
+        return {
+            "success": True,
+            "food": food
+        }
     except Exception as e:
-        logger.error(f"Error searching by barcode: {str(e)}")
-
-        # Check for specific IP whitelist error
-        error_str = str(e)
-        if "not whitelisted in FatSecret API" in error_str:
-            raise HTTPException(status_code=403, detail=error_str)
-            
-        if hasattr(e, 'status_code') and e.status_code:
-            raise HTTPException(status_code=e.status_code, detail=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to search by barcode: {str(e)}")
+        logger.error(f"Error getting food details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting food details: {str(e)}")
 
 @router.post("/barcode")
-async def search_by_barcode_post(
-    request: BarcodeSearchRequest,
+async def search_by_barcode(
+    request: Dict[str, Any] = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Search for food by barcode/UPC (POST method)
-    
-    Parameters:
-    -----------
-    request: BarcodeSearchRequest containing barcode
-    
-    Returns:
-    --------
-    Food item information for the barcode
+    Search for a food by barcode
     """
-    user_id = current_user.get('firebase_uid', 'unknown')
-    logger.info(f"Barcode search request from user {user_id}: {request.barcode}")
-    
-    # Initialize FatSecret service
-    fatsecret_service = get_fatsecret_service()
-    if not fatsecret_service:
-        raise HTTPException(status_code=503, detail="FatSecret service is not available")
-    
     try:
-        if not request.barcode or len(request.barcode.strip()) < 8:
-            raise HTTPException(status_code=400, detail="Barcode must be at least 8 characters long")
-            
-        result = fatsecret_service.search_by_barcode(request.barcode.strip())
+        barcode = request.get("barcode")
         
-        if not result:
-            # No result found but API call was successful
-            logger.info(f"No food found for barcode: {request.barcode}")
-            raise HTTPException(status_code=404, detail=f"No food found for barcode: {request.barcode}")
-            
-        logger.info(f"Successfully found food for barcode: {request.barcode}")
-        return result
-            
+        if not barcode:
+            raise HTTPException(status_code=400, detail="Barcode is required")
+        
+        food = await fatsecret_api.search_by_barcode(barcode)
+        
+        if not food:
+            raise HTTPException(status_code=404, detail="Food not found for barcode")
+        
+        return {
+            "success": True,
+            "food": food
+        }
     except Exception as e:
         logger.error(f"Error searching by barcode: {str(e)}")
-        
-        # Check for specific IP whitelist error
-        error_str = str(e)
-        if "not whitelisted in FatSecret API" in error_str:
-            raise HTTPException(status_code=403, detail=error_str)
-            
-        raise HTTPException(status_code=500, detail=f"Failed to search by barcode: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error searching by barcode: {str(e)}")
 
+# Health check endpoint
 @router.get("/health")
-async def food_service_health():
+async def health_check():
     """
-    Health check endpoint for food service
-    
-    Returns:
-        Status of the food service and FatSecret API configuration
+    Check if the FatSecret API is available
     """
     try:
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            return {
-                "status": "unhealthy",
-                "service": "food",
-                "api_provider": "FatSecret",
-                "configured": False,
-                "message": "FatSecret service not available"
-            }
+        # Try to get a token as a basic health check
+        await fatsecret_api.get_oauth_token()
         
-        # Test if we can get an access token
-        token = fatsecret_service._get_access_token()
-        
-        # Check API availability (could be limited by IP restrictions)
-        ip_whitelisted = True
-        ip_address = "unknown"
-        try:
-            # Make a simple API call to test IP whitelisting
-            test_params = {
-                'method': 'foods.search',
-                'search_expression': 'apple',
-                'format': 'json'
-            }
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'Content-Type': 'application/json'
-            }
-            test_response = requests.get(
-                f"{fatsecret_service.base_url}/server.api", 
-                params=test_params, 
-                headers=headers,
-                timeout=10
-            )
-            
-            # Check if the response contains an IP whitelist error
-            if test_response.status_code == 200:
-                response_data = test_response.json()
-                if 'error' in response_data and response_data['error'].get('code') == 21:
-                    ip_whitelisted = False
-                    error_message = response_data['error'].get('message', '')
-                    # Extract IP address from error message if available
-                    if "Invalid IP address detected:" in error_message and "'" in error_message:
-                        ip_address = error_message.split("'")[1].strip()
-            
-        except Exception:
-            # If we can't make test call, assume IP is not whitelisted
-            ip_whitelisted = False
-            
         return {
-            "status": "healthy" if fatsecret_service.is_configured and ip_whitelisted else "unhealthy",
-            "service": "food",
-            "api_provider": "FatSecret",
-            "configured": fatsecret_service.is_configured,
-            "ip_whitelisted": ip_whitelisted,
-            "server_ip": ip_address if not ip_whitelisted else "whitelisted",
-            "has_token": token is not None,
-            "message": "FatSecret API ready" if (fatsecret_service.is_configured and ip_whitelisted) 
-                    else f"FatSecret API IP whitelist error - add {ip_address} to your whitelist" if (fatsecret_service.is_configured and not ip_whitelisted)
-                    else "FatSecret API not configured"
+            "status": "healthy",
+            "message": "FatSecret API is available"
         }
     except Exception as e:
-        logger.error(f"Error checking food service health: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "service": "food",
-            "api_provider": "FatSecret",
-            "configured": False,
-            "message": f"Error: {str(e)}"
-        }
+        logger.error(f"FatSecret API health check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"FatSecret API is unavailable: {str(e)}")
 
 @router.get("/health/barcode-diagnostic")
 async def barcode_diagnostic():
@@ -562,5 +328,24 @@ async def get_server_ip():
             "error": str(e),
             "time": str(datetime.now())
         }
+
+@router.post("/get-token")
+async def get_fatsecret_token(current_user: dict = Depends(get_current_user)):
+    """
+    Get a simulated FatSecret token for the client.
+    
+    This endpoint doesn't actually return a real FatSecret API key (which would be a security risk),
+    but instead returns a simulated token with expiration for client-side caching purposes.
+    The actual API key is kept secure on the server.
+    """
+    try:
+        # Return a simulated token with expiration
+        return {
+            "token": f"simulated-fatsecret-token-{int(time.time())}",
+            "expires_in": 3600,  # 1 hour expiration
+            "token_type": "Bearer"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating FatSecret token: {str(e)}")
 
  

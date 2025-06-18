@@ -22,7 +22,7 @@ import Animated, {
     runOnJS,
     clamp
 } from 'react-native-reanimated';
-import { FoodItem } from '../api/nutritionix';
+import { FoodItem } from '../services/BarcodeService';
 
 // Define theme colors
 const PRIMARY_BG = '#000000';

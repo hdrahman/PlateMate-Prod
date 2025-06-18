@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import requests
 import os
 import logging
@@ -8,6 +8,7 @@ import re
 from dotenv import load_dotenv
 import httpx
 from auth.firebase_auth import get_current_user
+import time
 
 # Load environment variables
 load_dotenv()
@@ -16,7 +17,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/arli-ai", tags=["arli-ai"])
 
 # Get Arli AI API key from environment variables
 ARLI_AI_API_KEY = os.getenv("ARLI_AI_API_KEY")
@@ -228,4 +229,23 @@ Keep responses focused on health, nutrition, and fitness advice. Use a tone that
         return {
             "response": fallback_response,
             "conversation_id": request.conversation_id or "error"
-        } 
+        }
+
+@router.post("/get-token")
+async def get_arli_ai_token(current_user: dict = Depends(get_current_user)):
+    """
+    Get a simulated Arli AI token for the client.
+    
+    This endpoint doesn't actually return a real Arli AI API key (which would be a security risk),
+    but instead returns a simulated token with expiration for client-side caching purposes.
+    The actual API key is kept secure on the server.
+    """
+    try:
+        # Return a simulated token with expiration
+        return {
+            "token": f"simulated-arli-ai-token-{int(time.time())}",
+            "expires_in": 3600,  # 1 hour expiration
+            "token_type": "Bearer"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating Arli AI token: {str(e)}") 

@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel, HttpUrl
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 import requests
 import os
 import logging
 from dotenv import load_dotenv
 import httpx
 from auth.firebase_auth import get_current_user
+import time
+import openai
 
 # Load environment variables
 load_dotenv()
@@ -15,12 +17,10 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/gpt", tags=["gpt"])
 
-# Get OpenAI API key from environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    logger.warning("Warning: OPENAI_API_KEY not found in environment variables")
+# Load OpenAI API key from environment variable
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 
 # Pydantic model for request
 class FoodAnalysisRequest(BaseModel):
@@ -38,6 +38,28 @@ class FoodAnalysisResponse(BaseModel):
     description: str
     healthiness_rating: Optional[int] = None
 
+# Token management
+@router.post("/get-token")
+async def get_openai_token(current_user: dict = Depends(get_current_user)):
+    """
+    Get a simulated OpenAI token for the client.
+    
+    This endpoint doesn't actually return a real OpenAI API key (which would be a security risk),
+    but instead returns a simulated token with expiration for client-side caching purposes.
+    The actual API key is kept secure on the server.
+    """
+    try:
+        # Return a simulated token with expiration
+        # In a real implementation, this could be a JWT or other token format
+        # that represents authorized access but doesn't expose the actual API key
+        return {
+            "token": f"simulated-openai-token-{int(time.time())}",
+            "expires_in": 3600,  # 1 hour expiration
+            "token_type": "Bearer"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating OpenAI token: {str(e)}")
+
 @router.post("/analyze-food", response_model=FoodAnalysisResponse)
 async def analyze_food(
     request: FoodAnalysisRequest,
@@ -46,8 +68,8 @@ async def analyze_food(
     """
     Analyze food images using GPT-4 Vision and provide a description and healthiness rating.
     """
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+    if not openai.api_key:
+        logger.warning("Warning: OPENAI_API_KEY not found in environment variables")
     
     try:
         logger.info(f"Analyzing food: {request.food_name} for meal type: {request.meal_type} (user: {current_user['firebase_uid']})")
@@ -116,7 +138,7 @@ async def analyze_food(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {OPENAI_API_KEY}"
+                    "Authorization": f"Bearer {openai.api_key}"
                 },
                 json={
                     "model": "gpt-4o",
@@ -209,7 +231,7 @@ async def analyze_meal(
         Keep your response concise and informative, around 200-250 words.
         """
         
-        if not OPENAI_API_KEY:
+        if not openai.api_key:
             raise HTTPException(status_code=500, detail="OpenAI API key not configured")
         
         # Make the API request to OpenAI
@@ -218,7 +240,7 @@ async def analyze_meal(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {OPENAI_API_KEY}"
+                    "Authorization": f"Bearer {openai.api_key}"
                 },
                 json={
                     "model": "gpt-4o",

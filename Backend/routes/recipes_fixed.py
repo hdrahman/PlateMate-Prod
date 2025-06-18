@@ -321,10 +321,10 @@ async def autocomplete_recipes(
         
         fatsecret_service = get_fatsecret_service()
         if not fatsecret_service:
-            return []
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
         
         if not fatsecret_service.is_configured:
-            return []
+            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
         
         try:
             results = fatsecret_service.autocomplete_recipes(query.strip())
@@ -336,53 +336,11 @@ async def autocomplete_recipes(
             # Return empty array instead of 500 error to maintain API contract
             return []
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 401, 403, etc.)
+        raise
     except Exception as e:
         logger.error(f"Error getting recipe autocomplete: {str(e)}")
-        # Return empty array instead of 500 error to maintain API contract
-        return []
-
-@router.post("/autocomplete")
-async def autocomplete_recipes_post(
-    request: dict,
-    current_user: dict = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    """
-    POST endpoint for recipe autocomplete suggestions
-    
-    Args:
-        request: Request body with query parameter
-        current_user: Current authenticated user
-        
-    Returns:
-        List of recipe suggestions
-    """
-    try:
-        query = request.get("query", "")
-        if not query or len(query.strip()) < 1:
-            return []
-            
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
-        logger.info(f"Recipe autocomplete POST request from user {user_id}: {query}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            return []
-        
-        if not fatsecret_service.is_configured:
-            return []
-        
-        try:
-            results = fatsecret_service.autocomplete_recipes(query.strip())
-            logger.info(f"Found {len(results)} recipe suggestions for: {query}")
-            return results
-        except Exception as service_error:
-            # Handle errors from the service
-            logger.error(f"FatSecret service error during recipe autocomplete: {service_error}")
-            # Return empty array instead of 500 error to maintain API contract
-            return []
-        
-    except Exception as e:
-        logger.error(f"Error getting recipe autocomplete (POST): {str(e)}")
         # Return empty array instead of 500 error to maintain API contract
         return []
 
@@ -407,10 +365,10 @@ async def autocomplete_ingredients(
         
         fatsecret_service = get_fatsecret_service()
         if not fatsecret_service:
-            return []
+            raise HTTPException(status_code=503, detail="FatSecret service is not available")
         
         if not fatsecret_service.is_configured:
-            return []
+            raise HTTPException(status_code=503, detail="FatSecret service is not configured")
         
         try:
             results = fatsecret_service.autocomplete_ingredients(query.strip())
@@ -422,91 +380,13 @@ async def autocomplete_ingredients(
             # Return empty array instead of 500 error to maintain API contract
             return []
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 401, 403, etc.)
+        raise
     except Exception as e:
         logger.error(f"Error getting ingredient autocomplete: {str(e)}")
         # Return empty array instead of 500 error to maintain API contract
         return []
-
-@router.post("/ingredients/autocomplete")
-async def autocomplete_ingredients_post(
-    request: dict,
-    current_user: dict = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    """
-    POST endpoint for ingredient autocomplete suggestions
-    
-    Args:
-        request: Request body with query parameter
-        current_user: Current authenticated user
-        
-    Returns:
-        List of ingredient suggestions
-    """
-    try:
-        query = request.get("query", "")
-        if not query or len(query.strip()) < 1:
-            return []
-            
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
-        logger.info(f"Ingredient autocomplete POST request from user {user_id}: {query}")
-        
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            return []
-        
-        if not fatsecret_service.is_configured:
-            return []
-        
-        try:
-            results = fatsecret_service.autocomplete_ingredients(query.strip())
-            logger.info(f"Found {len(results)} ingredient suggestions for: {query}")
-            return results
-        except Exception as service_error:
-            # Handle errors from the service
-            logger.error(f"FatSecret service error during ingredient autocomplete: {service_error}")
-            # Return empty array instead of 500 error to maintain API contract
-            return []
-        
-    except Exception as e:
-        logger.error(f"Error getting ingredient autocomplete (POST): {str(e)}")
-        # Return empty array instead of 500 error to maintain API contract
-        return []
-
-@router.get("/health")
-async def recipe_service_health():
-    """
-    Health check endpoint for recipe service
-    
-    Returns:
-        Status of the recipe service and FatSecret API configuration
-    """
-    try:
-        fatsecret_service = get_fatsecret_service()
-        if not fatsecret_service:
-            return {
-                "status": "unhealthy",
-                "service": "recipes",
-                "api_provider": "FatSecret",
-                "configured": False,
-                "message": "FatSecret service not available"
-            }
-        
-        return {
-            "status": "healthy" if fatsecret_service.is_configured else "degraded",
-            "service": "recipes",
-            "api_provider": "FatSecret",
-            "configured": fatsecret_service.is_configured,
-            "message": "FatSecret API ready" if fatsecret_service.is_configured else "FatSecret API not configured"
-        }
-    except Exception as e:
-        logger.error(f"Error checking recipe service health: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "service": "recipes",
-            "api_provider": "FatSecret",
-            "configured": False,
-            "message": f"Error: {str(e)}"
-        }
 
 @router.get("/{recipe_id}")
 async def get_recipe_by_id(
@@ -549,4 +429,40 @@ async def get_recipe_by_id(
         raise
     except Exception as e:
         logger.error(f"Error getting recipe by ID: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get recipe by ID: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get recipe by ID: {str(e)}")
+
+@router.get("/health")
+async def recipe_service_health():
+    """
+    Health check endpoint for recipe service
+    
+    Returns:
+        Status of the recipe service and FatSecret API configuration
+    """
+    try:
+        fatsecret_service = get_fatsecret_service()
+        if not fatsecret_service:
+            return {
+                "status": "unhealthy",
+                "service": "recipes",
+                "api_provider": "FatSecret",
+                "configured": False,
+                "message": "FatSecret service not available"
+            }
+        
+        return {
+            "status": "healthy" if fatsecret_service.is_configured else "degraded",
+            "service": "recipes",
+            "api_provider": "FatSecret",
+            "configured": fatsecret_service.is_configured,
+            "message": "FatSecret API ready" if fatsecret_service.is_configured else "FatSecret API not configured"
+        }
+    except Exception as e:
+        logger.error(f"Error checking recipe service health: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "service": "recipes",
+            "api_provider": "FatSecret",
+            "configured": False,
+            "message": f"Error: {str(e)}"
+        } 

@@ -17,6 +17,7 @@ class SettingsService {
             lunch: '12:00',
             dinner: '18:00',
             snacks: false,
+            snackTimes: ['10:00', '15:00', '20:00'],
         },
         waterReminders: {
             enabled: true,
@@ -80,6 +81,14 @@ class SettingsService {
             const stored = await AsyncStorage.getItem(this.NOTIFICATION_SETTINGS_KEY);
             if (stored) {
                 const parsed = JSON.parse(stored);
+
+                // Handle migration for existing users who don't have snackTimes property
+                if (parsed.mealReminders && !parsed.mealReminders.snackTimes) {
+                    parsed.mealReminders.snackTimes = this.defaultNotificationSettings.mealReminders.snackTimes;
+                    // Save the migrated settings
+                    await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
+                }
+
                 // Merge with defaults to ensure all properties exist
                 return { ...this.defaultNotificationSettings, ...parsed };
             }
@@ -100,10 +109,34 @@ class SettingsService {
     }
 
     async updateNotificationSetting(path: string, value: any): Promise<NotificationSettings> {
-        const currentSettings = await this.getNotificationSettings();
-        const updatedSettings = this.updateNestedProperty(currentSettings, path, value);
-        await this.saveNotificationSettings(updatedSettings);
-        return updatedSettings;
+        try {
+            const settings = await this.getNotificationSettings();
+
+            // Parse the path to update nested properties
+            const pathParts = path.split('.');
+            let current = settings;
+
+            // Navigate to the parent object of the property to update
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                const part = pathParts[i];
+                if (!current[part]) {
+                    current[part] = {};
+                }
+                current = current[part];
+            }
+
+            // Update the property
+            const lastPart = pathParts[pathParts.length - 1];
+            current[lastPart] = value;
+
+            // Save the updated settings
+            await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+
+            return settings;
+        } catch (error) {
+            console.error('Error updating notification setting:', error);
+            throw error;
+        }
     }
 
     // Data Sharing Settings Methods
@@ -203,6 +236,11 @@ class SettingsService {
         } catch (error) {
             return false;
         }
+    }
+
+    // Getter for default settings
+    getDefaultSettings(): NotificationSettings {
+        return this.defaultNotificationSettings;
     }
 }
 

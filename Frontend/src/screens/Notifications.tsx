@@ -319,11 +319,36 @@ export default function NotificationsScreen() {
             // Format in 24-hour format for storage (HH:MM)
             const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes}`;
 
-            const updatedSettings = await SettingsService.updateNotificationSetting(
-                showTimePicker.type,
-                formattedTime
-            );
-            setSettings(updatedSettings);
+            // Check if this is a snack time array update
+            if (showTimePicker.type.includes('snackTimes[')) {
+                // Extract the index from the type string (e.g., "mealReminders.snackTimes[0]")
+                const indexMatch = showTimePicker.type.match(/\[(\d+)\]/);
+                if (indexMatch && indexMatch[1]) {
+                    const index = parseInt(indexMatch[1]);
+
+                    // Create a copy of the current snack times, ensuring it exists
+                    const snackTimes = settings.mealReminders.snackTimes ||
+                        SettingsService.getDefaultSettings().mealReminders.snackTimes;
+                    const updatedSnackTimes = [...snackTimes];
+
+                    // Update the specific time at the index
+                    updatedSnackTimes[index] = formattedTime;
+
+                    // Update the entire snackTimes array
+                    const updatedSettings = await SettingsService.updateNotificationSetting(
+                        'mealReminders.snackTimes',
+                        updatedSnackTimes
+                    );
+                    setSettings(updatedSettings);
+                }
+            } else {
+                // Regular time setting update
+                const updatedSettings = await SettingsService.updateNotificationSetting(
+                    showTimePicker.type,
+                    formattedTime
+                );
+                setSettings(updatedSettings);
+            }
 
             // Reschedule notifications with error handling
             try {
@@ -535,6 +560,21 @@ export default function NotificationsScreen() {
                                             thumbColor={settings.mealReminders.snacks ? '#fff' : '#f4f3f4'}
                                         />
                                     </View>
+
+                                    {settings.mealReminders.snacks && settings.mealReminders.snackTimes && (
+                                        <>
+                                            {settings.mealReminders.snackTimes.map((time, index) => (
+                                                <TouchableOpacity
+                                                    key={`snack-${index}`}
+                                                    style={styles.timeRow}
+                                                    onPress={() => showTimePickerModal(`mealReminders.snackTimes[${index}]`, time)}
+                                                >
+                                                    <Text style={styles.timeLabel}>🍎 Snack {index + 1}</Text>
+                                                    <Text style={styles.timeValue}>{formatTime(time)}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </>
+                                    )}
                                 </>
                             )}
                         </GradientBorderCard>
@@ -776,40 +816,46 @@ export default function NotificationsScreen() {
                                 <View style={styles.timePickerRow}>
                                     <View style={styles.timePickerColumn}>
                                         <Text style={styles.timePickerLabel}>Hour</Text>
-                                        <WheelPicker
-                                            data={hourData}
-                                            selectedValue={selectedHour}
-                                            onValueChange={(value) => setSelectedHour(value)}
-                                            itemHeight={40}
-                                            containerHeight={160}
-                                            containerStyle={{ width: 80 }}
-                                        />
+                                        <View style={styles.pickerContainer}>
+                                            <WheelPicker
+                                                data={hourData}
+                                                selectedValue={selectedHour}
+                                                onValueChange={(value) => setSelectedHour(value)}
+                                                itemHeight={40}
+                                                containerHeight={160}
+                                                containerStyle={{ width: 80 }}
+                                            />
+                                        </View>
                                     </View>
 
                                     <Text style={styles.timePickerSeparator}>:</Text>
 
                                     <View style={styles.timePickerColumn}>
                                         <Text style={styles.timePickerLabel}>Minute</Text>
-                                        <WheelPicker
-                                            data={minuteData}
-                                            selectedValue={selectedMinute}
-                                            onValueChange={(value) => setSelectedMinute(value)}
-                                            itemHeight={40}
-                                            containerHeight={160}
-                                            containerStyle={{ width: 80 }}
-                                        />
+                                        <View style={styles.pickerContainer}>
+                                            <WheelPicker
+                                                data={minuteData}
+                                                selectedValue={selectedMinute}
+                                                onValueChange={(value) => setSelectedMinute(value)}
+                                                itemHeight={40}
+                                                containerHeight={160}
+                                                containerStyle={{ width: 80 }}
+                                            />
+                                        </View>
                                     </View>
 
                                     <View style={styles.timePickerColumn}>
                                         <Text style={styles.timePickerLabel}>AM/PM</Text>
-                                        <WheelPicker
-                                            data={amPmData}
-                                            selectedValue={selectedAmPm}
-                                            onValueChange={(value) => setSelectedAmPm(value)}
-                                            itemHeight={40}
-                                            containerHeight={160}
-                                            containerStyle={{ width: 80 }}
-                                        />
+                                        <View style={styles.pickerContainer}>
+                                            <WheelPicker
+                                                data={amPmData}
+                                                selectedValue={selectedAmPm}
+                                                onValueChange={(value) => setSelectedAmPm(value)}
+                                                itemHeight={40}
+                                                containerHeight={160}
+                                                containerStyle={{ width: 80 }}
+                                            />
+                                        </View>
                                     </View>
                                 </View>
 
@@ -1058,9 +1104,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 20,
+        paddingHorizontal: 10,
     },
     timePickerColumn: {
         alignItems: 'center',
+        marginHorizontal: 5,
     },
     timePickerLabel: {
         color: SUBDUED,
@@ -1084,5 +1132,11 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontSize: 16,
         fontWeight: '600',
+    },
+    pickerContainer: {
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 10,
+        width: 80,
     },
 }); 

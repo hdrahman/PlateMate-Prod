@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
-import { FoodItem } from './nutritionix';
+import { FoodItem } from '../services/BarcodeService';
 import { addFoodLog, getFoodLogsByDate as getLocalFoodLogsByDate, getRecentFoodLogs } from '../utils/database';
 import { formatDateToYYYYMMDD, getCurrentDate } from '../utils/helpers';
 import { FoodLogEntry as ContextFoodLogEntry } from '../context/FoodLogContext';

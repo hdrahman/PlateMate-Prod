@@ -196,12 +196,22 @@ class NotificationService {
             // Calculate seconds from now
             const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
 
-            // Use seconds type explicitly on Android (TimeIntervalTriggerInput)
-            return {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: secondsFromNow,
-                repeats: repeats
-            };
+            // For repeating notifications, we need to be explicit about the repeat interval
+            if (repeats) {
+                // Daily repeating notifications (24 hours = 86400 seconds)
+                return {
+                    type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                    seconds: secondsFromNow,
+                    repeats: true
+                };
+            } else {
+                // One-time notification
+                return {
+                    type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                    seconds: secondsFromNow,
+                    repeats: false
+                };
+            }
         } else {
             // For iOS, we can use calendar trigger (CalendarTriggerInput)
             return {
@@ -253,7 +263,8 @@ class NotificationService {
 
         // Schedule snack reminders if enabled
         if (settings.mealReminders.snacks) {
-            const snackTimes = ['10:00', '15:00', '20:00'];
+            // Use the snackTimes array from settings
+            const snackTimes = settings.mealReminders.snackTimes;
 
             for (const time of snackTimes) {
                 const [hours, minutes] = time.split(':').map(Number);
@@ -264,7 +275,7 @@ class NotificationService {
                             content: {
                                 title: '🍎 Snack Time!',
                                 body: 'Remember to log any snacks you have',
-                                data: { type: 'snack_reminder' },
+                                data: { type: 'snack_reminder', time },
                                 sound: true,
                             },
                             trigger: this.getNotificationTrigger(hours, minutes),
@@ -292,32 +303,142 @@ class NotificationService {
         const startHour = 7; // Start at 7 AM
         const endHour = 22; // End at 10 PM
 
-        for (let hour = startHour; hour < endHour; hour += frequency) {
-            if (!this.isInQuietHours(hour, 0, settings)) {
-                try {
-                    const id = await Notifications.scheduleNotificationAsync({
-                        content: {
-                            title: '💧 Stay Hydrated!',
-                            body: 'Time for a glass of water. Your body will thank you!',
-                            data: { type: 'water_reminder' },
-                            sound: true,
-                        },
-                        trigger: this.getNotificationTrigger(hour, 0),
-                    });
+        // Cancel any existing water reminders first to prevent duplicates
+        const existingNotifications = await this.getScheduledNotifications();
+        for (const notification of existingNotifications) {
+            if (notification.type === 'water') {
+                await this.cancelNotification(notification.id);
+            }
+        }
 
-                    await this.saveScheduledNotification({
-                        id,
-                        type: 'water',
-                        title: 'Water Reminder',
-                        body: 'Stay hydrated',
-                        scheduledTime: `${hour.toString().padStart(2, '0')}:00`,
-                        repeats: true,
-                        enabled: true,
-                    });
-                } catch (error) {
-                    console.error(`Error scheduling water reminder for ${hour}:00:`, error);
+        await this.showDebugNotification(`Setting up water reminders with frequency: ${frequency} hours`);
+
+        // For water reminders with exact frequency
+        try {
+            // Get current time
+            const now = new Date();
+
+            // Calculate the first reminder time
+            // We want to start from the current hour and find the next reminder time
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+
+            // Calculate the next reminder time based on the current time
+            let nextReminderHour = currentHour;
+            let nextReminderMinute = 0;
+
+            // If we're already past the minute mark for this hour, move to the next hour
+            if (currentMinute > 0) {
+                nextReminderHour += 1;
+            }
+
+            // Adjust to match frequency pattern (e.g., for 2-hour frequency: 8, 10, 12, 14, etc.)
+            // Find the next hour that's divisible by frequency when counting from startHour
+            nextReminderHour = startHour + (Math.ceil((nextReminderHour - startHour) / frequency) * frequency);
+
+            // Create the first scheduled time
+            let scheduledTime = new Date();
+            scheduledTime.setHours(nextReminderHour, nextReminderMinute, 0, 0);
+
+            // If this time has already passed today or is outside our range, adjust to tomorrow
+            if (scheduledTime <= now || nextReminderHour >= endHour) {
+                scheduledTime.setDate(scheduledTime.getDate() + 1);
+                scheduledTime.setHours(startHour, 0, 0, 0);
+                await this.showDebugNotification(`First water reminder scheduled for tomorrow at ${startHour}:00`);
+            } else {
+                await this.showDebugNotification(`First water reminder scheduled for today at ${nextReminderHour}:00`);
+            }
+
+            // Calculate seconds from now for the first notification
+            const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
+
+            // Schedule the first notification
+            const id = await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '💧 Stay Hydrated!',
+                    body: `Time for a glass of water (${frequency}-hour reminder)`,
+                    data: { type: 'water_reminder', frequency },
+                    sound: true,
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                    seconds: secondsFromNow,
+                    repeats: true
+                },
+            });
+
+            await this.saveScheduledNotification({
+                id,
+                type: 'water',
+                title: 'Water Reminder',
+                body: 'Stay hydrated',
+                scheduledTime: `${scheduledTime.getHours()}:00`,
+                repeats: true,
+                enabled: true,
+                data: { frequency, firstReminder: true }
+            });
+
+            console.log(`Water reminder scheduled to start at ${scheduledTime.toLocaleTimeString()} and repeat every 24 hours`);
+
+            // Schedule additional reminders for the same day
+            // We need to do this because each notification can only repeat at 24-hour intervals
+            let currentScheduleHour = scheduledTime.getHours();
+
+            for (let i = 1; i < Math.floor((endHour - startHour) / frequency); i++) {
+                const nextHour = currentScheduleHour + frequency;
+
+                // Only schedule if within the day's range
+                if (nextHour < endHour) {
+                    const additionalTime = new Date(scheduledTime);
+                    additionalTime.setHours(nextHour, 0, 0, 0);
+
+                    // If this time is still today and in the future
+                    if (additionalTime > now && additionalTime.getDate() === now.getDate()) {
+                        const additionalSeconds = Math.floor((additionalTime.getTime() - now.getTime()) / 1000);
+
+                        const additionalId = await Notifications.scheduleNotificationAsync({
+                            content: {
+                                title: '💧 Stay Hydrated!',
+                                body: `Time for a glass of water (${frequency}-hour reminder)`,
+                                data: { type: 'water_reminder', frequency },
+                                sound: true,
+                            },
+                            trigger: {
+                                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                                seconds: additionalSeconds,
+                                repeats: true
+                            },
+                        });
+
+                        await this.saveScheduledNotification({
+                            id: additionalId,
+                            type: 'water',
+                            title: 'Water Reminder',
+                            body: 'Stay hydrated',
+                            scheduledTime: `${nextHour}:00`,
+                            repeats: true,
+                            enabled: true,
+                            data: { frequency }
+                        });
+
+                        await this.showDebugNotification(`Additional water reminder scheduled at ${nextHour}:00`);
+                    }
+
+                    currentScheduleHour = nextHour;
                 }
             }
+
+            // Log all scheduled notifications for debugging
+            const scheduledNotifications = await this.getScheduledNotifications();
+            const waterNotifications = scheduledNotifications.filter(n => n.type === 'water');
+            console.log(`Total water notifications scheduled: ${waterNotifications.length}`);
+            waterNotifications.forEach(n => {
+                console.log(`- Water notification at ${n.scheduledTime}`);
+            });
+
+        } catch (error) {
+            console.error(`Error scheduling water reminders:`, error);
+            await this.showDebugNotification(`Error scheduling water reminders: ${error.message}`);
         }
     }
 
@@ -460,6 +581,18 @@ class NotificationService {
             },
             trigger: null,
         });
+    }
+
+    // Debug method to show when notifications are scheduled
+    async showDebugNotification(message: string): Promise<void> {
+        console.log(`[NotificationService Debug] ${message}`);
+        if (__DEV__) {
+            await this.showImmediateNotification(
+                '🔍 Notification Debug',
+                message,
+                { type: 'debug' }
+            );
+        }
     }
 
     async showAchievementNotification(achievement: string): Promise<void> {

@@ -119,12 +119,12 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
 
     return (
         <View style={[styles.container, { height: containerHeight }, containerStyle]}>
-            {/* Highlight for the selected item - adjusted for better centering */}
+            {/* Highlight for the selected item - fixed positioning */}
             <View
                 style={[
                     styles.highlightView,
                     {
-                        top: (containerHeight - itemHeight) / 2,
+                        top: Math.floor(containerHeight / 2 - itemHeight / 2),
                         height: itemHeight
                     }
                 ]}
@@ -206,6 +206,7 @@ const styles = StyleSheet.create({
     item: {
         justifyContent: 'center',
         alignItems: 'center',
+        paddingVertical: 2, // Add a small padding to improve alignment
     },
     text: {
         fontSize: 16,

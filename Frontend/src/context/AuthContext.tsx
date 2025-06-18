@@ -5,6 +5,8 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
+import tokenManager from '../utils/tokenManager';
+import apiService from '../utils/apiService';
 
 // Import auth methods directly from Auth
 const {
@@ -58,6 +60,7 @@ interface AuthContextType {
     signInWithGoogle: () => Promise<Auth.UserCredential | void>;
     signInWithApple: () => Promise<void>;
     signInAnonymously: () => Promise<void>;
+    isPreloading: boolean;
 }
 
 // Create context with default values
@@ -70,12 +73,14 @@ const AuthContext = createContext<AuthContextType>({
     signInWithGoogle: async () => { },
     signInWithApple: async () => { },
     signInAnonymously: async () => { },
+    isPreloading: false,
 });
 
 // Provider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isPreloading, setIsPreloading] = useState(false);
 
     // Check for stored credentials on mount and restore auth state
     useEffect(() => {
@@ -100,14 +105,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Listen for auth state changes
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
             setUser(authUser);
+
+            // If user just logged in, preload data
+            if (authUser && !user) {
+                setIsPreloading(true);
+                try {
+                    // Initialize token manager
+                    await tokenManager.initialize();
+
+                    // Preload common API data
+                    await apiService.preloadCommonData();
+                } catch (error) {
+                    console.error('Error preloading data after login:', error);
+                } finally {
+                    setIsPreloading(false);
+                }
+            }
+
             setIsLoading(false);
         });
 
         // Cleanup subscription
         return unsubscribe;
-    }, []);
+    }, [user]);
 
     // Sign up with email/password
     const signUp = async (email: string, password: string) => {
@@ -203,6 +225,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             }
 
+            // Clear all tokens
+            await tokenManager.clearAllTokens();
+
+            // Clear API caches
+            apiService.clearCache();
+
             // Sign out from Firebase
             await firebaseSignOut(auth);
         } catch (error: any) {
@@ -222,6 +250,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 signInWithGoogle,
                 signInWithApple,
                 signInAnonymously,
+                isPreloading,
             }}
         >
             {children}

@@ -245,6 +245,20 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ sync_log table created successfully');
 
+        // Create api_tokens table for token management
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS api_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_name TEXT NOT NULL UNIQUE,
+            token TEXT NOT NULL,
+            token_type TEXT NOT NULL DEFAULT 'Bearer',
+            expiry_time INTEGER NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `);
+        console.log('✅ api_tokens table created successfully');
+
         // Verify database tables
         const foodLogsTable = await db.getFirstAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='food_logs'`);
         const exercisesTable = await db.getFirstAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='exercises'`);
@@ -3056,5 +3070,136 @@ export const cancelSubscription = async (
     } catch (error) {
         console.error('Error canceling subscription:', error);
         return false;
+    }
+};
+
+/**
+ * Store an API token in the database
+ * @param serviceName Name of the service (e.g., 'firebase', 'openai', 'deepseek')
+ * @param token The token string
+ * @param expiryTime Expiry time in milliseconds (epoch time)
+ * @param tokenType Type of token (default: 'Bearer')
+ */
+export const storeApiToken = async (
+    serviceName: string,
+    token: string,
+    expiryTime: number,
+    tokenType: string = 'Bearer'
+): Promise<void> => {
+    try {
+        const db = await getDatabase();
+
+        // Check if token already exists for this service
+        const existingResult = await db.getAllAsync(
+            `SELECT id FROM api_tokens WHERE service_name = ?`,
+            [serviceName]
+        );
+
+        if (existingResult.length > 0) {
+            // Update existing token
+            await db.runAsync(
+                `UPDATE api_tokens 
+         SET token = ?, token_type = ?, expiry_time = ?, updated_at = datetime('now')
+         WHERE service_name = ?`,
+                [token, tokenType, expiryTime, serviceName]
+            );
+            console.log(`✅ Updated token for ${serviceName}`);
+        } else {
+            // Insert new token
+            await db.runAsync(
+                `INSERT INTO api_tokens (service_name, token, token_type, expiry_time)
+         VALUES (?, ?, ?, ?)`,
+                [serviceName, token, tokenType, expiryTime]
+            );
+            console.log(`✅ Stored new token for ${serviceName}`);
+        }
+    } catch (error) {
+        console.error(`❌ Error storing API token for ${serviceName}:`, error);
+        throw error;
+    }
+};
+
+/**
+ * Get an API token from the database
+ * @param serviceName Name of the service
+ * @returns Token object or null if not found or expired
+ */
+export const getApiToken = async (
+    serviceName: string
+): Promise<{ token: string; tokenType: string } | null> => {
+    try {
+        const db = await getDatabase();
+
+        const result = await db.getAllAsync(
+            `SELECT token, token_type, expiry_time FROM api_tokens WHERE service_name = ?`,
+            [serviceName]
+        );
+
+        if (result.length === 0) {
+            console.log(`No token found for ${serviceName}`);
+            return null;
+        }
+
+        const { token, token_type, expiry_time } = result[0];
+
+        // Check if token is expired (with 10 second buffer)
+        if (expiry_time < Date.now() + 10000) {
+            console.log(`Token for ${serviceName} is expired`);
+            return null;
+        }
+
+        return { token, tokenType: token_type };
+    } catch (error) {
+        console.error(`❌ Error getting API token for ${serviceName}:`, error);
+        return null;
+    }
+};
+
+/**
+ * Delete an API token from the database
+ * @param serviceName Name of the service
+ */
+export const deleteApiToken = async (serviceName: string): Promise<void> => {
+    try {
+        const db = await getDatabase();
+
+        await db.runAsync(
+            `DELETE FROM api_tokens WHERE service_name = ?`,
+            [serviceName]
+        );
+
+        console.log(`✅ Deleted token for ${serviceName}`);
+    } catch (error) {
+        console.error(`❌ Error deleting API token for ${serviceName}:`, error);
+        throw error;
+    }
+};
+
+/**
+ * Get all stored API tokens
+ * @returns Array of token objects
+ */
+export const getAllApiTokens = async (): Promise<Array<{
+    serviceName: string;
+    token: string;
+    tokenType: string;
+    expiryTime: number;
+}>> => {
+    try {
+        const db = await getDatabase();
+
+        const results = await db.getAllAsync(
+            `SELECT service_name, token, token_type, expiry_time FROM api_tokens`
+        );
+
+        return results.map(row => ({
+            serviceName: row.service_name,
+            token: row.token,
+            tokenType: row.token_type,
+            expiryTime: row.expiry_time
+        }));
+    } catch (error) {
+        console.error('❌ Error getting all API tokens:', error);
+        return [];
     }
 };

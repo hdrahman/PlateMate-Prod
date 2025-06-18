@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase, useFocusEffect } from '@react-navigation/native';
 import RecipeCard from '../components/RecipeCard';
 import { Recipe, searchRecipes } from '../api/recipes';
 
@@ -14,7 +14,10 @@ const PURPLE_ACCENT = '#AA00FF';
 
 // Define route params interface
 interface RecipeResultsParams {
-    query: string;
+    query?: string;
+    cuisine?: string;
+    diet?: string;
+    maxReadyTime?: number;
 }
 
 export default function RecipeResults() {
@@ -24,20 +27,15 @@ export default function RecipeResults() {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [noResults, setNoResults] = useState<boolean>(false);
-
-    useEffect(() => {
-        // Get search query from navigation params
-        if (route.params?.query) {
-            const query = route.params.query.trim();
-            setSearchQuery(query);
-            performSearch(query);
-        } else {
-            setLoading(false);
-        }
-    }, [route.params?.query]);
+    const [error, setError] = useState<string | null>(null);
 
     // Function to search for recipes
-    const performSearch = async (query: string) => {
+    const performSearch = useCallback(async (query: string) => {
+        if (!query.trim()) {
+            setLoading(false);
+            return;
+        }
+
         try {
             setLoading(true);
             setNoResults(false);
@@ -65,12 +63,79 @@ export default function RecipeResults() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    // Perform search when component mounts or query changes
+    useEffect(() => {
+        const initializeSearch = async () => {
+            try {
+                // Get query from route params
+                const routeQuery = route.params?.query;
+                if (routeQuery) {
+                    setSearchQuery(routeQuery);
+                    setLoading(true);
+
+                    console.log('Initializing search with query:', routeQuery);
+
+                    // Build search params
+                    const searchParams = {
+                        query: routeQuery,
+                        number: 20,
+                        // Add any filters from route params if needed
+                        cuisine: route.params?.cuisine,
+                        diet: route.params?.diet,
+                        maxReadyTime: route.params?.maxReadyTime
+                    };
+
+                    // Remove undefined values
+                    Object.keys(searchParams).forEach(key =>
+                        searchParams[key] === undefined && delete searchParams[key]
+                    );
+
+                    // Perform search
+                    const results = await searchRecipes(searchParams);
+                    setRecipes(results);
+
+                    // Log results for debugging
+                    console.log(`Found ${results.length} recipes for query: ${routeQuery}`);
+                    if (results.length > 0) {
+                        console.log('First recipe:', {
+                            title: results[0].title,
+                            hasIngredients: results[0].ingredients?.length > 0,
+                            hasInstructions: Boolean(results[0].instructions)
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error initializing search:', error);
+                setError('Failed to load recipes. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        initializeSearch();
+    }, [route.params?.query]);
+
+    // Re-run search when screen comes into focus with a query
+    useFocusEffect(
+        useCallback(() => {
+            console.log('RecipeResults screen focused, params:', route.params);
+            if (route.params?.query && route.params.query !== searchQuery) {
+                const query = route.params.query.trim();
+                console.log('Focus effect running search with:', query);
+                setSearchQuery(query);
+                performSearch(query);
+            }
+        }, [route.params, searchQuery, performSearch])
+    );
 
     // Handle search submission
     const handleSearch = () => {
         if (searchQuery.trim()) {
             performSearch(searchQuery);
+            // Update route params to reflect the new search
+            navigation.setParams({ query: searchQuery.trim() });
         }
     };
 
@@ -78,8 +143,6 @@ export default function RecipeResults() {
     const handleRecipePress = (recipe: Recipe) => {
         navigation.navigate('RecipeDetails', { recipeId: recipe.id });
     };
-
-
 
     return (
         <SafeAreaView style={styles.container}>

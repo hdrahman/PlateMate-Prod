@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel, validator
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import httpx
 import os
 import logging
 from dotenv import load_dotenv
 from auth.firebase_auth import get_current_user
+import time
 
 # Load environment variables
 load_dotenv()
@@ -66,6 +67,26 @@ class ChatWithContextRequest(BaseModel):
     user_context: Optional[str] = None  # Frontend can provide context data as a string
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 1000
+
+# Token management
+@router.post("/get-token")
+async def get_deepseek_token(current_user: dict = Depends(get_current_user)):
+    """
+    Get a simulated DeepSeek token for the client.
+    
+    This endpoint doesn't actually return a real DeepSeek API key (which would be a security risk),
+    but instead returns a simulated token with expiration for client-side caching purposes.
+    The actual API key is kept secure on the server.
+    """
+    try:
+        # Return a simulated token with expiration
+        return {
+            "token": f"simulated-deepseek-token-{int(time.time())}",
+            "expires_in": 3600,  # 1 hour expiration
+            "token_type": "Bearer"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating DeepSeek token: {str(e)}")
 
 @router.post("/nutrition-analysis", response_model=ChatResponse)
 async def analyze_nutrition(
@@ -231,8 +252,6 @@ async def chat_with_coach(
     except Exception as e:
         logger.error(f"Error in chat: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to chat with AI coach")
-
-
 
 @router.post("/chat-with-context", response_model=ChatResponse)
 async def chat_with_context(

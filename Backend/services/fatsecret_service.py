@@ -8,6 +8,9 @@ from math import floor
 from dotenv import load_dotenv
 import base64
 import random
+import httpx
+import asyncio
+from .connection_pool import get_http_client, cache_response, request_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,13 @@ class FatSecretService:
         self._access_token = None
         self._token_expires_at = 0
         self._api_available = True  # Track API availability
+        # Cache for autocomplete results to reduce API calls
+        self._autocomplete_cache = {
+            'recipes': {},  # {query: [results], ...}
+            'ingredients': {}  # {query: [results], ...}
+        }
+        self._cache_expiry = {}  # {cache_key: expiry_timestamp, ...}
+        self._CACHE_TTL = 3600  # Cache time-to-live in seconds (1 hour)
     
     def _load_credentials(self):
         """Load API credentials, with fallback to reload .env if not found"""
@@ -467,46 +477,88 @@ class FatSecretService:
         recipe_name = recipe.get('recipe_name', '')
         recipe_description = recipe.get('recipe_description', '')
         recipe_image = recipe.get('recipe_image', '')
+        
+        # Extract preparation and cooking time
+        prep_time = int(recipe.get('preparation_time_min', 0) or 0)
+        cook_time = int(recipe.get('cooking_time_min', 0) or 0)
+        ready_in_minutes = prep_time + cook_time
+        
+        # Extract servings
+        servings = int(float(recipe.get('number_of_servings', 4) or 4))
 
         # Extract nutrition information
-        nutrition = recipe.get('recipe_nutrition', {})
+        nutrition = {}
+        if 'recipe_nutrition' in recipe:
+            nutrition = recipe['recipe_nutrition']
+        elif 'serving_sizes' in recipe and 'serving' in recipe['serving_sizes']:
+            nutrition = recipe['serving_sizes']['serving']
+            
         calories = float(nutrition.get('calories', 0) or 0)
         protein = float(nutrition.get('protein', 0) or 0)
         carbs = float(nutrition.get('carbohydrate', 0) or 0)
         fat = float(nutrition.get('fat', 0) or 0)
 
         # Extract ingredients
-        ingredients_data = recipe.get('recipe_ingredients', {})
-        if isinstance(ingredients_data, dict) and 'ingredient' in ingredients_data:
-            ingredients_list = ingredients_data['ingredient']
-            if not isinstance(ingredients_list, list):
-                ingredients_list = [ingredients_list]
-        else:
-            ingredients_list = []
+        ingredients_list = []
+        if 'recipe_ingredients' in recipe and 'ingredient' in recipe['recipe_ingredients']:
+            raw_ingredients = recipe['recipe_ingredients']['ingredient']
+            if isinstance(raw_ingredients, list):
+                ingredients_list = raw_ingredients
+            else:
+                ingredients_list = [raw_ingredients]
+        # Check for detailed ingredients
+        elif 'ingredients' in recipe and 'ingredient' in recipe['ingredients']:
+            raw_ingredients = recipe['ingredients']['ingredient']
+            if isinstance(raw_ingredients, list):
+                ingredients_list = [item.get('ingredient_description', '') for item in raw_ingredients if 'ingredient_description' in item]
+            elif isinstance(raw_ingredients, dict):
+                ingredients_list = [raw_ingredients.get('ingredient_description', '')]
 
-        # Extract recipe types
-        types_data = recipe.get('recipe_types', {})
-        if isinstance(types_data, dict) and 'recipe_type' in types_data:
-            types_list = types_data['recipe_type']
-            if not isinstance(types_list, list):
-                types_list = [types_list]
-        else:
-            types_list = []
+        # Extract directions/instructions
+        instructions = ""
+        if 'directions' in recipe and 'direction' in recipe['directions']:
+            directions = recipe['directions']['direction']
+            if isinstance(directions, list):
+                # Sort by direction_number if available
+                directions.sort(key=lambda x: int(x.get('direction_number', 0)) if x.get('direction_number') else 0)
+                instructions = "\n".join([f"{i+1}. {d.get('direction_description', '')}" 
+                                        for i, d in enumerate(directions) 
+                                        if 'direction_description' in d])
+            elif isinstance(directions, dict) and 'direction_description' in directions:
+                instructions = f"1. {directions['direction_description']}"
+
+        # Extract recipe types for diets
+        diets = []
+        if 'recipe_types' in recipe and 'recipe_type' in recipe['recipe_types']:
+            types_list = recipe['recipe_types']['recipe_type']
+            if isinstance(types_list, list):
+                diets = types_list
+            else:
+                diets = [types_list]
+        
+        # Extract recipe categories for cuisines
+        cuisines = []
+        if 'recipe_categories' in recipe and 'recipe_category' in recipe['recipe_categories']:
+            categories = recipe['recipe_categories']['recipe_category']
+            if isinstance(categories, list):
+                cuisines = [cat.get('recipe_category_name', '') for cat in categories if 'recipe_category_name' in cat]
+            elif isinstance(categories, dict) and 'recipe_category_name' in categories:
+                cuisines = [categories['recipe_category_name']]
 
         return {
             'id': recipe_id,
             'title': recipe_name,
             'image': recipe_image,
-            'readyInMinutes': 30,  # Default value as FatSecret doesn't provide this
-            'servings': 4,  # Default value
-            'sourceUrl': f'https://www.fatsecret.com/recipes/{recipe_id}',
+            'readyInMinutes': ready_in_minutes if ready_in_minutes > 0 else 30,
+            'servings': servings,
+            'sourceUrl': recipe.get('recipe_url', f'https://www.fatsecret.com/recipes/{recipe_id}'),
             'summary': recipe_description,
-            'healthScore': min(100, max(0, int(calories / 10))),  # Rough health score calculation
+            'healthScore': min(100, max(0, int(100 - (calories / 20)))),  # Rough health score calculation
             'ingredients': ingredients_list,
-            'instructions': '',  # FatSecret doesn't provide detailed instructions in search
-            'diets': [],  # Would need to be determined from ingredients
-            'cuisines': [],  # FatSecret doesn't provide cuisine classification in basic search
-            'aggregateLikes': 0  # Not available in FatSecret
+            'instructions': instructions,
+            'diets': diets,
+            'cuisines': cuisines,
+            'aggregateLikes': int(recipe.get('rating', 0) or 0)
         }
 
     def search_recipes(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -515,23 +567,25 @@ class FatSecretService:
             raise Exception('FatSecret API key not configured')
         
         query = params.get('query', 'recipe')
+        max_results = min(params.get('number', 10), 20)  # Limit to 20 for performance
         
         try:
             # Build FatSecret API parameters
             api_params = {
-                'max_results': params.get('number', 10),
-                'page_number': params.get('offset', 0) // params.get('number', 10),
+                'max_results': max_results,
+                'page_number': params.get('offset', 0) // max_results,
                 'format': 'json'
             }
             
             if params.get('query'):
                 api_params['search_expression'] = params['query']
             
-            # Try FatSecret API
+            # Try FatSecret API for search
             response = self._make_request('GET', 'recipes/search/v3', api_params)
             
             if not response:
-                raise Exception(f"FatSecret API request failed for recipe search: {query}")
+                logger.error(f"FatSecret API request failed for recipe search: {query}")
+                return []
                 
             recipes_data = response.get('recipes', {})
             if isinstance(recipes_data, dict) and 'recipe' in recipes_data:
@@ -541,12 +595,32 @@ class FatSecretService:
             else:
                 recipes_list = []
             
-            logger.info(f"Found {len(recipes_list)} recipes for search")
-            return [self._map_fatsecret_recipe_to_recipe(recipe) for recipe in recipes_list]
+            logger.info(f"Found {len(recipes_list)} recipes for search: {query}")
+            
+            # Extract recipe IDs from search results
+            recipe_ids = [str(recipe.get('recipe_id', '')) for recipe in recipes_list if recipe.get('recipe_id')]
+            
+            # Fetch full details for each recipe (limited to first 5 for performance)
+            detailed_recipes = []
+            for recipe_id in recipe_ids[:5]:
+                try:
+                    detailed_recipe = self.get_recipe_by_id(recipe_id)
+                    if detailed_recipe:
+                        detailed_recipes.append(detailed_recipe)
+                except Exception as detail_error:
+                    logger.error(f"Error fetching details for recipe {recipe_id}: {detail_error}")
+            
+            # If we couldn't get detailed recipes, use the basic search results
+            if not detailed_recipes:
+                logger.warning("Falling back to basic recipe data without full details")
+                return [self._map_fatsecret_recipe_to_recipe(recipe) for recipe in recipes_list]
+            
+            logger.info(f"Retrieved full details for {len(detailed_recipes)} recipes")
+            return detailed_recipes
             
         except Exception as e:
             logger.error(f'Error searching recipes: {e}')
-            raise Exception(f'Failed to search for recipes "{query}": {str(e)}')
+            return []
 
     def get_recipe_by_id(self, recipe_id: str) -> Optional[Dict[str, Any]]:
         """Get recipe details by ID"""
@@ -559,16 +633,29 @@ class FatSecretService:
                 'format': 'json'
             }
             
-            response = self._make_request('GET', 'recipe/v2', params)
+            # Use the recipe/v1 endpoint to get full recipe details
+            response = self._make_request('GET', 'recipe/v1', params)
             
             if not response:
-                raise Exception(f"FatSecret API request failed for recipe ID: {recipe_id}")
+                logger.error(f"FatSecret API request failed for recipe ID: {recipe_id}")
+                return None
+            
+            # Log the response structure to help with debugging
+            logger.debug(f"Recipe detail response keys: {list(response.keys() if response else [])}")
                 
-            return self._map_fatsecret_recipe_to_recipe(response)
+            # Map the response to our recipe format
+            recipe = self._map_fatsecret_recipe_to_recipe(response)
+            logger.info(f"Successfully retrieved recipe details for ID: {recipe_id}")
+            
+            # Log whether we got instructions and ingredients
+            logger.debug(f"Recipe has instructions: {bool(recipe.get('instructions'))}")
+            logger.debug(f"Recipe has ingredients: {len(recipe.get('ingredients', []))}")
+            
+            return recipe
             
         except Exception as e:
             logger.error(f'Error getting recipe by ID: {e}')
-            raise Exception(f'Failed to get recipe with ID "{recipe_id}": {str(e)}')
+            return None
 
     def get_random_recipes(self, count: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Get random recipes"""
@@ -692,17 +779,35 @@ class FatSecretService:
             raise Exception(f'Failed to generate meal plan: {str(e)}')
 
     def autocomplete_recipes(self, query: str) -> List[Dict[str, Any]]:
-        """Autocomplete recipe search - simplified implementation"""
+        """Autocomplete recipe search with caching"""
         if not self._ensure_configured():
             raise Exception('FatSecret API key not configured')
             
         if not query.strip():
             raise Exception('Query cannot be empty for recipe autocomplete')
         
+        # Normalize query for cache lookup
+        normalized_query = query.strip().lower()
+        cache_key = f"recipe_{normalized_query}"
+        
+        # Check cache first
+        current_time = time.time()
+        if cache_key in self._autocomplete_cache['recipes'] and self._cache_expiry.get(cache_key, 0) > current_time:
+            logger.info(f"Using cached recipe autocomplete results for: {normalized_query}")
+            return self._autocomplete_cache['recipes'][cache_key]
+        
+        # For short queries (2-3 chars), only search if it's a prefix of a cached query
+        # This reduces API calls for partial typing
+        if len(normalized_query) <= 3:
+            for cached_query, results in self._autocomplete_cache['recipes'].items():
+                if cached_query.startswith(normalized_query) and self._cache_expiry.get(f"recipe_{cached_query}", 0) > current_time:
+                    logger.info(f"Using prefix-matched cache for recipe autocomplete: {normalized_query} -> {cached_query}")
+                    return results
+        
         try:
             # Use regular recipe search with limited results for autocomplete
             params = {
-                'query': query.strip(),
+                'query': normalized_query,
                 'number': 10
             }
             
@@ -726,6 +831,10 @@ class FatSecretService:
                         'id': fallback_id,
                         'title': recipe['title']
                     })
+            
+            # Cache the results
+            self._autocomplete_cache['recipes'][normalized_query] = autocomplete_results
+            self._cache_expiry[cache_key] = current_time + self._CACHE_TTL
                     
             return autocomplete_results
             
@@ -734,17 +843,42 @@ class FatSecretService:
             raise Exception(f'Failed to get recipe autocomplete for "{query}": {str(e)}')
 
     def autocomplete_ingredients(self, query: str) -> List[Dict[str, Any]]:
-        """Autocomplete ingredient search - using food search"""
+        """Autocomplete ingredient search with caching"""
         if not self._ensure_configured():
             raise Exception('FatSecret API key not configured')
             
         if not query.strip():
             raise Exception('Query cannot be empty for ingredient autocomplete')
         
+        # Normalize query for cache lookup
+        normalized_query = query.strip().lower()
+        cache_key = f"ingredient_{normalized_query}"
+        
+        # Check cache first
+        current_time = time.time()
+        if cache_key in self._autocomplete_cache['ingredients'] and self._cache_expiry.get(cache_key, 0) > current_time:
+            logger.info(f"Using cached ingredient autocomplete results for: {normalized_query}")
+            return self._autocomplete_cache['ingredients'][cache_key]
+        
+        # For short queries (2-3 chars), only search if it's a prefix of a cached query
+        if len(normalized_query) <= 3:
+            for cached_query, results in self._autocomplete_cache['ingredients'].items():
+                if cached_query.startswith(normalized_query) and self._cache_expiry.get(f"ingredient_{cached_query}", 0) > current_time:
+                    logger.info(f"Using prefix-matched cache for ingredient autocomplete: {normalized_query} -> {cached_query}")
+                    return results
+        
         try:
             # Use food search for ingredient autocomplete
-            food_results = self.search_food(query.strip())
-            return [{'id': i, 'name': food['food_name']} for i, food in enumerate(food_results[:8])]
+            food_results = self.search_food(normalized_query)
+            
+            # Create consistent results
+            ingredient_results = [{'id': i, 'name': food['food_name']} for i, food in enumerate(food_results[:8])]
+            
+            # Cache the results
+            self._autocomplete_cache['ingredients'][normalized_query] = ingredient_results
+            self._cache_expiry[cache_key] = current_time + self._CACHE_TTL
+            
+            return ingredient_results
             
         except Exception as e:
             logger.error(f'Error getting ingredient autocomplete: {e}')

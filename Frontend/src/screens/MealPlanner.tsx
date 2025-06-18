@@ -9,9 +9,51 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
-import { Recipe, foodCategories, getRandomRecipes, autocompleteRecipes, autocompleteIngredients } from '../api/recipes';
+import { Recipe, getRandomRecipes, searchRecipes, getRecipesByMealType } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
 import { RecipeCacheService } from '../services/RecipeCacheService';
+import apiService from '../utils/apiService';
+import { ServiceTokenType } from '../utils/tokenManager';
+
+// Define food categories locally since they were removed from the API
+const foodCategories = [
+    { id: 'breakfast', name: 'Breakfast', icon: 'sunny-outline' },
+    { id: 'lunch', name: 'Lunch', icon: 'fast-food-outline' },
+    { id: 'dinner', name: 'Dinner', icon: 'restaurant-outline' },
+    { id: 'italian', name: 'Italian', icon: 'pizza-outline' },
+    { id: 'american', name: 'American', icon: 'flag-outline' },
+    { id: 'quick', name: 'Quick & Easy', icon: 'timer-outline' },
+    { id: 'snack', name: 'Snacks', icon: 'cafe-outline' },
+    { id: 'healthy', name: 'Healthy', icon: 'fitness-outline' },
+    { id: 'vegetarian', name: 'Vegetarian', icon: 'leaf-outline' },
+];
+
+// Define autocomplete functions locally since they were removed from the API
+const autocompleteRecipes = async (query: string): Promise<{ id: number; title: string }[]> => {
+    try {
+        console.log(`Fetching autocomplete suggestions for: "${query}"`);
+        const response = await apiService.get('/recipes/autocomplete', { query }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH
+        });
+        console.log(`Autocomplete response for "${query}":`, response);
+        return Array.isArray(response) ? response : [];
+    } catch (error) {
+        console.error('Error getting recipe autocomplete:', error);
+        return [];
+    }
+};
+
+const autocompleteIngredients = async (query: string): Promise<{ id: number; name: string }[]> => {
+    try {
+        const response = await apiService.get('/recipes/ingredients/autocomplete', { query }, {
+            serviceType: ServiceTokenType.FIREBASE_AUTH
+        });
+        return Array.isArray(response) ? response : [];
+    } catch (error) {
+        console.error('Error getting ingredient autocomplete:', error);
+        return [];
+    }
+};
 
 // Custom imports for user data
 import { useAuth } from '../context/AuthContext';
@@ -130,16 +172,23 @@ const SuggestionItem = React.memo(({
         style={styles.suggestionItem}
         onPress={() => onPress(item)}
     >
-        <Ionicons
-            name={item.type === 'recipe' ? 'restaurant-outline' : 'leaf-outline'}
-            size={16}
-            color={SUBDUED}
-            style={styles.suggestionIcon}
-        />
+        <View style={[
+            styles.suggestionIconContainer,
+            { backgroundColor: item.type === 'recipe' ? '#AA00FF20' : '#00CFFF20' }
+        ]}>
+            <Ionicons
+                name={item.type === 'recipe' ? 'restaurant' : 'leaf'}
+                size={16}
+                color={item.type === 'recipe' ? '#AA00FF' : '#00CFFF'}
+            />
+        </View>
         <Text style={styles.suggestionText}>
             {item.title || item.name || 'Unknown'}
         </Text>
-        <Text style={styles.suggestionType}>
+        <Text style={[
+            styles.suggestionType,
+            { color: item.type === 'recipe' ? '#AA00FF' : '#00CFFF' }
+        ]}>
             {item.type === 'recipe' ? 'Recipe' : 'Ingredient'}
         </Text>
     </TouchableOpacity>
@@ -178,108 +227,254 @@ export default function MealPlanner() {
     });
     const [userGoals, setUserGoals] = useState<NutritionGoals>(getDefaultNutritionGoals());
 
-    // Debounced autocomplete function
+    // Cache for autocomplete results to prevent redundant API calls
+    const autocompleteCacheRef = useRef<{ [query: string]: AutocompleteSuggestion[] }>({});
+    // Minimum query length before triggering autocomplete
+    const MIN_QUERY_LENGTH = 2;
+    // Debounce delay in milliseconds - increased to reduce API calls
+    const DEBOUNCE_DELAY = 500;
+    // Maximum number of suggestions to display
+    const MAX_SUGGESTIONS = 5;
+    // Last query that was sent to the API
+    const lastQueryRef = useRef<string>('');
+    // Current query being processed
+    const currentQueryRef = useRef<string>('');
+    // Prefetched common terms
+    const COMMON_TERMS = ['chicken', 'beef', 'pasta', 'rice', 'salad', 'breakfast', 'lunch', 'dinner'];
+
+    // Prefetch common search terms
+    useEffect(() => {
+        // Simplified prefetch function to avoid TypeError
+        const prefetchCommonTerms = async () => {
+            try {
+                // Use the defined COMMON_TERMS constant
+                for (const term of COMMON_TERMS) {
+                    // Skip if already cached
+                    if (autocompleteCacheRef.current[term]) continue;
+
+                    try {
+                        // Simple implementation to avoid errors
+                        const results = await autocompleteRecipes(term);
+
+                        // Create safe suggestions array
+                        const suggestions = [];
+
+                        // Only process if we have valid results
+                        if (results && Array.isArray(results)) {
+                            // Process each item individually with safety checks
+                            for (let i = 0; i < Math.min(results.length, MAX_SUGGESTIONS); i++) {
+                                const item = results[i];
+                                if (item && typeof item === 'object' && 'id' in item && 'title' in item) {
+                                    suggestions.push({
+                                        id: Number(item.id) || i,
+                                        title: String(item.title) || 'Unknown',
+                                        type: 'recipe' as const,
+                                        uniqueKey: `recipe-${i}-${Date.now()}`
+                                    });
+                                }
+                            }
+                        }
+
+                        // Store in cache (even if empty)
+                        autocompleteCacheRef.current[term] = suggestions;
+
+                    } catch (err) {
+                        console.error(`Error prefetching term "${term}":`, err);
+                        // Store empty array on error
+                        autocompleteCacheRef.current[term] = [];
+                    }
+                }
+            } catch (error) {
+                console.error('Error in prefetchCommonTerms:', error);
+            }
+        };
+
+        // Run prefetch after component mounts
+        prefetchCommonTerms();
+    }, []);
+
+    // Simplified autocomplete function - only fetch recipes, not ingredients
     const fetchAutocomplete = useCallback(async (query: string) => {
-        if (!query.trim() || query.length < 2) {
+        if (!query.trim() || query.length < MIN_QUERY_LENGTH) {
             setSuggestions([]);
             setShowSuggestions(false);
             return;
         }
 
+        // Normalize the query to avoid case sensitivity issues
+        const normalizedQuery = query.trim().toLowerCase();
+
+        // Save the query we're currently processing
+        currentQueryRef.current = normalizedQuery;
+
+        // Check if this exact query was the last one processed
+        if (normalizedQuery === lastQueryRef.current) {
+            return;
+        }
+
+        // Check if we have cached results for this query
+        if (autocompleteCacheRef.current[normalizedQuery]) {
+            console.log('Using cached autocomplete results for:', normalizedQuery);
+            setSuggestions(autocompleteCacheRef.current[normalizedQuery]);
+            setShowSuggestions(autocompleteCacheRef.current[normalizedQuery].length > 0);
+            return;
+        }
+
+        // Check if this query is a substring of any cached query
+        for (const cachedQuery in autocompleteCacheRef.current) {
+            if (cachedQuery.includes(normalizedQuery)) {
+                console.log('Using partial match from cache:', cachedQuery);
+                setSuggestions(autocompleteCacheRef.current[cachedQuery]);
+                setShowSuggestions(autocompleteCacheRef.current[cachedQuery].length > 0);
+                return;
+            }
+        }
+
+        // Update last processed query
+        lastQueryRef.current = normalizedQuery;
         setIsLoadingSuggestions(true);
 
         try {
-            // Fetch both recipe and ingredient suggestions in parallel
-            const [recipeResults, ingredientResults] = await Promise.all([
-                autocompleteRecipes(query),
-                autocompleteIngredients(query)
-            ]);
+            // Only fetch recipe suggestions for better performance
+            const results = await autocompleteRecipes(normalizedQuery);
 
-            const recipeSuggestions: AutocompleteSuggestion[] = recipeResults
-                .filter(item => item && item.id && item.title) // Filter out invalid items
-                .map((item, index) => ({
-                    id: item.id,
-                    title: item.title,
-                    type: 'recipe' as const,
-                    uniqueKey: `recipe-${item.id}-${index}` // Add unique key
-                }));
+            // Create safe suggestions array
+            const suggestions: AutocompleteSuggestion[] = [];
 
-            const ingredientSuggestions: AutocompleteSuggestion[] = ingredientResults
-                .filter(item => item && item.id && item.name) // Filter out invalid items
-                .map((item, index) => ({
-                    id: item.id,
-                    name: item.name,
-                    type: 'ingredient' as const,
-                    uniqueKey: `ingredient-${item.id}-${index}` // Add unique key
-                }));
+            // Only process if we have valid results
+            if (results && Array.isArray(results)) {
+                // Process each item individually with safety checks
+                for (let i = 0; i < Math.min(results.length, MAX_SUGGESTIONS); i++) {
+                    const item = results[i];
+                    if (item && typeof item === 'object' && 'id' in item && 'title' in item) {
+                        suggestions.push({
+                            id: Number(item.id) || i,
+                            title: String(item.title) || 'Unknown',
+                            type: 'recipe' as const,
+                            uniqueKey: `recipe-${i}-${Date.now()}`
+                        });
+                    }
+                }
+            }
 
-            // Combine and limit suggestions
-            const allSuggestions = [...recipeSuggestions.slice(0, 6), ...ingredientSuggestions.slice(0, 4)];
-            setSuggestions(allSuggestions);
-            setShowSuggestions(allSuggestions.length > 0);
+            // Cache the results
+            autocompleteCacheRef.current[normalizedQuery] = suggestions;
+
+            // Only update UI if this is still the current query being processed
+            if (normalizedQuery === currentQueryRef.current) {
+                setSuggestions(suggestions);
+                setShowSuggestions(suggestions.length > 0);
+            }
         } catch (error) {
             console.error('Error fetching autocomplete suggestions:', error);
-            setSuggestions([]);
-            setShowSuggestions(false);
+            if (normalizedQuery === currentQueryRef.current) {
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
+            // Cache empty results to prevent repeated failed lookups
+            autocompleteCacheRef.current[normalizedQuery] = [];
         } finally {
-            setIsLoadingSuggestions(false);
+            if (normalizedQuery === currentQueryRef.current) {
+                setIsLoadingSuggestions(false);
+            }
         }
     }, []);
 
-    // Handle search query changes with debouncing
+    // Handle search query changes with improved debouncing
     const handleSearchQueryChange = useCallback((text: string) => {
+        // Always update the search query immediately for responsive UI
         setSearchQuery(text);
+
+        // Always update the current query reference immediately
+        currentQueryRef.current = text.trim().toLowerCase();
 
         // Clear existing timeout
         if (autocompleteTimeoutRef.current) {
             clearTimeout(autocompleteTimeoutRef.current);
+            autocompleteTimeoutRef.current = null;
         }
 
         // Only fetch autocomplete if text is long enough
-        if (text.trim().length >= 2) {
-            // Set new timeout for autocomplete
-            autocompleteTimeoutRef.current = setTimeout(() => {
-                fetchAutocomplete(text);
-            }, 300);
+        if (text.trim().length >= MIN_QUERY_LENGTH) {
+            // Show cached results immediately if available
+            const normalizedQuery = text.trim().toLowerCase();
+
+            // Check exact cache match
+            if (autocompleteCacheRef.current[normalizedQuery]) {
+                setSuggestions(autocompleteCacheRef.current[normalizedQuery]);
+                setShowSuggestions(autocompleteCacheRef.current[normalizedQuery].length > 0);
+                return; // Skip API call if we have exact cache match
+            }
+
+            // Check for partial matches in cache
+            let foundPartialMatch = false;
+            for (const cachedQuery in autocompleteCacheRef.current) {
+                if (cachedQuery.includes(normalizedQuery)) {
+                    setSuggestions(autocompleteCacheRef.current[cachedQuery]);
+                    setShowSuggestions(autocompleteCacheRef.current[cachedQuery].length > 0);
+                    foundPartialMatch = true;
+                    break;
+                }
+            }
+
+            // Only make API call if no cache hits
+            if (!foundPartialMatch) {
+                setIsLoadingSuggestions(true);
+
+                // Set new timeout with appropriate delay to reduce API calls
+                autocompleteTimeoutRef.current = setTimeout(() => {
+                    fetchAutocomplete(text);
+                }, DEBOUNCE_DELAY);
+            }
         } else {
             // Clear suggestions if text is too short
             setSuggestions([]);
             setShowSuggestions(false);
+            setIsLoadingSuggestions(false);
         }
     }, [fetchAutocomplete]);
 
     // Handle suggestion selection
     const handleSuggestionSelect = useCallback((suggestion: AutocompleteSuggestion) => {
-        const searchTerm = suggestion.title || suggestion.name || '';
+        console.log('Suggestion selected:', suggestion);
 
         // Clear suggestions immediately to prevent UI flicker
         setShowSuggestions(false);
+        Keyboard.dismiss();
 
         // Update search query without triggering autocomplete
         if (autocompleteTimeoutRef.current) {
             clearTimeout(autocompleteTimeoutRef.current);
         }
 
-        setSearchQuery(searchTerm);
-        Keyboard.dismiss();
-
-        // Navigate to search results
+        // Get search term from suggestion
+        const searchTerm = suggestion.title || suggestion.name || '';
         if (searchTerm.trim()) {
-            navigation.navigate('RecipeResults', { query: searchTerm.trim() });
-            // Clear after a short delay to prevent flicker
+            // Always navigate to search results for any suggestion type
+            console.log('Navigating to RecipeResults with query:', searchTerm);
+            navigation.navigate('RecipeResults', { query: searchTerm });
+
+            // Clear the search query after navigation
             setTimeout(() => {
                 setSearchQuery('');
-            }, 100);
+            }, 200);
         }
     }, [navigation]);
 
     // Handle search submission
     const handleSearch = useCallback(() => {
         if (searchQuery.trim()) {
+            console.log('Search submitted with query:', searchQuery.trim());
             setShowSuggestions(false);
             Keyboard.dismiss();
+
+            // Navigate to search results
             navigation.navigate('RecipeResults', { query: searchQuery.trim() });
-            setSearchQuery(''); // Clear the search field after submitting
+
+            // Clear the search field after submitting
+            setTimeout(() => {
+                setSearchQuery('');
+            }, 200);
         }
     }, [searchQuery, navigation]);
 
@@ -936,15 +1131,20 @@ const styles = StyleSheet.create({
         maxHeight: 200,
     },
     suggestionItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
+        flexDirection: "row",
+        alignItems: "center",
         paddingVertical: 12,
+        paddingHorizontal: 15,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+        borderBottomColor: CARD_BG,
         height: 48,
     },
-    suggestionIcon: {
+    suggestionIconContainer: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginRight: 12,
     },
     suggestionText: {
@@ -953,9 +1153,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     suggestionType: {
-        color: SUBDUED,
         fontSize: 12,
-        fontStyle: 'italic',
+        color: SUBDUED,
+        marginLeft: 8,
     },
-
 });

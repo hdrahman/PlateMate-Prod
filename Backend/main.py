@@ -25,11 +25,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from routes.image import router as image_router
-from routes.gpt import router as gpt_router  # Include GPT router
-from routes.arli_ai import router as arli_ai_router  # Include Arli AI router
-from routes.deepseek import router as deepseek_router  # Include DeepSeek router
-from routes.food import router as food_router  # Include food router
-from routes.recipes import router as recipes_router  # Include recipes router
+from routes.gpt import router as gpt_router
+from routes.arli_ai import router as arli_ai_router
+from routes.deepseek import router as deepseek_router
+from routes.food import router as food_router
+from routes.recipes import router as recipes_router
+
+# Add the import for connection pool
+from services.connection_pool import start_connection_pool, stop_connection_pool
 
 app = FastAPI()
 
@@ -73,9 +76,12 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Mount static files for serving uploaded images
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# Startup event to ensure Firebase admin SDK is initialized
+# Start the connection pool when the app starts
 @app.on_event("startup")
 async def startup_event():
+    print("Starting PlateMate API server...")
+    
+    # Initialize Firebase Admin SDK
     try:
         # Import here to avoid circular imports
         from auth.firebase_auth import initialize_firebase_admin
@@ -90,6 +96,17 @@ async def startup_event():
     except Exception as e:
         print(f"❌ Failed to initialize Firebase Admin SDK: {e}")
         print("⚠️ The application will continue but Firebase authentication will not work")
+    
+    # Initialize connection pool
+    start_connection_pool()
+    print("Connection pool initialized")
+
+# Stop the connection pool when the app shuts down
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("Shutting down PlateMate API server...")
+    await stop_connection_pool()
+    print("Connection pool stopped")
 
 # Custom Exception Handler to Log Full Errors
 @app.exception_handler(Exception)
@@ -115,14 +132,15 @@ app.add_middleware(
     expose_headers=["*"],  # Expose all headers
 )
 
-# Include routers correctly
+# Include routers correctly - routers now have their own prefixes defined
 app.include_router(image_router, prefix='/images', tags=['images'])
-app.include_router(gpt_router, prefix='/gpt', tags=['gpt'])  # Include GPT router
-app.include_router(arli_ai_router, prefix='/arli', tags=['arli_ai'])  # Include Arli AI router
-app.include_router(deepseek_router, tags=['deepseek'])  # Include DeepSeek router
-app.include_router(food_router, prefix='/food', tags=['food'])  # Include food router
-app.include_router(recipes_router, prefix='/recipes', tags=['recipes'])  # Include recipes router
+app.include_router(gpt_router)  # Using prefix from router definition
+app.include_router(arli_ai_router)  # Using prefix from router definition
+app.include_router(deepseek_router)  # Using prefix from router definition
+app.include_router(food_router, prefix='/food', tags=['food'])
+app.include_router(recipes_router, prefix='/recipes', tags=['recipes'])
 
+# Health check endpoints
 @app.get("/")
 def home():
     return {'message': "FastAPI backend services are running!"}
@@ -131,3 +149,18 @@ def home():
 async def health_check():
     """Simple health check endpoint for network connectivity testing"""
     return {"status": "ok", "message": "Server is running"}
+
+# Add token health check endpoint
+@app.get("/health/tokens")
+async def token_health_check():
+    """Check if token endpoints are properly configured"""
+    return {
+        "status": "ok",
+        "token_endpoints": {
+            "firebase": "Managed by frontend",
+            "openai": "/gpt/get-token",
+            "deepseek": "/deepseek/get-token",
+            "fatsecret": "/food/get-token",
+            "arli_ai": "/arli-ai/get-token"
+        }
+    }

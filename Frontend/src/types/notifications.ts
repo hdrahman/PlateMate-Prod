@@ -5,6 +5,7 @@ export interface NotificationSettings {
         lunch: string;     // "12:00"
         dinner: string;    // "18:00"
         snacks: boolean;
+        snackTimes: string[]; // Array of times for snack reminders in 24h format ["10:00", "15:00", "20:00"]
     };
     waterReminders: {
         enabled: boolean;

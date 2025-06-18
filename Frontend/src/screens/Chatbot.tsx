@@ -97,7 +97,7 @@ export default function Chatbot() {
   const getFirebaseToken = async (): Promise<string> => {
     try {
       // Use the cached token system for better performance
-      const token = await tokenManager.getToken();
+      const token = await tokenManager.getToken('firebase_auth');
       return token;
     } catch (error) {
       console.error('Error getting Firebase token:', error);
@@ -107,12 +107,34 @@ export default function Chatbot() {
 
   // Prefetch token when component mounts
   useEffect(() => {
-    // Prefetch authentication token to speed up first message
-    tokenManager.getToken().then(() => {
-      console.log('Auth token prefetched for Coach Max chat');
-    }).catch(error => {
-      console.error('Failed to prefetch auth token:', error);
-    });
+    // Prefetch authentication tokens to speed up first message
+    const prefetchTokens = async () => {
+      try {
+        // Prefetch Firebase token
+        await tokenManager.getToken('firebase_auth');
+
+        // Try to prefetch AI service tokens if they're available
+        try {
+          await tokenManager.getToken('openai');
+          console.log('OpenAI token already available');
+        } catch (error) {
+          console.log('OpenAI token not cached yet');
+        }
+
+        try {
+          await tokenManager.getToken('deepseek');
+          console.log('DeepSeek token already available');
+        } catch (error) {
+          console.log('DeepSeek token not cached yet');
+        }
+
+        console.log('Auth tokens prefetched for Coach Max chat');
+      } catch (error) {
+        console.error('Failed to prefetch auth tokens:', error);
+      }
+    };
+
+    prefetchTokens();
   }, []);
 
   // Helper function to format date for database queries

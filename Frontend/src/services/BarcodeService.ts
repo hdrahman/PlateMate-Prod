@@ -1,6 +1,91 @@
-import { fetchFoodByBarcode as fetchFromBackend } from '../api/nutritionix';
-import { FoodItem } from '../api/nutritionix';
 import axios from 'axios';
+import { BACKEND_URL } from '../utils/config';
+import { auth } from '../utils/firebase/index';
+
+// Backend API base URL
+const BACKEND_BASE_URL = BACKEND_URL;
+
+/**
+ * Get authorization headers for backend API calls
+ */
+const getAuthHeaders = async () => {
+    try {
+        const user = auth.currentUser;
+
+        if (user) {
+            try {
+                const token = await user.getIdToken(true);
+                return {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                };
+            } catch (tokenError) {
+                console.error('Error getting Firebase token:', tokenError);
+                throw tokenError;
+            }
+        }
+    } catch (error) {
+        console.error('Error getting auth token:', error);
+    }
+    return {
+        'Content-Type': 'application/json'
+    };
+};
+
+// Define FoodItem interface directly here
+export interface FoodItem {
+    food_name: string;
+    brand_name?: string;
+    calories: number;
+    proteins: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+    sugar: number;
+    saturated_fat: number;
+    polyunsaturated_fat: number;
+    monounsaturated_fat: number;
+    trans_fat: number;
+    cholesterol: number;
+    sodium: number;
+    potassium: number;
+    vitamin_a: number;
+    vitamin_c: number;
+    calcium: number;
+    iron: number;
+    image: string;
+    serving_unit: string;
+    serving_weight_grams: number;
+    serving_qty: number;
+    healthiness_rating?: number;
+    notes?: string;
+}
+
+/**
+ * Fetch food by barcode using the backend API
+ */
+export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | null> => {
+    try {
+        // Clean the barcode
+        const cleanBarcode = barcode.replace(/\D/g, '');
+        console.log('Searching for barcode:', cleanBarcode);
+
+        // Get authentication headers
+        const headers = await getAuthHeaders();
+
+        // Use the backend API to search for food by barcode
+        const response = await axios.post(
+            `${BACKEND_BASE_URL}/food/barcode`,
+            { barcode: cleanBarcode },
+            { headers }
+        );
+
+        return response.data || null;
+    } catch (error) {
+        console.error('Error fetching food by barcode:', error);
+        throw error;
+    }
+};
 
 /**
  * Centralized Barcode Service
@@ -49,7 +134,7 @@ export class BarcodeService {
 
                     // Strategy: Backend API
                     console.log('🥗 Trying Backend API...');
-                    const backendResult = await fetchFromBackend(cleanBarcode);
+                    const backendResult = await fetchFoodByBarcode(cleanBarcode);
 
                     if (backendResult) {
                         console.log('✅ Success with Backend API');

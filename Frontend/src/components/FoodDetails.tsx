@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FoodItem } from '../api/nutritionix';
+import { FoodItem } from '../services/BarcodeService';
 
 // App theme colors - matching Manual.tsx
 const PRIMARY_BG = '#000000';
