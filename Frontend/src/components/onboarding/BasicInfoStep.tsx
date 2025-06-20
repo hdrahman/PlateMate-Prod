@@ -5,10 +5,13 @@ import {
     StyleSheet,
     TextInput,
     TouchableOpacity,
+    ScrollView,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { auth } from '../../utils/firebase';
 
 interface BasicInfoStepProps {
     profile: UserProfile;
@@ -19,37 +22,45 @@ interface BasicInfoStepProps {
 const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, onNext }) => {
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [lastName, setLastName] = useState(profile.lastName || '');
+    const [email, setEmail] = useState(auth.currentUser?.email || profile.email || '');
     const [dateOfBirth, setDateOfBirth] = useState(profile.dateOfBirth || '');
-    const [errors, setErrors] = useState({
-        firstName: '',
-        dateOfBirth: '',
-    });
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Format date input as DD-MM-YYYY
-    const handleDateChange = (text: string) => {
+    // Handle DOB formatting
+    const formatDateOfBirth = (text: string) => {
         // Remove any non-digit characters
         const cleaned = text.replace(/\D/g, '');
 
-        // Apply DD-MM-YYYY formatting
-        let formatted = cleaned;
-        if (cleaned.length >= 3) {
-            formatted = cleaned.substring(0, 2) + '-' + cleaned.substring(2);
-        }
-        if (cleaned.length >= 5) {
-            formatted = cleaned.substring(0, 2) + '-' + cleaned.substring(2, 4) + '-' + cleaned.substring(4, 8);
-        }
-
-        // Limit to 10 characters (DD-MM-YYYY)
-        if (formatted.length <= 10) {
-            setDateOfBirth(formatted);
+        // Format with slashes
+        if (cleaned.length <= 2) {
+            setDateOfBirth(cleaned);
+        } else if (cleaned.length <= 4) {
+            setDateOfBirth(`${cleaned.slice(0, 2)}/${cleaned.slice(2)}`);
+        } else if (cleaned.length <= 8) {
+            setDateOfBirth(`${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4)}`);
         }
     };
 
-    const calculateAge = (dob: string): number | null => {
-        if (!dob || !/^\d{2}-\d{2}-\d{4}$/.test(dob)) return null;
+    const validateEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
 
-        const [day, month, year] = dob.split('-').map(Number);
-        const birthDate = new Date(year, month - 1, day);
+    const validateDateOfBirth = (dob: string): boolean => {
+        // Basic format validation (MM/DD/YYYY)
+        const dobRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+        if (!dobRegex.test(dob)) {
+            return false;
+        }
+
+        // Check if it's a valid date and user is at least 13 years old
+        const parts = dob.split('/');
+        const birthDate = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
+
+        if (isNaN(birthDate.getTime())) {
+            return false;
+        }
+
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -58,63 +69,75 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             age--;
         }
 
-        return age;
+        return age >= 13;
     };
 
-    const validateForm = () => {
-        let isValid = true;
-        const newErrors = {
-            firstName: '',
-            dateOfBirth: '',
-        };
-
-        // Validate first name
+    const handleSubmit = async () => {
         if (!firstName.trim()) {
-            newErrors.firstName = 'First name is required';
-            isValid = false;
+            Alert.alert('Missing Information', 'Please enter your first name');
+            return;
         }
 
-        // Validate date of birth format
-        if (dateOfBirth && !/^\d{2}-\d{2}-\d{4}$/.test(dateOfBirth)) {
-            newErrors.dateOfBirth = 'Please use DD-MM-YYYY format';
-            isValid = false;
-        } else if (dateOfBirth) {
-            const [day, month, year] = dateOfBirth.split('-').map(Number);
-            const date = new Date(year, month - 1, day);
-            if (isNaN(date.getTime()) || date > new Date() || year < 1900) {
-                newErrors.dateOfBirth = 'Please enter a valid date';
-                isValid = false;
+        if (!validateEmail(email)) {
+            Alert.alert('Invalid Email', 'Please enter a valid email address');
+            return;
+        }
+
+        if (!dateOfBirth) {
+            Alert.alert('Missing Information', 'Please enter your date of birth');
+            return;
+        }
+
+        if (!validateDateOfBirth(dateOfBirth)) {
+            Alert.alert('Invalid Date of Birth', 'Please enter a valid date (MM/DD/YYYY) and ensure you are at least 13 years old');
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+
+            // Calculate age if date of birth is provided
+            let age = null;
+            if (dateOfBirth) {
+                const parts = dateOfBirth.split('/');
+                const birthDate = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
+                const today = new Date();
+                age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
             }
-        }
 
-        setErrors(newErrors);
-        return isValid;
-    };
-
-    const handleNext = async () => {
-        if (validateForm()) {
-            const age = calculateAge(dateOfBirth);
             await updateProfile({
-                firstName,
-                lastName,
-                dateOfBirth: dateOfBirth || null,
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
+                email: email.trim(),
+                dateOfBirth: dateOfBirth,
                 age: age,
             });
+
             onNext();
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            Alert.alert('Error', 'Failed to save your information. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
-                <Text style={styles.title}>Personal Information</Text>
-                <Text style={styles.subtitle}>Let's start with the basics</Text>
+                <Text style={styles.title}>Let's Get Started</Text>
+                <Text style={styles.subtitle}>Tell us a bit about yourself</Text>
             </View>
 
             <View style={styles.form}>
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>First Name</Text>
-                    <View style={[styles.inputContainer, errors.firstName ? styles.inputError : null]}>
+                    <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
                             placeholder="Enter your first name"
@@ -124,7 +147,6 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                             autoCapitalize="words"
                         />
                     </View>
-                    {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -142,27 +164,48 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                 </View>
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Date of Birth <Text style={styles.optional}>(optional)</Text></Text>
-                    <View style={[styles.inputContainer, errors.dateOfBirth ? styles.inputError : null]}>
+                    <Text style={styles.label}>Email</Text>
+                    <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
-                            placeholder="DD-MM-YYYY"
+                            placeholder="Enter your email"
+                            placeholderTextColor="#666"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                    </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Date of Birth</Text>
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="MM/DD/YYYY"
                             placeholderTextColor="#666"
                             value={dateOfBirth}
-                            onChangeText={handleDateChange}
+                            onChangeText={formatDateOfBirth}
                             keyboardType="numeric"
-                            maxLength={10}
                         />
-                        <Ionicons name="calendar-outline" size={20} color="#666" />
                     </View>
-                    {errors.dateOfBirth ? <Text style={styles.errorText}>{errors.dateOfBirth}</Text> : null}
-                    {dateOfBirth && calculateAge(dateOfBirth) && (
-                        <Text style={styles.helpText}>Age: {calculateAge(dateOfBirth)} years</Text>
-                    )}
+                    <Text style={styles.hint}>You must be at least 13 years old</Text>
                 </View>
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleNext}>
+            <View style={styles.infoContainer}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#888" />
+                <Text style={styles.infoText}>
+                    Your information is securely stored and never shared with third parties
+                </Text>
+            </View>
+
+            <TouchableOpacity
+                style={styles.button}
+                onPress={handleSubmit}
+                disabled={isLoading}
+            >
                 <LinearGradient
                     colors={["#0074dd", "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
@@ -173,17 +216,20 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                     <Ionicons name="arrow-forward" size={18} color="#fff" />
                 </LinearGradient>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    contentContainer: {
         paddingTop: 20,
+        paddingBottom: 40,
     },
     header: {
-        marginBottom: 40,
+        marginBottom: 32,
     },
     title: {
         fontSize: 28,
@@ -198,16 +244,16 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
     form: {
-        flex: 1,
+        marginBottom: 30,
     },
     inputGroup: {
-        marginBottom: 24,
+        marginBottom: 20,
     },
     label: {
-        fontSize: 15,
+        fontSize: 16,
+        fontWeight: '500',
         color: '#fff',
         marginBottom: 8,
-        fontWeight: '500',
     },
     optional: {
         color: '#888',
@@ -215,52 +261,57 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.12)',
-        borderRadius: 8,
+        borderRadius: 12,
         paddingHorizontal: 16,
-        height: 52,
-    },
-    inputError: {
-        borderColor: '#ff3b30',
-        backgroundColor: 'rgba(255, 59, 48, 0.1)',
+        height: 56,
+        justifyContent: 'center',
     },
     input: {
-        flex: 1,
         color: '#fff',
         fontSize: 16,
-        height: '100%',
     },
-    errorText: {
-        color: '#ff3b30',
-        fontSize: 13,
-        marginTop: 6,
-        fontWeight: '500',
-    },
-    helpText: {
+    hint: {
         color: '#888',
-        fontSize: 13,
+        fontSize: 12,
         marginTop: 6,
+        marginLeft: 4,
+    },
+    infoContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 30,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.06)',
+        marginHorizontal: 20,
+    },
+    infoText: {
+        flex: 1,
+        color: '#888',
+        fontSize: 14,
+        lineHeight: 20,
+        marginLeft: 12,
     },
     button: {
-        borderRadius: 8,
+        borderRadius: 12,
         overflow: 'hidden',
-        marginTop: 20,
+        marginHorizontal: 20,
     },
     buttonGradient: {
-        paddingVertical: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        paddingVertical: 16,
     },
     buttonText: {
         color: '#fff',
+        fontSize: 18,
         fontWeight: '600',
-        fontSize: 16,
+        marginRight: 8,
     },
 });
 

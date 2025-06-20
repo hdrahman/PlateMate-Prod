@@ -24,15 +24,16 @@ import * as userApi from '../api/userApi';
 
 // Onboarding step components
 import WelcomeStep from '../components/onboarding/WelcomeStep';
+import GoalsStep from '../components/onboarding/GoalsStep';
+import MotivationStep from '../components/onboarding/MotivationStep';
+import WeightChangeRateStep from '../components/onboarding/WeightChangeRateStep';
 import BasicInfoStep from '../components/onboarding/BasicInfoStep';
 import PhysicalAttributesStep from '../components/onboarding/PhysicalAttributesStep';
-import PersonalizedInfoStep from '../components/onboarding/PersonalizedInfoStep';
-import GoalsStep from '../components/onboarding/GoalsStep';
+import ActivityLevelStep from '../components/onboarding/ActivityLevelStep';
+import GenderStep from '../components/onboarding/GenderStep';
 import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesStep';
-import LifestyleHabitsStep from '../components/onboarding/LifestyleHabitsStep';
-import HealthGoalsStep from '../components/onboarding/HealthGoalsStep';
-import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
 import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
+import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
 import SubscriptionStep from '../components/onboarding/SubscriptionStep';
 
 const { width, height } = Dimensions.get('window');
@@ -170,26 +171,30 @@ const Onboarding = () => {
     const renderCurrentStep = () => {
         switch (currentStep) {
             case 1:
-                return <WelcomeStep onNext={handleNext} />;
             case 2:
-                return <BasicInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 3:
-                return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <WelcomeStep onNext={handleNext} />;
             case 4:
-                return <PersonalizedInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 5:
                 return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 5:
+                return <MotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 6:
-                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <WeightChangeRateStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 7:
-                return <LifestyleHabitsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <BasicInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 8:
-                return <HealthGoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 9:
-                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <ActivityLevelStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 10:
-                return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 11:
+                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 12:
+                return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 13:
+                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 14:
                 return <SubscriptionStep onComplete={handleCompleteOnboarding} />;
             default:
                 return <WelcomeStep onNext={handleNext} />;
@@ -206,21 +211,25 @@ const Onboarding = () => {
             />
 
             <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-                <View style={styles.progressContainer}>
-                    {Array.from({ length: totalSteps }).map((_, index) => (
-                        <View
-                            key={index}
-                            style={[
-                                styles.progressDot,
-                                index + 1 === currentStep ? styles.activeDot :
-                                    index + 1 < currentStep ? styles.completedDot :
-                                        styles.inactiveDot
-                            ]}
-                        />
-                    ))}
-                </View>
+                {/* Only show progress dots after intro screens (steps 1-3) */}
+                {currentStep > 3 && (
+                    <View style={styles.progressContainer}>
+                        {Array.from({ length: totalSteps - 3 }).map((_, index) => (
+                            <View
+                                key={index}
+                                style={[
+                                    styles.progressDot,
+                                    index + 4 === currentStep ? styles.activeDot :
+                                        index + 4 < currentStep ? styles.completedDot :
+                                            styles.inactiveDot
+                                ]}
+                            />
+                        ))}
+                    </View>
+                )}
 
-                {currentStep > 1 && (
+                {/* Hide Back button during intro screens (steps 1-3) */}
+                {currentStep > 3 && (
                     <TouchableOpacity
                         style={[styles.backButton, { top: Math.max(insets.top + 10, 20) }]}
                         onPress={handleBack}
@@ -233,7 +242,8 @@ const Onboarding = () => {
                     </TouchableOpacity>
                 )}
 
-                {currentStep < totalSteps && (
+                {/* Hide Skip button during intro screens (steps 1-3) */}
+                {currentStep > 3 && currentStep < totalSteps && (
                     <TouchableOpacity
                         style={[styles.skipButton, { top: Math.max(insets.top + 10, 20) }]}
                         onPress={handleSkip}
@@ -249,9 +259,13 @@ const Onboarding = () => {
                 style={{ flex: 1 }}
             >
                 <ScrollView
-                    contentContainerStyle={styles.content}
+                    contentContainerStyle={[
+                        styles.content,
+                        currentStep <= 3 && styles.introContent
+                    ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    scrollEnabled={currentStep > 3} // Disable scrolling for intro screens
                 >
                     {renderCurrentStep()}
                 </ScrollView>
@@ -349,8 +363,14 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     content: {
-        flexGrow: 1,
+        paddingHorizontal: 20,
         paddingBottom: 40,
+    },
+    introContent: {
+        paddingHorizontal: 0,
+        paddingBottom: 0,
+        paddingTop: 0,
+        flex: 1
     },
     errorContainer: {
         backgroundColor: '#FF3B30',

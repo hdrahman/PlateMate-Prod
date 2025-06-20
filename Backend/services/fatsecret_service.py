@@ -624,7 +624,15 @@ class FatSecretService:
             else:
                 recipes_list = []
             
+            # Log the raw response for debugging
             logger.info(f"Found {len(recipes_list)} recipes for search: {query}")
+            
+            # Check if recipes have images
+            for recipe in recipes_list:
+                has_image = 'recipe_image' in recipe and recipe['recipe_image']
+                logger.info(f"Recipe {recipe.get('recipe_id', 'unknown')}: {recipe.get('recipe_name', 'unknown')} - Has image: {has_image}")
+                if has_image:
+                    logger.info(f"Image URL: {recipe['recipe_image']}")
             
             # Extract recipe IDs from search results
             recipe_ids = [str(recipe.get('recipe_id', '')) for recipe in recipes_list if recipe.get('recipe_id')]
@@ -671,7 +679,19 @@ class FatSecretService:
             
             # Log the response structure to help with debugging
             logger.debug(f"Recipe detail response keys: {list(response.keys() if response else [])}")
-                
+            
+            # Check if the response has an image
+            if 'recipe' in response:
+                has_image = 'recipe_image' in response['recipe'] and response['recipe']['recipe_image']
+                logger.info(f"Recipe {recipe_id} has image: {has_image}")
+                if has_image:
+                    logger.info(f"Original image URL: {response['recipe']['recipe_image']}")
+                    
+                # Check if it has recipe_images collection
+                has_recipe_images = 'recipe_images' in response['recipe'] and 'recipe_image' in response['recipe']['recipe_images']
+                if has_recipe_images:
+                    logger.info(f"Recipe {recipe_id} has recipe_images collection")
+                    
             # Map the response to our recipe format
             recipe = self._map_fatsecret_recipe_to_recipe(response)
             logger.info(f"Successfully retrieved recipe details for ID: {recipe_id}")
@@ -679,6 +699,7 @@ class FatSecretService:
             # Log whether we got instructions and ingredients
             logger.debug(f"Recipe has instructions: {bool(recipe.get('instructions'))}")
             logger.debug(f"Recipe has ingredients: {len(recipe.get('ingredients', []))}")
+            logger.info(f"Final image URL: {recipe.get('image')}")
             
             return recipe
             

@@ -3,6 +3,7 @@ export interface UserProfile {
     // Basic info
     firstName: string;
     lastName: string;
+    email: string;
 
     // Enhanced personal info
     dateOfBirth: string | null;
@@ -20,15 +21,33 @@ export interface UserProfile {
     foodAllergies: string[];
     cuisinePreferences: string[];
     spiceTolerance: string | null;
+    dietType?: string;
 
     // Health & fitness goals
     weightGoal: string | null;
     targetWeight: number | null;
     startingWeight: number | null;
+    fitnessGoal: string | null;
     healthConditions: string[];
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
-    fitnessGoal?: string;
+
+    // Motivation & preferences
+    motivations: string[];
+    futureSelfMessage: string | null;
+    futureSelfMessageType: string | null;
+    futureSelfMessageCreatedAt: string | null;
+    futureSelfMessageUri: string | null;
+
+    // User preferences
+    useMetricSystem?: boolean;
+    darkMode?: boolean;
+    notificationsEnabled?: boolean;
+
+    // App state
+    onboardingComplete: boolean;
+    premium: boolean;
+    lastSyncDate?: string;
 
     // Cheat day preferences
     cheatDayEnabled?: boolean;
@@ -39,7 +58,6 @@ export interface UserProfile {
     sleepQuality?: string;
     stressLevel?: string;
     eatingPattern?: string;
-    motivations?: string[];
     whyMotivation?: string;
 
     // Enhanced fitness goals
@@ -52,11 +70,6 @@ export interface UserProfile {
     projectedCompletionDate?: string;
     estimatedMetabolicAge?: number;
     estimatedDurationWeeks?: number;
-
-    // Future Self Motivation System
-    futureSelfMessage?: string | null;
-    futureSelfMessageType?: string | null;
-    futureSelfMessageCreatedAt?: string | null;
 
     // Delivery preferences
     defaultAddress: string | null;
@@ -78,7 +91,6 @@ export interface UserProfile {
     preferredLanguage: string;
     timezone: string;
     unitPreference: string;
-    darkMode: boolean;
     syncDataOffline: boolean;
 }
 

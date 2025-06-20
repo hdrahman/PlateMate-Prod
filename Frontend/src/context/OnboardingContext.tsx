@@ -24,10 +24,11 @@ interface OnboardingContextType {
 }
 
 // User profile data structure
-interface UserProfile {
+export interface UserProfile {
     // Basic info
     firstName: string;
     lastName: string;
+    email: string;
 
     // Enhanced personal info
     dateOfBirth: string | null;
@@ -46,6 +47,7 @@ interface UserProfile {
     foodAllergies: string[];
     cuisinePreferences: string[];
     spiceTolerance: string | null;
+    dietType?: string;
 
     // Health & fitness goals
     weightGoal: string | null;
@@ -60,7 +62,7 @@ interface UserProfile {
     sleepQuality?: string | null;
     stressLevel?: string | null;
     eatingPattern?: string | null;
-    motivations?: string[];
+    motivations: string[];
     whyMotivation?: string | null;
 
     // Enhanced fitness goals
@@ -75,9 +77,10 @@ interface UserProfile {
     estimatedDurationWeeks?: number | null;
 
     // Future Self Motivation System
-    futureSelfMessage?: string | null;
-    futureSelfMessageType?: string | null;
-    futureSelfMessageCreatedAt?: string | null;
+    futureSelfMessage: string | null;
+    futureSelfMessageType: string | null;
+    futureSelfMessageCreatedAt: string | null;
+    futureSelfMessageUri: string | null;
 
     // Delivery preferences
     defaultAddress: string | null;
@@ -100,84 +103,68 @@ interface UserProfile {
     timezone: string;
     darkMode: boolean;
     syncDataOffline: boolean;
+
+    // Additional fields
+    useMetricSystem: boolean;
+    notificationsEnabled: boolean;
+    premium: boolean;
+    onboardingComplete: boolean;
 }
 
 // Default values for user profile
 const defaultProfile: UserProfile = {
     firstName: '',
     lastName: '',
-
-    // Enhanced personal info
+    email: '',
     dateOfBirth: null,
     location: null,
-
     height: null,
     weight: null,
     age: null,
     gender: null,
     activityLevel: null,
-    unitPreference: 'metric',
-
     dietaryRestrictions: [],
     foodAllergies: [],
     cuisinePreferences: [],
     spiceTolerance: null,
-
     weightGoal: null,
     targetWeight: null,
     startingWeight: null,
-    healthConditions: [],
     fitnessGoal: null,
+    healthConditions: [],
     dailyCalorieTarget: null,
     nutrientFocus: null,
-
-    // Lifestyle and motivation data
-    sleepQuality: null,
-    stressLevel: null,
-    eatingPattern: null,
     motivations: [],
-    whyMotivation: null,
-
-    // Enhanced fitness goals
-    stepGoal: null,
-    waterGoal: null,
-    workoutFrequency: null,
-    sleepGoal: null,
-
-    // Predictive insights
-    projectedCompletionDate: null,
-    estimatedMetabolicAge: null,
-    estimatedDurationWeeks: null,
-
-    // Future Self Motivation System
     futureSelfMessage: null,
     futureSelfMessageType: null,
     futureSelfMessageCreatedAt: null,
-
-    defaultAddress: null,
-    preferredDeliveryTimes: [],
-    deliveryInstructions: null,
-
+    futureSelfMessageUri: null,
+    useMetricSystem: true,
+    darkMode: false,
+    notificationsEnabled: true,
+    onboardingComplete: false,
+    premium: false,
     pushNotificationsEnabled: true,
     emailNotificationsEnabled: true,
     smsNotificationsEnabled: false,
-    marketingEmailsEnabled: true,
-
+    marketingEmailsEnabled: false,
     paymentMethods: [],
     billingAddress: null,
     defaultPaymentMethodId: null,
-
     preferredLanguage: 'en',
     timezone: 'UTC',
-    darkMode: false,
+    unitPreference: 'metric',
     syncDataOffline: true,
+    defaultAddress: null,
+    preferredDeliveryTimes: [],
+    deliveryInstructions: null,
 };
 
 // Create context with default values
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 11,
+    totalSteps: 12,
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -195,6 +182,7 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
     return {
         firstName: sqliteProfile.first_name || '',
         lastName: sqliteProfile.last_name || '',
+        email: sqliteProfile.email || '',
         dateOfBirth: sqliteProfile.date_of_birth,
         location: sqliteProfile.location,
         height: sqliteProfile.height,
@@ -229,6 +217,7 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         futureSelfMessage: sqliteProfile.future_self_message,
         futureSelfMessageType: sqliteProfile.future_self_message_type,
         futureSelfMessageCreatedAt: sqliteProfile.future_self_message_created_at,
+        futureSelfMessageUri: sqliteProfile.future_self_message_uri,
         defaultAddress: null, // Not stored in database
         preferredDeliveryTimes: [], // Not stored in database
         deliveryInstructions: null, // Not stored in database
@@ -243,6 +232,10 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         timezone: sqliteProfile.timezone || 'UTC',
         darkMode: Boolean(sqliteProfile.dark_mode),
         syncDataOffline: Boolean(sqliteProfile.sync_data_offline),
+        useMetricSystem: Boolean(sqliteProfile.use_metric_system),
+        notificationsEnabled: Boolean(sqliteProfile.notifications_enabled),
+        premium: Boolean(sqliteProfile.premium),
+        onboardingComplete: sqliteProfile.onboarding_complete || false,
     };
 };
 
@@ -287,6 +280,7 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         future_self_message: frontendProfile.futureSelfMessage,
         future_self_message_type: frontendProfile.futureSelfMessageType,
         future_self_message_created_at: frontendProfile.futureSelfMessageCreatedAt,
+        future_self_message_uri: frontendProfile.futureSelfMessageUri,
         push_notifications_enabled: frontendProfile.pushNotificationsEnabled,
         email_notifications_enabled: frontendProfile.emailNotificationsEnabled,
         sms_notifications_enabled: frontendProfile.smsNotificationsEnabled,
@@ -295,7 +289,10 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         timezone: frontendProfile.timezone,
         dark_mode: frontendProfile.darkMode,
         sync_data_offline: frontendProfile.syncDataOffline,
-        onboarding_complete: false, // Set based on onboarding state
+        use_metric_system: frontendProfile.useMetricSystem,
+        notifications_enabled: frontendProfile.notificationsEnabled,
+        premium: frontendProfile.premium,
+        onboarding_complete: frontendProfile.onboardingComplete,
     };
 };
 
@@ -307,7 +304,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const [profile, setProfile] = useState<UserProfile>(defaultProfile);
     const [isLoading, setIsLoading] = useState(false);
 
-    const totalSteps = 11;
+    const totalSteps = 14;
 
     // Reset state when user changes
     useEffect(() => {

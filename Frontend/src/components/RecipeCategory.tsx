@@ -108,7 +108,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
         // Make sure we have a valid image URL
         if (!recipe.image || typeof recipe.image !== 'string' || !recipe.image.startsWith('http')) {
             console.error(`Invalid image URL for recipe in category: ${recipe.title}`);
-            return 'https://www.fatsecret.com/static/recipe/default.jpg';
+            return 'https://spoonacular.com/recipeImages/default-food.jpg';
         }
         return recipe.image;
     };

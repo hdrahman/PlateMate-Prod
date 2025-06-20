@@ -158,7 +158,9 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         estimated_duration_weeks INTEGER,
         future_self_message TEXT,
         future_self_message_type TEXT,
-        future_self_message_created_at TEXT
+        future_self_message_created_at TEXT,
+        diet_type TEXT,
+        use_metric_system INTEGER DEFAULT 1
       )
     `);
         console.log('✅ user_profiles table created successfully');
@@ -1405,6 +1407,8 @@ interface UserProfile {
     future_self_message?: string;
     future_self_message_type?: string;
     future_self_message_created_at?: string;
+    diet_type?: string;
+    use_metric_system?: number;
 }
 
 // Get user profile from local SQLite by Firebase UID
@@ -1438,7 +1442,9 @@ export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
             marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
             dark_mode: Boolean(profile.dark_mode),
             sync_data_offline: Boolean(profile.sync_data_offline),
-            onboarding_complete: Boolean(profile.onboarding_complete)
+            onboarding_complete: Boolean(profile.onboarding_complete),
+            diet_type: profile.diet_type,
+            use_metric_system: profile.use_metric_system
         };
     } catch (error) {
         console.error('❌ Error getting user profile:', error);
@@ -1540,7 +1546,9 @@ export const getUnsyncedUserProfiles = async () => {
             marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
             dark_mode: Boolean(profile.dark_mode),
             sync_data_offline: Boolean(profile.sync_data_offline),
-            onboarding_complete: Boolean(profile.onboarding_complete)
+            onboarding_complete: Boolean(profile.onboarding_complete),
+            diet_type: profile.diet_type,
+            use_metric_system: profile.use_metric_system
         }));
     } catch (error) {
         console.error('❌ Error getting unsynced profiles:', error);

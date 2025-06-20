@@ -62,6 +62,22 @@ class LRUCache<T> {
     delete(key: string): void {
         this.cache.delete(key);
     }
+
+    // Get all entries in the cache
+    getEntries(): [string, CachedResponse<T>][] {
+        return Array.from(this.cache.entries());
+    }
+
+    // Count recent items based on timestamp threshold
+    countRecentItems(timestampThreshold: number): number {
+        let count = 0;
+        for (const [_, value] of this.cache.entries()) {
+            if (value.timestamp > timestampThreshold) {
+                count++;
+            }
+        }
+        return count;
+    }
 }
 
 // Create response caches for different endpoints
@@ -323,20 +339,21 @@ class ApiService {
         try {
             console.log('Preloading common API data...');
 
-            // Preload in parallel
+            // Check if we have recent cache data first
+            const hasRecentCache = await this.hasRecentCacheData();
+            if (hasRecentCache) {
+                console.log('Recent API cache data found, skipping preload');
+                return;
+            }
+
+            // Preload in parallel with reduced number of requests
             await Promise.all([
-                // Random recipes
-                this.get('/recipes/random', { count: 5 }),
+                // Random recipes - reduced to 3
+                this.get('/recipes/random', { count: 3 }),
 
-                // Common food categories
-                ...['breakfast', 'quick', 'healthy'].map(category =>
-                    this.get('/recipes/search', { query: category, number: 3 })
-                ),
-
-                // Common food items
-                ...['apple', 'banana', 'chicken', 'rice', 'bread'].map(food =>
-                    this.post('/food/search', { query: food, max_results: 5 })
-                )
+                // Reduced to just 2 categories with fewer recipes
+                this.get('/recipes/search', { query: 'breakfast', number: 3 }),
+                this.get('/recipes/search', { query: 'quick', number: 3 })
             ]);
 
             console.log('✅ Common API data preloaded successfully');
@@ -344,6 +361,20 @@ class ApiService {
             console.error('Error preloading common API data:', error);
             // Don't throw - preloading failure shouldn't block the app
         }
+    }
+
+    /**
+     * Check if we have recent cache data to avoid unnecessary preloading
+     */
+    private async hasRecentCacheData(): Promise<boolean> {
+        // Consider cache fresh if we have at least 5 items less than 12 hours old
+        const cacheThreshold = 5;
+        const recentThreshold = Date.now() - (12 * 60 * 60 * 1000); // 12 hours
+
+        // Check recipe cache using our optimized method
+        const recentRecipeCount = recipeCache.countRecentItems(recentThreshold);
+
+        return recentRecipeCount >= cacheThreshold;
     }
 }
 

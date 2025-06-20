@@ -124,18 +124,13 @@ const Auth = ({ navigation }: any) => {
             >
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
                     <View style={styles.logoContainer}>
-                        <LinearGradient
-                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.logoGradient}
-                        >
+                        <View style={styles.logoCircle}>
                             <Image
-                                source={require('../../assets/Cropped2.jpg')}
+                                source={require('../../assets/icon2.png')}
                                 style={styles.logoImage}
                                 resizeMode="cover"
                             />
-                        </LinearGradient>
+                        </View>
                         <Text style={styles.title}>PlateMate</Text>
                         <Text style={styles.subtitle}>AI-Powered Nutrition & Fitness Tracker</Text>
                     </View>
@@ -303,31 +298,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 40,
     },
-    logoGradient: {
-        width: 114,
-        height: 114,
-        borderRadius: 57,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-        overflow: 'hidden',
-        padding: 2,
-    },
-    logoImage: {
+    logoCircle: {
         width: 110,
         height: 110,
         borderRadius: 55,
-        objectFit: 'cover',
+        overflow: 'hidden',
+        backgroundColor: '#000',
+        shadowColor: "#5c00dd",
+        shadowOffset: {
+            width: 0,
+            height: 8,
+        },
+        shadowOpacity: 0.5,
+        shadowRadius: 16,
+        elevation: 20,
+    },
+    logoImage: {
+        width: '100%',
+        height: '100%',
     },
     title: {
         fontSize: 36,
         fontWeight: 'bold',
         color: 'white',
         marginBottom: 8,
+        marginTop: 16,
+        letterSpacing: 1,
+        textShadowColor: 'rgba(92, 0, 221, 0.5)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#999',
+        color: '#aaa',
         textAlign: 'center',
         maxWidth: '80%',
     },

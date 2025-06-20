@@ -35,6 +35,7 @@ interface PlanOption {
     features: string[];
     bestValue?: boolean;
     subscriptionType: SubscriptionStatus;
+    imageUploads: string;
 }
 
 const { width } = Dimensions.get('window');
@@ -51,37 +52,56 @@ const PremiumSubscription = () => {
 
     const plans: PlanOption[] = [
         {
-            id: 'basic',
-            title: 'Basic',
+            id: 'free',
+            title: 'Free',
             monthlyPrice: 0,
             annualPrice: 0,
             gradient: ['#333333', '#1A1A1A'],
             subscriptionType: 'free',
+            imageUploads: '1 image upload per day',
             features: [
-                'Basic food logging',
-                'Daily calorie tracking',
-                'Basic nutrition insights',
-                'Limited recipe access',
+                'Unlimited food search',
+                'Barcode scanning support',
+                'Basic meal planning',
+                'Calorie tracking',
                 'Weekly progress reports',
                 'Ad-supported experience'
+            ]
+        },
+        {
+            id: 'basic',
+            title: 'Basic',
+            monthlyPrice: 5.99,
+            annualPrice: 59.88, // 4.99 x 12
+            gradient: ['#5A60EA', '#3940B8'],
+            subscriptionType: 'standard',
+            imageUploads: '3 image uploads per day',
+            features: [
+                'Everything in Free plan',
+                'Advanced meal planning',
+                'Limited AI food analysis',
+                'Personalized nutrition tips',
+                'Ad-free experience',
+                'Email support'
             ]
         },
         {
             id: 'premium',
             title: 'Premium',
             monthlyPrice: 9.99,
-            annualPrice: 99.99,
+            annualPrice: 83.88, // 6.99 x 12
             gradient: ['#5A60EA', '#FF00F5'],
             subscriptionType: isAnnual ? 'premium_annual' : 'premium',
             bestValue: true,
+            imageUploads: 'Unlimited image uploads',
             features: [
-                'Advanced food logging & analysis',
-                'Unlimited recipe access',
-                'AI-powered meal recommendations',
-                'Personalized nutrition coach',
-                'Macro & micronutrient tracking',
-                'Ad-free premium experience',
-                'Priority customer support'
+                'Everything in Basic plan',
+                'Unlimited AI food analysis',
+                'Advanced nutrition insights',
+                'Custom meal recommendations',
+                'Personalized coaching',
+                'Priority support',
+                'Early access to new features'
             ]
         }
     ];
@@ -95,12 +115,18 @@ const PremiumSubscription = () => {
 
                     // Pre-select current plan if user has one
                     if (status?.status) {
-                        const planId = status.status === 'premium' || status.status === 'premium_annual'
-                            ? 'premium' : 'basic';
+                        let planId;
+                        if (status.status === 'premium' || status.status === 'premium_annual') {
+                            planId = 'premium';
+                        } else if (status.status === 'standard') {
+                            planId = 'basic';
+                        } else {
+                            planId = 'free';
+                        }
                         setSelectedPlan(planId);
                     } else {
-                        // Default to premium for new users
-                        setSelectedPlan('premium');
+                        // Default to basic for new users
+                        setSelectedPlan('basic');
                     }
                 }
             } catch (error) {
@@ -137,8 +163,8 @@ const PremiumSubscription = () => {
             return;
         }
 
-        if (selectedPlan === 'basic' && subscriptionStatus?.status === 'free') {
-            Alert.alert('Already Subscribed', 'You are already on the Basic plan');
+        if (selectedPlan === 'free' && subscriptionStatus?.status === 'free') {
+            Alert.alert('Already Subscribed', 'You are already on the Free plan');
             return;
         }
 
@@ -149,7 +175,7 @@ const PremiumSubscription = () => {
 
             // Calculate end date based on subscription type
             let endDate = null;
-            if (selectedPlan !== 'basic') {
+            if (selectedPlan !== 'free') {
                 const endDateObj = new Date();
                 if (isAnnual) {
                     endDateObj.setFullYear(endDateObj.getFullYear() + 1);
@@ -171,7 +197,7 @@ const PremiumSubscription = () => {
                 startDate,
                 endDate,
                 autoRenew: true,
-                paymentMethod: 'Credit Card',
+                paymentMethod: selectedPlan === 'free' ? 'None' : 'Credit Card',
             });
 
             // Update local state
@@ -180,7 +206,7 @@ const PremiumSubscription = () => {
                 startDate,
                 endDate,
                 autoRenew: true,
-                paymentMethod: 'Credit Card',
+                paymentMethod: selectedPlan === 'free' ? 'None' : 'Credit Card',
                 canceledAt: null,
                 trialEndsAt: null,
             });
@@ -251,12 +277,15 @@ const PremiumSubscription = () => {
         const period = isAnnual ? '/year' : '/month';
 
         // Calculate monthly equivalent for annual plan
-        const monthlyEquivalent = plan.id === 'premium' && isAnnual
-            ? (plan.annualPrice / 12).toFixed(2)
+        const monthlyEquivalent = plan.id !== 'free' && isAnnual
+            ? plan.id === 'basic' ? '$4.99/month' : '$6.99/month'
             : null;
 
         // Check if user is currently on this plan
-        const isPlanActive = subscriptionStatus?.status === plan.subscriptionType;
+        const isPlanActive =
+            (plan.id === 'free' && subscriptionStatus?.status === 'free') ||
+            (plan.id === 'basic' && subscriptionStatus?.status === 'standard') ||
+            (plan.id === 'premium' && (subscriptionStatus?.status === 'premium' || subscriptionStatus?.status === 'premium_annual'));
 
         return (
             <TouchableOpacity
@@ -290,9 +319,14 @@ const PremiumSubscription = () => {
 
                     {monthlyEquivalent && (
                         <Text style={styles.monthlyEquivalent}>
-                            Just ${monthlyEquivalent}/month
+                            {monthlyEquivalent} billed annually
                         </Text>
                     )}
+
+                    <View style={styles.planHighlight}>
+                        <Ionicons name="image-outline" size={18} color="#FFF" style={styles.featureIcon} />
+                        <Text style={[styles.featureText, styles.highlightText]}>{plan.imageUploads}</Text>
+                    </View>
 
                     <View style={styles.planDivider} />
 
@@ -353,9 +387,9 @@ const PremiumSubscription = () => {
                         >
                             <View style={styles.heroContent}>
                                 <Ionicons name="star" size={40} color="#FFD700" />
-                                <Text style={styles.heroTitle}>Upgrade to Premium</Text>
+                                <Text style={styles.heroTitle}>Upgrade Your Experience</Text>
                                 <Text style={styles.heroText}>
-                                    Get advanced nutrition tracking, unlimited recipes, and personalized meal plans
+                                    Get more image uploads, AI-powered analysis, and personalized nutrition insights
                                 </Text>
                             </View>
                         </LinearGradient>
@@ -371,7 +405,7 @@ const PremiumSubscription = () => {
                         </TouchableOpacity>
                         <Text style={[styles.billingOption, isAnnual && styles.activeBillingOption]}>Annual</Text>
                         <View style={styles.savingsPill}>
-                            <Text style={styles.savingsPillText}>Save 17%</Text>
+                            <Text style={styles.savingsPillText}>Save up to 30%</Text>
                         </View>
                     </View>
 
@@ -398,11 +432,11 @@ const PremiumSubscription = () => {
                                     <ActivityIndicator color="#FFF" />
                                 ) : (
                                     <Text style={styles.subscribeButtonText}>
-                                        {(selectedPlan === 'premium' &&
-                                            (subscriptionStatus?.status === 'premium' ||
-                                                subscriptionStatus?.status === 'premium_annual'))
+                                        {isPlanActive(selectedPlan, subscriptionStatus)
                                             ? 'You are subscribed to this plan'
-                                            : 'Subscribe Now'}
+                                            : selectedPlan === 'free'
+                                                ? 'Continue with Free Plan'
+                                                : 'Subscribe Now'}
                                     </Text>
                                 )}
                             </LinearGradient>
@@ -430,6 +464,13 @@ const PremiumSubscription = () => {
                         <Text style={styles.faqTitle}>Frequently Asked Questions</Text>
 
                         <View style={styles.faqItem}>
+                            <Text style={styles.faqQuestion}>What happens when I reach my daily image upload limit?</Text>
+                            <Text style={styles.faqAnswer}>
+                                You can still use all other features of the app, including manual food logging and barcode scanning. Your upload limit resets every 24 hours.
+                            </Text>
+                        </View>
+
+                        <View style={styles.faqItem}>
                             <Text style={styles.faqQuestion}>How do I cancel my subscription?</Text>
                             <Text style={styles.faqAnswer}>
                                 You can cancel anytime from this screen. You'll continue to have access until the end of your billing period.
@@ -439,13 +480,24 @@ const PremiumSubscription = () => {
                         <View style={styles.faqItem}>
                             <Text style={styles.faqQuestion}>Will I lose my data if I downgrade?</Text>
                             <Text style={styles.faqAnswer}>
-                                No, your data will be preserved. However, you may lose access to premium features.
+                                No, your data will be preserved. However, you may lose access to premium features and AI-powered analysis.
                             </Text>
                         </View>
                     </View>
                 </Animated.View>
             </ScrollView>
         </SafeAreaView>
+    );
+};
+
+// Helper function to check if the selected plan is the active plan
+const isPlanActive = (selectedPlan: string | null, subscriptionStatus: SubscriptionDetails | null) => {
+    if (!selectedPlan || !subscriptionStatus) return false;
+
+    return (
+        (selectedPlan === 'free' && subscriptionStatus.status === 'free') ||
+        (selectedPlan === 'basic' && subscriptionStatus.status === 'standard') ||
+        (selectedPlan === 'premium' && (subscriptionStatus.status === 'premium' || subscriptionStatus.status === 'premium_annual'))
     );
 };
 
@@ -612,6 +664,18 @@ const styles = StyleSheet.create({
         color: '#FF00F5',
         fontSize: 14,
         marginTop: 4,
+    },
+    planHighlight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        marginBottom: 8,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: 10,
+        borderRadius: 8,
+    },
+    highlightText: {
+        fontWeight: 'bold',
     },
     planDivider: {
         height: 1,

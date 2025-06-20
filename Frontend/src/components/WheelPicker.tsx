@@ -36,6 +36,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
     const [initialized, setInitialized] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [scrollPosition, setScrollPosition] = useState(0);
+    const [isScrolling, setIsScrolling] = useState(false);
 
     // Find index of selected value
     useEffect(() => {
@@ -83,19 +84,33 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
         setScrollPosition(y);
     };
 
+    const handleScrollBeginDrag = () => {
+        setIsScrolling(true);
+    };
+
+    const handleScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        // Only snap to position when user ends the scroll, not when momentum is still going
+        const y = event.nativeEvent.contentOffset.y;
+        const velocity = event.nativeEvent.velocity?.y || 0;
+
+        // If the scroll velocity is low enough, snap immediately
+        if (Math.abs(velocity) < 0.5) {
+            const index = Math.round(y / itemHeight);
+            snapToIndex(index);
+        }
+    };
+
     const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        setIsScrolling(false);
         const y = event.nativeEvent.contentOffset.y;
         const index = Math.round(y / itemHeight);
+        snapToIndex(index);
+    };
 
+    const snapToIndex = (index: number) => {
         if (index >= 0 && index < data.length) {
             // Ensure we snap to the exact position with precision
-            const exactPosition = index * itemHeight;
-            if (Math.abs(y - exactPosition) > 1) {
-                // Re-align to exact position
-                setTimeout(() => {
-                    scrollToIndex(index, true);
-                }, 10);
-            }
+            scrollToIndex(index, true);
 
             // Only update if value changed
             if (index !== currentIndex) {
@@ -134,9 +149,12 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                 ref={scrollViewRef}
                 showsVerticalScrollIndicator={false}
                 snapToInterval={itemHeight}
-                decelerationRate={Platform.OS === 'ios' ? 'normal' : 0.9}
+                decelerationRate={Platform.OS === 'ios' ? 0.992 : 0.95}
+                bounces={false}
                 onScroll={handleScroll}
                 onMomentumScrollEnd={handleMomentumScrollEnd}
+                onScrollBeginDrag={handleScrollBeginDrag}
+                onScrollEndDrag={handleScrollEndDrag}
                 scrollEventThrottle={16}
                 contentContainerStyle={{ paddingTop, paddingBottom }}
                 keyboardShouldPersistTaps="always"

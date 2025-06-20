@@ -67,15 +67,15 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
         // Mark loading as complete and try to use the default image
         setImageLoading(false);
         setImageError(true);
-        console.error(`Error loading image for recipe: ${recipe.title || 'Unknown'}`);
+        console.error(`Error loading image for recipe: ${recipe.title ? recipe.title.toString() : 'Unknown'}`);
     };
 
     // Use the image from the API, with validation
     const getImageSource = () => {
         // Make sure we have a valid image URL
         if (!recipe.image || typeof recipe.image !== 'string' || !recipe.image.startsWith('http')) {
-            console.error(`Invalid image URL for recipe: ${recipe.title}`);
-            return 'https://www.fatsecret.com/static/recipe/default.jpg';
+            console.error(`Invalid image URL for recipe: ${recipe.title ? recipe.title.toString() : 'Unknown'}`);
+            return 'https://spoonacular.com/recipeImages/default-food.jpg';
         }
         return recipe.image;
     };

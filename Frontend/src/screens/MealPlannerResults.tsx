@@ -98,7 +98,7 @@ export default function MealPlannerResults() {
                     source={{
                         uri: recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
                             ? recipe.image
-                            : 'https://www.fatsecret.com/static/recipe/default.jpg'
+                            : 'https://spoonacular.com/recipeImages/default-food.jpg'
                     }}
                     style={[styles.mealImage, { opacity: isLoading ? 0 : 1 }]}
                     resizeMode="cover"

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -6,9 +6,17 @@ import {
     Image,
     TouchableOpacity,
     Dimensions,
+    ScrollView,
+    FlatList,
+    Animated,
+    ViewToken,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+
+import IntroStep1 from './IntroStep1';
+import IntroStep2 from './IntroStep2';
+import IntroStep3 from './IntroStep3';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,74 +24,108 @@ interface WelcomeStepProps {
     onNext: () => void;
 }
 
+interface ViewableItemsChangedInfo {
+    viewableItems: Array<ViewToken>;
+    changed: Array<ViewToken>;
+}
+
 const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const flatListRef = useRef<FlatList>(null);
+
+    const handleViewableItemsChanged = useRef(({ viewableItems }: ViewableItemsChangedInfo) => {
+        if (viewableItems.length > 0) {
+            setCurrentIndex(viewableItems[0].index || 0);
+        }
+    }).current;
+
+    const handleNextSlide = () => {
+        if (currentIndex < 2) {
+            flatListRef.current?.scrollToIndex({
+                index: currentIndex + 1,
+                animated: true
+            });
+        } else {
+            onNext();
+        }
+    };
+
+    const renderItem = ({ item, index }: { item: number; index: number }) => {
+        switch (index) {
+            case 0:
+                return <IntroStep1 onNext={handleNextSlide} />;
+            case 1:
+                return <IntroStep2 onNext={handleNextSlide} />;
+            case 2:
+                return <IntroStep3 onNext={handleNextSlide} />;
+            default:
+                return null;
+        }
+    };
+
+    const viewabilityConfig = {
+        itemVisiblePercentThreshold: 50,
+        minimumViewTime: 200, // ms the item needs to be visible before changing
+        waitForInteraction: true
+    };
+
     return (
         <View style={styles.container}>
-            <View style={styles.logoContainer}>
-                <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.logoGradient}
-                >
-                    <Image
-                        source={require('../../../assets/Cropped2.jpg')}
-                        style={styles.logoImage}
-                        resizeMode="cover"
-                    />
-                </LinearGradient>
+            <FlatList
+                ref={flatListRef}
+                data={[0, 1, 2]}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.toString()}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={width}
+                decelerationRate="fast"
+                snapToAlignment="center"
+                disableIntervalMomentum={true}
+                snapToOffsets={[0, width, width * 2]}
+                bounces={false}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                    { useNativeDriver: false }
+                )}
+                onViewableItemsChanged={handleViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                getItemLayout={(_, index) => ({
+                    length: width,
+                    offset: width * index,
+                    index,
+                })}
+            />
+
+            <View style={styles.pagination}>
+                {[0, 1, 2].map((_, i) => {
+                    const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+
+                    const dotWidth = scrollX.interpolate({
+                        inputRange,
+                        outputRange: [8, 16, 8],
+                        extrapolate: 'clamp',
+                    });
+
+                    const opacity = scrollX.interpolate({
+                        inputRange,
+                        outputRange: [0.3, 1, 0.3],
+                        extrapolate: 'clamp',
+                    });
+
+                    return (
+                        <Animated.View
+                            key={i}
+                            style={[
+                                styles.dot,
+                                { width: dotWidth, opacity }
+                            ]}
+                        />
+                    );
+                })}
             </View>
-
-            <Text style={styles.title}>Welcome to PlateMate</Text>
-            <Text style={styles.subtitle}>Let's personalize your experience</Text>
-
-            <View style={styles.featuresContainer}>
-                <View style={styles.featureItem}>
-                    <View style={styles.featureIconContainer}>
-                        <Ionicons name="restaurant-outline" size={28} color="#0074dd" />
-                    </View>
-                    <View style={styles.featureTextContainer}>
-                        <Text style={styles.featureTitle}>Personalized Nutrition</Text>
-                        <Text style={styles.featureDescription}>AI-powered meal recommendations based on your preferences and goals</Text>
-                    </View>
-                </View>
-
-                <View style={styles.featureItem}>
-                    <View style={styles.featureIconContainer}>
-                        <Ionicons name="camera-outline" size={28} color="#5c00dd" />
-                    </View>
-                    <View style={styles.featureTextContainer}>
-                        <Text style={styles.featureTitle}>Smart Food Recognition</Text>
-                        <Text style={styles.featureDescription}>Just snap a photo and we'll identify and track your meal</Text>
-                    </View>
-                </View>
-
-                <View style={styles.featureItem}>
-                    <View style={styles.featureIconContainer}>
-                        <Ionicons name="analytics-outline" size={28} color="#dd0095" />
-                    </View>
-                    <View style={styles.featureTextContainer}>
-                        <Text style={styles.featureTitle}>Comprehensive Tracking</Text>
-                        <Text style={styles.featureDescription}>Track all nutrients, not just calories, for optimal health</Text>
-                    </View>
-                </View>
-            </View>
-
-            <Text style={styles.setupText}>
-                Let's set up your profile in just a few steps to get the most out of PlateMate
-            </Text>
-
-            <TouchableOpacity style={styles.button} onPress={onNext}>
-                <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.buttonGradient}
-                >
-                    <Text style={styles.buttonText}>Get Started</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </LinearGradient>
-            </TouchableOpacity>
         </View>
     );
 };
@@ -91,63 +133,76 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        alignItems: 'center',
+        width: width,
+        backgroundColor: '#000',
+    },
+    pagination: {
+        flexDirection: 'row',
         justifyContent: 'center',
-        paddingHorizontal: 20,
-    },
-    logoContainer: {
-        marginBottom: 24,
-    },
-    logoGradient: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: 5,
+        height: 40,
+        position: 'absolute',
+        bottom: 20,
+        width: '100%',
     },
-    logoImage: {
-        width: 90,
-        height: 90,
-        borderRadius: 45,
+    dot: {
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#fff',
+        marginHorizontal: 4,
     },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
+    header: {
+        alignItems: 'center',
+        marginBottom: 40,
+    },
+    welcomeText: {
+        fontSize: 24,
         color: '#fff',
         marginBottom: 8,
-        textAlign: 'center',
     },
-    subtitle: {
-        fontSize: 18,
+    appName: {
+        fontSize: 42,
+        fontWeight: '700',
+        color: '#fff',
+        letterSpacing: -1,
+    },
+    tagline: {
+        fontSize: 16,
         color: '#aaa',
-        marginBottom: 32,
-        textAlign: 'center',
+        marginTop: 8,
+    },
+    imageContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 20,
+    },
+    image: {
+        width: width * 0.5,
+        height: width * 0.5,
     },
     featuresContainer: {
-        width: '100%',
-        marginBottom: 32,
+        marginBottom: 40,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
+        paddingHorizontal: 20,
     },
-    featureIconContainer: {
+    featureIcon: {
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
     },
-    featureTextContainer: {
+    featureContent: {
         flex: 1,
     },
     featureTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '600',
         color: '#fff',
         marginBottom: 4,
     },
@@ -156,30 +211,31 @@ const styles = StyleSheet.create({
         color: '#aaa',
         lineHeight: 20,
     },
-    setupText: {
+    getStartedContainer: {
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    getStartedText: {
         fontSize: 16,
-        color: '#ccc',
+        color: '#fff',
         textAlign: 'center',
-        marginBottom: 32,
-        lineHeight: 24,
+        marginBottom: 24,
     },
     button: {
         width: '100%',
         borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: 16,
     },
     buttonGradient: {
-        paddingVertical: 16,
-        paddingHorizontal: 24,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingVertical: 16,
     },
     buttonText: {
         color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 18,
+        fontWeight: '600',
         marginRight: 8,
     },
 });
