@@ -42,18 +42,21 @@ const formatLikes = (likes: number): string => {
     return likes.toString();
 };
 
-// We no longer use fallback images
+const MAX_RETRIES = 2; // Maximum number of retries for image loading
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = false }) => {
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
-    const isFav = isFavorite(recipe.id);
+    const recipeId = recipe.id?.toString() || '';
+    const isFav = isFavorite(recipeId);
     const [imageLoading, setImageLoading] = useState(true);
     const [imageError, setImageError] = useState(false);
+    const [imageRetries, setImageRetries] = useState(0);
+    const [currentImageUrl, setCurrentImageUrl] = useState(recipe.image || '');
 
     const handleFavoritePress = async (e: GestureResponderEvent) => {
         e.stopPropagation();
         if (isFav) {
-            await removeFavorite(recipe.id);
+            await removeFavorite(recipeId);
         } else {
             await addFavorite(recipe);
         }
@@ -64,20 +67,87 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
     };
 
     const handleImageError = () => {
-        // Mark loading as complete and try to use the default image
-        setImageLoading(false);
-        setImageError(true);
-        console.error(`Error loading image for recipe: ${recipe.title ? recipe.title.toString() : 'Unknown'}`);
+        const recipeTitle = recipe.title || 'Unknown Recipe';
+        console.error(`Error loading image for recipe: ${recipeTitle} (ID: ${recipeId}), URL: ${currentImageUrl}, Retry: ${imageRetries}`);
+
+        // If we've reached max retries, mark as error and use fallback
+        if (imageRetries >= MAX_RETRIES) {
+            setImageLoading(false);
+            setImageError(true);
+            return;
+        }
+
+        // Increment retry count
+        const newRetryCount = imageRetries + 1;
+        setImageRetries(newRetryCount);
+
+        // Try a different image URL format
+        let newImageUrl;
+        if (newRetryCount === 1) {
+            // First retry: Try Spoonacular format with 556x370
+            newImageUrl = `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+        } else {
+            // Second retry: Try 636x393 format
+            newImageUrl = `https://spoonacular.com/recipeImages/${recipeId}-636x393.jpg`;
+        }
+
+        console.log(`Retrying with new image URL for ${recipeTitle}: ${newImageUrl}`);
+        setCurrentImageUrl(newImageUrl);
     };
 
-    // Use the image from the API, with validation
+    // Use the image from the API, with validation and fallbacks
     const getImageSource = () => {
-        // Make sure we have a valid image URL
-        if (!recipe.image || typeof recipe.image !== 'string' || !recipe.image.startsWith('http')) {
-            console.error(`Invalid image URL for recipe: ${recipe.title ? recipe.title.toString() : 'Unknown'}`);
-            return 'https://spoonacular.com/recipeImages/default-food.jpg';
+        // If we've already determined this image has errors after retries
+        if (imageError) {
+            // Try to determine an appropriate category-based fallback
+            let category = "food";
+            if (recipe.cuisines && recipe.cuisines.length > 0) {
+                category = recipe.cuisines[0].toLowerCase();
+            } else if (recipe.diets && recipe.diets.length > 0) {
+                category = recipe.diets[0].toLowerCase();
+            }
+
+            // Map common categories to image types
+            let imageType = "food";
+            if (category.includes("italian") || category.includes("pasta")) {
+                imageType = "pasta";
+            } else if (category.includes("chicken")) {
+                imageType = "chicken";
+            } else if (category.includes("beef") || category.includes("meat")) {
+                imageType = "beef";
+            } else if (category.includes("breakfast")) {
+                imageType = "breakfast";
+            } else if (category.includes("dessert") || category.includes("sweet")) {
+                imageType = "dessert";
+            } else if (category.includes("seafood") || category.includes("fish")) {
+                imageType = "seafood";
+            } else if (category.includes("vegetable") || category.includes("vegan")) {
+                imageType = "vegetable";
+            } else if (category.includes("beverage") || category.includes("drink")) {
+                imageType = "beverage";
+            }
+
+            return `https://spoonacular.com/recipeImages/default-${imageType}.jpg`;
         }
-        return recipe.image;
+
+        // Skip known problematic FatSecret default images
+        if (recipe.image === "https://www.fatsecret.com/static/recipe/default.jpg" ||
+            (recipe.image && recipe.image.endsWith("/static/recipe/default.jpg"))) {
+            return `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+        }
+
+        // Use current image URL (which may be the original or a retry URL)
+        if (currentImageUrl && typeof currentImageUrl === 'string' && currentImageUrl.startsWith('http')) {
+            return currentImageUrl;
+        }
+
+        // If the current image is invalid but we have a recipe ID, generate a URL
+        if (recipe.id) {
+            return `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+        }
+
+        // Last resort fallback
+        return 'https://spoonacular.com/recipeImages/default-food.jpg';
     };
 
     return (

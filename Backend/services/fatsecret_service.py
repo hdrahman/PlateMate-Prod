@@ -477,30 +477,85 @@ class FatSecretService:
         recipe_name = recipe.get('recipe_name', '')
         recipe_description = recipe.get('recipe_description', '')
         
-        # Extract recipe image - FatSecret API always provides images in recipe_image field
-        recipe_image = recipe.get('recipe_image', '')
+        # Enhanced image extraction logic - try multiple sources
+        recipe_image = None
         
-        # Ensure the image URL is valid
-        if not recipe_image or not isinstance(recipe_image, str) or not recipe_image.startswith(('http://', 'https://')):
-            # Try recipe_images collection as a backup
-            if 'recipe_images' in recipe and 'recipe_image' in recipe['recipe_images']:
-                images = recipe['recipe_images']['recipe_image']
+        # Method 1: Direct recipe_image field
+        if 'recipe_image' in recipe and recipe['recipe_image']:
+            recipe_image = recipe['recipe_image']
+            logger.info(f"Found primary image for recipe {recipe_id}: {recipe_image}")
+        
+        # Method 2: Check recipe_images collection
+        if not recipe_image and 'recipe_images' in recipe:
+            images_data = recipe['recipe_images']
+            if isinstance(images_data, dict) and 'recipe_image' in images_data:
+                images = images_data['recipe_image']
                 if isinstance(images, list) and len(images) > 0:
+                    # Take the first image
                     recipe_image = images[0]
-                elif isinstance(images, str):
+                    logger.info(f"Using first image from collection for recipe {recipe_id}: {recipe_image}")
+                elif isinstance(images, str) and images:
                     recipe_image = images
+                    logger.info(f"Using single image from collection for recipe {recipe_id}: {recipe_image}")
         
-        # Convert relative URLs to absolute URLs
-        if recipe_image and isinstance(recipe_image, str) and not recipe_image.startswith(('http://', 'https://')):
-            if recipe_image.startswith('/'):
-                recipe_image = f"https://www.fatsecret.com{recipe_image}"
-            else:
-                recipe_image = f"https://www.fatsecret.com/{recipe_image}"
+        # Method 3: Check recipe_image_url if available
+        if not recipe_image and 'recipe_image_url' in recipe and recipe['recipe_image_url']:
+            recipe_image = recipe['recipe_image_url']
+            logger.info(f"Using image URL field for recipe {recipe_id}: {recipe_image}")
+            
+        # Make sure the image is a valid URL - fix relative URLs
+        if recipe_image and isinstance(recipe_image, str):
+            # Skip FatSecret default image which doesn't work
+            if recipe_image == "https://www.fatsecret.com/static/recipe/default.jpg" or recipe_image.endswith("/static/recipe/default.jpg"):
+                logger.warning(f"Discarding FatSecret default image for recipe {recipe_id}: {recipe_image}")
+                recipe_image = None
+            elif not recipe_image.startswith(('http://', 'https://')):
+                if recipe_image.startswith('/'):
+                    recipe_image = f"https://www.fatsecret.com{recipe_image}"
+                else:
+                    recipe_image = f"https://www.fatsecret.com/{recipe_image}"
+                logger.info(f"Converted relative URL to absolute for recipe {recipe_id}: {recipe_image}")
+                
+            # Validate the URL format
+            if recipe_image and not recipe_image.startswith(('http://', 'https://')):
+                logger.warning(f"Invalid image URL for recipe {recipe_id}: {recipe_image}")
+                recipe_image = None
+        else:
+            recipe_image = None
         
-        # If still no valid image, use a generic food image that's guaranteed to work
-        if not recipe_image or not isinstance(recipe_image, str) or not recipe_image.startswith(('http://', 'https://')):
-            recipe_image = 'https://spoonacular.com/recipeImages/default-food.jpg'
-            logger.warning(f"No valid image found for recipe {recipe_id}: {recipe_name}, using default image")
+        # If still no valid image, generate a stable fallback URL based on recipe id
+        if not recipe_image:
+            # Try to find the category to use an appropriate fallback image
+            category = "food"
+            if 'recipe_categories' in recipe and 'recipe_category' in recipe['recipe_categories']:
+                categories = recipe['recipe_categories']['recipe_category']
+                if isinstance(categories, list) and len(categories) > 0:
+                    category = categories[0].get('recipe_category_name', '').lower()
+                elif isinstance(categories, dict):
+                    category = categories.get('recipe_category_name', '').lower()
+
+            # Map category to a more specific image
+            image_category = 'food'
+            if 'pasta' in category or 'italian' in category:
+                image_category = 'pasta'
+            elif 'chicken' in category:
+                image_category = 'chicken'
+            elif 'beef' in category or 'meat' in category:
+                image_category = 'beef'  
+            elif 'breakfast' in category:
+                image_category = 'breakfast'
+            elif 'dessert' in category or 'sweet' in category:
+                image_category = 'dessert'
+            elif 'seafood' in category or 'fish' in category:
+                image_category = 'seafood'
+            elif 'vegetable' in category or 'veggie' in category:
+                image_category = 'vegetable'
+            elif 'beverage' in category or 'drink' in category:
+                image_category = 'beverage'
+
+            # Use a valid image URL from Spoonacular that doesn't require attribution
+            recipe_image = f"https://spoonacular.com/recipeImages/{recipe_id}-556x370.jpg"
+            logger.warning(f"No valid image found for recipe {recipe_id}: {recipe_name}, using generated Spoonacular URL: {recipe_image}")
         
         logger.info(f"Final image URL for recipe {recipe_id}: {recipe_image}")
             

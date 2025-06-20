@@ -28,7 +28,8 @@ const formatLikes = (likes: number): string => {
     return likes.toString();
 };
 
-// We no longer use fallback images
+// Maximum number of image loading retries
+const MAX_RETRIES = 2;
 
 interface RecipeCategoryProps {
     title: string;
@@ -37,15 +38,21 @@ interface RecipeCategoryProps {
     onRecipePress: (recipe: Recipe) => void;
 }
 
+interface RecipeWithRetries extends Recipe {
+    retryCount?: number;
+    currentImageUrl?: string;
+}
+
 const RecipeCategory: React.FC<RecipeCategoryProps> = ({
     title,
     categoryId,
     icon,
     onRecipePress
 }) => {
-    const [recipes, setRecipes] = useState<Recipe[]>([]);
+    const [recipes, setRecipes] = useState<RecipeWithRetries[]>([]);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+    const [imageLoading, setImageLoading] = useState<{ [key: string]: boolean }>({});
 
     useEffect(() => {
         const fetchRecipes = async () => {
@@ -57,14 +64,28 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
 
                 if (cachedRecipes && cachedRecipes.length > 0) {
                     console.log(`🎯 Using cached ${categoryId} recipes to save API costs`);
-                    setRecipes(cachedRecipes);
+
+                    // Initialize image loading and retry states
+                    const initialImageLoading: { [key: string]: boolean } = {};
+                    const recipesWithRetries = cachedRecipes.map(recipe => {
+                        const recipeId = recipe.id?.toString() || '';
+                        initialImageLoading[recipeId] = true;
+                        return {
+                            ...recipe,
+                            retryCount: 0,
+                            currentImageUrl: recipe.image
+                        };
+                    });
+
+                    setRecipes(recipesWithRetries);
+                    setImageLoading(initialImageLoading);
                     setLoading(false);
                     return;
                 }
 
                 // If no cache, fetch from API and cache the results
                 console.log(`🌐 Fetching fresh ${categoryId} recipes from API`);
-                const data = await getRecipesByMealType(categoryId, 10); // Increased from 4 to 10
+                const data = await getRecipesByMealType(categoryId, 12); // Increased from 10 to 12 for better fallbacks
 
                 console.log(`Category ${categoryId}: Received ${data?.length || 0} recipes`);
 
@@ -74,9 +95,35 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                 });
 
                 if (data && data.length > 0) {
+                    // Pre-validate images
+                    const validatedRecipes: RecipeWithRetries[] = data.map(recipe => {
+                        let validImageUrl = recipe.image;
+
+                        // Check if image URL is valid
+                        if (!validImageUrl || typeof validImageUrl !== 'string' || !validImageUrl.startsWith('http')) {
+                            // Generate a Spoonacular URL as fallback
+                            validImageUrl = `https://spoonacular.com/recipeImages/${recipe.id}-556x370.jpg`;
+                        }
+
+                        return {
+                            ...recipe,
+                            image: validImageUrl,
+                            currentImageUrl: validImageUrl,
+                            retryCount: 0
+                        };
+                    });
+
+                    // Initialize image loading states
+                    const initialImageLoading: { [key: string]: boolean } = {};
+                    validatedRecipes.forEach(recipe => {
+                        const recipeId = recipe.id?.toString() || '';
+                        initialImageLoading[recipeId] = true;
+                    });
+                    setImageLoading(initialImageLoading);
+
                     // Filter to recipes with valid images
-                    const validRecipes = data.filter(recipe =>
-                        recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
+                    const validRecipes = validatedRecipes.filter(recipe =>
+                        recipe.image && typeof recipe.image === 'string'
                     );
 
                     console.log(`Category ${categoryId}: Found ${validRecipes.length} recipes with valid images`);
@@ -99,18 +146,109 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
         fetchRecipes();
     }, [categoryId]);
 
-    const handleImageError = (recipeId: string) => {
-        setImageErrors(prev => ({ ...prev, [recipeId]: true }));
-        console.error(`Error loading image for recipe ID: ${recipeId} in category: ${title}`);
+    const handleImageLoad = (recipeId: string) => {
+        setImageLoading(prev => ({ ...prev, [recipeId]: false }));
     };
 
-    const getImageSource = (recipe: Recipe): string => {
-        // Make sure we have a valid image URL
-        if (!recipe.image || typeof recipe.image !== 'string' || !recipe.image.startsWith('http')) {
-            console.error(`Invalid image URL for recipe in category: ${recipe.title}`);
-            return 'https://spoonacular.com/recipeImages/default-food.jpg';
+    const handleImageError = (recipeId: string) => {
+        console.error(`Error loading image for recipe ID: ${recipeId} in category: ${title}`);
+
+        // Find the recipe and check retry count
+        const recipeToRetry = recipes.find(r => r.id?.toString() === recipeId);
+        if (!recipeToRetry) return;
+
+        const currentRetries = recipeToRetry.retryCount || 0;
+
+        // If we've reached max retries, mark as error
+        if (currentRetries >= MAX_RETRIES) {
+            setImageLoading(prev => ({ ...prev, [recipeId]: false }));
+            setImageErrors(prev => ({ ...prev, [recipeId]: true }));
+            return;
         }
-        return recipe.image;
+
+        // Try a different image URL format based on retry count
+        const newRetryCount = currentRetries + 1;
+        let newImageUrl;
+
+        if (newRetryCount === 1) {
+            // First retry: Try Spoonacular format with 556x370
+            newImageUrl = `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+        } else {
+            // Second retry: Try 636x393 format
+            newImageUrl = `https://spoonacular.com/recipeImages/${recipeId}-636x393.jpg`;
+        }
+
+        console.log(`Retry ${newRetryCount} for recipe ${recipeId} with URL: ${newImageUrl}`);
+
+        // Update the recipe with new retry count and image URL
+        const updatedRecipes = recipes.map(recipe => {
+            if (recipe.id?.toString() === recipeId) {
+                return {
+                    ...recipe,
+                    retryCount: newRetryCount,
+                    currentImageUrl: newImageUrl
+                };
+            }
+            return recipe;
+        });
+
+        setRecipes(updatedRecipes);
+    };
+
+    const getImageSource = (recipe: RecipeWithRetries): string => {
+        const recipeId = recipe.id?.toString() || '';
+        const hasError = imageErrors[recipeId];
+
+        if (hasError) {
+            // If we've tried multiple times and failed, use a category-based fallback
+            let category = "food";
+            if (recipe.cuisines && recipe.cuisines.length > 0) {
+                category = recipe.cuisines[0].toLowerCase();
+            } else if (recipe.diets && recipe.diets.length > 0) {
+                category = recipe.diets[0].toLowerCase();
+            }
+
+            // Map category to appropriate fallback
+            let imageType = "food";
+            if (category.includes("italian") || category.includes("pasta")) {
+                imageType = "pasta";
+            } else if (category.includes("chicken")) {
+                imageType = "chicken";
+            } else if (category.includes("beef") || category.includes("meat")) {
+                imageType = "beef";
+            } else if (category.includes("breakfast")) {
+                imageType = "breakfast";
+            } else if (category.includes("dessert") || category.includes("sweet")) {
+                imageType = "dessert";
+            } else if (category.includes("seafood") || category.includes("fish")) {
+                imageType = "seafood";
+            } else if (category.includes("vegetable") || category.includes("vegan")) {
+                imageType = "vegetable";
+            } else if (category.includes("beverage") || category.includes("drink")) {
+                imageType = "beverage";
+            }
+
+            return `https://spoonacular.com/recipeImages/default-${imageType}.jpg`;
+        }
+
+        // Skip known problematic FatSecret default images
+        if (recipe.image === "https://www.fatsecret.com/static/recipe/default.jpg" ||
+            (recipe.image && recipe.image.endsWith("/static/recipe/default.jpg"))) {
+            return `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+        }
+
+        // Use the current image URL (could be original or retry URL)
+        if (recipe.currentImageUrl && typeof recipe.currentImageUrl === 'string') {
+            return recipe.currentImageUrl;
+        }
+
+        // Fallback to original image if available
+        if (recipe.image && typeof recipe.image === 'string') {
+            return recipe.image;
+        }
+
+        // Last resort fallback
+        return `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
     };
 
     if (loading) {
@@ -170,7 +308,8 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                     style={styles.recipeImage}
                                     imageStyle={styles.recipeImageStyle}
                                     resizeMode="cover"
-                                    onError={() => handleImageError(recipe.id?.toString() || 'unknown')}
+                                    onLoad={() => handleImageLoad(recipe.id?.toString() || '')}
+                                    onError={() => handleImageError(recipe.id?.toString() || '')}
                                 >
                                     <LinearGradient
                                         colors={['transparent', 'rgba(0,0,0,0.8)']}

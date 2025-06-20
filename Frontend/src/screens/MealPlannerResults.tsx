@@ -47,6 +47,7 @@ export default function MealPlannerResults() {
     });
     const [imageLoadingStates, setImageLoadingStates] = useState<{ [key: string]: boolean }>({});
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+    const [retryCount, setRetryCount] = useState<{ [key: string]: number }>({});
 
     useEffect(() => {
         // Get meal plan data from navigation params
@@ -54,15 +55,42 @@ export default function MealPlannerResults() {
             const { mealPlan: mealPlanData, nutrients: nutrientsData } = route.params;
 
             if (mealPlanData) {
-                setMealPlan(mealPlanData);
+                // Log received recipes for debugging
+                console.log(`Received ${mealPlanData.length} recipes in meal plan`);
+                mealPlanData.forEach((recipe, index) => {
+                    console.log(`Recipe ${index + 1}: ${recipe.title}, Image URL: ${recipe.image || 'No image'}`);
+                });
+
+                // Validate image URLs up front
+                const validatedMealPlan = mealPlanData.map(recipe => {
+                    if (recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')) {
+                        return recipe;
+                    } else {
+                        console.log(`Recipe ${recipe.title} has invalid image URL: ${recipe.image}`);
+                        // Create a more reliable URL based on recipe ID
+                        const fixedRecipe = {
+                            ...recipe,
+                            image: `https://spoonacular.com/recipeImages/${recipe.id}-556x370.jpg`
+                        };
+                        console.log(`Fixed image URL to: ${fixedRecipe.image}`);
+                        return fixedRecipe;
+                    }
+                });
+
+                setMealPlan(validatedMealPlan);
+
                 // Initialize image loading states
                 const loadingStates: { [key: string]: boolean } = {};
-                mealPlanData.forEach((recipe) => {
+                const retries: { [key: string]: number } = {};
+                validatedMealPlan.forEach((recipe) => {
                     if (recipe.id) {
-                        loadingStates[recipe.id.toString()] = true;
+                        const recipeId = recipe.id.toString();
+                        loadingStates[recipeId] = true;
+                        retries[recipeId] = 0;
                     }
                 });
                 setImageLoadingStates(loadingStates);
+                setRetryCount(retries);
             }
 
             if (nutrientsData) {
@@ -77,10 +105,83 @@ export default function MealPlannerResults() {
         setImageLoadingStates(prev => ({ ...prev, [recipeId]: false }));
     };
 
-    const handleImageError = (recipeId: string) => {
-        setImageLoadingStates(prev => ({ ...prev, [recipeId]: false }));
-        setImageErrors(prev => ({ ...prev, [recipeId]: true }));
-        console.error(`Error loading image for recipe ID: ${recipeId}`);
+    const handleImageError = (recipeId: string, recipeTitle: string) => {
+        console.error(`Error loading image for recipe ID: ${recipeId}, Title: ${recipeTitle}`);
+
+        // If we've already retried 2 times, mark as error
+        if (retryCount[recipeId] >= 2) {
+            setImageLoadingStates(prev => ({ ...prev, [recipeId]: false }));
+            setImageErrors(prev => ({ ...prev, [recipeId]: true }));
+            return;
+        }
+
+        // Increment retry count
+        setRetryCount(prev => ({
+            ...prev,
+            [recipeId]: (prev[recipeId] || 0) + 1
+        }));
+
+        // Try an alternative image URL with a different format
+        const updatedMealPlan = mealPlan.map(recipe => {
+            if (recipe.id.toString() === recipeId) {
+                // Try different image formats based on retry count
+                let newImageUrl;
+                if (retryCount[recipeId] === 0) {
+                    // First retry: Try Spoonacular format with 556x370
+                    newImageUrl = `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+                } else {
+                    // Second retry: Try 636x393 format
+                    newImageUrl = `https://spoonacular.com/recipeImages/${recipeId}-636x393.jpg`;
+                }
+
+                console.log(`Retrying with new image URL for ${recipe.title}: ${newImageUrl}`);
+
+                return {
+                    ...recipe,
+                    image: newImageUrl
+                };
+            }
+            return recipe;
+        });
+
+        setMealPlan(updatedMealPlan);
+    };
+
+    const getImageSource = (recipe: Recipe) => {
+        const recipeId = recipe.id?.toString() || 'unknown';
+        const hasError = imageErrors[recipeId];
+
+        if (hasError) {
+            // If we've tried multiple times and failed, use a category-based fallback
+            let category = "food";
+            if (recipe.cuisines && recipe.cuisines.length > 0) {
+                category = recipe.cuisines[0].toLowerCase();
+            } else if (recipe.diets && recipe.diets.length > 0) {
+                category = recipe.diets[0].toLowerCase();
+            }
+
+            // Map common categories to image types
+            let imageType = "food";
+            if (category.includes("italian") || category.includes("pasta")) {
+                imageType = "pasta";
+            } else if (category.includes("asian") || category.includes("chinese")) {
+                imageType = "asian";
+            } else if (category.includes("breakfast")) {
+                imageType = "breakfast";
+            }
+
+            return `https://spoonacular.com/recipeImages/default-${imageType}.jpg`;
+        }
+
+        // Skip known problematic FatSecret default images
+        if (recipe.image === "https://www.fatsecret.com/static/recipe/default.jpg" ||
+            (recipe.image && recipe.image.endsWith("/static/recipe/default.jpg"))) {
+            return `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
+        }
+
+        return recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
+            ? recipe.image
+            : `https://spoonacular.com/recipeImages/${recipeId}-556x370.jpg`;
     };
 
     const renderMealImage = (recipe: Recipe) => {
@@ -95,15 +196,11 @@ export default function MealPlannerResults() {
                     </View>
                 )}
                 <Image
-                    source={{
-                        uri: recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
-                            ? recipe.image
-                            : 'https://spoonacular.com/recipeImages/default-food.jpg'
-                    }}
+                    source={{ uri: getImageSource(recipe) }}
                     style={[styles.mealImage, { opacity: isLoading ? 0 : 1 }]}
                     resizeMode="cover"
                     onLoad={() => handleImageLoad(recipeId)}
-                    onError={() => handleImageError(recipeId)} // Handle error properly
+                    onError={() => handleImageError(recipeId, recipe.title || 'Unknown Recipe')}
                 />
             </View>
         );
