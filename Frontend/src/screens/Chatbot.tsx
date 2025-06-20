@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { ThemeContext } from "../ThemeContext";
@@ -26,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth } from '../utils/firebase/index';
 import RichTextRenderer from "../components/RichTextRenderer";
 import tokenManager from '../utils/firebase/tokenManager';
+import { addFoodLog } from '../utils/database';
 import {
   getUserProfileByFirebaseUid,
   getRecentFoodLogs,
@@ -35,7 +37,8 @@ import {
   getTodayCarbs,
   getTodayFats,
   getTodayExerciseCalories,
-  getUserStreak
+  getUserStreak,
+  getCurrentUserId
 } from '../utils/database';
 
 // Get IP and port from the BACKEND_URL
@@ -51,6 +54,15 @@ interface Message {
   timestamp: Date;
   isTyping?: boolean;
 }
+
+// Define navigation types
+type RootStackParamList = {
+  FoodDetail: { foodId: number };
+  FoodLog: { refresh?: number };
+  // Add other screens as needed
+};
+
+type ChatbotNavigationProp = StackNavigationProp<RootStackParamList>;
 
 // User context interface
 interface UserContext {
@@ -69,7 +81,7 @@ interface UserContext {
 
 export default function Chatbot() {
   const { isDarkTheme } = useContext(ThemeContext);
-  const navigation = useNavigation();
+  const navigation = useNavigation<ChatbotNavigationProp>();
   const route = useRoute();
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");

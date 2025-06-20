@@ -3203,3 +3203,24 @@ export const getAllApiTokens = async (): Promise<Array<{
         return [];
     }
 };
+
+// Function to get food logs by meal_id
+export const getFoodLogsByMealId = async (mealId: number): Promise<any[]> => {
+    try {
+        const db = await getDatabase();
+        const result = await db.executeSql(
+            'SELECT * FROM food_logs WHERE meal_id = ? ORDER BY id DESC',
+            [mealId]
+        );
+
+        const foodLogs = [];
+        for (let i = 0; i < result[0].rows.length; i++) {
+            foodLogs.push(result[0].rows.item(i));
+        }
+
+        return foodLogs;
+    } catch (error) {
+        console.error('Error getting food logs by meal ID:', error);
+        return [];
+    }
+};

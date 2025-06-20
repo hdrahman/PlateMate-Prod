@@ -398,20 +398,56 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Add a new food log entry
     const addFoodLog = async (foodLog: Omit<FoodLogEntry, 'id'>): Promise<number | undefined> => {
         try {
-            // Add to local database
-            const id = await addLocalFoodLog(foodLog);
+            // Start database operation immediately
+            const idPromise = addLocalFoodLog(foodLog);
 
-            // Manually refresh without going through the loading state
-            // For immediate UI update without flicker
-            await forceSingleRefresh();
+            // Update UI state optimistically without waiting for database operation
+            // This creates a smoother user experience
+            const optimisticLog = { ...foodLog, id: Date.now() } as FoodLogEntry;
+            setFoodLogs(prevLogs => [...prevLogs, optimisticLog]);
 
-            // Also notify other components watching the database
-            try {
-                await notifyDatabaseChanged();
-            } catch (notifyError) {
-                console.error('Error notifying database changes:', notifyError);
-                // Continue anyway
+            // If this is today's log, update today's logs and nutrition totals
+            const today = formatDateToString(new Date());
+            if (foodLog.date === today) {
+                setTodayLogs(prevLogs => [...prevLogs, optimisticLog]);
+                setNutrientTotals(prevTotals => {
+                    const newTotals = { ...prevTotals };
+                    newTotals.calories += foodLog.calories || 0;
+                    newTotals.protein += foodLog.proteins || 0;
+                    newTotals.carbs += foodLog.carbs || 0;
+                    newTotals.fat += foodLog.fats || 0;
+                    newTotals.fiber += foodLog.fiber || 0;
+                    newTotals.sugar += foodLog.sugar || 0;
+                    newTotals.saturatedFat += foodLog.saturated_fat || 0;
+                    newTotals.polyunsaturatedFat += foodLog.polyunsaturated_fat || 0;
+                    newTotals.monounsaturatedFat += foodLog.monounsaturated_fat || 0;
+                    newTotals.transFat += foodLog.trans_fat || 0;
+                    newTotals.cholesterol += foodLog.cholesterol || 0;
+                    newTotals.sodium += foodLog.sodium || 0;
+                    newTotals.potassium += foodLog.potassium || 0;
+                    newTotals.vitaminA += foodLog.vitamin_a || 0;
+                    newTotals.vitaminC += foodLog.vitamin_c || 0;
+                    newTotals.calcium += foodLog.calcium || 0;
+                    newTotals.iron += foodLog.iron || 0;
+                    return newTotals;
+                });
             }
+
+            // Update timestamp immediately for responsive UI
+            setLastUpdated(Date.now());
+
+            // Now wait for the actual database operation to complete
+            const id = await idPromise;
+
+            // Notify other components in the background
+            setTimeout(async () => {
+                try {
+                    await notifyDatabaseChanged();
+                } catch (notifyError) {
+                    console.error('Error notifying database changes:', notifyError);
+                    // Continue anyway
+                }
+            }, 0);
 
             // Reset error state on successful add
             resetErrorState();
@@ -420,6 +456,12 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         } catch (error) {
             console.error('Error adding food log:', error);
             setHasError(true);
+
+            // Force a refresh to ensure data consistency after error
+            forceSingleRefresh().catch(refreshError =>
+                console.error('Error refreshing after failed add:', refreshError)
+            );
+
             return undefined;
         }
     };

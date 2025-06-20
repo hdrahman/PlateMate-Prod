@@ -43,6 +43,13 @@ class SettingsService {
             quietEnd: '07:00',
             enabled: true,
         },
+        permanentNotification: {
+            enabled: false,
+            showCalories: true,
+            showProtein: true,
+            showNextMeal: true,
+            updateFrequency: 15, // Update every 15 minutes
+        },
     };
 
     private readonly defaultDataSharingSettings: DataSharingSettings = {
@@ -85,6 +92,13 @@ class SettingsService {
                 // Handle migration for existing users who don't have snackTimes property
                 if (parsed.mealReminders && !parsed.mealReminders.snackTimes) {
                     parsed.mealReminders.snackTimes = this.defaultNotificationSettings.mealReminders.snackTimes;
+                    // Save the migrated settings
+                    await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
+                }
+
+                // Handle migration for existing users who don't have permanentNotification property
+                if (!parsed.permanentNotification) {
+                    parsed.permanentNotification = this.defaultNotificationSettings.permanentNotification;
                     // Save the migrated settings
                     await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
                 }

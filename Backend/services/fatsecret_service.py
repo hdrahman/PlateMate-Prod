@@ -476,8 +476,34 @@ class FatSecretService:
         recipe_id = str(recipe.get('recipe_id', ''))
         recipe_name = recipe.get('recipe_name', '')
         recipe_description = recipe.get('recipe_description', '')
+        
+        # Extract recipe image - FatSecret API always provides images in recipe_image field
         recipe_image = recipe.get('recipe_image', '')
         
+        # Ensure the image URL is valid
+        if not recipe_image or not isinstance(recipe_image, str) or not recipe_image.startswith(('http://', 'https://')):
+            # Try recipe_images collection as a backup
+            if 'recipe_images' in recipe and 'recipe_image' in recipe['recipe_images']:
+                images = recipe['recipe_images']['recipe_image']
+                if isinstance(images, list) and len(images) > 0:
+                    recipe_image = images[0]
+                elif isinstance(images, str):
+                    recipe_image = images
+        
+        # Convert relative URLs to absolute URLs
+        if recipe_image and isinstance(recipe_image, str) and not recipe_image.startswith(('http://', 'https://')):
+            if recipe_image.startswith('/'):
+                recipe_image = f"https://www.fatsecret.com{recipe_image}"
+            else:
+                recipe_image = f"https://www.fatsecret.com/{recipe_image}"
+        
+        # If still no valid image, use a generic food image that's guaranteed to work
+        if not recipe_image or not isinstance(recipe_image, str) or not recipe_image.startswith(('http://', 'https://')):
+            recipe_image = 'https://spoonacular.com/recipeImages/default-food.jpg'
+            logger.warning(f"No valid image found for recipe {recipe_id}: {recipe_name}, using default image")
+        
+        logger.info(f"Final image URL for recipe {recipe_id}: {recipe_image}")
+            
         # Extract preparation and cooking time
         prep_time = int(recipe.get('preparation_time_min', 0) or 0)
         cook_time = int(recipe.get('cooking_time_min', 0) or 0)
@@ -545,6 +571,9 @@ class FatSecretService:
             elif isinstance(categories, dict) and 'recipe_category_name' in categories:
                 cuisines = [categories['recipe_category_name']]
 
+        # Log the final image URL for debugging
+        logger.info(f"Final image URL for recipe {recipe_id}: {recipe_image}")
+        
         return {
             'id': recipe_id,
             'title': recipe_name,
@@ -600,9 +629,9 @@ class FatSecretService:
             # Extract recipe IDs from search results
             recipe_ids = [str(recipe.get('recipe_id', '')) for recipe in recipes_list if recipe.get('recipe_id')]
             
-            # Fetch full details for each recipe (limited to first 5 for performance)
+            # Fetch full details for each recipe (increased from 5 to 10 for better results)
             detailed_recipes = []
-            for recipe_id in recipe_ids[:5]:
+            for recipe_id in recipe_ids[:10]:
                 try:
                     detailed_recipe = self.get_recipe_by_id(recipe_id)
                     if detailed_recipe:
@@ -716,6 +745,13 @@ class FatSecretService:
             
             results = self.search_recipes(params)
             logger.info(f"Found {len(results)} recipes for meal type: {meal_type}")
+            
+            # Log detailed information about each recipe
+            for i, recipe in enumerate(results):
+                logger.info(f"Recipe {i+1} for {meal_type}: ID={recipe.get('id', 'unknown')}, Title={recipe.get('title', 'unknown')}, Has Image: {bool(recipe.get('image'))}")
+                if recipe.get('image'):
+                    logger.info(f"Image URL for recipe {i+1}: {recipe.get('image')}")
+            
             return results
             
         except Exception as e:
@@ -733,25 +769,36 @@ class FatSecretService:
             target_calories = params.get('targetCalories', 2000)
             
             if time_frame == 'day':
-                # Generate a day's worth of meals
-                breakfast_recipes = self.get_recipes_by_meal_type('breakfast', 1)
-                lunch_recipes = self.get_recipes_by_meal_type('lunch', 1)
-                dinner_recipes = self.get_recipes_by_meal_type('dinner', 1)
+                # Generate a day's worth of meals - fetch more recipes to ensure we get valid ones
+                breakfast_recipes = self.get_recipes_by_meal_type('breakfast', 3)
+                lunch_recipes = self.get_recipes_by_meal_type('lunch', 3)
+                dinner_recipes = self.get_recipes_by_meal_type('dinner', 3)
                 
                 meals = []
                 total_nutrients = {'calories': 0, 'protein': 0, 'fat': 0, 'carbohydrates': 0}
                 
                 for meal_type, recipes in [('breakfast', breakfast_recipes), ('lunch', lunch_recipes), ('dinner', dinner_recipes)]:
                     if recipes:
-                        recipe = recipes[0]
-                        meal = {
-                            'id': recipe['id'],
-                            'slot': 1,
-                            'position': 0,
-                            'type': meal_type,
-                            'value': recipe
-                        }
-                        meals.append(meal)
+                        # Find the first recipe with a valid image
+                        valid_recipe = None
+                        for recipe in recipes:
+                            if recipe.get('image') and isinstance(recipe['image'], str) and recipe['image'].startswith('http'):
+                                valid_recipe = recipe
+                                break
+                        
+                        # If no recipe with valid image found, use the first one
+                        if not valid_recipe and recipes:
+                            valid_recipe = recipes[0]
+                            
+                        if valid_recipe:
+                            meal = {
+                                'id': valid_recipe['id'],
+                                'slot': 1,
+                                'position': 0,
+                                'type': meal_type,
+                                'value': valid_recipe
+                            }
+                            meals.append(meal)
                         
                         # Add to total nutrients (rough estimation)
                         total_nutrients['calories'] += target_calories // 3

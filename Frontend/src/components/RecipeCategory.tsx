@@ -28,31 +28,7 @@ const formatLikes = (likes: number): string => {
     return likes.toString();
 };
 
-// Fallback food images for different meal types
-const getFallbackImage = (title: string): string => {
-    const titleLower = title.toLowerCase();
-
-    if (titleLower.includes('breakfast') || titleLower.includes('pancake') || titleLower.includes('egg') || titleLower.includes('oatmeal')) {
-        return 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('salad') || titleLower.includes('vegetable') || titleLower.includes('green')) {
-        return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('pasta') || titleLower.includes('spaghetti') || titleLower.includes('noodle')) {
-        return 'https://images.unsplash.com/photo-1551892589-865f69869476?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('chicken') || titleLower.includes('meat') || titleLower.includes('beef')) {
-        return 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('soup') || titleLower.includes('broth')) {
-        return 'https://images.unsplash.com/photo-1547592180-85f7d2b5c2b8?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('pizza')) {
-        return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('burger') || titleLower.includes('sandwich')) {
-        return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('dessert') || titleLower.includes('cake') || titleLower.includes('sweet')) {
-        return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=300&fit=crop&crop=center';
-    }
-
-    // Default fallback
-    return 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&crop=center';
-};
+// We no longer use fallback images
 
 interface RecipeCategoryProps {
     title: string;
@@ -88,13 +64,29 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
 
                 // If no cache, fetch from API and cache the results
                 console.log(`🌐 Fetching fresh ${categoryId} recipes from API`);
-                const data = await getRecipesByMealType(categoryId, 4);
+                const data = await getRecipesByMealType(categoryId, 10); // Increased from 4 to 10
+
+                console.log(`Category ${categoryId}: Received ${data?.length || 0} recipes`);
+
+                // Log image URLs for debugging
+                data?.forEach((recipe, index) => {
+                    console.log(`${categoryId} Recipe ${index + 1}: ${recipe.title}, Image: ${recipe.image || 'No image'}`);
+                });
 
                 if (data && data.length > 0) {
-                    setRecipes(data);
+                    // Filter to recipes with valid images
+                    const validRecipes = data.filter(recipe =>
+                        recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
+                    );
+
+                    console.log(`Category ${categoryId}: Found ${validRecipes.length} recipes with valid images`);
+
+                    // Use up to 4 valid recipes
+                    const recipesToShow = validRecipes.slice(0, 4);
+                    setRecipes(recipesToShow);
 
                     // Cache the recipes for the rest of the day
-                    await RecipeCacheService.cacheCategoryRecipes(categoryId, data);
+                    await RecipeCacheService.cacheCategoryRecipes(categoryId, recipesToShow);
                     console.log(`💾 ${categoryId} recipes cached for today`);
                 }
             } catch (error) {
@@ -109,12 +101,14 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
 
     const handleImageError = (recipeId: string) => {
         setImageErrors(prev => ({ ...prev, [recipeId]: true }));
+        console.error(`Error loading image for recipe ID: ${recipeId} in category: ${title}`);
     };
 
     const getImageSource = (recipe: Recipe): string => {
-        const recipeId = recipe.id?.toString() || 'unknown';
-        if (imageErrors[recipeId] || !recipe.image) {
-            return getFallbackImage(recipe.title);
+        // Make sure we have a valid image URL
+        if (!recipe.image || typeof recipe.image !== 'string' || !recipe.image.startsWith('http')) {
+            console.error(`Invalid image URL for recipe in category: ${recipe.title}`);
+            return 'https://www.fatsecret.com/static/recipe/default.jpg';
         }
         return recipe.image;
     };
@@ -219,11 +213,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                             </View>
                                         </View>
                                     </LinearGradient>
-                                    {(!recipe.image || imageErrors[recipe.id?.toString() || 'unknown']) && (
-                                        <View style={styles.placeholderOverlay}>
-                                            <Ionicons name="restaurant" size={24} color={WHITE} style={{ opacity: 0.6 }} />
-                                        </View>
-                                    )}
+
                                 </ImageBackground>
                             </LinearGradient>
                         </View>

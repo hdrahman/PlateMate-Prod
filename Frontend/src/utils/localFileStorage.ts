@@ -61,20 +61,20 @@ export const saveImageLocally = async (imageUri: string, userId: string): Promis
 };
 
 // Save multiple images to local device storage
-export const saveMultipleImagesLocally = async (imageUris: string[], userId: string): Promise<string[]> => {
+export const saveMultipleImagesLocally = async (uris: string[], userId: string): Promise<string[]> => {
     try {
-        const savedPaths: string[] = [];
+        console.log(`Starting to save ${uris.length} images locally in parallel`);
 
-        for (const imageUri of imageUris) {
-            const localPath = await saveImageLocally(imageUri, userId);
-            savedPaths.push(localPath);
-        }
+        // Process all images in parallel
+        const savePromises = uris.map(uri => saveImageLocally(uri, userId));
 
-        console.log(`✅ Saved ${savedPaths.length} images locally`);
+        // Wait for all save operations to complete
+        const savedPaths = await Promise.all(savePromises);
+
+        console.log(`Successfully saved ${savedPaths.length} images locally`);
         return savedPaths;
-
     } catch (error) {
-        console.error('❌ Error saving multiple images locally:', error);
+        console.error('Error saving multiple images locally:', error);
         throw error;
     }
 };

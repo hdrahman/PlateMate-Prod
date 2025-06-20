@@ -293,9 +293,9 @@ export default function MealPlanner() {
         prefetchCommonTerms();
     }, []);
 
-    // Simplified autocomplete function - only fetch recipes, not ingredients
+    // Fetch autocomplete suggestions with improved performance
     const fetchAutocomplete = useCallback(async (query: string) => {
-        if (!query.trim() || query.length < MIN_QUERY_LENGTH) {
+        if (!query || query.trim().length < MIN_QUERY_LENGTH) {
             setSuggestions([]);
             setShowSuggestions(false);
             return;
@@ -335,10 +335,16 @@ export default function MealPlanner() {
         setIsLoadingSuggestions(true);
 
         try {
-            // Only fetch recipe suggestions for better performance
-            const results = await autocompleteRecipes(normalizedQuery);
+            // Start the API request but don't wait for it yet
+            const resultsPromise = autocompleteRecipes(normalizedQuery);
 
-            // Create safe suggestions array
+            // Process other UI tasks in parallel
+            // This is where we could add other non-blocking operations if needed
+
+            // Now wait for the API results
+            const results = await resultsPromise;
+
+            // Create safe suggestions array in a non-blocking way
             const suggestions: AutocompleteSuggestion[] = [];
 
             // Only process if we have valid results
@@ -357,8 +363,10 @@ export default function MealPlanner() {
                 }
             }
 
-            // Cache the results
-            autocompleteCacheRef.current[normalizedQuery] = suggestions;
+            // Cache the results (do this in the background)
+            setTimeout(() => {
+                autocompleteCacheRef.current[normalizedQuery] = suggestions;
+            }, 0);
 
             // Only update UI if this is still the current query being processed
             if (normalizedQuery === currentQueryRef.current) {
@@ -372,7 +380,9 @@ export default function MealPlanner() {
                 setShowSuggestions(false);
             }
             // Cache empty results to prevent repeated failed lookups
-            autocompleteCacheRef.current[normalizedQuery] = [];
+            setTimeout(() => {
+                autocompleteCacheRef.current[normalizedQuery] = [];
+            }, 0);
         } finally {
             if (normalizedQuery === currentQueryRef.current) {
                 setIsLoadingSuggestions(false);
@@ -621,13 +631,29 @@ export default function MealPlanner() {
 
             // If no cache, fetch from API and cache the results
             console.log('🌐 Fetching fresh featured recipes from API');
-            const recipes = await getRandomRecipes(5);
+            const recipes = await getRandomRecipes(10); // Increased from 5 to 10 for better results
+
+            console.log(`Received ${recipes?.length || 0} recipes from API`);
+
+            // Log image URLs for debugging
+            recipes?.forEach((recipe, index) => {
+                console.log(`Recipe ${index + 1}: ${recipe.title}, Image: ${recipe.image || 'No image'}`);
+            });
 
             if (recipes && recipes.length > 0) {
-                setFeaturedRecipes(recipes);
+                // Filter to recipes with valid images
+                const validRecipes = recipes.filter(recipe =>
+                    recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
+                );
+
+                console.log(`Found ${validRecipes.length} recipes with valid images`);
+
+                // Use up to 5 valid recipes
+                const recipesToShow = validRecipes.slice(0, 5);
+                setFeaturedRecipes(recipesToShow);
 
                 // Cache the recipes for the rest of the day
-                await RecipeCacheService.cacheFeaturedRecipes(recipes);
+                await RecipeCacheService.cacheFeaturedRecipes(recipesToShow);
                 console.log('💾 Featured recipes cached for today');
             }
         } catch (error) {

@@ -6,6 +6,8 @@ const CACHE_KEYS = {
     FEATURED_RECIPES: 'featured_recipes_cache',
     CATEGORY_RECIPES: 'category_recipes_cache_',
     LAST_FETCH_DATE: 'last_fetch_date',
+    RECIPES: 'recipes_cache',
+    RECIPE_IDS: 'recipe_ids_cache',
 };
 
 // Cache expiration time (24 hours in milliseconds)
@@ -115,6 +117,146 @@ export class RecipeCacheService {
     }
 
     /**
+     * Cache multiple recipes
+     */
+    static async cacheRecipes(recipes: Recipe[]): Promise<void> {
+        try {
+            // Get existing recipe IDs
+            const existingIdsString = await AsyncStorage.getItem(CACHE_KEYS.RECIPE_IDS);
+            const existingIds: number[] = existingIdsString ? JSON.parse(existingIdsString) : [];
+
+            // Add new recipes to cache
+            for (const recipe of recipes) {
+                if (recipe && recipe.id) {
+                    const key = `${CACHE_KEYS.RECIPES}_${recipe.id}`;
+                    await this.setCache(key, recipe);
+
+                    // Add ID to list if not already there
+                    if (!existingIds.includes(recipe.id)) {
+                        existingIds.push(recipe.id);
+                    }
+                }
+            }
+
+            // Update recipe IDs list
+            await AsyncStorage.setItem(CACHE_KEYS.RECIPE_IDS, JSON.stringify(existingIds));
+            console.log(`✅ Cached ${recipes.length} recipes, total unique recipes: ${existingIds.length}`);
+        } catch (error) {
+            console.error('❌ Error caching recipes:', error);
+        }
+    }
+
+    /**
+     * Cache a single recipe
+     */
+    static async cacheRecipe(recipe: Recipe): Promise<void> {
+        if (recipe && recipe.id) {
+            try {
+                // Cache the individual recipe
+                const key = `${CACHE_KEYS.RECIPES}_${recipe.id}`;
+                await this.setCache(key, recipe);
+
+                // Add to recipe IDs list if not already there
+                const existingIdsString = await AsyncStorage.getItem(CACHE_KEYS.RECIPE_IDS);
+                const existingIds: number[] = existingIdsString ? JSON.parse(existingIdsString) : [];
+
+                if (!existingIds.includes(recipe.id)) {
+                    existingIds.push(recipe.id);
+                    await AsyncStorage.setItem(CACHE_KEYS.RECIPE_IDS, JSON.stringify(existingIds));
+                }
+
+                console.log(`✅ Cached recipe: ${recipe.title} (ID: ${recipe.id})`);
+            } catch (error) {
+                console.error(`❌ Error caching recipe ${recipe.id}:`, error);
+            }
+        }
+    }
+
+    /**
+     * Get a cached recipe by ID
+     */
+    static async getCachedRecipeById(id: number): Promise<Recipe | null> {
+        const key = `${CACHE_KEYS.RECIPES}_${id}`;
+        return await this.getCache<Recipe>(key);
+    }
+
+    /**
+     * Search cached recipes by query
+     */
+    static async searchCachedRecipes(query: string, limit: number = 10): Promise<Recipe[]> {
+        try {
+            // Get all recipe IDs
+            const existingIdsString = await AsyncStorage.getItem(CACHE_KEYS.RECIPE_IDS);
+            if (!existingIdsString) {
+                return [];
+            }
+
+            const recipeIds: number[] = JSON.parse(existingIdsString);
+            const matchingRecipes: Recipe[] = [];
+            const normalizedQuery = query.toLowerCase();
+
+            // Search through cached recipes
+            for (const id of recipeIds) {
+                if (matchingRecipes.length >= limit) break;
+
+                const recipe = await this.getCachedRecipeById(id);
+                if (recipe) {
+                    // Check if recipe matches search query
+                    const matchesTitle = recipe.title && recipe.title.toLowerCase().includes(normalizedQuery);
+                    const matchesCuisine = recipe.cuisines && recipe.cuisines.some(c =>
+                        c.toLowerCase().includes(normalizedQuery));
+                    const matchesDishType = recipe.dishTypes && recipe.dishTypes.some(d =>
+                        d.toLowerCase().includes(normalizedQuery));
+
+                    if (matchesTitle || matchesCuisine || matchesDishType) {
+                        matchingRecipes.push(recipe);
+                    }
+                }
+            }
+
+            console.log(`✅ Found ${matchingRecipes.length} cached recipes matching "${query}"`);
+            return matchingRecipes;
+        } catch (error) {
+            console.error(`❌ Error searching cached recipes for "${query}":`, error);
+            return [];
+        }
+    }
+
+    /**
+     * Get random cached recipes
+     */
+    static async getRandomCachedRecipes(count: number = 10): Promise<Recipe[]> {
+        try {
+            // Get all recipe IDs
+            const existingIdsString = await AsyncStorage.getItem(CACHE_KEYS.RECIPE_IDS);
+            if (!existingIdsString) {
+                return [];
+            }
+
+            const recipeIds: number[] = JSON.parse(existingIdsString);
+
+            // Shuffle the IDs
+            const shuffledIds = [...recipeIds].sort(() => 0.5 - Math.random());
+            const selectedIds = shuffledIds.slice(0, Math.min(count, shuffledIds.length));
+
+            // Get the selected recipes
+            const recipes: Recipe[] = [];
+            for (const id of selectedIds) {
+                const recipe = await this.getCachedRecipeById(id);
+                if (recipe) {
+                    recipes.push(recipe);
+                }
+            }
+
+            console.log(`✅ Retrieved ${recipes.length} random cached recipes`);
+            return recipes;
+        } catch (error) {
+            console.error(`❌ Error getting random cached recipes:`, error);
+            return [];
+        }
+    }
+
+    /**
      * Clear all recipe caches (useful for debugging or force refresh)
      */
     static async clearAllCaches(): Promise<void> {
@@ -123,6 +265,8 @@ export class RecipeCacheService {
             const cacheKeys = keys.filter(key =>
                 key.startsWith(CACHE_KEYS.FEATURED_RECIPES) ||
                 key.startsWith(CACHE_KEYS.CATEGORY_RECIPES) ||
+                key.startsWith(CACHE_KEYS.RECIPES) ||
+                key === CACHE_KEYS.RECIPE_IDS ||
                 key === CACHE_KEYS.LAST_FETCH_DATE
             );
 
@@ -139,6 +283,7 @@ export class RecipeCacheService {
     static async getCacheStatus(): Promise<{
         featuredRecipes: boolean;
         cachedCategories: string[];
+        totalCachedRecipes: number;
         currentDate: string;
     }> {
         const currentDate = this.getCurrentDateString();
@@ -157,9 +302,14 @@ export class RecipeCacheService {
             }
         }
 
+        // Get total cached recipes count
+        const existingIdsString = await AsyncStorage.getItem(CACHE_KEYS.RECIPE_IDS);
+        const recipeIds: number[] = existingIdsString ? JSON.parse(existingIdsString) : [];
+
         return {
             featuredRecipes: !!featuredCache,
             cachedCategories,
+            totalCachedRecipes: recipeIds.length,
             currentDate,
         };
     }

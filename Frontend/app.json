@@ -22,7 +22,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.platemate.app"
+      "package": "com.platemate.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,11 +39,12 @@
         }
       ],
       "expo-barcode-scanner",
-      "expo-sqlite"
+      "expo-sqlite",
+      "./notifee.plugin.js"
     ],
     "extra": {
       "eas": {
-        "projectId": "platemate-e8f63"
+        "projectId": "6c1ede6a-d918-4fbc-a5b8-c549ed290ff6"
       }
     },
     "doctor": {
@@ -49,6 +54,7 @@
       "checkMissingDependencies": false,
       "checkDependencyVersions": false,
       "checkNativeModules": false
-    }
+    },
+    "owner": "haamed"
   }
 }

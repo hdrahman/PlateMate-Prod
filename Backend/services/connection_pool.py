@@ -157,8 +157,27 @@ async def request_with_retry(
     """
     last_exception = None
     
+    # Enhanced URL validation with detailed logging
+    if url is None:
+        error_msg = "URL cannot be None"
+        logger.error(f"URL validation failed: {error_msg}")
+        raise ValueError(error_msg)
+    
+    if not isinstance(url, (str, httpx.URL)):
+        error_msg = f"Invalid URL type: {type(url)}. Expected str or httpx.URL."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+        
+    if isinstance(url, str) and not url.strip():
+        error_msg = "URL string cannot be empty"
+        logger.error(f"URL validation failed: {error_msg}")
+        raise ValueError(error_msg)
+    
+    logger.info(f"Making {method} request to {url}")
+    
     for attempt in range(retry_count + 1):
         try:
+            logger.debug(f"Request attempt {attempt + 1}/{retry_count + 1} to {url}")
             response = await client.request(method, url, **kwargs)
             response.raise_for_status()
             return response
@@ -167,14 +186,15 @@ async def request_with_retry(
             
             # Don't retry on client errors (4xx)
             if isinstance(e, httpx.HTTPStatusError) and 400 <= e.response.status_code < 500:
+                logger.error(f"Client error in request to {url}: {str(e)}")
                 raise
             
             if attempt < retry_count:
                 wait_time = RETRY_DELAY * (2 ** attempt)  # Exponential backoff
-                logger.warning(f"Request failed, retrying in {wait_time}s: {str(e)}")
+                logger.warning(f"Request to {url} failed, retrying in {wait_time}s: {str(e)}")
                 await asyncio.sleep(wait_time)
             else:
-                logger.error(f"Request failed after {retry_count} retries: {str(e)}")
+                logger.error(f"Request to {url} failed after {retry_count} retries: {str(e)}")
                 raise last_exception
 
 # Cleanup task

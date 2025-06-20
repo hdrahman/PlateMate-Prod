@@ -35,7 +35,7 @@ const { width } = Dimensions.get('window');
 
 // Define navigation types
 type RootStackParamList = {
-    'Food Log': { refresh?: number };
+    FoodLog: { refresh?: number };
     ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
     Camera: undefined;
     BarcodeScanner: undefined;
@@ -317,36 +317,42 @@ const ImageCapture: React.FC = () => {
             // Get current user ID for local storage
             const userId = getCurrentUserId();
 
-            // Save images locally for the gallery FIRST (before uploading to backend)
-            console.log(`💾 Saving ${imageUris.length} images locally for gallery...`);
-            const localImagePaths = await saveMultipleImagesLocally(imageUris, userId);
-            console.log('✅ Images saved locally for gallery');
+            // Start local image saving and form data preparation in parallel
+            const [localImagePathsPromise, formData] = [
+                // Save images locally for the gallery (async operation)
+                saveMultipleImagesLocally(imageUris, userId),
+                // Prepare form data for upload (sync operation)
+                (() => {
+                    const form = new FormData();
+                    form.append('user_id', '1');
 
-            const formData = new FormData();
-            formData.append('user_id', '1');
+                    // Add all images to FormData
+                    for (let i = 0; i < imageUris.length; i++) {
+                        const uri = imageUris[i];
+                        form.append('images', {
+                            uri,
+                            type: 'image/jpeg',
+                            name: uri.split('/').pop() || `image_${i}.jpg`,
+                        } as any);
+                    }
+                    return form;
+                })()
+            ];
 
-            // Add all images to FormData
-            for (let i = 0; i < imageUris.length; i++) {
-                const uri = imageUris[i];
-                const fileInfo = await FileSystem.getInfoAsync(uri);
-
-                formData.append('images', {
-                    uri,
-                    type: 'image/jpeg',
-                    name: fileInfo.uri.split('/').pop() || `image_${i}.jpg`,
-                } as any);
-            }
+            // Get Firebase auth token while other operations are in progress
+            const tokenPromise = auth.currentUser?.getIdToken(true);
 
             setAnalysisStage('analyzing');
 
-            // Get Firebase auth token
-            const token = await auth.currentUser?.getIdToken(true);
+            // Wait for token
+            const token = await tokenPromise;
             if (!token) {
                 throw new Error('User not authenticated. Please sign in again.');
             }
 
+            // Send the upload request
             console.log('Sending request to backend for ChatGPT analysis...');
-            const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
+            const uploadPromise = fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -355,6 +361,14 @@ const ImageCapture: React.FC = () => {
                 },
                 body: formData,
             });
+
+            // Wait for both the local image saving and the upload to complete in parallel
+            const [localImagePaths, response] = await Promise.all([
+                localImagePathsPromise,
+                uploadPromise
+            ]);
+
+            console.log('✅ Images saved locally for gallery');
 
             const endTime = Date.now();
             console.log(`✅ Backend ChatGPT analysis completed in ${(endTime - startTime) / 1000} seconds`);
@@ -487,15 +501,13 @@ const ImageCapture: React.FC = () => {
                 };
 
                 console.log('Saving barcode food log to local database:', foodLog);
-                await addFoodLog(foodLog);
 
-                // Navigate directly to the food log screen with refresh parameter
-                // Add a small delay to ensure database operations complete
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                // Navigate to Food Log with refresh parameter
+                // Navigate immediately while database operation runs in background
                 const refreshTimestamp = Date.now();
-                navigation.navigate('Food Log', { refresh: refreshTimestamp });
+                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+
+                // Continue with database operation after navigation has started
+                await addFoodLog(foodLog);
                 return;
             } catch (error) {
                 console.error('Error submitting barcode food:', error);
@@ -538,6 +550,12 @@ const ImageCapture: React.FC = () => {
             const today = new Date();
             const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             console.log(`Saving food logs with date: ${formattedDate}`);
+
+            // Hide the analysis modal immediately to improve perceived performance
+            setShowAnalysisModal(false);
+
+            // Prepare for navigation
+            const refreshTimestamp = Date.now();
 
             // Check if we have an array of nutrition data
             if (Array.isArray(result.nutrition_data) && result.nutrition_data.length > 0) {
@@ -585,6 +603,10 @@ const ImageCapture: React.FC = () => {
                     foodLogsToInsert.push(foodLog);
                 }
 
+                // Navigate before database operation to prevent UI blocking
+                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+
+                // Continue with database operation after navigation has started
                 console.log(`Saving ${foodLogsToInsert.length} food logs to local database in batch`);
                 await addMultipleFoodLogs(foodLogsToInsert);
                 console.log(`Saved ${result.nutrition_data.length} food items to database`);
@@ -628,21 +650,13 @@ const ImageCapture: React.FC = () => {
                     notes: notes
                 };
 
+                // Navigate before database operation to prevent UI blocking
+                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+
+                // Continue with database operation after navigation has started
                 console.log('Saving food log to local database:', foodLog);
                 await addFoodLog(foodLog);
             }
-
-            // Hide the analysis modal
-            setShowAnalysisModal(false);
-
-            // Navigate directly to the food log screen with refresh parameter
-            // Add a small delay to ensure database operations complete
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Navigate to Food Log with refresh parameter
-            const refreshTimestamp = Date.now();
-            navigation.navigate('Food Log', { refresh: refreshTimestamp });
-
         } catch (error) {
             setShowAnalysisModal(false);
             console.error('Error submitting food:', error);

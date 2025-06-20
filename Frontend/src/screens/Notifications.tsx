@@ -22,6 +22,7 @@ import { NotificationSettings } from '../types/notifications';
 import SettingsService from '../services/SettingsService';
 import NotificationService from '../services/NotificationService';
 import WheelPicker from '../components/WheelPicker';
+import PermanentNotificationService from '../services/PermanentNotificationService';
 
 // Define theme colors - matching the app's dark theme
 const PRIMARY_BG = '#000000';
@@ -273,7 +274,7 @@ export default function NotificationsScreen() {
             } else if (path === 'generalSettings.enabled' && !value) {
                 await NotificationService.cancelAllNotifications();
             } else if (value) {
-                await NotificationService.scheduleAllNotifications();
+                await NotificationService.rescheduleNotifications();
             }
 
             Alert.alert('Success', 'Settings updated successfully');
@@ -290,7 +291,7 @@ export default function NotificationsScreen() {
             setIsSaving(true);
             const updatedSettings = await SettingsService.updateNotificationSetting(path, value);
             setSettings(updatedSettings);
-            await NotificationService.scheduleAllNotifications();
+            await NotificationService.rescheduleNotifications();
             Alert.alert('Success', 'Frequency updated successfully');
         } catch (error) {
             console.error('Error updating notification setting:', error);
@@ -352,7 +353,7 @@ export default function NotificationsScreen() {
 
             // Reschedule notifications with error handling
             try {
-                await NotificationService.scheduleAllNotifications();
+                await NotificationService.rescheduleNotifications();
                 Alert.alert('Success', 'Time updated successfully');
             } catch (error) {
                 console.error('Error scheduling notifications after time update:', error);
@@ -397,7 +398,7 @@ export default function NotificationsScreen() {
                             setIsSaving(true);
                             const defaultSettings = await SettingsService.resetNotificationSettings();
                             setSettings(defaultSettings);
-                            await NotificationService.scheduleAllNotifications();
+                            await NotificationService.rescheduleNotifications();
                             Alert.alert('Success', 'Notification settings reset to defaults');
                         } catch (error) {
                             console.error('Error resetting settings:', error);
@@ -422,6 +423,115 @@ export default function NotificationsScreen() {
         hours = displayHour === 0 ? 12 : displayHour;
 
         return `${hours}:${minutesStr} ${amPm}`;
+    };
+
+    const handlePermanentNotificationToggle = async (enabled: boolean) => {
+        try {
+            await handleToggle('permanentNotification.enabled', enabled);
+
+            if (Platform.OS !== 'android') {
+                Alert.alert('Not Supported', 'Permanent notifications are only supported on Android devices.');
+                return;
+            }
+
+            if (enabled) {
+                // Start the permanent notification service
+                await PermanentNotificationService.startPermanentNotification();
+            } else {
+                // Stop the permanent notification service
+                await PermanentNotificationService.stopPermanentNotification();
+            }
+        } catch (error) {
+            console.error('Error toggling permanent notification:', error);
+            Alert.alert('Error', 'Failed to toggle permanent notification. Please try again.');
+        }
+    };
+
+    const handlePermanentNotificationSetting = async (path: string, value: boolean) => {
+        try {
+            await handleToggle(`permanentNotification.${path}`, value);
+
+            // If the permanent notification is currently running, update it
+            if (PermanentNotificationService.isNotificationRunning()) {
+                await PermanentNotificationService.updateNotificationContent();
+            }
+        } catch (error) {
+            console.error(`Error updating permanent notification setting ${path}:`, error);
+            Alert.alert('Error', 'Failed to update permanent notification setting. Please try again.');
+        }
+    };
+
+    const renderPermanentNotificationSection = () => {
+        if (!settings) return null;
+
+        const { permanentNotification } = settings;
+
+        // Only show on Android
+        if (Platform.OS !== 'android') {
+            return null;
+        }
+
+        return (
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Permanent Notification</Text>
+                <GradientBorderCard>
+                    <View style={styles.settingRow}>
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingTitle}>Enable Permanent Notification</Text>
+                            <Text style={styles.settingDescription}>
+                                Show a permanent notification with your daily stats
+                            </Text>
+                        </View>
+                        <Switch
+                            value={permanentNotification.enabled}
+                            onValueChange={(value) => handlePermanentNotificationToggle(value)}
+                            trackColor={{ false: '#767577', true: '#4ECDC4' }}
+                            thumbColor={permanentNotification.enabled ? '#2A9D8F' : '#f4f3f4'}
+                        />
+                    </View>
+
+                    {permanentNotification.enabled && (
+                        <>
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingTitle}>Show Calories Remaining</Text>
+                                </View>
+                                <Switch
+                                    value={permanentNotification.showCalories}
+                                    onValueChange={(value) => handlePermanentNotificationSetting('showCalories', value)}
+                                    trackColor={{ false: '#767577', true: '#4ECDC4' }}
+                                    thumbColor={permanentNotification.showCalories ? '#2A9D8F' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingTitle}>Show Protein Remaining</Text>
+                                </View>
+                                <Switch
+                                    value={permanentNotification.showProtein}
+                                    onValueChange={(value) => handlePermanentNotificationSetting('showProtein', value)}
+                                    trackColor={{ false: '#767577', true: '#4ECDC4' }}
+                                    thumbColor={permanentNotification.showProtein ? '#2A9D8F' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingTitle}>Show Next Meal Time</Text>
+                                </View>
+                                <Switch
+                                    value={permanentNotification.showNextMeal}
+                                    onValueChange={(value) => handlePermanentNotificationSetting('showNextMeal', value)}
+                                    trackColor={{ false: '#767577', true: '#4ECDC4' }}
+                                    thumbColor={permanentNotification.showNextMeal ? '#2A9D8F' : '#f4f3f4'}
+                                />
+                            </View>
+                        </>
+                    )}
+                </GradientBorderCard>
+            </View>
+        );
     };
 
     if (isLoading || !settings) {
@@ -789,6 +899,8 @@ export default function NotificationsScreen() {
                             <Text style={styles.resetButtonText}>Reset to Defaults</Text>
                         </TouchableOpacity>
 
+                        {renderPermanentNotificationSection()}
+
                         <View style={styles.bottomSpacer} />
                     </View>
                 </ScrollView>
@@ -1138,5 +1250,14 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderRadius: 10,
         width: 80,
+    },
+    section: {
+        marginBottom: 20,
+    },
+    settingTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: WHITE,
+        marginBottom: 4,
     },
 }); 

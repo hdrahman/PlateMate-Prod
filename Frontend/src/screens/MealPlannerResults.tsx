@@ -32,31 +32,7 @@ interface MealPlannerResultsParams {
     nutrients: Nutrients;
 }
 
-// Fallback food images for different meal types
-const getFallbackImage = (title: string): string => {
-    const titleLower = title.toLowerCase();
-
-    if (titleLower.includes('breakfast') || titleLower.includes('pancake') || titleLower.includes('egg') || titleLower.includes('oatmeal')) {
-        return 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('salad') || titleLower.includes('vegetable') || titleLower.includes('green')) {
-        return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('pasta') || titleLower.includes('spaghetti') || titleLower.includes('noodle')) {
-        return 'https://images.unsplash.com/photo-1551892589-865f69869476?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('chicken') || titleLower.includes('meat') || titleLower.includes('beef')) {
-        return 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('soup') || titleLower.includes('broth')) {
-        return 'https://images.unsplash.com/photo-1547592180-85f7d2b5c2b8?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('pizza')) {
-        return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('burger') || titleLower.includes('sandwich')) {
-        return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&crop=center';
-    } else if (titleLower.includes('dessert') || titleLower.includes('cake') || titleLower.includes('sweet')) {
-        return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=300&fit=crop&crop=center';
-    }
-
-    // Default fallback
-    return 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&crop=center';
-};
+// We no longer use fallback images
 
 export default function MealPlannerResults() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -104,20 +80,12 @@ export default function MealPlannerResults() {
     const handleImageError = (recipeId: string) => {
         setImageLoadingStates(prev => ({ ...prev, [recipeId]: false }));
         setImageErrors(prev => ({ ...prev, [recipeId]: true }));
+        console.error(`Error loading image for recipe ID: ${recipeId}`);
     };
 
     const renderMealImage = (recipe: Recipe) => {
         const recipeId = recipe.id?.toString() || 'unknown';
         const isLoading = imageLoadingStates[recipeId];
-        const hasError = imageErrors[recipeId];
-
-        // Determine which image to show
-        let imageSource = '';
-        if (hasError || !recipe.image) {
-            imageSource = getFallbackImage(recipe.title);
-        } else {
-            imageSource = recipe.image;
-        }
 
         return (
             <View style={styles.imageContainer}>
@@ -127,17 +95,16 @@ export default function MealPlannerResults() {
                     </View>
                 )}
                 <Image
-                    source={{ uri: imageSource }}
+                    source={{
+                        uri: recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
+                            ? recipe.image
+                            : 'https://www.fatsecret.com/static/recipe/default.jpg'
+                    }}
                     style={[styles.mealImage, { opacity: isLoading ? 0 : 1 }]}
                     resizeMode="cover"
                     onLoad={() => handleImageLoad(recipeId)}
-                    onError={() => handleImageError(recipeId)}
+                    onError={() => handleImageError(recipeId)} // Handle error properly
                 />
-                {!recipe.image && !isLoading && (
-                    <View style={styles.placeholderOverlay}>
-                        <Ionicons name="restaurant" size={24} color={WHITE} style={{ opacity: 0.6 }} />
-                    </View>
-                )}
             </View>
         );
     };

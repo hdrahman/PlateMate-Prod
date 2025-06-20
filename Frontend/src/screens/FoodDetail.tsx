@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFoodLogById, updateFoodLog } from '../utils/database';
+import { getFoodLogById, updateFoodLog, getFoodLogsByMealId } from '../utils/database';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -48,7 +48,7 @@ const VITAMIN_COLORS = {
 // Define navigation types
 type RootStackParamList = {
     FoodDetail: { foodId: number };
-    FoodLog: undefined;
+    FoodLog: { refresh?: number; mealIdFilter?: number };
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -100,6 +100,8 @@ const FoodDetailScreen: React.FC = () => {
     const [imageError, setImageError] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editedFoodData, setEditedFoodData] = useState<Partial<FoodLogEntry>>({});
+    const [relatedFoodItems, setRelatedFoodItems] = useState<FoodLogEntry[]>([]);
+    const [hasRelatedItems, setHasRelatedItems] = useState(false);
 
     useEffect(() => {
         loadFoodData();
@@ -110,6 +112,15 @@ const FoodDetailScreen: React.FC = () => {
             setLoading(true);
             const data = await getFoodLogById(foodId);
             setFoodData(data);
+
+            // Check for other food items with the same meal_id
+            if (data && data.meal_id) {
+                const relatedItems = await getFoodLogsByMealId(data.meal_id);
+                // Filter out the current item
+                const otherItems = relatedItems.filter(item => item.id !== foodId);
+                setRelatedFoodItems(otherItems);
+                setHasRelatedItems(otherItems.length > 0);
+            }
         } catch (error) {
             console.error('Error loading food data:', error);
         } finally {
@@ -259,6 +270,17 @@ const FoodDetailScreen: React.FC = () => {
             Alert.alert('Error', 'Failed to update food log entry');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Handle viewing all related food items
+    const handleViewAllItems = () => {
+        if (foodData) {
+            // Navigate to FoodLog with filter for this meal
+            navigation.navigate('FoodLog', {
+                refresh: Date.now(),
+                mealIdFilter: foodData.meal_id
+            });
         }
     };
 
@@ -1198,6 +1220,27 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1000,
+    },
+    relatedItemsBanner: {
+        marginVertical: 15,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    relatedItemsGradient: {
+        padding: 12,
+        borderRadius: 10,
+    },
+    relatedItemsContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    relatedItemsText: {
+        flex: 1,
+        color: WHITE,
+        fontSize: 16,
+        fontWeight: '500',
+        marginLeft: 10,
     },
 });
 

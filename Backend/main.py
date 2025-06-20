@@ -97,6 +97,21 @@ async def startup_event():
         print(f"❌ Failed to initialize Firebase Admin SDK: {e}")
         print("⚠️ The application will continue but Firebase authentication will not work")
     
+    # Verify FatSecret API credentials
+    try:
+        fatsecret_client_id = os.environ.get("FATSECRET_CLIENT_ID")
+        fatsecret_client_secret = os.environ.get("FATSECRET_CLIENT_SECRET")
+        
+        if not fatsecret_client_id or not fatsecret_client_secret:
+            print("⚠️ FatSecret API credentials are missing or incomplete")
+            print("   Food search functionality may not work properly")
+            print(f"   FATSECRET_CLIENT_ID present: {bool(fatsecret_client_id)}")
+            print(f"   FATSECRET_CLIENT_SECRET present: {bool(fatsecret_client_secret)}")
+        else:
+            print("✅ FatSecret API credentials are loaded")
+    except Exception as e:
+        print(f"❌ Error checking FatSecret credentials: {e}")
+    
     # Initialize connection pool
     start_connection_pool()
     print("Connection pool initialized")

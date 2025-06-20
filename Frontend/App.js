@@ -22,6 +22,9 @@ import { FoodLogProvider } from './src/context/FoodLogContext';
 import { app, auth } from './src/utils/firebase/index';
 // Import token manager for optimized authentication
 import tokenManager from './src/utils/firebase/tokenManager';
+// Import PermanentNotificationService
+import PermanentNotificationService from './src/services/PermanentNotificationService';
+import SettingsService from './src/services/SettingsService';
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
@@ -384,6 +387,38 @@ export default function App() {
       try {
         // Initialize SQLite database
         await getDatabase();
+
+        // Check if we're running in Expo Go
+        const isExpoGo = global.isExpoGo === true;
+
+        if (isExpoGo) {
+          console.log('Running in Expo Go - Some features like permanent notifications will be disabled');
+        }
+
+        // Initialize the permanent notification service
+        try {
+          await PermanentNotificationService.initialize();
+
+          // Check if permanent notification should be enabled
+          const settings = await SettingsService.getNotificationSettings();
+          if (settings.permanentNotification?.enabled) {
+            // Only try to start if Notifee is available
+            if (PermanentNotificationService.isNotificationAvailable()) {
+              await PermanentNotificationService.startPermanentNotification();
+            } else {
+              if (isExpoGo) {
+                console.log('Permanent notifications are disabled in Expo Go.');
+                console.log('To use this feature, create a development build with: npm run build-dev');
+              } else {
+                console.log('Permanent notifications are enabled but Notifee is not available.');
+                console.log('To use this feature, create a development build with: npm run build-dev');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to initialize permanent notification:', error);
+          // Continue app initialization even if permanent notification fails
+        }
 
         // Start background sync service
         startPeriodicSync();

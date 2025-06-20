@@ -162,6 +162,7 @@ export default function Home() {
   const [targetWeight, setTargetWeight] = useState<number | null>(null);
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [weightLost, setWeightLost] = useState(0);
+  const [weightGoal, setWeightGoal] = useState<string>('maintain'); // Add state for weight goal
 
   // Add state for temporary today's weight display
   const [showTodayWeight, setShowTodayWeight] = useState(false);
@@ -199,6 +200,11 @@ export default function Home() {
             fitnessGoal: userGoals?.fitnessGoal,
             targetWeight: userGoals?.targetWeight
           });
+
+          // Store the user's weight goal
+          if (userGoals?.fitnessGoal) {
+            setWeightGoal(userGoals.fitnessGoal);
+          }
 
           console.log('📋 User profile data:', {
             daily_calorie_target: profile.daily_calorie_target,
@@ -637,71 +643,92 @@ export default function Home() {
   };
 
   // Update the weight lost card render function
-  const renderWeightLostCard = () => (
-    <GradientBorderCard>
-      <View style={styles.burnContainer}>
-        <Text style={styles.burnTitle}>
-          {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
-        </Text>
-        <View style={[
-          styles.burnBarBackground,
-          {
-            backgroundColor: weightLost >= 0
-              ? 'rgba(0, 100, 0, 0.2)'  // subdued green for weight loss
-              : 'rgba(139, 0, 0, 0.2)'  // subdued red for weight gain
-          }
-        ]}>
-          {weightLost >= 0 ? (
-            // Weight loss (positive) - use green gradient
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={['#006400', '#006400', '#00FF00']} // green gradient
-              style={[
-                styles.burnBarFill,
-                {
-                  width: `${Math.min(
-                    (Math.abs(weightLost) / (startingWeight && targetWeight && startingWeight > targetWeight
-                      ? startingWeight - targetWeight
-                      : 10)) * 100,
-                    100
-                  )}%`
-                }
-              ]}
-            />
-          ) : (
-            // Weight gain (negative) - use red gradient
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={['#8B0000', '#8B0000', '#FF0000']} // red gradient
-              style={[
-                styles.burnBarFill,
-                {
-                  width: `${Math.min(
-                    (Math.abs(weightLost) / 10) * 100, // use a default of 10kg for the scale if no target
-                    100
-                  )}%`
-                }
-              ]}
-            />
-          )}
-        </View>
-        <View style={styles.weightLabelsContainer}>
-          <Text style={styles.weightLabel}>{startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : '--')} kg</Text>
-          <Text style={[
-            styles.burnDetails,
-            weightLost < 0 && styles.burnDetailsGain
-          ]}>
-            {weightLost >= 0
-              ? `${Math.abs(weightLost)} Kilograms Lost!`
-              : `${Math.abs(weightLost)} Kilograms Gained!`}
+  const renderWeightLostCard = () => {
+    // Check if the user's goal is to gain weight
+    const isGainGoal = weightGoal.startsWith('gain');
+
+    // Determine if the weight change aligns with the goal
+    const isAlignedWithGoal = (isGainGoal && weightLost < 0) || (!isGainGoal && weightLost >= 0);
+
+    // Set background colors based on goal
+    const lossBackgroundColor = isGainGoal ? 'rgba(139, 0, 0, 0.2)' : 'rgba(0, 100, 0, 0.2)';
+    const gainBackgroundColor = isGainGoal ? 'rgba(0, 100, 0, 0.2)' : 'rgba(139, 0, 0, 0.2)';
+
+    // Set gradient colors based on goal
+    const lossGradientColors = isGainGoal
+      ? ['#8B0000', '#8B0000', '#FF0000'] as const
+      : ['#006400', '#006400', '#00FF00'] as const;
+
+    const gainGradientColors = isGainGoal
+      ? ['#006400', '#006400', '#00FF00'] as const
+      : ['#8B0000', '#8B0000', '#FF0000'] as const;
+
+    return (
+      <GradientBorderCard>
+        <View style={styles.burnContainer}>
+          <Text style={styles.burnTitle}>
+            {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
           </Text>
-          <Text style={styles.weightLabel}>{targetWeight ? `${targetWeight} kg` : '---'}</Text>
+          <View style={[
+            styles.burnBarBackground,
+            {
+              backgroundColor: weightLost >= 0
+                ? lossBackgroundColor  // For weight loss
+                : gainBackgroundColor  // For weight gain
+            }
+          ]}>
+            {weightLost >= 0 ? (
+              // Weight loss - use appropriate gradient based on goal
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={lossGradientColors}
+                style={[
+                  styles.burnBarFill,
+                  {
+                    width: `${Math.min(
+                      (Math.abs(weightLost) / (startingWeight && targetWeight && startingWeight > targetWeight
+                        ? startingWeight - targetWeight
+                        : 10)) * 100,
+                      100
+                    )}%`
+                  }
+                ]}
+              />
+            ) : (
+              // Weight gain - use appropriate gradient based on goal
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={gainGradientColors}
+                style={[
+                  styles.burnBarFill,
+                  {
+                    width: `${Math.min(
+                      (Math.abs(weightLost) / 10) * 100, // use a default of 10kg for the scale if no target
+                      100
+                    )}%`
+                  }
+                ]}
+              />
+            )}
+          </View>
+          <View style={styles.weightLabelsContainer}>
+            <Text style={styles.weightLabel}>{startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : '--')} kg</Text>
+            <Text style={[
+              styles.burnDetails,
+              !isAlignedWithGoal && styles.burnDetailsGain // Apply red style if not aligned with goal
+            ]}>
+              {weightLost >= 0
+                ? `${Math.abs(weightLost)} Kilograms Lost!`
+                : `${Math.abs(weightLost)} Kilograms Gained!`}
+            </Text>
+            <Text style={styles.weightLabel}>{targetWeight ? `${targetWeight} kg` : '---'}</Text>
+          </View>
         </View>
-      </View>
-    </GradientBorderCard>
-  );
+      </GradientBorderCard>
+    );
+  };
 
   // Add a modal for entering new weight
   const renderWeightModal = () => (

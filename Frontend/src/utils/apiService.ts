@@ -154,8 +154,8 @@ class ApiService {
             forceRefresh = false
         } = options;
 
-        // Ensure the token manager is initialized
-        await tokenManager.initialize();
+        // Start token initialization in parallel with other operations
+        const tokenInitPromise = tokenManager.initialize();
 
         // Prepare the full config
         const fullConfig: AxiosRequestConfig = {
@@ -164,11 +164,12 @@ class ApiService {
             ...config
         };
 
-        // Check cache if enabled and not forcing refresh
+        // Check cache first (before waiting for token) if enabled and not forcing refresh
+        let cachedData = null;
         if (useCache && !forceRefresh && isCacheable(fullConfig)) {
             const cacheKey = generateCacheKey(fullConfig);
             const cache = getCache(fullConfig);
-            const cachedData = cache.get(cacheKey);
+            cachedData = cache.get(cacheKey);
 
             if (cachedData) {
                 console.log(`Using cached response for ${fullConfig.url}`);
@@ -177,6 +178,9 @@ class ApiService {
         }
 
         try {
+            // Ensure token manager is initialized
+            await tokenInitPromise;
+
             // Get the token
             const token = await tokenManager.getToken(serviceType);
 
@@ -189,11 +193,15 @@ class ApiService {
             // Make the request with retry logic
             const response = await makeRequestWithRetry<T>(() => axios(fullConfig));
 
-            // Cache the response if applicable
+            // Cache the response if applicable (do this in the background)
             if (useCache && isCacheable(fullConfig)) {
                 const cacheKey = generateCacheKey(fullConfig);
                 const cache = getCache(fullConfig);
-                cache.set(cacheKey, response.data);
+
+                // Use setTimeout to make caching non-blocking
+                setTimeout(() => {
+                    cache.set(cacheKey, response.data);
+                }, 0);
             }
 
             return response.data;

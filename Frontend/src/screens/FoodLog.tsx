@@ -26,7 +26,7 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileByFirebaseUid, getUserGoals } from '../utils/database';
+import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileByFirebaseUid, getUserGoals } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -120,6 +120,7 @@ interface Exercise {
 // Add interface for route params
 type FoodLogRouteParams = {
     refresh?: number;
+    mealIdFilter?: number;
 };
 
 const DiaryScreen: React.FC = () => {
@@ -139,6 +140,8 @@ const DiaryScreen: React.FC = () => {
     const [profileLoading, setProfileLoading] = useState(true);
     const [userStreak, setUserStreak] = useState(0);
     const [userProfile, setUserProfile] = useState<any>(null);
+    const [mealIdFilter, setMealIdFilter] = useState<number | null>(null);
+    const [isFilteredView, setIsFilteredView] = useState(false);
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -155,6 +158,16 @@ const DiaryScreen: React.FC = () => {
         const params = route.params as FoodLogRouteParams;
         if (params?.refresh) {
             console.log('Detected refresh parameter in route.params:', params.refresh);
+
+            // Check if we have a meal ID filter
+            if (params?.mealIdFilter) {
+                console.log('Filtering by meal ID:', params.mealIdFilter);
+                setMealIdFilter(params.mealIdFilter);
+                setIsFilteredView(true);
+            } else {
+                setMealIdFilter(null);
+                setIsFilteredView(false);
+            }
 
             // Use a timer to ensure SQLite has time to complete its operations
             // before we trigger a refresh
@@ -352,8 +365,18 @@ const DiaryScreen: React.FC = () => {
                 // Try to get data from local SQLite database
                 console.log('Fetching from local SQLite database for date:', formattedDate);
                 try {
-                    const localData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
-                    console.log('Local meal data found:', localData.length, 'entries');
+                    let localData;
+
+                    // Check if we're filtering by meal ID
+                    if (mealIdFilter) {
+                        console.log('Filtering by meal ID:', mealIdFilter);
+                        localData = await getFoodLogsByMealId(mealIdFilter) as FoodLogEntry[];
+                        console.log('Found', localData.length, 'items with meal ID:', mealIdFilter);
+                    } else {
+                        // Normal date-based fetch
+                        localData = await getFoodLogsByDate(formattedDate) as FoodLogEntry[];
+                        console.log('Local meal data found:', localData.length, 'entries');
+                    }
 
                     // Debug: Print all found entries
                     if (localData && localData.length > 0) {
@@ -404,7 +427,7 @@ const DiaryScreen: React.FC = () => {
         };
 
         fetchMeals();
-    }, [currentDate, refreshTrigger]); // Re-run when date changes or refresh is triggered
+    }, [currentDate, refreshTrigger, mealIdFilter]); // Re-run when date changes, refresh is triggered, or meal filter changes
 
     useEffect(() => {
         // This useEffect is now simplified since we handle meal type initialization elsewhere
@@ -707,6 +730,12 @@ const DiaryScreen: React.FC = () => {
         macroGoalItem: ViewStyle;
         macroGoalValue: TextStyle;
         macroGoalLabel: TextStyle;
+
+        // Filter banner styles
+        filterBanner: ViewStyle;
+        filterBannerGradient: ViewStyle;
+        filterBannerContent: ViewStyle;
+        filterBannerText: TextStyle;
     };
 
     const styles = StyleSheet.create({
@@ -1219,6 +1248,28 @@ const DiaryScreen: React.FC = () => {
             color: '#AAAAAA',
             fontSize: 12,
             marginTop: 2,
+        },
+
+        // Filter banner styles
+        filterBanner: {
+            marginBottom: 10,
+            borderRadius: 10,
+            padding: 10,
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        },
+        filterBannerGradient: {
+            borderRadius: 10,
+            padding: 5,
+        },
+        filterBannerContent: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        filterBannerText: {
+            color: WHITE,
+            fontSize: 14,
+            fontWeight: '600',
         },
     });
 
@@ -1860,6 +1911,38 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
         };
     };
 
+    // Render filter banner when viewing filtered items
+    const renderFilterBanner = () => {
+        if (!isFilteredView) return null;
+
+        return (
+            <TouchableOpacity
+                style={styles.filterBanner}
+                onPress={() => {
+                    // Clear filter and refresh
+                    setMealIdFilter(null);
+                    setIsFilteredView(false);
+                    refreshMealData();
+                }}
+            >
+                <LinearGradient
+                    colors={["rgba(90, 96, 234, 0.2)", "rgba(255, 0, 245, 0.2)"]}
+                    style={styles.filterBannerGradient}
+                >
+                    <View style={styles.filterBannerContent}>
+                        <Ionicons name="filter" size={20} color="#AA00FF" />
+                        <Text style={styles.filterBannerText}>
+                            Viewing items from the same meal
+                        </Text>
+                        <TouchableOpacity>
+                            <Ionicons name="close-circle" size={20} color="#AA00FF" />
+                        </TouchableOpacity>
+                    </View>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    };
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView style={containerStyle}>
@@ -1936,6 +2019,9 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                     activeOffsetX={[-20, 20]} // Decreased horizontal threshold to make it more responsive
                 >
                     <Animated.View style={[styles.animatedContent, { transform: [{ translateX: swipeAnim }, { scale: scaleInterpolation }], opacity: opacityInterpolation }]}>
+                        {/* Filter Banner */}
+                        {renderFilterBanner()}
+
                         <ScrollView
                             ref={scrollRef}
                             contentContainerStyle={styles.scrollInner}

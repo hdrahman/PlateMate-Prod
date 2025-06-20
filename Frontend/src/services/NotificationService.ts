@@ -166,6 +166,18 @@ class NotificationService {
             if (errors.length > 0) {
                 console.warn(`Completed scheduling with errors in: ${errors.join(', ')}`);
             }
+
+            // Schedule a daily refresh of all notifications to maintain correct scheduling patterns
+            const midnight = new Date();
+            midnight.setHours(0, 0, 0, 0);
+            midnight.setDate(midnight.getDate() + 1);
+
+            const secondsUntilMidnight = Math.floor((midnight.getTime() - new Date().getTime()) / 1000);
+
+            setTimeout(() => {
+                this.scheduleAllNotifications();
+            }, secondsUntilMidnight * 1000);
+
         } catch (error) {
             console.error('Error scheduling notifications:', error);
             throw error;
@@ -311,49 +323,115 @@ class NotificationService {
             }
         }
 
-        await this.showDebugNotification(`Setting up water reminders with frequency: ${frequency} hours`);
-
         // For water reminders with exact frequency
         try {
             // Get current time
             const now = new Date();
 
-            // Calculate the first reminder time
-            // We want to start from the current hour and find the next reminder time
-            const currentHour = now.getHours();
-            const currentMinute = now.getMinutes();
+            // Calculate the first reminder time based on frequency
+            // We want to start from the current hour and find the next valid reminder time
+            let currentHour = now.getHours();
 
-            // Calculate the next reminder time based on the current time
-            let nextReminderHour = currentHour;
-            let nextReminderMinute = 0;
-
-            // If we're already past the minute mark for this hour, move to the next hour
-            if (currentMinute > 0) {
-                nextReminderHour += 1;
-            }
-
-            // Adjust to match frequency pattern (e.g., for 2-hour frequency: 8, 10, 12, 14, etc.)
-            // Find the next hour that's divisible by frequency when counting from startHour
-            nextReminderHour = startHour + (Math.ceil((nextReminderHour - startHour) / frequency) * frequency);
-
-            // Create the first scheduled time
-            let scheduledTime = new Date();
-            scheduledTime.setHours(nextReminderHour, nextReminderMinute, 0, 0);
-
-            // If this time has already passed today or is outside our range, adjust to tomorrow
-            if (scheduledTime <= now || nextReminderHour >= endHour) {
-                scheduledTime.setDate(scheduledTime.getDate() + 1);
-                scheduledTime.setHours(startHour, 0, 0, 0);
-                await this.showDebugNotification(`First water reminder scheduled for tomorrow at ${startHour}:00`);
+            // Find the next hour that follows the frequency pattern from startHour
+            // For example, with 2-hour frequency and startHour of 7, valid hours would be: 7, 9, 11, 13, 15, 17, 19, 21
+            const hoursSinceStart = currentHour - startHour;
+            const nextValidHourOffset = frequency - (hoursSinceStart % frequency);
+            if (nextValidHourOffset === frequency) {
+                // If we're exactly on a valid hour but have passed the minutes, we need to go to the next frequency interval
+                if (now.getMinutes() > 0) {
+                    currentHour += frequency;
+                }
             } else {
-                await this.showDebugNotification(`First water reminder scheduled for today at ${nextReminderHour}:00`);
+                // Otherwise, go to the next valid hour based on frequency
+                currentHour += nextValidHourOffset;
             }
 
-            // Calculate seconds from now for the first notification
-            const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
+            // If the calculated hour is outside our range, adjust to the next day's start
+            if (currentHour >= endHour) {
+                const tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(startHour, 0, 0, 0);
 
-            // Schedule the first notification
-            const id = await Notifications.scheduleNotificationAsync({
+                // Schedule for tomorrow at startHour
+                const secondsUntilTomorrow = Math.floor((tomorrow.getTime() - now.getTime()) / 1000);
+
+                const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: '💧 Stay Hydrated!',
+                        body: `Time for a glass of water (${frequency}-hour reminder)`,
+                        data: { type: 'water_reminder', frequency },
+                        sound: true,
+                    },
+                    trigger: {
+                        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                        seconds: secondsUntilTomorrow,
+                        repeats: false
+                    },
+                });
+
+                await this.saveScheduledNotification({
+                    id,
+                    type: 'water',
+                    title: 'Water Reminder',
+                    body: 'Stay hydrated',
+                    scheduledTime: `${startHour}:00 (tomorrow)`,
+                    repeats: false,
+                    enabled: true,
+                    data: { frequency }
+                });
+
+                console.log(`First water reminder scheduled for tomorrow at ${startHour}:00`);
+                return;
+            }
+
+            // Schedule notifications for each valid hour today
+            for (let hour = currentHour; hour < endHour; hour += frequency) {
+                if (hour < startHour) continue; // Skip if before start hour
+
+                const reminderTime = new Date(now);
+                reminderTime.setHours(hour, 0, 0, 0);
+
+                // Skip if this time has already passed
+                if (reminderTime <= now) continue;
+
+                const secondsFromNow = Math.floor((reminderTime.getTime() - now.getTime()) / 1000);
+
+                const id = await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: '💧 Stay Hydrated!',
+                        body: `Time for a glass of water (${frequency}-hour reminder)`,
+                        data: { type: 'water_reminder', frequency },
+                        sound: true,
+                    },
+                    trigger: {
+                        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                        seconds: secondsFromNow,
+                        repeats: false // Set to false to prevent automatic repetition
+                    },
+                });
+
+                await this.saveScheduledNotification({
+                    id,
+                    type: 'water',
+                    title: 'Water Reminder',
+                    body: 'Stay hydrated',
+                    scheduledTime: `${hour}:00`,
+                    repeats: false,
+                    enabled: true,
+                    data: { frequency }
+                });
+
+                console.log(`Water reminder scheduled for today at ${hour}:00`);
+            }
+
+            // Schedule first reminder for tomorrow to ensure daily continuity
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(startHour, 0, 0, 0);
+
+            const secondsUntilTomorrow = Math.floor((tomorrow.getTime() - now.getTime()) / 1000);
+
+            const tomorrowId = await Notifications.scheduleNotificationAsync({
                 content: {
                     title: '💧 Stay Hydrated!',
                     body: `Time for a glass of water (${frequency}-hour reminder)`,
@@ -362,71 +440,21 @@ class NotificationService {
                 },
                 trigger: {
                     type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                    seconds: secondsFromNow,
-                    repeats: true
+                    seconds: secondsUntilTomorrow,
+                    repeats: false
                 },
             });
 
             await this.saveScheduledNotification({
-                id,
+                id: tomorrowId,
                 type: 'water',
                 title: 'Water Reminder',
                 body: 'Stay hydrated',
-                scheduledTime: `${scheduledTime.getHours()}:00`,
-                repeats: true,
+                scheduledTime: `${startHour}:00 (tomorrow)`,
+                repeats: false,
                 enabled: true,
-                data: { frequency, firstReminder: true }
+                data: { frequency }
             });
-
-            console.log(`Water reminder scheduled to start at ${scheduledTime.toLocaleTimeString()} and repeat every 24 hours`);
-
-            // Schedule additional reminders for the same day
-            // We need to do this because each notification can only repeat at 24-hour intervals
-            let currentScheduleHour = scheduledTime.getHours();
-
-            for (let i = 1; i < Math.floor((endHour - startHour) / frequency); i++) {
-                const nextHour = currentScheduleHour + frequency;
-
-                // Only schedule if within the day's range
-                if (nextHour < endHour) {
-                    const additionalTime = new Date(scheduledTime);
-                    additionalTime.setHours(nextHour, 0, 0, 0);
-
-                    // If this time is still today and in the future
-                    if (additionalTime > now && additionalTime.getDate() === now.getDate()) {
-                        const additionalSeconds = Math.floor((additionalTime.getTime() - now.getTime()) / 1000);
-
-                        const additionalId = await Notifications.scheduleNotificationAsync({
-                            content: {
-                                title: '💧 Stay Hydrated!',
-                                body: `Time for a glass of water (${frequency}-hour reminder)`,
-                                data: { type: 'water_reminder', frequency },
-                                sound: true,
-                            },
-                            trigger: {
-                                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                                seconds: additionalSeconds,
-                                repeats: true
-                            },
-                        });
-
-                        await this.saveScheduledNotification({
-                            id: additionalId,
-                            type: 'water',
-                            title: 'Water Reminder',
-                            body: 'Stay hydrated',
-                            scheduledTime: `${nextHour}:00`,
-                            repeats: true,
-                            enabled: true,
-                            data: { frequency }
-                        });
-
-                        await this.showDebugNotification(`Additional water reminder scheduled at ${nextHour}:00`);
-                    }
-
-                    currentScheduleHour = nextHour;
-                }
-            }
 
             // Log all scheduled notifications for debugging
             const scheduledNotifications = await this.getScheduledNotifications();
@@ -568,6 +596,18 @@ class NotificationService {
             await AsyncStorage.setItem(this.SCHEDULED_NOTIFICATIONS_KEY, JSON.stringify(updatedNotifications));
         } catch (error) {
             console.error('Error canceling notification:', error);
+        }
+    }
+
+    // Method to reschedule notifications when settings change
+    async rescheduleNotifications(): Promise<void> {
+        try {
+            console.log('Rescheduling notifications due to settings change');
+            await this.cancelAllNotifications();
+            await this.scheduleAllNotifications();
+        } catch (error) {
+            console.error('Error rescheduling notifications:', error);
+            throw error;
         }
     }
 

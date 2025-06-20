@@ -16,6 +16,14 @@ import NotificationsScreen from '../screens/Notifications';
 import DataSharing from '../screens/DataSharing';
 import PrivacyPolicy from '../screens/PrivacyPolicy';
 import DebugOnboarding from '../components/DebugOnboarding';
+import FoodLog from '../screens/FoodLog';
+import FoodDetail from '../screens/FoodDetail';
+import Chatbot from '../screens/Chatbot';
+import ImageCapture from '../screens/ImageCapture';
+import Camera from '../screens/Camera';
+import BarcodeScanner from '../screens/BarcodeScanner';
+import Manual from '../screens/Manual';
+import MealGallery from '../screens/MealGallery';
 // Import other screens as needed - these would be your existing screens
 // import HomeScreen from '../screens/HomeScreen';
 // import MealLogScreen from '../screens/MealLogScreen';
@@ -35,6 +43,14 @@ type RootStackParamList = {
     DataSharing: undefined;
     PrivacyPolicy: undefined;
     DebugOnboarding: undefined;
+    FoodLog: { refresh?: number; mealIdFilter?: number };
+    FoodDetail: { foodId: number };
+    Chatbot: undefined;
+    ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
+    Camera: undefined;
+    BarcodeScanner: undefined;
+    Manual: { mealType: string; sourcePage?: string };
+    MealGallery: undefined;
     // Add other screens as needed
 };
 
@@ -105,6 +121,14 @@ const AppNavigator = () => {
                 <Stack.Screen name="DataSharing" component={DataSharing} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
                 <Stack.Screen name="DebugOnboarding" component={DebugOnboarding} />
+                <Stack.Screen name="FoodLog" component={FoodLog} />
+                <Stack.Screen name="FoodDetail" component={FoodDetail} />
+                <Stack.Screen name="Chatbot" component={Chatbot} />
+                <Stack.Screen name="ImageCapture" component={ImageCapture} />
+                <Stack.Screen name="Camera" component={Camera} />
+                <Stack.Screen name="BarcodeScanner" component={BarcodeScanner} />
+                <Stack.Screen name="Manual" component={Manual} />
+                <Stack.Screen name="MealGallery" component={MealGallery} />
                 {/* Add your other screens here */}
             </Stack.Navigator>
         </NavigationContainer>

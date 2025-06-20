@@ -19,13 +19,18 @@ from .connection_pool import get_http_client, cache_response, request_with_retry
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Log module initialization
+logger.info("Initializing FatSecret API module")
+
 # FatSecret API credentials
 FATSECRET_CLIENT_ID = os.environ.get("FATSECRET_CLIENT_ID", "")
 FATSECRET_CLIENT_SECRET = os.environ.get("FATSECRET_CLIENT_SECRET", "")
 
+# Log credential status
+logger.info(f"FatSecret API credentials loaded: CLIENT_ID present: {bool(FATSECRET_CLIENT_ID)}, CLIENT_SECRET present: {bool(FATSECRET_CLIENT_SECRET)}")
+
 # FatSecret API endpoints
 FATSECRET_API_URL = "https://platform.fatsecret.com/rest/server.api"
-TOKEN_URL = "https://oauth.fatsecret.com/connect/token"
 
 # Cache for OAuth token
 oauth_token = None
@@ -45,9 +50,14 @@ async def get_oauth_token() -> str:
     if oauth_token and token_expiry > current_time + 60:  # 60 second buffer
         return oauth_token
     
-    logger.info("Getting new FatSecret OAuth token")
+    logger.info(f"Getting new FatSecret OAuth token")
     
     try:
+        # Check if credentials are available
+        if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
+            logger.error("FatSecret API credentials are not configured properly")
+            raise ValueError("FatSecret API credentials are missing")
+            
         # Prepare Basic Auth header
         credentials = f"{FATSECRET_CLIENT_ID}:{FATSECRET_CLIENT_SECRET}"
         encoded_credentials = base64.b64encode(credentials.encode()).decode()
@@ -61,10 +71,11 @@ async def get_oauth_token() -> str:
             }
         )
         
-        # Request a new token
+        # Request a new token - use hardcoded URL to avoid variable issues
+        logger.info("Making token request to https://oauth.fatsecret.com/connect/token")
         response = await request_with_retry(
             "POST",
-            TOKEN_URL,
+            "https://oauth.fatsecret.com/connect/token",
             client,
             data={
                 "grant_type": "client_credentials",
@@ -94,44 +105,179 @@ async def search_food(query: str, max_results: int = 50) -> List[Dict[str, Any]]
         max_results: Maximum number of results to return
         
     Returns:
-        List of food items
+        List of food items with actual data (no default values for missing fields)
     """
     try:
-        # Get OAuth token
-        token = await get_oauth_token()
+        # STANDALONE IMPLEMENTATION: Use httpx directly without connection_pool
+        logger.info(f"Starting standalone search for: {query}")
         
-        # Get a client from the connection pool
-        client = await get_http_client(
-            "fatsecret_api",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        
-        # Make the request
-        response = await request_with_retry(
-            "GET",
-            FATSECRET_API_URL,
-            client,
-            params={
-                "method": "foods.search",
-                "search_expression": query,
-                "max_results": max_results,
-                "format": "json"
-            }
-        )
-        
-        data = response.json()
-        
-        # Extract foods from response
-        foods_data = data.get("foods", {}).get("food", [])
-        if not foods_data:
+        # Check credentials
+        if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
+            logger.error("FatSecret API credentials are not configured properly")
             return []
+            
+        # Create a new httpx client for token request
+        async with httpx.AsyncClient(timeout=30.0) as token_client:
+            try:
+                # Prepare Basic Auth header
+                credentials = f"{FATSECRET_CLIENT_ID}:{FATSECRET_CLIENT_SECRET}"
+                encoded_credentials = base64.b64encode(credentials.encode()).decode()
+                
+                # Direct token URL
+                token_url = "https://oauth.fatsecret.com/connect/token"
+                logger.info(f"Making standalone token request to {token_url}")
+                
+                # Request token
+                token_response = await token_client.post(
+                    token_url,
+                    headers={
+                        "Authorization": f"Basic {encoded_credentials}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data={
+                        "grant_type": "client_credentials",
+                        "scope": "basic premier barcode"
+                    }
+                )
+                
+                if token_response.status_code != 200:
+                    logger.error(f"Failed to get token: {token_response.status_code} - {token_response.text}")
+                    return []
+                    
+                token_data = token_response.json()
+                access_token = token_data.get("access_token")
+                
+                if not access_token:
+                    logger.error("No access token in response")
+                    return []
+                    
+                logger.info("Successfully obtained token with standalone request")
+            except Exception as token_error:
+                logger.error(f"Error getting token: {str(token_error)}")
+                return []
         
-        # Ensure foods_data is a list
-        if isinstance(foods_data, dict):
-            foods_data = [foods_data]
+        # Create a new httpx client for search request
+        async with httpx.AsyncClient(timeout=30.0) as search_client:
+            try:
+                # Make the search request with the token
+                api_url = "https://platform.fatsecret.com/rest/server.api"
+                logger.info(f"Searching FatSecret API for: {query} at URL: {api_url}")
+                
+                search_response = await search_client.get(
+                    api_url,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={
+                        "method": "foods.search",
+                        "search_expression": query,
+                        "max_results": max_results,
+                        "format": "json"
+                    }
+                )
+                
+                if search_response.status_code != 200:
+                    logger.error(f"Search request failed: {search_response.status_code} - {search_response.text}")
+                    return []
+                    
+                data = search_response.json()
+                logger.info(f"FatSecret API response status: {search_response.status_code}")
+                
+                # Extract foods from response
+                foods_data = data.get("foods", {}).get("food", [])
+                if not foods_data:
+                    logger.info(f"No foods found for query: {query}")
+                    return []
+                
+                # Ensure foods_data is a list
+                if isinstance(foods_data, dict):
+                    foods_data = [foods_data]
+                
+                logger.info(f"Found {len(foods_data)} foods for query: {query}")
+            except Exception as search_error:
+                logger.error(f"Error making search request: {str(search_error)}")
+                return []
         
-        # Map the response to our format
-        return [map_food_item(food) for food in foods_data]
+        # For search results, we need to fetch detailed information for each food
+        results = []
+        for food_item in foods_data[:max_results]:
+            try:
+                # Extract the food_id
+                food_id = food_item.get("food_id")
+                if not food_id:
+                    continue
+                    
+                # Basic mapping from search results
+                food_data = {
+                    "food_id": food_id,
+                    "food_name": food_item.get("food_name"),
+                    "brand_name": food_item.get("brand_name"),
+                    "food_type": food_item.get("food_type"),
+                    "food_description": food_item.get("food_description", ""),
+                }
+                
+                # Extract nutritional information from food_description
+                description = food_item.get("food_description", "")
+                serving_data = {}
+                
+                if description:
+                    import re
+                    
+                    # Try to extract serving info from formats like "Per 100g - "
+                    serving_match = re.search(r'Per\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', description)
+                    if serving_match:
+                        serving_data["number_of_units"] = serving_match.group(1)
+                        serving_data["serving_description"] = serving_match.group(2)
+                        
+                        # If it's grams, set the metric serving amount
+                        if serving_match.group(2).lower() in ['g', 'gram', 'grams']:
+                            serving_data["metric_serving_amount"] = serving_match.group(1)
+                            serving_data["metric_serving_unit"] = "g"
+                    
+                    # Try to extract calories - format: "Calories: 300kcal"
+                    cal_match = re.search(r'Calories:\s*(\d+(?:\.\d+)?)(?:kcal)?', description)
+                    if cal_match:
+                        serving_data["calories"] = cal_match.group(1)
+                    
+                    # Try to extract fat - format: "Fat: 13.00g"
+                    fat_match = re.search(r'Fat:\s*(\d+(?:\.\d+)?)(?:g)?', description)
+                    if fat_match:
+                        serving_data["fat"] = fat_match.group(1)
+                    
+                    # Try to extract carbs - format: "Carbs: 32.00g"
+                    carbs_match = re.search(r'Carbs:\s*(\d+(?:\.\d+)?)(?:g)?', description)
+                    if carbs_match:
+                        serving_data["carbohydrate"] = carbs_match.group(1)
+                    
+                    # Try to extract protein - format: "Protein: 15.00g"
+                    protein_match = re.search(r'Protein:\s*(\d+(?:\.\d+)?)(?:g)?', description)
+                    if protein_match:
+                        serving_data["protein"] = protein_match.group(1)
+                
+                # Create a food object with servings data structure
+                detailed_food = {
+                    **food_data,
+                    "servings": {
+                        "serving": serving_data
+                    }
+                }
+                
+                # Map to our standard format - no defaults will be added
+                mapped_food = map_food_item(detailed_food)
+                
+                # Log what data we have and what's missing
+                present_fields = [k for k, v in mapped_food.items() if v is not None]
+                missing_fields = [k for k, v in mapped_food.items() if v is None]
+                logger.info(f"Food {mapped_food['food_name']} has data for: {', '.join(present_fields)}")
+                if missing_fields:
+                    logger.info(f"Food {mapped_food['food_name']} is missing: {', '.join(missing_fields)}")
+                
+                results.append(mapped_food)
+                
+            except Exception as e:
+                logger.error(f"Error processing food item {food_item.get('food_id')}: {str(e)}")
+                continue
+        
+        logger.info(f"Successfully mapped {len(results)} food items")
+        return results
     except Exception as e:
         logger.error(f"Error searching FatSecret foods: {str(e)}")
         return []
@@ -236,7 +382,7 @@ def map_food_item(food: Dict[str, Any]) -> Dict[str, Any]:
         food: FatSecret food data
         
     Returns:
-        Mapped food item
+        Mapped food item with actual values (no default values for missing fields)
     """
     # Extract basic food information
     food_id = food.get("food_id", "")
@@ -258,38 +404,119 @@ def map_food_item(food: Dict[str, Any]) -> Dict[str, Any]:
         else:
             serving = serving_data
     
-    # Extract nutritional information
-    calories = float(serving.get("calories", 0) or 0)
-    protein = float(serving.get("protein", 0) or 0)
-    carbs = float(serving.get("carbohydrate", 0) or 0)
-    fat = float(serving.get("fat", 0) or 0)
+    # Extract nutritional information - use None when data is missing
+    # Do not set default values to zero - pass through null values
+    def safe_float(value):
+        """Convert value to float if possible, otherwise return None"""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
     
-    # Calculate healthiness rating
-    healthiness_rating = calculate_healthiness_rating(serving)
+    # Extract values directly without defaults
+    calories = safe_float(serving.get("calories"))
+    proteins = safe_float(serving.get("protein"))
+    carbs = safe_float(serving.get("carbohydrate"))
+    fats = safe_float(serving.get("fat"))
+    fiber = safe_float(serving.get("fiber"))
+    sugar = safe_float(serving.get("sugar"))
+    saturated_fat = safe_float(serving.get("saturated_fat"))
+    polyunsaturated_fat = safe_float(serving.get("polyunsaturated_fat"))
+    monounsaturated_fat = safe_float(serving.get("monounsaturated_fat"))
+    trans_fat = safe_float(serving.get("trans_fat"))
+    cholesterol = safe_float(serving.get("cholesterol"))
+    sodium = safe_float(serving.get("sodium"))
+    potassium = safe_float(serving.get("potassium"))
+    vitamin_a = safe_float(serving.get("vitamin_a"))
+    vitamin_c = safe_float(serving.get("vitamin_c"))
+    calcium = safe_float(serving.get("calcium"))
+    iron = safe_float(serving.get("iron"))
     
-    # Build the response
-    return {
+    # If we don't have nutritional info from serving data, try to extract from food_description
+    food_description = food.get("food_description", "")
+    if food_description and (calories is None or proteins is None or carbs is None or fats is None):
+        import re
+        
+        # Try to extract calories - format: "Calories: 300kcal"
+        if calories is None:
+            cal_match = re.search(r'Calories:\s*(\d+(?:\.\d+)?)(?:kcal)?', food_description)
+            if cal_match:
+                calories = safe_float(cal_match.group(1))
+        
+        # Try to extract protein - format: "Protein: 15.00g"
+        if proteins is None:
+            protein_match = re.search(r'Protein:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
+            if protein_match:
+                proteins = safe_float(protein_match.group(1))
+        
+        # Try to extract carbs - format: "Carbs: 32.00g"
+        if carbs is None:
+            carbs_match = re.search(r'Carbs:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
+            if carbs_match:
+                carbs = safe_float(carbs_match.group(1))
+        
+        # Try to extract fats - format: "Fat: 13.00g"
+        if fats is None:
+            fat_match = re.search(r'Fat:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
+            if fat_match:
+                fats = safe_float(fat_match.group(1))
+    
+    # Extract serving information
+    serving_unit = serving.get("serving_description")
+    serving_qty = safe_float(serving.get("number_of_units"))
+    
+    # Try to get serving weight in grams
+    serving_weight_grams = None
+    if serving.get("metric_serving_amount") and serving.get("metric_serving_unit") == "g":
+        serving_weight_grams = safe_float(serving.get("metric_serving_amount"))
+    
+    # Calculate healthiness rating only if we have enough data
+    healthiness_rating = None
+    if calories is not None and proteins is not None and carbs is not None and fats is not None:
+        healthiness_rating = calculate_healthiness_rating(serving)
+    
+    # Get image URL if available
+    image_url = serving.get("serving_url", "")
+    
+    # Build the response matching the frontend FoodItem interface
+    # but without setting default values
+    result = {
         "food_id": food_id,
         "food_name": food_name,
-        "brand_name": brand_name or None,
+        "brand_name": brand_name,
         "food_type": food_type,
-        "serving_description": serving.get("serving_description", ""),
-        "serving_url": serving.get("serving_url", ""),
-        "metric_serving_amount": serving.get("metric_serving_amount", ""),
-        "metric_serving_unit": serving.get("metric_serving_unit", ""),
         "calories": calories,
-        "protein": protein,
+        "proteins": proteins,
         "carbs": carbs,
-        "fat": fat,
-        "healthiness_rating": healthiness_rating,
-        "fiber": float(serving.get("fiber", 0) or 0),
-        "sugar": float(serving.get("sugar", 0) or 0),
-        "sodium": float(serving.get("sodium", 0) or 0),
-        "potassium": float(serving.get("potassium", 0) or 0),
-        "cholesterol": float(serving.get("cholesterol", 0) or 0),
-        "saturated_fat": float(serving.get("saturated_fat", 0) or 0),
-        "trans_fat": float(serving.get("trans_fat", 0) or 0)
+        "fats": fats,
+        "fiber": fiber,
+        "sugar": sugar,
+        "saturated_fat": saturated_fat,
+        "polyunsaturated_fat": polyunsaturated_fat,
+        "monounsaturated_fat": monounsaturated_fat,
+        "trans_fat": trans_fat,
+        "cholesterol": cholesterol,
+        "sodium": sodium,
+        "potassium": potassium,
+        "vitamin_a": vitamin_a,
+        "vitamin_c": vitamin_c,
+        "calcium": calcium,
+        "iron": iron,
+        "image": image_url,
+        "serving_unit": serving_unit,
+        "serving_weight_grams": serving_weight_grams,
+        "serving_qty": serving_qty,
+        "healthiness_rating": healthiness_rating
     }
+    
+    # Log missing fields to help with debugging
+    missing_fields = [k for k, v in result.items() if v is None]
+    if missing_fields:
+        logger.info(f"Food {food_name} (ID: {food_id}) is missing fields: {', '.join(missing_fields)}")
+        
+    return result
 
 def calculate_healthiness_rating(serving: Dict[str, Any]) -> int:
     """

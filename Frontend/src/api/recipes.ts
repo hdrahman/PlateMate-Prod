@@ -1,6 +1,6 @@
 import apiService from '../utils/apiService';
 import { ServiceTokenType } from '../utils/tokenManager';
-import RecipeCacheService from '../services/RecipeCacheService';
+import { RecipeCacheService } from '../services/RecipeCacheService';
 
 // Recipe API interface
 export interface Recipe {
@@ -39,6 +39,8 @@ export interface Recipe {
     dishTypes?: string[];
     extendedIngredients?: any[];
     nutrition?: any;
+    aggregateLikes?: number;
+    ingredients?: string[];
 }
 
 // Get random recipes
@@ -76,6 +78,49 @@ export const getRandomRecipes = async (count: number = 10): Promise<Recipe[]> =>
 // Search recipes
 export const searchRecipes = async (query: string, number: number = 10, offset: number = 0): Promise<any> => {
     try {
+        // Check cache first for faster response
+        try {
+            const cachedRecipes = await RecipeCacheService.searchCachedRecipes(query, number);
+            if (cachedRecipes.length > 0) {
+                console.log(`Using ${cachedRecipes.length} cached recipes matching "${query}"`);
+
+                // Start a background refresh to update cache with fresh data
+                setTimeout(async () => {
+                    try {
+                        const freshResponse = await apiService.get('/recipes/search', {
+                            query,
+                            number,
+                            offset
+                        }, {
+                            serviceType: ServiceTokenType.FIREBASE_AUTH,
+                            useCache: false // Skip cache check since we're updating the cache
+                        });
+
+                        // Update cache in the background
+                        if (freshResponse.results && Array.isArray(freshResponse.results)) {
+                            await RecipeCacheService.cacheRecipes(freshResponse.results);
+                            console.log(`Updated cache with ${freshResponse.results.length} fresh recipes for "${query}"`);
+                        }
+                    } catch (refreshError) {
+                        console.log('Background cache refresh failed:', refreshError);
+                        // Non-critical error, can be ignored
+                    }
+                }, 0);
+
+                // Return cached results immediately
+                return {
+                    results: cachedRecipes,
+                    totalResults: cachedRecipes.length,
+                    offset: 0,
+                    number: cachedRecipes.length
+                };
+            }
+        } catch (cacheError) {
+            console.log('Cache check failed, continuing with API request:', cacheError);
+            // Continue with API request if cache check fails
+        }
+
+        // Make the API request
         const response = await apiService.get('/recipes/search', {
             query,
             number,
@@ -85,9 +130,17 @@ export const searchRecipes = async (query: string, number: number = 10, offset: 
             useCache: true
         });
 
-        // Cache the recipes for offline use
+        // Cache the recipes in the background for offline use
         if (response.results && Array.isArray(response.results)) {
-            await RecipeCacheService.cacheRecipes(response.results);
+            setTimeout(async () => {
+                try {
+                    await RecipeCacheService.cacheRecipes(response.results);
+                    console.log(`Cached ${response.results.length} recipes for offline use`);
+                } catch (cacheError) {
+                    console.error('Error caching recipes:', cacheError);
+                    // Non-critical error, can be ignored
+                }
+            }, 0);
         }
 
         return response;
@@ -98,7 +151,7 @@ export const searchRecipes = async (query: string, number: number = 10, offset: 
         try {
             const cachedRecipes = await RecipeCacheService.searchCachedRecipes(query, number);
             if (cachedRecipes.length > 0) {
-                console.log(`Retrieved ${cachedRecipes.length} cached recipes matching "${query}"`);
+                console.log(`Retrieved ${cachedRecipes.length} cached recipes matching "${query}" after API failure`);
                 return {
                     results: cachedRecipes,
                     totalResults: cachedRecipes.length,
