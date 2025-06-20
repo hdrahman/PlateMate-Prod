@@ -11,7 +11,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 
 const { width, height } = Dimensions.get('window');
 
@@ -72,10 +71,6 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                                             resizeMode="cover"
                                         />
                                     </View>
-                                    <LinearGradient
-                                        colors={['transparent', 'rgba(0,0,0,0.8)']}
-                                        style={styles.imageOverlay}
-                                    />
                                 </View>
 
                                 {/* Features section at the bottom */}
@@ -175,137 +170,124 @@ const styles = StyleSheet.create({
         marginBottom: 0,
     },
     subtitleText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#8a5cff',
-        letterSpacing: 2,
+        fontSize: 12,
+        color: '#fff',
+        fontWeight: '600',
+        letterSpacing: 1.5,
+        opacity: 0.7,
+        textTransform: 'uppercase',
+        marginBottom: 5,
+        marginTop: 40,
     },
     mainContent: {
         flex: 1,
-        justifyContent: 'flex-start',
+        justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 0,
     },
     textContainer: {
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 30,
     },
     titleText: {
-        fontSize: 36,
+        fontSize: 32,
         fontWeight: '700',
         color: '#fff',
         textAlign: 'center',
         letterSpacing: 0.5,
     },
     titleAccent: {
-        fontSize: 40,
-        fontWeight: '800',
-        marginBottom: 8,
-        color: '#fff',
+        fontSize: 32,
+        fontWeight: '700',
+        color: '#5c00dd',
         textAlign: 'center',
+        marginBottom: 8,
     },
     titleUnderline: {
-        height: 4,
-        width: 120,
-        borderRadius: 2,
+        height: 3,
+        width: 60,
+        borderRadius: 4,
     },
-    // New styles for the combined card
     imageCardContainer: {
         width: width * 0.9,
-        height: width * 1.25,
-        borderRadius: 25,
+        alignSelf: 'center',
+        borderRadius: 18,
         overflow: 'hidden',
         shadowColor: "#5c00dd",
         shadowOffset: {
             width: 0,
-            height: 12,
+            height: 8,
         },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
-        elevation: 20,
-        marginTop: 0,
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 15,
     },
     cardBorder: {
+        borderRadius: 18,
+        padding: 2.5,
         width: '100%',
-        height: '100%',
-        borderRadius: 25,
-        padding: 3,
-        overflow: 'hidden',
     },
     cardInnerContainer: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 22,
+        backgroundColor: 'rgba(15, 15, 15, 0.95)',
+        borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: '#000',
     },
     imageSection: {
-        flex: 1,
+        width: '100%',
+        height: height * 0.35,
         position: 'relative',
-        overflow: 'hidden',
     },
     imageWrapper: {
         width: '100%',
         height: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
+        overflow: 'hidden',
     },
     image: {
         width: '100%',
-        height: '130%',
-        marginTop: 0,
-    },
-    imageOverlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 120,
+        height: '100%',
     },
     featuresSection: {
-        backgroundColor: 'rgba(18, 18, 18, 0.95)',
-        padding: 16,
+        padding: 20,
     },
     featuresTitle: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 18,
         color: '#fff',
-        marginBottom: 10,
-        textAlign: 'center',
+        fontWeight: '600',
+        marginBottom: 15,
     },
     featuresList: {
-        marginTop: 5,
+        paddingHorizontal: 5,
     },
     featureRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 14,
     },
     featureIconBg: {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        alignItems: 'center',
+        backgroundColor: 'rgba(15, 15, 15, 0.8)',
         justifyContent: 'center',
+        alignItems: 'center',
         marginRight: 12,
     },
     featureText: {
-        fontSize: 15,
-        color: '#fff',
+        fontSize: 14,
+        color: '#eee',
         fontWeight: '500',
+        flex: 1,
     },
     bottomArea: {
         alignItems: 'center',
-        marginTop: 20,
+        paddingBottom: 0,
     },
     nextButton: {
-        width: width * 0.7,
-        height: 54,
-        borderRadius: 27,
+        width: width * 0.5,
+        height: 50,
+        borderRadius: 25,
         overflow: 'hidden',
-        marginBottom: 10,
         shadowColor: "#5c00dd",
         shadowOffset: {
             width: 0,
@@ -314,6 +296,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 10,
+        marginBottom: 20,
     },
     buttonGradient: {
         flexDirection: 'row',
@@ -324,7 +307,7 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#fff',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         letterSpacing: 0.5,
     },

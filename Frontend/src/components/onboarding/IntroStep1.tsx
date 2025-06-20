@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     Dimensions,
     StatusBar,
+    Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,51 @@ interface IntroStep1Props {
 
 const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
     const insets = useSafeAreaInsets();
+
+    // Render a corner with gradient for camera frame overlay
+    const renderCorner = (position) => {
+        return (
+            <View style={[
+                styles.corner,
+                position === 'topLeft' && styles.topLeft,
+                position === 'topRight' && styles.topRight,
+                position === 'bottomRight' && styles.bottomRight,
+                position === 'bottomLeft' && styles.bottomLeft,
+            ]}>
+                {/* Vertical part */}
+                <View style={[
+                    styles.cornerVertical,
+                    position === 'topLeft' && styles.cornerVerticalTopLeft,
+                    position === 'topRight' && styles.cornerVerticalTopRight,
+                    position === 'bottomRight' && styles.cornerVerticalBottomRight,
+                    position === 'bottomLeft' && styles.cornerVerticalBottomLeft,
+                ]}>
+                    <LinearGradient
+                        colors={['#9B00FF', '#FF00F5']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.cornerGradient}
+                    />
+                </View>
+
+                {/* Horizontal part */}
+                <View style={[
+                    styles.cornerHorizontal,
+                    position === 'topLeft' && styles.cornerHorizontalTopLeft,
+                    position === 'topRight' && styles.cornerHorizontalTopRight,
+                    position === 'bottomRight' && styles.cornerHorizontalBottomRight,
+                    position === 'bottomLeft' && styles.cornerHorizontalBottomLeft,
+                ]}>
+                    <LinearGradient
+                        colors={['#9B00FF', '#FF00F5']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.cornerGradient}
+                    />
+                </View>
+            </View>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -63,6 +109,14 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                                     resizeMode="cover"
                                 />
                                 <View style={styles.imageOverlay} />
+
+                                {/* Camera frame overlay - inset from edges */}
+                                <View style={styles.scanFrame}>
+                                    {renderCorner('topLeft')}
+                                    {renderCorner('topRight')}
+                                    {renderCorner('bottomRight')}
+                                    {renderCorner('bottomLeft')}
+                                </View>
                             </View>
                         </LinearGradient>
                     </View>
@@ -176,8 +230,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
     },
     imageOuterContainer: {
-        width: width * 0.85,
-        aspectRatio: 1.2,
+        width: width * 0.8,
+        aspectRatio: 1,
         shadowColor: "#5c00dd",
         shadowOffset: {
             width: 0,
@@ -209,6 +263,83 @@ const styles = StyleSheet.create({
     imageOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.2)', // subtle darkening
+    },
+    // Scanner frame styles - inset from edges
+    scanFrame: {
+        position: 'absolute',
+        top: '10%',
+        left: '10%',
+        right: '10%',
+        bottom: '10%',
+        width: '80%',
+        height: '80%',
+    },
+    corner: {
+        position: 'absolute',
+        width: 30,
+        height: 30,
+    },
+    cornerVertical: {
+        position: 'absolute',
+        width: 3,
+        height: 25,
+    },
+    cornerHorizontal: {
+        position: 'absolute',
+        height: 3,
+        width: 25,
+    },
+    cornerVerticalTopLeft: {
+        top: 0,
+        left: 0,
+    },
+    cornerHorizontalTopLeft: {
+        top: 0,
+        left: 0,
+    },
+    cornerVerticalTopRight: {
+        top: 0,
+        right: 0,
+    },
+    cornerHorizontalTopRight: {
+        top: 0,
+        right: 0,
+    },
+    cornerVerticalBottomRight: {
+        bottom: 0,
+        right: 0,
+    },
+    cornerHorizontalBottomRight: {
+        bottom: 0,
+        right: 0,
+    },
+    cornerVerticalBottomLeft: {
+        bottom: 0,
+        left: 0,
+    },
+    cornerHorizontalBottomLeft: {
+        bottom: 0,
+        left: 0,
+    },
+    cornerGradient: {
+        width: '100%',
+        height: '100%',
+    },
+    topLeft: {
+        top: 0,
+        left: 0,
+    },
+    topRight: {
+        top: 0,
+        right: 0,
+    },
+    bottomRight: {
+        bottom: 0,
+        right: 0,
+    },
+    bottomLeft: {
+        bottom: 0,
+        left: 0,
     },
     textContainer: {
         alignItems: 'center',
@@ -248,34 +379,32 @@ const styles = StyleSheet.create({
     },
     nextButton: {
         width: width * 0.7,
-        height: 54,
-        borderRadius: 27,
+        height: 56,
+        borderRadius: 28,
         overflow: 'hidden',
-        marginBottom: 30,
         shadowColor: "#5c00dd",
         shadowOffset: {
             width: 0,
-            height: 5,
+            height: 6,
         },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.35,
         shadowRadius: 8,
-        elevation: 10,
+        elevation: 8,
     },
     buttonGradient: {
+        flex: 1,
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
-        height: '100%',
+        alignItems: 'center',
     },
     buttonText: {
         color: '#fff',
+        fontWeight: '700',
         fontSize: 18,
-        fontWeight: '600',
-        letterSpacing: 0.5,
+        marginRight: 8,
     },
     buttonIcon: {
-        marginLeft: 8,
+        marginLeft: 4,
     },
 });
 

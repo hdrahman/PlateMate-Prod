@@ -11,6 +11,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { NUTRITION_COLORS } from '../charts/NutritionCharts';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,6 +22,20 @@ interface IntroStep3Props {
 
 const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
     const insets = useSafeAreaInsets();
+
+    // Sample macros data for the overlay - different from IntroStep2
+    const sampleMacros = {
+        protein: 18,
+        carbs: 45,
+        fat: 12,
+        calories: 356
+    };
+
+    // Calculate percentages for the visual representation
+    const total = sampleMacros.protein + sampleMacros.carbs + sampleMacros.fat;
+    const proteinPercentage = (sampleMacros.protein / total) * 100;
+    const carbsPercentage = (sampleMacros.carbs / total) * 100;
+    const fatPercentage = (sampleMacros.fat / total) * 100;
 
     return (
         <View style={styles.container}>
@@ -49,6 +65,78 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                             resizeMode="cover"
                         />
                         <View style={styles.imageOverlay} />
+
+                        {/* Macros Overlay */}
+                        <View style={styles.macrosOverlayContainer}>
+                            <BlurView intensity={80} style={styles.macrosBlurView} tint="dark">
+                                <View style={styles.macrosContent}>
+                                    <View style={styles.macrosHeader}>
+                                        <Text style={styles.macrosTitle}>Scanned Food</Text>
+                                        <View style={styles.macrosBadge}>
+                                            <Text style={styles.macrosBadgeText}>AI Analysis</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={styles.foodNameText}>Grilled Chicken Salad</Text>
+                                    <Text style={styles.caloriesText}>{sampleMacros.calories} calories</Text>
+
+                                    {/* Macro bar visualization */}
+                                    <View style={styles.macroBar}>
+                                        <View
+                                            style={[
+                                                styles.macroBarSegment,
+                                                {
+                                                    backgroundColor: NUTRITION_COLORS.PROTEIN,
+                                                    width: `${proteinPercentage}%`
+                                                }
+                                            ]}
+                                        />
+                                        <View
+                                            style={[
+                                                styles.macroBarSegment,
+                                                {
+                                                    backgroundColor: NUTRITION_COLORS.CARBS,
+                                                    width: `${carbsPercentage}%`
+                                                }
+                                            ]}
+                                        />
+                                        <View
+                                            style={[
+                                                styles.macroBarSegment,
+                                                {
+                                                    backgroundColor: NUTRITION_COLORS.FAT,
+                                                    width: `${fatPercentage}%`
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+
+                                    {/* Macro details */}
+                                    <View style={styles.macroDetailsContainer}>
+                                        <View style={styles.macroDetail}>
+                                            <View style={[styles.macroCircle, { backgroundColor: NUTRITION_COLORS.PROTEIN }]} />
+                                            <View>
+                                                <Text style={styles.macroValue}>{sampleMacros.protein}g</Text>
+                                                <Text style={styles.macroLabel}>Protein</Text>
+                                            </View>
+                                        </View>
+                                        <View style={styles.macroDetail}>
+                                            <View style={[styles.macroCircle, { backgroundColor: NUTRITION_COLORS.CARBS }]} />
+                                            <View>
+                                                <Text style={styles.macroValue}>{sampleMacros.carbs}g</Text>
+                                                <Text style={styles.macroLabel}>Carbs</Text>
+                                            </View>
+                                        </View>
+                                        <View style={styles.macroDetail}>
+                                            <View style={[styles.macroCircle, { backgroundColor: NUTRITION_COLORS.FAT }]} />
+                                            <View>
+                                                <Text style={styles.macroValue}>{sampleMacros.fat}g</Text>
+                                                <Text style={styles.macroLabel}>Fat</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            </BlurView>
+                        </View>
                     </View>
 
                     <View style={styles.textContainer}>
@@ -200,6 +288,98 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.2)',
     },
+    // New styles for macros overlay
+    macrosOverlayContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    macrosBlurView: {
+        width: '90%',
+        borderRadius: 18,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    macrosContent: {
+        width: '100%',
+        padding: 16,
+    },
+    macrosHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    macrosTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    macrosBadge: {
+        backgroundColor: NUTRITION_COLORS.PROTEIN,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    macrosBadgeText: {
+        fontSize: 10,
+        color: '#fff',
+        fontWeight: '700',
+    },
+    foodNameText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    caloriesText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 12,
+    },
+    macroBar: {
+        height: 6,
+        width: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 3,
+        flexDirection: 'row',
+        overflow: 'hidden',
+        marginBottom: 14,
+    },
+    macroBarSegment: {
+        height: '100%',
+    },
+    macroDetailsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+    },
+    macroDetail: {
+        alignItems: 'center',
+    },
+    macroCircle: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        marginBottom: 6,
+    },
+    macroLabel: {
+        fontSize: 10,
+        color: 'rgba(255, 255, 255, 0.7)',
+        textAlign: 'center',
+    },
+    macroValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#fff',
+        textAlign: 'center',
+    },
     textContainer: {
         alignItems: 'center',
         marginBottom: 30,
@@ -248,25 +428,16 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#fff',
         textAlign: 'center',
-        fontWeight: '500',
     },
     bottomContent: {
         alignItems: 'center',
-        marginBottom: 40,
+        paddingVertical: 25,
     },
     startButton: {
-        width: width * 0.8,
-        height: 58,
-        borderRadius: 29,
+        width: width * 0.7,
+        height: 54,
+        borderRadius: 27,
         overflow: 'hidden',
-        shadowColor: "#dd0095",
-        shadowOffset: {
-            width: 0,
-            height: 8,
-        },
-        shadowOpacity: 0.5,
-        shadowRadius: 15,
-        elevation: 15,
     },
     buttonGradient: {
         flexDirection: 'row',
@@ -277,12 +448,12 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#fff',
-        fontSize: 20,
-        fontWeight: '700',
-        letterSpacing: 0.5,
+        fontSize: 18,
+        fontWeight: '600',
+        marginRight: 8,
     },
     buttonIcon: {
-        marginLeft: 10,
+        marginLeft: 8,
     },
 });
 
