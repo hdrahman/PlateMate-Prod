@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,440 +7,424 @@ import {
     TouchableOpacity,
     Dimensions,
     StatusBar,
+    Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 
 const { width, height } = Dimensions.get('window');
-
-// Define nutrition colors
-const NUTRITION_COLORS = {
-    PROTEIN: '#5c00dd',
-    CARBS: '#0074dd',
-    FAT: '#dd0095',
-};
 
 interface IntroStep3Props {
     onNext: () => void;
 }
 
 const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
-    const insets = useSafeAreaInsets();
+    const fadeIn = useRef(new Animated.Value(0)).current;
+    const slideUp = useRef(new Animated.Value(20)).current;
+    const progressWidth = useRef(new Animated.Value(0)).current;
 
-    // Sample macros data for the overlay
-    const sampleMacros = {
-        protein: 25,
-        carbs: 35,
-        fat: 15,
-        calories: 375
-    };
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeIn, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideUp, {
+                toValue: 0,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+        ]).start();
 
-    // Calculate percentages for the visual representation
-    const total = sampleMacros.protein + sampleMacros.carbs + sampleMacros.fat;
-    const proteinPercentage = (sampleMacros.protein / total) * 100;
-    const carbsPercentage = (sampleMacros.carbs / total) * 100;
-    const fatPercentage = (sampleMacros.fat / total) * 100;
+        setTimeout(() => {
+            Animated.timing(progressWidth, {
+                toValue: 1,
+                duration: 1500,
+                useNativeDriver: false,
+            }).start();
+        }, 600);
+    }, []);
+
+    const chartWidth = progressWidth.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0%', '78%'],
+    });
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
-            {/* Background elements */}
             <LinearGradient
-                colors={['#000000', '#0a0a0a', '#111111']}
-                style={styles.backgroundGradient}
+                colors={['#000000', '#0a0a1c', '#1a1a35']}
+                style={styles.background}
             />
 
-            {/* Decorative background elements */}
-            <View style={styles.circlesContainer}>
-                <View style={[styles.circle, styles.circle1]} />
-                <View style={[styles.circle, styles.circle2]} />
-                <View style={[styles.circle, styles.circle3]} />
-            </View>
+            <Animated.View
+                style={[
+                    styles.content,
+                    { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+                ]}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <Text style={styles.tag}>SMART ANALYTICS</Text>
+                    <Text style={styles.title}>Your Health</Text>
+                    <Text style={styles.titleAccent}>Intelligence Hub</Text>
+                    <Text style={styles.subtitle}>
+                        AI-powered insights transform your data into actionable health guidance.
+                    </Text>
+                </View>
 
-            <View style={styles.contentWrapper}>
-                {/* Main content - Removed logo as requested and moved image to top */}
-                <View style={styles.mainContent}>
-                    {/* Food image at the top */}
-                    <View style={styles.topImageContainer}>
+                {/* Dashboard */}
+                <View style={styles.dashboardSection}>
+                    <LinearGradient
+                        colors={['rgba(15,15,30,0.95)', 'rgba(25,25,45,0.9)']}
+                        style={styles.dashboardFrame}
+                    >
                         <Image
-                            source={require('../../../assets/food.png')}
-                            style={styles.topImage}
-                            resizeMode="cover"
+                            source={require('../../../assets/home.png')}
+                            style={styles.dashboardImage}
+                            resizeMode="contain"
                         />
-                        <View style={styles.imageOverlay} />
+                        <View style={styles.liveIndicator}>
+                            <View style={styles.liveDot} />
+                            <Text style={styles.liveText}>LIVE</Text>
+                        </View>
+                    </LinearGradient>
+                </View>
 
-                        {/* Nutrition Facts Overlay */}
-                        <View style={styles.macrosOverlayContainer}>
-                            <BlurView intensity={60} style={styles.macrosBlurView} tint="dark">
-                                <View style={styles.macrosContent}>
-                                    <Text style={styles.macrosTitle}>Nutrition Facts</Text>
-                                    <Text style={styles.caloriesText}>{sampleMacros.calories} calories</Text>
+                {/* Progress */}
+                <View style={styles.progressSection}>
+                    <View style={styles.progressCard}>
+                        <View style={styles.progressHeader}>
+                            <MaterialCommunityIcons name="chart-line" size={14} color="#0074dd" />
+                            <Text style={styles.progressTitle}>Weekly Progress</Text>
+                        </View>
+                        <View style={styles.progressBar}>
+                            <Animated.View style={[styles.progressFill, { width: chartWidth }]}>
+                                <LinearGradient
+                                    colors={['#0074dd', '#5c00dd', '#dd0095']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.progressGradient}
+                                />
+                            </Animated.View>
+                        </View>
+                        <Text style={styles.progressValue}>78% Goal Achievement</Text>
+                    </View>
 
-                                    {/* Macro bar visualization */}
-                                    <View style={styles.macroBar}>
-                                        <View
-                                            style={[
-                                                styles.macroBarSegment,
-                                                {
-                                                    backgroundColor: NUTRITION_COLORS.PROTEIN,
-                                                    width: `${proteinPercentage}%`
-                                                }
-                                            ]}
-                                        />
-                                        <View
-                                            style={[
-                                                styles.macroBarSegment,
-                                                {
-                                                    backgroundColor: NUTRITION_COLORS.CARBS,
-                                                    width: `${carbsPercentage}%`
-                                                }
-                                            ]}
-                                        />
-                                        <View
-                                            style={[
-                                                styles.macroBarSegment,
-                                                {
-                                                    backgroundColor: NUTRITION_COLORS.FAT,
-                                                    width: `${fatPercentage}%`
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-
-                                    {/* Macro details */}
-                                    <View style={styles.macroDetailsContainer}>
-                                        <View style={styles.macroDetail}>
-                                            <View style={[styles.macroIndicator, { backgroundColor: NUTRITION_COLORS.PROTEIN }]} />
-                                            <Text style={styles.macroLabel}>Protein</Text>
-                                            <Text style={styles.macroValue}>{sampleMacros.protein}g</Text>
-                                        </View>
-                                        <View style={styles.macroDetail}>
-                                            <View style={[styles.macroIndicator, { backgroundColor: NUTRITION_COLORS.CARBS }]} />
-                                            <Text style={styles.macroLabel}>Carbs</Text>
-                                            <Text style={styles.macroValue}>{sampleMacros.carbs}g</Text>
-                                        </View>
-                                        <View style={styles.macroDetail}>
-                                            <View style={[styles.macroIndicator, { backgroundColor: NUTRITION_COLORS.FAT }]} />
-                                            <Text style={styles.macroLabel}>Fat</Text>
-                                            <Text style={styles.macroValue}>{sampleMacros.fat}g</Text>
-                                        </View>
-                                    </View>
+                    <View style={styles.statsRow}>
+                        {[
+                            { day: 'M', value: 85, color: '#0074dd' },
+                            { day: 'T', value: 92, color: '#5c00dd' },
+                            { day: 'W', value: 78, color: '#dd0095' }
+                        ].map((stat, index) => (
+                            <View key={index} style={styles.stat}>
+                                <Text style={styles.statDay}>{stat.day}</Text>
+                                <View style={[styles.statBar, { backgroundColor: stat.color + '20' }]}>
+                                    <View
+                                        style={[
+                                            styles.statFill,
+                                            { height: `${stat.value}%`, backgroundColor: stat.color }
+                                        ]}
+                                    />
                                 </View>
-                            </BlurView>
-                        </View>
-                    </View>
-
-                    <View style={styles.textContainer}>
-                        <Text style={styles.welcomeText}>Your Journey Begins</Text>
-                        <LinearGradient
-                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.divider}
-                        />
-                        <Text style={styles.descriptionText}>
-                            Join thousands who've transformed their health with PlateMate's
-                            AI-powered nutrition tracking and personalized insights.
-                        </Text>
-                    </View>
-
-                    <View style={styles.featuresContainer}>
-                        <View style={styles.featureItem}>
-                            <LinearGradient
-                                colors={["rgba(0,116,221,0.2)", "rgba(0,116,221,0.05)"]}
-                                style={styles.featureIconContainer}
-                            >
-                                <Ionicons name="camera-outline" size={20} color="#0074dd" />
-                            </LinearGradient>
-                            <Text style={styles.featureText}>Photo Food Recognition</Text>
-                        </View>
-
-                        <View style={styles.featureItem}>
-                            <LinearGradient
-                                colors={["rgba(92,0,221,0.2)", "rgba(92,0,221,0.05)"]}
-                                style={styles.featureIconContainer}
-                            >
-                                <MaterialCommunityIcons name="chart-timeline-variant" size={20} color="#5c00dd" />
-                            </LinearGradient>
-                            <Text style={styles.featureText}>Health Analytics</Text>
-                        </View>
-
-                        <View style={styles.featureItem}>
-                            <LinearGradient
-                                colors={["rgba(221,0,149,0.2)", "rgba(221,0,149,0.05)"]}
-                                style={styles.featureIconContainer}
-                            >
-                                <Ionicons name="fitness-outline" size={20} color="#dd0095" />
-                            </LinearGradient>
-                            <Text style={styles.featureText}>Fitness Integration</Text>
-                        </View>
+                            </View>
+                        ))}
                     </View>
                 </View>
 
-                {/* Bottom area with button */}
-                <View style={styles.bottomContent}>
-                    <TouchableOpacity
-                        style={styles.startButton}
-                        onPress={onNext}
-                        activeOpacity={0.8}
-                    >
+                {/* AI Insights */}
+                <View style={styles.insightsSection}>
+                    <View style={styles.insightsHeader}>
+                        <MaterialCommunityIcons name="brain" size={16} color="#dd0095" />
+                        <Text style={styles.insightsTitle}>AI Insights</Text>
+                    </View>
+                    <View style={styles.insightsList}>
+                        {[
+                            { icon: 'trending-up', text: 'Protein intake improved 23%', color: '#00dd74' },
+                            { icon: 'flame', text: 'Burned 2,847 calories this week', color: '#dd4400' },
+                        ].map((insight, index) => (
+                            <View key={index} style={styles.insight}>
+                                <View style={[styles.insightIcon, { backgroundColor: insight.color + '15' }]}>
+                                    <Ionicons name={insight.icon} size={12} color={insight.color} />
+                                </View>
+                                <Text style={styles.insightText}>{insight.text}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
+                {/* CTA */}
+                <View style={styles.cta}>
+                    <TouchableOpacity style={styles.button} onPress={onNext}>
                         <LinearGradient
                             colors={["#0074dd", "#5c00dd", "#dd0095"]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.buttonGradient}
                         >
-                            <Text style={styles.buttonText}>Get Started</Text>
-                            <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.buttonIcon} />
+                            <MaterialCommunityIcons name="rocket-launch" size={16} color="#fff" />
+                            <Text style={styles.buttonText}>Begin Your Journey</Text>
+                            <Ionicons name="arrow-forward" size={14} color="#fff" />
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </Animated.View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        width,
+        width: width,
+        height: height,
         backgroundColor: '#000',
     },
-    backgroundGradient: {
+    background: {
         position: 'absolute',
         width: width,
         height: height,
     },
-    circlesContainer: {
-        position: 'absolute',
-        width: width,
-        height: height,
-        overflow: 'hidden',
-    },
-    circle: {
-        position: 'absolute',
-        borderWidth: 1,
-        borderStyle: 'solid',
-    },
-    circle1: {
-        width: width * 1.3,
-        height: width * 1.3,
-        borderRadius: width * 0.65,
-        borderColor: 'rgba(0,116,221,0.1)',
-        top: -width * 0.8,
-        left: -width * 0.15,
-    },
-    circle2: {
-        width: width * 1.2,
-        height: width * 1.2,
-        borderRadius: width * 0.6,
-        borderColor: 'rgba(92,0,221,0.08)',
-        bottom: -width * 0.4,
-        right: -width * 0.3,
-    },
-    circle3: {
-        width: width * 0.8,
-        height: width * 0.8,
-        borderRadius: width * 0.4,
-        borderColor: 'rgba(221,0,149,0.1)',
-        top: height * 0.3,
-        left: -width * 0.4,
-    },
-    contentWrapper: {
+    content: {
         flex: 1,
-        justifyContent: 'space-between',
-    },
-    mainContent: {
-        flex: 1,
-        alignItems: 'center',
-        paddingTop: 30,
         paddingHorizontal: 30,
-    },
-    topImageContainer: {
-        width: width * 0.85,
-        height: width * 0.6,
-        borderRadius: 24,
-        overflow: 'hidden',
-        marginBottom: 30,
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 10,
-        },
-        shadowOpacity: 0.4,
-        shadowRadius: 15,
-        elevation: 15,
-        position: 'relative',
-    },
-    topImage: {
-        width: '100%',
-        height: '100%',
-    },
-    imageOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.2)',
-    },
-    // Nutrition Facts overlay styles
-    macrosOverlayContainer: {
-        position: 'absolute',
-        bottom: 15,
-        left: 15,
-        right: 15,
-        borderRadius: 15,
-        overflow: 'hidden',
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 4.65,
-        elevation: 8,
-    },
-    macrosBlurView: {
-        padding: 15,
-        borderRadius: 15,
-        overflow: 'hidden',
-    },
-    macrosContent: {
-        width: '100%',
-    },
-    macrosTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#fff',
-        marginBottom: 5,
-    },
-    caloriesText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#fff',
-        marginBottom: 10,
-    },
-    macroBar: {
-        height: 8,
-        width: '100%',
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 4,
-        flexDirection: 'row',
-        overflow: 'hidden',
-        marginBottom: 10,
-    },
-    macroBarSegment: {
-        height: '100%',
-    },
-    macroDetailsContainer: {
-        flexDirection: 'row',
+        paddingTop: 60,
+        paddingBottom: 100,
         justifyContent: 'space-between',
-        marginTop: 5,
     },
-    macroDetail: {
-        flexDirection: 'row',
+    header: {
         alignItems: 'center',
-    },
-    macroIndicator: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        marginRight: 4,
-    },
-    macroLabel: {
-        fontSize: 12,
-        color: '#fff',
-        marginRight: 4,
-    },
-    macroValue: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#fff',
-    },
-    textContainer: {
-        alignItems: 'center',
-        marginBottom: 30,
-    },
-    welcomeText: {
-        fontSize: 34,
-        fontWeight: '700',
-        color: '#fff',
-        marginBottom: 12,
-        textAlign: 'center',
-        letterSpacing: 0.5,
-    },
-    divider: {
-        height: 3,
-        width: 60,
-        borderRadius: 1.5,
-        marginBottom: 15,
-    },
-    descriptionText: {
-        fontSize: 16,
-        lineHeight: 24,
-        color: '#ddd',
-        textAlign: 'center',
-        paddingHorizontal: 10,
-    },
-    featuresContainer: {
-        width: '100%',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 10,
-        marginTop: 20,
-    },
-    featureItem: {
-        alignItems: 'center',
-        width: '30%',
-    },
-    featureIconContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
+        flex: 0.2,
         justifyContent: 'center',
+    },
+    tag: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#dd0095',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
         marginBottom: 8,
     },
-    featureText: {
-        fontSize: 13,
+    title: {
+        fontSize: 22,
+        fontWeight: '900',
         color: '#fff',
         textAlign: 'center',
+        marginBottom: 2,
     },
-    bottomContent: {
-        alignItems: 'center',
-        paddingBottom: 40,
-        paddingTop: 20,
+    titleAccent: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#0074dd',
+        textAlign: 'center',
+        marginBottom: 8,
     },
-    startButton: {
-        width: width * 0.7,
-        height: 56,
-        borderRadius: 28,
+    subtitle: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.7)',
+        textAlign: 'center',
+        lineHeight: 16,
+        paddingHorizontal: 10,
+    },
+    dashboardSection: {
+        width: width * 0.8,
+        height: height * 0.18,
+        alignSelf: 'center',
+        flex: 0.25,
+        justifyContent: 'center',
+    },
+    dashboardFrame: {
+        flex: 1,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
         overflow: 'hidden',
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.3,
+        padding: 4,
+    },
+    dashboardImage: {
+        width: '100%',
+        height: '100%',
+    },
+    liveIndicator: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    liveDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#dd0095',
+        marginRight: 4,
+    },
+    liveText: {
+        color: '#dd0095',
+        fontSize: 8,
+        fontWeight: '700',
+    },
+    progressSection: {
+        flex: 0.25,
+        justifyContent: 'center',
+    },
+    progressCard: {
+        backgroundColor: 'rgba(0,116,221,0.08)',
+        padding: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        marginBottom: 12,
+    },
+    progressHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    progressTitle: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 5,
+    },
+    progressBar: {
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2,
+        marginBottom: 8,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    progressGradient: {
+        flex: 1,
+        borderRadius: 2,
+    },
+    progressValue: {
+        color: '#0074dd',
+        fontSize: 10,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 16,
+    },
+    stat: {
+        alignItems: 'center',
+    },
+    statDay: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 9,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    statBar: {
+        width: 12,
+        height: 30,
+        borderRadius: 6,
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    statFill: {
+        width: '100%',
+        borderRadius: 4,
+    },
+    insightsSection: {
+        flex: 0.18,
+        justifyContent: 'center',
+    },
+    insightsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    insightsTitle: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+        marginLeft: 5,
+    },
+    insightsList: {
+        gap: 8,
+    },
+    insight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    insightIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
+    insightText: {
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 10,
+        fontWeight: '500',
+        flex: 1,
+    },
+    cta: {
+        alignItems: 'center',
+        flex: 0.12,
+        justifyContent: 'flex-end',
+    },
+    button: {
+        marginBottom: 12,
+        shadowColor: '#dd0095',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
         shadowRadius: 8,
-        elevation: 10,
+        elevation: 4,
     },
     buttonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
-        height: '100%',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 20,
+        minWidth: width * 0.6,
     },
     buttonText: {
         color: '#fff',
-        fontSize: 18,
+        fontSize: 13,
         fontWeight: '600',
-        letterSpacing: 0.5,
+        marginHorizontal: 8,
     },
-    buttonIcon: {
-        marginLeft: 8,
+    dots: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+    },
+    activeDot: {
+        backgroundColor: '#dd0095',
+        width: 18,
+        borderRadius: 9,
     },
 });
 
-export default IntroStep3;
+export default IntroStep3; 

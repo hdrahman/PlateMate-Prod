@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,11 +7,10 @@ import {
     TouchableOpacity,
     Dimensions,
     StatusBar,
-    ImageStyle,
+    Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,365 +19,430 @@ interface IntroStep2Props {
 }
 
 const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
-    const insets = useSafeAreaInsets();
+    const fadeIn = useRef(new Animated.Value(0)).current;
+    const slideUp = useRef(new Animated.Value(20)).current;
+    const progressWidth = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeIn, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideUp, {
+                toValue: 0,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+        ]).start();
+
+        setTimeout(() => {
+            Animated.timing(progressWidth, {
+                toValue: 1,
+                duration: 1500,
+                useNativeDriver: false,
+            }).start();
+        }, 600);
+    }, []);
+
+    const progressInterpolated = progressWidth.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0%', '85%'],
+    });
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
-            {/* Background elements */}
             <LinearGradient
-                colors={['#000000', '#0c0c0c', '#101010']}
-                style={styles.backgroundGradient}
+                colors={['#000000', '#0a0a18', '#1a1a32']}
+                style={styles.background}
             />
 
-            <View style={styles.decorationSquare1} />
-            <View style={styles.decorationSquare2} />
-
-            <View style={styles.contentWrapper} pointerEvents="box-none">
-                {/* Header with subtitle */}
-                <View style={styles.headerContainer}>
-                    <Text style={styles.subtitleText}>FITNESS TRACKING</Text>
+            <Animated.View
+                style={[
+                    styles.content,
+                    { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+                ]}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <Text style={styles.tag}>FITNESS TRANSFORMATION</Text>
+                    <Text style={styles.title}>
+                        <Text style={styles.titleAccent}>Achieve</Text> Your Dream
+                    </Text>
+                    <Text style={styles.title}>Physique</Text>
                 </View>
 
-                {/* Main content area */}
-                <View style={styles.mainContent}>
-                    <View style={styles.textContainer}>
-                        <Text style={styles.titleText}>Achieve Your</Text>
-                        <Text style={styles.titleAccent}>Fitness Goals</Text>
+                {/* Athlete Section */}
+                <View style={styles.athleteSection}>
+                    <View style={styles.athleteContainer}>
                         <LinearGradient
-                            colors={['rgba(92,0,221,0.8)', 'rgba(221,0,149,0.5)']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.titleUnderline}
-                        />
-                    </View>
-
-                    {/* Combined image and features in one larger card */}
-                    <View style={styles.imageCardContainer}>
-                        <LinearGradient
-                            colors={['rgba(92,0,221,0.8)', 'rgba(0,116,221,0.8)', 'rgba(0,116,221,0.5)']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.cardBorder}
+                            colors={['rgba(0,116,221,0.15)', 'rgba(92,0,221,0.1)', 'rgba(221,0,149,0.05)']}
+                            style={styles.athleteFrame}
                         >
-                            <View style={styles.cardInnerContainer}>
-                                {/* Image section with overlay gradient */}
-                                <View style={styles.contentContainer}>
-                                    {/* Image in background */}
-                                    <View style={styles.imageSection}>
-                                        <View style={styles.imageWrapper}>
-                                            <Image
-                                                source={require('../../../assets/AthleticMale.png')}
-                                                style={styles.image as ImageStyle}
-                                                resizeMode="contain"
-                                            />
-                                        </View>
-                                    </View>
+                            <Image
+                                source={require('../../../assets/AthleticMale.png')}
+                                style={styles.athleteImage}
+                                resizeMode="cover"
+                            />
 
-                                    {/* Gradient overlay that covers everything and darkens toward bottom */}
-                                    <LinearGradient
-                                        colors={[
-                                            'rgba(15, 15, 15, 0)',
-                                            'rgba(15, 15, 15, 0.3)',
-                                            'rgba(15, 15, 15, 0.7)',
-                                            'rgba(15, 15, 15, 0.95)'
-                                        ]}
-                                        locations={[0, 0.4, 0.7, 1]}
-                                        style={styles.overlayGradient}
-                                    />
+                            {/* Achievement badges */}
+                            <View style={styles.badge1}>
+                                <View style={styles.badgeContent}>
+                                    <MaterialCommunityIcons name="medal" size={10} color="#FFD700" />
+                                    <Text style={styles.badgeText}>First Mile</Text>
+                                </View>
+                            </View>
 
-                                    {/* Features section at the bottom */}
-                                    <View style={styles.featuresSection}>
-                                        {/* Features background gradient */}
-                                        <LinearGradient
-                                            colors={[
-                                                'rgba(15, 15, 15, 0)',
-                                                'rgba(15, 15, 15, 0.4)',
-                                                'rgba(15, 15, 15, 0.8)',
-                                                'rgba(15, 15, 15, 0.95)'
-                                            ]}
-                                            locations={[0, 0.2, 0.6, 1]}
-                                            style={styles.featuresBackground}
-                                        />
+                            <View style={styles.badge2}>
+                                <View style={styles.badgeContent}>
+                                    <MaterialCommunityIcons name="food" size={10} color="#0074dd" />
+                                    <Text style={styles.badgeText}>Protein Goal</Text>
+                                </View>
+                            </View>
 
-                                        <View style={styles.featuresContent}>
-                                            <Text style={styles.featuresTitle}>Key Features</Text>
-
-                                            <View style={styles.featuresList}>
-                                                <View style={styles.featureRow}>
-                                                    <View style={styles.featureIconBg}>
-                                                        <Ionicons name="barbell-outline" size={14} color="#5c00dd" />
-                                                    </View>
-                                                    <Text style={styles.featureText}>Personalized workout plans</Text>
-                                                </View>
-
-                                                <View style={styles.featureRow}>
-                                                    <View style={styles.featureIconBg}>
-                                                        <Ionicons name="trending-up-outline" size={14} color="#0074dd" />
-                                                    </View>
-                                                    <Text style={styles.featureText}>Track progress & achievements</Text>
-                                                </View>
-
-                                                <View style={styles.featureRow}>
-                                                    <View style={styles.featureIconBg}>
-                                                        <Ionicons name="sync-outline" size={14} color="#dd0095" />
-                                                    </View>
-                                                    <Text style={styles.featureText}>Sync with nutrition data</Text>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </View>
+                            <View style={styles.badge3}>
+                                <View style={styles.badgeContent}>
+                                    <MaterialCommunityIcons name="trophy" size={10} color="#dd0095" />
+                                    <Text style={styles.badgeText}>Week Streak</Text>
                                 </View>
                             </View>
                         </LinearGradient>
                     </View>
                 </View>
 
-                {/* Bottom navigation area */}
-                <View style={styles.bottomArea}>
-                    <TouchableOpacity
-                        style={styles.nextButton}
-                        onPress={onNext}
-                        activeOpacity={0.8}
-                    >
+                {/* Progress Panel */}
+                <View style={styles.progressSection}>
+                    <View style={styles.progressPanel}>
+                        <View style={styles.progressHeader}>
+                            <MaterialCommunityIcons name="chart-line" size={16} color="#0074dd" />
+                            <Text style={styles.progressTitle}>Your Progress</Text>
+                        </View>
+
+                        <View style={styles.mainProgress}>
+                            <Text style={styles.progressLabel}>Fitness Goal</Text>
+                            <View style={styles.progressBarContainer}>
+                                <Animated.View style={[styles.progressBar, { width: progressInterpolated }]}>
+                                    <LinearGradient
+                                        colors={['#0074dd', '#5c00dd', '#dd0095']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.progressFill}
+                                    />
+                                </Animated.View>
+                            </View>
+                            <Text style={styles.progressValue}>85%</Text>
+                        </View>
+
+                        <View style={styles.metricsGrid}>
+                            {[
+                                { label: 'Calories', value: '2,847', color: '#0074dd' },
+                                { label: 'Weight Lost', value: '15 lbs', color: '#5c00dd' },
+                                { label: 'Muscle', value: '8 lbs', color: '#dd0095' },
+                                { label: 'Streak', value: '42', color: '#00dd74' },
+                            ].map((metric, index) => (
+                                <View key={index} style={styles.metricCard}>
+                                    <View style={[styles.metricIcon, { backgroundColor: metric.color + '15' }]}>
+                                        <View style={[styles.iconDot, { backgroundColor: metric.color }]} />
+                                    </View>
+                                    <Text style={styles.metricValue}>{metric.value}</Text>
+                                    <Text style={styles.metricLabel}>{metric.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                </View>
+
+                {/* Features */}
+                <View style={styles.featuresSection}>
+                    <View style={styles.featuresRow}>
+                        {[
+                            { title: 'Smart Goal', subtitle: 'Setting' },
+                            { title: 'Achievement', subtitle: 'System' },
+                            { title: 'Progress', subtitle: 'Tracking' }
+                        ].map((feature, index) => (
+                            <View key={index} style={styles.featureCard}>
+                                <View style={styles.featureIcon}>
+                                    <View style={[styles.iconDot, {
+                                        backgroundColor: index === 0 ? '#0074dd' : index === 1 ? '#5c00dd' : '#dd0095'
+                                    }]} />
+                                </View>
+                                <Text style={styles.featureTitle}>{feature.title}</Text>
+                                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
+                {/* CTA */}
+                <View style={styles.cta}>
+                    <TouchableOpacity style={styles.button} onPress={onNext}>
                         <LinearGradient
                             colors={["#0074dd", "#5c00dd", "#dd0095"]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.buttonGradient}
                         >
-                            <Text style={styles.buttonText}>Next</Text>
-                            <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.buttonIcon} />
+                            <MaterialCommunityIcons name="dumbbell" size={18} color="#fff" />
+                            <Text style={styles.buttonText}>Transform Now</Text>
+                            <Ionicons name="arrow-forward" size={16} color="#fff" />
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </Animated.View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        width,
+        width: width,
+        height: height,
         backgroundColor: '#000',
-        overflow: 'hidden',
     },
-    backgroundGradient: {
+    background: {
         position: 'absolute',
         width: width,
         height: height,
     },
-    decorationSquare1: {
-        position: 'absolute',
-        width: width * 0.7,
-        height: width * 0.7,
-        transform: [{ rotate: '45deg' }],
-        backgroundColor: 'rgba(0,116,221,0.04)',
-        top: -width * 0.35,
-        left: -width * 0.15,
-    },
-    decorationSquare2: {
-        position: 'absolute',
-        width: width * 0.8,
-        height: width * 0.8,
-        transform: [{ rotate: '30deg' }],
-        backgroundColor: 'rgba(221,0,149,0.05)',
-        bottom: -width * 0.3,
-        right: -width * 0.3,
-    },
-    contentWrapper: {
+    content: {
         flex: 1,
+        paddingHorizontal: 25,
+        paddingTop: 60,
+        paddingBottom: 100,
         justifyContent: 'space-between',
-        paddingTop: 0,
-        paddingBottom: 15,
     },
-    headerContainer: {
+    header: {
         alignItems: 'center',
-        marginTop: -10,
-        marginBottom: 0,
+        marginBottom: 25,
     },
-    subtitleText: {
-        fontSize: 12,
-        color: '#fff',
-        fontWeight: '600',
+    tag: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#0074dd',
         letterSpacing: 1.5,
-        opacity: 0.7,
         textTransform: 'uppercase',
-        marginBottom: 5,
-        marginTop: 15,
+        marginBottom: 12,
     },
-    mainContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 0,
-        marginTop: -30,
-    },
-    textContainer: {
-        alignItems: 'center',
-        marginBottom: 45,
-        marginTop: -50,
-    },
-    titleText: {
-        fontSize: 32,
-        fontWeight: '700',
+    title: {
+        fontSize: 26,
+        fontWeight: '900',
         color: '#fff',
         textAlign: 'center',
-        letterSpacing: 0.5,
+        lineHeight: 30,
     },
     titleAccent: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: '#5c00dd',
-        textAlign: 'center',
-        marginBottom: 8,
+        color: '#dd0095',
     },
-    titleUnderline: {
-        height: 3,
-        width: 60,
-        borderRadius: 4,
-        marginTop: -5,
-    },
-    imageCardContainer: {
-        width: width * 0.9,
-        alignSelf: 'center',
-        borderRadius: 18,
-        overflow: 'hidden',
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 8,
-        },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 15,
-        marginTop: -15,
-    },
-    cardBorder: {
-        borderRadius: 18,
-        padding: 2.5,
-        width: '100%',
-    },
-    cardInnerContainer: {
-        backgroundColor: 'rgba(15, 15, 15, 0.95)',
-        borderRadius: 16,
-        overflow: 'hidden',
-    },
-    contentContainer: {
-        position: 'relative',
-        width: '100%',
-    },
-    imageSection: {
-        width: '100%',
-        height: height * 0.35,
-        position: 'relative',
-        backgroundColor: '#0F0F0F',
-    },
-    imageWrapper: {
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden',
-        justifyContent: 'flex-start',
+    athleteSection: {
         alignItems: 'center',
+        marginBottom: 30,
     },
-    image: {
+    athleteContainer: {
+        position: 'relative',
+        width: 170,
+        height: 240,
+        alignSelf: 'center',
+    },
+    athleteFrame: {
+        flex: 1,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
+    },
+    athleteImage: {
         width: '100%',
         height: '100%',
-        transform: [{ scale: 1.75 }, { translateY: 50 }],
-    } as ImageStyle,
-    overlayGradient: {
+    },
+    badge1: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
+        top: -8,
+        right: -20,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
-    featuresSection: {
-        position: 'relative',
-        zIndex: 2,
-    },
-    featuresBackground: {
+    badge2: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
+        bottom: 90,
+        left: -25,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
-    featuresContent: {
-        padding: 15,
-        position: 'relative',
-        zIndex: 2,
+    badge3: {
+        position: 'absolute',
+        top: 130,
+        right: -22,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
-    featuresTitle: {
-        fontSize: 18,
-        color: '#fff',
-        fontWeight: '600',
-        marginBottom: 10,
-    },
-    featuresList: {
-        paddingHorizontal: 5,
-    },
-    featureRow: {
+    badgeContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
     },
-    featureIconBg: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: 'rgba(15, 15, 15, 0.8)',
-        justifyContent: 'center',
+    badgeText: {
+        color: '#fff',
+        fontSize: 7,
+        fontWeight: '600',
+        marginLeft: 3,
+    },
+    progressSection: {
+        marginBottom: 25,
+    },
+    progressPanel: {
+        backgroundColor: 'rgba(15,15,28,0.95)',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    progressHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 12,
+        marginBottom: 14,
     },
-    featureText: {
+    progressTitle: {
+        color: '#fff',
         fontSize: 14,
-        color: '#eee',
+        fontWeight: '600',
+        marginLeft: 6,
+    },
+    mainProgress: {
+        marginBottom: 16,
+    },
+    progressLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
         fontWeight: '500',
-        flex: 1,
+        marginBottom: 8,
     },
-    bottomArea: {
-        alignItems: 'center',
-        paddingBottom: 0,
-        marginBottom: -10,
-    },
-    nextButton: {
-        width: width * 0.5,
-        height: 50,
-        borderRadius: 25,
+    progressBarContainer: {
+        height: 5,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2.5,
+        marginBottom: 8,
         overflow: 'hidden',
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
+    },
+    progressBar: {
+        height: '100%',
+        borderRadius: 2.5,
+    },
+    progressFill: {
+        flex: 1,
+        borderRadius: 2.5,
+    },
+    progressValue: {
+        color: '#0074dd',
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    metricsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    metricCard: {
+        width: '47%',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.02)',
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    metricIcon: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 5,
+    },
+    iconDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    metricValue: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    metricLabel: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 8,
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    featuresSection: {
+        marginBottom: 25,
+    },
+    featuresRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 6,
+    },
+    featureCard: {
+        flex: 1,
+        alignItems: 'center',
+        marginHorizontal: 3,
+    },
+    featureIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0,116,221,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    featureTitle: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginBottom: 2,
+    },
+    featureSubtitle: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 8,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    cta: {
+        alignItems: 'center',
+    },
+    button: {
+        shadowColor: '#5c00dd',
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 10,
-        marginTop: -45,
-        marginBottom: 80,
+        shadowRadius: 12,
+        elevation: 6,
     },
     buttonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
-        height: '100%',
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 26,
+        minWidth: width * 0.7,
     },
     buttonText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
-        letterSpacing: 0.5,
-    },
-    buttonIcon: {
-        marginLeft: 8,
+        marginHorizontal: 10,
     },
 });
 

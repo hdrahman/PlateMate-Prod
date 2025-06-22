@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,8 +10,7 @@ import {
     Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,391 +19,444 @@ interface IntroStep1Props {
 }
 
 const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
-    const insets = useSafeAreaInsets();
+    const fadeIn = useRef(new Animated.Value(0)).current;
+    const slideUp = useRef(new Animated.Value(20)).current;
+    const scanAnimation = useRef(new Animated.Value(0)).current;
+    const particleOpacity = useRef(new Animated.Value(0)).current;
 
-    // Render a corner with gradient for camera frame overlay
-    const renderCorner = (position) => {
-        return (
-            <View style={[
-                styles.corner,
-                position === 'topLeft' && styles.topLeft,
-                position === 'topRight' && styles.topRight,
-                position === 'bottomRight' && styles.bottomRight,
-                position === 'bottomLeft' && styles.bottomLeft,
-            ]}>
-                {/* Vertical part */}
-                <View style={[
-                    styles.cornerVertical,
-                    position === 'topLeft' && styles.cornerVerticalTopLeft,
-                    position === 'topRight' && styles.cornerVerticalTopRight,
-                    position === 'bottomRight' && styles.cornerVerticalBottomRight,
-                    position === 'bottomLeft' && styles.cornerVerticalBottomLeft,
-                ]}>
-                    <LinearGradient
-                        colors={['#9B00FF', '#FF00F5']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.cornerGradient}
-                    />
-                </View>
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeIn, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideUp, {
+                toValue: 0,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+        ]).start();
 
-                {/* Horizontal part */}
-                <View style={[
-                    styles.cornerHorizontal,
-                    position === 'topLeft' && styles.cornerHorizontalTopLeft,
-                    position === 'topRight' && styles.cornerHorizontalTopRight,
-                    position === 'bottomRight' && styles.cornerHorizontalBottomRight,
-                    position === 'bottomLeft' && styles.cornerHorizontalBottomLeft,
-                ]}>
-                    <LinearGradient
-                        colors={['#9B00FF', '#FF00F5']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.cornerGradient}
-                    />
-                </View>
-            </View>
-        );
-    };
+        setTimeout(() => {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(scanAnimation, {
+                        toValue: 1,
+                        duration: 2000,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(scanAnimation, {
+                        toValue: 0,
+                        duration: 100,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(particleOpacity, {
+                        toValue: 0.8,
+                        duration: 1500,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(particleOpacity, {
+                        toValue: 0.2,
+                        duration: 1500,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        }, 600);
+    }, []);
+
+    const scanY = scanAnimation.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 150],
+    });
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
-            {/* Background gradient with animated overlay */}
             <LinearGradient
-                colors={['#000000', '#0f0f0f', '#121212']}
-                style={styles.backgroundGradient}
+                colors={['#000000', '#0a0a1e', '#1a1a38']}
+                style={styles.background}
             />
 
-            <View style={styles.decorationCircle1} />
-            <View style={styles.decorationCircle2} />
-
-            <View style={styles.contentWrapper} pointerEvents="box-none">
-                {/* App logo at the top */}
-                <View style={styles.logoContainer}>
-                    <View style={styles.logoWrapper}>
-                        <Image
-                            source={require('../../../assets/icon2.png')}
-                            style={styles.logoImage}
-                            resizeMode="contain"
-                        />
-                    </View>
-                    <Text style={styles.logoText}>PlateMate</Text>
+            <Animated.View
+                style={[
+                    styles.content,
+                    { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+                ]}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <Text style={styles.tag}>SMART FOOD RECOGNITION</Text>
+                    <Text style={styles.title}>Instant AI-Powered</Text>
+                    <Text style={styles.titleAccent}>Nutrition Analysis</Text>
+                    <Text style={styles.subtitle}>
+                        Simply snap a photo and get complete nutritional insights in seconds.
+                    </Text>
                 </View>
 
-                {/* Main content area */}
-                <View style={styles.mainContent}>
-                    <View style={styles.imageOuterContainer}>
+                {/* Food Scanner */}
+                <View style={styles.scannerSection}>
+                    <View style={styles.scannerFrame}>
                         <LinearGradient
-                            colors={['rgba(0,116,221,0.8)', 'rgba(92,0,221,0.8)', 'rgba(221,0,149,0.8)']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.imageBorder}
+                            colors={['rgba(0,116,221,0.15)', 'rgba(92,0,221,0.1)', 'rgba(221,0,149,0.05)']}
+                            style={styles.frameGradient}
                         >
-                            <View style={styles.imageContainer}>
-                                <Image
-                                    source={require('../../../assets/food.png')}
-                                    style={styles.image}
-                                    resizeMode="cover"
-                                />
-                                <View style={styles.imageOverlay} />
+                            <Image
+                                source={require('../../../assets/food.png')}
+                                style={styles.foodImage}
+                                resizeMode="cover"
+                            />
 
-                                {/* Camera frame overlay - inset from edges */}
-                                <View style={styles.scanFrame}>
-                                    {renderCorner('topLeft')}
-                                    {renderCorner('topRight')}
-                                    {renderCorner('bottomRight')}
-                                    {renderCorner('bottomLeft')}
-                                </View>
+                            {/* Scanning overlay */}
+                            <Animated.View
+                                style={[
+                                    styles.scanLine,
+                                    { transform: [{ translateY: scanY }] }
+                                ]}
+                            >
+                                <LinearGradient
+                                    colors={['transparent', '#0074dd', 'transparent']}
+                                    style={styles.scanGradient}
+                                />
+                            </Animated.View>
+
+                            {/* Corner indicators */}
+                            <View style={styles.corners}>
+                                <View style={[styles.corner, styles.topLeft]} />
+                                <View style={[styles.corner, styles.topRight]} />
+                                <View style={[styles.corner, styles.bottomLeft]} />
+                                <View style={[styles.corner, styles.bottomRight]} />
+                            </View>
+
+                            {/* Analysis overlay */}
+                            <View style={styles.analysisOverlay}>
+                                <Animated.View
+                                    style={[styles.analysisLabel, { opacity: particleOpacity }]}
+                                >
+                                    <MaterialCommunityIcons name="brain" size={12} color="#0074dd" />
+                                    <Text style={styles.analysisText}>AI Analyzing...</Text>
+                                </Animated.View>
                             </View>
                         </LinearGradient>
                     </View>
+                </View>
 
-                    <View style={styles.textContainer}>
-                        <Text style={styles.titleText}>Discover Food</Text>
-                        <Text style={styles.titleAccent}>with AI Precision</Text>
-                        <Text style={styles.descriptionText}>
-                            Take a photo of any meal and instantly get accurate nutrition information. PlateMate's advanced AI detects, analyzes and tracks everything for you.
-                        </Text>
+                {/* Features */}
+                <View style={styles.featuresSection}>
+                    <View style={styles.featuresGrid}>
+                        {[
+                            { icon: 'food-apple', title: 'Instant Nutrition', subtitle: 'Facts' },
+                            { icon: 'camera', title: 'Smart Photo', subtitle: 'Recognition' },
+                            { icon: 'flash', title: 'Real-time', subtitle: 'Analysis' },
+                            { icon: 'star', title: 'AI-Powered', subtitle: 'Accuracy' },
+                        ].map((feature, index) => (
+                            <View key={index} style={styles.featureCard}>
+                                <View style={[styles.featureIcon, {
+                                    backgroundColor: index % 2 === 0 ? '#0074dd15' : '#dd009515'
+                                }]}>
+                                    <MaterialCommunityIcons
+                                        name={feature.icon}
+                                        size={14}
+                                        color={index % 2 === 0 ? '#0074dd' : '#dd0095'}
+                                    />
+                                </View>
+                                <Text style={styles.featureTitle}>{feature.title}</Text>
+                                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                            </View>
+                        ))}
                     </View>
                 </View>
 
-                {/* Bottom navigation area */}
-                <View style={styles.bottomArea}>
-                    <TouchableOpacity
-                        style={styles.nextButton}
-                        onPress={onNext}
-                        activeOpacity={0.8}
-                    >
+                {/* Stats */}
+                <View style={styles.statsSection}>
+                    <View style={styles.statsRow}>
+                        {[
+                            { value: '99.2%', label: 'Accuracy', color: '#0074dd', icon: 'target' },
+                            { value: '<3s', label: 'Analysis', color: '#dd0095', icon: 'speedometer' },
+                            { value: '10K+', label: 'Foods', color: '#5c00dd', icon: 'database' },
+                        ].map((stat, index) => (
+                            <View key={index} style={styles.statCard}>
+                                <View style={[styles.statIcon, { backgroundColor: stat.color + '15' }]}>
+                                    <MaterialCommunityIcons name={stat.icon} size={12} color={stat.color} />
+                                </View>
+                                <Text style={styles.statValue}>{stat.value}</Text>
+                                <Text style={styles.statLabel}>{stat.label}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
+                {/* CTA */}
+                <View style={styles.cta}>
+                    <TouchableOpacity style={styles.button} onPress={onNext}>
                         <LinearGradient
                             colors={["#0074dd", "#5c00dd", "#dd0095"]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.buttonGradient}
                         >
-                            <Text style={styles.buttonText}>Next</Text>
-                            <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.buttonIcon} />
+                            <MaterialCommunityIcons name="camera" size={16} color="#fff" />
+                            <Text style={styles.buttonText}>Start Scanning</Text>
+                            <Ionicons name="arrow-forward" size={14} color="#fff" />
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </Animated.View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        width,
+        width: width,
+        height: height,
         backgroundColor: '#000',
-        overflow: 'hidden',
     },
-    backgroundGradient: {
+    background: {
         position: 'absolute',
         width: width,
         height: height,
     },
-    decorationCircle1: {
-        position: 'absolute',
-        width: width * 1.2,
-        height: width * 1.2,
-        borderRadius: width * 0.6,
-        backgroundColor: 'rgba(92,0,221,0.06)',
-        top: -width * 0.6,
-        left: -width * 0.2,
-    },
-    decorationCircle2: {
-        position: 'absolute',
-        width: width * 1.4,
-        height: width * 1.4,
-        borderRadius: width * 0.7,
-        backgroundColor: 'rgba(0,116,221,0.08)',
-        bottom: -width * 0.8,
-        right: -width * 0.4,
-    },
-    contentWrapper: {
+    content: {
         flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 60,
+        paddingBottom: 100,
         justifyContent: 'space-between',
-        paddingTop: 30,
-        paddingBottom: 40,
     },
-    logoContainer: {
-        flexDirection: 'row',
+    header: {
         alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 20,
-        marginBottom: 10,
+        marginBottom: 30,
     },
-    logoWrapper: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        padding: 2,
-        backgroundColor: '#000',
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 8,
+    tag: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#dd0095',
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        marginBottom: 12,
     },
-    logoImage: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 16,
-    },
-    logoText: {
-        fontSize: 22,
-        fontWeight: '700',
+    title: {
+        fontSize: 24,
+        fontWeight: '900',
         color: '#fff',
-        marginLeft: 8,
-        letterSpacing: 0.5,
+        textAlign: 'center',
+        marginBottom: 4,
     },
-    mainContent: {
-        flex: 1,
-        justifyContent: 'center',
+    titleAccent: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#0074dd',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    subtitle: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.7)',
+        textAlign: 'center',
+        lineHeight: 20,
+        paddingHorizontal: 20,
+    },
+    scannerSection: {
         alignItems: 'center',
-        paddingHorizontal: 24,
+        marginBottom: 30,
     },
-    imageOuterContainer: {
-        width: width * 0.8,
-        aspectRatio: 1,
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 10,
-        },
-        shadowOpacity: 0.4,
-        shadowRadius: 15,
-        elevation: 15,
-    },
-    imageBorder: {
-        width: '100%',
-        height: '100%',
+    scannerFrame: {
+        width: width * 0.65,
+        height: width * 0.65,
         borderRadius: 20,
-        padding: 3,
         overflow: 'hidden',
     },
-    imageContainer: {
-        width: '100%',
-        height: '100%',
+    frameGradient: {
+        flex: 1,
+        borderWidth: 2,
+        borderColor: 'rgba(0,116,221,0.3)',
         borderRadius: 18,
-        overflow: 'hidden',
-        backgroundColor: '#000',
         position: 'relative',
+        overflow: 'hidden',
     },
-    image: {
+    foodImage: {
         width: '100%',
         height: '100%',
     },
-    imageOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.2)', // subtle darkening
-    },
-    // Scanner frame styles - inset from edges
-    scanFrame: {
+    scanLine: {
         position: 'absolute',
-        top: '10%',
-        left: '10%',
-        right: '10%',
-        bottom: '10%',
-        width: '80%',
-        height: '80%',
+        left: 0,
+        right: 0,
+        height: 2,
+        zIndex: 2,
+    },
+    scanGradient: {
+        flex: 1,
+    },
+    corners: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
     },
     corner: {
         position: 'absolute',
-        width: 30,
-        height: 30,
-    },
-    cornerVertical: {
-        position: 'absolute',
-        width: 3,
-        height: 25,
-    },
-    cornerHorizontal: {
-        position: 'absolute',
-        height: 3,
-        width: 25,
-    },
-    cornerVerticalTopLeft: {
-        top: 0,
-        left: 0,
-    },
-    cornerHorizontalTopLeft: {
-        top: 0,
-        left: 0,
-    },
-    cornerVerticalTopRight: {
-        top: 0,
-        right: 0,
-    },
-    cornerHorizontalTopRight: {
-        top: 0,
-        right: 0,
-    },
-    cornerVerticalBottomRight: {
-        bottom: 0,
-        right: 0,
-    },
-    cornerHorizontalBottomRight: {
-        bottom: 0,
-        right: 0,
-    },
-    cornerVerticalBottomLeft: {
-        bottom: 0,
-        left: 0,
-    },
-    cornerHorizontalBottomLeft: {
-        bottom: 0,
-        left: 0,
-    },
-    cornerGradient: {
-        width: '100%',
-        height: '100%',
+        width: 20,
+        height: 20,
+        borderColor: '#0074dd',
+        borderWidth: 2,
     },
     topLeft: {
-        top: 0,
-        left: 0,
+        top: 10,
+        left: 10,
+        borderBottomWidth: 0,
+        borderRightWidth: 0,
+        borderTopLeftRadius: 8,
     },
     topRight: {
-        top: 0,
-        right: 0,
-    },
-    bottomRight: {
-        bottom: 0,
-        right: 0,
+        top: 10,
+        right: 10,
+        borderBottomWidth: 0,
+        borderLeftWidth: 0,
+        borderTopRightRadius: 8,
     },
     bottomLeft: {
-        bottom: 0,
-        left: 0,
+        bottom: 10,
+        left: 10,
+        borderTopWidth: 0,
+        borderRightWidth: 0,
+        borderBottomLeftRadius: 8,
     },
-    textContainer: {
+    bottomRight: {
+        bottom: 10,
+        right: 10,
+        borderTopWidth: 0,
+        borderLeftWidth: 0,
+        borderBottomRightRadius: 8,
+    },
+    analysisOverlay: {
+        position: 'absolute',
+        bottom: 12,
+        left: 12,
+        right: 12,
         alignItems: 'center',
-        marginTop: 40,
-        paddingHorizontal: 20,
+        zIndex: 3,
     },
-    titleText: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: '#fff',
-        textAlign: 'center',
-        letterSpacing: 0.5,
-        marginBottom: 5,
+    analysisLabel: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,116,221,0.3)',
     },
-    titleAccent: {
-        fontSize: 26,
+    analysisText: {
+        color: '#0074dd',
+        fontSize: 11,
         fontWeight: '600',
-        marginBottom: 16,
-        // Gradient text implementation
-        backgroundColor: 'transparent',
-        textAlign: 'center',
-        color: '#5c00dd',
-        textShadowColor: 'rgba(92,0,221,0.5)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 3,
+        marginLeft: 5,
     },
-    descriptionText: {
-        fontSize: 16,
-        color: '#ddd',
-        textAlign: 'center',
-        lineHeight: 24,
-        letterSpacing: 0.3,
+    featuresSection: {
+        marginBottom: 25,
     },
-    bottomArea: {
+    featuresGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    featureCard: {
+        width: '47%',
         alignItems: 'center',
-        marginTop: 30,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
-    nextButton: {
-        width: width * 0.7,
-        height: 56,
-        borderRadius: 28,
-        overflow: 'hidden',
-        shadowColor: "#5c00dd",
-        shadowOffset: {
-            width: 0,
-            height: 6,
-        },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 8,
+    featureIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 6,
+    },
+    featureTitle: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginBottom: 2,
+    },
+    featureSubtitle: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 8,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    statsSection: {
+        marginBottom: 25,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+    },
+    statCard: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    statIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 6,
+    },
+    statValue: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    statLabel: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 9,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    cta: {
+        alignItems: 'center',
+    },
+    button: {
+        shadowColor: '#dd0095',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 6,
     },
     buttonGradient: {
-        flex: 1,
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 26,
+        minWidth: width * 0.7,
     },
     buttonText: {
         color: '#fff',
-        fontWeight: '700',
-        fontSize: 18,
-        marginRight: 8,
-    },
-    buttonIcon: {
-        marginLeft: 4,
+        fontSize: 14,
+        fontWeight: '600',
+        marginHorizontal: 10,
     },
 });
 
