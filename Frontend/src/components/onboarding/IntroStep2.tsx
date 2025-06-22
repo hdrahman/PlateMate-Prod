@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     Dimensions,
     StatusBar,
+    ImageStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,41 +63,54 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                             style={styles.cardBorder}
                         >
                             <View style={styles.cardInnerContainer}>
-                                {/* Image section */}
-                                <View style={styles.imageSection}>
-                                    <View style={styles.imageWrapper}>
-                                        <Image
-                                            source={require('../../../assets/AthleticMale.png')}
-                                            style={styles.image}
-                                            resizeMode="cover"
-                                        />
+                                {/* Image section with overlay gradient */}
+                                <View style={styles.contentContainer}>
+                                    {/* Image in background */}
+                                    <View style={styles.imageSection}>
+                                        <View style={styles.imageWrapper}>
+                                            <Image
+                                                source={require('../../../assets/AthleticMale.png')}
+                                                style={styles.image as ImageStyle}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
                                     </View>
-                                </View>
 
-                                {/* Features section at the bottom */}
-                                <View style={styles.featuresSection}>
-                                    <Text style={styles.featuresTitle}>Key Features</Text>
+                                    {/* Gradient overlay that covers everything and darkens toward bottom */}
+                                    <LinearGradient
+                                        colors={[
+                                            'rgba(15, 15, 15, 0)',
+                                            'rgba(15, 15, 15, 0.5)',
+                                            'rgba(15, 15, 15, 0.85)'
+                                        ]}
+                                        style={styles.overlayGradient}
+                                    />
 
-                                    <View style={styles.featuresList}>
-                                        <View style={styles.featureRow}>
-                                            <View style={styles.featureIconBg}>
-                                                <Ionicons name="barbell-outline" size={14} color="#5c00dd" />
+                                    {/* Features section at the bottom */}
+                                    <View style={styles.featuresSection}>
+                                        <Text style={styles.featuresTitle}>Key Features</Text>
+
+                                        <View style={styles.featuresList}>
+                                            <View style={styles.featureRow}>
+                                                <View style={styles.featureIconBg}>
+                                                    <Ionicons name="barbell-outline" size={14} color="#5c00dd" />
+                                                </View>
+                                                <Text style={styles.featureText}>Personalized workout plans</Text>
                                             </View>
-                                            <Text style={styles.featureText}>Personalized workout plans</Text>
-                                        </View>
 
-                                        <View style={styles.featureRow}>
-                                            <View style={styles.featureIconBg}>
-                                                <Ionicons name="trending-up-outline" size={14} color="#0074dd" />
+                                            <View style={styles.featureRow}>
+                                                <View style={styles.featureIconBg}>
+                                                    <Ionicons name="trending-up-outline" size={14} color="#0074dd" />
+                                                </View>
+                                                <Text style={styles.featureText}>Track progress & achievements</Text>
                                             </View>
-                                            <Text style={styles.featureText}>Track progress & achievements</Text>
-                                        </View>
 
-                                        <View style={styles.featureRow}>
-                                            <View style={styles.featureIconBg}>
-                                                <Ionicons name="sync-outline" size={14} color="#dd0095" />
+                                            <View style={styles.featureRow}>
+                                                <View style={styles.featureIconBg}>
+                                                    <Ionicons name="sync-outline" size={14} color="#dd0095" />
+                                                </View>
+                                                <Text style={styles.featureText}>Sync with nutrition data</Text>
                                             </View>
-                                            <Text style={styles.featureText}>Sync with nutrition data</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -162,11 +176,11 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'space-between',
         paddingTop: 0,
-        paddingBottom: 25,
+        paddingBottom: 15,
     },
     headerContainer: {
         alignItems: 'center',
-        marginTop: 5,
+        marginTop: -10,
         marginBottom: 0,
     },
     subtitleText: {
@@ -177,7 +191,7 @@ const styles = StyleSheet.create({
         opacity: 0.7,
         textTransform: 'uppercase',
         marginBottom: 5,
-        marginTop: 40,
+        marginTop: 15,
     },
     mainContent: {
         flex: 1,
@@ -185,10 +199,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 0,
+        marginTop: -30,
     },
     textContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 45,
+        marginTop: -50,
     },
     titleText: {
         fontSize: 32,
@@ -208,6 +224,7 @@ const styles = StyleSheet.create({
         height: 3,
         width: 60,
         borderRadius: 4,
+        marginTop: -5,
     },
     imageCardContainer: {
         width: width * 0.9,
@@ -222,6 +239,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 12,
         elevation: 15,
+        marginTop: -15,
     },
     cardBorder: {
         borderRadius: 18,
@@ -233,28 +251,46 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         overflow: 'hidden',
     },
+    contentContainer: {
+        position: 'relative',
+        width: '100%',
+    },
     imageSection: {
         width: '100%',
         height: height * 0.35,
         position: 'relative',
+        backgroundColor: '#0F0F0F',
     },
     imageWrapper: {
         width: '100%',
         height: '100%',
         overflow: 'hidden',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
     },
     image: {
         width: '100%',
         height: '100%',
+        transform: [{ scale: 1.75 }, { translateY: 50 }],
+    } as ImageStyle,
+    overlayGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
     },
     featuresSection: {
-        padding: 20,
+        padding: 15,
+        position: 'relative',
+        zIndex: 2,
     },
     featuresTitle: {
         fontSize: 18,
         color: '#fff',
         fontWeight: '600',
-        marginBottom: 15,
+        marginBottom: 10,
     },
     featuresList: {
         paddingHorizontal: 5,
@@ -262,7 +298,7 @@ const styles = StyleSheet.create({
     featureRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 10,
     },
     featureIconBg: {
         width: 28,
@@ -282,6 +318,7 @@ const styles = StyleSheet.create({
     bottomArea: {
         alignItems: 'center',
         paddingBottom: 0,
+        marginBottom: -10,
     },
     nextButton: {
         width: width * 0.5,
@@ -296,7 +333,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 10,
-        marginBottom: 20,
+        marginTop: -45,
+        marginBottom: 80,
     },
     buttonGradient: {
         flexDirection: 'row',
