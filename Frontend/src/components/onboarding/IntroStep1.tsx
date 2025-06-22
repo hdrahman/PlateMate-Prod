@@ -225,8 +225,8 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 100,
+        paddingTop: 0,
+        paddingBottom: 80,
         justifyContent: 'space-between',
     },
     header: {

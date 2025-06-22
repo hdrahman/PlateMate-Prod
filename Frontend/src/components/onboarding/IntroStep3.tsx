@@ -213,7 +213,10 @@ const styles = StyleSheet.create({
     container: {
         width: width,
         height: height,
-        backgroundColor: '#000',
+        backgroundColor: 'rgba(15,15,30,1)',
+        paddingTop: 0,
+        paddingBottom: 80,
+        paddingHorizontal: 15,
     },
     background: {
         position: 'absolute',
@@ -223,7 +226,7 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: 30,
-        paddingTop: 20,
+        paddingTop: -50,
         paddingBottom: 80,
         justifyContent: 'space-between',
     },
@@ -291,7 +294,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.15)',
-        marginBottom: 15,
+        marginBottom: 18,
         width: '100%',
         minHeight: 70,
     },
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
     },
     dashboardContainer: {
         width: width * 0.42,
-        height: height * 0.45,
+        height: height * 0.41,
         marginBottom: 15,
         justifyContent: 'center',
         alignItems: 'center',
@@ -331,11 +334,11 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.1)',
         overflow: 'hidden',
         width: width * 0.42,
-        height: height * 0.45,
+        height: height * 0.41,
     },
     dashboardImage: {
         width: width * 0.42,
-        height: height * 0.45,
+        height: height * 0.41,
     },
     liveIndicator: {
         position: 'absolute',
