@@ -208,13 +208,13 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: 25,
-        paddingTop: 60,
-        paddingBottom: 100,
+        paddingTop: 20,
+        paddingBottom: 80,
         justifyContent: 'space-between',
     },
     header: {
         alignItems: 'center',
-        marginBottom: 25,
+        marginBottom: 20,
     },
     tag: {
         fontSize: 10,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     },
     athleteSection: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 20,
     },
     athleteContainer: {
         position: 'relative',
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
         marginLeft: 3,
     },
     progressSection: {
-        marginBottom: 25,
+        marginBottom: 15,
     },
     progressPanel: {
         backgroundColor: 'rgba(15,15,28,0.95)',
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     featuresSection: {
-        marginBottom: 25,
+        marginBottom: 15,
     },
     featuresRow: {
         flexDirection: 'row',

@@ -69,32 +69,108 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                     <Text style={styles.tag}>SMART ANALYTICS</Text>
                     <Text style={styles.title}>Your Health</Text>
                     <Text style={styles.titleAccent}>Intelligence Hub</Text>
+                </View>
+
+                {/* Central Dashboard - Hero Section */}
+                <View style={styles.heroSection}>
+                    <View style={styles.dashboardRow}>
+                        {/* Left Side Content */}
+                        <View style={styles.leftContent}>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="chart-line" size={18} color="#0074dd" />
+                                    <View style={styles.trendArrow}>
+                                        <MaterialCommunityIcons name="trending-up" size={12} color="#00dd74" />
+                                    </View>
+                                </View>
+                                <Text style={styles.statValue}>78%</Text>
+                                <Text style={styles.statLabel}>Weekly Goal</Text>
+                                <View style={styles.miniProgressBar}>
+                                    <View style={[styles.miniProgress, { width: '78%' }]} />
+                                </View>
+                            </View>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="fire" size={18} color="#dd4400" />
+                                    <Text style={styles.changeIndicator}>+247</Text>
+                                </View>
+                                <Text style={styles.statValue}>2,847</Text>
+                                <Text style={styles.statLabel}>Calories Today</Text>
+                                <View style={styles.sparklineContainer}>
+                                    <View style={styles.sparkline}>
+                                        {[0.3, 0.7, 0.4, 0.9, 0.6, 0.8, 1.0].map((height, index) => (
+                                            <View
+                                                key={index}
+                                                style={[styles.sparkBar, { height: height * 15 + 3 }]}
+                                            />
+                                        ))}
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Central Dashboard */}
+                        <View style={styles.dashboardContainer}>
+                            <LinearGradient
+                                colors={['rgba(15,15,30,0.95)', 'rgba(25,25,45,0.9)']}
+                                style={styles.dashboardFrame}
+                            >
+                                <Image
+                                    source={require('../../../assets/home.png')}
+                                    style={styles.dashboardImage}
+                                    resizeMode="contain"
+                                />
+                                <View style={styles.liveIndicator}>
+                                    <View style={styles.liveDot} />
+                                    <Text style={styles.liveText}>LIVE</Text>
+                                </View>
+                            </LinearGradient>
+                        </View>
+
+                        {/* Right Side Content */}
+                        <View style={styles.rightContent}>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="trending-up" size={18} color="#00dd74" />
+                                    <Text style={styles.percentageBadge}>+23%</Text>
+                                </View>
+                                <Text style={styles.statValue}>127g</Text>
+                                <Text style={styles.statLabel}>Protein</Text>
+                                <View style={styles.macroBar}>
+                                    <View style={styles.macroSegment} />
+                                    <View style={[styles.macroSegment, { backgroundColor: '#00dd74' }]} />
+                                    <View style={styles.macroSegment} />
+                                </View>
+                            </View>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="trophy" size={18} color="#dd0095" />
+                                    <MaterialCommunityIcons name="fire-circle" size={14} color="#ffaa00" />
+                                </View>
+                                <Text style={styles.statValue}>42</Text>
+                                <Text style={styles.statLabel}>Day Streak</Text>
+                                <View style={styles.streakDots}>
+                                    {[1, 1, 1, 1, 1, 0, 1].map((active, index) => (
+                                        <View
+                                            key={index}
+                                            style={[styles.streakDot, active ? styles.activeDot : styles.inactiveDot]}
+                                        />
+                                    ))}
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Subtitle positioned below dashboard */}
                     <Text style={styles.subtitle}>
                         AI-powered insights transform your data into actionable health guidance.
                     </Text>
                 </View>
 
-                {/* Dashboard */}
-                <View style={styles.dashboardSection}>
-                    <LinearGradient
-                        colors={['rgba(15,15,30,0.95)', 'rgba(25,25,45,0.9)']}
-                        style={styles.dashboardFrame}
-                    >
-                        <Image
-                            source={require('../../../assets/home.png')}
-                            style={styles.dashboardImage}
-                            resizeMode="contain"
-                        />
-                        <View style={styles.liveIndicator}>
-                            <View style={styles.liveDot} />
-                            <Text style={styles.liveText}>LIVE</Text>
-                        </View>
-                    </LinearGradient>
-                </View>
-
-                {/* Progress */}
-                <View style={styles.progressSection}>
-                    <View style={styles.progressCard}>
+                {/* Bottom Content - Progress & Insights */}
+                <View style={styles.bottomContent}>
+                    {/* Quick Progress Indicator */}
+                    <View style={styles.quickProgress}>
                         <View style={styles.progressHeader}>
                             <MaterialCommunityIcons name="chart-line" size={14} color="#0074dd" />
                             <Text style={styles.progressTitle}>Weekly Progress</Text>
@@ -111,47 +187,6 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                         </View>
                         <Text style={styles.progressValue}>78% Goal Achievement</Text>
                     </View>
-
-                    <View style={styles.statsRow}>
-                        {[
-                            { day: 'M', value: 85, color: '#0074dd' },
-                            { day: 'T', value: 92, color: '#5c00dd' },
-                            { day: 'W', value: 78, color: '#dd0095' }
-                        ].map((stat, index) => (
-                            <View key={index} style={styles.stat}>
-                                <Text style={styles.statDay}>{stat.day}</Text>
-                                <View style={[styles.statBar, { backgroundColor: stat.color + '20' }]}>
-                                    <View
-                                        style={[
-                                            styles.statFill,
-                                            { height: `${stat.value}%`, backgroundColor: stat.color }
-                                        ]}
-                                    />
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-                </View>
-
-                {/* AI Insights */}
-                <View style={styles.insightsSection}>
-                    <View style={styles.insightsHeader}>
-                        <MaterialCommunityIcons name="brain" size={16} color="#dd0095" />
-                        <Text style={styles.insightsTitle}>AI Insights</Text>
-                    </View>
-                    <View style={styles.insightsList}>
-                        {[
-                            { icon: 'trending-up', text: 'Protein intake improved 23%', color: '#00dd74' },
-                            { icon: 'flame', text: 'Burned 2,847 calories this week', color: '#dd4400' },
-                        ].map((insight, index) => (
-                            <View key={index} style={styles.insight}>
-                                <View style={[styles.insightIcon, { backgroundColor: insight.color + '15' }]}>
-                                    <Ionicons name={insight.icon} size={12} color={insight.color} />
-                                </View>
-                                <Text style={styles.insightText}>{insight.text}</Text>
-                            </View>
-                        ))}
-                    </View>
                 </View>
 
                 {/* CTA */}
@@ -163,9 +198,9 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                             end={{ x: 1, y: 0 }}
                             style={styles.buttonGradient}
                         >
-                            <MaterialCommunityIcons name="rocket-launch" size={16} color="#fff" />
+                            <MaterialCommunityIcons name="rocket-launch" size={18} color="#fff" />
                             <Text style={styles.buttonText}>Begin Your Journey</Text>
-                            <Ionicons name="arrow-forward" size={14} color="#fff" />
+                            <Ionicons name="arrow-forward" size={16} color="#fff" />
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
@@ -188,14 +223,13 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: 30,
-        paddingTop: 60,
-        paddingBottom: 100,
+        paddingTop: 20,
+        paddingBottom: 80,
         justifyContent: 'space-between',
     },
     header: {
         alignItems: 'center',
-        flex: 0.2,
-        justifyContent: 'center',
+        marginBottom: 20,
     },
     tag: {
         fontSize: 9,
@@ -220,30 +254,88 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     subtitle: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.7)',
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 13,
         textAlign: 'center',
-        lineHeight: 16,
-        paddingHorizontal: 10,
+        lineHeight: 18,
+        paddingHorizontal: 25,
+        fontWeight: '500',
+        marginBottom: 8,
     },
-    dashboardSection: {
-        width: width * 0.8,
-        height: height * 0.18,
-        alignSelf: 'center',
-        flex: 0.25,
+    heroSection: {
+        alignItems: 'center',
+        marginBottom: 25,
+    },
+    dashboardRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        marginBottom: 15,
+    },
+    leftContent: {
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        width: width * 0.22,
+        marginRight: 15,
+    },
+    rightContent: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        width: width * 0.22,
+        marginLeft: 15,
+    },
+    statCard: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        marginBottom: 15,
+        width: '100%',
+        minHeight: 70,
+    },
+    statHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    trendArrow: {
+        backgroundColor: 'rgba(0,221,116,0.2)',
+        padding: 2,
+        borderRadius: 3,
+    },
+    statValue: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    statLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 9,
+        fontWeight: '500',
+        marginBottom: 6,
+    },
+    dashboardContainer: {
+        width: width * 0.42,
+        height: height * 0.45,
+        marginBottom: 15,
         justifyContent: 'center',
+        alignItems: 'center',
     },
     dashboardFrame: {
-        flex: 1,
-        borderRadius: 16,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
         overflow: 'hidden',
-        padding: 4,
+        width: width * 0.42,
+        height: height * 0.45,
     },
     dashboardImage: {
-        width: '100%',
-        height: '100%',
+        width: width * 0.42,
+        height: height * 0.45,
     },
     liveIndicator: {
         position: 'absolute',
@@ -268,17 +360,17 @@ const styles = StyleSheet.create({
         fontSize: 8,
         fontWeight: '700',
     },
-    progressSection: {
-        flex: 0.25,
-        justifyContent: 'center',
+    bottomContent: {
+        marginBottom: 30,
+        paddingHorizontal: 20,
     },
-    progressCard: {
+    quickProgress: {
         backgroundColor: 'rgba(0,116,221,0.08)',
-        padding: 12,
+        padding: 14,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
-        marginBottom: 12,
+        marginBottom: 15,
     },
     progressHeader: {
         flexDirection: 'row',
@@ -312,79 +404,8 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         textAlign: 'center',
     },
-    statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 16,
-    },
-    stat: {
-        alignItems: 'center',
-    },
-    statDay: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 9,
-        fontWeight: '600',
-        marginBottom: 6,
-    },
-    statBar: {
-        width: 12,
-        height: 30,
-        borderRadius: 6,
-        justifyContent: 'flex-end',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    statFill: {
-        width: '100%',
-        borderRadius: 4,
-    },
-    insightsSection: {
-        flex: 0.18,
-        justifyContent: 'center',
-    },
-    insightsHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-    },
-    insightsTitle: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '600',
-        marginLeft: 5,
-    },
-    insightsList: {
-        gap: 8,
-    },
-    insight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        padding: 10,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    insightIcon: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-    },
-    insightText: {
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 10,
-        fontWeight: '500',
-        flex: 1,
-    },
     cta: {
         alignItems: 'center',
-        flex: 0.12,
-        justifyContent: 'flex-end',
     },
     button: {
         marginBottom: 12,
@@ -422,8 +443,79 @@ const styles = StyleSheet.create({
     },
     activeDot: {
         backgroundColor: '#dd0095',
-        width: 18,
-        borderRadius: 9,
+    },
+    inactiveDot: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    miniProgressBar: {
+        height: 2,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 1,
+        marginTop: 4,
+        overflow: 'hidden',
+    },
+    miniProgress: {
+        height: '100%',
+        backgroundColor: '#0074dd',
+        borderRadius: 1,
+    },
+    changeIndicator: {
+        color: '#00dd74',
+        fontSize: 8,
+        fontWeight: '600',
+        backgroundColor: 'rgba(0,221,116,0.15)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    percentageBadge: {
+        backgroundColor: 'rgba(0,221,116,0.2)',
+        color: '#00dd74',
+        fontSize: 8,
+        fontWeight: '600',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    sparklineContainer: {
+        height: 12,
+        marginTop: 4,
+    },
+    sparkline: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        height: '100%',
+        gap: 1,
+    },
+    sparkBar: {
+        flex: 1,
+        backgroundColor: '#dd4400',
+        borderRadius: 1,
+        opacity: 0.7,
+    },
+    macroBar: {
+        flexDirection: 'row',
+        height: 3,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2,
+        marginTop: 4,
+        overflow: 'hidden',
+    },
+    macroSegment: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginHorizontal: 0.5,
+    },
+    streakDots: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 4,
+    },
+    streakDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
 });
 
