@@ -80,36 +80,52 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                                     <LinearGradient
                                         colors={[
                                             'rgba(15, 15, 15, 0)',
-                                            'rgba(15, 15, 15, 0.5)',
-                                            'rgba(15, 15, 15, 0.85)'
+                                            'rgba(15, 15, 15, 0.3)',
+                                            'rgba(15, 15, 15, 0.7)',
+                                            'rgba(15, 15, 15, 0.95)'
                                         ]}
+                                        locations={[0, 0.4, 0.7, 1]}
                                         style={styles.overlayGradient}
                                     />
 
                                     {/* Features section at the bottom */}
                                     <View style={styles.featuresSection}>
-                                        <Text style={styles.featuresTitle}>Key Features</Text>
+                                        {/* Features background gradient */}
+                                        <LinearGradient
+                                            colors={[
+                                                'rgba(15, 15, 15, 0)',
+                                                'rgba(15, 15, 15, 0.4)',
+                                                'rgba(15, 15, 15, 0.8)',
+                                                'rgba(15, 15, 15, 0.95)'
+                                            ]}
+                                            locations={[0, 0.2, 0.6, 1]}
+                                            style={styles.featuresBackground}
+                                        />
 
-                                        <View style={styles.featuresList}>
-                                            <View style={styles.featureRow}>
-                                                <View style={styles.featureIconBg}>
-                                                    <Ionicons name="barbell-outline" size={14} color="#5c00dd" />
-                                                </View>
-                                                <Text style={styles.featureText}>Personalized workout plans</Text>
-                                            </View>
+                                        <View style={styles.featuresContent}>
+                                            <Text style={styles.featuresTitle}>Key Features</Text>
 
-                                            <View style={styles.featureRow}>
-                                                <View style={styles.featureIconBg}>
-                                                    <Ionicons name="trending-up-outline" size={14} color="#0074dd" />
+                                            <View style={styles.featuresList}>
+                                                <View style={styles.featureRow}>
+                                                    <View style={styles.featureIconBg}>
+                                                        <Ionicons name="barbell-outline" size={14} color="#5c00dd" />
+                                                    </View>
+                                                    <Text style={styles.featureText}>Personalized workout plans</Text>
                                                 </View>
-                                                <Text style={styles.featureText}>Track progress & achievements</Text>
-                                            </View>
 
-                                            <View style={styles.featureRow}>
-                                                <View style={styles.featureIconBg}>
-                                                    <Ionicons name="sync-outline" size={14} color="#dd0095" />
+                                                <View style={styles.featureRow}>
+                                                    <View style={styles.featureIconBg}>
+                                                        <Ionicons name="trending-up-outline" size={14} color="#0074dd" />
+                                                    </View>
+                                                    <Text style={styles.featureText}>Track progress & achievements</Text>
                                                 </View>
-                                                <Text style={styles.featureText}>Sync with nutrition data</Text>
+
+                                                <View style={styles.featureRow}>
+                                                    <View style={styles.featureIconBg}>
+                                                        <Ionicons name="sync-outline" size={14} color="#dd0095" />
+                                                    </View>
+                                                    <Text style={styles.featureText}>Sync with nutrition data</Text>
+                                                </View>
                                             </View>
                                         </View>
                                     </View>
@@ -282,6 +298,18 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     featuresSection: {
+        position: 'relative',
+        zIndex: 2,
+    },
+    featuresBackground: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
+    },
+    featuresContent: {
         padding: 15,
         position: 'relative',
         zIndex: 2,
