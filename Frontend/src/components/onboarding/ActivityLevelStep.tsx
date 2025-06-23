@@ -26,7 +26,7 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
             label: 'Sedentary',
             description: 'Desk job, little to no exercise, and mostly sitting throughout the day',
             icon: 'bed-outline',
-            color: '#9e9e9e',
+            color: '#ff5722',
         },
         {
             id: 'light',

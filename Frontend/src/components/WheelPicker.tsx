@@ -95,7 +95,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
 
         // Improved velocity threshold - if the scroll velocity is low enough, snap immediately
         // This prevents the slingshot effect by catching slower movements
-        if (Math.abs(velocity) < 1.0) {
+        if (Math.abs(velocity) < 0.5) {
             const index = Math.round(y / itemHeight);
             snapToIndex(index);
         }
@@ -153,7 +153,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                 ref={scrollViewRef}
                 showsVerticalScrollIndicator={false}
                 snapToInterval={itemHeight}
-                decelerationRate={Platform.OS === 'ios' ? 0.992 : 0.95}
+                decelerationRate={Platform.OS === 'ios' ? 0.985 : 0.88}
                 bounces={false}
                 onScroll={handleScroll}
                 onMomentumScrollEnd={handleMomentumScrollEnd}

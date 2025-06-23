@@ -17,7 +17,7 @@ interface GoalsStepProps {
 }
 
 const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext }) => {
-    const [fitnessGoal, setFitnessGoal] = useState<string>(profile.fitnessGoal || 'balanced');
+    const [fitnessGoal, setFitnessGoal] = useState<string>(profile.fitnessGoal || 'fat_loss');
 
     // Fitness goals
     const fitnessGoals = [

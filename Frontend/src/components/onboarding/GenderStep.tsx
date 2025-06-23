@@ -82,7 +82,9 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
                         <Text style={[
                             styles.genderLabel,
                             gender === option.id && { color: option.color }
-                        ]}>
+                        ]}
+                            numberOfLines={1}
+                        >
                             {option.label}
                         </Text>
                     </TouchableOpacity>
@@ -142,7 +144,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
         borderRadius: 16,
         padding: 24,
-        marginHorizontal: 8,
+        marginHorizontal: 6,
         borderWidth: 2,
         borderColor: 'rgba(255, 255, 255, 0.1)',
         minHeight: 140,
@@ -165,7 +167,8 @@ const styles = StyleSheet.create({
         color: '#fff',
         textAlign: 'center',
         width: '100%',
-        paddingHorizontal: 4,
+        paddingHorizontal: 2,
+        flexWrap: 'nowrap',
     },
     infoContainer: {
         flexDirection: 'row',
