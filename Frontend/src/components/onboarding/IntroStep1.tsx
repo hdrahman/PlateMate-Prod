@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     },
     signInButton: {
         position: 'absolute',
-        top: 5,
+        top: 0,
         right: 5,
         paddingHorizontal: 10,
         paddingVertical: 4,
