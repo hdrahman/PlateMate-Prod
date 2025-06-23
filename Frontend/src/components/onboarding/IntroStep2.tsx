@@ -73,106 +73,112 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                     <Text style={styles.title}>Physique</Text>
                 </View>
 
-                {/* Athlete Section */}
-                <View style={styles.athleteSection}>
-                    <View style={styles.athleteContainer}>
+                {/* Image Container with Overlays */}
+                <View style={styles.imageContainer}>
+                    <Image
+                        source={require('../../../assets/AthleticMale.png')}
+                        style={styles.fullScreenImage}
+                        resizeMode="cover"
+                    />
+
+                    {/* Dark overlay for better text readability */}
+                    <View style={styles.imageOverlay} />
+
+                    {/* Bottom gradient mask */}
+                    <View style={styles.bottomGradientMask}>
                         <LinearGradient
-                            colors={['rgba(0,116,221,0.15)', 'rgba(92,0,221,0.1)', 'rgba(221,0,149,0.05)']}
-                            style={styles.athleteFrame}
-                        >
-                            <Image
-                                source={require('../../../assets/AthleticMale.png')}
-                                style={styles.athleteImage}
-                                resizeMode="cover"
-                            />
-
-                            {/* Achievement badges */}
-                            <View style={styles.badge1}>
-                                <View style={styles.badgeContent}>
-                                    <MaterialCommunityIcons name="medal" size={10} color="#FFD700" />
-                                    <Text style={styles.badgeText}>First Mile</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.badge2}>
-                                <View style={styles.badgeContent}>
-                                    <MaterialCommunityIcons name="food" size={10} color="#0074dd" />
-                                    <Text style={styles.badgeText}>Protein Goal</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.badge3}>
-                                <View style={styles.badgeContent}>
-                                    <MaterialCommunityIcons name="trophy" size={10} color="#dd0095" />
-                                    <Text style={styles.badgeText}>Week Streak</Text>
-                                </View>
-                            </View>
-                        </LinearGradient>
+                            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+                            locations={[0, 0.3, 0.7, 1]}
+                            style={styles.gradientOverlay}
+                        />
                     </View>
-                </View>
 
-                {/* Progress Panel */}
-                <View style={styles.progressSection}>
-                    <View style={styles.progressPanel}>
-                        <View style={styles.progressHeader}>
-                            <MaterialCommunityIcons name="chart-line" size={16} color="#0074dd" />
-                            <Text style={styles.progressTitle}>Your Progress</Text>
+                    {/* Dynamic Stats Positioning */}
+                    {/* Top Left - Fitness Goal */}
+                    <View style={styles.topLeftStat}>
+                        <View style={styles.statCard}>
+                            <View style={styles.statHeader}>
+                                <MaterialCommunityIcons name="dumbbell" size={18} color="#0074dd" />
+                                <View style={styles.trendArrow}>
+                                    <MaterialCommunityIcons name="trending-up" size={12} color="#00dd74" />
+                                </View>
+                            </View>
+                            <Text style={styles.statValue}>85%</Text>
+                            <Text style={styles.statLabel}>Fitness Goal</Text>
+                            <View style={styles.miniProgressBar}>
+                                <View style={[styles.miniProgress, { width: '85%' }]} />
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Top Right - Muscle Mass */}
+                    <View style={styles.topRightStat}>
+                        <View style={styles.statCard}>
+                            <View style={styles.statHeader}>
+                                <MaterialCommunityIcons name="dumbbell" size={18} color="#dd0095" />
+                                <Text style={styles.percentageBadge}>+8 lbs</Text>
+                            </View>
+                            <Text style={styles.statValue}>152g</Text>
+                            <Text style={styles.statLabel}>Muscle Mass</Text>
+                            <View style={styles.macroBar}>
+                                <View style={styles.macroSegment} />
+                                <View style={[styles.macroSegment, { backgroundColor: '#dd0095' }]} />
+                                <View style={styles.macroSegment} />
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Bottom Right - Current Weight */}
+                    <View style={styles.bottomRightStat}>
+                        <View style={styles.statCard}>
+                            <View style={styles.statHeader}>
+                                <MaterialCommunityIcons name="weight" size={18} color="#00dd74" />
+                                <Text style={styles.changeIndicator}>-15 lbs</Text>
+                            </View>
+                            <Text style={styles.statValue}>178</Text>
+                            <Text style={styles.statLabel}>Current Weight</Text>
+                            <View style={styles.sparklineContainer}>
+                                <View style={styles.sparkline}>
+                                    {[1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4].map((height, index) => (
+                                        <View
+                                            key={index}
+                                            style={[styles.sparkBar, { height: height * 15 + 3 }]}
+                                        />
+                                    ))}
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Bottom Progress Overlay */}
+                    <View style={styles.bottomOverlay}>
+                        <View style={styles.subtitleContainer}>
+                            <Text style={styles.subtitle}>
+                                Track workouts, build muscle, and achieve your dream physique with personalized guidance.
+                            </Text>
                         </View>
 
-                        <View style={styles.mainProgress}>
-                            <Text style={styles.progressLabel}>Fitness Goal</Text>
-                            <View style={styles.progressBarContainer}>
-                                <Animated.View style={[styles.progressBar, { width: progressInterpolated }]}>
+                        <View style={styles.quickProgress}>
+                            <View style={styles.progressHeader}>
+                                <MaterialCommunityIcons name="chart-line" size={14} color="#5c00dd" />
+                                <Text style={styles.progressTitle}>Transformation Progress</Text>
+                            </View>
+                            <View style={styles.progressBar}>
+                                <Animated.View style={[styles.progressFill, { width: progressInterpolated }]}>
                                     <LinearGradient
                                         colors={['#0074dd', '#5c00dd', '#dd0095']}
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
-                                        style={styles.progressFill}
+                                        style={styles.progressGradient}
                                     />
                                 </Animated.View>
                             </View>
-                            <Text style={styles.progressValue}>85%</Text>
-                        </View>
-
-                        <View style={styles.metricsGrid}>
-                            {[
-                                { label: 'Calories', value: '2,847', color: '#0074dd' },
-                                { label: 'Weight Lost', value: '15 lbs', color: '#5c00dd' },
-                                { label: 'Muscle', value: '8 lbs', color: '#dd0095' },
-                                { label: 'Streak', value: '42', color: '#00dd74' },
-                            ].map((metric, index) => (
-                                <View key={index} style={styles.metricCard}>
-                                    <View style={[styles.metricIcon, { backgroundColor: metric.color + '15' }]}>
-                                        <View style={[styles.iconDot, { backgroundColor: metric.color }]} />
-                                    </View>
-                                    <Text style={styles.metricValue}>{metric.value}</Text>
-                                    <Text style={styles.metricLabel}>{metric.label}</Text>
-                                </View>
-                            ))}
+                            <Text style={styles.progressValue}>85% Fitness Achievement</Text>
                         </View>
                     </View>
                 </View>
 
-                {/* Features */}
-                <View style={styles.featuresSection}>
-                    <View style={styles.featuresRow}>
-                        {[
-                            { title: 'Smart Goal', subtitle: 'Setting' },
-                            { title: 'Achievement', subtitle: 'System' },
-                            { title: 'Progress', subtitle: 'Tracking' }
-                        ].map((feature, index) => (
-                            <View key={index} style={styles.featureCard}>
-                                <View style={styles.featureIcon}>
-                                    <View style={[styles.iconDot, {
-                                        backgroundColor: index === 0 ? '#0074dd' : index === 1 ? '#5c00dd' : '#dd0095'
-                                    }]} />
-                                </View>
-                                <Text style={styles.featureTitle}>{feature.title}</Text>
-                                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
+
 
                 {/* CTA */}
                 <View style={styles.cta}>
@@ -234,191 +240,223 @@ const styles = StyleSheet.create({
     titleAccent: {
         color: '#dd0095',
     },
-    athleteSection: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    athleteContainer: {
+    imageContainer: {
+        height: height * 0.7,
         position: 'relative',
-        width: 170,
-        height: 240,
-        alignSelf: 'center',
-    },
-    athleteFrame: {
-        flex: 1,
+        marginHorizontal: -25,
+        marginBottom: 25,
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
         overflow: 'hidden',
     },
-    athleteImage: {
+    fullScreenImage: {
+        width: '100%',
+        height: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    imageOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+    },
+    bottomGradientMask: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: '50%',
+        zIndex: 5,
+    },
+    gradientOverlay: {
         width: '100%',
         height: '100%',
     },
-    badge1: {
+    topLeftStat: {
         position: 'absolute',
-        top: -8,
-        right: -20,
-        borderRadius: 12,
-        overflow: 'hidden',
+        left: 8,
+        top: 15,
+        width: width * 0.24,
+        zIndex: 10,
     },
-    badge2: {
+    topRightStat: {
         position: 'absolute',
-        bottom: 90,
-        left: -25,
-        borderRadius: 12,
-        overflow: 'hidden',
+        right: 8,
+        top: 45,
+        width: width * 0.24,
+        zIndex: 10,
     },
-    badge3: {
+    bottomRightStat: {
         position: 'absolute',
-        top: 130,
-        right: -22,
-        borderRadius: 12,
-        overflow: 'hidden',
+        right: 8,
+        bottom: 185,
+        width: width * 0.24,
+        zIndex: 10,
     },
-    badgeContent: {
+    bottomOverlay: {
+        position: 'absolute',
+        bottom: 25,
+        left: 25,
+        right: 25,
+        zIndex: 10,
+    },
+    subtitleContainer: {
+        marginBottom: 18,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+    },
+    subtitle: {
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 13,
+        textAlign: 'center',
+        lineHeight: 18,
+        paddingHorizontal: 0,
+        fontWeight: '500',
+        marginBottom: 8,
+    },
+    statCard: {
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        padding: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        marginBottom: 0,
+        width: '100%',
+        minHeight: 55,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+        elevation: 1,
+    },
+    statHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    trendArrow: {
+        backgroundColor: 'rgba(0,221,116,0.2)',
+        padding: 2,
+        borderRadius: 3,
+    },
+    statValue: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 3,
+    },
+    statLabel: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 8,
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    miniProgressBar: {
+        height: 2,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 1,
+        marginTop: 4,
+        overflow: 'hidden',
+    },
+    miniProgress: {
+        height: '100%',
+        backgroundColor: '#0074dd',
+        borderRadius: 1,
+    },
+    changeIndicator: {
+        color: '#00dd74',
+        fontSize: 8,
+        fontWeight: '600',
+        backgroundColor: 'rgba(0,221,116,0.15)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    percentageBadge: {
+        backgroundColor: 'rgba(221,0,149,0.2)',
+        color: '#dd0095',
+        fontSize: 8,
+        fontWeight: '600',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 3,
+    },
+    sparklineContainer: {
+        height: 12,
+        marginTop: 4,
+    },
+    sparkline: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        height: '100%',
+        gap: 1,
+    },
+    sparkBar: {
+        flex: 1,
+        backgroundColor: '#00dd74',
+        borderRadius: 1,
+        opacity: 0.7,
+    },
+    macroBar: {
+        flexDirection: 'row',
+        height: 3,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2,
+        marginTop: 4,
+        overflow: 'hidden',
+    },
+    macroSegment: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginHorizontal: 0.5,
+    },
+    quickProgress: {
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        padding: 14,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 7,
-        fontWeight: '600',
-        marginLeft: 3,
-    },
-    progressSection: {
         marginBottom: 15,
-    },
-    progressPanel: {
-        backgroundColor: 'rgba(15,15,28,0.95)',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
     },
     progressHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 8,
     },
     progressTitle: {
         color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 6,
-    },
-    mainProgress: {
-        marginBottom: 16,
-    },
-    progressLabel: {
-        color: 'rgba(255,255,255,0.7)',
         fontSize: 12,
-        fontWeight: '500',
-        marginBottom: 8,
+        fontWeight: '600',
+        marginLeft: 5,
     },
-    progressBarContainer: {
-        height: 5,
+    progressBar: {
+        height: 4,
         backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 2.5,
+        borderRadius: 2,
         marginBottom: 8,
         overflow: 'hidden',
     },
-    progressBar: {
-        height: '100%',
-        borderRadius: 2.5,
-    },
     progressFill: {
+        height: '100%',
+        borderRadius: 2,
+    },
+    progressGradient: {
         flex: 1,
-        borderRadius: 2.5,
+        borderRadius: 2,
     },
     progressValue: {
-        color: '#0074dd',
-        fontSize: 12,
+        color: '#5c00dd',
+        fontSize: 10,
         fontWeight: '700',
         textAlign: 'center',
     },
-    metricsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        gap: 8,
-    },
-    metricCard: {
-        width: '47%',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.02)',
-        paddingVertical: 10,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
-    },
-    metricIcon: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 5,
-    },
-    iconDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    metricValue: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    metricLabel: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 8,
-        textAlign: 'center',
-        fontWeight: '500',
-    },
-    featuresSection: {
-        marginBottom: 15,
-    },
-    featuresRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 6,
-    },
-    featureCard: {
-        flex: 1,
-        alignItems: 'center',
-        marginHorizontal: 3,
-    },
-    featureIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0,116,221,0.08)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    featureTitle: {
-        color: '#fff',
-        fontSize: 11,
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 2,
-    },
-    featureSubtitle: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 8,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
+
     cta: {
         alignItems: 'center',
     },

@@ -99,7 +99,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                     </Text>
                 </View>
 
-                {/* Food Scanner */}
+                {/* Food Scanner with Floating Nutrition Tags */}
                 <View style={styles.scannerSection}>
                     <View style={styles.scannerFrame}>
                         <LinearGradient
@@ -131,6 +131,43 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                                 <View style={[styles.corner, styles.topRight]} />
                                 <View style={[styles.corner, styles.bottomLeft]} />
                                 <View style={[styles.corner, styles.bottomRight]} />
+                            </View>
+
+                            {/* Floating Nutrition Tags */}
+                            {/* Top Left - Calories */}
+                            <View style={styles.nutritionTag1}>
+                                <View style={styles.nutritionTagContent}>
+                                    <MaterialCommunityIcons name="fire" size={10} color="#dd4400" />
+                                    <Text style={styles.nutritionValue}>342</Text>
+                                    <Text style={styles.nutritionLabel}>Cal</Text>
+                                </View>
+                            </View>
+
+                            {/* Top Right - Protein */}
+                            <View style={styles.nutritionTag2}>
+                                <View style={styles.nutritionTagContent}>
+                                    <MaterialCommunityIcons name="dumbbell" size={10} color="#00dd74" />
+                                    <Text style={styles.nutritionValue}>28g</Text>
+                                    <Text style={styles.nutritionLabel}>Protein</Text>
+                                </View>
+                            </View>
+
+                            {/* Bottom Left - Fat */}
+                            <View style={styles.nutritionTag3}>
+                                <View style={styles.nutritionTagContent}>
+                                    <MaterialCommunityIcons name="circle" size={10} color="#FFD700" />
+                                    <Text style={styles.nutritionValue}>12g</Text>
+                                    <Text style={styles.nutritionLabel}>Fat</Text>
+                                </View>
+                            </View>
+
+                            {/* Bottom Right - Carbs */}
+                            <View style={styles.nutritionTag4}>
+                                <View style={styles.nutritionTagContent}>
+                                    <MaterialCommunityIcons name="circle" size={10} color="#5c00dd" />
+                                    <Text style={styles.nutritionValue}>45g</Text>
+                                    <Text style={styles.nutritionLabel}>Carbs</Text>
+                                </View>
                             </View>
 
                             {/* Analysis overlay */}
@@ -267,8 +304,8 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     scannerFrame: {
-        width: width * 0.65,
-        height: width * 0.65,
+        width: width * 0.8,
+        height: height * 0.35,
         borderRadius: 20,
         overflow: 'hidden',
     },
@@ -336,6 +373,58 @@ const styles = StyleSheet.create({
         borderTopWidth: 0,
         borderLeftWidth: 0,
         borderBottomRightRadius: 8,
+    },
+    // Floating Nutrition Tags
+    nutritionTag1: {
+        position: 'absolute',
+        top: -8,
+        left: -15,
+        zIndex: 5,
+    },
+    nutritionTag2: {
+        position: 'absolute',
+        top: -8,
+        right: -15,
+        zIndex: 5,
+    },
+    nutritionTag3: {
+        position: 'absolute',
+        bottom: 20,
+        left: -15,
+        zIndex: 5,
+    },
+    nutritionTag4: {
+        position: 'absolute',
+        bottom: -8,
+        right: -15,
+        zIndex: 5,
+    },
+    nutritionTagContent: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        minWidth: 55,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    nutritionValue: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 2,
+        marginBottom: 1,
+    },
+    nutritionLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 8,
+        fontWeight: '500',
     },
     analysisOverlay: {
         position: 'absolute',

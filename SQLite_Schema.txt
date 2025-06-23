@@ -1,40 +1,157 @@
 # PlateMate SQLite Database Schema
 
 ## Overview
-PlateMate uses SQLite for local development/offline functionality. This document outlines the schema structure.
+PlateMate uses SQLite for local offline functionality. This document outlines the actual schema structure as implemented in the Frontend React Native app. The database is created and managed via Expo SQLite.
+
+## Database Information
+- **Database Name**: `platemate.db`
+- **Location**: Frontend React Native app (Expo SQLite)
+- **Current Migration Version**: 11
+- **Primary Key Strategy**: Firebase UID is used as the user identifier across tables
 
 ## Tables
 
-### 1. users
+### 1. food_logs
+Primary table for tracking all food consumption with comprehensive nutritional data.
+
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `meal_id`: INTEGER NOT NULL
+- `user_id`: TEXT DEFAULT 1 (stores Firebase UID)
+- `food_name`: TEXT NOT NULL
+- `calories`: INTEGER NOT NULL
+- `proteins`: INTEGER NOT NULL
+- `carbs`: INTEGER NOT NULL
+- `fats`: INTEGER NOT NULL
+- `fiber`: INTEGER NOT NULL DEFAULT 0
+- `sugar`: INTEGER NOT NULL DEFAULT 0
+- `saturated_fat`: INTEGER NOT NULL DEFAULT 0
+- `polyunsaturated_fat`: INTEGER NOT NULL DEFAULT 0
+- `monounsaturated_fat`: INTEGER NOT NULL DEFAULT 0
+- `trans_fat`: INTEGER NOT NULL DEFAULT 0
+- `cholesterol`: INTEGER NOT NULL DEFAULT 0
+- `sodium`: INTEGER NOT NULL DEFAULT 0
+- `potassium`: INTEGER NOT NULL DEFAULT 0
+- `vitamin_a`: INTEGER NOT NULL DEFAULT 0
+- `vitamin_c`: INTEGER NOT NULL DEFAULT 0
+- `calcium`: INTEGER NOT NULL DEFAULT 0
+- `iron`: INTEGER NOT NULL DEFAULT 0
+- `weight`: REAL
+- `weight_unit`: TEXT DEFAULT 'g'
+- `image_url`: TEXT NOT NULL
+- `file_key`: TEXT NOT NULL DEFAULT 'default_file_key'
+- `healthiness_rating`: INTEGER
+- `date`: TEXT NOT NULL
+- `meal_type`: TEXT
+- `brand_name`: TEXT
+- `quantity`: TEXT
+- `notes`: TEXT
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL
+
+### 2. user_profiles
+Comprehensive user profile information with extensive onboarding data.
+
+**Columns:**
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
 - `firebase_uid`: TEXT UNIQUE NOT NULL
 - `email`: TEXT UNIQUE NOT NULL
 - `first_name`: TEXT NOT NULL
 - `last_name`: TEXT
-- `onboarding_complete`: BOOLEAN DEFAULT 0
-- `height`: REAL (in cm)
-- `weight`: REAL (in kg)
-- `age`: INTEGER
-- `gender`: TEXT CHECK(gender IN ('male', 'female', 'other'))
-- `activity_level`: TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active'))
-- `target_weight`: REAL (in kg)
-- `starting_weight`: REAL (in kg)
-- `date_of_birth`: TIMESTAMP
+- `date_of_birth`: TEXT
 - `location`: TEXT
-- `is_imperial_units`: BOOLEAN DEFAULT 0
-- `profile_image_url`: TEXT
-- `created_at`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-- `updated_at`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `height`: REAL
+- `weight`: REAL
+- `age`: INTEGER
+- `gender`: TEXT
+- `activity_level`: TEXT
+- `target_weight`: REAL
+- `starting_weight`: REAL
+- `dietary_restrictions`: TEXT
+- `food_allergies`: TEXT
+- `cuisine_preferences`: TEXT
+- `spice_tolerance`: TEXT
+- `health_conditions`: TEXT
+- `fitness_goal`: TEXT
+- `weight_goal`: TEXT
+- `daily_calorie_target`: INTEGER
+- `nutrient_focus`: TEXT
+- `unit_preference`: TEXT DEFAULT 'metric'
+- `push_notifications_enabled`: INTEGER DEFAULT 1
+- `email_notifications_enabled`: INTEGER DEFAULT 1
+- `sms_notifications_enabled`: INTEGER DEFAULT 0
+- `marketing_emails_enabled`: INTEGER DEFAULT 1
+- `preferred_language`: TEXT DEFAULT 'en'
+- `timezone`: TEXT DEFAULT 'UTC'
+- `dark_mode`: INTEGER DEFAULT 0
+- `sync_data_offline`: INTEGER DEFAULT 1
+- `onboarding_complete`: INTEGER DEFAULT 0
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL
+- `protein_goal`: INTEGER
+- `carb_goal`: INTEGER
+- `fat_goal`: INTEGER
+- `weekly_workouts`: INTEGER
+- `step_goal`: INTEGER
+- `water_goal`: INTEGER
+- `sleep_goal`: INTEGER
+- `workout_frequency`: INTEGER
+- `sleep_quality`: TEXT
+- `stress_level`: TEXT
+- `eating_pattern`: TEXT
+- `motivations`: TEXT
+- `why_motivation`: TEXT
+- `projected_completion_date`: TEXT
+- `estimated_metabolic_age`: INTEGER
+- `estimated_duration_weeks`: INTEGER
+- `future_self_message`: TEXT
+- `future_self_message_type`: TEXT
+- `future_self_message_created_at`: TEXT
+- `diet_type`: TEXT
+- `use_metric_system`: INTEGER DEFAULT 1
 
-### 2. user_weights
-- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `user_id`: INTEGER NOT NULL (FOREIGN KEY to users.id)
-- `weight`: REAL NOT NULL (in kg)
-- `recorded_at`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+### 3. user_subscriptions
+Subscription management for premium features.
 
-### 3. nutrition_goals
+**Columns:**
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `user_id`: INTEGER UNIQUE NOT NULL (FOREIGN KEY to users.id)
+- `firebase_uid`: TEXT UNIQUE NOT NULL
+- `subscription_status`: TEXT NOT NULL DEFAULT 'free'
+- `start_date`: TEXT NOT NULL
+- `end_date`: TEXT
+- `auto_renew`: INTEGER DEFAULT 0
+- `payment_method`: TEXT
+- `subscription_id`: TEXT
+- `trial_ends_at`: TEXT
+- `canceled_at`: TEXT
+- `created_at`: TEXT NOT NULL DEFAULT (datetime('now'))
+- `updated_at`: TEXT NOT NULL DEFAULT (datetime('now'))
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL DEFAULT (datetime('now'))
+- **Foreign Key**: `firebase_uid` REFERENCES `user_profiles(firebase_uid)`
+
+### 4. user_weights
+Weight history tracking for progress monitoring.
+
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `firebase_uid`: TEXT NOT NULL
+- `weight`: REAL NOT NULL
+- `recorded_at`: TEXT NOT NULL DEFAULT (datetime('now'))
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL DEFAULT (datetime('now'))
+- **Foreign Key**: `firebase_uid` REFERENCES `user_profiles(firebase_uid)`
+
+### 5. nutrition_goals
+Nutrition targets and goals management.
+
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `firebase_uid`: TEXT UNIQUE NOT NULL
 - `target_weight`: REAL
 - `daily_calorie_goal`: INTEGER
 - `protein_goal`: INTEGER
@@ -42,100 +159,120 @@ PlateMate uses SQLite for local development/offline functionality. This document
 - `fat_goal`: INTEGER
 - `weight_goal`: TEXT CHECK(weight_goal IN ('lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5'))
 - `activity_level`: TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active'))
-
-### 4. fitness_goals
-- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `user_id`: INTEGER UNIQUE NOT NULL (FOREIGN KEY to users.id)
-- `weekly_workouts`: INTEGER
-- `daily_step_goal`: INTEGER
-- `water_intake_goal`: INTEGER (in ml)
-
-### 5. user_gamification
-- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `user_id`: INTEGER UNIQUE NOT NULL (FOREIGN KEY to users.id)
-- `level`: INTEGER DEFAULT 1
-- `xp`: INTEGER DEFAULT 0
-- `xp_to_next_level`: INTEGER DEFAULT 100
-- `rank`: TEXT DEFAULT 'Beginner'
-- `streak_days`: INTEGER DEFAULT 0
-- `last_activity_date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL
 
 ### 6. cheat_day_settings
+Cheat day management and scheduling.
+
+**Columns:**
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `firebase_uid`: TEXT UNIQUE NOT NULL (FOREIGN KEY to user_profiles.firebase_uid)
-- `cheat_day_frequency`: INTEGER DEFAULT 7 (days between cheat days)
-- `last_cheat_day`: TEXT (ISO date string)
-- `next_cheat_day`: TEXT (ISO date string)
-- `enabled`: INTEGER DEFAULT 1 (boolean: 1 = enabled, 0 = disabled)
+- `firebase_uid`: TEXT UNIQUE NOT NULL
+- `cheat_day_frequency`: INTEGER DEFAULT 7
+- `last_cheat_day`: TEXT
+- `next_cheat_day`: TEXT
+- `enabled`: INTEGER DEFAULT 1
+- `preferred_day_of_week`: INTEGER
 - `created_at`: TEXT DEFAULT (datetime('now'))
 - `updated_at`: TEXT DEFAULT (datetime('now'))
 - `synced`: INTEGER DEFAULT 0
 - `sync_action`: TEXT DEFAULT 'create'
 - `last_modified`: TEXT NOT NULL DEFAULT (datetime('now'))
+- **Foreign Key**: `firebase_uid` REFERENCES `user_profiles(firebase_uid)`
 
-### 7. achievements
+### 7. exercises
+Exercise logging and tracking.
+
+**Columns:**
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `name`: TEXT NOT NULL
-- `description`: TEXT NOT NULL
-- `icon`: TEXT
-- `xp_reward`: INTEGER DEFAULT 50
-
-### 8. user_achievements
-- `user_id`: INTEGER NOT NULL (FOREIGN KEY to users.id)
-- `achievement_id`: INTEGER NOT NULL (FOREIGN KEY to achievements.id)
-- `completed`: BOOLEAN DEFAULT 0
-- `completed_at`: TIMESTAMP
-- PRIMARY KEY (user_id, achievement_id)
-
-### 9. food_logs
-- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `meal_id`: INTEGER NOT NULL
-- `user_id`: INTEGER (FOREIGN KEY to users.id)
-- `food_name`: TEXT NOT NULL
-- `calories`: INTEGER NOT NULL
-- `proteins`: INTEGER NOT NULL
-- `carbs`: INTEGER NOT NULL
-- `fats`: INTEGER NOT NULL
-- `fiber`: INTEGER NOT NULL
-- `sugar`: INTEGER NOT NULL
-- `saturated_fat`: INTEGER NOT NULL
-- `polyunsaturated_fat`: INTEGER NOT NULL
-- `monounsaturated_fat`: INTEGER NOT NULL
-- `trans_fat`: INTEGER NOT NULL
-- `cholesterol`: INTEGER NOT NULL
-- `sodium`: INTEGER NOT NULL
-- `potassium`: INTEGER NOT NULL
-- `vitamin_a`: INTEGER NOT NULL
-- `vitamin_c`: INTEGER NOT NULL
-- `calcium`: INTEGER NOT NULL
-- `iron`: INTEGER NOT NULL
-- `weight`: REAL
-- `weight_unit`: TEXT DEFAULT 'g'
-- `image_url`: TEXT NOT NULL
-- `file_key`: TEXT NOT NULL DEFAULT 'default_file_key'
-- `healthiness_rating`: INTEGER
-- `date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-- `meal_type`: TEXT
-
-### 10. exercises
-- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
-- `user_id`: INTEGER (FOREIGN KEY to users.id)
+- `user_id`: INTEGER DEFAULT 1
 - `exercise_name`: TEXT NOT NULL
 - `calories_burned`: INTEGER NOT NULL
-- `duration`: INTEGER NOT NULL (in minutes)
-- `date`: TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- `duration`: INTEGER NOT NULL
+- `date`: TEXT NOT NULL
 - `notes`: TEXT
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL
 
-### 11. alembic_version
-- `version_num`: TEXT NOT NULL
+### 8. steps
+Daily step tracking.
 
-## Relationships
-- `users` -> `food_logs`: one-to-many
-- `users` -> `exercises`: one-to-many
-- `users` -> `nutrition_goals`: one-to-one
-- `users` -> `fitness_goals`: one-to-one
-- `users` -> `user_gamification`: one-to-one
-- `users` -> `user_achievements`: one-to-many
-- `users` -> `user_weights`: one-to-many
-- `users` -> `cheat_day_settings`: one-to-one
-- `achievements` -> `user_achievements`: one-to-many 
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `user_id`: INTEGER DEFAULT 1
+- `date`: TEXT NOT NULL
+- `count`: INTEGER NOT NULL DEFAULT 0
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL
+
+### 9. user_streaks
+User activity streak tracking for gamification.
+
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `firebase_uid`: TEXT UNIQUE NOT NULL
+- `current_streak`: INTEGER DEFAULT 0
+- `longest_streak`: INTEGER DEFAULT 0
+- `last_activity_date`: TEXT
+- `synced`: INTEGER DEFAULT 0
+- `sync_action`: TEXT DEFAULT 'create'
+- `last_modified`: TEXT NOT NULL
+
+### 10. sync_log
+Synchronization status tracking.
+
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `last_sync`: TEXT
+- `sync_status`: TEXT
+
+### 11. api_tokens
+API token management for external services.
+
+**Columns:**
+- `id`: INTEGER PRIMARY KEY AUTOINCREMENT
+- `service_name`: TEXT NOT NULL UNIQUE
+- `token`: TEXT NOT NULL
+- `token_type`: TEXT NOT NULL DEFAULT 'Bearer'
+- `expiry_time`: INTEGER NOT NULL
+- `created_at`: TEXT NOT NULL DEFAULT (datetime('now'))
+- `updated_at`: TEXT NOT NULL DEFAULT (datetime('now'))
+
+## Database Configuration
+- **Journal Mode**: WAL (Write-Ahead Logging)
+- **Synchronous**: NORMAL
+- **Cache Size**: 10000
+- **Temp Store**: MEMORY
+- **Busy Timeout**: 30000ms (30 seconds)
+
+## Key Relationships
+- `user_profiles.firebase_uid` -> Primary user identifier used across all user-related tables
+- `user_subscriptions.firebase_uid` -> `user_profiles.firebase_uid`
+- `user_weights.firebase_uid` -> `user_profiles.firebase_uid`
+- `cheat_day_settings.firebase_uid` -> `user_profiles.firebase_uid`
+- `nutrition_goals.firebase_uid` -> `user_profiles.firebase_uid`
+- `user_streaks.firebase_uid` -> `user_profiles.firebase_uid`
+
+## Migration System
+- Current version: 11
+- Version tracking via AsyncStorage key: 'DB_VERSION'
+- Migrations handle backward compatibility and column additions
+- All migrations are non-destructive and preserve existing data
+
+## Sync System
+- All tables include sync tracking fields: `synced`, `sync_action`, `last_modified`
+- Supports offline-first functionality with backend synchronization
+- Firebase Authentication integration for user identification
+
+## Notes
+- Database is created at runtime by React Native app
+- Uses Expo SQLite for React Native implementation
+- All timestamp fields use TEXT format with ISO strings
+- Boolean fields use INTEGER (0/1) following SQLite conventions
+- Comprehensive nutrition tracking with 20+ nutritional fields
+- Supports both metric and imperial units
+- Includes gamification features (streaks, achievements)
+- Premium subscription management built-in 
