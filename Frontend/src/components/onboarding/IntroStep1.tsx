@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ interface IntroStep1Props {
 }
 
 const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
+    const navigation = useNavigation();
     const fadeIn = useRef(new Animated.Value(0)).current;
     const slideUp = useRef(new Animated.Value(20)).current;
     const scanAnimation = useRef(new Animated.Value(0)).current;
@@ -76,12 +78,25 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
         outputRange: [0, width * 0.65],
     });
 
+    const handleSignIn = () => {
+        (navigation as any).navigate('Auth');
+    };
+
     return (
         <View style={styles.container}>
             <LinearGradient
                 colors={['#000000', '#0a0a1e', '#1a1a38']}
                 style={styles.background}
             />
+
+            {/* Sign In Button */}
+            <TouchableOpacity
+                style={styles.signInButton}
+                onPress={handleSignIn}
+                activeOpacity={0.7}
+            >
+                <Text style={styles.signInText}>Sign In</Text>
+            </TouchableOpacity>
 
             <Animated.View
                 style={[
@@ -195,7 +210,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                                     backgroundColor: index % 2 === 0 ? '#0074dd15' : '#dd009515'
                                 }]}>
                                     <MaterialCommunityIcons
-                                        name={feature.icon}
+                                        name={feature.icon as any}
                                         size={14}
                                         color={index % 2 === 0 ? '#0074dd' : '#dd0095'}
                                     />
@@ -217,7 +232,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                         ].map((stat, index) => (
                             <View key={index} style={styles.statCard}>
                                 <View style={[styles.statIcon, { backgroundColor: stat.color + '15' }]}>
-                                    <MaterialCommunityIcons name={stat.icon} size={12} color={stat.color} />
+                                    <MaterialCommunityIcons name={stat.icon as any} size={12} color={stat.color} />
                                 </View>
                                 <Text style={styles.statValue}>{stat.value}</Text>
                                 <Text style={styles.statLabel}>{stat.label}</Text>
@@ -528,26 +543,48 @@ const styles = StyleSheet.create({
         marginTop: 25,
     },
     button: {
-        shadowColor: '#dd0095',
-        shadowOffset: { width: 0, height: 6 },
+        width: '100%',
+        height: 60,
+        borderRadius: 30,
+        marginHorizontal: 20,
+        overflow: 'hidden',
+        elevation: 8,
+        shadowColor: '#9333ea',
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 6,
+        shadowRadius: 8,
     },
     buttonGradient: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 32,
-        paddingVertical: 14,
-        borderRadius: 26,
-        minWidth: width * 0.7,
+        paddingHorizontal: 20,
+        gap: 8,
     },
     buttonText: {
         color: '#fff',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
-        marginHorizontal: 10,
+        letterSpacing: 0.5,
+    },
+    signInButton: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        zIndex: 1000,
+    },
+    signInText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '500',
+        opacity: 0.8,
     },
 });
 

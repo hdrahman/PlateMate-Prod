@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ interface IntroStep3Props {
 }
 
 const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
+    const navigation = useNavigation();
     const fadeIn = useRef(new Animated.Value(0)).current;
     const slideUp = useRef(new Animated.Value(20)).current;
     const progressWidth = useRef(new Animated.Value(0)).current;
@@ -51,12 +53,25 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
         outputRange: ['0%', '78%'],
     });
 
+    const handleSignIn = () => {
+        (navigation as any).navigate('Auth');
+    };
+
     return (
         <View style={styles.container}>
             <LinearGradient
                 colors={['#000000', '#0a0a1c', '#1a1a35']}
                 style={styles.background}
             />
+
+            {/* Sign In Button */}
+            <TouchableOpacity
+                style={styles.signInButton}
+                onPress={handleSignIn}
+                activeOpacity={0.7}
+            >
+                <Text style={styles.signInText}>Sign In</Text>
+            </TouchableOpacity>
 
             <Animated.View
                 style={[
@@ -429,9 +444,9 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#fff',
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: '600',
-        marginHorizontal: 8,
+        letterSpacing: 0.5,
     },
     dots: {
         flexDirection: 'row',
@@ -519,6 +534,24 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
+    },
+    signInButton: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        zIndex: 1000,
+    },
+    signInText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '500',
+        opacity: 0.8,
     },
 });
 
