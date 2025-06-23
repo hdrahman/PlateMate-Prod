@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
         marginLeft: 5,
     },
     featuresSection: {
-        marginBottom: 40,
+        marginBottom: 30,
     },
     featuresGrid: {
         flexDirection: 'row',
