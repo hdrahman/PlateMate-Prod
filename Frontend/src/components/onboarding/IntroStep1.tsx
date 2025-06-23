@@ -43,12 +43,12 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                 Animated.sequence([
                     Animated.timing(scanAnimation, {
                         toValue: 1,
-                        duration: 2000,
+                        duration: 3000,
                         useNativeDriver: true,
                     }),
                     Animated.timing(scanAnimation, {
                         toValue: 0,
-                        duration: 100,
+                        duration: 3000,
                         useNativeDriver: true,
                     }),
                 ])
@@ -73,7 +73,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
 
     const scanY = scanAnimation.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 150],
+        outputRange: [0, width * 0.65],
     });
 
     return (
@@ -103,13 +103,13 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                 <View style={styles.scannerSection}>
                     <View style={styles.scannerFrame}>
                         <LinearGradient
-                            colors={['rgba(0,116,221,0.15)', 'rgba(92,0,221,0.1)', 'rgba(221,0,149,0.05)']}
+                            colors={['rgba(147,51,234,0.15)', 'rgba(168,85,247,0.1)', 'rgba(196,181,253,0.05)']}
                             style={styles.frameGradient}
                         >
                             <Image
                                 source={require('../../../assets/food.png')}
                                 style={styles.foodImage}
-                                resizeMode="cover"
+                                resizeMode="contain"
                             />
 
                             {/* Scanning overlay */}
@@ -120,7 +120,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                                 ]}
                             >
                                 <LinearGradient
-                                    colors={['transparent', '#0074dd', 'transparent']}
+                                    colors={['transparent', '#9333ea', 'transparent']}
                                     style={styles.scanGradient}
                                 />
                             </Animated.View>
@@ -189,8 +189,6 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                         {[
                             { icon: 'food-apple', title: 'Instant Nutrition', subtitle: 'Facts' },
                             { icon: 'camera', title: 'Smart Photo', subtitle: 'Recognition' },
-                            { icon: 'flash', title: 'Real-time', subtitle: 'Analysis' },
-                            { icon: 'star', title: 'AI-Powered', subtitle: 'Accuracy' },
                         ].map((feature, index) => (
                             <View key={index} style={styles.featureCard}>
                                 <View style={[styles.featureIcon, {
@@ -263,12 +261,12 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 20,
         paddingTop: 0,
-        paddingBottom: 80,
-        justifyContent: 'space-between',
+        paddingBottom: 40,
+        justifyContent: 'flex-start',
     },
     header: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 15,
     },
     tag: {
         fontSize: 10,
@@ -302,17 +300,20 @@ const styles = StyleSheet.create({
     scannerSection: {
         alignItems: 'center',
         marginBottom: 30,
+        marginHorizontal: 20,
+        paddingVertical: 0,
+        marginTop: 15,
     },
     scannerFrame: {
-        width: width * 0.8,
-        height: height * 0.35,
+        width: width * 0.95,
+        height: width * 0.65,
         borderRadius: 20,
         overflow: 'hidden',
     },
     frameGradient: {
         flex: 1,
         borderWidth: 2,
-        borderColor: 'rgba(0,116,221,0.3)',
+        borderColor: 'rgba(147,51,234,0.4)',
         borderRadius: 18,
         position: 'relative',
         overflow: 'hidden',
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         width: 20,
         height: 20,
-        borderColor: '#0074dd',
+        borderColor: '#9333ea',
         borderWidth: 2,
     },
     topLeft: {
@@ -377,42 +378,42 @@ const styles = StyleSheet.create({
     // Floating Nutrition Tags
     nutritionTag1: {
         position: 'absolute',
-        top: -8,
-        left: -15,
+        top: '10%',
+        left: 30,
         zIndex: 5,
     },
     nutritionTag2: {
         position: 'absolute',
-        top: -8,
-        right: -15,
+        top: '10%',
+        right: 30,
         zIndex: 5,
     },
     nutritionTag3: {
         position: 'absolute',
-        bottom: 20,
-        left: -15,
+        bottom: '10%',
+        left: 30,
         zIndex: 5,
     },
     nutritionTag4: {
         position: 'absolute',
-        bottom: -8,
-        right: -15,
+        bottom: '10%',
+        right: 30,
         zIndex: 5,
     },
     nutritionTagContent: {
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        paddingHorizontal: 8,
-        paddingVertical: 6,
-        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderColor: 'rgba(147,51,234,0.3)',
         alignItems: 'center',
-        minWidth: 55,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 4,
+        minWidth: 60,
+        shadowColor: '#9333ea',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        elevation: 6,
     },
     nutritionValue: {
         color: '#fff',
@@ -437,21 +438,21 @@ const styles = StyleSheet.create({
     analysisLabel: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.8)',
+        backgroundColor: 'rgba(0,0,0,0.6)',
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(0,116,221,0.3)',
+        borderColor: 'rgba(147,51,234,0.3)',
     },
     analysisText: {
-        color: '#0074dd',
+        color: '#9333ea',
         fontSize: 11,
         fontWeight: '600',
         marginLeft: 5,
     },
     featuresSection: {
-        marginBottom: 25,
+        marginBottom: 40,
     },
     featuresGrid: {
         flexDirection: 'row',
@@ -460,7 +461,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     featureCard: {
-        width: '47%',
+        width: '48%',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.03)',
         paddingVertical: 12,
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     statsSection: {
-        marginBottom: 25,
+        marginBottom: 12,
     },
     statsRow: {
         flexDirection: 'row',
@@ -524,6 +525,7 @@ const styles = StyleSheet.create({
     },
     cta: {
         alignItems: 'center',
+        marginTop: 25,
     },
     button: {
         shadowColor: '#dd0095',
