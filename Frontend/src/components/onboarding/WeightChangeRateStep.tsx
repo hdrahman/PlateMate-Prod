@@ -99,7 +99,11 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
         <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
                 <Text style={styles.title}>Set Your Pace</Text>
-                <Text style={styles.subtitle}>Choose a comfortable rate of progress</Text>
+                <Text style={styles.subtitle}>
+                    Based on your goal of "{profile.fitnessGoal === 'fat_loss' ? 'weight loss' :
+                        profile.fitnessGoal === 'muscle_gain' ? 'muscle gain' : 'balanced fitness'}",
+                    choose a comfortable rate of progress
+                </Text>
             </View>
 
             <View style={styles.rateContainer}>
@@ -141,6 +145,14 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
                 ))}
             </View>
 
+            <View style={styles.infoContainer}>
+                <Ionicons name="information-circle-outline" size={20} color="#0074dd" />
+                <Text style={styles.infoText}>
+                    Your pace determines how aggressive your calorie deficit or surplus will be.
+                    Slower rates are more sustainable long-term.
+                </Text>
+            </View>
+
             <View style={styles.divider} />
 
             <View style={styles.cheatDaySection}>
@@ -161,58 +173,30 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
                             Cheat days can help maintain motivation and make your plan more sustainable
                         </Text>
 
-                        <View style={styles.frequencyContainer}>
-                            <Text style={styles.frequencyLabel}>Frequency:</Text>
-                            <View style={styles.frequencyControls}>
-                                <TouchableOpacity
-                                    style={styles.frequencyButton}
-                                    onPress={() => handleCheatDayFrequencyChange(false)}
-                                    disabled={cheatDayFrequency <= 1}
-                                >
-                                    <Ionicons name="remove" size={24} color="#fff" />
-                                </TouchableOpacity>
-                                <Text style={styles.frequencyValue}>
-                                    {cheatDayFrequency === 1 ? 'Every day' :
-                                        cheatDayFrequency === 7 ? 'Once a week' :
-                                            cheatDayFrequency === 14 ? 'Every two weeks' :
-                                                `Every ${cheatDayFrequency} days`}
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.frequencyButton}
-                                    onPress={() => handleCheatDayFrequencyChange(true)}
-                                    disabled={cheatDayFrequency >= 14}
-                                >
-                                    <Ionicons name="add" size={24} color="#fff" />
-                                </TouchableOpacity>
+                        <View style={styles.daySelectionContainer}>
+                            <Text style={styles.daySelectionLabel}>Preferred day:</Text>
+                            <View style={styles.daysContainer}>
+                                {[0, 1, 2, 3, 4, 5, 6].map((dayIndex) => (
+                                    <TouchableOpacity
+                                        key={dayIndex}
+                                        style={[
+                                            styles.dayButton,
+                                            preferredCheatDay === dayIndex && styles.selectedDay
+                                        ]}
+                                        onPress={() => handleCheatDayChange(dayIndex)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.dayText,
+                                                preferredCheatDay === dayIndex && styles.selectedDayText
+                                            ]}
+                                        >
+                                            {getDayName(dayIndex).substring(0, 3)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
                             </View>
                         </View>
-
-                        {cheatDayFrequency === 7 && (
-                            <View style={styles.daySelectionContainer}>
-                                <Text style={styles.daySelectionLabel}>Preferred day:</Text>
-                                <View style={styles.daysContainer}>
-                                    {[0, 1, 2, 3, 4, 5, 6].map((dayIndex) => (
-                                        <TouchableOpacity
-                                            key={dayIndex}
-                                            style={[
-                                                styles.dayButton,
-                                                preferredCheatDay === dayIndex && styles.selectedDay
-                                            ]}
-                                            onPress={() => handleCheatDayChange(dayIndex)}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.dayText,
-                                                    preferredCheatDay === dayIndex && styles.selectedDayText
-                                                ]}
-                                            >
-                                                {getDayName(dayIndex).substring(0, 3)}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            </View>
-                        )}
                     </>
                 )}
             </View>
@@ -328,36 +312,6 @@ const styles = StyleSheet.create({
         color: '#aaa',
         marginBottom: 20,
         lineHeight: 20,
-    },
-    frequencyContainer: {
-        marginBottom: 24,
-    },
-    frequencyLabel: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#fff',
-        marginBottom: 12,
-    },
-    frequencyControls: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 12,
-        padding: 12,
-    },
-    frequencyButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    frequencyValue: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#fff',
     },
     daySelectionContainer: {
         marginBottom: 16,

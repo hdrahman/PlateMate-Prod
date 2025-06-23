@@ -35,6 +35,7 @@ import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesS
 import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
 import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
 import SubscriptionStep from '../components/onboarding/SubscriptionStep';
+import AccountCreationStep from '../components/onboarding/AccountCreationStep';
 
 const { width, height } = Dimensions.get('window');
 
@@ -76,7 +77,7 @@ const Onboarding = () => {
     const handleNext = async () => {
         setError(null);
         try {
-            await goToNextStep();
+            goToNextStep();
         } catch (error) {
             console.error('Error going to next step:', error);
             setError('Failed to proceed to next step. Please try again.');
@@ -173,7 +174,7 @@ const Onboarding = () => {
             case 1:
             case 2:
             case 3:
-                return <WelcomeStep onNext={handleNext} />;
+                return <WelcomeStep currentStep={currentStep} onNext={handleNext} />;
             case 4:
                 return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 5:
@@ -195,7 +196,13 @@ const Onboarding = () => {
             case 13:
                 return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 14:
-                return <SubscriptionStep onComplete={handleCompleteOnboarding} />;
+                return <SubscriptionStep onComplete={handleNext} />;
+            case 15:
+                return <AccountCreationStep
+                    profile={profile}
+                    onComplete={handleCompleteOnboarding}
+                    onSkip={handleSkip}
+                />;
             default:
                 return <WelcomeStep onNext={handleNext} />;
         }
@@ -211,10 +218,10 @@ const Onboarding = () => {
             />
 
             <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-                {/* Only show progress dots after intro screens (steps 1-3) */}
-                {currentStep > 3 && (
+                {/* Only show progress dots during main onboarding (steps 4-14) */}
+                {currentStep > 3 && currentStep < 15 && (
                     <View style={styles.progressContainer}>
-                        {Array.from({ length: totalSteps - 3 }).map((_, index) => (
+                        {Array.from({ length: 11 }).map((_, index) => ( // 11 main onboarding steps (4-14)
                             <View
                                 key={index}
                                 style={[
@@ -228,8 +235,8 @@ const Onboarding = () => {
                     </View>
                 )}
 
-                {/* Hide Back button during intro screens (steps 1-3) */}
-                {currentStep > 3 && (
+                {/* Hide Back button during intro screens and account creation */}
+                {currentStep > 3 && currentStep < 15 && (
                     <TouchableOpacity
                         style={[styles.backButton, { top: Math.max(insets.top + 10, 20) }]}
                         onPress={handleBack}
@@ -242,8 +249,8 @@ const Onboarding = () => {
                     </TouchableOpacity>
                 )}
 
-                {/* Hide Skip button during intro screens (steps 1-3) */}
-                {currentStep > 3 && currentStep < totalSteps && (
+                {/* Hide Skip button during intro screens and account creation */}
+                {currentStep > 3 && currentStep < 15 && (
                     <TouchableOpacity
                         style={[styles.skipButton, { top: Math.max(insets.top + 10, 20) }]}
                         onPress={handleSkip}
@@ -261,11 +268,11 @@ const Onboarding = () => {
                 <ScrollView
                     contentContainerStyle={[
                         styles.content,
-                        currentStep <= 3 && styles.introContent
+                        (currentStep <= 3 || currentStep === 15) && styles.introContent
                     ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 3} // Disable scrolling for intro screens
+                    scrollEnabled={currentStep > 3 && currentStep < 15} // Disable scrolling for intro screens and account creation
                 >
                     {renderCurrentStep()}
                 </ScrollView>

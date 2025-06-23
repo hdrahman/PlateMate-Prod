@@ -517,53 +517,25 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
 
                 {cheatDayEnabled && (
                     <View style={styles.cheatDayFrequencyContainer}>
-                        <Text style={styles.cheatDayFrequencyTitle}>Cheat Day Frequency</Text>
-                        <View style={styles.frequencyOptions}>
-                            {frequencyOptions.map((option) => (
-                                <TouchableOpacity
-                                    key={option.id}
-                                    style={[
-                                        styles.frequencyOption,
-                                        cheatDayFrequency === option.days && styles.selectedFrequencyOption
-                                    ]}
-                                    onPress={() => setCheatDayFrequency(option.days)}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.frequencyOptionText,
-                                            cheatDayFrequency === option.days && styles.selectedFrequencyOptionText
-                                        ]}
-                                    >
-                                        {option.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                        <Text style={styles.cheatDayFrequencyDescription}>
-                            You'll have a cheat day every {cheatDayFrequency} days
-                        </Text>
-
-                        <View style={styles.preferredDayContainer}>
-                            <Text style={styles.cheatDayFrequencyTitle}>Preferred Cheat Day</Text>
-                            <TouchableOpacity
-                                style={styles.daySelector}
-                                onPress={() => setShowPreferredDayPicker(true)}
-                            >
-                                <Text style={styles.daySelectorText}>
-                                    {preferredCheatDayOfWeek !== undefined
-                                        ? dayNames[preferredCheatDayOfWeek]
-                                        : 'From Today (Flexible)'
-                                    }
-                                </Text>
-                                <Ionicons name="chevron-down" size={20} color="#fff" />
-                            </TouchableOpacity>
-                            <Text style={styles.dayHintText}>
+                        <Text style={styles.cheatDayFrequencyTitle}>Preferred Cheat Day</Text>
+                        <TouchableOpacity
+                            style={styles.daySelector}
+                            onPress={() => setShowPreferredDayPicker(true)}
+                        >
+                            <Text style={styles.daySelectorText}>
                                 {preferredCheatDayOfWeek !== undefined
-                                    ? `Your cheat days will always fall on ${dayNames[preferredCheatDayOfWeek]}s`
-                                    : 'Choose a specific day of the week for your cheat days, or leave flexible'
+                                    ? dayNames[preferredCheatDayOfWeek]
+                                    : 'From Today (Flexible)'
                                 }
                             </Text>
-                        </View>
+                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                        </TouchableOpacity>
+                        <Text style={styles.dayHintText}>
+                            {preferredCheatDayOfWeek !== undefined
+                                ? `Your cheat days will always fall on ${dayNames[preferredCheatDayOfWeek]}s`
+                                : 'Choose a specific day of the week for your cheat days, or leave flexible'
+                            }
+                        </Text>
                     </View>
                 )}
             </View>

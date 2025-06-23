@@ -53,8 +53,16 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
         outputRange: ['0%', '78%'],
     });
 
+    const handleBeginJourney = () => {
+        // Navigate directly to onboarding steps without requiring authentication
+        onNext();
+    };
+
     const handleSignIn = () => {
-        (navigation as any).navigate('Auth');
+        (navigation as any).navigate('Auth', {
+            returnTo: 'onboarding',
+            skipIntroSteps: true
+        });
     };
 
     return (
@@ -206,7 +214,7 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
 
                 {/* CTA */}
                 <View style={styles.cta}>
-                    <TouchableOpacity style={styles.button} onPress={onNext}>
+                    <TouchableOpacity style={styles.button} onPress={handleBeginJourney}>
                         <LinearGradient
                             colors={["#0074dd", "#5c00dd", "#dd0095"]}
                             start={{ x: 0, y: 0 }}

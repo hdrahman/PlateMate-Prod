@@ -17,7 +17,7 @@ interface ActivityLevelStepProps {
 }
 
 const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updateProfile, onNext }) => {
-    const [activityLevel, setActivityLevel] = useState<string>(profile.activityLevel || 'moderate');
+    const [activityLevel, setActivityLevel] = useState<string>(profile.activityLevel || 'sedentary');
 
     // Activity levels with detailed descriptions
     const activityLevels = [

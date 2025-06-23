@@ -334,10 +334,13 @@ function AppNavigator() {
         }}
       >
         {!user ? (
-          // Authentication flow
-          <Stack.Screen name="Auth" component={Auth} />
+          // Show IntroStep screens first when not logged in, with Auth available for sign in
+          <>
+            <Stack.Screen name="Onboarding" component={Onboarding} />
+            <Stack.Screen name="Auth" component={Auth} />
+          </>
         ) : !onboardingComplete ? (
-          // Onboarding flow
+          // Continue onboarding flow after login
           <Stack.Screen name="Onboarding" component={Onboarding} />
         ) : (
           // Main app flow

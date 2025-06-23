@@ -122,7 +122,7 @@ const defaultProfile: UserProfile = {
     weight: null,
     age: null,
     gender: null,
-    activityLevel: null,
+    activityLevel: 'sedentary',
     dietaryRestrictions: [],
     foodAllergies: [],
     cuisinePreferences: [],
@@ -164,7 +164,7 @@ const defaultProfile: UserProfile = {
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 12,
+    totalSteps: 15, // Updated to include intro steps (3) + onboarding (11) + account creation (1)
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -304,7 +304,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const [profile, setProfile] = useState<UserProfile>(defaultProfile);
     const [isLoading, setIsLoading] = useState(false);
 
-    const totalSteps = 14;
+    const totalSteps = 15;
 
     // Reset state when user changes
     useEffect(() => {
@@ -352,7 +352,8 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 } else {
                     console.log('ℹ️ No profile found in SQLite, user needs onboarding');
                     setOnboardingComplete(false);
-                    setCurrentStep(1);
+                    // For logged-in users without a profile, start at step 4 (skip intro steps)
+                    setCurrentStep(4);
                     setProfile(defaultProfile);
                 }
             } catch (error) {
@@ -386,6 +387,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     // Go to next step
     const goToNextStep = () => {
         const nextStep = Math.min(currentStep + 1, totalSteps);
+        console.log(`🚀 Moving from step ${currentStep} to step ${nextStep}`);
         setCurrentStep(nextStep);
         saveOnboardingProgress();
     };

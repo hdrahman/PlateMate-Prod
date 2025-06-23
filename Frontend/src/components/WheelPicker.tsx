@@ -93,8 +93,9 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
         const y = event.nativeEvent.contentOffset.y;
         const velocity = event.nativeEvent.velocity?.y || 0;
 
-        // If the scroll velocity is low enough, snap immediately
-        if (Math.abs(velocity) < 0.5) {
+        // Improved velocity threshold - if the scroll velocity is low enough, snap immediately
+        // This prevents the slingshot effect by catching slower movements
+        if (Math.abs(velocity) < 1.0) {
             const index = Math.round(y / itemHeight);
             snapToIndex(index);
         }
@@ -108,14 +109,17 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
     };
 
     const snapToIndex = (index: number) => {
-        if (index >= 0 && index < data.length) {
+        // Clamp index to valid range to prevent slingshot
+        const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
+
+        if (clampedIndex >= 0 && clampedIndex < data.length) {
             // Ensure we snap to the exact position with precision
-            scrollToIndex(index, true);
+            scrollToIndex(clampedIndex, true);
 
             // Only update if value changed
-            if (index !== currentIndex) {
-                setCurrentIndex(index);
-                onValueChange(data[index].id);
+            if (clampedIndex !== currentIndex) {
+                setCurrentIndex(clampedIndex);
+                onValueChange(data[clampedIndex].id);
             }
         }
     };

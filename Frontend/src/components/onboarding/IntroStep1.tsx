@@ -79,7 +79,10 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
     });
 
     const handleSignIn = () => {
-        (navigation as any).navigate('Auth');
+        (navigation as any).navigate('Auth', {
+            returnTo: 'onboarding',
+            skipIntroSteps: true
+        });
     };
 
     return (

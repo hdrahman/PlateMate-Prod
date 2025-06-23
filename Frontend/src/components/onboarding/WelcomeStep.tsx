@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -21,6 +21,7 @@ import IntroStep3 from './IntroStep3';
 const { width, height } = Dimensions.get('window');
 
 interface WelcomeStepProps {
+    currentStep: number;
     onNext: () => void;
 }
 
@@ -29,10 +30,22 @@ interface ViewableItemsChangedInfo {
     changed: Array<ViewToken>;
 }
 
-const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+const WelcomeStep: React.FC<WelcomeStepProps> = ({ currentStep, onNext }) => {
+    const [currentIndex, setCurrentIndex] = useState(currentStep - 1); // Convert step to index
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
+
+    // Update FlatList position when currentStep changes
+    useEffect(() => {
+        const targetIndex = currentStep - 1;
+        if (targetIndex !== currentIndex) {
+            setCurrentIndex(targetIndex);
+            flatListRef.current?.scrollToIndex({
+                index: targetIndex,
+                animated: false
+            });
+        }
+    }, [currentStep]);
 
     const handleViewableItemsChanged = useRef(({ viewableItems }: ViewableItemsChangedInfo) => {
         if (viewableItems.length > 0) {
@@ -40,25 +53,27 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
         }
     }).current;
 
-    const handleNextSlide = () => {
-        if (currentIndex < 2) {
-            flatListRef.current?.scrollToIndex({
-                index: currentIndex + 1,
-                animated: true
-            });
-        } else {
-            onNext();
-        }
+    // Separate handlers for each step to avoid state sync issues
+    const handleStep1Next = () => {
+        onNext(); // This will move to step 2
+    };
+
+    const handleStep2Next = () => {
+        onNext(); // This will move to step 3
+    };
+
+    const handleStep3Next = () => {
+        onNext(); // This will move to step 4 (start main onboarding)
     };
 
     const renderItem = ({ item, index }: { item: number; index: number }) => {
         switch (index) {
             case 0:
-                return <IntroStep1 onNext={handleNextSlide} />;
+                return <IntroStep1 onNext={handleStep1Next} />;
             case 1:
-                return <IntroStep2 onNext={handleNextSlide} />;
+                return <IntroStep2 onNext={handleStep2Next} />;
             case 2:
-                return <IntroStep3 onNext={handleNextSlide} />;
+                return <IntroStep3 onNext={handleStep3Next} />;
             default:
                 return null;
         }

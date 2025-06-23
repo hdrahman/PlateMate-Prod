@@ -145,6 +145,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
         borderWidth: 2,
         borderColor: 'rgba(255, 255, 255, 0.1)',
+        minHeight: 140,
     },
     selectedGender: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -162,6 +163,9 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: '#fff',
+        textAlign: 'center',
+        width: '100%',
+        paddingHorizontal: 4,
     },
     infoContainer: {
         flexDirection: 'row',
