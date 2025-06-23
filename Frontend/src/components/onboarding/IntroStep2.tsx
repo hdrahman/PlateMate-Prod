@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     tag: {
         fontSize: 10,
@@ -241,21 +241,21 @@ const styles = StyleSheet.create({
         color: '#dd0095',
     },
     imageContainer: {
-        height: height * 0.7,
+        height: height * 0.6,
         position: 'relative',
         marginHorizontal: -25,
-        marginBottom: 25,
+        marginBottom: 100,
         borderRadius: 20,
         overflow: 'hidden',
     },
     fullScreenImage: {
         width: '100%',
-        height: '100%',
+        height: '115%',
         position: 'absolute',
-        top: 0,
+        top: -35,
         left: 0,
         right: 0,
-        bottom: 0,
+        bottom: -40,
     },
     imageOverlay: {
         position: 'absolute',
@@ -466,6 +466,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 12,
         elevation: 6,
+        marginTop: -125,
     },
     buttonGradient: {
         flexDirection: 'row',
