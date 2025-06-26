@@ -1,7 +1,7 @@
 import { BACKEND_URL } from '../utils/config';
 import axios from 'axios';
-import { auth } from '../utils/firebase/index';
-import tokenManager from '../utils/firebase/tokenManager';
+import { supabase } from '../utils/supabaseClient';
+import tokenManager, { ServiceTokenType } from '../utils/tokenManager';
 
 // Backend API base URL
 const BACKEND_BASE_URL = BACKEND_URL;
@@ -13,18 +13,18 @@ const getAuthHeaders = async () => {
     try {
         console.log('Getting auth headers...');
 
-        // First, try to get user from auth
-        const user = auth.currentUser;
+        // First, try to get user from Supabase auth
+        const { data: { user } } = await supabase.auth.getUser();
         console.log('Current user:', user ? 'Authenticated' : 'Not authenticated');
 
         if (user) {
-            console.log('User UID:', user.uid);
+            console.log('User ID:', user.id);
             console.log('User email:', user.email);
 
             try {
                 // Use tokenManager for faster token retrieval
                 console.time('tokenRetrieval');
-                const token = await tokenManager.getToken();
+                const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
                 console.timeEnd('tokenRetrieval');
 
                 return {
@@ -32,7 +32,7 @@ const getAuthHeaders = async () => {
                     'Content-Type': 'application/json'
                 };
             } catch (tokenError) {
-                console.error('Error getting Firebase token:', tokenError);
+                console.error('Error getting auth token:', tokenError);
                 throw tokenError;
             }
         } else {

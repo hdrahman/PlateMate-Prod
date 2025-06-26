@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -13,11 +13,15 @@ import { UserProfile } from '../../types/user';
 interface GoalsStepProps {
     profile: UserProfile;
     updateProfile: (data: Partial<UserProfile>) => Promise<void>;
-    onNext: () => void;
+    onNext: (selectedGoal?: string) => void;
 }
 
 const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext }) => {
     const [fitnessGoal, setFitnessGoal] = useState<string>(profile.fitnessGoal || 'fat_loss');
+
+    useEffect(() => {
+        setFitnessGoal(profile.fitnessGoal || 'fat_loss');
+    }, [profile.fitnessGoal]);
 
     // Fitness goals
     const fitnessGoals = [
@@ -46,11 +50,8 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext })
 
     const handleSubmit = async () => {
         try {
-            await updateProfile({
-                fitnessGoal,
-            });
-
-            onNext();
+            await updateProfile({ fitnessGoal });
+            onNext(fitnessGoal);
         } catch (error) {
             console.error('Error updating profile:', error);
         }
@@ -72,7 +73,11 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext })
                             fitnessGoal === goal.id && styles.selectedGoal,
                             fitnessGoal === goal.id && { borderColor: goal.color }
                         ]}
-                        onPress={() => setFitnessGoal(goal.id)}
+                        onPress={() => {
+                            setFitnessGoal(goal.id);
+                            // Persist selection immediately
+                            updateProfile({ fitnessGoal: goal.id }).catch(console.error);
+                        }}
                     >
                         <View style={styles.goalLogoContainer}>
                             <View style={[styles.goalIcon, { backgroundColor: `${goal.color}20` }]}>

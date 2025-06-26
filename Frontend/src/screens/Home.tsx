@@ -7,7 +7,12 @@ import { G, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { useSteps } from '../context/StepContext';
 import { getTodayExerciseCalories, getCheatDayProgress, CheatDayProgress, getUserStreak, checkAndUpdateStreak, hasActivityForToday } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
-import { getUserProfileByFirebaseUid, getUserGoals, updateUserProfile } from '../utils/database';
+import {
+  getUserProfileBySupabaseUid,
+  getUserProfileByFirebaseUid,
+  getUserGoals,
+  updateUserProfile
+} from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
 import { subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from '../utils/databaseWatcher';

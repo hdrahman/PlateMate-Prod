@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
 
-from auth.firebase_auth import get_current_user
+from auth.supabase_auth import get_current_user
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ import json
 import httpx
 import re
 
-from auth.firebase_auth import get_current_user
+from auth.supabase_auth import get_current_user
 from services import fatsecret_api
 
 logger = logging.getLogger(__name__)

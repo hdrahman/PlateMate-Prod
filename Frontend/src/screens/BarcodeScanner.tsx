@@ -11,7 +11,7 @@ import { addFoodLog } from '../utils/database';
 import { barcodeService } from '../services/BarcodeService';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import tokenManager from '../utils/firebase/tokenManager';
+import tokenManager from '../utils/tokenManager';
 
 const { width, height } = Dimensions.get('window');
 

@@ -47,7 +47,7 @@ export interface Recipe {
 export const getRandomRecipes = async (count: number = 10): Promise<Recipe[]> => {
     try {
         const response = await apiService.get('/recipes/random', { count }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -92,7 +92,7 @@ export const searchRecipes = async (query: string, number: number = 10, offset: 
                             number,
                             offset
                         }, {
-                            serviceType: ServiceTokenType.FIREBASE_AUTH,
+                            serviceType: ServiceTokenType.SUPABASE_AUTH,
                             useCache: false // Skip cache check since we're updating the cache
                         });
 
@@ -126,7 +126,7 @@ export const searchRecipes = async (query: string, number: number = 10, offset: 
             number,
             offset
         }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -171,7 +171,7 @@ export const searchRecipes = async (query: string, number: number = 10, offset: 
 export const getRecipeById = async (id: number): Promise<Recipe> => {
     try {
         const response = await apiService.get(`/recipes/${id}`, undefined, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -208,7 +208,7 @@ export const getRecipeInformation = async (id: number): Promise<Recipe> => {
 export const getSimilarRecipes = async (id: number, number: number = 5): Promise<Recipe[]> => {
     try {
         const response = await apiService.get(`/recipes/${id}/similar`, { number }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -231,7 +231,7 @@ export const getRecipesByMealType = async (mealType: string, number: number = 10
             query: mealType,
             number
         }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -266,7 +266,7 @@ export const getRecipesByDiet = async (diet: string, number: number = 10): Promi
             diet,
             number
         }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -311,7 +311,7 @@ export const generateMealPlan = async (
         if (exclude) params.exclude = exclude;
 
         const response = await apiService.get('/recipes/mealplan', params, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 
@@ -326,7 +326,7 @@ export const generateMealPlan = async (
 export const getRecipeNutrition = async (id: number): Promise<any> => {
     try {
         const response = await apiService.get(`/recipes/${id}/nutritionWidget`, undefined, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH,
+            serviceType: ServiceTokenType.SUPABASE_AUTH,
             useCache: true
         });
 

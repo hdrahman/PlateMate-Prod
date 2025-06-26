@@ -21,7 +21,6 @@ import IntroStep3 from './IntroStep3';
 const { width, height } = Dimensions.get('window');
 
 interface WelcomeStepProps {
-    currentStep: number;
     onNext: () => void;
 }
 
@@ -30,40 +29,29 @@ interface ViewableItemsChangedInfo {
     changed: Array<ViewToken>;
 }
 
-const WelcomeStep: React.FC<WelcomeStepProps> = ({ currentStep, onNext }) => {
-    const [currentIndex, setCurrentIndex] = useState(currentStep - 1); // Convert step to index
+const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
 
-    // Update FlatList position when currentStep changes
-    useEffect(() => {
-        const targetIndex = currentStep - 1;
-        if (targetIndex !== currentIndex) {
-            setCurrentIndex(targetIndex);
-            flatListRef.current?.scrollToIndex({
-                index: targetIndex,
-                animated: false
-            });
-        }
-    }, [currentStep]);
-
-    const handleViewableItemsChanged = useRef(({ viewableItems }: ViewableItemsChangedInfo) => {
-        if (viewableItems.length > 0) {
-            setCurrentIndex(viewableItems[0].index || 0);
+    const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+        if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+            setCurrentIndex(viewableItems[0].index);
         }
     }).current;
 
-    // Separate handlers for each step to avoid state sync issues
     const handleStep1Next = () => {
-        onNext(); // This will move to step 2
+        flatListRef.current?.scrollToIndex({ index: 1, animated: true });
+        setCurrentIndex(1);
     };
 
     const handleStep2Next = () => {
-        onNext(); // This will move to step 3
+        flatListRef.current?.scrollToIndex({ index: 2, animated: true });
+        setCurrentIndex(2);
     };
 
     const handleStep3Next = () => {
-        onNext(); // This will move to step 4 (start main onboarding)
+        onNext();
     };
 
     const renderItem = ({ item, index }: { item: number; index: number }) => {

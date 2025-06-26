@@ -4,7 +4,8 @@ import GamificationService, {
     GamificationStatus,
     XPAwardResult
 } from '../services/GamificationService';
-import { auth } from '../utils/firebase';
+import { useAuth } from './AuthContext';
+import { supabase } from '../utils/supabaseClient';
 
 interface GamificationContextType {
     status: GamificationStatus | null;
@@ -58,7 +59,8 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Refresh gamification status
     const refreshStatus = useCallback(async () => {
-        if (!auth.currentUser) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
         try {
             setIsLoading(true);
@@ -75,7 +77,8 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Refresh achievements
     const refreshAchievements = useCallback(async () => {
-        if (!auth.currentUser) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
         try {
             setError(null);
@@ -89,7 +92,8 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Award XP and handle popups
     const awardXP = useCallback(async (action: string, amount?: number): Promise<XPAwardResult | null> => {
-        if (!auth.currentUser) return null;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
 
         try {
             const result = await GamificationService.awardXP(action, amount);
@@ -131,7 +135,8 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Check for new achievements manually
     const checkForNewAchievements = useCallback(async () => {
-        if (!auth.currentUser) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
         try {
             const result = await GamificationService.checkAchievements();
@@ -187,8 +192,8 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Initialize data when user changes
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            if (user) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session?.user) {
                 // User signed in, load gamification data
                 refreshStatus();
                 refreshAchievements();
@@ -200,7 +205,7 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             }
         });
 
-        return unsubscribe;
+        return () => subscription.unsubscribe();
     }, [refreshStatus, refreshAchievements]);
 
     const value: GamificationContextType = {

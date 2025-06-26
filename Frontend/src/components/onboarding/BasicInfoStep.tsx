@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,7 +11,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
-import { auth } from '../../utils/firebase';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../utils/supabaseClient';
 
 interface BasicInfoStepProps {
     profile: UserProfile;
@@ -22,9 +23,30 @@ interface BasicInfoStepProps {
 const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, onNext }) => {
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [lastName, setLastName] = useState(profile.lastName || '');
-    const [email, setEmail] = useState(auth.currentUser?.email || profile.email || '');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState(profile.password || '');
     const [dateOfBirth, setDateOfBirth] = useState(profile.dateOfBirth || '');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
+    // Only prefill email from Supabase if profile.email is empty
+    useEffect(() => {
+        const prefillEmail = async () => {
+            if (profile.email) {
+                setEmail(profile.email);
+                return;
+            }
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user?.email) {
+                    setEmail(user.email);
+                }
+            } catch (err) {
+                console.error('Failed to fetch user email from Supabase:', err);
+            }
+        };
+        prefillEmail();
+    }, [profile.email]);
 
     // Handle DOB formatting
     const formatDateOfBirth = (text: string) => {
@@ -83,6 +105,11 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             return;
         }
 
+        if (!password || password.length < 6) {
+            Alert.alert('Invalid Password', 'Password must be at least 6 characters long');
+            return;
+        }
+
         if (!dateOfBirth) {
             Alert.alert('Missing Information', 'Please enter your date of birth');
             return;
@@ -114,6 +141,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
                 email: email.trim(),
+                password: password,
                 dateOfBirth: dateOfBirth,
                 age: age,
             });
@@ -126,6 +154,18 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             setIsLoading(false);
         }
     };
+
+    // Persist user input immediately to profile context so that navigating away and back retains values
+    useEffect(() => {
+        // We purposely do not await this promise to avoid blocking UI updates
+        updateProfile({
+            firstName,
+            lastName,
+            email,
+            password,
+            dateOfBirth,
+        }).catch(console.error);
+    }, [firstName, lastName, email, password, dateOfBirth]);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -176,6 +216,32 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                             autoCapitalize="none"
                         />
                     </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Password</Text>
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={[styles.input, styles.passwordInput]}
+                            placeholder="Enter your password (min. 6 characters)"
+                            placeholderTextColor="#666"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry={!showPassword}
+                            autoCapitalize="none"
+                        />
+                        <TouchableOpacity
+                            style={styles.eyeIcon}
+                            onPress={() => setShowPassword(!showPassword)}
+                        >
+                            <Ionicons
+                                name={showPassword ? "eye-off" : "eye"}
+                                size={20}
+                                color="#666"
+                            />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.hint}>This will be used to create your account when you subscribe</Text>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -312,6 +378,14 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         marginRight: 8,
+    },
+    passwordInput: {
+        paddingRight: 40,
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: 16,
+        top: 16,
     },
 });
 

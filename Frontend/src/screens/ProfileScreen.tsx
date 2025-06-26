@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getUserProfileByFirebaseUid, getUserGoals } from '../utils/database';
+import { getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
@@ -45,24 +45,33 @@ const ProfileScreen = () => {
     });
 
     useEffect(() => {
-        // Here you would fetch user data from backend
         const fetchUserProfile = async () => {
             if (!user) return;
 
             try {
                 // Get user profile from local database
-                const profile = await getUserProfileByFirebaseUid(user.uid);
+                const profile = await getUserProfileBySupabaseUid(user.id);
 
                 // Get user goals from the database to get the calorie goal
-                const userGoals = await getUserGoals(user.uid);
+                const userGoals = await getUserGoals(user.id);
 
                 if (profile) {
                     // Update profile data with fetched information
                     setProfileData(prevData => ({
                         ...prevData,
+                        username: profile.first_name && profile.last_name ?
+                            `${profile.first_name}_${profile.last_name}`.toLowerCase() :
+                            profile.first_name || 'user',
+                        location: profile.location || 'Not set',
+                        startingWeight: profile.starting_weight || profile.weight || 0,
+                        currentWeight: profile.weight || 0,
                         goalWeight: profile.target_weight || 0,
-                        dailyCalories: userGoals?.calorieGoal || 0,
-                        // Update other fields as needed
+                        dailyCalories: userGoals?.calorieGoal || profile.daily_calorie_target || 0,
+                        macros: {
+                            carbs: userGoals?.carbGoal || profile.carb_goal || 225,
+                            fat: userGoals?.fatGoal || profile.fat_goal || 60,
+                            protein: userGoals?.proteinGoal || profile.protein_goal || 90,
+                        }
                     }));
                 }
             } catch (error) {

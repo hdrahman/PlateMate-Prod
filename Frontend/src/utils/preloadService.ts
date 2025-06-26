@@ -3,8 +3,8 @@
  * to improve app performance and user experience
  */
 
-import { auth } from './firebase/index';
-import tokenManager from './firebase/tokenManager';
+import { supabase } from './supabaseClient';
+import tokenManager from './tokenManager';
 import { getDatabase } from './database';
 import axios from 'axios';
 import { BACKEND_URL } from './config';
@@ -49,15 +49,28 @@ export const preloadAuthTokens = async (): Promise<void> => {
         console.log('🔄 Preloading authentication tokens...');
 
         // Ensure user is logged in
-        const user = auth.currentUser;
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             console.log('⚠️ No authenticated user, skipping token preloading');
             return;
         }
 
-        // Get Firebase auth token first (this is required for other API calls)
-        const firebaseToken = await tokenManager.getToken('firebase_auth');
-        console.log('✅ Firebase token preloaded');
+        // Get Supabase auth token first (this is required for other API calls)
+        const supabaseToken = await tokenManager.getToken('supabase_auth');
+        console.log('✅ New Supabase token acquired, valid until:', new Date(Date.now() + 3600000).toLocaleTimeString());
+
+        // Preload other service tokens that we know exist
+        const services = ['openai', 'deepseek', 'fatsecret', 'arli_ai'];
+
+        for (const service of services) {
+            try {
+                await tokenManager.getToken(service);
+                console.log(`✅ ${service} token preloaded`);
+            } catch (error) {
+                console.log(`⚠️ Could not preload ${service} token:`, error.message);
+                // Don't throw - some services might not be configured
+            }
+        }
 
     } catch (error) {
         console.error('❌ Error preloading authentication tokens:', error);

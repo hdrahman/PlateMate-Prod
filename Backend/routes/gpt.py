@@ -6,7 +6,7 @@ import os
 import logging
 from dotenv import load_dotenv
 import httpx
-from auth.firebase_auth import get_current_user
+from auth.supabase_auth import get_current_user
 import time
 import openai
 

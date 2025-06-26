@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getUserGoals, updateUserGoals, getUserProfileByFirebaseUid } from '../utils/database'; // Local database functions
+import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid } from '../utils/database'; // Local database functions
 import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile, resetNutritionGoals } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
 import { calculateNutritionGoalsFromProfile, Gender, ActivityLevel, WeightGoal, mapWeightGoal } from '../utils/offlineNutritionCalculator';
@@ -482,7 +482,7 @@ export default function EditGoals() {
                     console.log('Calculating nutrition goals offline...');
 
                     // Get user profile from SQLite
-                    const userProfile = await getUserProfileByFirebaseUid(user.uid);
+                    const userProfile = await getUserProfileBySupabaseUid(user.uid);
                     if (!userProfile) {
                         throw new Error('User profile not found in local database');
                     }
@@ -610,10 +610,18 @@ export default function EditGoals() {
                                 console.log('Calculating nutrition goals offline...');
 
                                 // Get user profile from SQLite
-                                const userProfile = await getUserProfileByFirebaseUid(user.uid);
+                                const userProfile = await getUserProfileBySupabaseUid(user.uid);
                                 if (!userProfile) {
                                     throw new Error('User profile not found in local database');
                                 }
+
+                                console.log('Profile data for calculation:', {
+                                    weight: userProfile.weight,
+                                    height: userProfile.height,
+                                    age: userProfile.age,
+                                    gender: userProfile.gender,
+                                    activity_level: userProfile.activity_level
+                                });
 
                                 // Use current form values for calculation
                                 const profileForCalculation = {
@@ -623,10 +631,25 @@ export default function EditGoals() {
                                     target_weight: formValues.targetWeight ? (isImperialUnits ? lbsToKg(formValues.targetWeight) : formValues.targetWeight) : userProfile.target_weight
                                 };
 
+                                console.log('Final profile for calculation:', {
+                                    weight: profileForCalculation.weight,
+                                    height: profileForCalculation.height,
+                                    age: profileForCalculation.age,
+                                    gender: profileForCalculation.gender,
+                                    activity_level: profileForCalculation.activity_level
+                                });
+
                                 resetGoals = calculateNutritionGoalsFromProfile(profileForCalculation);
 
                                 if (!resetGoals) {
-                                    throw new Error('Unable to calculate nutrition goals - missing required profile data');
+                                    const missingFields = [];
+                                    if (!profileForCalculation.weight) missingFields.push('weight');
+                                    if (!profileForCalculation.height) missingFields.push('height');
+                                    if (!profileForCalculation.age) missingFields.push('age');
+                                    if (!profileForCalculation.gender) missingFields.push('gender');
+                                    if (!profileForCalculation.activity_level) missingFields.push('activity level');
+
+                                    throw new Error(`Unable to calculate nutrition goals. Missing: ${missingFields.join(', ')}`);
                                 }
 
                                 console.log('✅ Nutrition goals calculated offline');

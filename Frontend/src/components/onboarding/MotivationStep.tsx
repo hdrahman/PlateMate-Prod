@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -20,6 +20,11 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
     const [selectedMotivations, setSelectedMotivations] = useState<string[]>(
         profile.motivations || []
     );
+
+    // Persist changes immediately so navigating away without pressing Continue retains data
+    useEffect(() => {
+        updateProfile({ motivations: selectedMotivations }).catch(() => { });
+    }, [selectedMotivations]);
 
     const motivations = [
         {

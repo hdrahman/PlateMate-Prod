@@ -81,21 +81,23 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 async def startup_event():
     print("Starting PlateMate API server...")
     
-    # Initialize Firebase Admin SDK
+    # Initialize Supabase Auth
     try:
         # Import here to avoid circular imports
-        from auth.firebase_auth import initialize_firebase_admin
+        from auth.supabase_auth import get_auth_status
         
-        # Try to initialize Firebase Admin SDK
-        if initialize_firebase_admin():
-            print("✅ Firebase Admin SDK is initialized successfully at startup")
+        # Check Supabase auth configuration
+        auth_status = await get_auth_status()
+        if auth_status["jwt_secret_configured"]:
+            print("✅ Supabase Auth is configured successfully at startup")
+            print(f"   Supabase URL: {auth_status['supabase_url']}")
         else:
-            print("⚠️ Firebase Admin SDK initialization failed. Authentication will not work properly.")
-            print("   Please ensure firebase-admin-sdk.json is available or set FIREBASE_CREDENTIALS_JSON env variable.")
+            print("⚠️ Supabase Auth configuration incomplete. Authentication may not work properly.")
+            print("   Please ensure SUPABASE_JWT_SECRET or SUPABASE_ANON_KEY environment variables are set.")
         
     except Exception as e:
-        print(f"❌ Failed to initialize Firebase Admin SDK: {e}")
-        print("⚠️ The application will continue but Firebase authentication will not work")
+        print(f"❌ Failed to initialize Supabase Auth: {e}")
+        print("⚠️ The application will continue but Supabase authentication will not work")
     
     # Verify FatSecret API credentials
     try:
@@ -172,10 +174,17 @@ async def token_health_check():
     return {
         "status": "ok",
         "token_endpoints": {
-            "firebase": "Managed by frontend",
+            "supabase": "Managed by frontend",
             "openai": "/gpt/get-token",
             "deepseek": "/deepseek/get-token",
             "fatsecret": "/food/get-token",
             "arli_ai": "/arli-ai/get-token"
         }
     }
+
+# Add Supabase auth health check endpoint
+@app.get("/health/auth-status")
+async def auth_status_check():
+    """Check Supabase authentication configuration status"""
+    from auth.supabase_auth import get_auth_status
+    return await get_auth_status()

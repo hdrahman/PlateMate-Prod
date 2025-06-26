@@ -33,7 +33,7 @@ const autocompleteRecipes = async (query: string): Promise<{ id: number; title: 
     try {
         console.log(`Fetching autocomplete suggestions for: "${query}"`);
         const response = await apiService.get('/recipes/autocomplete', { query }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH
+            serviceType: ServiceTokenType.SUPABASE_AUTH
         });
         console.log(`Autocomplete response for "${query}":`, response);
         return Array.isArray(response) ? response : [];
@@ -46,7 +46,7 @@ const autocompleteRecipes = async (query: string): Promise<{ id: number; title: 
 const autocompleteIngredients = async (query: string): Promise<{ id: number; name: string }[]> => {
     try {
         const response = await apiService.get('/recipes/ingredients/autocomplete', { query }, {
-            serviceType: ServiceTokenType.FIREBASE_AUTH
+            serviceType: ServiceTokenType.SUPABASE_AUTH
         });
         return Array.isArray(response) ? response : [];
     } catch (error) {
@@ -58,7 +58,7 @@ const autocompleteIngredients = async (query: string): Promise<{ id: number; nam
 // Custom imports for user data
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
-import { getTodayExerciseCalories, getUserProfileByFirebaseUid } from '../utils/database';
+import { getTodayExerciseCalories, getUserProfileBySupabaseUid } from '../utils/database';
 import { NutritionGoals, calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { UserProfile } from '../types/user';
 import { useFoodLog } from '../context/FoodLogContext';
@@ -538,7 +538,7 @@ export default function MealPlanner() {
 
                 // Fallback to database if needed
                 if (!currentProfile && user) {
-                    const dbProfile = await getUserProfileByFirebaseUid(user.uid);
+                    const dbProfile = await getUserProfileBySupabaseUid(user.uid);
                     if (dbProfile) {
                         currentProfile = {
                             firstName: dbProfile.first_name,

@@ -26,7 +26,7 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileByFirebaseUid, getUserGoals } from '../utils/database';
+import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -485,7 +485,7 @@ const DiaryScreen: React.FC = () => {
             try {
                 setProfileLoading(true);
                 // Get user profile from local database
-                const profile = await getUserProfileByFirebaseUid(user.uid);
+                const profile = await getUserProfileBySupabaseUid(user.id);
                 setUserProfile(profile); // Store the profile data for use elsewhere
 
                 // Get the user's goals directly from the database (including nutrition goals)

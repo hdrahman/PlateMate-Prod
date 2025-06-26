@@ -1,13 +1,13 @@
-import { resetOnboardingCompletely, getUserProfileByFirebaseUid } from './database';
-import { auth } from './firebase';
+import { resetOnboardingCompletely, getUserProfileBySupabaseUid } from './database';
+import { supabase } from './supabaseClient';
 
 /**
  * Check current onboarding status for debugging
  */
-export const checkOnboardingStatus = async (firebaseUid?: string): Promise<void> => {
+export const checkOnboardingStatus = async (supabaseUid?: string): Promise<void> => {
     try {
-        const currentUser = auth.currentUser;
-        const uid = firebaseUid || currentUser?.uid;
+        const { data: { user } } = await supabase.auth.getUser();
+        const uid = supabaseUid || user?.id;
 
         if (!uid) {
             console.error('❌ No user ID provided and no user is currently logged in');
@@ -18,7 +18,7 @@ export const checkOnboardingStatus = async (firebaseUid?: string): Promise<void>
 
         // Check SQLite Database only
         try {
-            const dbProfile = await getUserProfileByFirebaseUid(uid);
+            const dbProfile = await getUserProfileBySupabaseUid(uid);
             console.log('🗄️ SQLite Database Status:');
             if (dbProfile) {
                 console.log(`  - Profile Exists: Yes`);
@@ -44,24 +44,24 @@ export const checkOnboardingStatus = async (firebaseUid?: string): Promise<void>
  */
 export const resetCurrentUserOnboarding = async (): Promise<boolean> => {
     try {
-        const currentUser = auth.currentUser;
+        const { data: { user } } = await supabase.auth.getUser();
 
-        if (!currentUser) {
+        if (!user) {
             console.error('❌ No user is currently logged in');
             return false;
         }
 
-        console.log(`🔄 Resetting onboarding for user: ${currentUser.uid}`);
+        console.log(`🔄 Resetting onboarding for user: ${user.id}`);
 
         // Check status before reset
         console.log('📊 Status before reset:');
-        await checkOnboardingStatus(currentUser.uid);
+        await checkOnboardingStatus(user.id);
 
-        await resetOnboardingCompletely(currentUser.uid);
+        await resetOnboardingCompletely(user.id);
 
         // Check status after reset
         console.log('📊 Status after reset:');
-        await checkOnboardingStatus(currentUser.uid);
+        await checkOnboardingStatus(user.id);
 
         console.log('✅ Onboarding reset completed! Please restart the app to see the onboarding flow.');
         return true;
@@ -72,21 +72,21 @@ export const resetCurrentUserOnboarding = async (): Promise<boolean> => {
 };
 
 /**
- * Reset onboarding for a specific user by Firebase UID
+ * Reset onboarding for a specific user by Supabase UID
  */
-export const resetUserOnboarding = async (firebaseUid: string): Promise<boolean> => {
+export const resetUserOnboarding = async (supabaseUid: string): Promise<boolean> => {
     try {
-        console.log(`🔄 Resetting onboarding for user: ${firebaseUid}`);
+        console.log(`🔄 Resetting onboarding for user: ${supabaseUid}`);
 
         // Check status before reset
         console.log('📊 Status before reset:');
-        await checkOnboardingStatus(firebaseUid);
+        await checkOnboardingStatus(supabaseUid);
 
-        await resetOnboardingCompletely(firebaseUid);
+        await resetOnboardingCompletely(supabaseUid);
 
         // Check status after reset
         console.log('📊 Status after reset:');
-        await checkOnboardingStatus(firebaseUid);
+        await checkOnboardingStatus(supabaseUid);
 
         console.log('✅ Onboarding reset completed!');
         return true;

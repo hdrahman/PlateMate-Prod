@@ -54,7 +54,6 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
     });
 
     const handleBeginJourney = () => {
-        // Navigate directly to onboarding steps without requiring authentication
         onNext();
     };
 

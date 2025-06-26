@@ -29,7 +29,8 @@ import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AnalysisModal from '../components/AnalysisModal';
 import { saveImageLocally, saveMultipleImagesLocally } from '../utils/localFileStorage';
-import { auth } from '../utils/firebase/index';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabaseClient';
 
 const { width } = Dimensions.get('window');
 
@@ -200,11 +201,12 @@ const ImageCapture: React.FC = () => {
                 name: fileInfo.uri.split('/').pop(),
             } as any);
 
-            // Get Firebase auth token
-            const token = await auth.currentUser?.getIdToken(true);
-            if (!token) {
+            // Get Supabase auth token
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
                 throw new Error('User not authenticated. Please sign in again.');
             }
+            const token = session.access_token;
 
             console.log('Sending request to backend...');
             const response = await fetch(`${BACKEND_URL}/images/upload-image`, {
@@ -273,11 +275,12 @@ const ImageCapture: React.FC = () => {
 
             console.log('Processed image URLs:', fullImageUrls);
 
-            // Get Firebase auth token
-            const token = await auth.currentUser?.getIdToken(true);
-            if (!token) {
+            // Get Supabase auth token
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
                 throw new Error('User not authenticated. Please sign in again.');
             }
+            const token = session.access_token;
 
             const response = await fetch(`${BACKEND_URL}/gpt/analyze-food`, {
                 method: 'POST',
@@ -339,8 +342,11 @@ const ImageCapture: React.FC = () => {
                 })()
             ];
 
-            // Get Firebase auth token while other operations are in progress
-            const tokenPromise = auth.currentUser?.getIdToken(true);
+            // Get Supabase auth token while other operations are in progress
+            const tokenPromise = supabase.auth.getSession().then(({ data: { session } }) => {
+                if (!session) throw new Error('User not authenticated. Please sign in again.');
+                return session.access_token;
+            });
 
             setAnalysisStage('analyzing');
 

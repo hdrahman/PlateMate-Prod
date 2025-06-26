@@ -1,5 +1,5 @@
-// Initialize Firebase first - importing from our config file
-import './src/utils/firebase/index';
+// Firebase has been migrated to Supabase - no initialization needed
+// Supabase client is initialized when imported in components
 
 import { registerRootComponent } from 'expo';
 import App from './App';

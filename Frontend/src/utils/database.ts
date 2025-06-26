@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import { updateDatabaseSchema } from './updateDatabase';
-import { auth } from './firebase/index';
+import { supabase } from './supabaseClient';
 import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
 
 // Import subscription types
@@ -15,6 +15,7 @@ let isInitializing = false;
 // Add a global flag for database initialization
 declare global {
     var dbInitialized: boolean;
+    var cachedSupabaseUser: any;
 }
 
 // Set initial value
@@ -78,7 +79,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ food_logs table created successfully');
 
-        // Create user_subscriptions table for subscription management
+        // Create user_subscriptions table for subscription management (SECURE - separate from profile)
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS user_subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,7 +102,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ user_subscriptions table created successfully');
 
-        // Create user_profiles table
+        // Create user_profiles table (premium column kept for backward compatibility but subscription logic should use user_subscriptions table)
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -160,10 +161,27 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         future_self_message_type TEXT,
         future_self_message_created_at TEXT,
         diet_type TEXT,
-        use_metric_system INTEGER DEFAULT 1
+        use_metric_system INTEGER DEFAULT 1,
+        future_self_message_uri TEXT,
+        premium INTEGER DEFAULT 0
       )
     `);
         console.log('✅ user_profiles table created successfully');
+
+        // Verify the premium column exists
+        try {
+            const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+            const premiumColumn = tableInfo.find((col: any) => col.name === 'premium');
+            if (premiumColumn) {
+                console.log('✅ Premium column verified in user_profiles table');
+            } else {
+                console.log('⚠️ Premium column not found, adding it manually...');
+                await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN premium INTEGER DEFAULT 0`);
+                console.log('✅ Premium column added successfully');
+            }
+        } catch (error) {
+            console.error('❌ Error verifying premium column:', error);
+        }
 
         // Create user_weights table for weight history
         await db.execAsync(`
@@ -179,6 +197,21 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       )
     `);
         console.log('✅ user_weights table created successfully');
+
+        // Create onboarding_temp table for storing data before user authentication
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS onboarding_temp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        temp_session_id TEXT UNIQUE NOT NULL,
+        profile_data TEXT NOT NULL,
+        current_step INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        firebase_uid TEXT,
+        synced_to_profile INTEGER DEFAULT 0
+      )
+    `);
+        console.log('✅ onboarding_temp table created successfully');
 
         // Create nutrition_goals table
         await db.execAsync(`
@@ -213,13 +246,16 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         synced INTEGER DEFAULT 0,
         sync_action TEXT DEFAULT 'create',
         last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        preferred_day_of_week INTEGER,
         FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
       )
     `);
         console.log('✅ cheat_day_settings table created successfully');
 
-        // Run database migrations
+        // Run database migrations to ensure all columns exist
+        console.log('🔄 Running database migrations...');
         await updateDatabaseSchema(db);
+        console.log('✅ Database migrations completed');
 
         // Create other tables
         await db.execAsync(`
@@ -238,64 +274,70 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ exercises table created successfully');
 
+        // Create sync_status table
         await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS sync_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        last_sync TEXT,
-        sync_status TEXT
+      CREATE TABLE IF NOT EXISTS sync_status (
+        id INTEGER PRIMARY KEY,
+        last_sync_time TEXT,
+        status TEXT DEFAULT 'pending'
       )
     `);
-        console.log('✅ sync_log table created successfully');
+        console.log('✅ sync_status table created successfully');
+
+        // Create steps table for step tracking
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 1,
+        step_count INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL
+      )
+    `);
+        console.log('✅ steps table created successfully');
+
+        // Create streak_tracking table for streak management
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS streak_tracking (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT UNIQUE NOT NULL,
+        current_streak INTEGER DEFAULT 0,
+        longest_streak INTEGER DEFAULT 0,
+        last_activity_date TEXT,
+        streak_start_date TEXT,
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
+      )
+    `);
+        console.log('✅ streak_tracking table created successfully');
 
         // Create api_tokens table for token management
         await db.execAsync(`
-          CREATE TABLE IF NOT EXISTS api_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            service_name TEXT NOT NULL UNIQUE,
-            token TEXT NOT NULL,
-            token_type TEXT NOT NULL DEFAULT 'Bearer',
-            expiry_time INTEGER NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-          )
-        `);
+      CREATE TABLE IF NOT EXISTS api_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_name TEXT UNIQUE NOT NULL,
+        token TEXT NOT NULL,
+        token_type TEXT DEFAULT 'Bearer',
+        expiry_time INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
         console.log('✅ api_tokens table created successfully');
 
-        // Verify database tables
-        const foodLogsTable = await db.getFirstAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='food_logs'`);
-        const exercisesTable = await db.getFirstAsync(`SELECT name FROM sqlite_master WHERE type='table' AND name='exercises'`);
-
-        console.log('Database tables verification:');
-        console.log('food_logs table exists:', !!foodLogsTable);
-        console.log('exercises table exists:', !!exercisesTable);
-
-        if (!foodLogsTable || !exercisesTable) {
-            console.error('⚠️ Some tables are missing! Database might not be initialized correctly.');
-        } else {
-            console.log('✅ All required tables exist and database is correctly initialized');
-        }
-
-        // Enable WAL mode for better performance and concurrency
-        await db.execAsync('PRAGMA journal_mode = WAL');
-
-        // Add additional SQLite optimizations to prevent locking
-        await db.execAsync('PRAGMA synchronous = NORMAL');
-        await db.execAsync('PRAGMA cache_size = 10000');
-        await db.execAsync('PRAGMA temp_store = MEMORY');
-        await db.execAsync('PRAGMA busy_timeout = 30000'); // 30 second timeout for locked database
-
-        // Set the global flag to indicate database is initialized
+        // Set initialization flags
         global.dbInitialized = true;
         isInitializing = false;
-        dbInitPromise = null; // Reset the promise for potential future re-initialization
-        console.log('✅ Database initialized flag set to true');
 
+        console.log('✅ Database initialization completed successfully');
         return db;
     } catch (error) {
-        console.error('❌ Error initializing database:', error);
-        global.dbInitialized = false;
         isInitializing = false;
-        dbInitPromise = null; // Reset on error
+        console.error('❌ Database initialization failed:', error);
         throw error;
     }
 };
@@ -311,13 +353,31 @@ export const getCurrentDate = () => {
     return now.toISOString();
 };
 
-// Helper function to get current user ID
+// Helper function to get current user ID (Legacy sync version)
 export const getCurrentUserId = (): string => {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-        return currentUser.uid;
+    // For backward compatibility, this will return cached user ID
+    // Use getCurrentUserIdAsync for new code
+    const cachedUser = global.cachedSupabaseUser;
+    if (cachedUser) {
+        return cachedUser.id;
     }
     return 'anonymous'; // Default if not signed in
+};
+
+// New async version that gets user from Supabase
+export const getCurrentUserIdAsync = async (): Promise<string> => {
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+            throw new Error('User not authenticated');
+        }
+        // Cache the user globally for sync functions
+        global.cachedSupabaseUser = user;
+        return user.id;
+    } catch (error) {
+        console.error('Error getting current user ID:', error);
+        throw error;
+    }
 };
 
 // Forward database change subscription functions to use our databaseWatcher module
@@ -392,7 +452,7 @@ export const addFoodLog = async (foodLog: any) => {
            trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
            calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
            brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
             [
                 formattedData.meal_id,
                 formattedData.user_id,
@@ -1267,6 +1327,7 @@ export const addUserProfile = async (profile: any) => {
         fitness_goal = null,
         daily_calorie_target = null,
         nutrient_focus = null,
+        future_self_message_uri = null,
         unit_preference = 'metric',
         push_notifications_enabled = true,
         email_notifications_enabled = true,
@@ -1276,13 +1337,62 @@ export const addUserProfile = async (profile: any) => {
         timezone = 'UTC',
         dark_mode = false,
         sync_data_offline = true,
-        onboarding_complete = false
+        onboarding_complete = false,
+        synced = 0,
+        last_modified = getCurrentDate(),
+        protein_goal = 0,
+        carb_goal = 0,
+        fat_goal = 0,
+        weekly_workouts = 0,
+        step_goal = 0,
+        water_goal = 0,
+        sleep_goal = 0,
+        workout_frequency = 0,
+        sleep_quality = '',
+        stress_level = '',
+        eating_pattern = '',
+        motivations = '',
+        why_motivation = '',
+        projected_completion_date = '',
+        estimated_metabolic_age = 0,
+        estimated_duration_weeks = 0,
+        future_self_message = '',
+        future_self_message_type = '',
+        future_self_message_created_at = '',
+        diet_type = '',
+        use_metric_system = 1,
+        premium = false,
     } = profile;
 
     try {
-        // Check if profile already exists
-        const existingProfile = await getUserProfileByFirebaseUid(firebase_uid);
+        // Check if profile already exists (use Supabase UID consistently)
+        const existingProfile = await getUserProfileBySupabaseUid(firebase_uid);
         if (existingProfile) {
+            console.log('ℹ️ Profile already exists for this Supabase UID, updating instead of creating new one.');
+            return updateUserProfile(firebase_uid, profile);
+        }
+
+        // NEW: Also check if a profile already exists with the same e-mail address (rare case where the
+        // firebase_uid changed – e.g. account re-creation after deletion). In such a scenario we
+        // simply update the existing row instead of inserting a duplicate which violates the UNIQUE
+        // constraint on user_profiles.email.
+        const existingByEmail = await getUserProfileByEmail(email);
+        if (existingByEmail) {
+            console.log('ℹ️ Existing profile found with the same email. Updating the firebase_uid and profile data instead of inserting a new one.');
+
+            // If the stored firebase_uid differs from the current one, update it first so that
+            // subsequent updates work correctly.
+            if (existingByEmail.firebase_uid !== firebase_uid) {
+                console.log(`🔄 Updating firebase_uid from ${existingByEmail.firebase_uid} to ${firebase_uid} for email ${email}`);
+                await db.runAsync(`UPDATE user_profiles SET firebase_uid = ?, last_modified = ? WHERE email = ?`, [
+                    firebase_uid,
+                    getCurrentDate(),
+                    email,
+                ]);
+            }
+
+            // Now update the remaining profile fields
+            console.log('📝 Updating existing profile with new data...');
             return updateUserProfile(firebase_uid, profile);
         }
 
@@ -1294,43 +1404,73 @@ export const addUserProfile = async (profile: any) => {
                 firebase_uid, email, first_name, last_name, date_of_birth, height, weight, age, gender, 
                 activity_level, weight_goal, target_weight, dietary_restrictions, food_allergies, 
                 cuisine_preferences, spice_tolerance, health_conditions, fitness_goal, daily_calorie_target, 
-                nutrient_focus, unit_preference, push_notifications_enabled, email_notifications_enabled, 
+                nutrient_focus, future_self_message_uri, unit_preference, push_notifications_enabled, email_notifications_enabled, 
                 sms_notifications_enabled, marketing_emails_enabled, preferred_language, timezone, 
-                dark_mode, sync_data_offline, onboarding_complete, synced, last_modified
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                dark_mode, sync_data_offline, onboarding_complete, synced, last_modified,
+                protein_goal, carb_goal, fat_goal, weekly_workouts, step_goal, water_goal, sleep_goal,
+                workout_frequency, sleep_quality, stress_level, eating_pattern, motivations, why_motivation,
+                projected_completion_date, estimated_metabolic_age, estimated_duration_weeks,
+                future_self_message, future_self_message_type, future_self_message_created_at,
+                diet_type, use_metric_system, starting_weight, location, premium
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
             [
-                firebase_uid,
-                email,
-                first_name,
-                last_name,
-                date_of_birth,
-                height,
-                weight,
-                age,
-                gender,
-                activity_level,
-                weight_goal,
-                target_weight,
-                JSON.stringify(dietary_restrictions),
-                JSON.stringify(food_allergies),
-                JSON.stringify(cuisine_preferences),
-                spice_tolerance,
-                JSON.stringify(health_conditions),
-                fitness_goal,
-                daily_calorie_target,
-                nutrient_focus ? JSON.stringify(nutrient_focus) : null,
-                unit_preference,
-                push_notifications_enabled ? 1 : 0,
-                email_notifications_enabled ? 1 : 0,
-                sms_notifications_enabled ? 1 : 0,
-                marketing_emails_enabled ? 1 : 0,
-                preferred_language,
-                timezone,
-                dark_mode ? 1 : 0,
-                sync_data_offline ? 1 : 0,
-                onboarding_complete ? 1 : 0,
-                0, // Not synced
-                getCurrentDate()
+                firebase_uid,                                      // 1
+                email,                                            // 2
+                first_name,                                       // 3
+                last_name,                                        // 4
+                date_of_birth,                                    // 5
+                height,                                           // 6
+                weight,                                           // 7
+                age,                                              // 8
+                gender,                                           // 9
+                activity_level,                                   // 10
+                weight_goal,                                      // 11
+                target_weight,                                    // 12
+                JSON.stringify(dietary_restrictions),             // 13
+                JSON.stringify(food_allergies),                   // 14
+                JSON.stringify(cuisine_preferences),              // 15
+                spice_tolerance,                                  // 16
+                JSON.stringify(health_conditions),                // 17
+                fitness_goal,                                     // 18
+                daily_calorie_target,                             // 19
+                nutrient_focus ? JSON.stringify(nutrient_focus) : null, // 20
+                future_self_message_uri,                          // 21
+                unit_preference,                                  // 22
+                push_notifications_enabled ? 1 : 0,              // 23
+                email_notifications_enabled ? 1 : 0,             // 24
+                sms_notifications_enabled ? 1 : 0,               // 25
+                marketing_emails_enabled ? 1 : 0,                // 26
+                preferred_language,                               // 27
+                timezone,                                         // 28
+                dark_mode ? 1 : 0,                               // 29
+                sync_data_offline ? 1 : 0,                       // 30
+                onboarding_complete ? 1 : 0,                     // 31
+                synced,                                           // 32
+                last_modified,                                    // 33
+                protein_goal,                                     // 34
+                carb_goal,                                        // 35
+                fat_goal,                                         // 36
+                weekly_workouts,                                  // 37
+                step_goal,                                        // 38
+                water_goal,                                       // 39
+                sleep_goal,                                       // 40
+                workout_frequency,                                // 41
+                sleep_quality,                                    // 42
+                stress_level,                                     // 43
+                eating_pattern,                                   // 44
+                motivations,                                      // 45
+                why_motivation,                                   // 46
+                projected_completion_date,                        // 47
+                estimated_metabolic_age,                          // 48
+                estimated_duration_weeks,                         // 49
+                future_self_message,                              // 50
+                future_self_message_type,                         // 51
+                future_self_message_created_at,                   // 52
+                diet_type,                                        // 53
+                use_metric_system,                                // 54
+                null, // starting_weight                          // 55
+                null, // location                                 // 56
+                premium ? 1 : 0                                    // 57
             ]
         );
 
@@ -1346,8 +1486,23 @@ export const addUserProfile = async (profile: any) => {
         } catch (rollbackError) {
             console.error('❌ Error rolling back transaction:', rollbackError);
         }
-        console.error('❌ Error adding user profile:', error);
-        throw error;
+
+        // Provide more specific error messages
+        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+
+        if (errorMessage.includes('UNIQUE constraint failed: user_profiles.email')) {
+            console.error('❌ Email already exists in database:', email);
+            throw new Error(`A profile with email ${email} already exists. Please use a different email or sign in with the existing account.`);
+        } else if (errorMessage.includes('UNIQUE constraint failed')) {
+            console.error('❌ Unique constraint violation:', errorMessage);
+            throw new Error('A profile with this information already exists. Please check your data and try again.');
+        } else if (errorMessage.includes('no such column')) {
+            console.error('❌ Database schema mismatch:', errorMessage);
+            throw new Error('Database schema is outdated. Please restart the app to update the database structure.');
+        } else {
+            console.error('❌ Error adding user profile:', error);
+            throw new Error(`Failed to create user profile: ${errorMessage}`);
+        }
     }
 };
 
@@ -1409,19 +1564,107 @@ interface UserProfile {
     future_self_message_created_at?: string;
     diet_type?: string;
     use_metric_system?: number;
+    premium?: number;
 }
 
 // Get user profile from local SQLite by Firebase UID
+// Legacy function for Firebase UID (keeping for compatibility during migration)
 export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
+    try {
+        // Ensure database is ready with proper schema
+        await ensureDatabaseReady();
+
+        if (!firebaseUid) {
+            console.error('❌ No Firebase UID provided');
+            return null;
+        }
+
+        console.log(`🔍 Looking up user profile for Firebase UID: ${firebaseUid}`);
+
+        const profile = await db.getFirstAsync<UserProfile>(
+            `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        if (!profile) {
+            console.log(`ℹ️ No profile found for Firebase UID: ${firebaseUid}`);
+            return null;
+        }
+
+        console.log(`✅ Profile found for Firebase UID: ${firebaseUid}`);
+
+        // Parse JSON strings back to objects with safe parsing
+        const parseJsonSafely = (jsonString: any) => {
+            if (!jsonString) return null;
+            try {
+                return JSON.parse(jsonString);
+            } catch {
+                return null;
+            }
+        };
+
+        return {
+            ...profile,
+            dietary_restrictions: parseJsonSafely(profile.dietary_restrictions) || [],
+            food_allergies: parseJsonSafely(profile.food_allergies) || [],
+            cuisine_preferences: parseJsonSafely(profile.cuisine_preferences) || [],
+            health_conditions: parseJsonSafely(profile.health_conditions) || [],
+            nutrient_focus: parseJsonSafely(profile.nutrient_focus),
+            push_notifications_enabled: Boolean(profile.push_notifications_enabled),
+            email_notifications_enabled: Boolean(profile.email_notifications_enabled),
+            sms_notifications_enabled: Boolean(profile.sms_notifications_enabled),
+            marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
+            dark_mode: Boolean(profile.dark_mode),
+            sync_data_offline: Boolean(profile.sync_data_offline),
+            onboarding_complete: Boolean(profile.onboarding_complete),
+            diet_type: profile.diet_type,
+            use_metric_system: profile.use_metric_system,
+            premium: Boolean(profile.premium)
+        };
+    } catch (error) {
+        console.error('❌ Error getting user profile by Firebase UID:', error);
+
+        // If it's a column error, it means the table structure is wrong
+        if (error && typeof error === 'object' && 'message' in error) {
+            const errorMessage = error.message || '';
+            if (errorMessage.includes('no such column')) {
+                console.error('❌ Database schema error detected. Column missing:', errorMessage);
+                // Try emergency migration
+                try {
+                    console.log('🔄 Attempting emergency database migration...');
+                    await ensureDatabaseReady();
+                    // Retry the query once
+                    const retryProfile = await db.getFirstAsync<UserProfile>(
+                        `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
+                        [firebaseUid]
+                    );
+                    return retryProfile ? {
+                        ...retryProfile,
+                        premium: Boolean(retryProfile.premium || 0)
+                    } : null;
+                } catch (migrationError) {
+                    console.error('❌ Emergency migration failed:', migrationError);
+                }
+            }
+        }
+
+        throw error;
+    }
+};
+
+// Get user profile from local SQLite by Supabase UID
+export const getUserProfileBySupabaseUid = async (supabaseUid: string) => {
     if (!db || !global.dbInitialized) {
         console.error('⚠️ Attempting to get user profile before database initialization');
         throw new Error('Database not initialized');
     }
 
     try {
+        // For now, use the firebase_uid column but with Supabase UID
+        // After full migration, we can update the column name
         const profile = await db.getFirstAsync<UserProfile>(
             `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
-            [firebaseUid]
+            [supabaseUid]
         );
 
         if (!profile) {
@@ -1447,7 +1690,7 @@ export const getUserProfileByFirebaseUid = async (firebaseUid: string) => {
             use_metric_system: profile.use_metric_system
         };
     } catch (error) {
-        console.error('❌ Error getting user profile:', error);
+        console.error('❌ Error getting user profile by Supabase UID:', error);
         throw error;
     }
 };
@@ -1469,7 +1712,7 @@ export const updateUserProfile = async (firebaseUid: string, updates: any, isAut
 
         for (const [key, value] of Object.entries(updates)) {
             // Skip the firebase_uid as it's used in the WHERE clause
-            if (key === 'firebase_uid') continue;
+            if (key === 'firebase_uid' || key === 'password') continue;
 
             // Handle arrays and objects by converting to JSON
             if (Array.isArray(value) || (value !== null && typeof value === 'object')) {
@@ -3232,3 +3475,422 @@ export const getFoodLogsByMealId = async (mealId: number): Promise<any[]> => {
         return [];
     }
 };
+
+// Mark food logs as synced (bulk operation)
+export const markFoodLogsSynced = async (ids: number[]): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to mark food logs as synced before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    if (ids.length === 0) return;
+
+    try {
+        const placeholders = ids.map(() => '?').join(',');
+        await db.runAsync(
+            `UPDATE food_logs SET synced = 1, sync_action = NULL WHERE id IN (${placeholders})`,
+            ids
+        );
+        console.log(`✅ Marked ${ids.length} food log records as synced`);
+    } catch (error) {
+        console.error('❌ Error marking food logs as synced:', error);
+        throw error;
+    }
+};
+
+// NEW HELPER ---------------------------------------------------------------
+// Get user profile from local SQLite by e-mail address (unique constraint)
+export const getUserProfileByEmail = async (email: string): Promise<UserProfile | null> => {
+    try {
+        // Ensure database is ready with proper schema
+        await ensureDatabaseReady();
+
+        if (!email) {
+            console.error('❌ No email provided to getUserProfileByEmail');
+            return null;
+        }
+
+        console.log(`🔍 Looking up user profile by email: ${email}`);
+
+        const profile = await db.getFirstAsync<UserProfile>(
+            `SELECT * FROM user_profiles WHERE email = ?`,
+            [email]
+        );
+
+        if (!profile) {
+            console.log(`ℹ️ No profile found for email: ${email}`);
+            return null;
+        }
+
+        console.log(`✅ Profile found for email: ${email}`);
+
+        // Parse JSON strings back to objects with safe parsing
+        const parseJsonSafely = (jsonString: any) => {
+            if (!jsonString) return null;
+            try {
+                return JSON.parse(jsonString);
+            } catch {
+                return null;
+            }
+        };
+
+        return {
+            ...profile,
+            dietary_restrictions: parseJsonSafely(profile.dietary_restrictions) || [],
+            food_allergies: parseJsonSafely(profile.food_allergies) || [],
+            cuisine_preferences: parseJsonSafely(profile.cuisine_preferences) || [],
+            health_conditions: parseJsonSafely(profile.health_conditions) || [],
+            nutrient_focus: parseJsonSafely(profile.nutrient_focus),
+            push_notifications_enabled: Boolean(profile.push_notifications_enabled),
+            email_notifications_enabled: Boolean(profile.email_notifications_enabled),
+            sms_notifications_enabled: Boolean(profile.sms_notifications_enabled),
+            marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
+            dark_mode: Boolean(profile.dark_mode),
+            sync_data_offline: Boolean(profile.sync_data_offline),
+            onboarding_complete: Boolean(profile.onboarding_complete),
+            premium: Boolean(profile.premium)
+        };
+    } catch (error) {
+        console.error('❌ Error getting user profile by email:', error);
+
+        // If it's a schema error, try emergency migration
+        if (error && typeof error === 'object' && 'message' in error) {
+            const errorMessage = error.message || '';
+            if (errorMessage.includes('no such column')) {
+                console.log('🔄 Schema error detected, running emergency migration...');
+                try {
+                    await ensureDatabaseReady();
+                    // Retry the query once
+                    const retryProfile = await db.getFirstAsync<UserProfile>(
+                        `SELECT * FROM user_profiles WHERE email = ?`,
+                        [email]
+                    );
+                    return retryProfile ? {
+                        ...retryProfile,
+                        premium: Boolean(retryProfile.premium || 0)
+                    } : null;
+                } catch (migrationError) {
+                    console.error('❌ Emergency migration failed:', migrationError);
+                }
+            }
+        }
+
+        throw error;
+    }
+};
+// --------------------------------------------------------------------------
+
+// Helper function to ensure database is properly initialized and schema is up to date
+export const ensureDatabaseReady = async (): Promise<void> => {
+    try {
+        if (!global.dbInitialized || !db) {
+            console.log('🔄 Database not ready, initializing...');
+            await initDatabase();
+        }
+
+        // Verify database is working by running a simple query
+        await db.getAllAsync('SELECT name FROM sqlite_master WHERE type="table" LIMIT 1');
+        console.log('✅ Database ready and responsive');
+    } catch (error) {
+        console.error('❌ Database readiness check failed:', error);
+        throw new Error('Database initialization failed');
+    }
+};
+
+// ===== INCREMENTAL ONBOARDING SYSTEM =====
+
+// Generate a unique session ID for temporary onboarding data
+export const generateTempSessionId = (): string => {
+    return `temp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+};
+
+// Save onboarding progress incrementally before user authentication
+export const saveOnboardingProgressIncremental = async (
+    tempSessionId: string,
+    profileData: any,
+    currentStep: number,
+    firebaseUid?: string
+): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        await getDatabase();
+    }
+
+    try {
+        const profileDataString = JSON.stringify(profileData);
+        const timestamp = getCurrentDate();
+
+        // Check if temp session already exists
+        const existingSession = await db.getFirstAsync(
+            'SELECT id FROM onboarding_temp WHERE temp_session_id = ?',
+            [tempSessionId]
+        );
+
+        if (existingSession) {
+            // Update existing session
+            await db.runAsync(
+                `UPDATE onboarding_temp 
+                 SET profile_data = ?, current_step = ?, updated_at = ?, firebase_uid = ?
+                 WHERE temp_session_id = ?`,
+                [profileDataString, currentStep, timestamp, firebaseUid || null, tempSessionId]
+            );
+            console.log('✅ Onboarding progress updated incrementally:', { tempSessionId, currentStep });
+        } else {
+            // Create new session
+            await db.runAsync(
+                `INSERT INTO onboarding_temp (temp_session_id, profile_data, current_step, firebase_uid, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [tempSessionId, profileDataString, currentStep, firebaseUid || null, timestamp, timestamp]
+            );
+            console.log('✅ Onboarding progress saved incrementally:', { tempSessionId, currentStep });
+        }
+    } catch (error) {
+        console.error('❌ Error saving onboarding progress incrementally:', error);
+        throw error;
+    }
+};
+
+// Load onboarding progress from temporary storage
+export const loadOnboardingProgressIncremental = async (
+    tempSessionId: string
+): Promise<{ profileData: any; currentStep: number } | null> => {
+    if (!db || !global.dbInitialized) {
+        await getDatabase();
+    }
+
+    try {
+        const result = await db.getFirstAsync(
+            'SELECT profile_data, current_step FROM onboarding_temp WHERE temp_session_id = ? AND synced_to_profile = 0',
+            [tempSessionId]
+        ) as any;
+
+        if (result) {
+            return {
+                profileData: JSON.parse(result.profile_data),
+                currentStep: result.current_step
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Error loading onboarding progress incrementally:', error);
+        return null;
+    }
+};
+
+// Sync temporary onboarding data to actual user profile once authenticated
+export const syncTempOnboardingToUserProfile = async (
+    tempSessionId: string,
+    firebaseUid: string,
+    email: string
+): Promise<boolean> => {
+    if (!db || !global.dbInitialized) {
+        await getDatabase();
+    }
+
+    try {
+        // Load temp onboarding data
+        const tempData = await db.getFirstAsync(
+            'SELECT profile_data, current_step FROM onboarding_temp WHERE temp_session_id = ? AND synced_to_profile = 0',
+            [tempSessionId]
+        ) as any;
+
+        if (!tempData) {
+            console.log('ℹ️ No temporary onboarding data found to sync');
+            return false;
+        }
+
+        const profileData = JSON.parse(tempData.profile_data);
+        console.log('🔄 Syncing temporary onboarding data to user profile:', { firebaseUid, email });
+
+        // Convert to SQLite format and save as user profile
+        const sqliteProfile = convertFrontendProfileToSQLiteFormatHelper(profileData, firebaseUid, email);
+        sqliteProfile.onboarding_complete = false; // Will be set to true when onboarding is fully complete
+
+        await addUserProfile(sqliteProfile);
+        console.log('✅ Temporary onboarding data synced to user profile');
+
+        // Mark temp data as synced
+        await db.runAsync(
+            'UPDATE onboarding_temp SET firebase_uid = ?, synced_to_profile = 1, updated_at = ? WHERE temp_session_id = ?',
+            [firebaseUid, getCurrentDate(), tempSessionId]
+        );
+
+        // Save nutrition goals if available
+        if (profileData.dailyCalorieTarget || profileData.weightGoal || profileData.targetWeight) {
+            try {
+                const goalsToSave = {
+                    targetWeight: profileData.targetWeight,
+                    calorieGoal: profileData.dailyCalorieTarget,
+                    proteinGoal: profileData.nutrientFocus?.protein,
+                    carbGoal: profileData.nutrientFocus?.carbs,
+                    fatGoal: profileData.nutrientFocus?.fat,
+                    fitnessGoal: profileData.fitnessGoal || profileData.weightGoal,
+                    activityLevel: profileData.activityLevel,
+                };
+
+                await updateUserGoals(firebaseUid, goalsToSave);
+                console.log('✅ Nutrition goals synced from temporary data');
+            } catch (nutritionError) {
+                console.error('❌ Error syncing nutrition goals:', nutritionError);
+                // Don't fail the whole operation for this
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error syncing temporary onboarding data:', error);
+        throw error;
+    }
+};
+
+// Clean up old temporary onboarding sessions (older than 7 days)
+export const cleanupOldTempOnboardingSessions = async (): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        await getDatabase();
+    }
+
+    try {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const cutoffDate = sevenDaysAgo.toISOString();
+
+        await db.runAsync(
+            'DELETE FROM onboarding_temp WHERE created_at < ? OR synced_to_profile = 1',
+            [cutoffDate]
+        );
+        console.log('✅ Cleaned up old temporary onboarding sessions');
+    } catch (error) {
+        console.error('❌ Error cleaning up temporary onboarding sessions:', error);
+    }
+};
+
+// Get all temp sessions for a firebase UID (for migration scenarios)
+export const getTempSessionsForUser = async (firebaseUid: string): Promise<any[]> => {
+    if (!db || !global.dbInitialized) {
+        await getDatabase();
+    }
+
+    try {
+        const sessions = await db.getAllAsync(
+            'SELECT * FROM onboarding_temp WHERE firebase_uid = ? AND synced_to_profile = 0',
+            [firebaseUid]
+        );
+        return sessions || [];
+    } catch (error) {
+        console.error('❌ Error getting temp sessions for user:', error);
+        return [];
+    }
+};
+
+// Helper function to convert frontend profile format for temp storage
+const convertFrontendProfileToSQLiteFormatHelper = (frontendProfile: any, firebaseUid: string, email: string): any => {
+    return {
+        firebase_uid: firebaseUid,
+        email: email,
+        first_name: frontendProfile.firstName || '',
+        last_name: frontendProfile.lastName || '',
+        date_of_birth: frontendProfile.dateOfBirth,
+        location: frontendProfile.location,
+        height: frontendProfile.height,
+        weight: frontendProfile.weight,
+        age: frontendProfile.age,
+        gender: frontendProfile.gender,
+        activity_level: frontendProfile.activityLevel,
+        target_weight: frontendProfile.targetWeight,
+        starting_weight: frontendProfile.startingWeight,
+        dietary_restrictions: JSON.stringify(frontendProfile.dietaryRestrictions || []),
+        food_allergies: JSON.stringify(frontendProfile.foodAllergies || []),
+        cuisine_preferences: JSON.stringify(frontendProfile.cuisinePreferences || []),
+        spice_tolerance: frontendProfile.spiceTolerance,
+        health_conditions: JSON.stringify(frontendProfile.healthConditions || []),
+        fitness_goal: frontendProfile.fitnessGoal,
+        weight_goal: frontendProfile.weightGoal,
+        daily_calorie_target: frontendProfile.dailyCalorieTarget,
+        nutrient_focus: frontendProfile.nutrientFocus ? JSON.stringify(frontendProfile.nutrientFocus) : null,
+        unit_preference: frontendProfile.unitPreference || 'metric',
+        push_notifications_enabled: frontendProfile.pushNotificationsEnabled ? 1 : 0,
+        email_notifications_enabled: frontendProfile.emailNotificationsEnabled ? 1 : 0,
+        sms_notifications_enabled: frontendProfile.smsNotificationsEnabled ? 1 : 0,
+        marketing_emails_enabled: frontendProfile.marketingEmailsEnabled ? 1 : 0,
+        preferred_language: frontendProfile.preferredLanguage || 'en',
+        timezone: frontendProfile.timezone || 'UTC',
+        dark_mode: frontendProfile.darkMode ? 1 : 0,
+        sync_data_offline: frontendProfile.syncDataOffline ? 1 : 0,
+        onboarding_complete: frontendProfile.onboardingComplete ? 1 : 0,
+        synced: 0,
+        sync_action: 'create',
+        last_modified: getCurrentDate(),
+        protein_goal: frontendProfile.nutrientFocus?.protein || 0,
+        carb_goal: frontendProfile.nutrientFocus?.carbs || 0,
+        fat_goal: frontendProfile.nutrientFocus?.fat || 0,
+        weekly_workouts: frontendProfile.weeklyWorkouts || 0,
+        step_goal: frontendProfile.stepGoal || 0,
+        water_goal: frontendProfile.waterGoal || 0,
+        sleep_goal: frontendProfile.sleepGoal || 0,
+        workout_frequency: frontendProfile.workoutFrequency || 0,
+        sleep_quality: frontendProfile.sleepQuality || '',
+        stress_level: frontendProfile.stressLevel || '',
+        eating_pattern: frontendProfile.eatingPattern || '',
+        motivations: JSON.stringify(frontendProfile.motivations || []),
+        why_motivation: frontendProfile.whyMotivation || '',
+        projected_completion_date: frontendProfile.projectedCompletionDate || '',
+        estimated_metabolic_age: frontendProfile.estimatedMetabolicAge || 0,
+        estimated_duration_weeks: frontendProfile.estimatedDurationWeeks || 0,
+        future_self_message: frontendProfile.futureSelfMessage || '',
+        future_self_message_type: frontendProfile.futureSelfMessageType || '',
+        future_self_message_created_at: frontendProfile.futureSelfMessageCreatedAt || '',
+        diet_type: frontendProfile.dietType || '',
+        use_metric_system: frontendProfile.useMetricSystem ? 1 : 0,
+        future_self_message_uri: frontendProfile.futureSelfMessageUri || '',
+        premium: frontendProfile.premium ? 1 : 0
+    };
+};
+
+// NEW: Unified profile retrieval function that works with both Firebase and Supabase UIDs
+export const getUserProfile = async (uid: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get user profile before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        console.log(`🔍 Looking up user profile for UID: ${uid}`);
+
+        const profile = await db.getFirstAsync<UserProfile>(
+            `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
+            [uid]
+        );
+
+        if (!profile) {
+            console.log(`ℹ️ No profile found for UID: ${uid}`);
+            return null;
+        }
+
+        console.log(`✅ Profile found for UID: ${uid}`);
+
+        // Parse JSON strings back to objects
+        return {
+            ...profile,
+            dietary_restrictions: profile.dietary_restrictions ? JSON.parse(profile.dietary_restrictions) : [],
+            food_allergies: profile.food_allergies ? JSON.parse(profile.food_allergies) : [],
+            cuisine_preferences: profile.cuisine_preferences ? JSON.parse(profile.cuisine_preferences) : [],
+            health_conditions: profile.health_conditions ? JSON.parse(profile.health_conditions) : [],
+            nutrient_focus: profile.nutrient_focus ? JSON.parse(profile.nutrient_focus) : null,
+            push_notifications_enabled: Boolean(profile.push_notifications_enabled),
+            email_notifications_enabled: Boolean(profile.email_notifications_enabled),
+            sms_notifications_enabled: Boolean(profile.sms_notifications_enabled),
+            marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
+            dark_mode: Boolean(profile.dark_mode),
+            sync_data_offline: Boolean(profile.sync_data_offline),
+            onboarding_complete: Boolean(profile.onboarding_complete),
+            diet_type: profile.diet_type,
+            use_metric_system: profile.use_metric_system,
+            premium: Boolean(profile.premium)
+        };
+    } catch (error) {
+        console.error('❌ Error getting user profile:', error);
+        throw error;
+    }
+};
+
+// Alias functions for backward compatibility
+export const getUserProfileByAnyUid = getUserProfile;

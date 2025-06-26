@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { getIdToken } from '../utils/firebase/auth';
+import { supabase } from '../utils/supabaseClient';
 
 // Get the local IP address from Expo Constants for physical device testing
 const getLocalIpAddress = () => {
@@ -16,7 +16,19 @@ const API_URL = Platform.OS === 'web'
     ? 'http://172.31.90.70:8000'
     : `http://${getLocalIpAddress()}:8000`;
 
-// Helper function to get Firebase ID token is now imported from firebase/auth
+// Helper function to get Supabase auth token
+const getIdToken = async (): Promise<string> => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('User not authenticated. Please sign in again.');
+        }
+        return session.access_token;
+    } catch (error: any) {
+        console.error('Error getting Supabase token:', error);
+        throw new Error('User not authenticated. Please sign in again.');
+    }
+};
 
 // Types for profile data
 export interface UserProfile {

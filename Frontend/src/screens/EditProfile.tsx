@@ -18,10 +18,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Auth, auth } from '../utils/firebase/index';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    getUserProfileByFirebaseUid,
+    getUserProfileBySupabaseUid,
     getUserGoals,
     getUserStreak,
     initDatabase,
@@ -229,7 +228,7 @@ const EditProfile = () => {
 
             if (user && user.uid) {
                 // Get user profile from SQLite
-                const profile = await getUserProfileByFirebaseUid(user.uid);
+                const profile = await getUserProfileBySupabaseUid(user.id);
 
                 // Get user goals from SQLite
                 const goals = await getUserGoals(user.uid);

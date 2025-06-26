@@ -7,13 +7,18 @@ import {
     ScrollView,
     Image,
     Alert,
+    ActivityIndicator,
+    TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useOnboarding } from '../../context/OnboardingContext';
+import { useAuth } from '../../context/AuthContext';
+import { UserProfile } from '../../types/user';
 
 interface SubscriptionStepProps {
+    profile: UserProfile;
     onComplete: () => void;
 }
 
@@ -65,47 +70,121 @@ const subscriptionPlans = [
     },
 ];
 
-const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ onComplete }) => {
+const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete }) => {
     const [selectedPlan, setSelectedPlan] = useState<string>('free_trial');
+    const [isLoading, setIsLoading] = useState(false);
     const navigation = useNavigation();
-    const { completeOnboarding } = useOnboarding();
+    const { completeOnboarding, profile: onboardingProfile } = useOnboarding();
+    const { signUp } = useAuth();
 
     const handleSubscribe = async () => {
-        // Mark onboarding as complete in context
-        await completeOnboarding();
+        // Automatically create account using collected profile data
+        if (profile.email && profile.password) {
+            setIsLoading(true);
+            try {
+                console.log('Creating account with collected profile data:', profile.email);
 
-        if (selectedPlan !== 'free_trial') {
-            // Show confirmation dialog to go to premium screen
-            Alert.alert(
-                'Upgrade to Premium',
-                'Would you like to view premium subscription options now?',
-                [
-                    {
-                        text: 'Not Now',
-                        onPress: () => navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Home' as never }],
-                        })
-                    },
-                    {
-                        text: 'View Options',
-                        onPress: () => navigation.reset({
-                            index: 0,
-                            routes: [
-                                { name: 'Home' as never },
-                                { name: 'PremiumSubscription' as never }
-                            ],
-                        })
-                    },
-                ]
-            );
+                // Create the account using collected info
+                await signUp(profile.email, profile.password);
+
+                console.log('Account created successfully');
+
+                // Wait for auth state to fully propagate
+                console.log('⏳ Waiting for auth state to propagate...');
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
+                // Retry mechanism for completing onboarding
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                while (retryCount < maxRetries) {
+                    try {
+                        await completeOnboarding();
+                        console.log('✅ Onboarding completed successfully');
+                        break;
+                    } catch (error) {
+                        retryCount++;
+                        console.log(`⚠️ Onboarding completion attempt ${retryCount} failed:`, error);
+
+                        if (retryCount < maxRetries) {
+                            console.log(`🔄 Retrying in ${retryCount} seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (selectedPlan === 'free_trial') {
+                    // Navigate to home for free trial
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Main' as never }],
+                    });
+                } else {
+                    // Show premium options for paid plans
+                    Alert.alert(
+                        'Upgrade to Premium',
+                        'Would you like to view premium subscription options now?',
+                        [
+                            {
+                                text: 'Not Now',
+                                onPress: () => navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Main' as never }],
+                                })
+                            },
+                            {
+                                text: 'View Options',
+                                onPress: () => navigation.reset({
+                                    index: 0,
+                                    routes: [
+                                        { name: 'Main' as never },
+                                        { name: 'PremiumSubscription' as never }
+                                    ],
+                                })
+                            },
+                        ]
+                    );
+                }
+            } catch (error) {
+                console.error('Account creation error:', error);
+                Alert.alert('Error', 'Failed to create account. Please try again.');
+            } finally {
+                setIsLoading(false);
+            }
         } else {
-            // Skip premium subscription and proceed to home screen
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Home' as never }],
-            });
+            Alert.alert('Error', 'Missing account information. Please go back and complete your profile.');
         }
+    };
+
+    const handleSkipAccount = async () => {
+        Alert.alert(
+            'Continue Without Account?',
+            'You can create an account later to sync your data across devices.',
+            [
+                { text: 'Create Account', style: 'default' },
+                {
+                    text: 'Skip for Now',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // Complete onboarding without account
+                            await completeOnboarding();
+
+                            // Navigate to home screen
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'Main' as never }],
+                            });
+                        } catch (error) {
+                            console.error('Error completing onboarding:', error);
+                            Alert.alert('Error', 'Failed to complete setup. Please try again.');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     return (
@@ -183,18 +262,45 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ onComplete }) => {
                 </Text>
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleSubscribe}>
+            <TouchableOpacity
+                style={styles.button}
+                onPress={handleSubscribe}
+                disabled={isLoading}
+            >
                 <LinearGradient
                     colors={["#0074dd", "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.buttonGradient}
                 >
-                    <Text style={styles.buttonText}>
-                        {selectedPlan === 'free_trial' ? 'Start Free Trial' : 'Subscribe Now'}
-                    </Text>
+                    {isLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.buttonText}>
+                                {selectedPlan === 'free_trial' ? 'Start Free Trial' : 'Subscribe Now'}
+                            </Text>
+                            <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+                        </View>
+                    )}
                 </LinearGradient>
             </TouchableOpacity>
+
+            {/* Show collected user info */}
+            <View style={styles.userInfoContainer}>
+                <View style={styles.profileIconContainer}>
+                    <Ionicons name="person-circle" size={40} color="#0074dd" />
+                </View>
+                <View style={styles.userInfoTextContainer}>
+                    <Text style={styles.userInfoText}>
+                        {profile.firstName} {profile.lastName}
+                    </Text>
+                    <Text style={styles.userInfoEmail}>{profile.email}</Text>
+                </View>
+                <View style={styles.checkmarkContainer}>
+                    <Ionicons name="checkmark-circle" size={24} color="#00dd74" />
+                </View>
+            </View>
 
             <Text style={styles.termsText}>
                 By continuing, you agree to our Terms of Service and Privacy Policy. We'll send a receipt to your email.
@@ -214,6 +320,11 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ onComplete }) => {
 
 const styles = StyleSheet.create({
     container: {
+        flexGrow: 1,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 800,
         paddingBottom: 40,
     },
     title: {
@@ -231,6 +342,7 @@ const styles = StyleSheet.create({
     },
     plansContainer: {
         marginBottom: 24,
+        width: '100%',
     },
     planCard: {
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -239,6 +351,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
+        width: '100%',
     },
     selectedPlan: {
         borderColor: '#0074dd',
@@ -355,6 +468,114 @@ const styles = StyleSheet.create({
     },
     paymentIcon: {
         marginHorizontal: 10,
+    },
+    // Account creation form styles
+    accountHeader: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    backToPlansButton: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        zIndex: 1,
+    },
+    backToPlansText: {
+        color: '#0074dd',
+        fontSize: 16,
+        marginLeft: 4,
+    },
+    accountIconContainer: {
+        marginBottom: 16,
+    },
+    benefitsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 32,
+        paddingHorizontal: 16,
+    },
+    benefit: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    benefitText: {
+        color: '#00dd74',
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    form: {
+        marginBottom: 32,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 12,
+        marginBottom: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
+        color: '#fff',
+        fontSize: 16,
+        paddingVertical: 16,
+    },
+    passwordInput: {
+        paddingRight: 50,
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: 16,
+        padding: 4,
+    },
+    actions: {
+        marginBottom: 16,
+    },
+    skipButton: {
+        alignItems: 'center',
+        marginTop: 16,
+        paddingVertical: 12,
+    },
+    skipButtonText: {
+        color: '#999',
+        fontSize: 16,
+    },
+    userInfoContainer: {
+        marginBottom: 16,
+        padding: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 12,
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    profileIconContainer: {
+        marginRight: 12,
+    },
+    userInfoTextContainer: {
+        flex: 1,
+    },
+    userInfoText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    userInfoEmail: {
+        color: '#aaa',
+        fontSize: 14,
+    },
+    checkmarkContainer: {
+        marginLeft: 12,
     },
 });
 

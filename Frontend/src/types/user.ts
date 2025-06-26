@@ -4,6 +4,7 @@ export interface UserProfile {
     firstName: string;
     lastName: string;
     email: string;
+    password?: string; // Optional password for account creation during onboarding
 
     // Enhanced personal info
     dateOfBirth: string | null;

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
-import { auth } from '../utils/firebase';
+import { supabase } from '../utils/supabaseClient';
 
 export interface Achievement {
     id: number;
@@ -47,9 +47,12 @@ class GamificationService {
     private baseURL = `${BACKEND_URL}/gamification`;
 
     private async getHeaders() {
-        const token = await auth.currentUser?.getIdToken(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('User not authenticated. Please sign in again.');
+        }
         return {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
         };
     }

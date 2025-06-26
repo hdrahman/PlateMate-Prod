@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 11; // Increment this to version 11 for fitness_goal column
+const CURRENT_VERSION = 13; // Increment to version 13 for robust column addition fix
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -296,6 +296,73 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                         } catch (error) {
                             console.error(`❌ Error adding fitness_goal column:`, error);
                         }
+                    }
+                },
+                // Migration to version 12 - Add future_self_message_uri, use_metric_system, and diet_type columns to user_profiles
+                async () => {
+                    if (currentVersion < 12) {
+                        console.log('Migrating to version 12: Adding new columns to user_profiles for enhanced onboarding and settings.');
+
+                        // Get existing columns to avoid errors
+                        const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+                        const existingColumns = tableInfo.map((col: any) => col.name);
+
+                        const columnsToAdd = [
+                            { name: 'future_self_message_uri', definition: 'TEXT' },
+                            { name: 'use_metric_system', definition: 'INTEGER DEFAULT 1' },
+                            { name: 'diet_type', definition: 'TEXT' }
+                        ];
+
+                        for (const col of columnsToAdd) {
+                            if (!existingColumns.includes(col.name)) {
+                                try {
+                                    await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN ${col.name} ${col.definition}`);
+                                    console.log(`✅ Added ${col.name} column to user_profiles`);
+                                } catch (error) {
+                                    console.error(`❌ Error adding ${col.name} column to user_profiles:`, error);
+                                }
+                            } else {
+                                console.log(`ℹ️ Column ${col.name} already exists in user_profiles.`);
+                            }
+                        }
+                    }
+                },
+                // Migration to version 13 - Add robust column addition fix
+                async () => {
+                    if (currentVersion < 13) {
+                        console.log('Migrating to version 13: Adding robust column addition fix');
+
+                        // Get existing columns to avoid errors
+                        const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+                        const existingColumns = tableInfo.map((col: any) => col.name);
+
+                        // Define all expected columns based on schema
+                        const allExpectedColumns = [
+                            { name: 'future_self_message_uri', definition: 'TEXT' },
+                            { name: 'use_metric_system', definition: 'INTEGER DEFAULT 1' },
+                            { name: 'diet_type', definition: 'TEXT' },
+                            { name: 'premium', definition: 'INTEGER DEFAULT 0' }
+                        ];
+
+                        console.log(`Found ${existingColumns.length} existing columns in user_profiles table`);
+                        console.log(`Checking ${allExpectedColumns.length} expected columns...`);
+
+                        let addedCount = 0;
+                        for (const col of allExpectedColumns) {
+                            if (!existingColumns.includes(col.name)) {
+                                try {
+                                    await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN ${col.name} ${col.definition}`);
+                                    console.log(`✅ Added missing column ${col.name} to user_profiles`);
+                                    addedCount++;
+                                } catch (error) {
+                                    console.error(`❌ Error adding ${col.name} column to user_profiles:`, error);
+                                }
+                            } else {
+                                console.log(`ℹ️ Column ${col.name} already exists in user_profiles.`);
+                            }
+                        }
+
+                        console.log(`✅ Migration to version 13 complete. Added ${addedCount} new columns.`);
                     }
                 }
             ];

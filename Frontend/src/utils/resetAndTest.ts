@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from './firebase';
+import { supabase } from './supabaseClient';
 import { testProfileSync, resetLocalProfile } from './testUserSync';
-import { getUserProfileByFirebaseUid } from './database';
+import { getUserProfileBySupabaseUid, getUserProfileByFirebaseUid } from './database';
 import * as SQLite from 'expo-sqlite';
 
 /**
@@ -12,13 +12,13 @@ import * as SQLite from 'expo-sqlite';
 // Reset all profile data for current user
 export const resetAllProfileData = async () => {
     try {
-        const currentUser = auth.currentUser;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (!currentUser) {
             console.error('❌ No authenticated user. Please sign in first.');
             return { success: false, message: 'Not authenticated' };
         }
 
-        const firebaseUid = currentUser.uid;
+        const firebaseUid = currentUser.id;
         console.log(`🧹 Resetting all profile data for user: ${firebaseUid}`);
 
         // Step 1: Clear AsyncStorage data
@@ -62,13 +62,13 @@ export const resetAllProfileData = async () => {
 // Check and print the current state of user profile
 export const checkAndPrintCurrentState = async () => {
     try {
-        const currentUser = auth.currentUser;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (!currentUser) {
             console.error('❌ No authenticated user. Please sign in first.');
             return { success: false, message: 'Not authenticated' };
         }
 
-        const firebaseUid = currentUser.uid;
+        const firebaseUid = currentUser.id;
         console.log(`🔍 Checking current state for user: ${firebaseUid}`);
 
         // Check AsyncStorage

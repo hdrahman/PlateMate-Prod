@@ -67,7 +67,10 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
                             gender === option.id && styles.selectedGender,
                             gender === option.id && { borderColor: option.color }
                         ]}
-                        onPress={() => setGender(option.id)}
+                        onPress={() => {
+                            setGender(option.id);
+                            updateProfile({ gender: option.id }).catch(console.error);
+                        }}
                     >
                         <View style={[
                             styles.genderIconContainer,

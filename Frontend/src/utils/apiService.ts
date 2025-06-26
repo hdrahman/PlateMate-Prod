@@ -166,7 +166,7 @@ class ApiService {
     ): Promise<T> {
         const {
             useCache = true,
-            serviceType = ServiceTokenType.FIREBASE_AUTH,
+            serviceType = ServiceTokenType.SUPABASE_AUTH,
             forceRefresh = false
         } = options;
 

@@ -50,7 +50,7 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
             color: '#7e57c2',
         },
         {
-            id: 'extreme',
+            id: 'very_active',
             label: 'Extremely Active',
             description: 'Professional athlete level, physical labor job plus training, or 2x daily workouts',
             icon: 'barbell-outline',
@@ -84,7 +84,10 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
                             styles.activityCard,
                             activityLevel === level.id && styles.selectedActivity
                         ]}
-                        onPress={() => setActivityLevel(level.id)}
+                        onPress={() => {
+                            setActivityLevel(level.id);
+                            updateProfile({ activityLevel: level.id }).catch(console.error);
+                        }}
                     >
                         <View style={[styles.activityIcon, { backgroundColor: `${level.color}20` }]}>
                             <Ionicons

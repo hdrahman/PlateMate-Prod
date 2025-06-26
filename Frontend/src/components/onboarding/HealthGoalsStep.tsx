@@ -67,7 +67,7 @@ const activityLevels = [
     { id: 'light', label: 'Lightly Active', description: '1-3 days/week' },
     { id: 'moderate', label: 'Moderately Active', description: '3-5 days/week' },
     { id: 'active', label: 'Very Active', description: '6-7 days/week' },
-    { id: 'extreme', label: 'Extremely Active', description: 'Physical job or 2x training' },
+    { id: 'very_active', label: 'Extremely Active', description: 'Physical job or 2x training' },
 ];
 
 const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfile, onNext }) => {
@@ -135,7 +135,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             case 'active':
                 activityMultiplier = 1.725;
                 break;
-            case 'extreme':
+            case 'very_active':
                 activityMultiplier = 1.9;
                 break;
         }
@@ -251,9 +251,9 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
         });
 
         // Initialize cheat day settings in database if enabled
-        if (cheatDayEnabled && user?.uid) {
+        if (cheatDayEnabled && user?.id) {
             try {
-                await initializeCheatDaySettings(user.uid, cheatDayFrequency, preferredCheatDayOfWeek);
+                await initializeCheatDaySettings(user.id, cheatDayFrequency, preferredCheatDayOfWeek);
             } catch (error) {
                 console.error('Error initializing cheat day settings:', error);
                 // Continue with onboarding even if cheat day initialization fails
@@ -317,7 +317,6 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                                 onValueChange={(value) => {
                                     handleDetailedGoalSelect(value);
                                 }}
-                                containerHeight={250}
                                 containerStyle={styles.wheelPicker}
                             />
 

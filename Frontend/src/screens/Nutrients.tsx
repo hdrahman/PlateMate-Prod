@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { initDatabase, isDatabaseReady, getUserProfileByFirebaseUid } from '../utils/database';
+import { initDatabase, isDatabaseReady, getUserProfileBySupabaseUid } from '../utils/database';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '../context/AuthContext';
 import { useFoodLog } from '../context/FoodLogContext';
@@ -202,7 +202,7 @@ const NutrientsScreen: React.FC = () => {
             try {
                 setProfileLoading(true);
                 // Get user profile from local database
-                const profile = await getUserProfileByFirebaseUid(user.uid);
+                const profile = await getUserProfileBySupabaseUid(user.id);
 
                 if (profile) {
                     // Calculate nutrition goals based on user profile

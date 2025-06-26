@@ -13,12 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Auth } from '../utils/firebase/index';
-import {
-    deleteUser,
-    reauthenticateWithCredential,
-    EmailAuthProvider
-} from 'firebase/auth';
+import { supabase } from '../utils/supabaseClient';
 
 export default function DeleteAccount() {
     const navigation = useNavigation<any>();
@@ -61,21 +56,22 @@ export default function DeleteAccount() {
         setIsLoading(true);
 
         try {
-            // Re-authenticate the user
-            const credential = EmailAuthProvider.credential(
-                user.email,
-                password
-            );
+            // Re-authenticate with current password using Supabase
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: password
+            });
 
-            await reauthenticateWithCredential(user, credential);
+            if (signInError) {
+                throw signInError;
+            }
 
-            // Delete the user account
-            await deleteUser(user);
+            // Delete the user account using Supabase
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
 
-            // This would typically also delete user data from Firestore/database
-            // For example:
-            // const db = firebase.firestore();
-            // await db.collection('users').doc(user.uid).delete();
+            if (deleteError) {
+                throw deleteError;
+            }
 
             Alert.alert(
                 'Account Deleted',
@@ -94,9 +90,9 @@ export default function DeleteAccount() {
             console.error('Delete account error:', error);
 
             // Handle specific error cases
-            if (error.code === 'auth/wrong-password') {
+            if (error.message?.includes('Invalid login credentials')) {
                 Alert.alert('Error', 'Password is incorrect');
-            } else if (error.code === 'auth/too-many-requests') {
+            } else if (error.message?.includes('too many requests')) {
                 Alert.alert('Error', 'Too many unsuccessful attempts. Please try again later.');
             } else {
                 Alert.alert('Error', 'Failed to delete account. Please try again.');

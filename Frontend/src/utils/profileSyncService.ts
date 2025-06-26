@@ -1,12 +1,12 @@
 import { getUserProfile, createUser, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
 import {
-    getUserProfileByFirebaseUid,
+    getUserProfileBySupabaseUid,
     addUserProfile,
     updateUserProfile as updateLocalUserProfile,
     markUserProfileSynced
 } from './database';
 import { isOnline } from './syncService';
-import { auth } from './firebase';
+import { supabase } from './supabaseClient';
 import { BACKEND_URL } from './config';
 
 // OFFLINE-ONLY MODE: All sync operations are disabled

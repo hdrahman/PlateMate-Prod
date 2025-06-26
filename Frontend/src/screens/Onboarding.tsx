@@ -13,6 +13,7 @@ import {
     BackHandler,
     Platform,
     KeyboardAvoidingView,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
+import { isLikelyOffline, isBackendAvailable } from '../utils/networkUtils';
 import * as userApi from '../api/userApi';
 
 // Onboarding step components
@@ -35,7 +37,6 @@ import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesS
 import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
 import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
 import SubscriptionStep from '../components/onboarding/SubscriptionStep';
-import AccountCreationStep from '../components/onboarding/AccountCreationStep';
 
 const { width, height } = Dimensions.get('window');
 
@@ -44,8 +45,8 @@ const Onboarding = () => {
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
     const {
-        currentStep,
         totalSteps,
+        currentStep,
         profile,
         updateProfile,
         goToNextStep,
@@ -53,18 +54,23 @@ const Onboarding = () => {
         completeOnboarding,
     } = useOnboarding();
 
+    // Track selected fitness goal from GoalsStep
+    const [selectedFitnessGoal, setSelectedFitnessGoal] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isOffline, setIsOffline] = useState(false);
+    const [hasShownOfflineWarning, setHasShownOfflineWarning] = useState(false);
 
-    // Handle Android back button
     useFocusEffect(
         React.useCallback(() => {
             const onBackPress = () => {
                 if (currentStep > 1) {
                     handleBack();
-                    return true; // Prevent default behavior (exit app)
+                    return true;
                 }
-                return false; // Let default behavior happen (exit app)
+                // For the welcome step, we might want to let the default back behavior (exit app) happen.
+                // Or handle it inside WelcomeStep if it has internal navigation.
+                return currentStep === 1; // Prevent back from step 1 if it's the initial screen.
             };
 
             const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -73,172 +79,137 @@ const Onboarding = () => {
         }, [currentStep])
     );
 
-    // Handle next step
-    const handleNext = async () => {
-        setError(null);
-        try {
-            goToNextStep();
-        } catch (error) {
-            console.error('Error going to next step:', error);
-            setError('Failed to proceed to next step. Please try again.');
+    // Check network connectivity when user starts onboarding steps
+    useEffect(() => {
+        const checkConnectivity = async () => {
+            if (currentStep === 2 && !hasShownOfflineWarning) { // After welcome step
+                const offline = await isLikelyOffline();
+                setIsOffline(offline);
+
+                if (offline) {
+                    setHasShownOfflineWarning(true);
+                    Alert.alert(
+                        'No Internet Connection',
+                        'You appear to be offline. While you can continue with the setup, some features may not work properly until you connect to the internet.',
+                        [
+                            { text: 'Continue Anyway', style: 'default' },
+                            {
+                                text: 'Check Connection',
+                                style: 'cancel',
+                                onPress: () => {
+                                    // User can manually check and try again
+                                    setHasShownOfflineWarning(false);
+                                }
+                            }
+                        ]
+                    );
+                }
+            }
+        };
+
+        checkConnectivity();
+    }, [currentStep, hasShownOfflineWarning]);
+
+    // Handle moving to the next step; for GoalsStep, receive the selected fitnessGoal
+    const handleNext = async (selectedGoal?: string) => {
+        if (currentStep === 2 && selectedGoal) {
+            setSelectedFitnessGoal(selectedGoal);
+            await updateProfile({ fitnessGoal: selectedGoal });
+        }
+        goToNextStep();
+    };
+
+    const handleBack = () => {
+        // We don't want to go back into the welcome steps from the first real onboarding step
+        if (currentStep > 1) {
+            goToPreviousStep();
         }
     };
 
-    // Handle previous step
-    const handleBack = () => {
-        setError(null);
-        goToPreviousStep();
-    };
-
-    // Complete onboarding
     const handleCompleteOnboarding = async () => {
         setIsLoading(true);
         setError(null);
-
         try {
-            console.log('🎯 Starting onboarding completion process...');
-
-            // Complete onboarding in context (saves to local database)
             await completeOnboarding();
-
-            // Backend sync disabled - app runs in offline-only mode
-            console.log('✅ Profile saved locally - backend sync disabled for offline mode');
-
-            // Navigate to home screen
             navigation.reset({
                 index: 0,
                 routes: [{ name: 'Home' as never }],
             });
-
         } catch (error) {
-            console.error('❌ Error completing onboarding:', error);
             setError('Failed to complete onboarding. Please try again.');
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Skip onboarding for now
-    const handleSkip = async () => {
-        try {
-            setIsLoading(true);
-            console.log('🔄 Skipping onboarding - saving minimal profile...');
-            console.log('Current user:', user?.uid);
-            console.log('Current profile before update:', profile);
-
-            // Create a minimal profile with default values
-            const minimalProfile = {
-                firstName: 'User',
-                lastName: '',
-                height: 170, // Default height in cm
-                weight: 70,  // Default weight in kg
-                age: 25,     // Default age
-                gender: 'prefer_not_to_say',
-                activityLevel: 'moderate',
-                unitPreference: 'metric',
-                weightGoal: 'maintain',
-                dailyCalorieTarget: 2000, // Default calorie target
-            };
-
-            console.log('Minimal profile to save:', minimalProfile);
-
-            // Update profile with minimal data
-            console.log('📝 Updating profile...');
-            await updateProfile(minimalProfile);
-            console.log('✅ Profile updated successfully');
-
-            // Complete onboarding
-            console.log('🏁 Completing onboarding...');
-            await completeOnboarding();
-            console.log('✅ Onboarding completed successfully');
-
-            console.log('✅ Onboarding skipped successfully with minimal profile');
-
-            // Navigate to home screen
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Home' as never }],
-            });
-        } catch (error) {
-            console.error('❌ Error skipping onboarding:', error);
-            console.error('Error details:', error.message, error.stack);
-            setError('Failed to skip onboarding. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Render current step
     const renderCurrentStep = () => {
         switch (currentStep) {
             case 1:
+                return <WelcomeStep onNext={handleNext} />;
             case 2:
-            case 3:
-                return <WelcomeStep currentStep={currentStep} onNext={handleNext} />;
-            case 4:
                 return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 5:
+            case 3:
                 return <MotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 6:
-                return <WeightChangeRateStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 7:
+            case 4:
+                return (
+                    <WeightChangeRateStep
+                        profile={profile}
+                        updateProfile={updateProfile}
+                        onNext={handleNext}
+                        fitnessGoalOverride={selectedFitnessGoal || undefined}
+                    />
+                );
+            case 5:
                 return <BasicInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 8:
+            case 6:
                 return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 9:
+            case 7:
                 return <ActivityLevelStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 10:
+            case 8:
                 return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 11:
+            case 9:
                 return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 12:
+            case 10:
                 return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 13:
+            case 11:
                 return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 14:
-                return <SubscriptionStep onComplete={handleNext} />;
-            case 15:
-                return <AccountCreationStep
-                    profile={profile}
-                    onComplete={handleCompleteOnboarding}
-                    onSkip={handleSkip}
-                />;
+            case 12:
+                return <SubscriptionStep profile={profile} onComplete={handleCompleteOnboarding} />;
             default:
+                // This case should ideally not be reached if totalSteps is accurate.
+                // Fallback to the first step.
                 return <WelcomeStep onNext={handleNext} />;
         }
     };
 
+    const TOTAL_ONBOARDING_STEPS = 11; // Number of steps after the welcome screen
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
-
             <LinearGradient
-                colors={['#000000', '#121212']}
+                colors={(currentStep === 6 || currentStep === 11) ? ['#000000', '#000000'] : ['#000000', '#121212']}
                 style={styles.background}
             />
-
             <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-                {/* Only show progress dots during main onboarding (steps 4-14) */}
-                {currentStep > 3 && currentStep < 15 && (
+                {currentStep > 1 && currentStep <= 12 && (
                     <View style={styles.progressContainer}>
-                        {Array.from({ length: 11 }).map((_, index) => ( // 11 main onboarding steps (4-14)
+                        {Array.from({ length: TOTAL_ONBOARDING_STEPS }).map((_, index) => (
                             <View
                                 key={index}
                                 style={[
                                     styles.progressDot,
-                                    index + 4 === currentStep ? styles.activeDot :
-                                        index + 4 < currentStep ? styles.completedDot :
+                                    index + 2 === currentStep ? styles.activeDot :
+                                        index + 2 < currentStep ? styles.completedDot :
                                             styles.inactiveDot
                                 ]}
                             />
                         ))}
                     </View>
                 )}
-
-                {/* Hide Back button during intro screens and account creation */}
-                {currentStep > 3 && currentStep < 15 && (
+                {currentStep > 1 && currentStep < 12 && (
                     <TouchableOpacity
-                        style={[styles.backButton, { top: Math.max(insets.top + 10, 20) }]}
+                        style={[styles.backButton, { top: Math.max(insets.top, 20) }]}
                         onPress={handleBack}
                         activeOpacity={0.7}
                     >
@@ -248,19 +219,7 @@ const Onboarding = () => {
                         </View>
                     </TouchableOpacity>
                 )}
-
-                {/* Hide Skip button during intro screens and account creation */}
-                {currentStep > 3 && currentStep < 15 && (
-                    <TouchableOpacity
-                        style={[styles.skipButton, { top: Math.max(insets.top + 10, 20) }]}
-                        onPress={handleSkip}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.skipText}>Skip</Text>
-                    </TouchableOpacity>
-                )}
             </View>
-
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
@@ -268,22 +227,22 @@ const Onboarding = () => {
                 <ScrollView
                     contentContainerStyle={[
                         styles.content,
-                        (currentStep <= 3 || currentStep === 15) && styles.introContent
+                        (currentStep === 1 || currentStep === 12) && styles.introContent,
+                        currentStep === 10 && { flexGrow: 1 },
+                        (currentStep === 6 || currentStep === 11) && { paddingHorizontal: 0, paddingBottom: 0 }
                     ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 3 && currentStep < 15} // Disable scrolling for intro screens and account creation
+                    scrollEnabled={currentStep > 1 && currentStep < 12}
                 >
                     {renderCurrentStep()}
                 </ScrollView>
             </KeyboardAvoidingView>
-
             {error && (
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{error}</Text>
                 </View>
             )}
-
             {isLoading && (
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color="#0074DD" />
@@ -319,7 +278,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 14,
     },
     progressDot: {
         width: 8,
@@ -355,19 +314,6 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         marginLeft: 2,
-    },
-    skipButton: {
-        position: 'absolute',
-        right: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        zIndex: 10,
-    },
-    skipText: {
-        color: '#fff',
-        fontSize: 14,
     },
     content: {
         paddingHorizontal: 20,

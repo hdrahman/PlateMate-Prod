@@ -71,4 +71,98 @@ export const testBackendConnection = async () => {
         Alert.alert('Connection Test Error', 'An unexpected error occurred during the test.');
         return [];
     }
+};
+
+/**
+ * Network utility functions to check connectivity
+ * Used during onboarding to warn users when offline
+ */
+
+export interface NetworkStatus {
+    isOnline: boolean;
+    backendReachable: boolean;
+    lastChecked: Date;
+}
+
+let cachedNetworkStatus: NetworkStatus | null = null;
+const CACHE_DURATION_MS = 30000; // 30 seconds
+
+/**
+ * Check if the app has internet connectivity and backend is reachable
+ */
+export const checkNetworkConnectivity = async (): Promise<NetworkStatus> => {
+    // Return cached result if available and fresh
+    if (cachedNetworkStatus &&
+        (Date.now() - cachedNetworkStatus.lastChecked.getTime()) < CACHE_DURATION_MS) {
+        return cachedNetworkStatus;
+    }
+
+    const status: NetworkStatus = {
+        isOnline: false,
+        backendReachable: false,
+        lastChecked: new Date()
+    };
+
+    try {
+        // Check basic internet connectivity with a simple HTTP request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const connectivityResponse = await fetch('https://httpbin.org/get', {
+            method: 'GET',
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        status.isOnline = connectivityResponse.ok;
+    } catch (error) {
+        console.log('ℹ️ No internet connectivity detected');
+        status.isOnline = false;
+    }
+
+    // If we have internet, check if our backend is reachable
+    if (status.isOnline) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+            const backendResponse = await fetch(`${BACKEND_URL}/health`, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+            status.backendReachable = backendResponse.ok;
+        } catch (error) {
+            console.log('ℹ️ Backend not reachable');
+            status.backendReachable = false;
+        }
+    }
+
+    // Cache the result
+    cachedNetworkStatus = status;
+    return status;
+};
+
+/**
+ * Quick check if we're likely offline (uses cached result if available)
+ */
+export const isLikelyOffline = async (): Promise<boolean> => {
+    const status = await checkNetworkConnectivity();
+    return !status.isOnline;
+};
+
+/**
+ * Check if backend services are available
+ */
+export const isBackendAvailable = async (): Promise<boolean> => {
+    const status = await checkNetworkConnectivity();
+    return status.backendReachable;
+};
+
+/**
+ * Clear the network status cache to force a fresh check
+ */
+export const clearNetworkCache = (): void => {
+    cachedNetworkStatus = null;
 }; 

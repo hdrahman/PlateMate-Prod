@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
-    StyleSheet,
     TouchableOpacity,
+    StyleSheet,
+    Alert,
     ScrollView,
-    Switch,
-    Platform,
-    KeyboardAvoidingView,
     Modal,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import WheelPicker from '../WheelPicker';
@@ -22,206 +19,279 @@ interface PhysicalAttributesStepProps {
 }
 
 const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile, updateProfile, onNext }) => {
-    const [useMetric, setUseMetric] = useState<boolean>(profile.useMetricSystem !== false);
+    const [useMetric, setUseMetric] = useState(profile.useMetricSystem ?? true);
 
     // For metric system
-    const [weightKg, setWeightKg] = useState<string>(profile.weight ? String(profile.weight) : '70');
-    const [heightCm, setHeightCm] = useState<string>(profile.height ? String(profile.height) : '170');
+    const [weightKg, setWeightKg] = useState<number>(profile.weight ? Math.round(profile.weight) : 70);
+    const [heightCm, setHeightCm] = useState<number>(profile.height ? Math.round(profile.height) : 170);
+    const [targetWeightKg, setTargetWeightKg] = useState<number>(profile.targetWeight ? Math.round(profile.targetWeight) : 65);
 
     // For imperial system
-    const [weightLbs, setWeightLbs] = useState<string>(profile.weight ? String(Math.round(profile.weight * 2.20462)) : '154');
-    const [heightFt, setHeightFt] = useState<string>(profile.height ? String(Math.floor((profile.height / 2.54) / 12)) : '5');
-    const [heightIn, setHeightIn] = useState<string>(profile.height ? String(Math.round((profile.height / 2.54) % 12)) : '7');
+    const [weightLbs, setWeightLbs] = useState<number>(profile.weight ? Math.round(profile.weight * 2.20462) : 154);
+    const [heightFt, setHeightFt] = useState<number>(profile.height ? Math.floor((profile.height / 2.54) / 12) : 5);
+    const [heightIn, setHeightIn] = useState<number>(profile.height ? Math.round((profile.height / 2.54) % 12) : 9);
+    const [targetWeightLbs, setTargetWeightLbs] = useState<number>(profile.targetWeight ? Math.round(profile.targetWeight * 2.20462) : 143);
 
     // Modal states
-    const [showWeightPicker, setShowWeightPicker] = useState<boolean>(false);
-    const [showHeightPicker, setShowHeightPicker] = useState<boolean>(false);
+    const [showWeightPicker, setShowWeightPicker] = useState(false);
+    const [showHeightPicker, setShowHeightPicker] = useState(false);
+    const [showTargetWeightPicker, setShowTargetWeightPicker] = useState(false);
 
     // Generate data for pickers
-    const generateWeightData = () => {
-        if (useMetric) {
-            return Array.from({ length: 201 }, (_, i) => ({
-                id: String(i + 40),
-                label: `${i + 40} kg`,
-            }));
-        } else {
-            return Array.from({ length: 301 }, (_, i) => ({
-                id: String(i + 80),
-                label: `${i + 80} lbs`,
-            }));
-        }
+    const generateWeightData = (isMetric: boolean) => {
+        const min = isMetric ? 30 : 66; // 30kg or 66lbs
+        const max = isMetric ? 200 : 440; // 200kg or 440lbs
+        return Array.from({ length: max - min + 1 }, (_, i) => ({
+            id: String(min + i),
+            label: `${min + i}${isMetric ? ' kg' : ' lbs'}`
+        }));
     };
 
     const generateHeightCmData = () => {
-        return Array.from({ length: 121 }, (_, i) => ({
-            id: String(i + 120),
-            label: `${i + 120} cm`,
+        return Array.from({ length: 101 }, (_, i) => ({
+            id: String(140 + i),
+            label: `${140 + i} cm`
         }));
     };
 
-    const generateHeightFtData = () => {
-        return Array.from({ length: 8 }, (_, i) => ({
-            id: String(i + 4),
-            label: `${i + 4} ft`,
+    const generateFeetData = () => {
+        return Array.from({ length: 6 }, (_, i) => ({
+            id: String(3 + i),
+            label: `${3 + i} ft`
         }));
     };
 
-    const generateHeightInData = () => {
+    const generateInchesData = () => {
         return Array.from({ length: 12 }, (_, i) => ({
             id: String(i),
-            label: `${i} in`,
+            label: `${i} in`
         }));
+    };
+
+    // Generate combined imperial height data
+    const generateImperialHeightData = () => {
+        const data = [];
+        for (let ft = 3; ft <= 8; ft++) {
+            for (let inch = 0; inch < 12; inch++) {
+                const id = `${ft}-${inch}`;
+                const label = `${ft}' ${inch}"`;
+                data.push({ id, label });
+            }
+        }
+        return data;
     };
 
     // Convert between metric and imperial on toggle
     useEffect(() => {
-        if (profile.weight) {
-            if (useMetric) {
-                // Convert lbs to kg if coming from imperial
-                if (weightLbs) {
-                    const kg = Math.round(parseFloat(weightLbs) / 2.20462);
-                    setWeightKg(String(kg));
-                }
-            } else {
-                // Convert kg to lbs if coming from metric
-                if (weightKg) {
-                    const lbs = Math.round(parseFloat(weightKg) * 2.20462);
-                    setWeightLbs(String(lbs));
-                }
-            }
-        }
-
         if (profile.height) {
             if (useMetric) {
                 // Convert ft/in to cm if coming from imperial
-                if (heightFt && heightIn) {
-                    const totalInches = (parseInt(heightFt) * 12) + parseInt(heightIn);
-                    const cm = Math.round(totalInches * 2.54);
-                    setHeightCm(String(cm));
-                }
+                const totalInches = (heightFt * 12) + heightIn;
+                const cm = Math.round(totalInches * 2.54);
+                setHeightCm(cm);
             } else {
                 // Convert cm to ft/in if coming from metric
-                if (heightCm) {
-                    const totalInches = Math.round(parseFloat(heightCm) / 2.54);
-                    const ft = Math.floor(totalInches / 12);
-                    const inches = totalInches % 12;
-                    setHeightFt(String(ft));
-                    setHeightIn(String(inches));
-                }
+                const totalInches = Math.round(heightCm / 2.54);
+                const feet = Math.floor(totalInches / 12);
+                const inches = totalInches % 12;
+                setHeightFt(feet);
+                setHeightIn(inches);
+            }
+        }
+
+        if (profile.weight) {
+            if (useMetric) {
+                // Convert lbs to kg if coming from imperial
+                const kg = Math.round(weightLbs / 2.20462);
+                setWeightKg(kg);
+            } else {
+                // Convert kg to lbs if coming from metric
+                const lbs = Math.round(weightKg * 2.20462);
+                setWeightLbs(lbs);
+            }
+        }
+
+        if (profile.targetWeight) {
+            if (useMetric) {
+                // Convert target weight lbs to kg if coming from imperial
+                const kg = Math.round(targetWeightLbs / 2.20462);
+                setTargetWeightKg(kg);
+            } else {
+                // Convert target weight kg to lbs if coming from metric
+                const lbs = Math.round(targetWeightKg * 2.20462);
+                setTargetWeightLbs(lbs);
             }
         }
     }, [useMetric]);
 
-    const getWeightValue = () => {
-        return useMetric ? `${weightKg} kg` : `${weightLbs} lbs`;
-    };
-
-    const getHeightValue = () => {
-        return useMetric ? `${heightCm} cm` : `${heightFt}'${heightIn}"`;
-    };
-
-    const handleSubmit = async () => {
+    const handleNext = async () => {
         try {
-            let weight = 0;
-            let height = 0;
+            let finalWeight: number;
+            let finalHeight: number;
+            let finalTargetWeight: number;
 
-            // Calculate weight in kg (stored value)
             if (useMetric) {
-                weight = parseFloat(weightKg);
-            } else {
-                weight = Math.round(parseFloat(weightLbs) / 2.20462);
-            }
+                if (weightKg <= 0 || weightKg > 300) {
+                    Alert.alert('Invalid Weight', 'Please enter a valid weight between 1-300 kg');
+                    return;
+                }
 
-            // Calculate height in cm (stored value)
-            if (useMetric) {
-                height = parseFloat(heightCm);
+                if (heightCm <= 0 || heightCm > 250) {
+                    Alert.alert('Invalid Height', 'Please enter a valid height between 1-250 cm');
+                    return;
+                }
+
+                if (targetWeightKg <= 0 || targetWeightKg > 300) {
+                    Alert.alert('Invalid Target Weight', 'Please enter a valid target weight between 1-300 kg');
+                    return;
+                }
+
+                finalWeight = weightKg;
+                finalHeight = heightCm;
+                finalTargetWeight = targetWeightKg;
             } else {
-                const totalInches = (parseInt(heightFt) * 12) + parseInt(heightIn);
-                height = Math.round(totalInches * 2.54);
+                if (weightLbs <= 0 || weightLbs > 660) {
+                    Alert.alert('Invalid Weight', 'Please enter a valid weight between 1-660 lbs');
+                    return;
+                }
+
+                if (heightFt < 3 || heightFt > 8) {
+                    Alert.alert('Invalid Height', 'Please enter a valid height between 3-8 feet');
+                    return;
+                }
+
+                if (heightIn < 0 || heightIn >= 12) {
+                    Alert.alert('Invalid Height', 'Please enter valid inches between 0-11');
+                    return;
+                }
+
+                if (targetWeightLbs <= 0 || targetWeightLbs > 660) {
+                    Alert.alert('Invalid Target Weight', 'Please enter a valid target weight between 1-660 lbs');
+                    return;
+                }
+
+                // Convert to metric for storage
+                finalWeight = weightLbs / 2.20462;
+                const totalInches = (heightFt * 12) + heightIn;
+                finalHeight = totalInches * 2.54;
+                finalTargetWeight = targetWeightLbs / 2.20462;
             }
 
             await updateProfile({
-                weight,
-                height,
+                weight: finalWeight,
+                height: finalHeight,
+                targetWeight: finalTargetWeight,
                 useMetricSystem: useMetric,
             });
 
             onNext();
         } catch (error) {
-            console.error('Error updating profile:', error);
+            console.error('Error updating physical attributes:', error);
+            Alert.alert('Error', 'Failed to save physical attributes. Please try again.');
         }
     };
 
-    const isFormValid = () => {
-        if (useMetric) {
-            return weightKg !== '' && heightCm !== '';
-        } else {
-            return weightLbs !== '' && heightFt !== '' && heightIn !== '';
-        }
+    const getWeightDisplay = () => {
+        return useMetric ? `${weightKg} kg` : `${weightLbs} lbs`;
+    };
+
+    const getHeightDisplay = () => {
+        return useMetric ? `${heightCm} cm` : `${heightFt}' ${heightIn}"`;
+    };
+
+    const getTargetWeightDisplay = () => {
+        return useMetric ? `${targetWeightKg} kg` : `${targetWeightLbs} lbs`;
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
-        >
-            <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.container}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.header}>
-                    <Text style={styles.title}>Your Physical Profile</Text>
-                    <Text style={styles.subtitle}>Help us personalize your nutrition and fitness plan</Text>
+                    <Text style={styles.title}>Physical Attributes</Text>
+                    <Text style={styles.subtitle}>
+                        Help us personalize your experience
+                    </Text>
                 </View>
 
-                <View style={styles.unitToggleContainer}>
-                    <Text style={styles.unitLabel}>Imperial</Text>
-                    <Switch
-                        trackColor={{ false: '#767577', true: '#0074dd' }}
-                        thumbColor={useMetric ? '#fff' : '#f4f3f4'}
-                        ios_backgroundColor="#3e3e3e"
-                        onValueChange={() => setUseMetric(!useMetric)}
-                        value={useMetric}
-                        style={styles.switch}
-                    />
-                    <Text style={styles.unitLabel}>Metric</Text>
-                </View>
-
-                <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Weight</Text>
+                {/* Metric/Imperial Toggle */}
+                <View style={styles.toggleContainer}>
                     <TouchableOpacity
-                        style={styles.pickerButton}
-                        onPress={() => setShowWeightPicker(true)}
+                        style={[styles.toggleButton, useMetric && styles.activeToggle]}
+                        onPress={() => setUseMetric(true)}
                     >
-                        <Text style={styles.pickerButtonText}>{getWeightValue()}</Text>
-                        <Ionicons name="chevron-down" size={24} color="#0074dd" />
+                        <Text style={[styles.toggleText, useMetric && styles.activeToggleText]}>
+                            Metric
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.toggleButton, !useMetric && styles.activeToggle]}
+                        onPress={() => setUseMetric(false)}
+                    >
+                        <Text style={[styles.toggleText, !useMetric && styles.activeToggleText]}>
+                            Imperial
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Height</Text>
-                    <TouchableOpacity
-                        style={styles.pickerButton}
-                        onPress={() => setShowHeightPicker(true)}
-                    >
-                        <Text style={styles.pickerButtonText}>{getHeightValue()}</Text>
-                        <Ionicons name="chevron-down" size={24} color="#0074dd" />
-                    </TouchableOpacity>
+                <View style={styles.attributesSection}>
+                    {/* Weight Display */}
+                    <View style={styles.attributeGroup}>
+                        <Text style={styles.attributeLabel}>Current Weight</Text>
+                        <TouchableOpacity
+                            style={styles.attributeSelector}
+                            onPress={() => setShowWeightPicker(true)}
+                        >
+                            <Text style={styles.attributeValue}>{getWeightDisplay()}</Text>
+                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Target Weight Display */}
+                    <View style={styles.attributeGroup}>
+                        <Text style={styles.attributeLabel}>Target Weight</Text>
+                        <TouchableOpacity
+                            style={styles.attributeSelector}
+                            onPress={() => setShowTargetWeightPicker(true)}
+                        >
+                            <Text style={styles.attributeValue}>{getTargetWeightDisplay()}</Text>
+                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Height Display */}
+                    <View style={styles.attributeGroup}>
+                        <Text style={styles.attributeLabel}>Height</Text>
+                        <TouchableOpacity
+                            style={styles.attributeSelector}
+                            onPress={() => setShowHeightPicker(true)}
+                        >
+                            <Text style={styles.attributeValue}>{getHeightDisplay()}</Text>
+                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                <TouchableOpacity
-                    style={[styles.button, !isFormValid() && styles.buttonDisabled]}
-                    onPress={handleSubmit}
-                    disabled={!isFormValid()}
-                >
-                    <LinearGradient
-                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.buttonGradient}
-                    >
-                        <Text style={styles.buttonText}>Continue</Text>
-                        <Ionicons name="arrow-forward" size={18} color="#fff" />
-                    </LinearGradient>
-                </TouchableOpacity>
+                <View style={styles.infoContainer}>
+                    <Ionicons name="information-circle-outline" size={20} color="#888" />
+                    <Text style={styles.infoText}>
+                        Your measurements help us calculate accurate nutrition goals and recommendations
+                    </Text>
+                </View>
             </ScrollView>
+
+            <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                    style={styles.nextButton}
+                    onPress={handleNext}
+                >
+                    <Text style={styles.nextButtonText}>Continue</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </TouchableOpacity>
+            </View>
 
             {/* Weight Picker Modal */}
             <Modal
@@ -233,31 +303,77 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Weight</Text>
-                            <TouchableOpacity onPress={() => setShowWeightPicker(false)}>
-                                <Ionicons name="close" size={24} color="#fff" />
+                            <Text style={styles.modalTitle}>Select Current Weight</Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowWeightPicker(false)}
+                            >
+                                <Ionicons name="close" size={24} color="#999" />
                             </TouchableOpacity>
                         </View>
-
                         <WheelPicker
-                            data={generateWeightData()}
-                            selectedValue={useMetric ? weightKg : weightLbs}
-                            onValueChange={(value) => {
+                            data={generateWeightData(useMetric)}
+                            selectedValue={String(useMetric ? weightKg : weightLbs)}
+                            onValueChange={(value: string) => {
+                                const numValue = parseInt(value);
                                 if (useMetric) {
-                                    setWeightKg(value);
+                                    setWeightKg(numValue);
                                 } else {
-                                    setWeightLbs(value);
+                                    setWeightLbs(numValue);
                                 }
                             }}
+                            containerStyle={styles.wheelPickerContainer}
                             itemHeight={50}
-                            containerHeight={250}
+                            defaultValue={String(useMetric ? weightKg : weightLbs)}
                         />
-
                         <TouchableOpacity
                             style={styles.modalButton}
                             onPress={() => setShowWeightPicker(false)}
                         >
-                            <Text style={styles.modalButtonText}>Confirm</Text>
+                            <Text style={styles.modalButtonText}>Done</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Target Weight Picker Modal */}
+            <Modal
+                visible={showTargetWeightPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowTargetWeightPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Select Target Weight</Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowTargetWeightPicker(false)}
+                            >
+                                <Ionicons name="close" size={24} color="#999" />
+                            </TouchableOpacity>
+                        </View>
+                        <WheelPicker
+                            data={generateWeightData(useMetric)}
+                            selectedValue={String(useMetric ? targetWeightKg : targetWeightLbs)}
+                            onValueChange={(value: string) => {
+                                const numValue = parseInt(value);
+                                if (useMetric) {
+                                    setTargetWeightKg(numValue);
+                                } else {
+                                    setTargetWeightLbs(numValue);
+                                }
+                            }}
+                            containerStyle={styles.wheelPickerContainer}
+                            itemHeight={50}
+                            defaultValue={String(useMetric ? targetWeightKg : targetWeightLbs)}
+                        />
+                        <TouchableOpacity
+                            style={styles.modalButton}
+                            onPress={() => setShowTargetWeightPicker(false)}
+                        >
+                            <Text style={styles.modalButtonText}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -274,54 +390,46 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Select Height</Text>
-                            <TouchableOpacity onPress={() => setShowHeightPicker(false)}>
-                                <Ionicons name="close" size={24} color="#fff" />
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowHeightPicker(false)}
+                            >
+                                <Ionicons name="close" size={24} color="#999" />
                             </TouchableOpacity>
                         </View>
-
                         {useMetric ? (
                             <WheelPicker
                                 data={generateHeightCmData()}
-                                selectedValue={heightCm}
-                                onValueChange={(value) => setHeightCm(value)}
+                                selectedValue={String(heightCm)}
+                                onValueChange={(value: string) => setHeightCm(parseInt(value))}
+                                containerStyle={styles.wheelPickerContainer}
                                 itemHeight={50}
-                                containerHeight={250}
+                                defaultValue={String(heightCm)}
                             />
                         ) : (
-                            <View style={styles.imperialHeightPickers}>
-                                <View style={styles.ftPickerContainer}>
-                                    <WheelPicker
-                                        data={generateHeightFtData()}
-                                        selectedValue={heightFt}
-                                        onValueChange={(value) => setHeightFt(value)}
-                                        itemHeight={50}
-                                        containerHeight={250}
-                                        containerStyle={{ flex: 1, marginRight: 10 }}
-                                    />
-                                </View>
-                                <View style={styles.inPickerContainer}>
-                                    <WheelPicker
-                                        data={generateHeightInData()}
-                                        selectedValue={heightIn}
-                                        onValueChange={(value) => setHeightIn(value)}
-                                        itemHeight={50}
-                                        containerHeight={250}
-                                        containerStyle={{ flex: 1, marginLeft: 10 }}
-                                    />
-                                </View>
-                            </View>
+                            <WheelPicker
+                                data={generateImperialHeightData()}
+                                selectedValue={`${heightFt}-${heightIn}`}
+                                onValueChange={(value: string) => {
+                                    const [ft, inch] = value.split('-').map(Number);
+                                    setHeightFt(ft);
+                                    setHeightIn(inch);
+                                }}
+                                containerStyle={styles.wheelPickerContainer}
+                                itemHeight={50}
+                                defaultValue={`${heightFt}-${heightIn}`}
+                            />
                         )}
-
                         <TouchableOpacity
                             style={styles.modalButton}
                             onPress={() => setShowHeightPicker(false)}
                         >
-                            <Text style={styles.modalButtonText}>Confirm</Text>
+                            <Text style={styles.modalButtonText}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
-        </KeyboardAvoidingView>
+        </View>
     );
 };
 
@@ -330,148 +438,193 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#000',
     },
-    contentContainer: {
-        padding: 20,
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
         paddingTop: 20,
-        paddingBottom: 40,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
     },
     header: {
-        marginBottom: 40,
-        paddingHorizontal: 4,
+        marginBottom: 32,
+        alignItems: 'center',
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
         color: '#fff',
-        marginBottom: 12,
-        letterSpacing: -0.5,
         textAlign: 'center',
+        marginBottom: 8,
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
         color: '#aaa',
-        lineHeight: 24,
         textAlign: 'center',
-        paddingHorizontal: 8,
+        lineHeight: 22,
     },
-    unitToggleContainer: {
+    toggleContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 40,
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 16,
-        padding: 16,
-        marginHorizontal: 20,
+        borderRadius: 12,
+        padding: 3,
+        marginBottom: 32,
+        alignSelf: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
-    unitLabel: {
-        fontSize: 16,
+    toggleButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 9,
+        minWidth: 100,
+        alignItems: 'center',
+    },
+    activeToggle: {
+        backgroundColor: '#5c00dd',
+    },
+    toggleText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#aaa',
+    },
+    activeToggleText: {
         color: '#fff',
-        marginHorizontal: 12,
-        fontWeight: '500',
+        fontWeight: '700',
     },
-    switch: {
-        transform: [{ scale: 1.2 }],
+    attributesSection: {
+        marginBottom: 32,
     },
-    inputContainer: {
-        marginBottom: 28,
-        marginHorizontal: 4,
+    attributeGroup: {
+        marginBottom: 20,
     },
-    inputLabel: {
-        fontSize: 18,
+    attributeLabel: {
+        fontSize: 16,
         fontWeight: '600',
         color: '#fff',
         marginBottom: 12,
-        paddingLeft: 4,
+        textAlign: 'center',
     },
-    pickerButton: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: 16,
-        paddingVertical: 20,
-        paddingHorizontal: 20,
+    attributeSelector: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
-        minHeight: 64,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        marginHorizontal: 0,
     },
-    pickerButtonText: {
+    attributeValue: {
         fontSize: 18,
-        fontWeight: '500',
         color: '#fff',
-        flex: 1,
+        fontWeight: '600',
     },
-    button: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        marginTop: 40,
-        marginHorizontal: 4,
-    },
-    buttonDisabled: {
-        opacity: 0.6,
-    },
-    buttonGradient: {
+    infoContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 18,
-        paddingHorizontal: 32,
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.06)',
+        alignItems: 'flex-start',
     },
-    buttonText: {
+    infoText: {
+        flex: 1,
+        color: '#888',
+        fontSize: 14,
+        lineHeight: 20,
+        marginLeft: 12,
+    },
+    buttonContainer: {
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+        paddingTop: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.95)',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    },
+    nextButton: {
+        backgroundColor: '#5c00dd',
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        shadowColor: '#5c00dd',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    nextButtonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
-        marginRight: 8,
     },
+    // Modal styles
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
     },
     modalContent: {
-        backgroundColor: '#1C1C1E',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 24,
-        paddingBottom: 40,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: '#1a1a1a',
+        borderRadius: 16,
+        width: '100%',
+        maxHeight: '80%',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },
     modalTitle: {
-        fontSize: 22,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '600',
         color: '#fff',
     },
-    modalButton: {
-        backgroundColor: '#0074dd',
+    modalCloseButton: {
+        width: 32,
+        height: 32,
         borderRadius: 16,
-        padding: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
-        marginTop: 24,
+        justifyContent: 'center',
+    },
+    wheelPickerContainer: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 10,
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    modalButton: {
+        backgroundColor: '#5c00dd',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 20,
+        marginHorizontal: 20,
+        marginBottom: 20,
     },
     modalButtonText: {
         color: '#fff',
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    imperialHeightPickers: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    ftPickerContainer: {
-        flex: 1,
-        marginRight: 10,
-    },
-    inPickerContainer: {
-        flex: 1,
-        marginLeft: 10,
+        fontSize: 16,
+        fontWeight: '600',
+        textAlign: 'center',
     },
 });
 

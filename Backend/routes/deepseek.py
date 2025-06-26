@@ -5,7 +5,7 @@ import httpx
 import os
 import logging
 from dotenv import load_dotenv
-from auth.firebase_auth import get_current_user
+from auth.supabase_auth import get_current_user
 import time
 
 # Load environment variables

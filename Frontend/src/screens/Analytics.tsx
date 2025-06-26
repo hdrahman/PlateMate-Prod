@@ -23,7 +23,7 @@ import {
     getTodayCarbs,
     getTodayFats,
     getTodayExerciseCalories,
-    getUserProfileByFirebaseUid
+    getUserProfileBySupabaseUid
 } from '../utils/database';
 
 const { width, height } = Dimensions.get('window');
@@ -131,7 +131,7 @@ const Analytics: React.FC = () => {
             const today = new Date();
 
             // Get user profile and goals for calculations
-            const profile = await getUserProfileByFirebaseUid(user?.uid || '');
+            const profile = await getUserProfileBySupabaseUid(user?.id || '');
 
             // Calculate nutrition goals based on profile
             let goals = null;

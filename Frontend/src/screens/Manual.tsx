@@ -30,7 +30,8 @@ import { useFoodLog } from '../context/FoodLogContext';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
-import { auth } from '../utils/firebase/index';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabaseClient';
 
 // Define navigation type
 type RootStackParamList = {
@@ -51,17 +52,19 @@ const BACKEND_BASE_URL = BACKEND_URL;
  */
 const getAuthHeaders = async () => {
     try {
-        const user = auth.currentUser;
+        const { user } = useAuth();
 
         if (user) {
             try {
-                const token = await user.getIdToken(true);
-                return {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                };
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    return {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json'
+                    };
+                }
             } catch (tokenError) {
-                console.error('Error getting Firebase token:', tokenError);
+                console.error('Error getting Supabase token:', tokenError);
                 throw tokenError;
             }
         }

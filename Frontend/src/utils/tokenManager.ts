@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { BACKEND_URL } from './config';
 import { getDatabase } from './database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from './firebase/index';
+import supabaseAuth from './supabaseAuth';
 import { decode as base64decode } from 'base-64';
 
 // Constants for token management
@@ -12,7 +12,7 @@ const RETRY_DELAY_MS = 1000;
 
 // Service names for different API tokens
 export enum ServiceTokenType {
-    FIREBASE_AUTH = 'firebase_auth',
+    SUPABASE_AUTH = 'supabase_auth',
     OPENAI = 'openai',
     DEEPSEEK = 'deepseek',
     FATSECRET = 'fatsecret',
@@ -64,8 +64,8 @@ class TokenManager {
             // Load tokens from SQLite database
             await this.loadTokensFromDatabase();
 
-            // Also try to load Firebase token from AsyncStorage for backward compatibility
-            await this.loadFirebaseTokenFromAsyncStorage();
+            // Load cached Supabase token from AsyncStorage if present
+            await this.loadSupabaseTokenFromAsyncStorage();
 
             this.isInitialized = true;
             console.log('✅ TokenManager initialized successfully');
@@ -110,25 +110,26 @@ class TokenManager {
     }
 
     /**
-     * Load Firebase token from AsyncStorage for backward compatibility
+     * Load cached Supabase auth token from AsyncStorage (legacy mobile cache).
+     * This ensures fast cold-start login without immediately hitting the network.
      */
-    private async loadFirebaseTokenFromAsyncStorage(): Promise<void> {
+    private async loadSupabaseTokenFromAsyncStorage(): Promise<void> {
         try {
             const cachedTokenJson = await AsyncStorage.getItem('@auth_token_cache');
             if (cachedTokenJson) {
                 const cachedToken = JSON.parse(cachedTokenJson);
 
                 if (cachedToken.expiryTime > Date.now() + TOKEN_REFRESH_THRESHOLD_MS) {
-                    this.tokenCache.set(ServiceTokenType.FIREBASE_AUTH, {
+                    this.tokenCache.set(ServiceTokenType.SUPABASE_AUTH, {
                         token: cachedToken.token,
                         expiryTime: cachedToken.expiryTime,
                         tokenType: 'Bearer'
                     });
-                    console.log('Firebase token loaded from AsyncStorage');
+                    console.log('Cached Supabase token loaded from AsyncStorage');
 
                     // Store in database for future use
                     await this.storeTokenInDatabase(
-                        ServiceTokenType.FIREBASE_AUTH,
+                        ServiceTokenType.SUPABASE_AUTH,
                         cachedToken.token,
                         cachedToken.expiryTime,
                         'Bearer'
@@ -136,7 +137,7 @@ class TokenManager {
                 }
             }
         } catch (error) {
-            console.error('Error loading Firebase token from AsyncStorage:', error);
+            console.error('Error loading cached Supabase token from AsyncStorage:', error);
         }
     }
 
@@ -184,6 +185,11 @@ class TokenManager {
      * Get a token for a specific service
      */
     public async getToken(serviceName: string): Promise<string> {
+        // Validate service name
+        if (!serviceName || typeof serviceName !== 'string') {
+            throw new Error(`Unknown service: ${serviceName}`);
+        }
+
         // If we're already refreshing this token, wait for that promise
         if (this.tokenRefreshPromises.has(serviceName)) {
             return this.tokenRefreshPromises.get(serviceName)!;
@@ -195,34 +201,38 @@ class TokenManager {
             return cachedToken.token;
         }
 
-        // For Firebase auth, we need to refresh the token
-        if (serviceName === ServiceTokenType.FIREBASE_AUTH) {
-            return this.refreshFirebaseToken();
+        // Supabase is now the single auth provider. If legacy code requests
+        // a Firebase token, treat it as a Supabase auth request so we still
+        // return a valid token instead of throwing.
+        if (serviceName === ServiceTokenType.SUPABASE_AUTH) {
+            return this.refreshSupabaseToken();
         }
 
-        // For other services, we need to fetch from the backend
+        // For other services, validate and fetch from the backend
+        if (!Object.values(ServiceTokenType).includes(serviceName as ServiceTokenType)) {
+            throw new Error(`Unknown service: ${serviceName}`);
+        }
+
         return this.fetchServiceToken(serviceName);
     }
 
     /**
-     * Refresh Firebase authentication token
+     * Refresh Supabase authentication token
      */
-    private async refreshFirebaseToken(): Promise<string> {
+    private async refreshSupabaseToken(): Promise<string> {
         // Create a promise for this refresh operation
         const refreshPromise = (async () => {
             try {
-                const user = auth.currentUser;
-                if (!user) {
+                const token = await supabaseAuth.getAccessToken();
+                if (!token) {
                     throw new Error('No authenticated user');
                 }
-
-                const token = await user.getIdToken(true);
 
                 // Parse expiry time from JWT
                 const expiryTime = this.getTokenExpiryTime(token);
 
                 // Store in memory cache
-                this.tokenCache.set(ServiceTokenType.FIREBASE_AUTH, {
+                this.tokenCache.set(ServiceTokenType.SUPABASE_AUTH, {
                     token,
                     expiryTime,
                     tokenType: 'Bearer'
@@ -236,26 +246,26 @@ class TokenManager {
 
                 // Store in database
                 await this.storeTokenInDatabase(
-                    ServiceTokenType.FIREBASE_AUTH,
+                    ServiceTokenType.SUPABASE_AUTH,
                     token,
                     expiryTime,
                     'Bearer'
                 );
 
-                console.log(`New Firebase token acquired, valid until: ${new Date(expiryTime).toLocaleTimeString()}`);
+                console.log(`New Supabase token acquired, valid until: ${new Date(expiryTime).toLocaleTimeString()}`);
 
                 return token;
             } catch (error) {
-                console.error('Error refreshing Firebase token:', error);
+                console.error('Error refreshing Supabase token:', error);
                 throw error;
             } finally {
                 // Remove this promise from the map
-                this.tokenRefreshPromises.delete(ServiceTokenType.FIREBASE_AUTH);
+                this.tokenRefreshPromises.delete(ServiceTokenType.SUPABASE_AUTH);
             }
         })();
 
         // Store the promise so concurrent calls can use it
-        this.tokenRefreshPromises.set(ServiceTokenType.FIREBASE_AUTH, refreshPromise);
+        this.tokenRefreshPromises.set(ServiceTokenType.SUPABASE_AUTH, refreshPromise);
 
         return refreshPromise;
     }
@@ -267,8 +277,8 @@ class TokenManager {
         // Create a promise for this fetch operation
         const fetchPromise = (async () => {
             try {
-                // First, we need a valid Firebase token
-                const firebaseToken = await this.getToken(ServiceTokenType.FIREBASE_AUTH);
+                // First, we need a valid Supabase token
+                const supabaseToken = await this.getToken(ServiceTokenType.SUPABASE_AUTH);
 
                 // Determine the endpoint based on service name
                 let endpoint: string;
@@ -296,7 +306,7 @@ class TokenManager {
                         {},
                         {
                             headers: {
-                                'Authorization': `Bearer ${firebaseToken}`,
+                                'Authorization': `Bearer ${supabaseToken}`,
                                 'Content-Type': 'application/json'
                             }
                         }
@@ -378,7 +388,7 @@ class TokenManager {
             // Decode the payload (middle part)
             const payload = JSON.parse(this.decodeBase64(parts[1]));
 
-            // Firebase tokens have 'exp' claim with expiry timestamp in seconds
+            // JWT tokens have 'exp' claim with expiry timestamp in seconds
             if (payload.exp) {
                 return payload.exp * 1000; // Convert to milliseconds
             }
@@ -443,8 +453,8 @@ class TokenManager {
                 if (error.response && (error.response.status === 401 || error.response.status === 403)) {
                     try {
                         // Force token refresh
-                        if (serviceName === ServiceTokenType.FIREBASE_AUTH) {
-                            await this.refreshFirebaseToken();
+                        if (serviceName === ServiceTokenType.SUPABASE_AUTH) {
+                            await this.refreshSupabaseToken();
                         } else {
                             // Clear token from cache to force refresh
                             this.tokenCache.delete(serviceName);
@@ -497,8 +507,8 @@ class TokenManager {
                 [serviceName]
             );
 
-            // If it's Firebase token, also remove from AsyncStorage
-            if (serviceName === ServiceTokenType.FIREBASE_AUTH) {
+            // If it's Supabase token, also remove from AsyncStorage
+            if (serviceName === ServiceTokenType.SUPABASE_AUTH) {
                 await AsyncStorage.removeItem('@auth_token_cache');
             }
 

@@ -1,5 +1,6 @@
-// Import Firebase components
-import { auth, Auth, getStoredUser, getStoredAuthToken } from '../utils/firebase/index';
+// Import Supabase Auth components
+import { supabase } from '../utils/supabaseClient';
+import supabaseAuth from '../utils/supabaseAuth';
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Alert, Platform } from 'react-native';
@@ -7,23 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
 import tokenManager from '../utils/tokenManager';
 import apiService from '../utils/apiService';
-
-// Import auth methods directly from Auth
-const {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut: firebaseSignOut,
-    onAuthStateChanged,
-    signInAnonymously: firebaseSignInAnonymously,
-    GoogleAuthProvider,
-    signInWithCredential,
-    setPersistence,
-    browserLocalPersistence,
-    inMemoryPersistence
-} = Auth;
-
-// Type for user
-type UserType = Auth.User;
+import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
+import { getUserProfileBySupabaseUid } from '../utils/database';
 
 // Import Google Sign In safely
 let GoogleSignin = null;
@@ -40,7 +26,7 @@ try {
             webClientId: GOOGLE_WEB_CLIENT_ID,
             offlineAccess: true,
         });
-        console.log('Firebase Auth initialized successfully');
+        console.log('Supabase Auth initialized successfully');
         console.log('Google Sign-In configured successfully');
     }
 } catch (error) {
@@ -50,6 +36,9 @@ try {
 // We've removed the Apple Authentication module
 console.log('Apple Authentication not available');
 
+// Type for user (using Supabase User type with Firebase compatibility)
+type UserType = any & { uid?: string }; // Supabase user with Firebase compatibility layer
+
 // Define the shape of our context
 interface AuthContextType {
     user: UserType | null;
@@ -57,7 +46,7 @@ interface AuthContextType {
     signUp: (email: string, password: string) => Promise<void>;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
-    signInWithGoogle: () => Promise<Auth.UserCredential | void>;
+    signInWithGoogle: () => Promise<any>;
     signInWithApple: () => Promise<void>;
     signInAnonymously: () => Promise<void>;
     isPreloading: boolean;
@@ -86,16 +75,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         const restoreAuthState = async () => {
             try {
-                // Check for stored token
-                const storedUser = await getStoredUser();
-                if (storedUser) {
-                    console.log('Found stored user data, attempting to restore auth state');
+                // Check for existing Supabase session
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    console.log('Found existing Supabase session, restoring auth state');
+                    // Add compatibility layer for Firebase -> Supabase migration
+                    (session.user as any).uid = session.user.id;
+                    setUser(session.user);
+                    // Cache user globally for database functions
+                    global.cachedSupabaseUser = session.user;
                 } else {
-                    console.log('No stored user data found');
-                    setIsLoading(false);
+                    console.log('No existing Supabase session found');
                 }
             } catch (error) {
                 console.error('Error restoring auth state:', error);
+            } finally {
                 setIsLoading(false);
             }
         };
@@ -105,15 +99,66 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Listen for auth state changes
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+        let previousUserId: string | null = null;
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Supabase auth state change:', event, session?.user?.id);
+
+            const authUser = session?.user || null;
+            const currentUserId = authUser?.id || null;
+
+            // Add compatibility layer for Firebase -> Supabase migration
+            // Add uid property that maps to id for backward compatibility
+            if (authUser) {
+                (authUser as any).uid = authUser.id;
+            }
+
+            // If user just logged out, stop services
+            if (!authUser && previousUserId) {
+                try {
+                    const { stopPeriodicSync } = await import('../utils/syncService');
+                    await stopPeriodicSync();
+                    console.log('🔄 User logged out, services stopped');
+                } catch (error) {
+                    console.warn('Error stopping services on logout:', error);
+                }
+            }
+
             setUser(authUser);
 
-            // If user just logged in, preload data
-            if (authUser && !user) {
+            // Cache user globally for database functions
+            global.cachedSupabaseUser = authUser;
+
+            // If user just logged in, preload data and initialize services
+            if (authUser && !previousUserId) {
                 setIsPreloading(true);
                 try {
-                    // Initialize token manager
+                    console.log('✅ User authenticated, initializing services...');
+
+                    // Initialize token manager for authenticated users only
                     await tokenManager.initialize();
+
+                    // Start sync services for authenticated users only
+                    const { startPeriodicSync, setupOnlineSync } = await import('../utils/syncService');
+                    startPeriodicSync();
+                    setupOnlineSync();
+
+                    // Check if local database is empty and restore from PostgreSQL if needed
+                    const localProfile = await getUserProfileBySupabaseUid(authUser.id);
+                    if (!localProfile) {
+                        console.log('🔄 No local profile found, attempting PostgreSQL restore...');
+                        try {
+                            const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
+                            if (restoreResult.success) {
+                                console.log('✅ PostgreSQL restore completed successfully:', restoreResult.stats);
+                            } else {
+                                console.warn('⚠️ PostgreSQL restore completed with errors:', restoreResult.errors);
+                            }
+                        } catch (error) {
+                            console.error('❌ PostgreSQL restore failed:', error);
+                            // Don't block login if restore fails
+                        }
+                    }
 
                     // Preload common API data
                     await apiService.preloadCommonData();
@@ -124,17 +169,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             }
 
+            // Update previous user ID for next comparison
+            previousUserId = currentUserId;
+
             setIsLoading(false);
         });
 
         // Cleanup subscription
-        return unsubscribe;
-    }, [user]);
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []); // Empty dependency array to prevent infinite loop
 
     // Sign up with email/password
     const signUp = async (email: string, password: string) => {
         try {
-            await createUserWithEmailAndPassword(auth, email, password);
+            await supabaseAuth.signUp(email, password);
         } catch (error: any) {
             Alert.alert('Sign Up Error', error.message);
             throw error;
@@ -144,7 +194,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign in with email/password
     const signIn = async (email: string, password: string) => {
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            await supabaseAuth.signIn(email, password);
         } catch (error: any) {
             Alert.alert('Sign In Error', error.message);
             throw error;
@@ -154,21 +204,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign in with Google
     const signInWithGoogle = async () => {
         try {
-            if (!GoogleSignin) {
-                throw new Error('Google Sign-In is not available');
-            }
-
-            // Check if your device supports Google Play
-            await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-            // Get the user ID token
-            const { idToken } = await GoogleSignin.signIn();
-
-            // Create a Google credential with the token
-            const googleCredential = GoogleAuthProvider.credential(idToken);
-
-            // Sign in with the credential
-            return await signInWithCredential(auth, googleCredential);
+            return await supabaseAuth.signInWithGoogle();
         } catch (error: any) {
             console.log('Google Sign In Error Details:', error);
 
@@ -194,10 +230,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign in with Apple - simplified implementation that shows an error
     const signInWithApple = async () => {
         try {
-            // Apple Authentication is not available because we've removed it
-            Alert.alert('Sign In Error', 'Apple Authentication is not available');
-            throw new Error('Apple Authentication is not available');
+            await supabaseAuth.signInWithApple();
         } catch (error: any) {
+            Alert.alert('Sign In Error', error.message);
             throw error;
         }
     };
@@ -205,7 +240,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign in anonymously
     const signInAnonymously = async () => {
         try {
-            await firebaseSignInAnonymously(auth);
+            await supabaseAuth.signInAnonymously();
         } catch (error: any) {
             Alert.alert('Anonymous Sign In Error', error.message);
             throw error;
@@ -215,14 +250,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign out
     const signOut = async () => {
         try {
-            // Sign out from Google if available
-            if (GoogleSignin) {
-                try {
-                    await GoogleSignin.signOut();
-                    console.log('Google Sign-Out successful');
-                } catch (error) {
-                    console.log('Google Sign-Out Error', error);
-                }
+            // Stop sync services when signing out
+            try {
+                const { stopPeriodicSync } = await import('../utils/syncService');
+                await stopPeriodicSync();
+            } catch (error) {
+                console.warn('Error stopping sync services:', error);
             }
 
             // Clear all tokens
@@ -231,8 +264,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Clear API caches
             apiService.clearCache();
 
-            // Sign out from Firebase
-            await firebaseSignOut(auth);
+            // Sign out from Supabase (includes Google sign out)
+            await supabaseAuth.signOut();
+
+            // Clear cached user
+            global.cachedSupabaseUser = null;
         } catch (error: any) {
             Alert.alert('Sign Out Error', error.message);
             throw error;
@@ -258,5 +294,4 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
 };
 
-// Custom hook for using auth context
 export const useAuth = () => useContext(AuthContext); 

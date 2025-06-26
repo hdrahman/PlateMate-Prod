@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List
 from openai import AsyncOpenAI
 from utils.file_manager import FileManager
-from auth.firebase_auth import get_current_user
+from auth.supabase_auth import get_current_user
 
 # Toggle between mock and real API
 USE_MOCK_API = False  # Set to False to use the real OpenAI API

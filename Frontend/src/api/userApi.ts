@@ -1,5 +1,5 @@
 import { BACKEND_URL } from '../utils/config';
-import { auth, getStoredAuthToken } from '../utils/firebase/index';
+import { supabase, getAuthHeaders } from '../utils/supabaseClient';
 
 // User profile data interfaces
 interface PhysicalAttributes {
@@ -82,61 +82,26 @@ export interface WeightHistoryResponse {
     weights: WeightEntry[];
 }
 
-// Function to get firebase token with better error handling
-const getFirebaseToken = async () => {
-    const currentUser = auth.currentUser;
-    let retries = 0;
-    const maxRetries = 3;
-
-    // Recursive retry function
-    const tryGetToken = async (attempts: number): Promise<string | null> => {
-        try {
-            if (currentUser) {
-                return await currentUser.getIdToken(true); // Force token refresh
-            }
-            return null;
-        } catch (error: any) {
-            console.error(`Error getting Firebase token (attempt ${attempts}):`, error);
-
-            // Specifically retry on network errors
-            if (error.code === 'auth/network-request-failed' && attempts < maxRetries) {
-                console.log(`Retrying token fetch (${attempts + 1}/${maxRetries})...`);
-                // Increasing backoff delay: 1s, 2s, 4s
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
-                return tryGetToken(attempts + 1);
-            }
-
-            return null;
-        }
-    };
-
-    // First try to get token from current user with retries
-    if (currentUser) {
-        const token = await tryGetToken(0);
-        if (token) return token;
-    }
-
-    // If no current user or token refresh failed, try to get the stored token
+// Function to get Supabase auth token
+const getSupabaseToken = async () => {
     try {
-        const storedToken = await getStoredAuthToken();
-        if (storedToken) {
-            console.log('Using stored Firebase token');
-            return storedToken;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('User not authenticated. Please sign in again.');
         }
-    } catch (error) {
-        console.error('Error getting stored Firebase token:', error);
+        return session.access_token;
+    } catch (error: any) {
+        console.error('Error getting Supabase token:', error);
+        throw new Error('User not authenticated. Please sign in again.');
     }
-
-    // If we get here, we don't have a valid token
-    throw new Error('User not authenticated. Please sign in again.');
 };
 
 // Create a new user with improved error handling
 export const createUser = async (userData: CreateUserData) => {
     try {
         // Validate that the user is signed in and matches the userData being sent
-        const currentUser = auth.currentUser;
-        if (!currentUser || currentUser.uid !== userData.firebase_uid) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser || currentUser.id !== userData.firebase_uid) {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
@@ -146,7 +111,7 @@ export const createUser = async (userData: CreateUserData) => {
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
-            const token = await getFirebaseToken();
+            const token = await getSupabaseToken();
             console.log(`Creating user at ${BACKEND_URL}/users for ${userData.firebase_uid}`);
 
             const response = await fetch(`${BACKEND_URL}/users`, {
@@ -196,15 +161,15 @@ export const createUser = async (userData: CreateUserData) => {
 export const getUserProfile = async (firebaseUid: string) => {
     try {
         // Validate that the user is signed in and matches the requested profile
-        const currentUser = auth.currentUser;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (!currentUser) {
             throw new Error('User not authenticated. Please sign in again.');
         }
 
         // Only allow users to access their own profile
-        if (currentUser.uid !== firebaseUid) {
+        if (currentUser.id !== firebaseUid) {
             console.warn('Attempting to access another user\'s profile. Redirecting to own profile.');
-            firebaseUid = currentUser.uid; // Force to use the authenticated user's UID
+            firebaseUid = currentUser.id; // Force to use the authenticated user's UID
         }
 
         // Add timeout to fetch request
@@ -213,7 +178,7 @@ export const getUserProfile = async (firebaseUid: string) => {
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
-            const token = await getFirebaseToken();
+            const token = await getSupabaseToken();
             console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
 
             const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}`, {
@@ -275,8 +240,8 @@ export const getUserProfile = async (firebaseUid: string) => {
 export const updateUserProfile = async (firebaseUid: string, userData: UpdateUserData, skipWeightHistory: boolean = false) => {
     try {
         // Validate that the user is signed in and matches the requested profile
-        const currentUser = auth.currentUser;
-        if (!currentUser || currentUser.uid !== firebaseUid) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser || currentUser.id !== firebaseUid) {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
@@ -286,7 +251,7 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
-            const token = await getFirebaseToken();
+            const token = await getSupabaseToken();
             console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`);
 
             const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`, {
@@ -345,33 +310,47 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
     }
 };
 
-// Add a new weight entry
+// Add weight entry
 export const addWeightEntry = async (firebaseUid: string, weight: number) => {
     try {
         // Validate that the user is signed in and matches the requested profile
-        const currentUser = auth.currentUser;
-        if (!currentUser || currentUser.uid !== firebaseUid) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser || currentUser.id !== firebaseUid) {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const token = await getFirebaseToken();
-        console.log(`Adding weight entry at ${BACKEND_URL}/users/${firebaseUid}/weight`);
+        const timeout = 8000; // 8 seconds timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weight`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ weight })
-        });
+        try {
+            const token = await getSupabaseToken();
+            console.log(`Adding weight entry at ${BACKEND_URL}/users/${firebaseUid}/weights`);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to add weight entry');
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weights`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ weight }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to add weight entry');
+            }
+
+            return await response.json();
+        } catch (fetchError: any) {
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Connection to server timed out. Please try again later.');
+            }
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
         console.error('Error adding weight entry:', error);
         throw error;
@@ -382,41 +361,44 @@ export const addWeightEntry = async (firebaseUid: string, weight: number) => {
 export const getWeightHistory = async (firebaseUid: string, limit: number = 100): Promise<WeightHistoryResponse> => {
     try {
         // Validate that the user is signed in and matches the requested profile
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-            throw new Error('User not authenticated. Please sign in again.');
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser || currentUser.id !== firebaseUid) {
+            throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        // Only allow users to access their own profile
-        if (currentUser.uid !== firebaseUid) {
-            console.warn('Attempting to access another user\'s weight history. Redirecting to own history.');
-            firebaseUid = currentUser.uid;
-        }
+        const timeout = 10000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const token = await getFirebaseToken();
-        console.log(`Fetching weight history from ${BACKEND_URL}/users/${firebaseUid}/weight/history?limit=${limit}`);
+        try {
+            const token = await getSupabaseToken();
+            console.log(`Fetching weight history from ${BACKEND_URL}/users/${firebaseUid}/weights?limit=${limit}`);
 
-        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weight/history?limit=${limit}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weights?limit=${limit}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to get weight history');
             }
-        });
 
-        if (!response.ok) {
-            if (response.status === 404) {
-                console.log('User not found in database (404 response)');
-                return { weights: [] };
+            return await response.json();
+        } catch (fetchError: any) {
+            if (fetchError.name === 'AbortError') {
+                return { weights: [] }; // Return empty array on timeout
             }
-
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to get weight history');
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
         console.error('Error getting weight history:', error);
-        return { weights: [] };
+        return { weights: [] }; // Return empty array on error
     }
 };
 
@@ -424,159 +406,157 @@ export const getWeightHistory = async (firebaseUid: string, limit: number = 100)
 export const updateSubscription = async (firebaseUid: string, subscriptionStatus: string) => {
     try {
         // Validate that the user is signed in and matches the requested profile
-        const currentUser = auth.currentUser;
-        if (!currentUser || currentUser.uid !== firebaseUid) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser || currentUser.id !== firebaseUid) {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const token = await getFirebaseToken();
-        console.log(`Updating subscription at ${BACKEND_URL}/users/${firebaseUid}/subscription`);
+        const timeout = 8000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/subscription`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ subscription_status: subscriptionStatus })
-        });
+        try {
+            const token = await getSupabaseToken();
+            console.log(`Updating subscription at ${BACKEND_URL}/users/${firebaseUid}/subscription`);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to update subscription status');
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/subscription`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ subscription_status: subscriptionStatus }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to update subscription');
+            }
+
+            return await response.json();
+        } catch (fetchError: any) {
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Connection to server timed out. Please try again later.');
+            }
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
-        console.error('Error updating subscription status:', error);
+        console.error('Error updating subscription:', error);
         throw error;
     }
 };
 
-// Helper to convert front-end profile format to backend format
+// Convert profile to backend format
 export const convertProfileToBackendFormat = (profile: any): UpdateUserData => {
     return {
-        first_name: profile.firstName,
-        last_name: profile.lastName,
-        phone_number: profile.phoneNumber,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
         physical_attributes: {
             height: profile.height,
             weight: profile.weight,
             age: profile.age,
             gender: profile.gender,
-            activity_level: profile.activityLevel
+            activity_level: profile.activity_level
         },
         dietary_preferences: {
-            dietary_restrictions: profile.dietaryRestrictions,
-            food_allergies: profile.foodAllergies,
-            cuisine_preferences: profile.cuisinePreferences,
-            spice_tolerance: profile.spiceTolerance
+            dietary_restrictions: profile.dietary_restrictions ? profile.dietary_restrictions.split(',').map((item: string) => item.trim()) : null,
+            food_allergies: profile.food_allergies ? profile.food_allergies.split(',').map((item: string) => item.trim()) : null,
+            cuisine_preferences: profile.cuisine_preferences ? profile.cuisine_preferences.split(',').map((item: string) => item.trim()) : null,
+            spice_tolerance: profile.spice_tolerance
         },
         health_goals: {
-            weight_goal: profile.weightGoal,
-            health_conditions: profile.healthConditions,
-            daily_calorie_target: profile.dailyCalorieTarget,
-            nutrient_focus: profile.nutrientFocus
-        },
-        delivery_preferences: {
-            default_address: profile.defaultAddress,
-            preferred_delivery_times: profile.preferredDeliveryTimes,
-            delivery_instructions: profile.deliveryInstructions
+            weight_goal: profile.weight_goal,
+            health_conditions: profile.health_conditions ? profile.health_conditions.split(',').map((item: string) => item.trim()) : null,
+            daily_calorie_target: profile.daily_calorie_target,
+            nutrient_focus: profile.nutrient_focus ? JSON.parse(profile.nutrient_focus) : null
         },
         notification_preferences: {
-            push_notifications_enabled: profile.pushNotificationsEnabled,
-            email_notifications_enabled: profile.emailNotificationsEnabled,
-            sms_notifications_enabled: profile.smsNotificationsEnabled,
-            marketing_emails_enabled: profile.marketingEmailsEnabled
-        },
-        payment_information: {
-            payment_methods: profile.paymentMethods,
-            billing_address: profile.billingAddress,
-            default_payment_method_id: profile.defaultPaymentMethodId
+            push_notifications_enabled: profile.push_notifications_enabled,
+            email_notifications_enabled: profile.email_notifications_enabled,
+            sms_notifications_enabled: profile.sms_notifications_enabled,
+            marketing_emails_enabled: profile.marketing_emails_enabled
         },
         app_settings: {
-            preferred_language: profile.preferredLanguage,
+            preferred_language: profile.preferred_language,
             timezone: profile.timezone,
-            unit_preference: profile.unitPreference,
-            dark_mode: profile.darkMode,
-            sync_data_offline: profile.syncDataOffline
+            unit_preference: profile.unit_preference,
+            dark_mode: profile.dark_mode,
+            sync_data_offline: profile.sync_data_offline
         }
     };
 };
 
-// Helper to convert backend data format to front-end profile format
+// Convert backend format to profile format
 export const convertBackendToProfileFormat = (backendData: any): any => {
     return {
-        id: backendData.id,
-        firstName: backendData.first_name,
-        lastName: backendData.last_name,
-        phoneNumber: backendData.phone_number || '',
-        height: backendData.height,
-        weight: backendData.weight,
-        age: backendData.age,
-        gender: backendData.gender,
-        activityLevel: backendData.activity_level,
-        dietaryRestrictions: backendData.dietary_restrictions || [],
-        foodAllergies: backendData.food_allergies || [],
-        cuisinePreferences: backendData.cuisine_preferences || [],
-        spiceTolerance: backendData.spice_tolerance,
-        weightGoal: backendData.weight_goal,
-        targetWeight: backendData.target_weight,
-        startingWeight: backendData.starting_weight,
-        healthConditions: backendData.health_conditions || [],
-        dailyCalorieTarget: backendData.daily_calorie_target,
-        nutrientFocus: backendData.nutrient_focus,
-        defaultAddress: backendData.default_address,
-        preferredDeliveryTimes: backendData.preferred_delivery_times || [],
-        deliveryInstructions: backendData.delivery_instructions,
-        pushNotificationsEnabled: backendData.push_notifications_enabled,
-        emailNotificationsEnabled: backendData.email_notifications_enabled,
-        smsNotificationsEnabled: backendData.sms_notifications_enabled,
-        marketingEmailsEnabled: backendData.marketing_emails_enabled,
-        paymentMethods: backendData.payment_methods || [],
-        billingAddress: backendData.billing_address,
-        defaultPaymentMethodId: backendData.default_payment_method_id,
-        preferredLanguage: backendData.preferred_language || 'en',
-        timezone: backendData.timezone || 'UTC',
-        unitPreference: backendData.unit_preference || 'metric',
-        darkMode: backendData.dark_mode,
-        syncDataOffline: backendData.sync_data_offline,
-        onboardingComplete: backendData.onboarding_complete
+        ...backendData,
+        height: backendData.physical_attributes?.height,
+        weight: backendData.physical_attributes?.weight,
+        age: backendData.physical_attributes?.age,
+        gender: backendData.physical_attributes?.gender,
+        activity_level: backendData.physical_attributes?.activity_level,
+        dietary_restrictions: backendData.dietary_preferences?.dietary_restrictions?.join(', '),
+        food_allergies: backendData.dietary_preferences?.food_allergies?.join(', '),
+        cuisine_preferences: backendData.dietary_preferences?.cuisine_preferences?.join(', '),
+        spice_tolerance: backendData.dietary_preferences?.spice_tolerance,
+        weight_goal: backendData.health_goals?.weight_goal,
+        health_conditions: backendData.health_goals?.health_conditions?.join(', '),
+        daily_calorie_target: backendData.health_goals?.daily_calorie_target,
+        nutrient_focus: backendData.health_goals?.nutrient_focus ? JSON.stringify(backendData.health_goals.nutrient_focus) : null,
+        push_notifications_enabled: backendData.notification_preferences?.push_notifications_enabled,
+        email_notifications_enabled: backendData.notification_preferences?.email_notifications_enabled,
+        sms_notifications_enabled: backendData.notification_preferences?.sms_notifications_enabled,
+        marketing_emails_enabled: backendData.notification_preferences?.marketing_emails_enabled,
+        preferred_language: backendData.app_settings?.preferred_language,
+        timezone: backendData.app_settings?.timezone,
+        unit_preference: backendData.app_settings?.unit_preference,
+        dark_mode: backendData.app_settings?.dark_mode,
+        sync_data_offline: backendData.app_settings?.sync_data_offline
     };
 };
 
-// Clear weight history (keeping only starting and current weights)
+// Clear weight history
 export const clearWeightHistory = async (firebaseUid: string): Promise<any> => {
     try {
         // Validate that the user is signed in and matches the requested profile
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-            throw new Error('User not authenticated. Please sign in again.');
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser || currentUser.id !== firebaseUid) {
+            throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        // Only allow users to access their own profile
-        if (currentUser.uid !== firebaseUid) {
-            console.warn('Attempting to clear another user\'s weight history. Operation denied.');
-            throw new Error('You can only clear your own weight history.');
-        }
+        const timeout = 10000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const token = await getFirebaseToken();
-        console.log(`Clearing weight history via ${BACKEND_URL}/users/${firebaseUid}/weight/clear`);
+        try {
+            const token = await getSupabaseToken();
+            console.log(`Clearing weight history at ${BACKEND_URL}/users/${firebaseUid}/weights`);
 
-        const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weight/clear`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weights`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to clear weight history');
             }
-        });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to clear weight history');
+            return await response.json();
+        } catch (fetchError: any) {
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Connection to server timed out. Please try again later.');
+            }
+            throw fetchError;
         }
-
-        return await response.json();
     } catch (error: any) {
         console.error('Error clearing weight history:', error);
         throw error;

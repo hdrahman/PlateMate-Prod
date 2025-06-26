@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
-import { auth } from '../utils/firebase/index';
+import { supabase } from '../utils/supabaseClient';
 
 // Backend API base URL
 const BACKEND_BASE_URL = BACKEND_URL;
@@ -10,17 +10,16 @@ const BACKEND_BASE_URL = BACKEND_URL;
  */
 const getAuthHeaders = async () => {
     try {
-        const user = auth.currentUser;
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (user) {
+        if (session) {
             try {
-                const token = await user.getIdToken(true);
                 return {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${session.access_token}`,
                     'Content-Type': 'application/json'
                 };
             } catch (tokenError) {
-                console.error('Error getting Firebase token:', tokenError);
+                console.error('Error getting Supabase token:', tokenError);
                 throw tokenError;
             }
         }

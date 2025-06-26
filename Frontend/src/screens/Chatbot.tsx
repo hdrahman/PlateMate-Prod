@@ -24,12 +24,12 @@ import { ThemeContext } from "../ThemeContext";
 import axios from "axios";
 import { BACKEND_URL } from '../utils/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth } from '../utils/firebase/index';
+import { useAuth } from '../context/AuthContext';
 import RichTextRenderer from "../components/RichTextRenderer";
-import tokenManager from '../utils/firebase/tokenManager';
+import tokenManager, { ServiceTokenType } from '../utils/tokenManager';
 import { addFoodLog } from '../utils/database';
 import {
-  getUserProfileByFirebaseUid,
+  getUserProfileBySupabaseUid,
   getRecentFoodLogs,
   getFoodLogsByDate,
   getTodayCalories,
@@ -81,6 +81,7 @@ interface UserContext {
 
 export default function Chatbot() {
   const { isDarkTheme } = useContext(ThemeContext);
+  const { user } = useAuth();
   const navigation = useNavigation<ChatbotNavigationProp>();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -109,7 +110,7 @@ export default function Chatbot() {
   const getFirebaseToken = async (): Promise<string> => {
     try {
       // Use the cached token system for better performance
-      const token = await tokenManager.getToken('firebase_auth');
+      const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
       return token;
     } catch (error) {
       console.error('Error getting Firebase token:', error);
@@ -123,7 +124,7 @@ export default function Chatbot() {
     const prefetchTokens = async () => {
       try {
         // Prefetch Firebase token
-        await tokenManager.getToken('firebase_auth');
+        await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
 
         // Try to prefetch AI service tokens if they're available
         try {
@@ -160,13 +161,12 @@ export default function Chatbot() {
       setIsLoadingContext(true);
       console.log('🔄 Loading user context from local database...');
 
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      if (!user) {
         throw new Error('User not authenticated');
       }
 
       // Get user profile
-      const profile = await getUserProfileByFirebaseUid(currentUser.uid);
+      const profile = await getUserProfileBySupabaseUid(user.id);
 
       // Get recent nutrition data (today)
       const todayCalories = await getTodayCalories();
@@ -179,7 +179,7 @@ export default function Chatbot() {
       const recentFoodLogs = await getRecentFoodLogs(15);
 
       // Get user streak
-      const userStreak = await getUserStreak(currentUser.uid);
+      const userStreak = await getUserStreak(user.id);
 
       // Create context summary
       const contextSummary = `Recent activity: ${todayCalories} calories consumed today, ${recentFoodLogs.length} recent meals logged, ${userStreak} day streak`;
@@ -204,8 +204,7 @@ export default function Chatbot() {
       setContextData(userContext);
       setContextActive(true);
 
-      // Prefetch token while user is reviewing their context data
-      tokenManager.refreshTokenInBackground();
+      // Context loaded successfully
 
     } catch (error: any) {
       console.error('❌ Error loading context:', error);

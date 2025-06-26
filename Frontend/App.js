@@ -18,10 +18,8 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider, useOnboarding } from './src/context/OnboardingContext';
 import { FoodLogProvider } from './src/context/FoodLogContext';
 
-// Import Firebase to ensure it's properly recognized
-import { app, auth } from './src/utils/firebase/index';
-// Import token manager for optimized authentication
-import tokenManager from './src/utils/firebase/tokenManager';
+// Import Supabase token manager for optimized authentication
+import tokenManager from './src/utils/tokenManager';
 // Import PermanentNotificationService
 import PermanentNotificationService from './src/services/PermanentNotificationService';
 import SettingsService from './src/services/SettingsService';
@@ -294,9 +292,67 @@ function MainTabs() {
   );
 }
 
+// Component to conditionally wrap authenticated app content with context providers
+function AuthenticatedApp({ children }) {
+  return (
+    <OnboardingProvider>
+      <ThemeProvider>
+        <StepProvider>
+          <FavoritesProvider>
+            <FoodLogProvider>
+              {children}
+            </FoodLogProvider>
+          </FavoritesProvider>
+        </StepProvider>
+      </ThemeProvider>
+    </OnboardingProvider>
+  );
+}
+
+// Component for authenticated user content
+function AuthenticatedContent() {
+  const { onboardingComplete } = useOnboarding();
+
+  if (!onboardingComplete) {
+    // Continue onboarding flow after login
+    return <Onboarding />;
+  }
+
+  // Main app navigation for authenticated users
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Main" component={MainTabs} />
+      <Stack.Screen name="Camera" component={CameraScreen} />
+      <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
+      <Stack.Screen name="Nutrients" component={Nutrients} />
+      <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+      <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
+      <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
+      <Stack.Screen name="Manual" component={Manual} />
+      <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
+      <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
+      <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
+      <Stack.Screen name="RecipeResults" component={RecipeResults} />
+      <Stack.Screen name="SearchResults" component={SearchResults} />
+      <Stack.Screen name="MealGallery" component={MealGallery} />
+      <Stack.Screen name="FoodDetail" component={FoodDetail} />
+      <Stack.Screen name="EditProfile" component={EditProfile} />
+      <Stack.Screen name="EditGoals" component={EditGoals} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
+      <Stack.Screen name="ChangePassword" component={ChangePassword} />
+      <Stack.Screen name="AboutUs" component={AboutUs} />
+      <Stack.Screen name="Settings" component={Settings} />
+      <Stack.Screen name="Notifications" component={Notifications} />
+      <Stack.Screen name="DataSharing" component={DataSharing} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+      <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
+      <Stack.Screen name="Analytics" component={Analytics} />
+    </Stack.Navigator>
+  );
+}
+
 function AppNavigator() {
   const { user, isLoading } = useAuth();
-  const { onboardingComplete } = useOnboarding();
 
   // Show loading indicator while checking auth state
   if (isLoading) {
@@ -334,44 +390,26 @@ function AppNavigator() {
         }}
       >
         {!user ? (
-          // Show IntroStep screens first when not logged in, with Auth available for sign in
+          // Show intro screens for unauthenticated users WITH onboarding context provider
           <>
-            <Stack.Screen name="Onboarding" component={Onboarding} />
+            <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
+              {() => (
+                <OnboardingProvider>
+                  <Onboarding />
+                </OnboardingProvider>
+              )}
+            </Stack.Screen>
             <Stack.Screen name="Auth" component={Auth} />
           </>
-        ) : !onboardingComplete ? (
-          // Continue onboarding flow after login
-          <Stack.Screen name="Onboarding" component={Onboarding} />
         ) : (
-          // Main app flow
-          <>
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="Camera" component={CameraScreen} />
-            <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
-            <Stack.Screen name="Nutrients" component={Nutrients} />
-            <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
-            <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
-            <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
-            <Stack.Screen name="Manual" component={Manual} />
-            <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
-            <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
-            <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
-            <Stack.Screen name="RecipeResults" component={RecipeResults} />
-            <Stack.Screen name="SearchResults" component={SearchResults} />
-            <Stack.Screen name="MealGallery" component={MealGallery} />
-            <Stack.Screen name="FoodDetail" component={FoodDetail} />
-            <Stack.Screen name="EditProfile" component={EditProfile} />
-            <Stack.Screen name="EditGoals" component={EditGoals} />
-            <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
-            <Stack.Screen name="ChangePassword" component={ChangePassword} />
-            <Stack.Screen name="AboutUs" component={AboutUs} />
-            <Stack.Screen name="Settings" component={Settings} />
-            <Stack.Screen name="Notifications" component={Notifications} />
-            <Stack.Screen name="DataSharing" component={DataSharing} />
-            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
-            <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
-            <Stack.Screen name="Analytics" component={Analytics} />
-          </>
+          // Authenticated user content wrapped with all context providers
+          <Stack.Screen name="AuthenticatedApp" options={{ headerShown: false }}>
+            {() => (
+              <AuthenticatedApp>
+                <AuthenticatedContent />
+              </AuthenticatedApp>
+            )}
+          </Stack.Screen>
         )}
       </Stack.Navigator>
     </NavigationContainer>
@@ -382,13 +420,10 @@ export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
-    // Initialize token manager for optimized authentication
-    tokenManager.initBackgroundRefresh();
-
-    // Initialize other app components
+    // Initialize basic app components
     const initApp = async () => {
       try {
-        // Initialize SQLite database
+        // Always initialize database (needed for basic functionality)
         await getDatabase();
 
         // Check if we're running in Expo Go
@@ -423,12 +458,6 @@ export default function App() {
           // Continue app initialization even if permanent notification fails
         }
 
-        // Start background sync service
-        startPeriodicSync();
-
-        // Setup online sync
-        setupOnlineSync();
-
         // App is ready
         setAppIsReady(true);
       } catch (e) {
@@ -451,18 +480,8 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <OnboardingProvider>
-          <ThemeProvider>
-            <StepProvider>
-              <FavoritesProvider>
-                <FoodLogProvider>
-                  <StatusBar barStyle="light-content" backgroundColor="black" />
-                  <AppNavigator />
-                </FoodLogProvider>
-              </FavoritesProvider>
-            </StepProvider>
-          </ThemeProvider>
-        </OnboardingProvider>
+        <StatusBar barStyle="light-content" backgroundColor="black" />
+        <AppNavigator />
       </AuthProvider>
     </SafeAreaProvider>
   );

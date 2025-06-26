@@ -64,7 +64,7 @@ const GoalsScreen = () => {
             setIsLoading(true);
             try {
                 // Fetch user goals from local database
-                const userGoals = await getUserGoals(user.uid);
+                const userGoals = await getUserGoals(user.id);
 
                 // Try to get profile data for additional info
                 let profileData = null;

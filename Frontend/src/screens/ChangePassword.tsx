@@ -14,12 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Auth, auth } from '../utils/firebase/index';
-import {
-    reauthenticateWithCredential,
-    EmailAuthProvider,
-    updatePassword
-} from 'firebase/auth';
+import { supabase } from '../utils/supabaseClient';
 
 export default function ChangePassword() {
     const navigation = useNavigation<any>();
@@ -58,16 +53,24 @@ export default function ChangePassword() {
                 throw new Error('User not authenticated');
             }
 
-            // Re-authenticate the user with their current password
-            const credential = EmailAuthProvider.credential(
-                user.email,
-                currentPassword
-            );
+            // Re-authenticate the user with their current password using Supabase
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: currentPassword
+            });
 
-            await reauthenticateWithCredential(user, credential);
+            if (signInError) {
+                throw signInError;
+            }
 
-            // Update the password
-            await updatePassword(user, newPassword);
+            // Update the password using Supabase
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword
+            });
+
+            if (updateError) {
+                throw updateError;
+            }
 
             Alert.alert('Success', 'Password updated successfully');
 
@@ -80,9 +83,9 @@ export default function ChangePassword() {
             console.error('Change password error:', error);
 
             // Handle specific error cases
-            if (error.code === 'auth/wrong-password') {
+            if (error.message?.includes('Invalid login credentials')) {
                 Alert.alert('Error', 'Current password is incorrect');
-            } else if (error.code === 'auth/too-many-requests') {
+            } else if (error.message?.includes('too many requests')) {
                 Alert.alert('Error', 'Too many unsuccessful attempts. Please try again later.');
             } else {
                 Alert.alert('Error', 'Failed to change password. Please try again.');

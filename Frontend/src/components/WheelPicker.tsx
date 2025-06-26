@@ -1,246 +1,220 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
-    Dimensions,
-    TouchableOpacity,
-    Platform,
+    FlatList,
+    NativeScrollEvent,
     NativeSyntheticEvent,
-    NativeScrollEvent
+    ViewStyle,
+    ListRenderItemInfo,
 } from 'react-native';
 
 interface WheelPickerProps {
-    data: Array<{ id: string, label: string, description?: string }>;
+    /**
+     * Items to display. `id` should be unique; `label` is what the user sees.
+     */
+    data: Array<{ id: string; label: string }>;
+    /**
+     * Currently selected item id.
+     */
     selectedValue: string;
+    /**
+     * Callback when the user picks a new value.
+     */
     onValueChange: (value: string) => void;
+    /**
+     * Optional style overrides for the outer container.
+     */
+    containerStyle?: ViewStyle;
+    /**
+     * Height of an individual item in pixels. Defaults to 48.
+     */
     itemHeight?: number;
-    containerHeight?: number;
-    textStyle?: any;
-    selectedTextStyle?: any;
-    containerStyle?: any;
+    /**
+     * Optional default value to scroll to initially (overrides selectedValue for first render).
+     * Useful for weight/height pickers to start at sensible defaults.
+     */
+    defaultValue?: string;
 }
+
+const VISIBLE_ROWS = 5; // Must be odd to keep a single centred row
 
 const WheelPicker: React.FC<WheelPickerProps> = ({
     data,
     selectedValue,
     onValueChange,
-    itemHeight = 40,
-    containerHeight = 200,
-    textStyle,
-    selectedTextStyle,
     containerStyle,
+    itemHeight = 48,
+    defaultValue,
 }) => {
-    const scrollViewRef = useRef<ScrollView>(null);
-    const [initialized, setInitialized] = useState(false);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [scrollPosition, setScrollPosition] = useState(0);
-    const [isScrolling, setIsScrolling] = useState(false);
+    const listRef = useRef<FlatList>(null);
+    const ITEM_HEIGHT = itemHeight;
+    const CONTAINER_HEIGHT = ITEM_HEIGHT * VISIBLE_ROWS;
+    const hasScrolledToDefault = useRef(false);
 
-    // Find index of selected value
+    // Add empty items at the beginning and end to make all items selectable
+    const paddingCount = Math.floor(VISIBLE_ROWS / 2);
+    const paddedData = useMemo(() => {
+        const emptyTop = Array.from({ length: paddingCount }, (_, i) => ({
+            id: `empty_top_${i}`,
+            label: '',
+        }));
+        const emptyBottom = Array.from({ length: paddingCount }, (_, i) => ({
+            id: `empty_bottom_${i}`,
+            label: '',
+        }));
+        return [...emptyTop, ...data, ...emptyBottom];
+    }, [data, paddingCount]);
+
+    // Memoised mapping from id → index for O(1) lookup
+    const idToIndex = useMemo(() => {
+        const map: Record<string, number> = {};
+        paddedData.forEach((item, idx) => {
+            map[item.id] = idx;
+        });
+        return map;
+    }, [paddedData]);
+
+    /** Scroll to the default value on initial mount */
     useEffect(() => {
-        const index = Math.max(0, data.findIndex(item => item.id === selectedValue));
-        if (index !== currentIndex) {
-            setCurrentIndex(index);
+        if (hasScrolledToDefault.current || !listRef.current) return;
 
-            // Only scroll if already initialized
-            if (initialized && scrollViewRef.current) {
-                scrollToIndex(index, true);
-            }
+        const valueToScrollTo = defaultValue || selectedValue;
+        const targetIndex = idToIndex[valueToScrollTo];
+
+        if (targetIndex != null) {
+            // Adjust so that the desired row is centered
+            const offset = Math.max(0, (targetIndex - paddingCount) * ITEM_HEIGHT);
+            setTimeout(() => {
+                listRef.current?.scrollToOffset({
+                    offset,
+                    animated: false,
+                });
+                hasScrolledToDefault.current = true;
+            }, 100);
         }
-    }, [selectedValue, data]);
+    }, [selectedValue, idToIndex, ITEM_HEIGHT, defaultValue, paddingCount]);
 
-    // Scroll to initial position after component mounts
-    useEffect(() => {
-        if (!initialized && data.length > 0) {
-            const initialIndex = Math.max(0, data.findIndex(item => item.id === selectedValue));
-            setCurrentIndex(initialIndex);
+    /** Called when momentum scrolling ends naturally - FIXED calculation */
+    const handleMomentumScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const offsetY = e.nativeEvent.contentOffset.y;
+        // FIXED: Simple calculation - the centered item index
+        const centerIndex = Math.round(offsetY / ITEM_HEIGHT) + paddingCount;
+        const clampedIndex = Math.max(paddingCount, Math.min(centerIndex, paddedData.length - 1 - paddingCount));
+        const selectedItem = paddedData[clampedIndex];
 
-            // Use a longer timeout for initial rendering
-            const timer = setTimeout(() => {
-                if (scrollViewRef.current) {
-                    scrollToIndex(initialIndex, false);
-                    setInitialized(true);
-                }
-            }, 150);
-
-            return () => clearTimeout(timer);
+        // Only update if it's a real item (not an empty padding item) and different from current
+        if (selectedItem && selectedItem.label && selectedItem.id !== selectedValue) {
+            onValueChange(selectedItem.id);
         }
-    }, [data]);
+    }, [ITEM_HEIGHT, paddedData, selectedValue, onValueChange, paddingCount]);
 
-    const scrollToIndex = (index: number, animated: boolean = true) => {
-        if (scrollViewRef.current) {
-            const y = index * itemHeight;
-            scrollViewRef.current.scrollTo({
-                y,
-                animated,
-            });
+    const getItemLayout = useCallback((_: any, index: number) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+    }), [ITEM_HEIGHT]);
+
+    const renderItem = useCallback(({ item, index }: ListRenderItemInfo<{ id: string; label: string }>) => {
+        // Don't show anything for empty padding items
+        if (!item.label) {
+            return <View style={{ height: ITEM_HEIGHT }} />;
         }
-    };
 
-    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const y = event.nativeEvent.contentOffset.y;
-        setScrollPosition(y);
-    };
+        // FIXED: Use actual selection state, not fixed center calculation
+        const isSelected = item.id === selectedValue;
 
-    const handleScrollBeginDrag = () => {
-        setIsScrolling(true);
-    };
+        return (
+            <View style={[styles.itemContainer, { height: ITEM_HEIGHT }]}>
+                <Text
+                    style={[
+                        styles.itemText,
+                        isSelected && styles.selectedText,
+                    ]}
+                    numberOfLines={1}
+                >
+                    {item.label}
+                </Text>
+            </View>
+        );
+    }, [ITEM_HEIGHT, selectedValue]);
 
-    const handleScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        // Only snap to position when user ends the scroll, not when momentum is still going
-        const y = event.nativeEvent.contentOffset.y;
-        const velocity = event.nativeEvent.velocity?.y || 0;
-
-        // Improved velocity threshold - if the scroll velocity is low enough, snap immediately
-        // This prevents the slingshot effect by catching slower movements
-        if (Math.abs(velocity) < 0.5) {
-            const index = Math.round(y / itemHeight);
-            snapToIndex(index);
-        }
-    };
-
-    const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        setIsScrolling(false);
-        const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / itemHeight);
-        snapToIndex(index);
-    };
-
-    const snapToIndex = (index: number) => {
-        // Clamp index to valid range to prevent slingshot
-        const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
-
-        if (clampedIndex >= 0 && clampedIndex < data.length) {
-            // Ensure we snap to the exact position with precision
-            scrollToIndex(clampedIndex, true);
-
-            // Only update if value changed
-            if (clampedIndex !== currentIndex) {
-                setCurrentIndex(clampedIndex);
-                onValueChange(data[clampedIndex].id);
-            }
-        }
-    };
-
-    const handleItemPress = (index: number) => {
-        scrollToIndex(index);
-        setCurrentIndex(index);
-        onValueChange(data[index].id);
-    };
-
-    // Add padding to top and bottom so center item is centered
-    const visibleItems = Math.floor(containerHeight / itemHeight);
-    const halfVisibleItems = Math.floor(visibleItems / 2);
-    const paddingTop = halfVisibleItems * itemHeight;
-    const paddingBottom = paddingTop;
+    const keyExtractor = useCallback((item: { id: string; label: string }) => item.id, []);
 
     return (
-        <View style={[styles.container, { height: containerHeight }, containerStyle]}>
-            {/* Highlight for the selected item - fixed positioning */}
+        <View
+            style={[
+                styles.container,
+                { height: CONTAINER_HEIGHT },
+                containerStyle,
+            ]}
+        >
+            {/* Selection highlight */}
             <View
                 style={[
-                    styles.highlightView,
+                    styles.selectionIndicator,
                     {
-                        top: Math.floor(containerHeight / 2 - itemHeight / 2),
-                        height: itemHeight
-                    }
+                        top: (CONTAINER_HEIGHT - ITEM_HEIGHT) / 2,
+                        height: ITEM_HEIGHT,
+                    },
                 ]}
             />
 
-            <ScrollView
-                ref={scrollViewRef}
+            <FlatList
+                ref={listRef}
+                data={paddedData}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                getItemLayout={getItemLayout}
                 showsVerticalScrollIndicator={false}
-                snapToInterval={itemHeight}
-                decelerationRate={Platform.OS === 'ios' ? 0.985 : 0.88}
-                bounces={false}
-                onScroll={handleScroll}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
                 onMomentumScrollEnd={handleMomentumScrollEnd}
-                onScrollBeginDrag={handleScrollBeginDrag}
-                onScrollEndDrag={handleScrollEndDrag}
                 scrollEventThrottle={16}
-                contentContainerStyle={{ paddingTop, paddingBottom }}
-                keyboardShouldPersistTaps="always"
-                snapToAlignment="center"
-            >
-                {data.map((item, index) => {
-                    const itemPosition = index * itemHeight;
-                    const distanceFromCenter = Math.abs(scrollPosition - itemPosition);
-                    const isSelected = index === currentIndex;
-
-                    // Scale and opacity based on distance from center
-                    const maxDistance = containerHeight / 2;
-                    const scale = isSelected ? 1.1 : Math.max(0.8, 1 - distanceFromCenter / maxDistance * 0.2);
-                    const opacity = Math.max(0.4, 1 - distanceFromCenter / maxDistance * 0.6);
-
-                    return (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={[styles.item, { height: itemHeight }]}
-                            onPress={() => handleItemPress(index)}
-                            activeOpacity={0.7}
-                        >
-                            <View style={{
-                                transform: [{ scale }],
-                                opacity,
-                                flex: 1,
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                width: '100%'
-                            }}>
-                                <Text
-                                    style={[
-                                        styles.text,
-                                        textStyle,
-                                        isSelected && styles.selectedText,
-                                        isSelected && selectedTextStyle,
-                                    ]}
-                                    numberOfLines={1}
-                                >
-                                    {item.label}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })}
-            </ScrollView>
+            />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        width: '100%',
-        backgroundColor: 'rgba(30, 30, 30, 0.9)',
-        borderRadius: 10,
+        backgroundColor: '#1a1a1a',
+        borderRadius: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#333',
     },
-    highlightView: {
-        position: 'absolute',
-        width: '100%',
-        backgroundColor: 'rgba(0, 116, 221, 0.2)',
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: 'rgba(0, 116, 221, 0.5)',
-        zIndex: 1,
-    },
-    item: {
+    itemContainer: {
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 2, // Add a small padding to improve alignment
+        paddingHorizontal: 16,
     },
-    text: {
+    itemText: {
         fontSize: 16,
-        color: '#aaa',
-        textAlign: 'center',
-        paddingHorizontal: 20,
+        color: '#666',
+        fontWeight: '400',
     },
     selectedText: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 20,
         color: '#fff',
+        fontWeight: '700',
+    },
+    adjacentText: {
+        fontSize: 17,
+        color: '#bbb',
+        fontWeight: '500',
+    },
+    selectionIndicator: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        backgroundColor: 'rgba(138, 43, 226, 0.15)',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: 'rgba(138, 43, 226, 0.4)',
+        zIndex: 1,
     },
 });
 
-export default WheelPicker; 
+export default WheelPicker;

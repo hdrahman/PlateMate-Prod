@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -77,6 +77,14 @@ const commonAllergies = [
 const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile, updateProfile, onNext }) => {
     const [selectedDiet, setSelectedDiet] = useState<string>(profile.dietType || 'classic');
     const [allergies, setAllergies] = useState<string[]>(profile.foodAllergies || []);
+
+    useEffect(() => {
+        updateProfile({
+            dietType: selectedDiet,
+            foodAllergies: allergies,
+            dietaryRestrictions: [selectedDiet],
+        }).catch(() => { });
+    }, [selectedDiet, allergies]);
 
     const toggleAllergy = (allergyId: string) => {
         if (allergies.includes(allergyId)) {

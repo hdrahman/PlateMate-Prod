@@ -1,8 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { createUser, getUserProfile, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
+import { supabase } from '../utils/supabaseClient';
 import { syncUserProfile } from '../utils/profileSyncService';
-import { getUserProfileByFirebaseUid, addUserProfile, updateUserProfile as updateLocalUserProfile } from '../utils/database';
+import {
+    getUserProfileBySupabaseUid,
+    addUserProfile,
+    updateUserProfile as updateLocalUserProfile,
+    generateTempSessionId,
+    saveOnboardingProgressIncremental,
+    loadOnboardingProgressIncremental,
+    syncTempOnboardingToUserProfile,
+    cleanupOldTempOnboardingSessions,
+    ensureDatabaseReady
+} from '../utils/database';
 
 interface OnboardingContextType {
     // Basic onboarding state
@@ -21,6 +32,7 @@ interface OnboardingContextType {
     completeOnboarding: () => Promise<void>;
     resetOnboarding: () => Promise<void>;
     saveOnboardingProgress: () => Promise<void>;
+    setCurrentStep: (step: number) => void;
 }
 
 // User profile data structure
@@ -29,6 +41,8 @@ export interface UserProfile {
     firstName: string;
     lastName: string;
     email: string;
+    // Optional password captured during onboarding for account creation
+    password?: string | null;
 
     // Enhanced personal info
     dateOfBirth: string | null;
@@ -57,6 +71,11 @@ export interface UserProfile {
     fitnessGoal: string | null;
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
+
+    // Cheat day preferences
+    cheatDayEnabled?: boolean;
+    cheatDayFrequency?: number; // days between cheat days
+    preferredCheatDayOfWeek?: number; // 0-6, where 0 = Sunday, 1 = Monday, etc.
 
     // Lifestyle and motivation data
     sleepQuality?: string | null;
@@ -106,7 +125,6 @@ export interface UserProfile {
 
     // Additional fields
     useMetricSystem: boolean;
-    notificationsEnabled: boolean;
     premium: boolean;
     onboardingComplete: boolean;
 }
@@ -116,13 +134,14 @@ const defaultProfile: UserProfile = {
     firstName: '',
     lastName: '',
     email: '',
+    password: null,
     dateOfBirth: null,
     location: null,
     height: null,
     weight: null,
     age: null,
     gender: null,
-    activityLevel: 'sedentary',
+    activityLevel: 'moderate',
     dietaryRestrictions: [],
     foodAllergies: [],
     cuisinePreferences: [],
@@ -141,9 +160,6 @@ const defaultProfile: UserProfile = {
     futureSelfMessageUri: null,
     useMetricSystem: true,
     darkMode: false,
-    notificationsEnabled: true,
-    onboardingComplete: false,
-    premium: false,
     pushNotificationsEnabled: true,
     emailNotificationsEnabled: true,
     smsNotificationsEnabled: false,
@@ -158,13 +174,15 @@ const defaultProfile: UserProfile = {
     defaultAddress: null,
     preferredDeliveryTimes: [],
     deliveryInstructions: null,
+    onboardingComplete: false,
+    premium: false,
 };
 
 // Create context with default values
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 15, // Updated to include intro steps (3) + onboarding (11) + account creation (1)
+    totalSteps: 14, // Updated to include intro steps (3) + onboarding (11), account creation now integrated
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -172,6 +190,7 @@ const OnboardingContext = createContext<OnboardingContextType>({
     completeOnboarding: async () => { },
     resetOnboarding: async () => { },
     saveOnboardingProgress: async () => { },
+    setCurrentStep: () => { },
     isLoading: true,
 });
 
@@ -179,10 +198,17 @@ const OnboardingContext = createContext<OnboardingContextType>({
 const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile => {
     if (!sqliteProfile) return defaultProfile;
 
+    console.log('🔄 Converting SQLite profile to frontend format:', {
+        onboarding_complete: sqliteProfile.onboarding_complete,
+        first_name: sqliteProfile.first_name,
+        email: sqliteProfile.email
+    });
+
     return {
         firstName: sqliteProfile.first_name || '',
         lastName: sqliteProfile.last_name || '',
         email: sqliteProfile.email || '',
+        password: sqliteProfile.password,
         dateOfBirth: sqliteProfile.date_of_birth,
         location: sqliteProfile.location,
         height: sqliteProfile.height,
@@ -191,21 +217,28 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         gender: sqliteProfile.gender,
         activityLevel: sqliteProfile.activity_level,
         unitPreference: sqliteProfile.unit_preference || 'metric',
-        dietaryRestrictions: sqliteProfile.dietary_restrictions || [],
-        foodAllergies: sqliteProfile.food_allergies || [],
-        cuisinePreferences: sqliteProfile.cuisine_preferences || [],
+        dietaryRestrictions: sqliteProfile.dietary_restrictions ?
+            (typeof sqliteProfile.dietary_restrictions === 'string' ? JSON.parse(sqliteProfile.dietary_restrictions) : sqliteProfile.dietary_restrictions) : [],
+        foodAllergies: sqliteProfile.food_allergies ?
+            (typeof sqliteProfile.food_allergies === 'string' ? JSON.parse(sqliteProfile.food_allergies) : sqliteProfile.food_allergies) : [],
+        cuisinePreferences: sqliteProfile.cuisine_preferences ?
+            (typeof sqliteProfile.cuisine_preferences === 'string' ? JSON.parse(sqliteProfile.cuisine_preferences) : sqliteProfile.cuisine_preferences) : [],
         spiceTolerance: sqliteProfile.spice_tolerance,
         weightGoal: sqliteProfile.weight_goal,
         targetWeight: sqliteProfile.target_weight,
         startingWeight: sqliteProfile.starting_weight,
-        healthConditions: sqliteProfile.health_conditions || [],
+        healthConditions: sqliteProfile.health_conditions ?
+            (typeof sqliteProfile.health_conditions === 'string' ? JSON.parse(sqliteProfile.health_conditions) : sqliteProfile.health_conditions) : [],
         fitnessGoal: sqliteProfile.fitness_goal,
         dailyCalorieTarget: sqliteProfile.daily_calorie_target,
-        nutrientFocus: sqliteProfile.nutrient_focus,
+        nutrientFocus: sqliteProfile.nutrient_focus ?
+            (typeof sqliteProfile.nutrient_focus === 'string' ? JSON.parse(sqliteProfile.nutrient_focus) : sqliteProfile.nutrient_focus) : null,
         sleepQuality: sqliteProfile.sleep_quality,
         stressLevel: sqliteProfile.stress_level,
         eatingPattern: sqliteProfile.eating_pattern,
-        motivations: sqliteProfile.motivations ? JSON.parse(sqliteProfile.motivations) : [],
+        motivations: sqliteProfile.motivations ?
+            (typeof sqliteProfile.motivations === 'string' ? sqliteProfile.motivations.split(',') :
+                (Array.isArray(sqliteProfile.motivations) ? sqliteProfile.motivations : [sqliteProfile.motivations])) : [],
         whyMotivation: sqliteProfile.why_motivation,
         stepGoal: sqliteProfile.step_goal,
         waterGoal: sqliteProfile.water_goal,
@@ -233,9 +266,8 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         darkMode: Boolean(sqliteProfile.dark_mode),
         syncDataOffline: Boolean(sqliteProfile.sync_data_offline),
         useMetricSystem: Boolean(sqliteProfile.use_metric_system),
-        notificationsEnabled: Boolean(sqliteProfile.notifications_enabled),
+        onboardingComplete: Boolean(sqliteProfile.onboarding_complete),
         premium: Boolean(sqliteProfile.premium),
-        onboardingComplete: sqliteProfile.onboarding_complete || false,
     };
 };
 
@@ -290,7 +322,6 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         dark_mode: frontendProfile.darkMode,
         sync_data_offline: frontendProfile.syncDataOffline,
         use_metric_system: frontendProfile.useMetricSystem,
-        notifications_enabled: frontendProfile.notificationsEnabled,
         premium: frontendProfile.premium,
         onboarding_complete: frontendProfile.onboardingComplete,
     };
@@ -302,192 +333,451 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const [onboardingComplete, setOnboardingComplete] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
     const [profile, setProfile] = useState<UserProfile>(defaultProfile);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
+    const [tempSessionId, setTempSessionId] = useState<string>('');
 
-    const totalSteps = 15;
+    const totalSteps = 14; // 3 intro steps + 11 onboarding steps
 
-    // Reset state when user changes
+    // Initialize temp session ID on mount
     useEffect(() => {
-        if (!user?.uid) {
-            setOnboardingComplete(false);
-            setCurrentStep(1);
-            setProfile(defaultProfile);
-            return;
+        if (!tempSessionId) {
+            const newSessionId = generateTempSessionId();
+            setTempSessionId(newSessionId);
+            console.log('🆔 Generated temp session ID:', newSessionId);
         }
+    }, []);
 
-        // Reset state when user changes
-        setOnboardingComplete(false);
-        setCurrentStep(1);
-        setProfile(defaultProfile);
-        setIsLoading(true);
-    }, [user?.uid]);
+    // Clear state when user changes, but keep temp session for unauthenticated users
+    useEffect(() => {
+        if (!user) {
+            setOnboardingComplete(false);
+            setIsLoading(false);
+            setHasLoadedInitialState(false);
+            // Don't reset profile or currentStep - let user continue onboarding before auth
+        }
+    }, [user?.id]);
 
-    // Load saved onboarding state from SQLite database only
+    // Load saved onboarding state from SQLite database or temp storage
     useEffect(() => {
         const loadOnboardingState = async () => {
-            if (!user) {
+            if (hasLoadedInitialState || !tempSessionId) {
                 setIsLoading(false);
                 return;
             }
 
             try {
                 setIsLoading(true);
-                console.log(`🔍 Loading onboarding state for user: ${user.uid}`);
+                console.log('🔍 Loading onboarding state...');
 
-                // Check SQLite database for user profile
-                const sqliteProfile = await getUserProfileByFirebaseUid(user.uid);
+                if (user && user.id) {
+                    // User is authenticated - try to load from user profile first
+                    console.log(`👤 Loading for authenticated user: ${user.id}`);
+                    const sqliteProfile = await getUserProfileBySupabaseUid(user.id);
 
-                if (sqliteProfile) {
-                    console.log('✅ Found profile in SQLite database');
-                    setOnboardingComplete(sqliteProfile.onboarding_complete || false);
-                    setProfile(convertSQLiteProfileToFrontendFormat(sqliteProfile));
+                    if (sqliteProfile) {
+                        console.log('✅ Found profile in SQLite database');
+                        console.log(`Profile data: onboarding_complete=${sqliteProfile.onboarding_complete}, email=${sqliteProfile.email}`);
 
-                    // Set current step based on onboarding completion
-                    if (sqliteProfile.onboarding_complete) {
-                        setCurrentStep(totalSteps); // Completed
+                        // Convert SQLite profile to frontend format
+                        const frontendProfile = convertSQLiteProfileToFrontendFormat(sqliteProfile);
+
+                        // FIXED: Properly check onboarding completion from the database
+                        const isOnboardingComplete = Boolean(sqliteProfile.onboarding_complete);
+
+                        setOnboardingComplete(isOnboardingComplete);
+                        setProfile(frontendProfile);
+                        setCurrentStep(isOnboardingComplete ? totalSteps : 1);
+
+                        console.log(`✅ Onboarding state loaded: complete=${isOnboardingComplete}, step=${isOnboardingComplete ? totalSteps : 1}`);
                     } else {
-                        // If not complete, start from step 1 or resume from where they left off
-                        setCurrentStep(1);
+                        // Try to load and sync temporary data
+                        console.log('📋 No existing profile found, checking temporary data...');
+                        const tempData = await loadOnboardingProgressIncremental(tempSessionId);
+                        if (tempData) {
+                            console.log('🔄 Found temporary data, syncing to user profile...');
+                            try {
+                                await syncTempOnboardingToUserProfile(tempSessionId, user.id, user.email);
+                                setProfile(tempData.profileData);
+                                setCurrentStep(tempData.currentStep);
+                                console.log('✅ Temporary data synced to user profile');
+                            } catch (syncError) {
+                                console.error('❌ Error syncing temporary data:', syncError);
+                                setProfile(tempData.profileData);
+                                setCurrentStep(tempData.currentStep);
+                            }
+                        } else {
+                            console.log('ℹ️ No existing data found, starting fresh');
+                            setProfile(defaultProfile);
+                            setCurrentStep(1);
+                        }
+                        setOnboardingComplete(false);
                     }
                 } else {
-                    console.log('ℹ️ No profile found in SQLite, user needs onboarding');
+                    // User not authenticated - try to load from temp storage
+                    console.log('👥 Loading for unauthenticated user');
+                    const tempData = await loadOnboardingProgressIncremental(tempSessionId);
+                    if (tempData) {
+                        console.log('✅ Found temporary onboarding data');
+                        setProfile(tempData.profileData);
+                        setCurrentStep(tempData.currentStep);
+                    } else {
+                        console.log('ℹ️ No temporary data found, starting fresh');
+                        setProfile(defaultProfile);
+                        setCurrentStep(1);
+                    }
                     setOnboardingComplete(false);
-                    // For logged-in users without a profile, start at step 4 (skip intro steps)
-                    setCurrentStep(4);
-                    setProfile(defaultProfile);
+                }
+
+                setHasLoadedInitialState(true);
+
+                // Clean up old temp sessions
+                try {
+                    await cleanupOldTempOnboardingSessions();
+                } catch (cleanupError) {
+                    console.warn('⚠️ Error cleaning up temp sessions:', cleanupError);
                 }
             } catch (error) {
-                console.error('❌ Error loading onboarding state from SQLite:', error);
+                console.error('❌ Error loading onboarding state:', error);
                 // Set defaults on error
                 setOnboardingComplete(false);
                 setCurrentStep(1);
                 setProfile(defaultProfile);
+                setHasLoadedInitialState(true);
             } finally {
                 setIsLoading(false);
             }
         };
 
         loadOnboardingState();
-    }, [user]);
+    }, [user, hasLoadedInitialState, tempSessionId]);
 
-    // Update profile data (only in memory during onboarding)
+    // Update profile data and save incrementally
     const updateProfile = async (data: Partial<UserProfile>) => {
-        const updatedProfile = { ...profile, ...data };
-        setProfile(updatedProfile);
-        // No need to save to storage during onboarding - only save when complete
+        try {
+            const updatedProfile = { ...profile, ...data };
+            setProfile(updatedProfile);
+            console.log('📝 Profile updated with:', data, 'Full profile:', updatedProfile);
+
+            // Save incrementally to temp storage
+            if (tempSessionId) {
+                await saveOnboardingProgressIncremental(
+                    tempSessionId,
+                    updatedProfile,
+                    currentStep,
+                    user?.id
+                );
+                console.log('✅ Profile data saved incrementally');
+            }
+
+            // If user is authenticated and has an existing profile, update it directly
+            if (user && user.id) {
+                try {
+                    const existingProfile = await getUserProfileBySupabaseUid(user.id);
+                    if (existingProfile) {
+                        const updateData = convertFrontendProfileToSQLiteFormat(updatedProfile, user.id, user.email);
+                        await updateLocalUserProfile(user.id, updateData);
+                        console.log('✅ Existing user profile updated');
+                    }
+                } catch (updateError) {
+                    console.log('ℹ️ Could not update existing profile (may not exist yet):', updateError);
+                    // This is expected if the profile doesn't exist yet
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error updating profile:', error);
+            // Don't throw - this shouldn't break the user experience
+        }
     };
 
-    // Save progress (no-op since we only save to SQLite on completion)
+    // Save progress incrementally (now actually saves)
     const saveOnboardingProgress = async () => {
-        // During onboarding, we keep everything in memory
-        // Only save to SQLite when onboarding is completed
-        console.log('📝 Onboarding progress saved in memory');
+        try {
+            if (tempSessionId) {
+                await saveOnboardingProgressIncremental(
+                    tempSessionId,
+                    profile,
+                    currentStep,
+                    user?.id
+                );
+                console.log('✅ Onboarding progress saved');
+            }
+        } catch (error) {
+            console.error('❌ Error saving onboarding progress:', error);
+        }
     };
 
-    // Go to next step
-    const goToNextStep = () => {
-        const nextStep = Math.min(currentStep + 1, totalSteps);
-        console.log(`🚀 Moving from step ${currentStep} to step ${nextStep}`);
+    // Go to next step and save progress
+    const goToNextStep = async () => {
+        const nextStep = currentStep + 1;
         setCurrentStep(nextStep);
-        saveOnboardingProgress();
+
+        // Save progress when moving to next step
+        try {
+            if (tempSessionId) {
+                await saveOnboardingProgressIncremental(
+                    tempSessionId,
+                    profile,
+                    nextStep,
+                    user?.id
+                );
+                console.log('✅ Step progress saved:', { currentStep: nextStep, tempSessionId });
+            }
+        } catch (error) {
+            console.error('❌ Error saving step progress:', error);
+        }
     };
 
     // Go to previous step
     const goToPreviousStep = () => {
-        const prevStep = Math.max(currentStep - 1, 1);
-        setCurrentStep(prevStep);
-        saveOnboardingProgress();
+        setCurrentStep(prevStep => Math.max(1, prevStep - 1));
     };
 
     // Complete the onboarding process
     const completeOnboarding = async () => {
-        if (!user || !user.email) {
-            console.error('Cannot complete onboarding: user or email is missing');
-            return;
+        console.log('🚀 Starting onboarding completion...');
+
+        // NEW: Enhanced user validation with retry mechanism
+        let currentUser = user;
+        let retryCount = 0;
+        const maxRetries = 5;
+
+        // Wait for user to be properly authenticated after account creation
+        while ((!currentUser || !currentUser.id) && retryCount < maxRetries) {
+            console.log(`⏳ Waiting for user authentication (attempt ${retryCount + 1}/${maxRetries})...`);
+
+            // Get fresh user from Supabase auth
+            const { data: { user: freshUser } } = await supabase.auth.getUser();
+            if (freshUser) {
+                currentUser = {
+                    id: freshUser.id,
+                    email: freshUser.email,
+                    uid: freshUser.id
+                };
+            }
+
+            if (!currentUser || !currentUser.id) {
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                retryCount++;
+            } else {
+                break;
+            }
         }
 
+        // Final validation
+        if (!currentUser) {
+            console.error('❌ Cannot complete onboarding: user is null/undefined after retries');
+            throw new Error('User not authenticated. Please try signing in again.');
+        }
+
+        if (!currentUser.id) {
+            console.error('❌ Cannot complete onboarding: user.id is missing after retries');
+            throw new Error('User ID is missing. Please try signing in again.');
+        }
+
+        if (!currentUser.email) {
+            console.error('❌ Cannot complete onboarding: user.email is missing after retries');
+            throw new Error('User email is missing. Please try signing in again.');
+        }
+
+        console.log(`✅ User validated: ${currentUser.id}, Email: ${currentUser.email}`);
+
+        // Ensure database is ready
+        await ensureDatabaseReady();
+
+        const profileData = {
+            firebase_uid: currentUser.id, // Use the validated currentUser
+            email: currentUser.email,
+            first_name: profile.firstName || '',
+            last_name: profile.lastName || '',
+            height: profile.height || null,
+            weight: profile.weight || null,
+            age: profile.age || null,
+            gender: profile.gender || null,
+            activity_level: profile.activityLevel || null,
+            weight_goal: profile.weightGoal || null,
+            target_weight: profile.targetWeight || null,
+            dietary_restrictions: Array.isArray(profile.dietaryRestrictions) ? profile.dietaryRestrictions : [],
+            food_allergies: Array.isArray(profile.foodAllergies) ? profile.foodAllergies : [],
+            cuisine_preferences: Array.isArray(profile.cuisinePreferences) ? profile.cuisinePreferences : [],
+            spice_tolerance: profile.spiceTolerance || null,
+            health_conditions: Array.isArray(profile.healthConditions) ? profile.healthConditions : [],
+            fitness_goal: profile.fitnessGoal || null,
+            daily_calorie_target: profile.dailyCalorieTarget || null,
+            nutrient_focus: profile.nutrientFocus || null,
+            future_self_message_uri: profile.futureSelfMessageUri || null,
+            unit_preference: profile.unitPreference || 'metric',
+            push_notifications_enabled: profile.pushNotificationsEnabled !== false,
+            email_notifications_enabled: profile.emailNotificationsEnabled !== false,
+            sms_notifications_enabled: profile.smsNotificationsEnabled || false,
+            marketing_emails_enabled: profile.marketingEmailsEnabled !== false,
+            preferred_language: profile.preferredLanguage || 'en',
+            timezone: profile.timezone || 'UTC',
+            dark_mode: profile.darkMode || false,
+            sync_data_offline: profile.syncDataOffline !== false,
+            onboarding_complete: true, // Mark as complete
+            synced: 0,
+            protein_goal: profile.nutrientFocus?.protein || 0,
+            carb_goal: profile.nutrientFocus?.carbs || 0,
+            fat_goal: profile.nutrientFocus?.fat || 0,
+            weekly_workouts: profile.workoutFrequency || 0,
+            step_goal: profile.stepGoal || 0,
+            water_goal: profile.waterGoal || 0,
+            sleep_goal: profile.sleepGoal || 0,
+            workout_frequency: profile.workoutFrequency || 0,
+            sleep_quality: profile.sleepQuality || '',
+            stress_level: profile.stressLevel || '',
+            eating_pattern: profile.eatingPattern || '',
+            motivations: profile.motivations ? (Array.isArray(profile.motivations) ? profile.motivations.join(',') : profile.motivations) : '',
+            why_motivation: profile.whyMotivation || '',
+            projected_completion_date: profile.projectedCompletionDate || '',
+            estimated_metabolic_age: profile.estimatedMetabolicAge || 0,
+            estimated_duration_weeks: profile.estimatedDurationWeeks || 0,
+            future_self_message: profile.futureSelfMessage || '',
+            future_self_message_type: profile.futureSelfMessageType || '',
+            future_self_message_created_at: profile.futureSelfMessageCreatedAt || '',
+            diet_type: profile.dietType || '',
+            use_metric_system: profile.useMetricSystem !== false ? 1 : 0,
+            premium: false,
+        };
+
+        console.log('💾 Saving profile to SQLite database...', {
+            firebase_uid: profileData.firebase_uid,
+            email: profileData.email,
+            onboarding_complete: profileData.onboarding_complete,
+            activity_level: profileData.activity_level,
+            fitness_goal: profileData.fitness_goal,
+            weight_goal: profileData.weight_goal
+        });
+
         try {
-            setIsLoading(true);
-            console.log('🔄 Starting onboarding completion...');
+            const profileId = await addUserProfile(profileData);
+            console.log('✅ Profile saved successfully with ID:', profileId);
 
-            // Mark onboarding as complete
-            setOnboardingComplete(true);
-
-            // Convert frontend profile to SQLite format
-            const sqliteProfile = convertFrontendProfileToSQLiteFormat(profile, user.uid, user.email);
-            sqliteProfile.onboarding_complete = true;
-
-            console.log('📋 Profile data to save:', {
-                daily_calorie_target: sqliteProfile.daily_calorie_target,
-                fitness_goal: sqliteProfile.fitness_goal,
-                weight_goal: sqliteProfile.weight_goal,
-                target_weight: sqliteProfile.target_weight
-            });
-
-            // Save to local SQLite database with better error handling
-            try {
-                await addUserProfile(sqliteProfile);
-                console.log('✅ Profile saved to local SQLite database');
-            } catch (profileError) {
-                console.error('❌ Error saving user profile:', profileError);
-                throw new Error(`Failed to save user profile: ${profileError}`);
-            }
-
-            // Also save nutrition goals to nutrition_goals table if we have the data
-            if (profile.dailyCalorieTarget || profile.weightGoal || profile.targetWeight) {
+            // NEW: Update Supabase Auth user profile with display name
+            if (profile.firstName || profile.lastName) {
+                console.log('💾 Updating Supabase Auth user profile with display name...');
                 try {
-                    console.log('🔄 Saving nutrition goals...');
-                    const { updateUserGoals } = await import('../utils/database');
+                    const displayName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim();
+                    if (displayName) {
+                        const { error: updateError } = await supabase.auth.updateUser({
+                            data: {
+                                display_name: displayName,
+                                full_name: displayName,
+                                first_name: profile.firstName,
+                                last_name: profile.lastName
+                            }
+                        });
 
-                    const goalsToSave = {
-                        targetWeight: profile.targetWeight,
-                        calorieGoal: profile.dailyCalorieTarget,
-                        proteinGoal: profile.nutrientFocus?.protein,
-                        carbGoal: profile.nutrientFocus?.carbs,
-                        fatGoal: profile.nutrientFocus?.fat,
-                        fitnessGoal: profile.fitnessGoal || profile.weightGoal, // Use fitnessGoal first, fallback to weightGoal
-                        activityLevel: profile.activityLevel,
-                    };
-
-                    console.log('📋 Nutrition goals to save:', goalsToSave);
-
-                    await updateUserGoals(user.uid, goalsToSave);
-                    console.log('✅ Nutrition goals saved to nutrition_goals table');
-                } catch (nutritionError) {
-                    console.error('❌ Error saving nutrition goals:', nutritionError);
-                    // Don't throw here - profile is already saved, this is supplementary
-                    console.warn('⚠️ Continuing despite nutrition goals save error');
+                        if (updateError) {
+                            console.warn('⚠️ Could not update Supabase Auth display name:', updateError);
+                        } else {
+                            console.log(`✅ Supabase Auth display name updated to: "${displayName}"`);
+                        }
+                    }
+                } catch (authUpdateError) {
+                    console.warn('⚠️ Error updating Supabase Auth profile:', authUpdateError);
+                    // Don't fail onboarding if auth profile update fails
                 }
-            } else {
-                console.log('ℹ️ No nutrition goals to save (missing required data)');
             }
 
-            console.log('✅ Onboarding completion successful');
+            // NEW: Save nutrition goals to the nutrition_goals table if we have the required data
+            if (profile.weightGoal || profile.fitnessGoal || profile.activityLevel || profile.dailyCalorieTarget) {
+                console.log('💾 Saving nutrition goals to nutrition_goals table...');
+
+                const { updateUserGoals } = await import('../utils/database');
+                const goalsToSave = {
+                    targetWeight: profile.targetWeight,
+                    calorieGoal: profile.dailyCalorieTarget,
+                    proteinGoal: profile.nutrientFocus?.protein,
+                    carbGoal: profile.nutrientFocus?.carbs,
+                    fatGoal: profile.nutrientFocus?.fat,
+                    fitnessGoal: profile.fitnessGoal || profile.weightGoal,
+                    activityLevel: profile.activityLevel,
+                };
+
+                await updateUserGoals(currentUser.id, goalsToSave);
+                console.log('✅ Nutrition goals saved successfully');
+            }
+
+            // NEW: Initialize cheat day settings if enabled
+            if (profile.cheatDayEnabled !== undefined || profile.cheatDayFrequency !== undefined || profile.preferredCheatDayOfWeek !== undefined) {
+                console.log('💾 Initializing cheat day settings...');
+
+                const { initializeCheatDaySettings } = await import('../utils/database');
+                try {
+                    await initializeCheatDaySettings(
+                        currentUser.id,
+                        profile.cheatDayFrequency || 7,
+                        profile.preferredCheatDayOfWeek
+                    );
+
+                    // Update cheat day settings with enabled status
+                    const { updateCheatDaySettings } = await import('../utils/database');
+                    await updateCheatDaySettings(currentUser.id, {
+                        enabled: profile.cheatDayEnabled || false,
+                        frequency: profile.cheatDayFrequency || 7,
+                        preferredDayOfWeek: profile.preferredCheatDayOfWeek
+                    });
+
+                    console.log('✅ Cheat day settings initialized successfully');
+                } catch (error) {
+                    console.error('❌ Error initializing cheat day settings:', error);
+                    // Continue with onboarding even if cheat day initialization fails
+                }
+            }
+
+            // Verify profile was saved
+            console.log('🔍 Verifying profile was saved...');
+            const savedProfile = await getUserProfileBySupabaseUid(currentUser.id);
+            if (savedProfile) {
+                console.log('✅ Profile verification successful:', {
+                    id: savedProfile.id,
+                    email: savedProfile.email,
+                    onboarding_complete: savedProfile.onboarding_complete,
+                    activity_level: savedProfile.activity_level,
+                    fitness_goal: savedProfile.fitness_goal
+                });
+            } else {
+                console.error('❌ Profile verification failed - could not retrieve saved profile');
+            }
+
+            // Clean up temporary data
+            if (tempSessionId) {
+                await cleanupOldTempOnboardingSessions();
+            }
+
+            // Mark onboarding as complete in state
+            setOnboardingComplete(true);
+            setCurrentStep(totalSteps);
+
+            console.log('🎉 Onboarding completed successfully!');
+
         } catch (error) {
-            console.error('❌ Error completing onboarding:', error);
-            // Reset onboarding complete status on error
-            setOnboardingComplete(false);
+            console.error('❌ Error saving user profile:', error);
             throw error;
-        } finally {
-            setIsLoading(false);
         }
     };
 
     // Reset onboarding (for testing purposes)
     const resetOnboarding = async () => {
-        if (!user) return;
-
         try {
-            console.log('🔄 Resetting onboarding for user:', user.uid);
+            console.log('🔄 Resetting onboarding...');
 
             // Reset state
             setOnboardingComplete(false);
             setCurrentStep(1);
             setProfile(defaultProfile);
 
-            // Reset onboarding status in SQLite database
-            const { resetOnboardingStatus } = await import('../utils/database');
-            await resetOnboardingStatus(user.uid);
+            // Generate new temp session
+            const newSessionId = generateTempSessionId();
+            setTempSessionId(newSessionId);
+
+            // Reset onboarding status in SQLite database if user exists
+            if (user && user.id) {
+                const { resetOnboardingStatus } = await import('../utils/database');
+                await resetOnboardingStatus(user.id);
+            }
 
             console.log('✅ Onboarding reset completed successfully');
         } catch (error) {
@@ -508,6 +798,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 completeOnboarding,
                 resetOnboarding,
                 saveOnboardingProgress,
+                setCurrentStep,
                 isLoading,
             }}
         >
