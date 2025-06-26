@@ -116,36 +116,34 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                 }
 
                 if (selectedPlan === 'free_trial') {
-                    // Navigate to home for free trial
-                    navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'Main' as never }],
-                    });
+                    // Let the parent onboarding component handle navigation
+                    onComplete();
                 } else {
-                    // Show premium options for paid plans
-                    Alert.alert(
-                        'Upgrade to Premium',
-                        'Would you like to view premium subscription options now?',
-                        [
-                            {
-                                text: 'Not Now',
-                                onPress: () => navigation.reset({
-                                    index: 0,
-                                    routes: [{ name: 'Main' as never }],
-                                })
-                            },
-                            {
-                                text: 'View Options',
-                                onPress: () => navigation.reset({
-                                    index: 0,
-                                    routes: [
-                                        { name: 'Main' as never },
-                                        { name: 'PremiumSubscription' as never }
-                                    ],
-                                })
-                            },
-                        ]
-                    );
+                    // Let the parent onboarding component handle navigation first
+                    onComplete();
+
+                    // Then show premium options after navigation is complete
+                    setTimeout(() => {
+                        Alert.alert(
+                            'Upgrade to Premium',
+                            'Would you like to view premium subscription options now?',
+                            [
+                                {
+                                    text: 'Not Now',
+                                    style: 'cancel'
+                                },
+                                {
+                                    text: 'View Options',
+                                    onPress: () => {
+                                        // Navigate to premium screen after the main app is loaded
+                                        setTimeout(() => {
+                                            navigation.navigate('PremiumSubscription' as never);
+                                        }, 1000);
+                                    }
+                                },
+                            ]
+                        );
+                    }, 500);
                 }
             } catch (error) {
                 console.error('Account creation error:', error);
@@ -172,11 +170,8 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                             // Complete onboarding without account
                             await completeOnboarding();
 
-                            // Navigate to home screen
-                            navigation.reset({
-                                index: 0,
-                                routes: [{ name: 'Main' as never }],
-                            });
+                            // Let the parent component handle navigation
+                            onComplete();
                         } catch (error) {
                             console.error('Error completing onboarding:', error);
                             Alert.alert('Error', 'Failed to complete setup. Please try again.');

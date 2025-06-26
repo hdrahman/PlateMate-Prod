@@ -295,17 +295,15 @@ function MainTabs() {
 // Component to conditionally wrap authenticated app content with context providers
 function AuthenticatedApp({ children }) {
   return (
-    <OnboardingProvider>
-      <ThemeProvider>
-        <StepProvider>
-          <FavoritesProvider>
-            <FoodLogProvider>
-              {children}
-            </FoodLogProvider>
-          </FavoritesProvider>
-        </StepProvider>
-      </ThemeProvider>
-    </OnboardingProvider>
+    <ThemeProvider>
+      <StepProvider>
+        <FavoritesProvider>
+          <FoodLogProvider>
+            {children}
+          </FoodLogProvider>
+        </FavoritesProvider>
+      </StepProvider>
+    </ThemeProvider>
   );
 }
 
@@ -365,53 +363,49 @@ function AppNavigator() {
 
   return (
     <NavigationContainer theme={DefaultTheme}>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'fade',
-          // For slide animations from left/right
-          cardStyleInterpolator: ({ current, layouts, next, inverted, routeName, ...rest }) => {
-            const slideFrom = rest.route.params?.slideFrom;
-            if (!slideFrom) return { cardStyle: { opacity: current.progress } };
+      <OnboardingProvider>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: 'fade',
+            // For slide animations from left/right
+            cardStyleInterpolator: ({ current, layouts, next, inverted, routeName, ...rest }) => {
+              const slideFrom = rest.route.params?.slideFrom;
+              if (!slideFrom) return { cardStyle: { opacity: current.progress } };
 
-            return {
-              cardStyle: {
-                transform: [
-                  {
-                    translateX: current.progress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [slideFrom === 'right' ? layouts.screen.width : -layouts.screen.width, 0],
-                    }),
-                  },
-                ],
-              },
-            };
-          },
-        }}
-      >
-        {!user ? (
-          // Show intro screens for unauthenticated users WITH onboarding context provider
-          <>
-            <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
+              return {
+                cardStyle: {
+                  transform: [
+                    {
+                      translateX: current.progress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [slideFrom === 'right' ? layouts.screen.width : -layouts.screen.width, 0],
+                      }),
+                    },
+                  ],
+                },
+              };
+            },
+          }}
+        >
+          {!user ? (
+            // Show intro screens for unauthenticated users
+            <>
+              <Stack.Screen name="Onboarding" component={Onboarding} />
+              <Stack.Screen name="Auth" component={Auth} />
+            </>
+          ) : (
+            // Authenticated user content wrapped with remaining context providers
+            <Stack.Screen name="AuthenticatedApp" options={{ headerShown: false }}>
               {() => (
-                <OnboardingProvider>
-                  <Onboarding />
-                </OnboardingProvider>
+                <AuthenticatedApp>
+                  <AuthenticatedContent />
+                </AuthenticatedApp>
               )}
             </Stack.Screen>
-            <Stack.Screen name="Auth" component={Auth} />
-          </>
-        ) : (
-          // Authenticated user content wrapped with all context providers
-          <Stack.Screen name="AuthenticatedApp" options={{ headerShown: false }}>
-            {() => (
-              <AuthenticatedApp>
-                <AuthenticatedContent />
-              </AuthenticatedApp>
-            )}
-          </Stack.Screen>
-        )}
-      </Stack.Navigator>
+          )}
+        </Stack.Navigator>
+      </OnboardingProvider>
     </NavigationContainer>
   );
 }

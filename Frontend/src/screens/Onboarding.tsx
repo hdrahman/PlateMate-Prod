@@ -131,11 +131,11 @@ const Onboarding = () => {
         setError(null);
         try {
             await completeOnboarding();
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Home' as never }],
-            });
+            console.log('✅ Onboarding completed successfully, app will navigate automatically');
+            // Don't navigate here - let the app automatically handle this
+            // The AuthenticatedContent component will check onboardingComplete and navigate appropriately
         } catch (error) {
+            console.error('❌ Onboarding completion failed:', error);
             setError('Failed to complete onboarding. Please try again.');
         } finally {
             setIsLoading(false);

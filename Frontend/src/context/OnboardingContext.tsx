@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { createUser, getUserProfile, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
 import { supabase } from '../utils/supabaseClient';
 import { syncUserProfile } from '../utils/profileSyncService';
+import { logAuthState } from '../utils/authDebugger';
 import {
     getUserProfileBySupabaseUid,
     addUserProfile,
@@ -355,6 +356,11 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             setIsLoading(false);
             setHasLoadedInitialState(false);
             // Don't reset profile or currentStep - let user continue onboarding before auth
+        } else {
+            // User just became authenticated - reload onboarding state if needed
+            if (!hasLoadedInitialState) {
+                setHasLoadedInitialState(false); // Force reload
+            }
         }
     }, [user?.id]);
 
@@ -747,15 +753,27 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 await cleanupOldTempOnboardingSessions();
             }
 
-            // Mark onboarding as complete in state
+            // Mark onboarding as complete in state IMMEDIATELY
+            console.log('🎯 Setting onboarding complete state immediately');
             setOnboardingComplete(true);
             setCurrentStep(totalSteps);
+
+            // Force a small delay to ensure state propagation
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             console.log('🎉 Onboarding completed successfully!');
 
         } catch (error) {
             console.error('❌ Error saving user profile:', error);
-            throw error;
+
+            // More specific error handling
+            if (error.message?.includes('User not authenticated')) {
+                throw new Error('Authentication failed. Please try signing in again.');
+            } else if (error.message?.includes('database')) {
+                throw new Error('Failed to save your profile. Please check your connection and try again.');
+            } else {
+                throw new Error(`Failed to complete onboarding: ${error.message || 'Unknown error'}`);
+            }
         }
     };
 
