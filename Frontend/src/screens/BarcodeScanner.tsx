@@ -50,7 +50,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 // To ensure Firebase token is ready when the screen is shown
 const prefetchAuthToken = () => {
-    tokenManager.getToken().then(() => {
+    tokenManager.getToken('supabase').then(() => {
         console.log('Auth token prefetched for barcode scanning');
     }).catch(error => {
         console.error('Failed to prefetch auth token:', error);

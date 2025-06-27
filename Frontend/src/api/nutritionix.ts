@@ -226,6 +226,12 @@ export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | nu
             );
 
             console.log('Backend barcode POST response success:', response.status);
+
+            // Extract the food data from the response structure
+            if (response.data && response.data.success && response.data.food) {
+                return response.data.food;
+            }
+
             return response.data;
 
         } catch (postError) {
@@ -247,6 +253,12 @@ export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | nu
             );
 
             console.log('Backend barcode GET response status:', response.status);
+
+            // Extract the food data from the response structure
+            if (response.data && response.data.success && response.data.food) {
+                return response.data.food;
+            }
+
             return response.data;
         }
     } catch (error) {

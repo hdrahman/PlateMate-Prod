@@ -73,7 +73,12 @@ export const fetchFoodByBarcode = async (barcode: string): Promise<FoodItem | nu
             { headers }
         );
 
-        return response.data || null;
+        // Extract the food data from the response structure
+        if (response.data && response.data.success && response.data.food) {
+            return response.data.food;
+        }
+
+        return null;
     } catch (error) {
         console.error('Error fetching food by barcode:', error);
         throw error;

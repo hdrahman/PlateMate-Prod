@@ -294,36 +294,89 @@ async def get_food_details(food_id: str) -> Optional[Dict[str, Any]]:
         Food details or None if not found
     """
     try:
-        # Get OAuth token
-        token = await get_oauth_token()
+        # STANDALONE IMPLEMENTATION: Use httpx directly without connection_pool
+        logger.info(f"Getting food details for ID: {food_id}")
         
-        # Get a client from the connection pool
-        client = await get_http_client(
-            "fatsecret_api",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        
-        # Make the request
-        response = await request_with_retry(
-            "GET",
-            FATSECRET_API_URL,
-            client,
-            params={
-                "method": "food.get.v2",
-                "food_id": food_id,
-                "format": "json"
-            }
-        )
-        
-        data = response.json()
-        
-        # Extract food from response
-        food_data = data.get("food", {})
-        if not food_data:
+        # Check credentials
+        if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
+            logger.error("FatSecret API credentials are not configured properly")
             return None
+            
+        # Create a new httpx client for token request
+        async with httpx.AsyncClient(timeout=30.0) as token_client:
+            try:
+                # Prepare Basic Auth header
+                credentials = f"{FATSECRET_CLIENT_ID}:{FATSECRET_CLIENT_SECRET}"
+                encoded_credentials = base64.b64encode(credentials.encode()).decode()
+                
+                # Direct token URL
+                token_url = "https://oauth.fatsecret.com/connect/token"
+                logger.info(f"Making token request for food details to {token_url}")
+                
+                # Request token
+                token_response = await token_client.post(
+                    token_url,
+                    headers={
+                        "Authorization": f"Basic {encoded_credentials}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data={
+                        "grant_type": "client_credentials",
+                        "scope": "basic premier barcode"
+                    }
+                )
+                
+                if token_response.status_code != 200:
+                    logger.error(f"Failed to get token for food details: {token_response.status_code} - {token_response.text}")
+                    return None
+                    
+                token_data = token_response.json()
+                access_token = token_data.get("access_token")
+                
+                if not access_token:
+                    logger.error("No access token in response for food details")
+                    return None
+                    
+                logger.info("Successfully obtained token for food details")
+            except Exception as token_error:
+                logger.error(f"Error getting token for food details: {str(token_error)}")
+                return None
         
-        # Map the response to our format
-        return map_food_item(food_data)
+        # Create a new httpx client for food details request
+        async with httpx.AsyncClient(timeout=30.0) as details_client:
+            try:
+                # Make the food details request
+                api_url = "https://platform.fatsecret.com/rest/server.api"
+                logger.info(f"Getting FatSecret API food details for ID: {food_id} at URL: {api_url}")
+                
+                details_response = await details_client.get(
+                    api_url,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={
+                        "method": "food.get.v2",
+                        "food_id": food_id,
+                        "format": "json"
+                    }
+                )
+                
+                if details_response.status_code != 200:
+                    logger.error(f"Food details request failed: {details_response.status_code} - {details_response.text}")
+                    return None
+                    
+                data = details_response.json()
+                logger.info(f"FatSecret API food details response for ID {food_id}: {data}")
+                
+                # Extract food from response
+                food_data = data.get("food", {})
+                if not food_data:
+                    logger.warning(f"No food data found for ID: {food_id}")
+                    return None
+        
+                # Map the response to our format
+                return map_food_item(food_data)
+            except Exception as details_error:
+                logger.error(f"Error making food details request: {str(details_error)}")
+                return None
     except Exception as e:
         logger.error(f"Error getting FatSecret food details: {str(e)}")
         return None
@@ -340,36 +393,99 @@ async def search_by_barcode(barcode: str) -> Optional[Dict[str, Any]]:
         Food details or None if not found
     """
     try:
-        # Get OAuth token
-        token = await get_oauth_token()
+        # STANDALONE IMPLEMENTATION: Use httpx directly without connection_pool
+        logger.info(f"Starting barcode search for: {barcode}")
         
-        # Get a client from the connection pool
-        client = await get_http_client(
-            "fatsecret_api",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        
-        # Make the request
-        response = await request_with_retry(
-            "GET",
-            FATSECRET_API_URL,
-            client,
-            params={
-                "method": "food.find_id_for_barcode",
-                "barcode": barcode,
-                "format": "json"
-            }
-        )
-        
-        data = response.json()
-        
-        # Extract food ID from response
-        food_id = data.get("food_id")
-        if not food_id:
+        # Check credentials
+        if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
+            logger.error("FatSecret API credentials are not configured properly")
             return None
+            
+        # Create a new httpx client for token request
+        async with httpx.AsyncClient(timeout=30.0) as token_client:
+            try:
+                # Prepare Basic Auth header
+                credentials = f"{FATSECRET_CLIENT_ID}:{FATSECRET_CLIENT_SECRET}"
+                encoded_credentials = base64.b64encode(credentials.encode()).decode()
+                
+                # Direct token URL
+                token_url = "https://oauth.fatsecret.com/connect/token"
+                logger.info(f"Making token request for barcode search to {token_url}")
+                
+                # Request token
+                token_response = await token_client.post(
+                    token_url,
+                    headers={
+                        "Authorization": f"Basic {encoded_credentials}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data={
+                        "grant_type": "client_credentials",
+                        "scope": "basic premier barcode"
+                    }
+                )
+                
+                if token_response.status_code != 200:
+                    logger.error(f"Failed to get token for barcode: {token_response.status_code} - {token_response.text}")
+                    return None
+                    
+                token_data = token_response.json()
+                access_token = token_data.get("access_token")
+                
+                if not access_token:
+                    logger.error("No access token in response for barcode search")
+                    return None
+                    
+                logger.info("Successfully obtained token for barcode search")
+            except Exception as token_error:
+                logger.error(f"Error getting token for barcode: {str(token_error)}")
+                return None
         
-        # Get food details
-        return await get_food_details(food_id)
+        # Create a new httpx client for barcode search request
+        async with httpx.AsyncClient(timeout=30.0) as search_client:
+            try:
+                # Make the barcode search request
+                api_url = "https://platform.fatsecret.com/rest/server.api"
+                logger.info(f"Searching FatSecret API for barcode: {barcode} at URL: {api_url}")
+                
+                search_response = await search_client.get(
+                    api_url,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={
+                        "method": "food.find_id_for_barcode",
+                        "barcode": barcode,
+                        "format": "json"
+                    }
+                )
+                
+                if search_response.status_code != 200:
+                    logger.error(f"Barcode search request failed: {search_response.status_code} - {search_response.text}")
+                    return None
+                    
+                data = search_response.json()
+                logger.info(f"FatSecret API barcode response: {data}")
+                
+                # Extract food ID from response
+                food_id = data.get("food_id")
+                if not food_id:
+                    logger.warning(f"No food_id found for barcode: {barcode}")
+                    return None
+                
+                # Handle different response formats for food_id
+                if isinstance(food_id, dict) and 'value' in food_id:
+                    food_id = food_id['value']
+                elif isinstance(food_id, dict):
+                    food_id = str(food_id)
+                else:
+                    food_id = str(food_id)
+                
+                logger.info(f"Found food_id: {food_id} for barcode: {barcode}")
+                
+                # Get food details using the food_id
+                return await get_food_details(food_id)
+            except Exception as search_error:
+                logger.error(f"Error making barcode search request: {str(search_error)}")
+                return None
     except Exception as e:
         logger.error(f"Error searching FatSecret by barcode: {str(e)}")
         return None
