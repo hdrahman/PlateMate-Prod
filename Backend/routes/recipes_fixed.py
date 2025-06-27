@@ -79,7 +79,7 @@ async def search_recipes(
         List of recipes matching the search criteria
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Recipe search request from user {user_id}: {query}")
         
         fatsecret_service = get_fatsecret_service()
@@ -129,7 +129,7 @@ async def search_recipes_post(
         List of recipes matching the search criteria
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Recipe search POST request from user {user_id}: {request.query}")
         
         fatsecret_service = get_fatsecret_service()
@@ -172,7 +172,7 @@ async def get_random_recipes(
         # Use either count or number parameter, defaulting to 5
         recipe_count = count or number or 5
         
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Random recipes request from user {user_id}: count={recipe_count}")
         
         fatsecret_service = get_fatsecret_service()
@@ -207,7 +207,7 @@ async def get_recipes_by_meal_type(
         List of recipes for the specified meal type
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Meal type recipes request from user {user_id}: {request.meal_type}")
         
         fatsecret_service = get_fatsecret_service()
@@ -266,7 +266,7 @@ async def generate_meal_plan(
         Generated meal plan
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Meal plan request from user {user_id}")
         
         fatsecret_service = get_fatsecret_service()
@@ -316,7 +316,7 @@ async def autocomplete_recipes(
         List of recipe suggestions
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Recipe autocomplete request from user {user_id}: {query}")
         
         fatsecret_service = get_fatsecret_service()
@@ -360,7 +360,7 @@ async def autocomplete_ingredients(
         List of ingredient suggestions
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Ingredient autocomplete request from user {user_id}: {query}")
         
         fatsecret_service = get_fatsecret_service()
@@ -404,7 +404,7 @@ async def get_recipe_by_id(
         Recipe details
     """
     try:
-        user_id = current_user.get('uid') if hasattr(current_user, 'get') else getattr(current_user, 'firebase_uid', 'unknown')
+        user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Recipe details request from user {user_id}: {recipe_id}")
         
         fatsecret_service = get_fatsecret_service()

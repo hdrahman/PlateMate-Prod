@@ -95,7 +95,7 @@ async def chat_with_arli(
         raise HTTPException(status_code=500, detail="Arli AI API key not configured")
     
     try:
-        logger.info(f"Sending chat request to Arli AI for user {current_user['firebase_uid']} with conversation ID: {request.conversation_id}")
+        logger.info(f"Sending chat request to Arli AI for user {current_user['supabase_uid']} with conversation ID: {request.conversation_id}")
         
         # Add a system message asking for plain text responses if not already present
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]

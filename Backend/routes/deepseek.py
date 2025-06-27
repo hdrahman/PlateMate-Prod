@@ -101,7 +101,7 @@ async def analyze_nutrition(
     try:
         nutrition_data = request.nutritionData
         
-        logger.info(f"Nutrition analysis requested for user {current_user['firebase_uid']}")
+        logger.info(f"Nutrition analysis requested for user {current_user['supabase_uid']}")
         
         # Create context message for Coach Max - use custom prompt if provided
         if request.customPrompt:
@@ -188,7 +188,7 @@ Let me give you personalized insights and recommendations to help you reach your
             result = response.json()
             coach_response = result["choices"][0]["message"]["content"]
             
-            logger.info(f"Nutrition analysis completed for user {current_user['firebase_uid']}")
+            logger.info(f"Nutrition analysis completed for user {current_user['supabase_uid']}")
             
             return ChatResponse(
                 response=coach_response,
@@ -212,7 +212,7 @@ async def chat_with_coach(
     Stateless service - no database access required.
     """
     try:
-        logger.info(f"Chat request from user {current_user['firebase_uid']}")
+        logger.info(f"Chat request from user {current_user['supabase_uid']}")
         
         # Call DeepSeek API securely from backend
         async with httpx.AsyncClient() as client:
@@ -264,7 +264,7 @@ async def chat_with_context(
     Stateless service - no database access required.
     """
     try:
-        logger.info(f"Context chat request from user {current_user['firebase_uid']}")
+        logger.info(f"Context chat request from user {current_user['supabase_uid']}")
         logger.info(f"Request messages count: {len(request.messages)}")
         logger.info(f"Request user_context provided: {bool(request.user_context)}")
         logger.info(f"Request temperature: {request.temperature}")

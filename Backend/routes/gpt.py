@@ -72,7 +72,7 @@ async def analyze_food(
         logger.warning("Warning: OPENAI_API_KEY not found in environment variables")
     
     try:
-        logger.info(f"Analyzing food: {request.food_name} for meal type: {request.meal_type} (user: {current_user['firebase_uid']})")
+        logger.info(f"Analyzing food: {request.food_name} for meal type: {request.meal_type} (user: {current_user['supabase_uid']})")
         logger.info(f"Received {len(request.image_urls)} image URLs")
         
         # Validate image URLs
@@ -201,7 +201,7 @@ async def analyze_meal(
         if not request.food_items:
             raise HTTPException(status_code=400, detail="No food items provided for analysis")
         
-        logger.info(f"Analyzing meal with {len(request.food_items)} food items (user: {current_user['firebase_uid']})")
+        logger.info(f"Analyzing meal with {len(request.food_items)} food items (user: {current_user['supabase_uid']})")
         
         # Extract meal information from provided data
         food_names = [item.get('food_name', 'Unknown food') for item in request.food_items]

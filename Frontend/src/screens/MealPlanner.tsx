@@ -19,12 +19,7 @@ const foodCategories = [
     { id: 'breakfast', name: 'Breakfast', icon: 'sunny-outline' },
     { id: 'lunch', name: 'Lunch', icon: 'fast-food-outline' },
     { id: 'dinner', name: 'Dinner', icon: 'restaurant-outline' },
-    { id: 'italian', name: 'Italian', icon: 'pizza-outline' },
-    { id: 'american', name: 'American', icon: 'flag-outline' },
-    { id: 'quick', name: 'Quick & Easy', icon: 'timer-outline' },
     { id: 'snack', name: 'Snacks', icon: 'cafe-outline' },
-    { id: 'healthy', name: 'Healthy', icon: 'fitness-outline' },
-    { id: 'vegetarian', name: 'Vegetarian', icon: 'leaf-outline' },
 ];
 
 // Define autocomplete functions locally since they were removed from the API
@@ -459,14 +454,21 @@ export default function MealPlanner() {
         // Get search term from suggestion
         const searchTerm = suggestion.title || suggestion.name || '';
         if (searchTerm.trim()) {
+            // Set the search query to show what was selected
+            setSearchQuery(searchTerm);
+
             // Always navigate to search results for any suggestion type
             console.log('Navigating to RecipeResults with query:', searchTerm);
-            navigation.navigate('RecipeResults', { query: searchTerm });
 
-            // Clear the search query after navigation
+            // Small delay to ensure state is updated before navigation
             setTimeout(() => {
-                setSearchQuery('');
-            }, 200);
+                navigation.navigate('RecipeResults', { query: searchTerm });
+
+                // Clear the search query after navigation
+                setTimeout(() => {
+                    setSearchQuery('');
+                }, 500);
+            }, 50);
         }
     }, [navigation]);
 
@@ -807,7 +809,7 @@ export default function MealPlanner() {
                 )}
 
                 {/* Display selected meal categories */}
-                {foodCategories.slice(0, 5).map(category => (
+                {foodCategories.map(category => (
                     <RecipeCategory
                         key={category.id}
                         title={category.name}

@@ -42,10 +42,7 @@ export default function RecipeResults() {
 
             console.log('🔍 Performing search for:', query);
 
-            const results = await searchRecipes({
-                query,
-                number: 20
-            });
+            const results = await searchRecipes(query, 20);
 
             console.log('📊 Search results:', results.length, 'recipes found');
 
@@ -77,23 +74,8 @@ export default function RecipeResults() {
 
                     console.log('Initializing search with query:', routeQuery);
 
-                    // Build search params
-                    const searchParams = {
-                        query: routeQuery,
-                        number: 20,
-                        // Add any filters from route params if needed
-                        cuisine: route.params?.cuisine,
-                        diet: route.params?.diet,
-                        maxReadyTime: route.params?.maxReadyTime
-                    };
-
-                    // Remove undefined values
-                    Object.keys(searchParams).forEach(key =>
-                        searchParams[key] === undefined && delete searchParams[key]
-                    );
-
-                    // Perform search
-                    const results = await searchRecipes(searchParams);
+                    // Perform search with the query (ignoring additional filters for now)
+                    const results = await searchRecipes(routeQuery, 20);
                     setRecipes(results);
 
                     // Log results for debugging
@@ -188,7 +170,7 @@ export default function RecipeResults() {
                     showsVerticalScrollIndicator={false}
                 >
                     <Text style={styles.resultsText}>
-                        {recipes.length} {recipes.length === 1 ? 'result' : 'results'} for "{searchQuery}"
+                        {recipes?.length || 0} {(recipes?.length || 0) === 1 ? 'result' : 'results'} for "{searchQuery}"
                     </Text>
 
                     {recipes.map((recipe) => (

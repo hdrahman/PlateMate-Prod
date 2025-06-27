@@ -226,10 +226,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                     <Ionicons name={icon as any} size={20} color={WHITE} />
                 </View>
                 <Text style={styles.title}>{title}</Text>
-                <TouchableOpacity style={styles.seeAllButton}>
-                    <Text style={styles.seeAllText}>See All</Text>
-                    <Ionicons name="chevron-forward" size={16} color={PURPLE_ACCENT} />
-                </TouchableOpacity>
+
             </View>
 
             <ScrollView
@@ -288,14 +285,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                                         </Text>
                                                     </View>
 
-                                                    {(recipe.aggregateLikes && recipe.aggregateLikes > 0) && (
-                                                        <View style={styles.likesContainer}>
-                                                            <Ionicons name="thumbs-up" size={14} color="#2196F3" />
-                                                            <Text style={[styles.metaText, { color: '#2196F3' }]}>
-                                                                {formatLikes(recipe.aggregateLikes)}
-                                                            </Text>
-                                                        </View>
-                                                    )}
+
                                                 </View>
                                             </View>
                                         </View>

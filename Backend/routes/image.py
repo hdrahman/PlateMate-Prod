@@ -145,7 +145,7 @@ async def upload_image(
     
     try:
         overall_start_time = time.time()
-        print(f"📸 Received image upload from user {user_id} (authenticated: {current_user['firebase_uid']})")
+        print(f"📸 Received image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
         
         # Save image file to disk first
         try:
@@ -308,7 +308,7 @@ async def upload_multiple_images(
     
     try:
         overall_start_time = time.time()
-        print(f"📸 Received multiple image upload from user {user_id} (authenticated: {current_user['firebase_uid']})")
+        print(f"📸 Received multiple image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
         print(f"Number of images: {len(images)}")
         
         # Save all images to disk first

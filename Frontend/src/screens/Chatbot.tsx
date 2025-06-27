@@ -123,20 +123,13 @@ export default function Chatbot() {
     // Prefetch authentication tokens to speed up first message
     const prefetchTokens = async () => {
       try {
-        // Prefetch Firebase token
+        // Prefetch Supabase auth token
         await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
 
-        // Try to prefetch AI service tokens if they're available
-        try {
-          await tokenManager.getToken('openai');
-          console.log('OpenAI token already available');
-        } catch (error) {
-          console.log('OpenAI token not cached yet');
-        }
-
+        // Try to prefetch DeepSeek token since this chatbot exclusively uses DeepSeek
         try {
           await tokenManager.getToken('deepseek');
-          console.log('DeepSeek token already available');
+          console.log('New deepseek token acquired, valid until: ' + new Date(Date.now() + 3600000).toLocaleTimeString());
         } catch (error) {
           console.log('DeepSeek token not cached yet');
         }
@@ -547,6 +540,17 @@ export default function Chatbot() {
         }
       );
 
+      console.log('✅ Backend response received:', {
+        status: response.status,
+        data: response.data,
+        response: response.data.response
+      });
+
+      if (!response.data.response) {
+        console.error('❌ Empty response from backend:', response.data);
+        throw new Error('Received empty response from Coach Max');
+      }
+
       return response.data.response;
     } catch (error: any) {
       console.error("Error calling DeepSeek via backend:", error);
@@ -602,10 +606,16 @@ export default function Chatbot() {
 
     try {
       // Get AI response
+      console.log('🤖 Calling chatWithCoachMax with message:', userMessage.text);
       const response = await chatWithCoachMax(userMessage.text);
+      console.log('🎯 Got response from chatWithCoachMax:', response);
 
       // Remove typing indicator and add bot response
-      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      setMessages(prev => {
+        const filtered = prev.filter(msg => !msg.isTyping);
+        console.log('📝 Messages after removing typing indicator:', filtered.length);
+        return filtered;
+      });
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -614,7 +624,12 @@ export default function Chatbot() {
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev, botMessage]);
+      console.log('💬 Adding bot message:', botMessage);
+      setMessages(prev => {
+        const newMessages = [...prev, botMessage];
+        console.log('📨 Total messages after adding bot response:', newMessages.length);
+        return newMessages;
+      });
 
       // Check if we should suggest context (after a short delay)
       if (shouldSuggestContext(userInputText)) {

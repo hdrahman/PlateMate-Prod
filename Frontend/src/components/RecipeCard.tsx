@@ -178,16 +178,7 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                     fadeDuration={200}
                 />
 
-                <TouchableOpacity
-                    style={styles.favoriteButton}
-                    onPress={handleFavoritePress}
-                >
-                    <Ionicons
-                        name={isFav ? "heart" : "heart-outline"}
-                        size={22}
-                        color={isFav ? "#FF4081" : WHITE}
-                    />
-                </TouchableOpacity>
+
 
                 <View style={styles.healthScoreBadge}>
                     <LinearGradient
