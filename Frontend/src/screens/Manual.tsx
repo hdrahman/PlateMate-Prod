@@ -52,28 +52,19 @@ const BACKEND_BASE_URL = BACKEND_URL;
  */
 const getAuthHeaders = async () => {
     try {
-        const { user } = useAuth();
-
-        if (user) {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                    return {
-                        'Authorization': `Bearer ${session.access_token}`,
-                        'Content-Type': 'application/json'
-                    };
-                }
-            } catch (tokenError) {
-                console.error('Error getting Supabase token:', tokenError);
-                throw tokenError;
-            }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('User not authenticated');
         }
+
+        return {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+        };
     } catch (error) {
-        console.error('Error getting auth token:', error);
+        console.error('Error getting auth headers:', error);
+        throw error;
     }
-    return {
-        'Content-Type': 'application/json'
-    };
 };
 
 /**
