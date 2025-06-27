@@ -381,8 +381,7 @@ export default function Chatbot() {
 
       setMessages([analysisMessage]);
 
-      // Prefetch next token in background after success
-      tokenManager.refreshTokenInBackground();
+      // Note: Token will be refreshed automatically on next request if needed
 
     } catch (error: any) {
       console.error('Error getting nutrition analysis:', error);
@@ -534,8 +533,7 @@ export default function Chatbot() {
       // Now get the token and make the request
       const token = await tokenPromise;
 
-      // Prefetch next token in background after using this one
-      setTimeout(() => tokenManager.refreshTokenInBackground(), 0);
+      // Note: Token will be refreshed automatically on next request if needed
 
       const response = await axios.post(
         endpoint,

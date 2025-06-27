@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, ImageBackground } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ImageBackground } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from './RecipeCard';
-import { Recipe, getRecipesByMealType } from '../api/recipes';
-import { RecipeCacheService } from '../services/RecipeCacheService';
+import { getRecipesByMealType, Recipe } from '../api/recipes';
 
 // Define color constants for consistent theming
 const WHITE = '#FFFFFF';
@@ -59,15 +58,16 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
             try {
                 setLoading(true);
 
-                // Try to get cached recipes first
-                const cachedRecipes = await RecipeCacheService.getCachedCategoryRecipes(categoryId);
+                // Fetch fresh recipes from API
+                console.log(`🌐 Fetching fresh ${categoryId} recipes from API`);
+                const data = await getRecipesByMealType(categoryId, 12);
 
-                if (cachedRecipes && cachedRecipes.length > 0) {
-                    console.log(`🎯 Using cached ${categoryId} recipes to save API costs`);
+                console.log(`Category ${categoryId}: Received ${data?.length || 0} recipes`);
 
+                if (data && data.length > 0) {
                     // Initialize image loading and retry states
                     const initialImageLoading: { [key: string]: boolean } = {};
-                    const recipesWithRetries = cachedRecipes.map(recipe => {
+                    const recipesWithRetries = data.map(recipe => {
                         const recipeId = recipe.id?.toString() || '';
                         initialImageLoading[recipeId] = true;
                         return {
@@ -79,65 +79,13 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
 
                     setRecipes(recipesWithRetries);
                     setImageLoading(initialImageLoading);
-                    setLoading(false);
-                    return;
-                }
-
-                // If no cache, fetch from API and cache the results
-                console.log(`🌐 Fetching fresh ${categoryId} recipes from API`);
-                const data = await getRecipesByMealType(categoryId, 12); // Increased from 10 to 12 for better fallbacks
-
-                console.log(`Category ${categoryId}: Received ${data?.length || 0} recipes`);
-
-                // Log image URLs for debugging
-                data?.forEach((recipe, index) => {
-                    console.log(`${categoryId} Recipe ${index + 1}: ${recipe.title}, Image: ${recipe.image || 'No image'}`);
-                });
-
-                if (data && data.length > 0) {
-                    // Pre-validate images
-                    const validatedRecipes: RecipeWithRetries[] = data.map(recipe => {
-                        let validImageUrl = recipe.image;
-
-                        // Check if image URL is valid
-                        if (!validImageUrl || typeof validImageUrl !== 'string' || !validImageUrl.startsWith('http')) {
-                            // Generate a Spoonacular URL as fallback
-                            validImageUrl = `https://spoonacular.com/recipeImages/${recipe.id}-556x370.jpg`;
-                        }
-
-                        return {
-                            ...recipe,
-                            image: validImageUrl,
-                            currentImageUrl: validImageUrl,
-                            retryCount: 0
-                        };
-                    });
-
-                    // Initialize image loading states
-                    const initialImageLoading: { [key: string]: boolean } = {};
-                    validatedRecipes.forEach(recipe => {
-                        const recipeId = recipe.id?.toString() || '';
-                        initialImageLoading[recipeId] = true;
-                    });
-                    setImageLoading(initialImageLoading);
-
-                    // Filter to recipes with valid images
-                    const validRecipes = validatedRecipes.filter(recipe =>
-                        recipe.image && typeof recipe.image === 'string'
-                    );
-
-                    console.log(`Category ${categoryId}: Found ${validRecipes.length} recipes with valid images`);
-
-                    // Use up to 4 valid recipes
-                    const recipesToShow = validRecipes.slice(0, 4);
-                    setRecipes(recipesToShow);
-
-                    // Cache the recipes for the rest of the day
-                    await RecipeCacheService.cacheCategoryRecipes(categoryId, recipesToShow);
-                    console.log(`💾 ${categoryId} recipes cached for today`);
+                } else {
+                    console.log(`No recipes found for category: ${categoryId}`);
+                    setRecipes([]);
                 }
             } catch (error) {
                 console.error(`Error fetching ${categoryId} recipes:`, error);
+                setRecipes([]);
             } finally {
                 setLoading(false);
             }

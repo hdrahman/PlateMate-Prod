@@ -7,7 +7,6 @@ import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
 import tokenManager from '../utils/tokenManager';
-import apiService from '../utils/apiService';
 import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
 import { getUserProfileBySupabaseUid } from '../utils/database';
 
@@ -160,8 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         }
                     }
 
-                    // Preload common API data
-                    await apiService.preloadCommonData();
+                    // Removed preloading API calls - as per user request, the imported recipes are useless
                 } catch (error) {
                     console.error('Error preloading data after login:', error);
                 } finally {
@@ -260,9 +258,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // Clear all tokens
             await tokenManager.clearAllTokens();
-
-            // Clear API caches
-            apiService.clearCache();
 
             // Sign out from Supabase (includes Google sign out)
             await supabaseAuth.signOut();

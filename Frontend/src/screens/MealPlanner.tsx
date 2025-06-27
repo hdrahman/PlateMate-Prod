@@ -9,9 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
-import { Recipe, getRandomRecipes, searchRecipes, getRecipesByMealType } from '../api/recipes';
+import { getRandomRecipes, getRecipesByMealType, Recipe } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
-import { RecipeCacheService } from '../services/RecipeCacheService';
 import apiService from '../utils/apiService';
 import { ServiceTokenType } from '../utils/tokenManager';
 
@@ -614,22 +613,12 @@ export default function MealPlanner() {
         loadUserData();
     }, [user, onboardingProfile, isOnboardingLoading, nutrientTotals, lastUpdated]);
 
-    // Function to load featured healthy and popular recipes with caching
+    // Function to load featured healthy and popular recipes
     const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
 
-            // Try to get cached recipes first
-            const cachedRecipes = await RecipeCacheService.getCachedFeaturedRecipes();
-
-            if (cachedRecipes && cachedRecipes.length > 0) {
-                console.log('🎯 Using cached featured recipes to save API costs');
-                setFeaturedRecipes(cachedRecipes);
-                setIsLoading(false);
-                return;
-            }
-
-            // If no cache, fetch from API and cache the results
+            // Fetch fresh recipes from API
             console.log('🌐 Fetching fresh featured recipes from API');
             const recipes = await getRandomRecipes(10); // Increased from 5 to 10 for better results
 
@@ -652,9 +641,7 @@ export default function MealPlanner() {
                 const recipesToShow = validRecipes.slice(0, 5);
                 setFeaturedRecipes(recipesToShow);
 
-                // Cache the recipes for the rest of the day
-                await RecipeCacheService.cacheFeaturedRecipes(recipesToShow);
-                console.log('💾 Featured recipes cached for today');
+                console.log('✅ Featured recipes loaded successfully');
             }
         } catch (error) {
             console.error('Error loading healthy popular recipes:', error);

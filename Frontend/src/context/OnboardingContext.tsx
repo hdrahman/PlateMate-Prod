@@ -541,6 +541,13 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
     // Complete the onboarding process
     const completeOnboarding = async () => {
+        // Prevent duplicate executions
+        if (isLoading || onboardingComplete) {
+            console.log('⚠️ Onboarding completion already in progress or completed, skipping');
+            return;
+        }
+
+        setIsLoading(true);
         console.log('🚀 Starting onboarding completion...');
 
         // NEW: Enhanced user validation with retry mechanism

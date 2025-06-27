@@ -982,88 +982,70 @@ export default function Home() {
     const setStartingWeightTo110 = async () => {
       if (user) {
         try {
-          // Import the necessary functions from database.ts
-          const { db, initDatabase, isDatabaseReady } = require('../utils/database');
+          // Import the onboarding context to check completion status
+          const { useOnboarding } = require('../context/OnboardingContext');
 
-          // Make sure the database is initialized
-          if (!isDatabaseReady()) {
-            console.log("Database not ready, initializing first...");
-            await initDatabase();
+          // Skip this if onboarding is not complete to avoid conflicts
+          const { onboardingComplete } = useOnboarding() || { onboardingComplete: false };
+          if (!onboardingComplete) {
+            console.log("🔄 Skipping automatic weight update - onboarding not complete yet");
+            return;
           }
+
+          // Import the proper database functions instead of using direct SQL
+          const { getUserProfileBySupabaseUid, updateUserProfile } = require('../utils/database');
 
           console.log("Checking if user profile exists...");
 
-          // First check if the user profile exists
-          const userProfile = await db.getFirstAsync(
-            `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
-            [user.uid]
-          );
+          // Check if the user profile exists using proper function
+          const userProfile = await getUserProfileBySupabaseUid(user.uid);
 
           if (!userProfile) {
-            console.log("User profile doesn't exist, creating one first...");
-            // Create a minimal profile
-            await db.runAsync(
-              `INSERT INTO user_profiles (
-                firebase_uid, email, first_name, last_name, 
-                starting_weight, weight, synced, last_modified
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                user.uid,
-                user.email || 'unknown@email.com',
-                user.displayName?.split(' ')[0] || 'User',
-                user.displayName?.split(' ').slice(1).join(' ') || '',
-                110, // starting weight
-                currentWeight || 110, // current weight 
-                0, // not synced
-                new Date().toISOString()
-              ]
-            );
-            console.log("Created new user profile with starting weight 110kg");
-          } else {
-            console.log("User profile exists, updating starting weight to 110kg");
-            // Update existing profile
-            await db.runAsync(
-              `UPDATE user_profiles SET starting_weight = ?, synced = 0, last_modified = ? WHERE firebase_uid = ?`,
-              [110, new Date().toISOString(), user.uid]
-            );
-            console.log("Starting weight updated to 110kg directly in SQLite");
+            console.log("⚠️ User profile doesn't exist yet, skipping weight update");
+            return;
           }
 
-          // Update the local state
-          setStartingWeight(110);
+          // Only update if starting_weight is not already set
+          if (!userProfile.starting_weight && userProfile.weight) {
+            console.log("📝 Setting starting weight to user's current weight from profile");
 
-          // Recalculate weight change if current weight exists
-          if (currentWeight) {
-            const weightChange = 110 - currentWeight;
-            setWeightLost(parseFloat(weightChange.toFixed(1)));
-          }
-        } catch (error) {
-          console.error("Error updating starting weight directly:", error);
+            // Use the user's actual weight from their profile as the starting weight
+            await updateUserProfile(user.uid, {
+              starting_weight: userProfile.weight
+            });
 
-          // Try an alternative method if the first fails
-          try {
-            console.log("Trying alternative method - memory update only");
-            // Just update the state variables without touching the database
-            setStartingWeight(110);
+            console.log(`✅ Starting weight set to ${userProfile.weight}kg (user's actual weight from profile)`);
 
-            if (currentWeight) {
-              const weightChange = 110 - currentWeight;
+            // Update the local state
+            setStartingWeight(userProfile.weight);
+
+            // Since starting weight equals current weight initially, weight lost should be 0
+            setWeightLost(0);
+          } else if (userProfile.starting_weight) {
+            console.log("ℹ️ Starting weight already set, using existing value");
+            setStartingWeight(userProfile.starting_weight);
+
+            // Calculate weight lost properly
+            if (userProfile.weight) {
+              const weightChange = userProfile.starting_weight - userProfile.weight;
               setWeightLost(parseFloat(weightChange.toFixed(1)));
             }
-
-            console.log("Updated starting weight in memory only (110kg)");
-          } catch (fallbackError) {
-            console.error("Alternative method also failed:", fallbackError);
+          } else {
+            console.log("⚠️ No weight data available in profile yet");
           }
+        } catch (error) {
+          console.error("⚠️ Error in automatic weight management:", error);
+          // Don't show fallback errors since this is now a background operation
         }
       }
     };
 
-    // Run once when component mounts
-    setStartingWeightTo110();
+    // Add a small delay to ensure onboarding completion has finished
+    const timer = setTimeout(setStartingWeightTo110, 1000);
+    return () => clearTimeout(timer);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, currentWeight]);
 
   // Load cheat day data
   const loadCheatDayData = async () => {
