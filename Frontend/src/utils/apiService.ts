@@ -7,8 +7,8 @@ const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 1000;
 
-// Cache configuration
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+// Cache configuration - Extended for gym users who want long-lasting cache
+const CACHE_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours (half a day) - much better for gym goers!
 const MAX_CACHE_SIZE = 100; // Maximum number of cached responses
 
 // Interface for cached response

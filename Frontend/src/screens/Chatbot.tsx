@@ -786,10 +786,7 @@ export default function Chatbot() {
                     end={{ x: 1, y: 0 }}
                     style={styles.botBubbleGradient}
                   >
-                    <RichTextRenderer
-                      text={message.text}
-                      baseStyle={styles.messageText}
-                    />
+                    <Text style={styles.messageText}>{message.text}</Text>
                   </LinearGradient>
                 </View>
               ) : (

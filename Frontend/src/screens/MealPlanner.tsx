@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import RecipeCategory from '../components/RecipeCategory';
 import RecipeCard from '../components/RecipeCard';
-import { getRandomRecipes, getRecipesByMealType, Recipe } from '../api/recipes';
+import { getRandomRecipes, getRecipesByMealType, searchRecipes, Recipe } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
 import apiService from '../utils/apiService';
 import { ServiceTokenType } from '../utils/tokenManager';
@@ -615,27 +615,40 @@ export default function MealPlanner() {
         loadUserData();
     }, [user, onboardingProfile, isOnboardingLoading, nutrientTotals, lastUpdated]);
 
-    // Function to load featured healthy and popular recipes
+    // Function to load featured gym-friendly recipes - NOW WITH CACHING & GYM-FRIENDLY SEARCH
     const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
 
-            // Fetch fresh recipes from API
-            console.log('🌐 Fetching fresh featured recipes from API');
-            const recipes = await getRandomRecipes(10); // Increased from 5 to 10 for better results
+            // Search for gym-friendly recipes instead of just "healthy" salads
+            console.log('Loading featured recipes (using cache if available)');
 
-            console.log(`Received ${recipes?.length || 0} recipes from API`);
+            // Mix of gym-friendly search terms to get variety - NO QUINOA SPAM!
+            const gymFriendlySearchTerms = [
+                'chicken breast', 'beef steak', 'grilled chicken', 'chicken pasta',
+                'beef stir fry', 'chicken rice', 'salmon fillet', 'turkey sandwich',
+                'chicken burrito', 'beef tacos', 'protein pancakes', 'chicken curry',
+                'beef noodles', 'chicken wrap', 'salmon bowl', 'turkey meatballs'
+            ];
 
-            // Log image URLs for debugging
-            recipes?.forEach((recipe, index) => {
-                console.log(`Recipe ${index + 1}: ${recipe.title}, Image: ${recipe.image || 'No image'}`);
-            });
+            // Pick a random search term for variety
+            const searchTerm = gymFriendlySearchTerms[Math.floor(Math.random() * gymFriendlySearchTerms.length)];
+
+            const searchResult = await searchRecipes(searchTerm, 15); // Search for 15 to have good selection
+            const recipes = searchResult.results || [];
+
+            console.log(`Received ${recipes?.length || 0} recipes for "${searchTerm}"`);
 
             if (recipes && recipes.length > 0) {
-                // Filter to recipes with valid images
+                // Filter to recipes with valid images and prefer higher protein/calories
                 const validRecipes = recipes.filter(recipe =>
                     recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
-                );
+                ).sort((a, b) => {
+                    // Prefer recipes with higher health scores (they tend to be more balanced)
+                    const scoreA = a.healthScore || 0;
+                    const scoreB = b.healthScore || 0;
+                    return scoreB - scoreA;
+                });
 
                 console.log(`Found ${validRecipes.length} recipes with valid images`);
 
@@ -643,11 +656,19 @@ export default function MealPlanner() {
                 const recipesToShow = validRecipes.slice(0, 5);
                 setFeaturedRecipes(recipesToShow);
 
-                console.log('✅ Featured recipes loaded successfully');
+                console.log('Featured recipes loaded and cached successfully');
+            } else {
+                // Fallback to random recipes if search fails
+                console.log('No recipes found, falling back to random recipes');
+                const fallbackRecipes = await getRandomRecipes(10);
+                const validFallback = fallbackRecipes.filter(recipe =>
+                    recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
+                );
+                setFeaturedRecipes(validFallback.slice(0, 5));
             }
         } catch (error) {
-            console.error('Error loading healthy popular recipes:', error);
-            Alert.alert('Error', 'Failed to load recipes. Please try again later.');
+            console.error('Error loading featured recipes:', error);
+            Alert.alert('Error', 'Failed to load featured recipes. Please try again later.');
         } finally {
             setIsLoading(false);
         }
@@ -793,7 +814,7 @@ export default function MealPlanner() {
                 )}
 
                 {/* Featured Recipes Section */}
-                <Text style={styles.sectionTitle}>Popular Healthy Recipes</Text>
+                <Text style={styles.sectionTitle}>Featured Recipes</Text>
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={PURPLE_ACCENT} />

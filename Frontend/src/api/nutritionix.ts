@@ -1,7 +1,6 @@
 import { BACKEND_URL } from '../utils/config';
 import axios from 'axios';
 import { supabase } from '../utils/supabaseClient';
-import tokenManager, { ServiceTokenType } from '../utils/tokenManager';
 
 // Backend API base URL
 const BACKEND_BASE_URL = BACKEND_URL;
@@ -11,39 +10,19 @@ const BACKEND_BASE_URL = BACKEND_URL;
  */
 const getAuthHeaders = async () => {
     try {
-        console.log('Getting auth headers...');
-
-        // First, try to get user from Supabase auth
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('Current user:', user ? 'Authenticated' : 'Not authenticated');
-
-        if (user) {
-            console.log('User ID:', user.id);
-            console.log('User email:', user.email);
-
-            try {
-                // Use tokenManager for faster token retrieval
-                console.time('tokenRetrieval');
-                const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
-                console.timeEnd('tokenRetrieval');
-
-                return {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                };
-            } catch (tokenError) {
-                console.error('Error getting auth token:', tokenError);
-                throw tokenError;
-            }
-        } else {
-            console.warn('No authenticated user found');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            throw new Error('User not authenticated');
         }
+
+        return {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+        };
     } catch (error) {
-        console.error('Error getting auth token:', error);
+        console.error('Error getting auth headers:', error);
+        throw error;
     }
-    return {
-        'Content-Type': 'application/json'
-    };
 };
 
 // Types
