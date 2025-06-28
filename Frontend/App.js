@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import LoadingScreen from './src/components/LoadingScreen';
 import { handleTakePhoto } from './src/screens/Camera';
 import { getDatabase } from './src/utils/database';
 import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
@@ -20,8 +21,10 @@ import { FoodLogProvider } from './src/context/FoodLogContext';
 
 // Import Supabase token manager for optimized authentication
 import tokenManager from './src/utils/tokenManager';
-// Import PermanentNotificationService
+// Import Enhanced Services
 import PermanentNotificationService from './src/services/PermanentNotificationService';
+import EnhancedPermanentNotificationService from './src/services/EnhancedPermanentNotificationService';
+import BackgroundStepTracker from './src/services/BackgroundStepTracker';
 import SettingsService from './src/services/SettingsService';
 
 import Home from "./src/screens/Home";
@@ -309,7 +312,13 @@ function AuthenticatedApp({ children }) {
 
 // Component for authenticated user content
 function AuthenticatedContent() {
-  const { onboardingComplete } = useOnboarding();
+  const { onboardingComplete, isLoading: onboardingLoading } = useOnboarding();
+  const { isPreloading } = useAuth();
+
+  // Show loading screen while either auth is preloading OR onboarding context is still loading
+  if (isPreloading || onboardingLoading) {
+    return <LoadingScreen message="Loading your profile..." />;
+  }
 
   if (!onboardingComplete) {
     // Continue onboarding flow after login
@@ -352,13 +361,9 @@ function AuthenticatedContent() {
 function AppNavigator() {
   const { user, isLoading } = useAuth();
 
-  // Show loading indicator while checking auth state
+  // Show loading screen while checking auth state
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#0074dd" />
-      </View>
-    );
+    return <LoadingScreen message="Checking authentication..." />;
   }
 
   return (
@@ -427,29 +432,45 @@ export default function App() {
           console.log('Running in Expo Go - Some features like permanent notifications will be disabled');
         }
 
-        // Initialize the permanent notification service
+        // Initialize enhanced services
         try {
-          await PermanentNotificationService.initialize();
+          // Initialize background step tracker
+          console.log('Initializing background step tracker...');
+          const stepAvailability = await BackgroundStepTracker.isAvailable();
+          if (stepAvailability.supported) {
+            await BackgroundStepTracker.startTracking();
+            console.log('Background step tracking started successfully');
+          } else {
+            console.log('Step tracking not supported on this device');
+          }
 
-          // Check if permanent notification should be enabled
+          // Initialize enhanced permanent notification service
+          console.log('Initializing enhanced permanent notifications...');
+          await EnhancedPermanentNotificationService.initialize();
+
+          if (EnhancedPermanentNotificationService.isNotificationAvailable()) {
+            await EnhancedPermanentNotificationService.startPermanentNotification();
+            console.log('Enhanced permanent notifications started successfully');
+          } else {
+            if (isExpoGo) {
+              console.log('Enhanced notifications available in limited mode in Expo Go (iOS scheduled notifications only)');
+            } else {
+              console.log('Enhanced notifications not available on this platform/configuration');
+            }
+          }
+
+          // Keep legacy notification service as fallback
+          await PermanentNotificationService.initialize();
           const settings = await SettingsService.getNotificationSettings();
-          if (settings.permanentNotification?.enabled) {
-            // Only try to start if Notifee is available
+          if (settings.permanentNotification?.enabled && !EnhancedPermanentNotificationService.isNotificationRunning()) {
             if (PermanentNotificationService.isNotificationAvailable()) {
               await PermanentNotificationService.startPermanentNotification();
-            } else {
-              if (isExpoGo) {
-                console.log('Permanent notifications are disabled in Expo Go.');
-                console.log('To use this feature, create a development build with: npm run build-dev');
-              } else {
-                console.log('Permanent notifications are enabled but Notifee is not available.');
-                console.log('To use this feature, create a development build with: npm run build-dev');
-              }
+              console.log('Legacy permanent notification started as fallback');
             }
           }
         } catch (error) {
-          console.error('Failed to initialize permanent notification:', error);
-          // Continue app initialization even if permanent notification fails
+          console.error('Failed to initialize enhanced services:', error);
+          // Continue app initialization even if services fail
         }
 
         // App is ready
@@ -464,11 +485,7 @@ export default function App() {
   }, []);
 
   if (!appIsReady) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-        <ActivityIndicator color="#FF00F5" size="large" />
-      </View>
-    );
+    return <LoadingScreen message="Initializing PlateMate..." />;
   }
 
   return (

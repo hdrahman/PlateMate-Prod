@@ -393,120 +393,94 @@ export const unsubscribeFromFoodLogChanges = (callback: () => void | Promise<voi
 };
 
 // Add a food log entry
-export const addFoodLog = async (foodLog: any) => {
-    const database = await getDatabase();
-
-    // Get current user ID from Firebase
-    const firebaseUserId = getCurrentUserId();
-    console.log('📝 Adding food log for user:', firebaseUserId);
-
-    // Set current timestamp
-    const timestamp = new Date().toISOString();
-
+export const addFoodLog = async (foodData: {
+    meal_id: string;
+    food_name: string;
+    brand_name?: string;
+    meal_type: string;
+    date: string;
+    quantity?: string;
+    weight?: number;
+    weight_unit?: string;
+    calories: number;
+    proteins: number;
+    carbs: number;
+    fats: number;
+    fiber?: number;
+    sugar?: number;
+    saturated_fat?: number;
+    polyunsaturated_fat?: number;
+    monounsaturated_fat?: number;
+    trans_fat?: number;
+    cholesterol?: number;
+    sodium?: number;
+    potassium?: number;
+    vitamin_a?: number;
+    vitamin_c?: number;
+    calcium?: number;
+    iron?: number;
+    healthiness_rating?: number;
+    notes?: string;
+    image_url: string;
+    file_key?: string;
+}) => {
     try {
-        // Format the meal data - Use Firebase UID directly as the user_id
-        const formattedData = {
-            meal_id: foodLog.meal_id || Math.floor(Math.random() * 1000000),
-            user_id: firebaseUserId, // Use Firebase UID directly
-            food_name: foodLog.food_name,
-            calories: foodLog.calories || 0,
-            proteins: foodLog.proteins || 0,
-            carbs: foodLog.carbs || 0,
-            fats: foodLog.fats || 0,
-            fiber: foodLog.fiber || 0,
-            sugar: foodLog.sugar || 0,
-            saturated_fat: foodLog.saturated_fat || 0,
-            polyunsaturated_fat: foodLog.polyunsaturated_fat || 0,
-            monounsaturated_fat: foodLog.monounsaturated_fat || 0,
-            trans_fat: foodLog.trans_fat || 0,
-            cholesterol: foodLog.cholesterol || 0,
-            sodium: foodLog.sodium || 0,
-            potassium: foodLog.potassium || 0,
-            vitamin_a: foodLog.vitamin_a || 0,
-            vitamin_c: foodLog.vitamin_c || 0,
-            calcium: foodLog.calcium || 0,
-            iron: foodLog.iron || 0,
-            image_url: foodLog.image_url || 'https://via.placeholder.com/150',
-            file_key: foodLog.file_key || 'default_file_key',
-            healthiness_rating: foodLog.healthiness_rating || 0,
-            date: foodLog.date || timestamp.split('T')[0],
-            meal_type: foodLog.meal_type || 'breakfast',
-            brand_name: foodLog.brand_name || '',
-            quantity: foodLog.quantity || '1 serving',
-            notes: foodLog.notes || '',
-            weight: foodLog.weight || null,
-            weight_unit: foodLog.weight_unit || 'g',
-            synced: 0,
-            sync_action: 'create',
-            last_modified: timestamp
-        };
+        const db = await getDatabase();
+        const userId = await getCurrentUserId();
 
-        // Log complete food entry data for debugging
-        console.log('📝 Food entry being added:', JSON.stringify(formattedData, null, 2));
-
-        // Build insert SQL with the correct number of placeholders (33)
-        const insertSQL = `INSERT INTO food_logs 
-          (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
-           fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
-           trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
-           calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
-           brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`;
+        if (!userId) {
+            throw new Error('No authenticated user found');
+        }
 
         // Insert into database
-        const result = await database.runAsync(insertSQL, [
-            formattedData.meal_id,
-            formattedData.user_id,
-            formattedData.food_name,
-            formattedData.calories,
-            formattedData.proteins,
-            formattedData.carbs,
-            formattedData.fats,
-            formattedData.fiber,
-            formattedData.sugar,
-            formattedData.saturated_fat,
-            formattedData.polyunsaturated_fat,
-            formattedData.monounsaturated_fat,
-            formattedData.trans_fat,
-            formattedData.cholesterol,
-            formattedData.sodium,
-            formattedData.potassium,
-            formattedData.vitamin_a,
-            formattedData.vitamin_c,
-            formattedData.calcium,
-            formattedData.iron,
-            formattedData.image_url,
-            formattedData.file_key,
-            formattedData.healthiness_rating,
-            formattedData.date,
-            formattedData.meal_type,
-            formattedData.brand_name,
-            formattedData.quantity,
-            formattedData.notes,
-            formattedData.weight,
-            formattedData.weight_unit,
-            formattedData.synced,
-            formattedData.sync_action,
-            formattedData.last_modified
-        ]);
-
-        // After insert, verify the entry was added by directly querying
-        console.log(`✅ Food log inserted with ID ${result.lastInsertRowId}, verifying...`);
-        const verifyEntry = await database.getFirstAsync(
-            `SELECT * FROM food_logs WHERE id = ?`,
-            [result.lastInsertRowId]
+        const result = await db.executeSql(
+            `INSERT INTO food_logs (
+                user_id, meal_id, food_name, brand_name, meal_type, date, 
+                quantity, weight, weight_unit, calories, proteins, carbs, fats,
+                fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
+                trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
+                calcium, iron, healthiness_rating, notes, image_url, file_key, synced
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            [
+                userId,
+                foodData.meal_id,
+                foodData.food_name,
+                foodData.brand_name || null,
+                foodData.meal_type,
+                foodData.date,
+                foodData.quantity || null,
+                foodData.weight || null,
+                foodData.weight_unit || 'g',
+                foodData.calories,
+                foodData.proteins,
+                foodData.carbs,
+                foodData.fats,
+                foodData.fiber || null,
+                foodData.sugar || null,
+                foodData.saturated_fat || null,
+                foodData.polyunsaturated_fat || null,
+                foodData.monounsaturated_fat || null,
+                foodData.trans_fat || null,
+                foodData.cholesterol || null,
+                foodData.sodium || null,
+                foodData.potassium || null,
+                foodData.vitamin_a || null,
+                foodData.vitamin_c || null,
+                foodData.calcium || null,
+                foodData.iron || null,
+                foodData.healthiness_rating || null,
+                foodData.notes || null,
+                foodData.image_url,
+                foodData.file_key || 'default_file_key'
+            ]
         );
-        console.log(`✅ Verification query result:`, verifyEntry ? 'Found' : 'Not found');
 
-        // Update user streak after logging food
-        await checkAndUpdateStreak(firebaseUserId);
+        // Track change for optimized sync
+        await trackDataChange('foodlog');
 
-        // Notify listeners about the data change
-        notifyDatabaseChanged();
-
-        return result.lastInsertRowId;
+        return result[0].insertId;
     } catch (error) {
-        console.error('❌ Error adding food log:', error);
+        console.error('Error adding food log:', error);
         throw error;
     }
 };
@@ -1130,6 +1104,12 @@ export const getStepsHistory = async (days: number = 7) => {
 export const updateTodaySteps = async (count: number) => {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
     return saveSteps(count, today);
+};
+
+// Get steps for today
+export const getTodaySteps = async (): Promise<number> => {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    return await getStepsForDate(today);
 };
 
 // Get unsynced steps for syncing to server

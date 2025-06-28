@@ -1,6 +1,7 @@
 import { Pedometer } from 'expo-sensors';
 import { updateTodaySteps, getStepsForDate, getStepsHistory } from './database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BackgroundStepTracker, { BackgroundStepTracker as BackgroundStepTrackerClass } from '../services/BackgroundStepTracker';
 
 // Keys for AsyncStorage
 const LAST_STEP_COUNT_KEY = 'LAST_STEP_COUNT';
@@ -147,4 +148,20 @@ class StepTracker {
 
 // Create a singleton instance
 const stepTracker = new StepTracker();
-export default stepTracker; 
+
+// Re-export the enhanced background step tracker as the main step tracker
+// This maintains compatibility with existing code while providing enhanced functionality
+export default BackgroundStepTracker;
+
+// Legacy compatibility exports
+export const stepTrackerLegacy = BackgroundStepTracker;
+
+// Re-export key methods for direct usage
+export const startTrackingLegacy = () => BackgroundStepTracker.startTracking();
+export const stopTrackingLegacy = () => BackgroundStepTracker.stopTracking();
+export const getTodayStepsLegacy = () => BackgroundStepTracker.getTodaySteps();
+export const getStepHistoryLegacy = (days?: number) => BackgroundStepTracker.getStepHistory(days);
+export const isAvailableLegacy = () => BackgroundStepTrackerClass.isAvailable();
+export const isCurrentlyTrackingLegacy = () => BackgroundStepTracker.isCurrentlyTracking();
+export const addListenerLegacy = (callback: (steps: number) => void) => BackgroundStepTracker.addListener(callback);
+export const removeListenerLegacy = (callback: (steps: number) => void) => BackgroundStepTracker.removeListener(callback); 

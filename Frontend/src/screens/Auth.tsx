@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Import types from our type definitions
 import '../types/expo-apple-authentication.d.ts';
@@ -253,6 +254,11 @@ const Auth = ({ navigation, route }: any) => {
             setConfirmPasswordVisible(false);
         }
     };
+
+    // Show loading screen if user is authenticated (prevents flash during navigation)
+    if (user) {
+        return <LoadingScreen message="Signing you in..." />;
+    }
 
     return (
         <View style={styles.container}>

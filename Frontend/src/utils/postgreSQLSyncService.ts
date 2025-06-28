@@ -21,6 +21,7 @@ import {
     updateUserGoals,
     updateUserProfile
 } from './database';
+import { AppState, AppStateStatus } from 'react-native';
 
 export interface SyncStats {
     usersUploaded: number;
@@ -61,47 +62,89 @@ class PostgreSQLSyncService {
     private lastSyncTime: Date | null = null;
     private isSyncing: boolean = false;
     private syncIntervalId: NodeJS.Timeout | null = null;
+    private changeTracker: Set<string> = new Set(); // Track what data has changed
+    private appStateSubscription: any = null;
+    private isAppActive: boolean = true;
 
     constructor() {
-        this.setupPeriodicSync();
+        this.setupEventDrivenSync();
     }
 
-    // Setup automatic sync every 24 hours if changes are detected
-    private setupPeriodicSync() {
+    // Setup event-driven sync instead of periodic sync
+    private setupEventDrivenSync() {
+        // Listen to app state changes
+        this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+
+        // Only sync when app becomes background after 24 hours and if changes exist
+        // Remove the hourly check interval
         if (this.syncIntervalId) {
             clearInterval(this.syncIntervalId);
+            this.syncIntervalId = null;
         }
-
-        // Check for sync every hour, but only sync if changes exist and it's been 24 hours
-        this.syncIntervalId = setInterval(async () => {
-            await this.checkAndPerformSync();
-        }, 60 * 60 * 1000); // 1 hour
     }
 
-    private async checkAndPerformSync() {
+    private handleAppStateChange(nextAppState: AppStateStatus) {
+        const wasActive = this.isAppActive;
+        this.isAppActive = nextAppState === 'active';
+
+        // If app is going to background and we have changes, check if we should sync
+        if (wasActive && nextAppState === 'background') {
+            this.checkAndPerformBackgroundSync();
+        }
+    }
+
+    private async checkAndPerformBackgroundSync() {
         try {
             const currentUser = await supabaseAuth.getCurrentUser();
             if (!currentUser) return;
 
-            // Check if 24 hours have passed since last sync
-            const now = new Date();
-            if (this.lastSyncTime && (now.getTime() - this.lastSyncTime.getTime()) < 24 * 60 * 60 * 1000) {
+            // Only sync if there are changes and it's been 24 hours
+            if (this.changeTracker.size === 0) {
+                console.log('📱 No changes to sync on background');
                 return;
             }
 
-            // Check if there are any unsynced changes
-            const hasChanges = await this.hasUnsyncedChanges();
-            if (hasChanges) {
-                console.log('🔄 Auto-sync triggered: Changes detected and 24 hours passed');
-                await this.syncToPostgreSQL();
+            const now = new Date();
+            if (this.lastSyncTime && (now.getTime() - this.lastSyncTime.getTime()) < 24 * 60 * 60 * 1000) {
+                console.log('📱 Sync skipped: 24 hours have not passed');
+                return;
             }
+
+            console.log('📱 Background sync triggered: Changes detected and 24 hours passed');
+            await this.syncToPostgreSQL();
+            this.changeTracker.clear();
         } catch (error) {
-            console.error('Error in automatic sync check:', error);
+            console.error('Error in background sync:', error);
         }
+    }
+
+    // Track changes to specific data types
+    public trackChange(dataType: 'user' | 'foodlog' | 'weight' | 'streak' | 'goals' | 'subscription' | 'cheatday') {
+        this.changeTracker.add(dataType);
+        console.log(`📝 Change tracked: ${dataType}`);
+    }
+
+    // Clear change tracking for specific data type
+    public clearChangeTracking(dataType?: string) {
+        if (dataType) {
+            this.changeTracker.delete(dataType);
+        } else {
+            this.changeTracker.clear();
+        }
+    }
+
+    // Remove the old periodic sync method
+    private async checkAndPerformSync() {
+        // This method is no longer needed - replaced with event-driven sync
     }
 
     private async hasUnsyncedChanges(): Promise<boolean> {
         try {
+            // If no changes tracked, skip expensive database queries
+            if (this.changeTracker.size === 0) {
+                return false;
+            }
+
             const currentUser = await supabaseAuth.getCurrentUser();
             if (!currentUser) return false;
 
@@ -1077,29 +1120,43 @@ class PostgreSQLSyncService {
 
     // Manual sync trigger
     async triggerManualSync(): Promise<SyncResult> {
+        // Clear change tracking since we're doing manual sync
+        this.changeTracker.clear();
         return this.syncToPostgreSQL();
     }
 
-    // Get sync status
     getSyncStatus() {
         return {
             lastSyncTime: this.lastSyncTime,
             isSyncing: this.isSyncing,
-            syncEnabled: this.syncIntervalId !== null
+            pendingChanges: Array.from(this.changeTracker),
+            isAppActive: this.isAppActive
         };
     }
 
-    // Disable automatic sync
     disableAutoSync() {
+        if (this.appStateSubscription) {
+            this.appStateSubscription?.remove();
+            this.appStateSubscription = null;
+        }
+        this.changeTracker.clear();
+        console.log('🔄 Auto-sync disabled');
+    }
+
+    enableAutoSync() {
+        if (!this.appStateSubscription) {
+            this.setupEventDrivenSync();
+        }
+        console.log('🔄 Auto-sync enabled');
+    }
+
+    // Clean up resources
+    destroy() {
+        this.disableAutoSync();
         if (this.syncIntervalId) {
             clearInterval(this.syncIntervalId);
             this.syncIntervalId = null;
         }
-    }
-
-    // Enable automatic sync
-    enableAutoSync() {
-        this.setupPeriodicSync();
     }
 }
 

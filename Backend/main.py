@@ -30,9 +30,15 @@ from routes.arli_ai import router as arli_ai_router
 from routes.deepseek import router as deepseek_router
 from routes.food import router as food_router
 from routes.recipes import router as recipes_router
+from routes.health import router as health_router
 
 # Add the import for connection pool
 from services.connection_pool import start_connection_pool, stop_connection_pool
+
+# Rate limiting imports
+from services.redis_connection import redis_manager, get_redis
+from services.rate_limiter import init_rate_limiter
+from middleware.rate_limiting import RateLimitMiddleware
 
 app = FastAPI()
 
@@ -114,6 +120,23 @@ async def startup_event():
     except Exception as e:
         print(f"❌ Error checking FatSecret credentials: {e}")
     
+    # Initialize Rate Limiting System
+    try:
+        rate_limiting_enabled = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
+        if rate_limiting_enabled:
+            # Initialize Redis
+            redis_client = await redis_manager.init_redis()
+            
+            # Initialize rate limiter
+            await init_rate_limiter(redis_client)
+            
+            print("✅ Rate limiting system initialized successfully")
+        else:
+            print("⚠️ Rate limiting is disabled")
+    except Exception as e:
+        print(f"❌ Failed to initialize rate limiting: {e}")
+        print("⚠️ The application will continue without rate limiting")
+    
     # Initialize connection pool
     start_connection_pool()
     print("Connection pool initialized")
@@ -122,6 +145,14 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Shutting down PlateMate API server...")
+    
+    # Clean up rate limiting system
+    try:
+        await redis_manager.close_redis()
+        print("🔄 Rate limiting system shut down")
+    except Exception as e:
+        print(f"⚠️ Error shutting down rate limiting: {e}")
+    
     await stop_connection_pool()
     print("Connection pool stopped")
 
@@ -136,6 +167,11 @@ async def custom_exception_handler(request: Request, exc: Exception):
     )
 
 # Add middleware in the correct order
+# Rate limiting middleware should be added first (after timeout)
+rate_limiting_enabled = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
+if rate_limiting_enabled:
+    app.add_middleware(RateLimitMiddleware)
+
 # The timeout middleware must be added before CORS middleware
 app.add_middleware(TimeoutMiddleware)
 
@@ -156,6 +192,7 @@ app.include_router(arli_ai_router)  # Using prefix from router definition
 app.include_router(deepseek_router)  # Using prefix from router definition
 app.include_router(food_router, prefix='/food', tags=['food'])
 app.include_router(recipes_router, prefix='/recipes', tags=['recipes'])
+app.include_router(health_router, tags=['health'])
 
 # Health check endpoints
 @app.get("/")

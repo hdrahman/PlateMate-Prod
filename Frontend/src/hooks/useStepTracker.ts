@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import stepTracker from '../utils/stepTracker';
+import BackgroundStepTracker, { BackgroundStepTracker as BackgroundStepTrackerClass } from '../services/BackgroundStepTracker';
 import { Pedometer } from 'expo-sensors';
 
 export interface StepHistoryItem {
@@ -45,11 +45,11 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             setLoading(true);
             try {
                 // Get today's steps
-                const steps = await stepTracker.getTodaySteps();
+                const steps = await BackgroundStepTracker.getTodaySteps();
                 setTodaySteps(steps);
 
                 // Get step history
-                const history = await stepTracker.getStepHistory(historyDays);
+                const history = await BackgroundStepTracker.getStepHistory(historyDays);
                 setStepHistory(history);
             } catch (error) {
                 console.error('Error loading step data:', error);
@@ -63,7 +63,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
     // Set up step counter listener
     useEffect(() => {
-        const unsubscribe = stepTracker.addListener((steps) => {
+        const unsubscribe = BackgroundStepTracker.addListener((steps) => {
             setTodaySteps(steps);
 
             // Also update history for today
@@ -94,13 +94,13 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
     const startTracking = async () => {
         if (!isAvailable) return;
 
-        await stepTracker.startTracking();
+        await BackgroundStepTracker.startTracking();
         setIsTracking(true);
     };
 
     // Stop tracking steps
     const stopTracking = () => {
-        stepTracker.stopTracking();
+        BackgroundStepTracker.stopTracking();
         setIsTracking(false);
     };
 
