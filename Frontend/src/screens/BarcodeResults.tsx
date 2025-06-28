@@ -11,7 +11,8 @@ import {
     Alert,
     ActivityIndicator,
     Dimensions,
-    Modal
+    Modal,
+    Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -626,6 +627,18 @@ const BarcodeResults: React.FC = () => {
                     </View>
                 )}
 
+                {/* FatSecret Attribution */}
+                <View style={styles.attributionContainer}>
+                    <Text
+                        style={styles.attributionText}
+                        onPress={() => {
+                            Linking.openURL('https://www.fatsecret.com');
+                        }}
+                    >
+                        Powered by fatsecret
+                    </Text>
+                </View>
+
                 {/* Bottom spacing for fixed button */}
                 <View style={{ height: 100 }} />
             </ScrollView>
@@ -1230,6 +1243,19 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: GRAY_LIGHT,
         fontWeight: '500',
+    },
+    attributionContainer: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    attributionText: {
+        fontSize: 12,
+        color: GRAY_MEDIUM,
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
 });
 

@@ -12,13 +12,14 @@ import {
     Alert,
     Modal,
     TextInput,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFoodLogById, updateFoodLog, getFoodLogsByMealId } from '../utils/database';
+import { getFoodLogById, updateFoodLog, getFoodLogsByMealId, addFoodLog } from '../utils/database';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -284,6 +285,65 @@ const FoodDetailScreen: React.FC = () => {
         }
     };
 
+    const handleQuickAdd = async () => {
+        if (!foodData) return;
+
+        try {
+            // Create a new food log entry with today's date
+            const today = new Date().toISOString().split('T')[0];
+            const newFoodLogEntry = {
+                meal_id: Math.floor(Math.random() * 1000000), // Generate new meal ID
+                user_id: foodData.user_id,
+                food_name: foodData.food_name,
+                calories: foodData.calories,
+                proteins: foodData.proteins,
+                carbs: foodData.carbs,
+                fats: foodData.fats,
+                fiber: foodData.fiber,
+                sugar: foodData.sugar,
+                saturated_fat: foodData.saturated_fat,
+                polyunsaturated_fat: foodData.polyunsaturated_fat,
+                monounsaturated_fat: foodData.monounsaturated_fat,
+                trans_fat: foodData.trans_fat,
+                cholesterol: foodData.cholesterol,
+                sodium: foodData.sodium,
+                potassium: foodData.potassium,
+                vitamin_a: foodData.vitamin_a,
+                vitamin_c: foodData.vitamin_c,
+                calcium: foodData.calcium,
+                iron: foodData.iron,
+                weight: foodData.weight,
+                weight_unit: foodData.weight_unit,
+                image_url: foodData.image_url,
+                file_key: foodData.file_key,
+                healthiness_rating: foodData.healthiness_rating,
+                date: today,
+                meal_type: foodData.meal_type,
+                brand_name: foodData.brand_name,
+                quantity: foodData.quantity,
+                notes: foodData.notes,
+                synced: 0,
+                sync_action: 'create',
+                last_modified: new Date().toISOString()
+            };
+
+            await addFoodLog(newFoodLogEntry);
+
+            Alert.alert(
+                'Success',
+                'Food item added to today\'s log!',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Error adding food log:', error);
+            Alert.alert(
+                'Error',
+                'Failed to add food item. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={styles.loadingContainer}>
@@ -307,6 +367,23 @@ const FoodDetailScreen: React.FC = () => {
     }
 
     const macroPercentages = getMacroPercentages();
+
+    // Determine if we should show the FatSecret attribution
+    const shouldShowAttribution = (() => {
+        if (!foodData) return false;
+
+        // Show attribution if:
+        // 1. The notes field references a scanned item (barcode or product)
+        // 2. The image URL points to a remote resource (manual search results typically have remote images)
+        //    Local images for GPT or manual entries usually start with "file://" or are empty.
+        const notesText = foodData.notes?.toLowerCase() || '';
+        const isScanned = notesText.includes('scanned');
+
+        const imageUrl = foodData.image_url || '';
+        const isRemoteImage = imageUrl.startsWith('http');
+
+        return isScanned || isRemoteImage;
+    })();
 
     return (
         <View style={styles.container}>
@@ -462,6 +539,17 @@ const FoodDetailScreen: React.FC = () => {
                 ]}>
                     {/* Calories Section */}
                     <View style={styles.calorieSection}>
+                        {/* Quick Add Button - Top (positioned absolutely) */}
+                        <TouchableOpacity
+                            style={styles.quickAddButtonTop}
+                            onPress={handleQuickAdd}
+                        >
+                            <View style={styles.quickAddButtonContent}>
+                                <Ionicons name="add" size={14} color="#4CAF50" />
+                                <Text style={styles.quickAddButtonText}>Add</Text>
+                            </View>
+                        </TouchableOpacity>
+
                         <View style={styles.calorieAlignmentContainer}>
                             <View style={styles.calorieRow}>
                                 <Text style={styles.calorieNumber}>{foodData?.calories}</Text>
@@ -560,6 +648,31 @@ const FoodDetailScreen: React.FC = () => {
                             </View>
                         )}
                     </View>
+
+                    {/* Quick Add Button - Bottom */}
+                    <TouchableOpacity
+                        style={styles.quickAddButtonBottom}
+                        onPress={handleQuickAdd}
+                    >
+                        <View style={styles.quickAddButtonContent}>
+                            <Ionicons name="add" size={18} color="#4CAF50" />
+                            <Text style={styles.quickAddButtonTextBottom}>Quick Add</Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* FatSecret Attribution - show conditionally */}
+                    {shouldShowAttribution && (
+                        <View style={styles.attributionContainer}>
+                            <Text
+                                style={styles.attributionText}
+                                onPress={() => {
+                                    Linking.openURL('https://www.fatsecret.com');
+                                }}
+                            >
+                                Powered by fatsecret
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Bottom Spacing */}
                     <View style={{ height: 60 }} />
@@ -856,6 +969,7 @@ const styles = StyleSheet.create({
         paddingTop: 20, // Increased from 10 to 20
         paddingBottom: 5,
         marginBottom: 24,
+        position: 'relative',
     },
     calorieAlignmentContainer: {
         alignItems: 'flex-start',
@@ -939,7 +1053,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     detailsSection: {
-        marginBottom: 40,
+        marginBottom: 8,
     },
     nutrientGroup: {
         backgroundColor: 'rgba(255,255,255,0.04)',
@@ -1241,6 +1355,58 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
         marginLeft: 10,
+    },
+    quickAddButtonTop: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        borderWidth: 1.5,
+        borderColor: '#4CAF50',
+        borderRadius: 20,
+        backgroundColor: 'transparent',
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        zIndex: 10,
+    },
+    quickAddButtonBottom: {
+        marginTop: 8,
+        marginBottom: 16,
+        marginHorizontal: 20,
+        borderWidth: 2,
+        borderColor: '#4CAF50',
+        borderRadius: 8,
+        backgroundColor: 'transparent',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+    },
+    quickAddButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickAddButtonText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 3,
+    },
+    quickAddButtonTextBottom: {
+        color: '#4CAF50',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    attributionContainer: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    attributionText: {
+        fontSize: 12,
+        color: SUBDUED,
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
 });
 

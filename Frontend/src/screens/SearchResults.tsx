@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    FlatList, ActivityIndicator, TextInput, StatusBar, Platform
+    FlatList, ActivityIndicator, TextInput, StatusBar, Platform, Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from '../components/RecipeCard';
-import { Recipe, searchRecipes, RecipeSearchParams } from '../api/recipes';
+import { Recipe, searchRecipes } from '../api/recipes';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -71,38 +71,13 @@ export default function SearchResults() {
     const [loading, setLoading] = useState(true);
     const [filtering, setFiltering] = useState(false);
 
-    // Prepare search params from route
-    const getSearchParams = (): RecipeSearchParams => {
-        const params: RecipeSearchParams = {};
-
-        if (route.params?.query) {
-            params.query = route.params.query;
-        } else if (searchQuery) {
-            params.query = searchQuery;
-        }
-
-        if (route.params?.cuisine) {
-            params.cuisine = route.params.cuisine;
-        }
-
-        if (route.params?.diet) {
-            params.diet = route.params.diet;
-        }
-
-        if (route.params?.includeIngredients) {
-            params.includeIngredients = route.params.includeIngredients;
-        }
-
-        return params;
-    };
-
     const handleSearchSubmit = async () => {
         if (!searchQuery.trim()) return;
 
         try {
             setFiltering(true);
-            const params = getSearchParams();
-            const results = await searchRecipes(params);
+            const query = route.params?.query || searchQuery;
+            const results = await searchRecipes(query, 20);
             setRecipes(results);
         } catch (error) {
             console.error('Error searching for recipes:', error);
@@ -115,8 +90,8 @@ export default function SearchResults() {
         const fetchRecipes = async () => {
             try {
                 setLoading(true);
-                const searchParams = getSearchParams();
-                const results = await searchRecipes(searchParams);
+                const query = route.params?.query || searchQuery;
+                const results = await searchRecipes(query, 20);
                 setRecipes(results);
             } catch (error) {
                 console.error('Error searching for recipes:', error);
@@ -186,7 +161,7 @@ export default function SearchResults() {
                         </Text>
                         <FlatList
                             data={recipes}
-                            keyExtractor={(item) => item.id}
+                            keyExtractor={(item) => item.id.toString()}
                             renderItem={({ item }) => (
                                 <View style={styles.recipeCardContainer}>
                                     <RecipeCard recipe={item} onPress={handleRecipePress} />
@@ -194,6 +169,18 @@ export default function SearchResults() {
                             )}
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={styles.listContent}
+                            ListFooterComponent={() => (
+                                <View style={styles.attributionContainer}>
+                                    <Text
+                                        style={styles.attributionText}
+                                        onPress={() => {
+                                            Linking.openURL('https://www.fatsecret.com');
+                                        }}
+                                    >
+                                        Powered by fatsecret
+                                    </Text>
+                                </View>
+                            )}
                         />
                     </>
                 ) : (
@@ -331,5 +318,18 @@ const styles = StyleSheet.create({
     gradientBorderContainer: {
         borderRadius: 10,
         overflow: 'hidden',
+    },
+    attributionContainer: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    attributionText: {
+        fontSize: 12,
+        color: SUBDUED,
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
 });

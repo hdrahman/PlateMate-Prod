@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase, useFocusEffect } from '@react-navigation/native';
 import RecipeCard from '../components/RecipeCard';
@@ -180,6 +180,18 @@ export default function RecipeResults() {
                             onPress={handleRecipePress}
                         />
                     ))}
+
+                    {/* FatSecret Attribution */}
+                    <View style={styles.attributionContainer}>
+                        <Text
+                            style={styles.attributionText}
+                            onPress={() => {
+                                Linking.openURL('https://www.fatsecret.com');
+                            }}
+                        >
+                            Powered by fatsecret
+                        </Text>
+                    </View>
                 </ScrollView>
             )}
         </SafeAreaView>
@@ -271,5 +283,18 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         marginTop: 8,
+    },
+    attributionContainer: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    attributionText: {
+        fontSize: 12,
+        color: SUBDUED,
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
 }); 

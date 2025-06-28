@@ -12,6 +12,7 @@ import {
     ActivityIndicator,
     Dimensions,
     Modal,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -642,6 +643,18 @@ const ScannedProduct: React.FC = () => {
                     </TouchableOpacity>
                 </Modal>
 
+                {/* FatSecret Attribution */}
+                <View style={styles.attributionContainer}>
+                    <Text
+                        style={styles.attributionText}
+                        onPress={() => {
+                            Linking.openURL('https://www.fatsecret.com');
+                        }}
+                    >
+                        Powered by fatsecret
+                    </Text>
+                </View>
+
                 {/* Bottom spacing for fixed button */}
                 <View style={{ height: 120 }} />
             </ScrollView>
@@ -1147,6 +1160,19 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.GRAY_LIGHT,
         fontWeight: '500',
+    },
+    attributionContainer: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    attributionText: {
+        fontSize: 12,
+        color: COLORS.GRAY_LIGHT,
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
 });
 
