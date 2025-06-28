@@ -890,14 +890,14 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 10,
-        paddingTop: 20, // Add padding to handle notch area
+        paddingTop: 5,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingVertical: 6,
     },
     scrollView: {
         flex: 1,
