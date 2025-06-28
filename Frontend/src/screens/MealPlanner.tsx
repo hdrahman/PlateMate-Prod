@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
     ScrollView, TextInput, Platform, Alert,
-    ActivityIndicator, FlatList, Keyboard
+    ActivityIndicator, FlatList, Keyboard, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -869,6 +869,18 @@ export default function MealPlanner() {
                         </View>
                     </View>
                 </GradientBorderCard>
+
+                {/* FatSecret Attribution */}
+                <View style={styles.attributionContainer}>
+                    <Text
+                        style={styles.attributionText}
+                        onPress={() => {
+                            Linking.openURL('https://www.fatsecret.com');
+                        }}
+                    >
+                        Powered by fatsecret
+                    </Text>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -1192,5 +1204,18 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: SUBDUED,
         marginLeft: 8,
+    },
+    attributionContainer: {
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    attributionText: {
+        fontSize: 12,
+        color: SUBDUED,
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
 });
