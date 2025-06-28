@@ -174,6 +174,26 @@ const FoodDetailScreen: React.FC = () => {
         return Math.min(Math.round((value / dv) * 100), 100);
     };
 
+    // Helper to safely format ISO date strings (YYYY-MM-DD or full ISO) into local date without UTC offset issues
+    const formatLocalDate = (isoDateString: string | undefined): string => {
+        if (!isoDateString) return '';
+
+        // Extract just the date portion if a time component exists
+        const datePart = isoDateString.split('T')[0]; // YYYY-MM-DD
+        const parts = datePart.split('-');
+        if (parts.length !== 3) {
+            // Fallback to native formatting if unexpected format encountered
+            return new Date(isoDateString).toLocaleDateString();
+        }
+
+        const [year, month, day] = parts.map(Number);
+
+        // Construct a date in local timezone to avoid UTC conversion shifting the day
+        const localDateObj = new Date(year, month - 1, day);
+
+        return localDateObj.toLocaleDateString();
+    };
+
     // Render nutrient row with progress bar
     const renderNutrientRowWithProgress = (
         icon: string,
@@ -459,7 +479,7 @@ const FoodDetailScreen: React.FC = () => {
                                 {/* Meal type and date with edit button on the right */}
                                 <View style={styles.metaContainer}>
                                     <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                        {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                                        {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
                                     </Text>
                                     <TouchableOpacity
                                         style={styles.editButton}
@@ -516,7 +536,7 @@ const FoodDetailScreen: React.FC = () => {
                                     {/* Meal type and date with edit button on the right */}
                                     <View style={styles.metaContainer}>
                                         <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                            {foodData?.meal_type} • {foodData && new Date(foodData.date).toLocaleDateString()}
+                                            {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
                                         </Text>
                                         <TouchableOpacity
                                             style={styles.editButton}

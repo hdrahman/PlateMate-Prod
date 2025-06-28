@@ -444,51 +444,51 @@ export const addFoodLog = async (foodLog: any) => {
         // Log complete food entry data for debugging
         console.log('📝 Food entry being added:', JSON.stringify(formattedData, null, 2));
 
-        // Insert into database
-        const result = await database.runAsync(
-            `INSERT INTO food_logs 
+        // Build insert SQL with the correct number of placeholders (33)
+        const insertSQL = `INSERT INTO food_logs 
           (meal_id, user_id, food_name, calories, proteins, carbs, fats, 
            fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat, 
            trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c, 
            calcium, iron, image_url, file_key, healthiness_rating, date, meal_type, 
            brand_name, quantity, notes, weight, weight_unit, synced, sync_action, last_modified) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-            [
-                formattedData.meal_id,
-                formattedData.user_id,
-                formattedData.food_name,
-                formattedData.calories,
-                formattedData.proteins,
-                formattedData.carbs,
-                formattedData.fats,
-                formattedData.fiber,
-                formattedData.sugar,
-                formattedData.saturated_fat,
-                formattedData.polyunsaturated_fat,
-                formattedData.monounsaturated_fat,
-                formattedData.trans_fat,
-                formattedData.cholesterol,
-                formattedData.sodium,
-                formattedData.potassium,
-                formattedData.vitamin_a,
-                formattedData.vitamin_c,
-                formattedData.calcium,
-                formattedData.iron,
-                formattedData.image_url,
-                formattedData.file_key,
-                formattedData.healthiness_rating,
-                formattedData.date,
-                formattedData.meal_type,
-                formattedData.brand_name,
-                formattedData.quantity,
-                formattedData.notes,
-                formattedData.weight,
-                formattedData.weight_unit,
-                formattedData.synced,
-                formattedData.sync_action,
-                formattedData.last_modified
-            ]
-        );
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`;
+
+        // Insert into database
+        const result = await database.runAsync(insertSQL, [
+            formattedData.meal_id,
+            formattedData.user_id,
+            formattedData.food_name,
+            formattedData.calories,
+            formattedData.proteins,
+            formattedData.carbs,
+            formattedData.fats,
+            formattedData.fiber,
+            formattedData.sugar,
+            formattedData.saturated_fat,
+            formattedData.polyunsaturated_fat,
+            formattedData.monounsaturated_fat,
+            formattedData.trans_fat,
+            formattedData.cholesterol,
+            formattedData.sodium,
+            formattedData.potassium,
+            formattedData.vitamin_a,
+            formattedData.vitamin_c,
+            formattedData.calcium,
+            formattedData.iron,
+            formattedData.image_url,
+            formattedData.file_key,
+            formattedData.healthiness_rating,
+            formattedData.date,
+            formattedData.meal_type,
+            formattedData.brand_name,
+            formattedData.quantity,
+            formattedData.notes,
+            formattedData.weight,
+            formattedData.weight_unit,
+            formattedData.synced,
+            formattedData.sync_action,
+            formattedData.last_modified
+        ]);
 
         // After insert, verify the entry was added by directly querying
         console.log(`✅ Food log inserted with ID ${result.lastInsertRowId}, verifying...`);
