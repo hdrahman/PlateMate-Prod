@@ -25,8 +25,11 @@ def check_env_file():
             break
     
     if not env_file:
-        logger.error("Could not find .env file")
-        return False
+        # Log as info instead of error because in production environments (e.g., Render),
+        # configuration is often provided directly via environment variables rather than a file.
+        # Returning True prevents upstream callers (main.py) from printing a noisy failure message.
+        #logger.info(".env file not found; assuming variables are provided via Render or system environment.")
+        return True
     
     try:
         # Read the file as binary to detect null characters

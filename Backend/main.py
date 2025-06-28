@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
@@ -198,6 +198,12 @@ app.include_router(health_router, tags=['health'])
 @app.get("/")
 def home():
     return {'message': "FastAPI backend services are running!"}
+
+# Add explicit HEAD handler for Render or other load balancers that issue HEAD requests
+@app.head("/")
+def home_head():
+    """Health check endpoint for HEAD requests (e.g., from Render)"""
+    return Response(status_code=200)
 
 @app.get("/health")
 async def health_check():
