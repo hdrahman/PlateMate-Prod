@@ -153,7 +153,8 @@ async def shutdown_event():
     except Exception as e:
         print(f"⚠️ Error shutting down rate limiting: {e}")
     
-    await stop_connection_pool()
+    # stop_connection_pool is a synchronous function – don't await it
+    stop_connection_pool()
     print("Connection pool stopped")
 
 # Custom Exception Handler to Log Full Errors
