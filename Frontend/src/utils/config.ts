@@ -5,8 +5,8 @@ import Constants from 'expo-constants';
 // Get the local IP address from Expo Constants for physical device testing
 // This helps connect to your development machine when using Expo Go
 const getLocalIpAddress = () => {
-    if (Constants.manifest && Constants.manifest.debuggerHost) {
-        return Constants.manifest.debuggerHost.split(':').shift();
+    if (Constants.manifest && (Constants.manifest as any).debuggerHost) {
+        return (Constants.manifest as any).debuggerHost.split(':').shift();
     }
     return '172.31.90.70'; // Fallback to the updated IP
 };
@@ -19,7 +19,7 @@ const DEV_BACKEND_URL = Platform.OS === 'web'
     : `http://${getLocalIpAddress()}:8000`; // Use the dynamically detected IP
 
 // Backend URL - dynamically set based on platform
-export const BACKEND_URL = DEV_BACKEND_URL;
+export const BACKEND_URL = 'https://platemateserver.onrender.com';
 
 // Check if we're in development environment
 export const isDebug = __DEV__;
