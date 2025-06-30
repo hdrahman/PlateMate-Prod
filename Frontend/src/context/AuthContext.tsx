@@ -115,8 +115,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // If user just logged out, stop services
             if (!authUser && previousUserId) {
                 try {
-                    const { stopPeriodicSync } = await import('../utils/syncService');
-                    await stopPeriodicSync();
+                    // Clean up sync listeners on logout
+                    try {
+                        postgreSQLSyncService.destroy();
+                    } catch (error) {
+                        console.warn('Error cleaning up sync services:', error);
+                    }
                     console.log('🔄 User logged out, services stopped');
                 } catch (error) {
                     console.warn('Error stopping services on logout:', error);
@@ -137,10 +141,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     // Initialize token manager for authenticated users only
                     await tokenManager.initialize();
 
-                    // Start sync services for authenticated users only
-                    const { startPeriodicSync, setupOnlineSync } = await import('../utils/syncService');
-                    startPeriodicSync();
-                    setupOnlineSync();
+                    // Initialize the new 6-hour PostgreSQL backup sync on app launch
+                    postgreSQLSyncService.initializeOnAppLaunch().catch(err => console.warn('Sync init error', err));
 
                     // Check if local database is empty and restore from PostgreSQL if needed
                     const localProfile = await getUserProfileBySupabaseUid(authUser.id);
@@ -248,14 +250,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign out
     const signOut = async () => {
         try {
-            // Stop sync services when signing out
-            try {
-                const { stopPeriodicSync } = await import('../utils/syncService');
-                await stopPeriodicSync();
-            } catch (error) {
-                console.warn('Error stopping sync services:', error);
-            }
-
             // Clear all tokens
             await tokenManager.clearAllTokens();
 

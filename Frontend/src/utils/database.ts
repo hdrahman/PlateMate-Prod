@@ -213,6 +213,16 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ onboarding_temp table created successfully');
 
+        // Create sync_log table to track last backup sync time and status
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        last_sync TEXT,
+        sync_status TEXT
+      )
+    `);
+        console.log('✅ sync_log table created/verified successfully');
+
         // Create nutrition_goals table
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS nutrition_goals (

@@ -22,6 +22,11 @@ import {
     updateUserProfile
 } from './database';
 import { AppState, AppStateStatus } from 'react-native';
+import { subscribeToDatabaseChanges } from './databaseWatcher';
+import { getLastSyncTime, updateLastSyncTime } from './database';
+import { isLikelyOffline } from './networkUtils';
+
+const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 export interface SyncStats {
     usersUploaded: number;
@@ -65,9 +70,17 @@ class PostgreSQLSyncService {
     private changeTracker: Set<string> = new Set(); // Track what data has changed
     private appStateSubscription: any = null;
     private isAppActive: boolean = true;
+    private pendingSync: boolean = false;
+    private dbChangeUnsubscribe: (() => void) | null = null;
 
     constructor() {
         this.setupEventDrivenSync();
+        // Listen for database changes so we know when local data mutated
+        this.dbChangeUnsubscribe = subscribeToDatabaseChanges(() => {
+            // Track a generic change and decide if we should sync
+            this.trackChange('user'); // type not important – just indicates change
+            this.maybeSyncAfterChange();
+        });
     }
 
     // Setup event-driven sync instead of periodic sync
@@ -75,8 +88,7 @@ class PostgreSQLSyncService {
         // Listen to app state changes
         this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
 
-        // Only sync when app becomes background after 24 hours and if changes exist
-        // Remove the hourly check interval
+        // Remove any leftover periodic sync
         if (this.syncIntervalId) {
             clearInterval(this.syncIntervalId);
             this.syncIntervalId = null;
@@ -98,23 +110,92 @@ class PostgreSQLSyncService {
             const currentUser = await supabaseAuth.getCurrentUser();
             if (!currentUser) return;
 
-            // Only sync if there are changes and it's been 24 hours
-            if (this.changeTracker.size === 0) {
-                console.log('📱 No changes to sync on background');
+            if (!(await this.hasUnsyncedChanges())) {
+                console.log('📱 No unsynced changes detected for background sync');
                 return;
             }
 
-            const now = new Date();
-            if (this.lastSyncTime && (now.getTime() - this.lastSyncTime.getTime()) < 24 * 60 * 60 * 1000) {
-                console.log('📱 Sync skipped: 24 hours have not passed');
+            if (!this.isIntervalElapsed()) {
+                console.log('📱 Background sync skipped – 6-hour interval not reached');
                 return;
             }
 
-            console.log('📱 Background sync triggered: Changes detected and 24 hours passed');
+            console.log('📱 Background sync triggered');
             await this.syncToPostgreSQL();
-            this.changeTracker.clear();
         } catch (error) {
             console.error('Error in background sync:', error);
+        }
+    }
+
+    private async isOnline(): Promise<boolean> {
+        try {
+            return !(await isLikelyOffline());
+        } catch (_) {
+            return false;
+        }
+    }
+
+    private isIntervalElapsed(): boolean {
+        const now = Date.now();
+        if (!this.lastSyncTime) return true;
+        return (now - this.lastSyncTime.getTime()) >= SYNC_INTERVAL_MS;
+    }
+
+    private async maybeSyncAfterChange(): Promise<void> {
+        if (this.isSyncing) return;
+        if (!(await this.hasUnsyncedChanges())) return;
+
+        if (!(await this.isOnline())) {
+            console.log('🚫 Device offline – marking sync as pending');
+            this.pendingSync = true;
+            await updateLastSyncTime('pending');
+            return;
+        }
+
+        if (this.isIntervalElapsed()) {
+            await this.syncToPostgreSQL();
+        } else {
+            console.log('⏳ Sync interval not yet elapsed – will sync later');
+            this.pendingSync = true;
+            await updateLastSyncTime('pending');
+        }
+    }
+
+    // Load metadata at app start
+    private async loadMeta(): Promise<void> {
+        try {
+            const meta = await getLastSyncTime();
+            if (meta && meta.lastSync) {
+                this.lastSyncTime = new Date(meta.lastSync);
+            }
+            this.pendingSync = meta?.syncStatus === 'pending';
+        } catch (err) {
+            console.warn('Failed to load sync metadata', err);
+        }
+    }
+
+    public async initializeOnAppLaunch(): Promise<void> {
+        await this.loadMeta();
+
+        const currentUser = await supabaseAuth.getCurrentUser();
+        if (!currentUser) return;
+
+        // If user has no backup yet, push immediately
+        const postgresUserId = await this.getPostgreSQLUserId(currentUser.id);
+        if (!postgresUserId) {
+            console.log('📤 No remote backup detected – pushing initial backup');
+            await this.syncToPostgreSQL();
+            return;
+        }
+
+        // If pending or interval elapsed with changes, attempt sync
+        if (this.pendingSync && (await this.hasUnsyncedChanges())) {
+            await this.syncToPostgreSQL();
+            return;
+        }
+
+        if (await this.hasUnsyncedChanges() && this.isIntervalElapsed()) {
+            await this.syncToPostgreSQL();
         }
     }
 
@@ -196,6 +277,27 @@ class PostgreSQLSyncService {
             throw new Error('Sync already in progress');
         }
 
+        if (!(await this.isOnline())) {
+            console.log('🚫 Cannot sync – device offline');
+            this.pendingSync = true;
+            await updateLastSyncTime('pending');
+            return {
+                success: false,
+                stats: {
+                    usersUploaded: 0,
+                    foodLogsUploaded: 0,
+                    weightsUploaded: 0,
+                    streaksUploaded: 0,
+                    nutritionGoalsUploaded: 0,
+                    subscriptionsUploaded: 0,
+                    cheatDaySettingsUploaded: 0,
+                    totalErrors: 1,
+                    lastSyncTime: new Date().toISOString()
+                },
+                errors: ['Device offline']
+            };
+        }
+
         this.isSyncing = true;
         const errors: string[] = [];
         const stats: SyncStats = {
@@ -241,6 +343,8 @@ class PostgreSQLSyncService {
 
             this.lastSyncTime = new Date();
             stats.totalErrors = errors.length;
+            this.pendingSync = false;
+            await updateLastSyncTime('success');
 
             console.log('✅ PostgreSQL sync completed:', stats);
 
@@ -254,6 +358,7 @@ class PostgreSQLSyncService {
             console.error('❌ PostgreSQL sync failed:', error);
             errors.push(`Sync failed: ${error.message}`);
             stats.totalErrors = errors.length;
+            await updateLastSyncTime('error');
 
             return {
                 success: false,
@@ -275,7 +380,12 @@ class PostgreSQLSyncService {
             // Check if user exists in PostgreSQL
             let postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
 
-            const userData = {
+            // Ensure starting_weight is present – default to current weight if missing
+            const startingWeightValue = (userProfile.starting_weight !== null && userProfile.starting_weight !== undefined)
+                ? userProfile.starting_weight
+                : userProfile.weight;
+
+            const rawUserData = {
                 firebase_uid: userProfile.firebase_uid,
                 email: userProfile.email,
                 first_name: userProfile.first_name,
@@ -285,7 +395,7 @@ class PostgreSQLSyncService {
                 height: userProfile.height,
                 weight: userProfile.weight,
                 target_weight: userProfile.target_weight,
-                starting_weight: userProfile.starting_weight,
+                starting_weight: startingWeightValue,
                 age: userProfile.age,
                 location: userProfile.location,
                 timezone: userProfile.timezone || 'UTC',
@@ -330,6 +440,16 @@ class PostgreSQLSyncService {
                 onboarding_complete: Boolean(userProfile.onboarding_complete),
                 updated_at: new Date().toISOString()
             };
+
+            // Sanitize: convert empty strings or invalid numbers to null
+            const userData: Record<string, any> = {};
+            Object.entries(rawUserData).forEach(([key, value]) => {
+                if (value === '' || value === undefined) {
+                    userData[key] = null;
+                } else {
+                    userData[key] = value;
+                }
+            });
 
             if (postgresUserId) {
                 // Update existing user
@@ -689,7 +809,7 @@ class PostgreSQLSyncService {
         }
     }
 
-    // Restore data from PostgreSQL to SQLite (when local storage is empty)
+    // Restore data from PostgreSQL to SQLite (Backup)
     async restoreFromPostgreSQL(): Promise<RestoreResult> {
         const errors: string[] = [];
         const stats: RestoreStats = {
@@ -714,7 +834,8 @@ class PostgreSQLSyncService {
             // Get PostgreSQL user ID
             const postgresUserId = await this.getPostgreSQLUserId(currentUser.id);
             if (!postgresUserId) {
-                console.log('ℹ️ User not found in PostgreSQL - nothing to restore');
+                console.log('ℹ️ User not found in PostgreSQL - performing initial backup instead');
+                await this.syncToPostgreSQL();
                 return { success: true, stats, errors };
             }
 
@@ -1156,6 +1277,9 @@ class PostgreSQLSyncService {
         if (this.syncIntervalId) {
             clearInterval(this.syncIntervalId);
             this.syncIntervalId = null;
+        }
+        if (this.dbChangeUnsubscribe) {
+            this.dbChangeUnsubscribe();
         }
     }
 }
