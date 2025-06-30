@@ -21,6 +21,7 @@ import {
   addWeightEntryLocal,
   clearWeightHistoryLocal
 } from '../utils/database';
+import { useOnboarding } from '../context/OnboardingContext';
 
 import {
   View,
@@ -117,6 +118,7 @@ export default function Home() {
   const navigation = useNavigation();
   const { isDarkTheme } = useContext(ThemeContext);
   const { user } = useAuth();
+  const { onboardingComplete } = useOnboarding();
   const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
   // Keep track of which "page" (card) we are on in the horizontal scroll
@@ -248,18 +250,18 @@ export default function Home() {
             defaultAddress: null,
             preferredDeliveryTimes: [],
             deliveryInstructions: null,
-            pushNotificationsEnabled: profile.push_notifications_enabled,
-            emailNotificationsEnabled: profile.email_notifications_enabled,
-            smsNotificationsEnabled: profile.sms_notifications_enabled,
-            marketingEmailsEnabled: profile.marketing_emails_enabled,
+            pushNotificationsEnabled: !!profile.push_notifications_enabled,
+            emailNotificationsEnabled: !!profile.email_notifications_enabled,
+            smsNotificationsEnabled: !!profile.sms_notifications_enabled,
+            marketingEmailsEnabled: !!profile.marketing_emails_enabled,
             paymentMethods: [],
             billingAddress: null,
             defaultPaymentMethodId: null,
             preferredLanguage: profile.preferred_language || 'en',
             timezone: profile.timezone || 'UTC',
-            darkMode: profile.dark_mode,
-            syncDataOffline: profile.sync_data_offline
-          });
+            darkMode: !!profile.dark_mode,
+            syncDataOffline: !!profile.sync_data_offline
+          } as any);
 
           console.log('📋 Calculated nutrition goals:', {
             calories: goals.calories,
@@ -982,18 +984,11 @@ export default function Home() {
     const setStartingWeightTo110 = async () => {
       if (user) {
         try {
-          // Import the onboarding context to check completion status
-          const { useOnboarding } = require('../context/OnboardingContext');
-
-          // Skip this if onboarding is not complete to avoid conflicts
-          const { onboardingComplete } = useOnboarding() || { onboardingComplete: false };
+          // Skip if onboarding has not completed to avoid conflicts
           if (!onboardingComplete) {
             console.log("🔄 Skipping automatic weight update - onboarding not complete yet");
             return;
           }
-
-          // Import the proper database functions instead of using direct SQL
-          const { getUserProfileBySupabaseUid, updateUserProfile } = require('../utils/database');
 
           console.log("Checking if user profile exists...");
 
@@ -1045,7 +1040,7 @@ export default function Home() {
     return () => clearTimeout(timer);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, currentWeight]);
+  }, [user, currentWeight, onboardingComplete]);
 
   // Load cheat day data
   const loadCheatDayData = async () => {
