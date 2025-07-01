@@ -68,6 +68,10 @@ class EnhancedPermanentNotificationService {
     private lastNotificationData: any = null;
     private isAppActive: boolean = true;
 
+    // Added: unsubscribe handles for Notifee event listeners so we can cleanly detach them
+    private foregroundEventUnsubscribe: (() => void) | null = null;
+    private backgroundEventUnsubscribe: (() => void) | null = null;
+
     // Singleton pattern
     public static getInstance(): EnhancedPermanentNotificationService {
         if (!EnhancedPermanentNotificationService.instance) {
@@ -183,15 +187,17 @@ class EnhancedPermanentNotificationService {
         try {
             await notifee.createChannel({
                 id: this.ANDROID_CHANNEL_ID,
-                name: 'PlateMate Fitness Tracker',
-                description: 'Persistent nutrition and fitness tracking with foreground service',
+                name: 'PlateMate Daily Stats',
+                description: 'Real-time nutrition and fitness tracking with visual progress indicators',
                 lights: false,
                 vibration: false,
                 importance: AndroidImportance.LOW,
                 sound: null, // Silent for battery optimization
+                badge: true,
+                bypassDnd: false,
             });
 
-            console.log('📱 Android notification channel created for foreground service');
+            console.log('📱 Android notification channel created for enhanced foreground service');
         } catch (error) {
             console.error('Failed to create Android notification channel:', error);
         }
@@ -281,14 +287,38 @@ class EnhancedPermanentNotificationService {
                     channelId: this.ANDROID_CHANNEL_ID,
                     ongoing: true,
                     asForegroundService: true,
-                    color: AndroidColor.BLUE,
+                    color: AndroidColor.GREEN,
                     colorized: true,
                     smallIcon: 'ic_launcher',
+                    largeIcon: 'ic_launcher',
                     pressAction: {
                         id: 'default',
                     },
+                    importance: AndroidImportance.LOW,
+                    autoCancel: false,
+                    showTimestamp: true,
+                    category: 'status',
                 },
             });
+
+            // Register listeners to recreate the notification if the user dismisses it
+            if (!this.foregroundEventUnsubscribe) {
+                this.foregroundEventUnsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
+                    if (type === EventType.DISMISSED && detail?.notification?.id === this.ANDROID_NOTIFICATION_ID) {
+                        console.log('🔄 PlateMate notification dismissed (foreground) – recreating');
+                        await this.updateAndroidNotification();
+                    }
+                });
+            }
+
+            if (!this.backgroundEventUnsubscribe) {
+                this.backgroundEventUnsubscribe = notifee.onBackgroundEvent(async ({ type, detail }) => {
+                    if (type === EventType.DISMISSED && detail?.notification?.id === this.ANDROID_NOTIFICATION_ID) {
+                        console.log('🔄 PlateMate notification dismissed (background) – recreating');
+                        await this.updateAndroidNotification();
+                    }
+                });
+            }
 
             console.log('📱 Android foreground service started');
         } catch (error) {
@@ -312,8 +342,8 @@ class EnhancedPermanentNotificationService {
 
     private async scheduleIOSBackgroundNotifications(): Promise<void> {
         try {
-            const trigger = {
-                type: 'timeInterval' as const,
+            const trigger: Notifications.TimeIntervalTriggerInput = {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
                 seconds: this.settings.updateInterval * 60,
                 repeats: true,
             };
@@ -350,6 +380,16 @@ class EnhancedPermanentNotificationService {
                 // Stop foreground service
                 await notifee.stopForegroundService();
                 await notifee.cancelNotification(this.ANDROID_NOTIFICATION_ID);
+
+                // Clean up event listeners
+                if (this.foregroundEventUnsubscribe) {
+                    this.foregroundEventUnsubscribe();
+                    this.foregroundEventUnsubscribe = null;
+                }
+                if (this.backgroundEventUnsubscribe) {
+                    this.backgroundEventUnsubscribe();
+                    this.backgroundEventUnsubscribe = null;
+                }
             } else if (Platform.OS === 'ios') {
                 await this.cancelScheduledIOSNotifications();
             }
@@ -431,16 +471,22 @@ class EnhancedPermanentNotificationService {
                     channelId: this.ANDROID_CHANNEL_ID,
                     ongoing: true,
                     asForegroundService: true,
-                    color: AndroidColor.BLUE,
+                    color: AndroidColor.GREEN,
                     colorized: true,
                     smallIcon: 'ic_launcher',
+                    largeIcon: 'ic_launcher',
                     pressAction: {
                         id: 'default',
                     },
                     style: {
-                        type: 1, // BigTextStyle
+                        type: 1, // BigTextStyle for better readability
                         text: body,
+                        title: title,
                     },
+                    importance: AndroidImportance.LOW,
+                    autoCancel: false,
+                    showTimestamp: true,
+                    category: 'status',
                 },
             });
         } catch (error) {
@@ -453,8 +499,8 @@ class EnhancedPermanentNotificationService {
             const userId = await getCurrentUserId();
             if (!userId) {
                 return {
-                    title: 'PlateMate Active',
-                    body: 'Tracking your nutrition and fitness...',
+                    title: '🍽️ PlateMate',
+                    body: '📊 Ready to track your nutrition and fitness journey',
                     calories: 0,
                     protein: 0
                 };
@@ -466,26 +512,59 @@ class EnhancedPermanentNotificationService {
                 getUserGoals(userId)
             ]);
 
-            // Build notification content based on settings
-            const contentParts: string[] = [];
+            // Calculate progress percentages
+            const calorieGoal = userGoals?.calorieGoal || 2000;
+            const proteinGoal = userGoals?.proteinGoal || 150;
+            const calorieProgress = Math.min(Math.round((todayCalories / calorieGoal) * 100), 100);
+            const proteinProgress = Math.min(Math.round((todayProtein / proteinGoal) * 100), 100);
 
-            if (this.settings.showCalories && userGoals?.calorieGoal) {
-                const calorieProgress = Math.round((todayCalories / userGoals.calorieGoal) * 100);
-                contentParts.push(`📊 Calories: ${todayCalories}/${userGoals.calorieGoal} (${calorieProgress}%)`);
+            // Generate visual progress bars
+            const generateProgressBar = (percentage: number, length: number = 8): string => {
+                const filled = Math.round((percentage / 100) * length);
+                const empty = length - filled;
+                return '█'.repeat(filled) + '░'.repeat(empty);
+            };
+
+            // Build structured notification content
+            const sections: string[] = [];
+
+            // Calorie section with visual progress
+            if (this.settings.showCalories) {
+                const calorieBar = generateProgressBar(calorieProgress);
+                const remaining = Math.max(0, calorieGoal - todayCalories);
+                
+                sections.push(`🔥 Calories Remaining:`);
+                sections.push(`${calorieBar} ${calorieProgress}%`);
+                sections.push(`${remaining.toLocaleString()} kcal`);
+                sections.push(''); // Spacing
             }
 
-            if (this.settings.showProtein && userGoals?.proteinGoal) {
-                const proteinProgress = Math.round((todayProtein / userGoals.proteinGoal) * 100);
-                contentParts.push(`🥩 Protein: ${todayProtein}g/${userGoals.proteinGoal}g (${proteinProgress}%)`);
+            // Protein section with visual progress
+            if (this.settings.showProtein) {
+                const proteinBar = generateProgressBar(proteinProgress);
+                
+                sections.push(`💪 Protein:`);
+                sections.push(`${proteinBar} ${proteinProgress}%`);
+                sections.push(`${Math.round(todayProtein)}g eaten`);
+                sections.push(''); // Spacing
             }
 
+            // Next meal information
             if (this.settings.showNextMeal) {
                 const nextMeal = this.calculateNextMealTime();
-                contentParts.push(`⏰ Next meal: ${nextMeal}`);
+                sections.push(nextMeal);
+                sections.push(''); // Spacing
             }
 
-            const title = 'PlateMate - Fitness Tracker';
-            const body = contentParts.length > 0 ? contentParts.join('\n') : 'Tracking your progress...';
+            // Enhanced title with current status
+            const title = `🍽️ PlateMate`;
+            
+            // Remove trailing empty lines and join
+            const body = sections.filter((section, index) => {
+                // Remove empty lines at the end
+                if (section === '' && index === sections.length - 1) return false;
+                return true;
+            }).join('\n');
 
             return {
                 title,
@@ -496,8 +575,8 @@ class EnhancedPermanentNotificationService {
         } catch (error) {
             console.error('Error generating notification content:', error);
             return {
-                title: 'PlateMate Active',
-                body: 'Tracking your nutrition and fitness...',
+                title: '🍽️ PlateMate',
+                body: '📊 Tracking your nutrition and fitness journey\n\n🔄 Tap to refresh your progress',
                 calories: 0,
                 protein: 0
             };
@@ -507,24 +586,52 @@ class EnhancedPermanentNotificationService {
     private calculateNextMealTime(): string {
         const now = new Date();
         const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
 
-        // Suggested meal times
+        // More detailed meal times with better descriptions
         const mealTimes = [
-            { name: 'Breakfast', hour: 8 },
-            { name: 'Lunch', hour: 13 },
-            { name: 'Dinner', hour: 19 },
+            { name: 'Breakfast', hour: 8, minute: 0, emoji: '🌅' },
+            { name: 'Morning Snack', hour: 10, minute: 30, emoji: '🍎' },
+            { name: 'Lunch', hour: 13, minute: 0, emoji: '🥗' },
+            { name: 'Afternoon Snack', hour: 15, minute: 30, emoji: '🥜' },
+            { name: 'Dinner', hour: 19, minute: 0, emoji: '🍽️' },
+            { name: 'Evening Snack', hour: 21, minute: 0, emoji: '🍓' },
         ];
 
+        // Convert current time to minutes for easier comparison
+        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
         for (const meal of mealTimes) {
-            if (currentHour < meal.hour) {
-                const timeUntil = meal.hour - currentHour;
-                return `${meal.name} in ${timeUntil}h`;
+            const mealTimeInMinutes = meal.hour * 60 + meal.minute;
+            
+            if (currentTimeInMinutes < mealTimeInMinutes) {
+                const timeDiff = mealTimeInMinutes - currentTimeInMinutes;
+                const hoursUntil = Math.floor(timeDiff / 60);
+                const minutesUntil = timeDiff % 60;
+
+                if (hoursUntil > 0) {
+                    if (minutesUntil > 0) {
+                        return `${meal.emoji} ${meal.name} in ${hoursUntil}h ${minutesUntil}m`;
+                    } else {
+                        return `${meal.emoji} ${meal.name} in ${hoursUntil}h`;
+                    }
+                } else {
+                    return `${meal.emoji} ${meal.name} in ${minutesUntil}m`;
+                }
             }
         }
 
-        // If past dinner time, suggest tomorrow's breakfast
-        const hoursUntilBreakfast = (24 - currentHour) + 8;
-        return `Breakfast in ${hoursUntilBreakfast}h`;
+        // If past all meal times, suggest tomorrow's breakfast
+        const tomorrowBreakfast = mealTimes[0];
+        const minutesUntilTomorrow = (24 * 60) - currentTimeInMinutes + (tomorrowBreakfast.hour * 60 + tomorrowBreakfast.minute);
+        const hoursUntilBreakfast = Math.floor(minutesUntilTomorrow / 60);
+        const minutesRemaining = minutesUntilTomorrow % 60;
+
+        if (hoursUntilBreakfast > 1) {
+            return `${tomorrowBreakfast.emoji} Tomorrow's ${tomorrowBreakfast.name} in ${hoursUntilBreakfast}h`;
+        } else {
+            return `${tomorrowBreakfast.emoji} Tomorrow's ${tomorrowBreakfast.name} in ${hoursUntilBreakfast}h ${minutesRemaining}m`;
+        }
     }
 
     async updateSettings(newSettings: Partial<NotificationSettings>): Promise<void> {
@@ -588,6 +695,16 @@ class EnhancedPermanentNotificationService {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
+        }
+
+        // Clean up Notifee listeners if any remain
+        if (this.foregroundEventUnsubscribe) {
+            this.foregroundEventUnsubscribe();
+            this.foregroundEventUnsubscribe = null;
+        }
+        if (this.backgroundEventUnsubscribe) {
+            this.backgroundEventUnsubscribe();
+            this.backgroundEventUnsubscribe = null;
         }
 
         this.isRunning = false;

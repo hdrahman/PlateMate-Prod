@@ -154,25 +154,28 @@ class PermanentNotificationService {
     }
 
     async startPermanentNotification(): Promise<void> {
-        if (this.isExpoGo || this.isRunning || !this.isNotifeeAvailable || !this.notifeeModule || Platform.OS !== 'android') {
-            if (this.isExpoGo) {
-                console.log('Cannot start permanent notification: Running in Expo Go');
-            } else if (!this.isNotifeeAvailable) {
-                console.warn('Cannot start permanent notification: Notifee not available');
-            }
+        // Expo Go and non-Android platforms do not support persistent foreground notifications
+        if (this.isExpoGo || Platform.OS !== 'android') {
+            console.log('Permanent notifications are only supported on a native Android build');
+            return;
+        }
+
+        if (this.isRunning) {
+            // Already running – nothing to do
+            return;
+        }
+
+        // Ensure the Notifee native module is available before continuing
+        if (!this.isNotifeeAvailable) {
+            await this.checkNotifeeAvailability();
+        }
+
+        if (!this.isNotifeeAvailable || !this.notifeeModule) {
+            console.warn('Cannot start permanent notification: Notifee native module not available');
             return;
         }
 
         try {
-            // Check if Notifee is available (it might have become available since initialization)
-            if (!this.isNotifeeAvailable) {
-                await this.checkNotifeeAvailability();
-                if (!this.isNotifeeAvailable) {
-                    console.warn('Cannot start permanent notification: Notifee not available');
-                    return;
-                }
-            }
-
             // Create the notification channel if it doesn't exist
             await this.createNotificationChannel();
 

@@ -8,6 +8,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { addFoodLog } from '../utils/database';
+import { getDefaultMealType } from '../utils/mealTypeUtils';
 import { barcodeService } from '../services/BarcodeService';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -39,7 +40,7 @@ type RootStackParamList = {
     ImageCapture: { mealType: string; foodData?: any; photoUri?: string; sourcePage?: string };
     BarcodeResults: { foodData: any; mealType?: string };
     ScannedProduct: { foodData: any; mealType?: string };
-    'Food Log': { refresh?: number };
+    FoodLog: { refresh?: number };
     Camera: undefined;
     BarcodeScanner: undefined;
     MainTabs: { screen: string };
@@ -155,7 +156,7 @@ export default function BarcodeScannerScreen() {
                 // Navigate to the new ScannedProduct screen
                 navigation.navigate('ScannedProduct', {
                     foodData,
-                    mealType: 'Snacks'
+                    mealType: getDefaultMealType()
                 });
             } else {
                 console.log('No food data found in any API');
@@ -221,7 +222,7 @@ export default function BarcodeScannerScreen() {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 navigation.navigate('ImageCapture', {
-                    mealType: 'Snacks',
+                    mealType: getDefaultMealType(),
                     photoUri: result.assets[0].uri,
                     sourcePage: 'BarcodeScanner'
                 });
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
-        paddingTop: StatusBar.currentHeight || 16,
+        paddingTop: 16,
         backgroundColor: 'transparent',
         position: 'absolute',
         top: 0,

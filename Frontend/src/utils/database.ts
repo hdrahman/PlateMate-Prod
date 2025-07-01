@@ -436,7 +436,14 @@ export const addFoodLog = async (foodData: {
 }) => {
     try {
         const db = await getDatabase();
-        const userId = await getCurrentUserId();
+        // Use async version to ensure we get a valid authenticated user ID when available
+        let userId: string;
+        try {
+            userId = await getCurrentUserIdAsync();
+        } catch (idErr) {
+            console.warn('⚠️ Falling back to cached/anonymous user id due to error fetching async user id:', idErr);
+            userId = getCurrentUserId();
+        }
 
         if (!userId) {
             throw new Error('No authenticated user found');
@@ -445,7 +452,7 @@ export const addFoodLog = async (foodData: {
         // Insert into database
         const result = await db.executeSql(
             `INSERT INTO food_logs (
-                user_id, meal_id, food_name, brand_name, meal_type, date, 
+                user_id, meal_id, food_name, brand_name, meal_type, date,
                 quantity, weight, weight_unit, calories, proteins, carbs, fats,
                 fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
                 trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
@@ -607,7 +614,14 @@ export const getFoodLogsByDate = async (date: string) => {
         throw new Error('Database not initialized');
     }
 
-    const firebaseUserId = getCurrentUserId();
+    // Ensure we fetch a reliable user id asynchronously
+    let firebaseUserId: string;
+    try {
+        firebaseUserId = await getCurrentUserIdAsync();
+    } catch (idErr) {
+        console.warn('⚠️ Falling back to cached/anonymous user id due to error fetching async user id:', idErr);
+        firebaseUserId = getCurrentUserId();
+    }
     console.log(`🔍 Looking for food logs with date=${date} and user_id=${firebaseUserId}`);
 
     try {

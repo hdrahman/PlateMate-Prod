@@ -35,7 +35,7 @@ import { supabase } from '../utils/supabaseClient';
 
 // Define navigation type
 type RootStackParamList = {
-    'Food Log': { refresh?: number };
+    FoodLog: { refresh?: number };
     Manual: { mealType?: string; sourcePage?: string };
     Camera: undefined;
     BarcodeScanner: undefined;
@@ -221,6 +221,7 @@ export default function Manual() {
     const params = route.params as { mealType?: string; sourcePage?: string };
     const defaultMealType = params?.mealType || 'Breakfast';
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItemType[]>([]);
     const [recentEntries, setRecentEntries] = useState<FoodItemType[]>([]);
@@ -322,8 +323,9 @@ export default function Manual() {
 
             setIsLoading(true);
 
-            // Use the food log context to add the entry
-            await addFoodEntryWithContext(food, finalMealType, quantity, 1, foodLogContext);
+            // Use the food log context to add the entry with the correct authenticated user ID
+            const currentUserId: string = (user as any)?.uid || (user as any)?.id || 'anonymous';
+            await addFoodEntryWithContext(food, finalMealType, quantity, currentUserId as any, foodLogContext);
 
             Alert.alert('Success', `Added ${food.food_name} to your ${finalMealType} log`, [
                 {
@@ -339,7 +341,7 @@ export default function Manual() {
                         setShowFoodDetails(false);
 
                         // Navigate back to Food Log with refresh parameter
-                        navigation.navigate('Food Log', { refresh: Date.now() });
+                        navigation.navigate('FoodLog', { refresh: Date.now() });
                     }
                 }
             ]);

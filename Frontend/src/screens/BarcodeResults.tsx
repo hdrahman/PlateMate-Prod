@@ -37,7 +37,7 @@ const { width, height } = Dimensions.get('window');
 
 // Navigation types
 type RootStackParamList = {
-    'Food Log': { refresh?: number };
+    FoodLog: { refresh?: number };
     BarcodeResults: { foodData: any; mealType?: string };
     BarcodeScanner: undefined;
     Manual: undefined;
@@ -290,7 +290,7 @@ const BarcodeResults: React.FC = () => {
 
             if (result) {
                 // Automatically navigate to Food Log
-                navigation.navigate('Food Log', { refresh: Date.now() });
+                navigation.navigate('FoodLog', { refresh: Date.now() });
             } else {
                 throw new Error('Failed to add food log entry');
             }

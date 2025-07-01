@@ -159,17 +159,45 @@ class BackgroundStepTracker {
         if (Platform.OS !== 'android') return true;
 
         try {
+            console.log('📱 Requesting Android permissions for step tracking...');
+            
+            // Check if permissions are already granted
+            const activityRecognitionStatus = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION);
+            const bodySensorsStatus = await PermissionsAndroid.check('android.permission.BODY_SENSORS');
+            
+            if (activityRecognitionStatus && bodySensorsStatus) {
+                console.log('✅ Step tracking permissions already granted');
+                this.hasPermissions = true;
+                return true;
+            }
+
+            // Request permissions
             const granted = await PermissionsAndroid.requestMultiple([
                 PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
-                'android.permission.BODY_SENSORS_BACKGROUND',
+                'android.permission.BODY_SENSORS',
             ]);
 
-            this.hasPermissions =
-                granted[PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION] === PermissionsAndroid.RESULTS.GRANTED;
+            const activityGranted = granted[PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION] === PermissionsAndroid.RESULTS.GRANTED;
+            const sensorsGranted = granted['android.permission.BODY_SENSORS'] === PermissionsAndroid.RESULTS.GRANTED;
+
+            this.hasPermissions = activityGranted;
+
+            if (activityGranted) {
+                console.log('✅ Activity Recognition permission granted');
+            } else {
+                console.log('❌ Activity Recognition permission denied');
+            }
+
+            if (sensorsGranted) {
+                console.log('✅ Body Sensors permission granted');
+            } else {
+                console.log('⚠️ Body Sensors permission denied (step tracking may be limited)');
+            }
 
             return this.hasPermissions;
         } catch (error) {
             console.error('Error requesting Android permissions:', error);
+            this.hasPermissions = false;
             return false;
         }
     }
@@ -502,6 +530,11 @@ class BackgroundStepTracker {
 
         this.listeners.clear();
         console.log('🧹 Background step tracker destroyed');
+    }
+
+    // Instance method for checking availability (matches API usage pattern)
+    async isAvailable(): Promise<{ supported: boolean; hasPermissions: boolean }> {
+        return BackgroundStepTracker.isAvailable();
     }
 }
 

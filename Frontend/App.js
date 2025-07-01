@@ -24,7 +24,7 @@ import tokenManager from './src/utils/tokenManager';
 // Import Enhanced Services
 import PermanentNotificationService from './src/services/PermanentNotificationService';
 import EnhancedPermanentNotificationService from './src/services/EnhancedPermanentNotificationService';
-import BackgroundStepTracker from './src/services/BackgroundStepTracker';
+import BackgroundStepTrackerInstance, { BackgroundStepTracker } from './src/services/BackgroundStepTracker';
 import SettingsService from './src/services/SettingsService';
 
 import Home from "./src/screens/Home";
@@ -436,9 +436,9 @@ export default function App() {
         try {
           // Initialize background step tracker
           console.log('Initializing background step tracker...');
-          const stepAvailability = await BackgroundStepTracker.isAvailable();
+          const stepAvailability = await BackgroundStepTrackerInstance.isAvailable();
           if (stepAvailability.supported) {
-            await BackgroundStepTracker.startTracking();
+            await BackgroundStepTrackerInstance.startTracking();
             console.log('Background step tracking started successfully');
           } else {
             console.log('Step tracking not supported on this device');

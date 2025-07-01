@@ -180,6 +180,7 @@ export default function NotificationsScreen() {
             if (Device.isDevice) {
                 const { status } = await Notifications.requestPermissionsAsync();
                 setHasPermission(status === 'granted');
+                setPermissionStatus(status);
 
                 if (status !== 'granted') {
                     Alert.alert(
@@ -934,7 +935,6 @@ export default function NotificationsScreen() {
                                                 selectedValue={selectedHour}
                                                 onValueChange={(value) => setSelectedHour(value)}
                                                 itemHeight={40}
-                                                containerHeight={160}
                                                 containerStyle={{ width: 80 }}
                                             />
                                         </View>
@@ -950,7 +950,6 @@ export default function NotificationsScreen() {
                                                 selectedValue={selectedMinute}
                                                 onValueChange={(value) => setSelectedMinute(value)}
                                                 itemHeight={40}
-                                                containerHeight={160}
                                                 containerStyle={{ width: 80 }}
                                             />
                                         </View>
@@ -964,7 +963,6 @@ export default function NotificationsScreen() {
                                                 selectedValue={selectedAmPm}
                                                 onValueChange={(value) => setSelectedAmPm(value)}
                                                 itemHeight={40}
-                                                containerHeight={160}
                                                 containerStyle={{ width: 80 }}
                                             />
                                         </View>
@@ -1005,7 +1003,6 @@ const styles = StyleSheet.create({
         height: 60,
         paddingHorizontal: 16,
         backgroundColor: PRIMARY_BG,
-        marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     backButton: {
         padding: 8,

@@ -7,11 +7,12 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getDefaultMealType } from '../utils/mealTypeUtils';
 
 // Define navigation types
 type RootStackParamList = {
     ImageCapture: { mealType: string; photoUri?: string; sourcePage?: string };
-    'Food Log': undefined;
+    FoodLog: undefined;
     Camera: undefined;
     BarcodeScanner: undefined;
     MainTabs: { screen: string };
@@ -133,7 +134,7 @@ export default function CameraScreen() {
 
             // Navigate to ImageCapture with the photo URI
             navigation.navigate('ImageCapture', {
-                mealType: 'Snacks',
+                mealType: getDefaultMealType(),
                 photoUri: photo.uri,
                 sourcePage: 'Camera'
             });
@@ -152,7 +153,7 @@ export default function CameraScreen() {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 navigation.navigate('ImageCapture', {
-                    mealType: 'Snacks',
+                    mealType: getDefaultMealType(),
                     photoUri: result.assets[0].uri,
                     sourcePage: 'Camera'
                 });
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'flex-start',
         alignItems: 'center',
-        paddingTop: 210,
+        paddingTop: 120,
     },
     // Scanner frame styles
     scanFrame: {

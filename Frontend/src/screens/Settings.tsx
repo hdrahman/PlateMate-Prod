@@ -5,7 +5,6 @@ import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { resetCurrentUserOnboarding } from "../utils/resetOnboarding";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
@@ -19,49 +18,6 @@ const SettingsScreen = () => {
         } catch (error) {
             Alert.alert('Logout Error', 'Failed to log out. Please try again.');
         }
-    };
-
-    const handleCheckOnboardingStatus = async () => {
-        try {
-            const { checkOnboardingStatus } = await import('../utils/resetOnboarding');
-            await checkOnboardingStatus();
-            Alert.alert('Debug', 'Onboarding status has been logged to console. Check the logs for details.');
-        } catch (error) {
-            Alert.alert('Error', 'Failed to check onboarding status.');
-        }
-    };
-
-    const handleResetOnboarding = async () => {
-        Alert.alert(
-            'Reset Onboarding',
-            'This will reset your onboarding status and you will need to go through the onboarding process again. Are you sure?',
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Reset',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            const success = await resetCurrentUserOnboarding();
-                            if (success) {
-                                Alert.alert(
-                                    'Success',
-                                    'Onboarding has been reset successfully. Please restart the app to see the onboarding flow.',
-                                    [{ text: 'OK' }]
-                                );
-                            } else {
-                                Alert.alert('Error', 'Failed to reset onboarding. Please try again.');
-                            }
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to reset onboarding. Please try again.');
-                        }
-                    },
-                },
-            ]
-        );
     };
 
     return (
@@ -159,33 +115,6 @@ const SettingsScreen = () => {
                                 <Ionicons name="document-text-outline" size={20} color="#C0C0C0" />
                             </View>
                             <Text style={styles.itemText}>Privacy Policy</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Developer</Text>
-                    <View style={styles.card}>
-                        <TouchableOpacity style={styles.item} onPress={handleCheckOnboardingStatus}>
-                            <View style={[styles.iconBubble, { backgroundColor: '#00BFFF30' }]}>
-                                <Ionicons name="information-circle-outline" size={20} color="#00BFFF" />
-                            </View>
-                            <Text style={styles.itemText}>Check Onboarding Status</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={handleResetOnboarding}>
-                            <View style={[styles.iconBubble, { backgroundColor: '#FF700030' }]}>
-                                <Ionicons name="refresh-outline" size={20} color="#FF7000" />
-                            </View>
-                            <Text style={styles.itemText}>Reset Onboarding</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("DebugOnboarding")}>
-                            <View style={[styles.iconBubble, { backgroundColor: '#9B00FF30' }]}>
-                                <Ionicons name="bug-outline" size={20} color="#9B00FF" />
-                            </View>
-                            <Text style={styles.itemText}>Debug Onboarding Data</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
                     </View>

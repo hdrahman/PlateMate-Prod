@@ -193,13 +193,28 @@ const ImageCapture: React.FC = () => {
                 console.log(`Image file size: ${fileInfo.size} bytes`);
             }
 
+            if (!fileInfo.exists) {
+                throw new Error('Image file does not exist');
+            }
+
+            // Extract file extension and create proper filename
+            const fileExtension = uri.split('.').pop() || 'jpg';
+            const fileName = `image_${Date.now()}.${fileExtension}`;
+
+            console.log(`📷 Processing single image upload: ${uri}`);
+
             const formData = new FormData();
             formData.append('user_id', '1');
-            formData.append('image', {
-                uri,
-                type: 'image/jpeg',
-                name: fileInfo.uri.split('/').pop(),
-            } as any);
+
+            // Use Android-compatible file object structure (NO blobs!)
+            const fileObject = {
+                uri: uri,
+                type: `image/${fileExtension}`,
+                name: fileName,
+            };
+
+            formData.append('image', fileObject as any);
+            console.log(`✅ Added image to FormData: ${fileName}`);
 
             // Get Supabase auth token
             const { data: { session } } = await supabase.auth.getSession();
@@ -208,12 +223,13 @@ const ImageCapture: React.FC = () => {
             }
             const token = session.access_token;
 
-            console.log('Sending request to backend...');
+            console.log('📤 Sending single image to backend...');
             const response = await fetch(`${BACKEND_URL}/images/upload-image`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'multipart/form-data',
+                    // CRITICAL: Do NOT set Content-Type for FormData in Android
+                    // Let the native implementation set the boundary automatically
                     'Authorization': `Bearer ${token}`,
                 },
                 body: formData,
@@ -223,7 +239,9 @@ const ImageCapture: React.FC = () => {
             console.log(`Upload + Analysis time: ${(endTime - startTime) / 1000} seconds`);
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`Upload failed with status ${response.status}:`, errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
@@ -310,6 +328,54 @@ const ImageCapture: React.FC = () => {
         }
     };
 
+    // Add debugging helper for network issues
+    const debugNetworkIssue = async () => {
+        try {
+            console.log('🔍 Starting network diagnostics...');
+            console.log(`📱 Platform: ${Platform.OS}`);
+            console.log(`🌐 Backend URL: ${BACKEND_URL}`);
+
+            // Test basic connectivity
+            console.log('🏥 Testing basic connectivity...');
+            const healthResponse = await fetch(`${BACKEND_URL}/health`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (healthResponse.ok) {
+                console.log('✅ Basic connectivity works');
+            } else {
+                console.log(`❌ Basic connectivity failed: ${healthResponse.status}`);
+            }
+
+            // Test authenticated endpoint
+            console.log('🔐 Testing authenticated endpoint...');
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const authTestResponse = await fetch(`${BACKEND_URL}/health/auth-status`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                    },
+                });
+
+                if (authTestResponse.ok) {
+                    console.log('✅ Authentication works');
+                } else {
+                    console.log(`❌ Authentication failed: ${authTestResponse.status}`);
+                }
+            } else {
+                console.log('❌ No auth session available');
+            }
+
+        } catch (error) {
+            console.error('❌ Network diagnostics failed:', error);
+        }
+    };
+
     // Function to upload multiple images to backend and get ChatGPT analysis
     const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any, localImagePaths: string[] }> => {
         try {
@@ -320,70 +386,112 @@ const ImageCapture: React.FC = () => {
             // Get current user ID for local storage
             const userId = getCurrentUserId();
 
-            // Start local image saving and form data preparation in parallel
-            const [localImagePathsPromise, formData] = [
-                // Save images locally for the gallery (async operation)
-                saveMultipleImagesLocally(imageUris, userId),
-                // Prepare form data for upload (sync operation)
-                (() => {
-                    const form = new FormData();
-                    form.append('user_id', '1');
+            // Start local image saving first
+            const localImagePathsPromise = saveMultipleImagesLocally(imageUris, userId);
 
-                    // Add all images to FormData
-                    for (let i = 0; i < imageUris.length; i++) {
-                        const uri = imageUris[i];
-                        form.append('images', {
-                            uri,
-                            type: 'image/jpeg',
-                            name: uri.split('/').pop() || `image_${i}.jpg`,
-                        } as any);
-                    }
-                    return form;
-                })()
-            ];
-
-            // Get Supabase auth token while other operations are in progress
-            const tokenPromise = supabase.auth.getSession().then(({ data: { session } }) => {
-                if (!session) throw new Error('User not authenticated. Please sign in again.');
-                return session.access_token;
-            });
+            // Get Supabase auth token
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                throw new Error('User not authenticated. Please sign in again.');
+            }
+            const token = session.access_token;
 
             setAnalysisStage('analyzing');
 
-            // Wait for token
-            const token = await tokenPromise;
-            if (!token) {
-                throw new Error('User not authenticated. Please sign in again.');
+            // Create FormData with Android-compatible file handling
+            const formData = new FormData();
+            formData.append('user_id', '1');
+
+            // Process each image for Android compatibility
+            for (let i = 0; i < imageUris.length; i++) {
+                const uri = imageUris[i];
+
+                try {
+                    // Verify file exists and get detailed info
+                    const fileInfo = await FileSystem.getInfoAsync(uri);
+                    console.log(`📋 File info for image ${i + 1}:`, {
+                        uri,
+                        exists: fileInfo.exists,
+                        size: fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 'unknown',
+                        isDirectory: fileInfo.exists && 'isDirectory' in fileInfo ? fileInfo.isDirectory : false
+                    });
+
+                    if (!fileInfo.exists) {
+                        console.error(`❌ Image file does not exist: ${uri}`);
+                        continue;
+                    }
+
+                    if (fileInfo.exists && 'isDirectory' in fileInfo && fileInfo.isDirectory) {
+                        console.error(`❌ URI points to directory, not file: ${uri}`);
+                        continue;
+                    }
+
+                    console.log(`✅ Processing valid image ${i + 1}/${imageUris.length}: ${uri}`);
+
+                    // Extract file extension from URI more reliably
+                    let fileExtension = 'jpg'; // Default fallback
+                    const uriParts = uri.split('.');
+                    if (uriParts.length > 1) {
+                        const lastPart = uriParts[uriParts.length - 1].toLowerCase();
+                        // Remove query parameters if any
+                        fileExtension = lastPart.split('?')[0];
+                    }
+
+                    // Ensure valid image extensions
+                    if (!['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+                        fileExtension = 'jpg';
+                    }
+
+                    const fileName = `image_${i}_${Date.now()}.${fileExtension}`;
+
+                    // Use Android-compatible file object structure (NO blobs!)
+                    const fileObject = {
+                        uri: uri,
+                        type: `image/${fileExtension}`,
+                        name: fileName,
+                    };
+
+                    console.log(`📦 Creating file object:`, fileObject);
+                    formData.append('images', fileObject as any);
+                    console.log(`✅ Successfully added image ${i + 1} to FormData: ${fileName}`);
+
+                } catch (fileError) {
+                    console.error(`❌ Error processing image ${i}:`, fileError);
+                    console.error(`❌ Failed URI: ${uri}`);
+                    continue; // Skip this image and continue with others
+                }
             }
 
-            // Send the upload request
-            console.log('Sending request to backend for ChatGPT analysis...');
-            const uploadPromise = fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
+            console.log('📤 Sending FormData to backend...');
+
+            // Make the upload request with proper headers for Android
+            const response = await fetch(`${BACKEND_URL}/images/upload-multiple-images`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'multipart/form-data',
+                    // CRITICAL: Do NOT set Content-Type for FormData in Android
+                    // Let the native implementation set the boundary automatically
                     'Authorization': `Bearer ${token}`,
                 },
                 body: formData,
             });
 
-            // Wait for both the local image saving and the upload to complete in parallel
-            const [localImagePaths, response] = await Promise.all([
-                localImagePathsPromise,
-                uploadPromise
-            ]);
-
+            // Wait for local image saving to complete
+            const localImagePaths = await localImagePathsPromise;
             console.log('✅ Images saved locally for gallery');
 
             const endTime = Date.now();
-            console.log(`✅ Backend ChatGPT analysis completed in ${(endTime - startTime) / 1000} seconds`);
+            console.log(`📊 Total upload time: ${(endTime - startTime) / 1000} seconds`);
 
+            // Check response
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`❌ Upload failed with status ${response.status}:`, errorText);
+                throw new Error(`Upload failed: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
+            console.log('📥 Received response from backend:', data);
 
             if (!data.nutrition_data || !Array.isArray(data.nutrition_data)) {
                 throw new Error('Invalid nutrition data received from backend');
@@ -391,16 +499,32 @@ const ImageCapture: React.FC = () => {
 
             setAnalysisStage('processing');
 
-            console.log(`✅ Received ${data.nutrition_data.length} food items from ChatGPT analysis`);
-            console.log(`🖼️ Local image paths for gallery: ${localImagePaths.length} images saved`);
+            console.log(`✅ Successfully processed ${data.nutrition_data.length} food items`);
+            console.log(`🖼️ Saved ${localImagePaths.length} images locally`);
 
             return {
                 meal_id: data.meal_id,
                 nutrition_data: data.nutrition_data,
-                localImagePaths: localImagePaths // Return local paths for gallery
+                localImagePaths: localImagePaths
             };
+
         } catch (error) {
-            console.error('❌ Backend ChatGPT analysis failed:', error);
+            console.error('❌ Complete upload process failed:', error);
+
+            // Run network diagnostics for debugging
+            console.log('🔍 Running network diagnostics after upload failure...');
+            await debugNetworkIssue();
+
+            // Log additional debugging info for Android
+            if (Platform.OS === 'android') {
+                console.error('🐛 Android-specific debugging:');
+                console.error('- Make sure network_security_config allows HTTPS');
+                console.error('- FormData file structure must use {uri, type, name} format');
+                console.error('- Content-Type header must NOT be set manually');
+                console.error('- Check if cleartext traffic is disabled');
+                console.error('- Verify file URIs are accessible in production build');
+            }
+
             throw error;
         }
     };
@@ -477,7 +601,7 @@ const ImageCapture: React.FC = () => {
 
                 // Create a food log entry from barcode data
                 const foodLog = {
-                    meal_id: Date.now(), // Generate a unique meal ID
+                    meal_id: Date.now().toString(), // Generate a unique meal ID
                     food_name: foodName || foodData.food_name || 'Unknown Food',
                     calories: foodData.calories || 0,
                     proteins: foodData.proteins || 0,
@@ -577,7 +701,7 @@ const ImageCapture: React.FC = () => {
 
                     // Create a food log entry with all required fields
                     const foodLog = {
-                        meal_id: result.meal_id,
+                        meal_id: result.meal_id.toString(),
                         food_name: foodName || nutritionData.food_name || 'Unknown Food',
                         calories: nutritionData.calories || 0,
                         proteins: nutritionData.proteins || 0,
@@ -627,7 +751,7 @@ const ImageCapture: React.FC = () => {
 
                 // Create a food log entry with all required fields
                 const foodLog = {
-                    meal_id: result.meal_id,
+                    meal_id: result.meal_id.toString(),
                     food_name: foodName || nutritionData.food_name || 'Unknown Food',
                     calories: nutritionData.calories || 0,
                     proteins: nutritionData.proteins || 0,
@@ -777,8 +901,7 @@ const ImageCapture: React.FC = () => {
     const containerStyle = {
         flex: 1,
         backgroundColor: '#000',
-        // Ensure padding for status bar if needed
-        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+        // Removed dynamic padding to avoid blank space at the top
     };
 
     // If user cancels the analysis

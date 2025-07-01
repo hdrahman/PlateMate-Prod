@@ -56,7 +56,7 @@ const COLORS = {
 
 // Navigation types
 type RootStackParamList = {
-    'Food Log': { refresh?: number };
+    FoodLog: { refresh?: number };
     BarcodeScanner: undefined;
     ScannedProduct: { foodData: any; mealType?: string };
     Manual: undefined;
@@ -258,7 +258,7 @@ const ScannedProduct: React.FC = () => {
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
                 // Automatically navigate to Food Log
-                navigation.navigate('Food Log', { refresh: Date.now() });
+                navigation.navigate('FoodLog', { refresh: Date.now() });
             } else {
                 throw new Error('Failed to add food log entry');
             }
