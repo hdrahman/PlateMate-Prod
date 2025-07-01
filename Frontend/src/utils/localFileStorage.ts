@@ -36,14 +36,21 @@ export const saveImageLocally = async (imageUri: string, userId: string): Promis
         const localPath = `${MEAL_IMAGES_DIR}${filename}`;
 
         // Optimize image while maintaining high quality
-        const optimizedImage = await manipulateAsync(
-            imageUri,
-            [{ resize: { width: 1200 } }], // Keep higher resolution 1200px width
-            {
-                compress: 0.95, // Much higher quality (95% vs 80%)
-                format: SaveFormat.JPEG
-            }
-        );
+        let optimizedImage;
+        try {
+            optimizedImage = await manipulateAsync(
+                imageUri,
+                [{ resize: { width: 1200 } }], // Keep higher resolution 1200px width
+                {
+                    compress: 0.95, // Much higher quality (95% vs 80%)
+                    format: SaveFormat.JPEG
+                }
+            );
+        } catch (manipulateError) {
+            console.warn('⚠️ Image manipulation failed, using original image:', manipulateError);
+            // If image manipulation fails, create a fallback object with the original URI
+            optimizedImage = { uri: imageUri };
+        }
 
         // Copy the optimized image to our local directory
         await FileSystem.copyAsync({
@@ -55,8 +62,9 @@ export const saveImageLocally = async (imageUri: string, userId: string): Promis
         return localPath;
 
     } catch (error) {
-        console.error('❌ Error saving image locally:', error);
-        throw error;
+        console.error('❌ Error saving image locally, returning original URI as fallback:', error);
+        // Return original URI as fallback if everything fails
+        return imageUri;
     }
 };
 
@@ -65,17 +73,26 @@ export const saveMultipleImagesLocally = async (uris: string[], userId: string):
     try {
         console.log(`Starting to save ${uris.length} images locally in parallel`);
 
-        // Process all images in parallel
-        const savePromises = uris.map(uri => saveImageLocally(uri, userId));
+        // Process all images in parallel with individual error handling
+        const savePromises = uris.map(async (uri, index) => {
+            try {
+                return await saveImageLocally(uri, userId);
+            } catch (error) {
+                console.warn(`⚠️ Failed to save image ${index + 1} locally, using original URI:`, error);
+                // Return original URI as fallback if local saving fails
+                return uri;
+            }
+        });
 
         // Wait for all save operations to complete
         const savedPaths = await Promise.all(savePromises);
 
-        console.log(`Successfully saved ${savedPaths.length} images locally`);
+        console.log(`Successfully processed ${savedPaths.length} images (mix of local saves and fallbacks)`);
         return savedPaths;
     } catch (error) {
-        console.error('Error saving multiple images locally:', error);
-        throw error;
+        console.error('Error in saveMultipleImagesLocally, using original URIs as fallback:', error);
+        // Return original URIs as complete fallback
+        return uris;
     }
 };
 

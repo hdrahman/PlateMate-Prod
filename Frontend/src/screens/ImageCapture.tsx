@@ -386,8 +386,15 @@ const ImageCapture: React.FC = () => {
             // Get current user ID for local storage
             const userId = getCurrentUserId();
 
-            // Start local image saving first
-            const localImagePathsPromise = saveMultipleImagesLocally(imageUris, userId);
+            // Start local image saving first (but don't let it block the main process)
+            let localImagePathsPromise: Promise<string[]>;
+            try {
+                localImagePathsPromise = saveMultipleImagesLocally(imageUris, userId);
+            } catch (localSaveError) {
+                console.warn('⚠️ Local image saving failed, continuing with backend upload:', localSaveError);
+                // Create a fallback promise that resolves to original URIs
+                localImagePathsPromise = Promise.resolve(imageUris);
+            }
 
             // Get Supabase auth token
             const { data: { session } } = await supabase.auth.getSession();
@@ -476,9 +483,16 @@ const ImageCapture: React.FC = () => {
                 body: formData,
             });
 
-            // Wait for local image saving to complete
-            const localImagePaths = await localImagePathsPromise;
-            console.log('✅ Images saved locally for gallery');
+            // Wait for local image saving to complete (with fallback if it fails)
+            let localImagePaths: string[];
+            try {
+                localImagePaths = await localImagePathsPromise;
+                console.log('✅ Images saved locally for gallery');
+            } catch (localSaveError) {
+                console.warn('⚠️ Local image saving failed during await, using original URIs:', localSaveError);
+                // Use original URIs as fallback
+                localImagePaths = imageUris;
+            }
 
             const endTime = Date.now();
             console.log(`📊 Total upload time: ${(endTime - startTime) / 1000} seconds`);
@@ -500,7 +514,7 @@ const ImageCapture: React.FC = () => {
             setAnalysisStage('processing');
 
             console.log(`✅ Successfully processed ${data.nutrition_data.length} food items`);
-            console.log(`🖼️ Saved ${localImagePaths.length} images locally`);
+            console.log(`🖼️ Local images status: ${localImagePaths.length} paths available`);
 
             return {
                 meal_id: data.meal_id,

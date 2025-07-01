@@ -11,6 +11,7 @@
     "@react-native-google-signin/google-signin": "^14.0.0",
     "@types/lodash": "^4.17.17",
     "expo-constants": "^17.1.6",
+    "expo-image-loader": "^5.1.0",
     "lodash": "^4.17.21"
   }
 }
