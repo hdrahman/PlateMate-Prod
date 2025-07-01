@@ -6,6 +6,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Define navigation types
 type RootStackParamList = {
@@ -26,6 +27,7 @@ export default function CameraScreen() {
     const [isCameraReady, setIsCameraReady] = useState(false);
     const cameraRef = useRef<CameraView>(null);
     const navigation = useNavigation<NavigationProp>();
+    const insets = useSafeAreaInsets();
 
     // Animation values for pulse effect
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -229,7 +231,7 @@ export default function CameraScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
@@ -296,7 +298,7 @@ export default function CameraScreen() {
 
                             {/* Capture Button - moved below options */}
                             <TouchableOpacity
-                                style={styles.captureButton}
+                                style={[styles.captureButton, { bottom: insets.bottom + 20 }]}
                                 onPress={handleCapturePhoto}
                             >
                                 <View style={styles.captureButtonInner} />

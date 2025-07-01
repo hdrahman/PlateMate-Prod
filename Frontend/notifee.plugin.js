@@ -35,6 +35,11 @@ module.exports = function withNotifeeAndroid(config) {
                     'android:name': 'android.permission.FOREGROUND_SERVICE',
                 },
             },
+            {
+                $: {
+                    'android:name': 'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+                },
+            },
         ];
 
         // Add permissions that don't already exist

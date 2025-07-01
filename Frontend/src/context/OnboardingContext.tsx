@@ -349,19 +349,23 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         }
     }, []);
 
-    // Clear state when user changes, but keep temp session for unauthenticated users
+    // React when authentication state changes
+    // 1) If the user logs out we simply flag that we need to reload onboarding data but **do not**
+    //    wipe the existing `onboardingComplete` flag – this prevents a brief flash of the
+    //    onboarding UI when the user signs-out and back in during the same session.
+    // 2) When the user logs in again we also trigger a reload so the latest profile is pulled
+    //    from SQLite (or restored from PostgreSQL if it does not exist locally).
     useEffect(() => {
         if (!user) {
-            setOnboardingComplete(false);
-            setIsLoading(false);
+            // Logged out – mark that we need to reload when a user logs in again.
             setHasLoadedInitialState(false);
-            // Don't reset profile or currentStep - let user continue onboarding before auth
+            setIsLoading(false);
         } else {
-            // User just became authenticated - reload onboarding state if needed
-            if (!hasLoadedInitialState) {
-                setHasLoadedInitialState(false); // Force reload
-            }
+            // Logged in – force a fresh load of onboarding state.
+            setHasLoadedInitialState(false);
         }
+        // NOTE: we intentionally do **not** mutate `onboardingComplete` here.
+        // The real value will be re-evaluated inside `loadOnboardingState()`.
     }, [user?.id]);
 
     // Load saved onboarding state from SQLite database or temp storage
@@ -379,7 +383,32 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 if (user && user.id) {
                     // User is authenticated - try to load from user profile first
                     console.log(`👤 Loading for authenticated user: ${user.id}`);
-                    const sqliteProfile = await getUserProfileBySupabaseUid(user.id);
+                    // Try the fast path – lookup by Supabase UID (stored in firebase_uid column)
+                    let sqliteProfile = await getUserProfileBySupabaseUid(user.id);
+
+                    // Fallback: the record may have been created under the old Firebase UID or the
+                    // user may have re-created their account which results in a new Supabase UID.
+                    // In that case we attempt to find the profile by email and, if found, update
+                    // its firebase_uid so future look-ups succeed.
+                    if (!sqliteProfile && user.email) {
+                        try {
+                            const { getUserProfileByEmail, getDatabase } = await import('../utils/database');
+                            const profileByEmail = await getUserProfileByEmail(user.email);
+                            if (profileByEmail) {
+                                console.log('🔄 Found profile by e-mail – updating firebase_uid to current Supabase UID');
+                                try {
+                                    const dbInstance = await getDatabase();
+                                    await dbInstance.runAsync(`UPDATE user_profiles SET firebase_uid = ? WHERE email = ?`, [user.id, user.email]);
+                                    // Reload the profile with the new UID mapping
+                                    sqliteProfile = await getUserProfileBySupabaseUid(user.id);
+                                } catch (uidUpdateErr) {
+                                    console.warn('⚠️ Failed to update firebase_uid', uidUpdateErr);
+                                }
+                            }
+                        } catch (fallbackErr) {
+                            console.warn('⚠️ Fallback email lookup failed:', fallbackErr);
+                        }
+                    }
 
                     if (sqliteProfile) {
                         console.log('✅ Found profile in SQLite database');
@@ -397,27 +426,55 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
                         console.log(`✅ Onboarding state loaded: complete=${isOnboardingComplete}, step=${isOnboardingComplete ? totalSteps : 1}`);
                     } else {
-                        // Try to load and sync temporary data
-                        console.log('📋 No existing profile found, checking temporary data...');
-                        const tempData = await loadOnboardingProgressIncremental(tempSessionId);
-                        if (tempData) {
-                            console.log('🔄 Found temporary data, syncing to user profile...');
-                            try {
-                                await syncTempOnboardingToUserProfile(tempSessionId, user.id, user.email);
-                                setProfile(tempData.profileData);
-                                setCurrentStep(tempData.currentStep);
-                                console.log('✅ Temporary data synced to user profile');
-                            } catch (syncError) {
-                                console.error('❌ Error syncing temporary data:', syncError);
-                                setProfile(tempData.profileData);
-                                setCurrentStep(tempData.currentStep);
+                        // No local profile – attempt to restore backup from PostgreSQL first
+                        console.log('📋 No existing profile found – attempting PostgreSQL restore');
+
+                        try {
+                            const { postgreSQLSyncService } = await import('../utils/postgreSQLSyncService');
+                            const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
+                            if (restoreResult.success) {
+                                console.log('✅ Backup restore succeeded – reloading profile');
+                                sqliteProfile = await getUserProfileBySupabaseUid(user.id);
+                            } else {
+                                console.warn('⚠️ Backup restore returned errors:', restoreResult.errors);
                             }
-                        } else {
-                            console.log('ℹ️ No existing data found, starting fresh');
-                            setProfile(defaultProfile);
-                            setCurrentStep(1);
+                        } catch (restoreErr) {
+                            console.warn('⚠️ Backup restore threw error:', restoreErr);
                         }
-                        setOnboardingComplete(false);
+
+                        // If restore populated the profile, use it; otherwise fall back to temp/onboarding
+                        if (sqliteProfile) {
+                            const frontendProfile = convertSQLiteProfileToFrontendFormat(sqliteProfile);
+                            const isOnboardingComplete = Boolean(sqliteProfile.onboarding_complete);
+
+                            setOnboardingComplete(isOnboardingComplete);
+                            setProfile(frontendProfile);
+                            setCurrentStep(isOnboardingComplete ? totalSteps : 1);
+
+                            console.log(`✅ Profile reloaded after restore: complete=${isOnboardingComplete}`);
+                        } else {
+                            // Try to load and sync temporary data
+                            console.log('📋 Still no profile found, checking temporary data...');
+                            const tempData = await loadOnboardingProgressIncremental(tempSessionId);
+                            if (tempData) {
+                                console.log('🔄 Found temporary data, syncing to user profile...');
+                                try {
+                                    await syncTempOnboardingToUserProfile(tempSessionId, user.id, user.email);
+                                    setProfile(tempData.profileData);
+                                    setCurrentStep(tempData.currentStep);
+                                    console.log('✅ Temporary data synced to user profile');
+                                } catch (syncError) {
+                                    console.error('❌ Error syncing temporary data:', syncError);
+                                    setProfile(tempData.profileData);
+                                    setCurrentStep(tempData.currentStep);
+                                }
+                            } else {
+                                console.log('ℹ️ No existing data found, starting fresh');
+                                setProfile(defaultProfile);
+                                setCurrentStep(1);
+                            }
+                            setOnboardingComplete(false);
+                        }
                     }
                 } else {
                     // User not authenticated - try to load from temp storage

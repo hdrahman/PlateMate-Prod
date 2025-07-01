@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { useAuth } from '../../context/AuthContext';
 import { UserProfile } from '../../types/user';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SubscriptionStepProps {
     profile: UserProfile;
@@ -71,6 +72,7 @@ const subscriptionPlans = [
 ];
 
 const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete }) => {
+    const insets = useSafeAreaInsets();
     const [selectedPlan, setSelectedPlan] = useState<string>('free_trial');
     const [isLoading, setIsLoading] = useState(false);
     const navigation = useNavigation();
@@ -184,7 +186,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
 
     return (
         <ScrollView
-            contentContainerStyle={styles.container}
+            contentContainerStyle={[styles.container, { paddingTop: insets.top + 40 }]}
             showsVerticalScrollIndicator={false}
         >
             <Text style={styles.title}>Choose Your Plan</Text>
@@ -319,7 +321,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 800,
+        paddingTop: 40,
         paddingBottom: 40,
     },
     title: {

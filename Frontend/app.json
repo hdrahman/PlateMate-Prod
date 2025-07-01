@@ -38,7 +38,6 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
         }
       ],
-      "expo-barcode-scanner",
       "expo-sqlite",
       "./notifee.plugin.js"
     ],

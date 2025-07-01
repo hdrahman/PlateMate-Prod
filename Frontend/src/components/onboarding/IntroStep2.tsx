@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +22,7 @@ interface IntroStep2Props {
 
 const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
     const fadeIn = useRef(new Animated.Value(0)).current;
     const slideUp = useRef(new Animated.Value(20)).current;
     const progressWidth = useRef(new Animated.Value(0)).current;
@@ -69,7 +71,7 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={styles.signInButton}
+                style={[styles.signInButton, { top: insets.top + 5 }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >

@@ -672,7 +672,7 @@ class PostgreSQLSyncService {
             const { data: existingGoals } = await supabase
                 .from('nutrition_goals')
                 .select('id')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (existingGoals) {
@@ -680,7 +680,7 @@ class PostgreSQLSyncService {
                 const { error } = await supabase
                     .from('nutrition_goals')
                     .update(goalData)
-                    .eq('user_id', postgresUserId);
+                    .eq('firebase_uid', firebaseUid);
 
                 if (error) throw error;
             } else {
@@ -728,7 +728,7 @@ class PostgreSQLSyncService {
             const { data: existingSubscription } = await supabase
                 .from('user_subscriptions')
                 .select('id')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (existingSubscription) {
@@ -736,7 +736,7 @@ class PostgreSQLSyncService {
                 const { error } = await supabase
                     .from('user_subscriptions')
                     .update(subscriptionData)
-                    .eq('user_id', postgresUserId);
+                    .eq('firebase_uid', firebaseUid);
 
                 if (error) throw error;
             } else {
@@ -781,7 +781,7 @@ class PostgreSQLSyncService {
             const { data: existingSettings } = await supabase
                 .from('cheat_day_settings')
                 .select('id')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (existingSettings) {
@@ -789,7 +789,7 @@ class PostgreSQLSyncService {
                 const { error } = await supabase
                     .from('cheat_day_settings')
                     .update(cheatDayData)
-                    .eq('user_id', postgresUserId);
+                    .eq('firebase_uid', firebaseUid);
 
                 if (error) throw error;
             } else {
@@ -981,7 +981,7 @@ class PostgreSQLSyncService {
             const { data: goals, error } = await supabase
                 .from('nutrition_goals')
                 .select('*')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (error) {
@@ -1017,14 +1017,16 @@ class PostgreSQLSyncService {
 
     private async restoreFoodLogs(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
-            const { data: foodLogs, error } = await supabase
+            const { data: rawFoodLogs, error } = await supabase
                 .from('food_logs')
                 .select('*')
                 .eq('user_id', postgresUserId)
                 .order('date', { ascending: false })
-                .limit(100); // Restore last 100 food logs to avoid overwhelming
+                .limit(100);
 
             if (error) throw error;
+
+            const foodLogs: any[] = rawFoodLogs as any[];
             if (!foodLogs || foodLogs.length === 0) return;
 
             for (const foodLog of foodLogs) {
@@ -1084,7 +1086,7 @@ class PostgreSQLSyncService {
             const { data: weights, error } = await supabase
                 .from('user_weights')
                 .select('*')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .order('recorded_at', { ascending: false })
                 .limit(50); // Restore last 50 weight entries
 
@@ -1112,7 +1114,7 @@ class PostgreSQLSyncService {
             const { data: streak, error } = await supabase
                 .from('user_streaks')
                 .select('*')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (error) {
@@ -1137,7 +1139,7 @@ class PostgreSQLSyncService {
             const { data: subscription, error } = await supabase
                 .from('user_subscriptions')
                 .select('*')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (error) {
@@ -1172,7 +1174,7 @@ class PostgreSQLSyncService {
             const { data: settings, error } = await supabase
                 .from('cheat_day_settings')
                 .select('*')
-                .eq('user_id', postgresUserId)
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (error) {
