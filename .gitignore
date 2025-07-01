@@ -118,3 +118,15 @@ pytest_cache/
 
 # Backend Python environment
 Backend/env/
+
+# =======================
+# ✅ Build & CLI Cache Artifacts
+# =======================
+# Gradle build cache copied into repo root during certain CI/IDE tasks
+gradle-temp/
+
+# Supabase CLI temporary metadata (generated on each local run)
+supabase/.temp/
+
+# Rare build artifacts with .prro extension (not part of source)
+*.prro
