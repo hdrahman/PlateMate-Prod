@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<scale xmlns:android="http://schemas.android.com/apk/res/android"
-    android:scaleWidth="90%"
-    android:scaleHeight="90%"
-    android:pivotX="50%"
-    android:pivotY="50%">
-    <bitmap
-        android:src="@mipmap/ic_launcher_foreground"
-        android:gravity="center" />
-</scale> 
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="center"
+          android:left="5%"
+          android:top="5%"
+          android:right="5%"
+          android:bottom="5%">
+        <bitmap
+            android:src="@mipmap/ic_launcher_foreground"
+            android:gravity="center"
+            android:scaleType="centerInside" />
+    </item>
+</layer-list> 

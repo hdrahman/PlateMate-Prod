@@ -37,9 +37,9 @@ export const formatNutritionalValue = (value: number | undefined | null, unit: s
 };
 
 /**
- * Check if a nutritional value is available (not missing)
+ * Check if a nutritional value is present (not missing)
  * @param value The nutritional value to check
- * @returns true if the value is available, false if missing
+ * @returns true if value is present (not -1, null, undefined, or 0), false otherwise
  */
 export const hasNutritionalValue = (value: number | undefined | null): boolean => {
     return value !== undefined && value !== null && value !== -1 && value > 0;

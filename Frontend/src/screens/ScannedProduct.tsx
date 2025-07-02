@@ -32,6 +32,7 @@ import {
     FoodUnit
 } from '../utils/foodUnitConversion';
 import { useAuth } from '../context/AuthContext';
+import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 
 const { width, height } = Dimensions.get('window');
 
@@ -414,27 +415,27 @@ const ScannedProduct: React.FC = () => {
                         </View>
 
                         {/* Additional Nutrients - Compact */}
-                        {(fiber || sugar || sodium) && (
+                        {(hasNutritionalValue(fiber) || hasNutritionalValue(sugar) || hasNutritionalValue(sodium)) && (
                             <>
                                 <View style={styles.sectionDivider} />
                                 <View style={styles.additionalNutrients}>
                                     <Text style={styles.sectionSubtitle}>Additional Info</Text>
                                     <View style={styles.nutrientGrid}>
-                                        {fiber && (
+                                        {hasNutritionalValue(fiber) && (
                                             <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{fiber}g</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(fiber, 'g')}</Text>
                                                 <Text style={styles.nutrientLabel}>Fiber</Text>
                                             </View>
                                         )}
-                                        {sugar && (
+                                        {hasNutritionalValue(sugar) && (
                                             <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{sugar}g</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(sugar, 'g')}</Text>
                                                 <Text style={styles.nutrientLabel}>Sugar</Text>
                                             </View>
                                         )}
-                                        {sodium && (
+                                        {hasNutritionalValue(sodium) && (
                                             <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{sodium}mg</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(sodium, 'mg')}</Text>
                                                 <Text style={styles.nutrientLabel}>Sodium</Text>
                                             </View>
                                         )}

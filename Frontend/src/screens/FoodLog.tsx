@@ -33,6 +33,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ExerciseModal from '../components/ExerciseModal';
 import { useAuth } from '../context/AuthContext';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
+import {
+    getSuggestedUnitsForFood,
+    convertFoodUnit,
+    recalculateNutrition,
+    formatUnitName,
+    isValidUnitForFood,
+    FoodUnit
+} from '../utils/foodUnitConversion';
+import { formatNutritionalValue } from '../utils/helpers';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -246,7 +255,7 @@ const DiaryScreen: React.FC = () => {
 
     const updateMealItems = (mealType, entries) => {
         return entries.map(entry => ({
-            name: `${entry.food_name}\nProtein ${entry.proteins}g`,
+            name: `${entry.food_name}\nProtein ${formatNutritionalValue(entry.proteins, 'g')}`,
             calories: entry.calories
         }));
     };
@@ -286,7 +295,7 @@ const DiaryScreen: React.FC = () => {
 
             // Format the item name with appropriate nutritional info
             const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';
-            const proteinInfo = `Protein: ${entry.proteins}g`;
+            const proteinInfo = `Protein: ${formatNutritionalValue(entry.proteins, 'g')}`;
             const itemDescription = weightInfo ? `${proteinInfo}\n${weightInfo}` : proteinInfo;
 
             mealDict[validMealType].items.push({

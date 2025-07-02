@@ -32,6 +32,7 @@ import {
 } from '../utils/foodUnitConversion';
 import { getUserGoals, UserGoals } from '../utils/database';
 import * as Haptics from 'expo-haptics';
+import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 
 const { width, height } = Dimensions.get('window');
 
@@ -434,21 +435,21 @@ const BarcodeResults: React.FC = () => {
                                 <View style={styles.additionalNutrients}>
                                     <Text style={styles.sectionSubtitle}>Additional Info</Text>
                                     <View style={styles.nutrientGrid}>
-                                        {foodData.fiber && (
+                                        {hasNutritionalValue(foodData.fiber) && (
                                             <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{currentNutrition?.fiber || 0}g</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(currentNutrition?.fiber, 'g')}</Text>
                                                 <Text style={styles.nutrientLabel}>Fiber</Text>
                                             </View>
                                         )}
-                                        {foodData.sugar && (
+                                        {hasNutritionalValue(foodData.sugar) && (
                                             <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{currentNutrition?.sugar || 0}g</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(currentNutrition?.sugar, 'g')}</Text>
                                                 <Text style={styles.nutrientLabel}>Sugar</Text>
                                             </View>
                                         )}
-                                        {foodData.sodium && (
+                                        {hasNutritionalValue(foodData.sodium) && (
                                             <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{currentNutrition?.sodium || 0}mg</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(currentNutrition?.sodium, 'mg')}</Text>
                                                 <Text style={styles.nutrientLabel}>Sodium</Text>
                                             </View>
                                         )}

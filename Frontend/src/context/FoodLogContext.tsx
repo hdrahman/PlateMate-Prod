@@ -416,19 +416,20 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
                     newTotals.protein += foodLog.proteins || 0;
                     newTotals.carbs += foodLog.carbs || 0;
                     newTotals.fat += foodLog.fats || 0;
-                    newTotals.fiber += foodLog.fiber || 0;
-                    newTotals.sugar += foodLog.sugar || 0;
-                    newTotals.saturatedFat += foodLog.saturated_fat || 0;
-                    newTotals.polyunsaturatedFat += foodLog.polyunsaturated_fat || 0;
-                    newTotals.monounsaturatedFat += foodLog.monounsaturated_fat || 0;
-                    newTotals.transFat += foodLog.trans_fat || 0;
-                    newTotals.cholesterol += foodLog.cholesterol || 0;
-                    newTotals.sodium += foodLog.sodium || 0;
-                    newTotals.potassium += foodLog.potassium || 0;
-                    newTotals.vitaminA += foodLog.vitamin_a || 0;
-                    newTotals.vitaminC += foodLog.vitamin_c || 0;
-                    newTotals.calcium += foodLog.calcium || 0;
-                    newTotals.iron += foodLog.iron || 0;
+                    // Only add values >= 0 (ignore -1 missing values)
+                    newTotals.fiber += (foodLog.fiber > 0) ? foodLog.fiber : 0;
+                    newTotals.sugar += (foodLog.sugar > 0) ? foodLog.sugar : 0;
+                    newTotals.saturatedFat += (foodLog.saturated_fat > 0) ? foodLog.saturated_fat : 0;
+                    newTotals.polyunsaturatedFat += (foodLog.polyunsaturated_fat > 0) ? foodLog.polyunsaturated_fat : 0;
+                    newTotals.monounsaturatedFat += (foodLog.monounsaturated_fat > 0) ? foodLog.monounsaturated_fat : 0;
+                    newTotals.transFat += (foodLog.trans_fat > 0) ? foodLog.trans_fat : 0;
+                    newTotals.cholesterol += (foodLog.cholesterol > 0) ? foodLog.cholesterol : 0;
+                    newTotals.sodium += (foodLog.sodium > 0) ? foodLog.sodium : 0;
+                    newTotals.potassium += (foodLog.potassium > 0) ? foodLog.potassium : 0;
+                    newTotals.vitaminA += (foodLog.vitamin_a > 0) ? foodLog.vitamin_a : 0;
+                    newTotals.vitaminC += (foodLog.vitamin_c > 0) ? foodLog.vitamin_c : 0;
+                    newTotals.calcium += (foodLog.calcium > 0) ? foodLog.calcium : 0;
+                    newTotals.iron += (foodLog.iron > 0) ? foodLog.iron : 0;
                     return newTotals;
                 });
             }

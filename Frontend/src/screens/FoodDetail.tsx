@@ -20,6 +20,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getFoodLogById, updateFoodLog, getFoodLogsByMealId, addFoodLog } from '../utils/database';
+import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -215,14 +216,14 @@ const FoodDetailScreen: React.FC = () => {
                     </View>
                     <View style={styles.nutrientRowRight}>
                         <Text style={styles.nutrientValue}>
-                            {value.toFixed(value < 1 && value > 0 ? 1 : 0)}{unit}
+                            {formatNutritionalValue(value, unit, value < 1 && value > 0 ? 1 : 0)}
                         </Text>
-                        {showProgress && percentage > 0 && (
+                        {showProgress && hasNutritionalValue(value) && percentage > 0 && (
                             <Text style={styles.percentageText}>{percentage}%</Text>
                         )}
                     </View>
                 </View>
-                {showProgress && percentage > 0 && (
+                {showProgress && hasNutritionalValue(value) && percentage > 0 && (
                     <View style={styles.progressBarContainer}>
                         <View style={styles.progressBarBackground}>
                             <View
@@ -242,8 +243,10 @@ const FoodDetailScreen: React.FC = () => {
     const renderMacroCircle = (label: string, value: number, unit: string, percentage: number, color: string) => (
         <View style={styles.macroCircle}>
             <View style={[styles.macroCircleInner, { borderColor: color }]}>
-                <Text style={styles.macroValue}>{value}{unit}</Text>
-                <Text style={styles.macroPercentage}>{percentage}%</Text>
+                <Text style={styles.macroValue}>{formatNutritionalValue(value, unit)}</Text>
+                {hasNutritionalValue(value) && (
+                    <Text style={styles.macroPercentage}>{percentage}%</Text>
+                )}
             </View>
             <Text style={styles.macroLabel}>{label}</Text>
         </View>

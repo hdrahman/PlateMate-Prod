@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FoodItem } from '../services/BarcodeService';
+import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 
 // App theme colors - matching Manual.tsx
 const PRIMARY_BG = '#000000';
@@ -88,8 +89,8 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
         onAddFood(adjustedFood, selectedMeal, qtyValue);
     };
 
-    // Check if a value is present
-    const hasValue = (value: number) => value > 0;
+    // Check if a value is present (using our helper function)
+    const hasValue = (value: number) => hasNutritionalValue(value);
 
     // Calculate macro percentages
     const totalMacroCalories = (food.proteins * 4) + (food.carbs * 4) + (food.fats * 9);
@@ -279,13 +280,13 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
                                         {hasValue(food.fiber) && (
                                             <View style={styles.nutrientRowIndented}>
                                                 <Text style={styles.nutrientNameSub}>Dietary Fiber</Text>
-                                                <Text style={styles.nutrientValue}>{calculateNutrient(food.fiber)}g</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(calculateNutrient(food.fiber), 'g')}</Text>
                                             </View>
                                         )}
                                         {hasValue(food.sugar) && (
                                             <View style={styles.nutrientRowIndented}>
                                                 <Text style={styles.nutrientNameSub}>Total Sugars</Text>
-                                                <Text style={styles.nutrientValue}>{calculateNutrient(food.sugar)}g</Text>
+                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(calculateNutrient(food.sugar), 'g')}</Text>
                                             </View>
                                         )}
                                     </View>
