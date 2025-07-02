@@ -204,36 +204,37 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         // Create food item
         const manualFoodItem: FoodItem = {
             food_name: foodName,
+            brand_name: '', // Default empty brand name
             calories: parsedCalories,
             proteins: parsedProteins,
             carbs: parsedCarbs,
             fats: parsedFats,
             fiber: parsedFiber,
             sugar: parsedSugar,
-            saturated_fat: 0,
-            polyunsaturated_fat: 0,
-            monounsaturated_fat: 0,
-            trans_fat: 0,
-            cholesterol: 0,
-            sodium: 0,
-            potassium: 0,
-            vitamin_a: 0,
-            vitamin_c: 0,
-            calcium: 0,
-            iron: 0,
-            image: '',
+            saturated_fat: -1, // Use -1 for fields not collected in manual entry (shows as "-")
+            polyunsaturated_fat: -1,
+            monounsaturated_fat: -1,
+            trans_fat: -1,
+            cholesterol: -1,
+            sodium: -1,
+            potassium: -1,
+            vitamin_a: -1,
+            vitamin_c: -1,
+            calcium: -1,
+            iron: -1,
+            image: '', // Empty image for manual entry
             serving_unit: servingUnit,
             serving_weight_grams: 0,
             serving_qty: parsedQuantity,
             healthiness_rating: healthRating, // Use selected health rating
+            notes: '' // Default empty notes
         };
 
-        // Add food to log
+        // Add food to log - let parent handle navigation and modal closing
         onAddFood(manualFoodItem, selectedMeal, parsedQuantity);
 
-        // Reset form and close modal
+        // Reset form for next use
         resetForm();
-        onClose();
     };
 
     return (

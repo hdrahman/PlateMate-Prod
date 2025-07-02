@@ -24,9 +24,9 @@ import FoodItem from '../components/FoodItem';
 import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
 import { FoodItem as FoodItemType } from '../services/BarcodeService';
-import { getRecentFoodEntries, addFoodEntryWithContext, FoodLogEntry } from '../api/foodLog';
+import { getRecentFoodEntries, FoodLogEntry } from '../api/foodLog';
+import { addFoodLog } from '../utils/database';
 import { debounce } from 'lodash';
-import { useFoodLog } from '../context/FoodLogContext';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
@@ -233,9 +233,6 @@ export default function Manual() {
     const [showManualEntry, setShowManualEntry] = useState(false);
     const [selectedMealCategory, setSelectedMealCategory] = useState(defaultMealType);
 
-    // Use the food log context
-    const foodLogContext = useFoodLog();
-
     // Load recent entries when component mounts
     useEffect(() => {
         loadRecentEntries();
@@ -323,28 +320,56 @@ export default function Manual() {
 
             setIsLoading(true);
 
-            // Use the food log context to add the entry with the correct authenticated user ID
-            const currentUserId: string = (user as any)?.uid || (user as any)?.id || 'anonymous';
-            await addFoodEntryWithContext(food, finalMealType, quantity, currentUserId as any, foodLogContext);
+            // Format current date as ISO string (YYYY-MM-DD) - same as ImageCapture
+            const today = new Date();
+            const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            console.log(`Saving food log from manual/search with date: ${formattedDate}`);
 
-            Alert.alert('Success', `Added ${food.food_name} to your ${finalMealType} log`, [
-                {
-                    text: 'OK',
-                    onPress: async () => {
-                        // Add a small delay to ensure database operations complete
-                        await new Promise(resolve => setTimeout(resolve, 300));
+            // Create food log entry using the EXACT same structure as ImageCapture
+            const foodLog = {
+                meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
+                food_name: food.food_name || 'Unknown Food',
+                brand_name: food.brand_name || '',
+                meal_type: finalMealType,
+                date: formattedDate, // Use formatted date
+                quantity: `${quantity} ${food.serving_unit || 'serving'}`,
+                weight: null,
+                weight_unit: 'g',
+                calories: food.calories || 0, // Keep calories as 0 since it's mandatory
+                proteins: food.proteins || -1, // Use -1 for missing data
+                carbs: food.carbs || -1,
+                fats: food.fats || -1,
+                fiber: food.fiber || -1,
+                sugar: food.sugar || -1,
+                saturated_fat: food.saturated_fat || -1,
+                polyunsaturated_fat: food.polyunsaturated_fat || -1,
+                monounsaturated_fat: food.monounsaturated_fat || -1,
+                trans_fat: food.trans_fat || -1,
+                cholesterol: food.cholesterol || -1,
+                sodium: food.sodium || -1,
+                potassium: food.potassium || -1,
+                vitamin_a: food.vitamin_a || -1,
+                vitamin_c: food.vitamin_c || -1,
+                calcium: food.calcium || -1,
+                iron: food.iron || -1,
+                healthiness_rating: food.healthiness_rating || 5,
+                notes: food.notes || '',
+                image_url: food.image || '', // Required field
+                file_key: 'default_key' // Required field
+            };
 
-                        // Refresh food logs across the app
-                        await foodLogContext.refreshLogs();
+            console.log('Saving manual/search food log to local database:', foodLog);
 
-                        // Hide food details modal
-                        setShowFoodDetails(false);
+            // Navigate immediately while database operation runs in background - same as ImageCapture
+            const refreshTimestamp = Date.now();
+            navigation.navigate('FoodLog', { refresh: refreshTimestamp });
 
-                        // Navigate back to Food Log with refresh parameter
-                        navigation.navigate('FoodLog', { refresh: Date.now() });
-                    }
-                }
-            ]);
+            // Continue with database operation after navigation has started - same as ImageCapture
+            await addFoodLog(foodLog);
+
+            // Hide food details modal if open
+            setShowFoodDetails(false);
+
         } catch (error) {
             console.error('Error adding food to log:', error);
             Alert.alert('Error', 'Failed to add food to log. Please try again.');

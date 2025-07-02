@@ -261,39 +261,53 @@ const BarcodeResults: React.FC = () => {
         try {
             setLoading(true);
 
-            // Get user ID from storage
-            const userId = await AsyncStorage.getItem('user_id');
-            if (!userId) {
-                Alert.alert('Error', 'Please log in to continue');
-                return;
-            }
+            // Format current date as ISO string (YYYY-MM-DD) - same as ImageCapture
+            const today = new Date();
+            const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            console.log(`Saving food log from barcode with date: ${formattedDate}`);
 
-            // Prepare food log entry
-            const foodLogEntry = {
-                user_id: parseInt(userId),
-                meal_type: mealType,
+            // Create food log entry using the EXACT same structure as ImageCapture
+            const foodLog = {
+                meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
                 food_name: foodData.food_name || 'Unknown Food',
                 brand_name: foodData.brand_name || '',
+                meal_type: mealType,
+                date: formattedDate, // Use formatted date, not timestamp
                 quantity: `${quantity} ${servingUnit}`,
-                calories: calories,
-                proteins: proteins,
-                carbs: carbs,
-                fats: fats,
+                weight: null,
+                weight_unit: 'g',
+                calories: calories || 0, // Keep calories as 0 since it's mandatory
+                proteins: proteins || -1, // Use -1 for missing data
+                carbs: carbs || -1,
+                fats: fats || -1,
+                fiber: currentNutrition?.fiber || -1,
+                sugar: currentNutrition?.sugar || -1,
+                saturated_fat: currentNutrition?.saturated_fat || -1,
+                polyunsaturated_fat: currentNutrition?.polyunsaturated_fat || -1,
+                monounsaturated_fat: currentNutrition?.monounsaturated_fat || -1,
+                trans_fat: currentNutrition?.trans_fat || -1,
+                cholesterol: currentNutrition?.cholesterol || -1,
+                sodium: currentNutrition?.sodium || -1,
+                potassium: currentNutrition?.potassium || -1,
+                vitamin_a: currentNutrition?.vitamin_a || -1,
+                vitamin_c: currentNutrition?.vitamin_c || -1,
+                calcium: currentNutrition?.calcium || -1,
+                iron: currentNutrition?.iron || -1,
+                healthiness_rating: foodData.healthiness_rating || 5,
                 notes: notes ? `${notes} | Scanned barcode` : 'Scanned barcode',
-                timestamp: new Date().toISOString(),
+                image_url: foodData.image || '', // Required field
+                file_key: 'default_key' // Required field
             };
 
-            console.log('Adding food log entry:', foodLogEntry);
+            console.log('Saving barcode food log to local database:', foodLog);
 
-            // Add to database
-            const result = await addFoodLog(foodLogEntry);
+            // Navigate immediately while database operation runs in background - same as ImageCapture
+            const refreshTimestamp = Date.now();
+            navigation.navigate('FoodLog', { refresh: refreshTimestamp });
 
-            if (result) {
-                // Automatically navigate to Food Log
-                navigation.navigate('FoodLog', { refresh: Date.now() });
-            } else {
-                throw new Error('Failed to add food log entry');
-            }
+            // Continue with database operation after navigation has started - same as ImageCapture
+            await addFoodLog(foodLog);
+
         } catch (error) {
             console.error('Error adding food to log:', error);
             Alert.alert('Error', 'Failed to add food to log. Please try again.');

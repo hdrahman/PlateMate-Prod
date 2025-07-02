@@ -309,45 +309,47 @@ const FoodDetailScreen: React.FC = () => {
         if (!foodData) return;
 
         try {
-            // Create a new food log entry with today's date
-            const today = new Date().toISOString().split('T')[0];
-            const newFoodLogEntry = {
-                meal_id: Math.floor(Math.random() * 1000000), // Generate new meal ID
-                user_id: foodData.user_id,
-                food_name: foodData.food_name,
-                calories: foodData.calories,
-                proteins: foodData.proteins,
-                carbs: foodData.carbs,
-                fats: foodData.fats,
-                fiber: foodData.fiber,
-                sugar: foodData.sugar,
-                saturated_fat: foodData.saturated_fat,
-                polyunsaturated_fat: foodData.polyunsaturated_fat,
-                monounsaturated_fat: foodData.monounsaturated_fat,
-                trans_fat: foodData.trans_fat,
-                cholesterol: foodData.cholesterol,
-                sodium: foodData.sodium,
-                potassium: foodData.potassium,
-                vitamin_a: foodData.vitamin_a,
-                vitamin_c: foodData.vitamin_c,
-                calcium: foodData.calcium,
-                iron: foodData.iron,
-                weight: foodData.weight,
-                weight_unit: foodData.weight_unit,
-                image_url: foodData.image_url,
-                file_key: foodData.file_key,
-                healthiness_rating: foodData.healthiness_rating,
-                date: today,
+            // Format current date as ISO string (YYYY-MM-DD) - same as ImageCapture
+            const today = new Date();
+            const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            console.log(`Saving food log from quick add with date: ${formattedDate}`);
+
+            // Create food log entry using the EXACT same structure as ImageCapture
+            const foodLog = {
+                meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
+                food_name: foodData.food_name || 'Unknown Food',
+                brand_name: foodData.brand_name || '',
                 meal_type: foodData.meal_type,
-                brand_name: foodData.brand_name,
-                quantity: foodData.quantity,
-                notes: foodData.notes,
-                synced: 0,
-                sync_action: 'create',
-                last_modified: new Date().toISOString()
+                date: formattedDate, // Use formatted date
+                quantity: foodData.quantity || '1 serving',
+                weight: foodData.weight || null,
+                weight_unit: foodData.weight_unit || 'g',
+                calories: foodData.calories || 0, // Keep calories as 0 since it's mandatory
+                proteins: foodData.proteins || -1, // Use -1 for missing data
+                carbs: foodData.carbs || -1,
+                fats: foodData.fats || -1,
+                fiber: foodData.fiber || -1,
+                sugar: foodData.sugar || -1,
+                saturated_fat: foodData.saturated_fat || -1,
+                polyunsaturated_fat: foodData.polyunsaturated_fat || -1,
+                monounsaturated_fat: foodData.monounsaturated_fat || -1,
+                trans_fat: foodData.trans_fat || -1,
+                cholesterol: foodData.cholesterol || -1,
+                sodium: foodData.sodium || -1,
+                potassium: foodData.potassium || -1,
+                vitamin_a: foodData.vitamin_a || -1,
+                vitamin_c: foodData.vitamin_c || -1,
+                calcium: foodData.calcium || -1,
+                iron: foodData.iron || -1,
+                healthiness_rating: foodData.healthiness_rating || 5,
+                notes: foodData.notes || '',
+                image_url: foodData.image_url || '', // Required field
+                file_key: foodData.file_key || 'default_key' // Required field
             };
 
-            await addFoodLog(newFoodLogEntry);
+            console.log('Saving quick add food log to local database:', foodLog);
+
+            await addFoodLog(foodLog);
 
             Alert.alert(
                 'Success',

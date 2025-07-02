@@ -67,46 +67,48 @@ export const addFoodEntry = async (
     userId: number = 1
 ): Promise<FoodLogEntry> => {
     try {
-        const meal_id = getMealIdFromType(mealType);
+        // Format current date as ISO string (YYYY-MM-DD) - same as ImageCapture
+        const today = new Date();
+        const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-        const foodLogEntry: Omit<FoodLogEntry, 'id' | 'notes'> = {
-            meal_id,
-            user_id: userId,
-            food_name: foodItem.food_name,
-            calories: foodItem.calories,
-            proteins: foodItem.proteins,
-            carbs: foodItem.carbs,
-            fats: foodItem.fats,
-            fiber: foodItem.fiber,
-            sugar: foodItem.sugar,
-            saturated_fat: foodItem.saturated_fat,
-            polyunsaturated_fat: foodItem.polyunsaturated_fat,
-            monounsaturated_fat: foodItem.monounsaturated_fat,
-            trans_fat: foodItem.trans_fat,
-            cholesterol: foodItem.cholesterol,
-            sodium: foodItem.sodium,
-            potassium: foodItem.potassium,
-            vitamin_a: foodItem.vitamin_a,
-            vitamin_c: foodItem.vitamin_c,
-            calcium: foodItem.calcium,
-            iron: foodItem.iron,
-            image_url: foodItem.image || '',
-            file_key: 'default_file_key',
-            healthiness_rating: foodItem.healthiness_rating,
-            date: formatDateToYYYYMMDD(new Date()),
+        // Create food log entry using the EXACT same structure as ImageCapture
+        const foodLogEntry = {
+            meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
+            user_id: userId, // Add user_id to match interface
+            food_name: foodItem.food_name || 'Unknown Food',
+            brand_name: foodItem.brand_name || '',
             meal_type: mealType,
-            brand_name: foodItem.brand_name,
-            quantity: `${quantity} ${foodItem.serving_unit}`,
+            date: formattedDate, // Use formatted date
+            quantity: `${quantity} ${foodItem.serving_unit || 'serving'}`,
+            weight: null,
+            weight_unit: 'g',
+            calories: foodItem.calories || 0, // Keep calories as 0 since it's mandatory
+            proteins: foodItem.proteins || -1,
+            carbs: foodItem.carbs || -1,
+            fats: foodItem.fats || -1,
+            fiber: foodItem.fiber || -1,
+            sugar: foodItem.sugar || -1,
+            saturated_fat: foodItem.saturated_fat || -1,
+            polyunsaturated_fat: foodItem.polyunsaturated_fat || -1,
+            monounsaturated_fat: foodItem.monounsaturated_fat || -1,
+            trans_fat: foodItem.trans_fat || -1,
+            cholesterol: foodItem.cholesterol || -1,
+            sodium: foodItem.sodium || -1,
+            potassium: foodItem.potassium || -1,
+            vitamin_a: foodItem.vitamin_a || -1,
+            vitamin_c: foodItem.vitamin_c || -1,
+            calcium: foodItem.calcium || -1,
+            iron: foodItem.iron || -1,
+            healthiness_rating: foodItem.healthiness_rating || 5,
+            notes: foodItem.notes || '',
+            image_url: foodItem.image || '', // Required field
+            file_key: 'default_key' // Required field
         };
 
-        // Save to local database
         console.log('Saving food entry to local database');
-        const localId = await addFoodLog({
-            ...foodLogEntry,
-            synced: 0  // Mark as not synced with server
-        });
+        const localId = await addFoodLog(foodLogEntry);
 
-        return { ...foodLogEntry, id: localId };
+        return { ...foodLogEntry, id: localId } as unknown as FoodLogEntry;
     } catch (error) {
         console.error('Error adding food entry:', error);
         throw new Error('Failed to add food to log');

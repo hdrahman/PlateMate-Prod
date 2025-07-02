@@ -449,15 +449,15 @@ export const addFoodLog = async (foodData: {
             throw new Error('No authenticated user found');
         }
 
-        // Insert into database
-        const result = await db.executeSql(
+        // Insert into database using the correct expo-sqlite v2 API
+        const result = await db.runAsync(
             `INSERT INTO food_logs (
                 user_id, meal_id, food_name, brand_name, meal_type, date,
                 quantity, weight, weight_unit, calories, proteins, carbs, fats,
                 fiber, sugar, saturated_fat, polyunsaturated_fat, monounsaturated_fat,
                 trans_fat, cholesterol, sodium, potassium, vitamin_a, vitamin_c,
-                calcium, iron, healthiness_rating, notes, image_url, file_key, synced
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+                calcium, iron, healthiness_rating, notes, image_url, file_key, synced, last_modified
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 userId,
                 foodData.meal_id,
@@ -472,30 +472,39 @@ export const addFoodLog = async (foodData: {
                 foodData.proteins,
                 foodData.carbs,
                 foodData.fats,
-                foodData.fiber || null,
-                foodData.sugar || null,
-                foodData.saturated_fat || null,
-                foodData.polyunsaturated_fat || null,
-                foodData.monounsaturated_fat || null,
-                foodData.trans_fat || null,
-                foodData.cholesterol || null,
-                foodData.sodium || null,
-                foodData.potassium || null,
-                foodData.vitamin_a || null,
-                foodData.vitamin_c || null,
-                foodData.calcium || null,
-                foodData.iron || null,
+                foodData.fiber || -1,
+                foodData.sugar || -1,
+                foodData.saturated_fat || -1,
+                foodData.polyunsaturated_fat || -1,
+                foodData.monounsaturated_fat || -1,
+                foodData.trans_fat || -1,
+                foodData.cholesterol || -1,
+                foodData.sodium || -1,
+                foodData.potassium || -1,
+                foodData.vitamin_a || -1,
+                foodData.vitamin_c || -1,
+                foodData.calcium || -1,
+                foodData.iron || -1,
                 foodData.healthiness_rating || null,
                 foodData.notes || null,
                 foodData.image_url,
-                foodData.file_key || 'default_file_key'
+                foodData.file_key || 'default_file_key',
+                0, // synced = 0
+                getCurrentDate() // last_modified
             ]
         );
 
-        // Track change for optimized sync
-        await trackDataChange('foodlog');
+        // No need for separate sync tracking - handled by notifyDatabaseChanged
 
-        return result[0].insertId;
+        // Trigger notification for observers
+        try {
+            await notifyDatabaseChanged();
+        } catch (notifyError) {
+            console.error('⚠️ Error notifying database observers:', notifyError);
+            // Continue anyway - the operation succeeded
+        }
+
+        return result.lastInsertRowId;
     } catch (error) {
         console.error('Error adding food log:', error);
         throw error;

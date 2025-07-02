@@ -13,4 +13,34 @@ export const formatDateToYYYYMMDD = (date: Date): string => {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+};
+
+/**
+ * Format nutritional values for display
+ * Shows "-" for missing data (-1) and formats numbers with units
+ * @param value The nutritional value to display
+ * @param unit The unit to append (e.g., 'g', 'mg', 'mcg')
+ * @param decimals Number of decimal places to show (default: 0)
+ * @returns Formatted string for display
+ */
+export const formatNutritionalValue = (value: number | undefined | null, unit: string = '', decimals: number = 0): string => {
+    // Handle undefined, null, or -1 (our sentinel value for missing data)
+    if (value === undefined || value === null || value === -1) {
+        return '-';
+    }
+    
+    // Format the number with specified decimals
+    const formattedNumber = decimals > 0 ? value.toFixed(decimals) : Math.round(value).toString();
+    
+    // Return with unit if provided
+    return unit ? `${formattedNumber}${unit}` : formattedNumber;
+};
+
+/**
+ * Check if a nutritional value is available (not missing)
+ * @param value The nutritional value to check
+ * @returns true if the value is available, false if missing
+ */
+export const hasNutritionalValue = (value: number | undefined | null): boolean => {
+    return value !== undefined && value !== null && value !== -1 && value > 0;
 }; 
