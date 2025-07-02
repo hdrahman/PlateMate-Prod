@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:gravity="center"
-          android:left="5%"
-          android:top="5%"
-          android:right="5%"
-          android:bottom="5%">
-        <bitmap
-            android:src="@mipmap/ic_launcher_foreground"
-            android:gravity="center"
-            android:scaleType="centerInside" />
-    </item>
-</layer-list> 
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="5%"
+    android:insetTop="5%"
+    android:insetRight="5%"
+    android:insetBottom="5%">
+
+    <bitmap
+        android:src="@mipmap/ic_launcher_foreground"
+        android:gravity="center" />
+</inset> 
