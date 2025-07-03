@@ -1,4 +1,4 @@
-import { createNavigationContainerRef, CommonActions } from '@react-navigation/native';
+import { createNavigationContainerRef, CommonActions, TabActions } from '@react-navigation/native';
 
 // Keep this in a separate module so any part of the app can navigate without
 // needing the component-level `navigation` object.
@@ -11,18 +11,20 @@ export function navigateToFoodLog() {
     console.log('✅ Navigation is ready, dispatching to FoodLog...');
     const refreshTimestamp = Date.now();
 
-    // Since FoodLog is now a tab screen within Main, we need to navigate to Main first,
-    // then use jumpTo to switch to the FoodLog tab
+    // Navigate to Main first to ensure we're in the tab navigator
     navigationRef.dispatch(
-      CommonActions.navigate({
-        name: 'Main',
-        params: {
-          screen: 'FoodLog',
-          params: { refresh: refreshTimestamp },
-        },
-      })
+      CommonActions.navigate('Main')
     );
-    console.log('🎯 Navigation dispatched to FoodLog tab with refresh:', refreshTimestamp);
+    
+    // Then jump to the FoodLog tab specifically
+    setTimeout(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.dispatch(
+          TabActions.jumpTo('FoodLog', { refresh: refreshTimestamp })
+        );
+        console.log('🎯 Jumped to FoodLog tab with refresh:', refreshTimestamp);
+      }
+    }, 50);
   } else {
     console.log('❌ Navigation is NOT ready yet');
   }
