@@ -451,10 +451,16 @@ const ImageCapture: React.FC = () => {
 
                     const fileName = `image_${i}_${Date.now()}.${fileExtension}`;
 
+                    // Map file extension to correct MIME type
+                    let mimeType = `image/${fileExtension}`;
+                    if (fileExtension === 'jpg') {
+                        mimeType = 'image/jpeg'; // Ensure compatibility with backend validation
+                    }
+
                     // Use Android-compatible file object structure (NO blobs!)
                     const fileObject = {
                         uri: uri,
-                        type: `image/${fileExtension}`,
+                        type: mimeType,
                         name: fileName,
                     };
 

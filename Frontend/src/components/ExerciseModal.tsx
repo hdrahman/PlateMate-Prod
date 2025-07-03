@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatDateToString } from '../utils/dateUtils';
-import { addExercise } from '../utils/database';
+import { addExercise, getCurrentUserIdAsync, getUserProfile } from '../utils/database';
 
 // Define the Exercise interface
 interface Exercise {
@@ -61,10 +61,30 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
     const [exerciseDuration, setExerciseDuration] = useState('30');
     const [exerciseIntensity, setExerciseIntensity] = useState('moderate');
     const [searchQuery, setSearchQuery] = useState('');
-    const [userWeight, setUserWeight] = useState(70); // Default 70kg (around 150lbs)
+    const [userWeight, setUserWeight] = useState<number>(70);
     const [manualMET, setManualMET] = useState('5.0');
     const [manualActivityName, setManualActivityName] = useState('');
     const [isManualEntry, setIsManualEntry] = useState(false);
+
+    // Fetch the current user's weight from their profile
+    useEffect(() => {
+        const loadUserWeight = async () => {
+            try {
+                const uid = await getCurrentUserIdAsync();
+                const profile: any = await getUserProfile(uid);
+
+                if (profile && typeof profile.weight === 'number' && profile.weight > 0) {
+                    setUserWeight(profile.weight);
+                } else {
+                    console.warn('⚠️ User weight not found in profile, using default of 70kg');
+                }
+            } catch (error) {
+                console.error('❌ Error loading user weight:', error);
+            }
+        };
+
+        loadUserWeight();
+    }, []);
 
     // Function to reset form
     const resetForm = () => {

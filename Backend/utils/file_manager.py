@@ -15,7 +15,7 @@ IMAGES_DIR = UPLOAD_DIR / "images"
 TEMP_DIR = UPLOAD_DIR / "temp"
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 # Ensure directories exist
 UPLOAD_DIR.mkdir(exist_ok=True)
