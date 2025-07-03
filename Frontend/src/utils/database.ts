@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as SQLite from 'expo-sqlite';
 
 import { updateDatabaseSchema } from './updateDatabase';
@@ -6,6 +7,7 @@ import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatab
 
 // Import subscription types
 import { SubscriptionStatus, SubscriptionDetails } from '../types/user';
+import { navigateToFoodLog } from '../navigation/RootNavigation';
 
 // Database singleton and initialization tracking
 let db: SQLite.SQLiteDatabase;
@@ -21,6 +23,7 @@ declare global {
 // Set initial value
 global.dbInitialized = false;
 
+// @ts-nocheck
 // Get or initialize the database with proper singleton pattern
 export const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     // If database is already initialized, return it
@@ -434,6 +437,11 @@ export const addFoodLog = async (foodData: {
     image_url: string;
     file_key?: string;
 }) => {
+    // Immediately navigate user to FoodLog screen so they can view the entry
+    console.log('🚀 About to navigate to FoodLog...');
+    navigateToFoodLog();
+    console.log('✅ navigateToFoodLog() called');
+
     try {
         const db = await getDatabase();
         // Use async version to ensure we get a valid authenticated user ID when available

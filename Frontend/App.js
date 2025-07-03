@@ -59,6 +59,7 @@ import Auth from "./src/screens/Auth";
 import Onboarding from "./src/screens/Onboarding";
 import Analytics from "./src/screens/Analytics";
 import PremiumSubscription from './src/screens/PremiumSubscription';
+import { navigationRef } from './src/navigation/RootNavigation';
 
 const { width } = Dimensions.get("window");
 const BASE_BUTTON_SIZE = 55;
@@ -367,7 +368,7 @@ function AppNavigator() {
   }
 
   return (
-    <NavigationContainer theme={DefaultTheme}>
+    <NavigationContainer theme={DefaultTheme} ref={navigationRef}>
       <OnboardingProvider>
         <Stack.Navigator
           screenOptions={{

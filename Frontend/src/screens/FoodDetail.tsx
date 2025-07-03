@@ -352,6 +352,10 @@ const FoodDetailScreen: React.FC = () => {
 
             console.log('Saving quick add food log to local database:', foodLog);
 
+            // Navigate to FoodLog immediately so the user can see the new entry
+            const refreshTimestamp = Date.now();
+            navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+
             await addFoodLog(foodLog);
 
             Alert.alert(

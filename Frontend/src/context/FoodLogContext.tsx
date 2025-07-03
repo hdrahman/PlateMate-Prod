@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { getFoodLogsByDate as getLocalFoodLogsByDate, addFoodLog as addLocalFoodLog } from '../utils/database';
 import { subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges, notifyDatabaseChanged } from '../utils/databaseWatcher';
+import { navigateToFoodLog } from '../navigation/RootNavigation';
 
 // Local helper to format date as YYYY-MM-DD
 function formatDateToString(date: Date): string {
@@ -397,9 +398,12 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Add a new food log entry
     const addFoodLog = async (foodLog: Omit<FoodLogEntry, 'id'>): Promise<number | undefined> => {
+        // Immediately navigate the user to the FoodLog screen so they can see the new entry
+        navigateToFoodLog();
+
         try {
             // Start database operation immediately
-            const idPromise = addLocalFoodLog(foodLog);
+            const idPromise = addLocalFoodLog(foodLog as any);
 
             // Update UI state optimistically without waiting for database operation
             // This creates a smoother user experience

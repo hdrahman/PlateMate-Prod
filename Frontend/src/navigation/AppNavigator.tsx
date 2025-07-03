@@ -24,9 +24,8 @@ import Camera from '../screens/Camera';
 import BarcodeScanner from '../screens/BarcodeScanner';
 import Manual from '../screens/Manual';
 import MealGallery from '../screens/MealGallery';
+import Home from '../screens/Home';
 // Import other screens as needed - these would be your existing screens
-// import HomeScreen from '../screens/HomeScreen';
-// import MealLogScreen from '../screens/MealLogScreen';
 // import ExerciseScreen from '../screens/ExerciseScreen';
 
 // Define types for the navigation
@@ -43,7 +42,6 @@ type RootStackParamList = {
     DataSharing: undefined;
     PrivacyPolicy: undefined;
     DebugOnboarding: undefined;
-    FoodLog: { refresh?: number; mealIdFilter?: number };
     FoodDetail: { foodId: number };
     Chatbot: undefined;
     ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
@@ -68,7 +66,7 @@ const MainTabNavigator = () => {
 
                     if (route.name === 'Home') {
                         iconName = focused ? 'home' : 'home-outline';
-                    } else if (route.name === 'MealLog') {
+                    } else if (route.name === 'FoodLog') {
                         iconName = focused ? 'restaurant' : 'restaurant-outline';
                     } else if (route.name === 'Exercise') {
                         iconName = focused ? 'fitness' : 'fitness-outline';
@@ -88,11 +86,8 @@ const MainTabNavigator = () => {
                 headerShown: false,
             })}
         >
-            {/* 
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="MealLog" component={MealLogScreen} />
-      <Tab.Screen name="Exercise" component={ExerciseScreen} /> 
-      */}
+            <Tab.Screen name="Home" component={Home} />
+            <Tab.Screen name="FoodLog" component={FoodLog} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
@@ -121,7 +116,6 @@ const AppNavigator = () => {
                 <Stack.Screen name="DataSharing" component={DataSharing} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
                 <Stack.Screen name="DebugOnboarding" component={DebugOnboarding} />
-                <Stack.Screen name="FoodLog" component={FoodLog} />
                 <Stack.Screen name="FoodDetail" component={FoodDetail} />
                 <Stack.Screen name="Chatbot" component={Chatbot} />
                 <Stack.Screen name="ImageCapture" component={ImageCapture} />
