@@ -31,6 +31,7 @@ import AnalysisModal from '../components/AnalysisModal';
 import { saveImageLocally, saveMultipleImagesLocally } from '../utils/localFileStorage';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
+import { navigateToFoodLog } from '../navigation/RootNavigation';
 
 const { width } = Dimensions.get('window');
 
@@ -653,8 +654,8 @@ const ImageCapture: React.FC = () => {
                 console.log('Saving barcode food log to local database:', foodLog);
 
                 // Navigate immediately while database operation runs in background
-                const refreshTimestamp = Date.now();
-                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+                console.log('🚀 About to navigate to FoodLog...');
+                navigateToFoodLog();
 
                 // Continue with database operation after navigation has started
                 await addFoodLog(foodLog);
@@ -704,9 +705,6 @@ const ImageCapture: React.FC = () => {
             // Hide the analysis modal immediately to improve perceived performance
             setShowAnalysisModal(false);
 
-            // Prepare for navigation
-            const refreshTimestamp = Date.now();
-
             // Check if we have an array of nutrition data
             if (Array.isArray(result.nutrition_data) && result.nutrition_data.length > 0) {
                 // Process each food item in the array
@@ -754,7 +752,8 @@ const ImageCapture: React.FC = () => {
                 }
 
                 // Navigate before database operation to prevent UI blocking
-                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+                console.log('🚀 About to navigate to FoodLog...');
+                navigateToFoodLog();
 
                 // Continue with database operation after navigation has started
                 console.log(`Saving ${foodLogsToInsert.length} food logs to local database in batch`);
@@ -801,7 +800,8 @@ const ImageCapture: React.FC = () => {
                 };
 
                 // Navigate before database operation to prevent UI blocking
-                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+                console.log('🚀 About to navigate to FoodLog...');
+                navigateToFoodLog();
 
                 // Continue with database operation after navigation has started
                 console.log('Saving food log to local database:', foodLog);
