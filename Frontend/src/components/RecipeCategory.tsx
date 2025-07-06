@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from './RecipeCard';
 import { getRecipesByMealType, Recipe } from '../api/recipes';
+import { getCachedRecipeCategory, cacheRecipeCategory, cleanupExpiredCache } from '../utils/database';
 
 // Define color constants for consistent theming
 const WHITE = '#FFFFFF';
@@ -58,7 +59,34 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
             try {
                 setLoading(true);
 
-                // Fetch fresh recipes from API
+                // Clean up expired cache entries first
+                await cleanupExpiredCache();
+
+                // Check if we have cached recipes for this category today
+                console.log(`🔍 Checking for cached ${categoryId} recipes...`);
+                const cachedRecipes = await getCachedRecipeCategory(categoryId);
+
+                if (cachedRecipes && cachedRecipes.length > 0) {
+                    console.log(`✅ Using cached ${categoryId} recipes from today`);
+
+                    // Initialize image loading and retry states for cached recipes
+                    const initialImageLoading: { [key: string]: boolean } = {};
+                    const recipesWithRetries = cachedRecipes.map(recipe => {
+                        const recipeId = recipe.id?.toString() || '';
+                        initialImageLoading[recipeId] = true;
+                        return {
+                            ...recipe,
+                            retryCount: 0,
+                            currentImageUrl: recipe.image
+                        };
+                    });
+
+                    setRecipes(recipesWithRetries);
+                    setImageLoading(initialImageLoading);
+                    return;
+                }
+
+                // No cache found, fetch fresh recipes from API
                 console.log(`🌐 Fetching fresh ${categoryId} recipes from API`);
                 const data = await getRecipesByMealType(categoryId, 12);
 
@@ -79,6 +107,10 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
 
                     setRecipes(recipesWithRetries);
                     setImageLoading(initialImageLoading);
+
+                    // Cache the recipes for today
+                    await cacheRecipeCategory(categoryId, data);
+                    console.log(`💾 ${categoryId} recipes cached for today`);
                 } else {
                     console.log(`No recipes found for category: ${categoryId}`);
                     setRecipes([]);

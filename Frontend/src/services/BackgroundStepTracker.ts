@@ -2,12 +2,12 @@ import { Platform, PermissionsAndroid, DeviceEventEmitter, NativeEventEmitter, N
 import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps, getStepsForDate } from '../utils/database';
+import { registerStepBackgroundTask, unregisterStepBackgroundTask } from '../tasks/StepCountTask';
 
 // Keys for AsyncStorage
 const STEP_TRACKER_ENABLED_KEY = 'STEP_TRACKER_ENABLED';
 const LAST_STEP_COUNT_KEY = 'LAST_STEP_COUNT';
 const LAST_RESET_DATE_KEY = 'LAST_RESET_DATE';
-const BACKGROUND_STEP_COUNT_KEY = 'BACKGROUND_STEP_COUNT';
 const LAST_SYNC_STEP_COUNT_KEY = 'LAST_SYNC_STEP_COUNT';
 
 // For iOS HealthKit integration (when available)
@@ -36,7 +36,7 @@ class BackgroundStepTracker {
     private hasPermissions: boolean = false;
     private appStateSubscription: any = null;
     private isAppActive: boolean = true;
-    private stepThreshold: number = 50; // Only sync when step difference is >= 50
+    private stepThreshold: number = 25; // Only sync when step difference is >= 25 (lowered for better background sync)
 
     constructor() {
         this.initialize();
@@ -62,19 +62,37 @@ class BackgroundStepTracker {
                 await this.requestAndroidPermissions();
             }
 
-            // Get last saved step counts
-            const lastStepCountStr = await AsyncStorage.getItem(LAST_STEP_COUNT_KEY);
-            const lastSyncStepCountStr = await AsyncStorage.getItem(LAST_SYNC_STEP_COUNT_KEY);
-
-            if (lastStepCountStr) {
-                this.lastStepCount = parseInt(lastStepCountStr, 10);
-            }
-            if (lastSyncStepCountStr) {
-                this.lastSyncStepCount = parseInt(lastSyncStepCountStr, 10);
-            }
-
-            // Check if we need to reset the counter (new day)
+            // Check if we need to reset the counter (new day) first
             await this.checkDateAndResetIfNeeded();
+
+            // Load today's steps from database (persistent storage)
+            const today = new Date().toISOString().split('T')[0];
+            const stepsFromDb = await getStepsForDate(today);
+            
+            // Database is the ONLY source of truth - use it always
+            this.lastStepCount = stepsFromDb;
+            this.lastSyncStepCount = stepsFromDb;
+            
+            console.log(`📊 Initialized with ${stepsFromDb} steps from database for ${today}`);
+
+            // Update AsyncStorage to match database state
+            await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, this.lastStepCount.toString());
+            await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastSyncStepCount.toString());
+
+            console.log(`📊 Initialized step tracker: DB=${stepsFromDb}, Current=${this.lastStepCount}, Sync=${this.lastSyncStepCount}`);
+
+            // 1a) Immediately persist today's step count if it hasn't been synced yet
+            try {
+                if (this.lastSyncStepCount !== this.lastStepCount) {
+                    await updateTodaySteps(this.lastStepCount);
+                    this.lastSyncStepCount = this.lastStepCount;
+                    await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastSyncStepCount.toString());
+                }
+                // 1b) Notify any listeners so UI can render the persisted count right away
+                this.notifyListeners(this.lastStepCount);
+            } catch (seedErr) {
+                console.error('Error seeding initial step count to DB:', seedErr);
+            }
 
             // Set up app state listener for battery optimization
             this.setupAppStateListener();
@@ -83,7 +101,19 @@ class BackgroundStepTracker {
             const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
             if (wasEnabled === 'true') {
                 await this.startTracking();
+                
+                // Resync from sensor to get latest step count (handles app restart scenario)
+                try {
+                    await this.resyncFromSensor();
+                    console.log('✅ Initial sensor resync completed');
+                } catch (error) {
+                    console.warn('⚠️ Initial sensor resync failed:', error);
+                }
             }
+            
+            // Register background task for step syncing
+            await registerStepBackgroundTask();
+            console.log('✅ Background step sync task registered');
         } catch (error) {
             console.error('Error initializing background step tracker:', error);
         }
@@ -91,6 +121,14 @@ class BackgroundStepTracker {
 
     private setupAppStateListener() {
         this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+        
+        // Also listen for app termination events (Android)
+        if (Platform.OS === 'android') {
+            DeviceEventEmitter.addListener('onDestroy', () => {
+                console.log('🔴 App is being destroyed, saving final step count...');
+                this.syncStepsToDatabase();
+            });
+        }
     }
 
     private handleAppStateChange(nextAppState: AppStateStatus) {
@@ -123,6 +161,11 @@ class BackgroundStepTracker {
         // Restore normal sync when app becomes active
         if (this.isTracking) {
             this.startBackgroundSync();
+            
+            // Resync from sensor to catch any steps taken while app was in background
+            this.resyncFromSensor().catch(error => {
+                console.warn('⚠️ Foreground resync failed:', error);
+            });
         }
 
         console.log('📱 Step tracker optimized for foreground');
@@ -213,7 +256,6 @@ class BackgroundStepTracker {
             await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, '0');
             await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, '0');
             await AsyncStorage.setItem(LAST_RESET_DATE_KEY, today);
-            await AsyncStorage.setItem(BACKGROUND_STEP_COUNT_KEY, '0');
             console.log('📅 Step counter reset for new day:', today);
         }
     }
@@ -298,9 +340,48 @@ class BackgroundStepTracker {
                 return;
             }
 
+            // Simple approach: Use real-time step count from system
+            let sessionStartSteps = 0;
+            let isFirstReading = true;
+
+            console.log(`📱 Starting pedometer tracking - Current daily total: ${this.lastStepCount}`);
+
             // Start pedometer subscription
             this.subscription = Pedometer.watchStepCount((result) => {
-                this.updateStepCount(result.steps);
+                const sessionSteps = result.steps; // Steps since tracking started
+                
+                console.log(`📱 Pedometer reading: session_steps=${sessionSteps}, current_total=${this.lastStepCount}`);
+
+                if (isFirstReading) {
+                    // First reading - just establish baseline
+                    sessionStartSteps = sessionSteps;
+                    isFirstReading = false;
+                    console.log(`📱 Pedometer session baseline set: ${sessionStartSteps}`);
+                    return;
+                }
+
+                // Handle session resets (can happen after background/OS optimizations)
+                if (sessionSteps < sessionStartSteps) {
+                    console.log('🔄 Pedometer session reset detected, adjusting baseline');
+                    sessionStartSteps = sessionSteps;
+                    return;
+                }
+
+                // Calculate NEW steps taken in this session
+                const newStepsTaken = Math.max(0, sessionSteps - sessionStartSteps);
+                
+                if (newStepsTaken > 0) {
+                    // Add new steps to our current total
+                    const newTotalSteps = this.lastStepCount + newStepsTaken;
+                    
+                    console.log(`📱 New steps detected: +${newStepsTaken} steps (${this.lastStepCount} → ${newTotalSteps})`);
+                    
+                    // Update the session baseline for next calculation
+                    sessionStartSteps = sessionSteps;
+                    
+                    // Update step count
+                    this.updateStepCount(newTotalSteps);
+                }
             });
 
             console.log('📱 Pedometer step tracking initialized');
@@ -327,32 +408,30 @@ class BackgroundStepTracker {
     }
 
     private async updateStepCount(steps: number) {
-        const stepDifference = Math.abs(steps - this.lastStepCount);
-
-        // Only update if significant change (reduces battery usage)
-        if (stepDifference >= 10) {
+        // Simple approach: just update if steps have changed
+        if (steps !== this.lastStepCount) {
+            const previousSteps = this.lastStepCount;
             this.lastStepCount = steps;
+            
+            // Update AsyncStorage
             await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString());
 
-            // Notify listeners
+            // Notify listeners immediately
             this.notifyListeners(steps);
 
-            // Smart sync: only sync if step difference is significant
-            if (Math.abs(steps - this.lastSyncStepCount) >= this.stepThreshold) {
-                this.smartSyncToDatabase();
+            console.log(`📊 Steps updated: ${previousSteps} → ${steps} (+${steps - previousSteps})`);
+
+            // Sync to database based on threshold
+            const stepDifference = Math.abs(steps - this.lastSyncStepCount);
+            if (stepDifference >= this.stepThreshold) {
+                await this.smartSyncToDatabase();
             }
         }
     }
 
     private async smartSyncToDatabase() {
         try {
-            // Only sync if there's a meaningful difference
             const stepDifference = Math.abs(this.lastStepCount - this.lastSyncStepCount);
-
-            if (stepDifference < this.stepThreshold) {
-                console.log(`📊 Sync skipped: step difference (${stepDifference}) below threshold (${this.stepThreshold})`);
-                return;
-            }
 
             await updateTodaySteps(this.lastStepCount);
 
@@ -400,6 +479,9 @@ class BackgroundStepTracker {
             // Update tracking state
             this.isTracking = false;
             await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'false');
+            
+            // Unregister background task
+            await unregisterStepBackgroundTask();
 
             console.log('👣 Step tracking stopped');
         } catch (error) {
@@ -408,19 +490,9 @@ class BackgroundStepTracker {
     }
 
     async getTodaySteps(): Promise<number> {
-        try {
-            if (this.isTracking) {
-                return this.lastStepCount;
-            }
-
-            // Fallback to database
-            const today = new Date().toISOString().split('T')[0];
-            const stepsFromDb = await getStepsForDate(today);
-            return stepsFromDb || 0;
-        } catch (error) {
-            console.error('Error getting today steps:', error);
-            return 0;
-        }
+        // Always serve the latest in-memory count; this value is kept in sync with
+        // SQLite and AsyncStorage during tracking and initialization.
+        return this.lastStepCount;
     }
 
     // Get step history from database
@@ -499,6 +571,44 @@ class BackgroundStepTracker {
     // Force sync steps to database
     async forceSyncToDatabase() {
         await this.syncStepsToDatabase();
+    }
+
+    // Resync from sensor (useful after app restart/swipe-kill)
+    async resyncFromSensor() {
+        try {
+            console.log('🔄 Resyncing steps from sensor...');
+            
+            // Get steps from midnight of today until now
+            const sinceMidnight = new Date();
+            sinceMidnight.setHours(0, 0, 0, 0);
+            
+            const { steps } = await Pedometer.getStepCountAsync(
+                sinceMidnight,
+                new Date()
+            );
+            
+            console.log(`📊 Resync: Retrieved ${steps} steps from sensor`);
+            
+            // Update our in-memory counters
+            this.lastStepCount = steps;
+            this.lastSyncStepCount = steps;
+            
+            // Update AsyncStorage
+            await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString());
+            await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, steps.toString());
+            
+            // Sync to database
+            await updateTodaySteps(steps);
+            
+            // Notify listeners
+            this.notifyListeners(steps);
+            
+            console.log('✅ Sensor resync completed successfully');
+            return steps;
+        } catch (error) {
+            console.error('❌ Error resyncing from sensor:', error);
+            throw error;
+        }
     }
 
     // Set custom step threshold for syncing

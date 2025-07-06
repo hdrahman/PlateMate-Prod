@@ -88,6 +88,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             } catch (error) {
                 console.error('Error restoring auth state:', error);
+                // Force logout on invalid or expired session so user is redirected to login
+                if (
+                    (error as any)?.code === 'refresh_token_already_used' ||
+                    (error as any)?.name === 'AuthSessionMissingError'
+                ) {
+                    try {
+                        console.log('🔒 Invalid Supabase session detected during auth restore – forcing logout');
+                        await supabaseAuth.signOut();
+                        setUser(null);
+                        global.cachedSupabaseUser = null;
+                    } catch (signOutErr) {
+                        console.warn('Error during forced logout:', signOutErr);
+                    }
+                }
             } finally {
                 setIsLoading(false);
             }

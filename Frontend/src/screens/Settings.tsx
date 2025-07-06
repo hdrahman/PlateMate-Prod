@@ -1,15 +1,53 @@
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, StatusBar } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getCacheStats, clearMealPlannerCache } from "../utils/database";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
     const { signOut } = useAuth();
+    const [cacheStats, setCacheStats] = useState<{ total: number, active: number, expired: number }>({ total: 0, active: 0, expired: 0 });
+
+    useEffect(() => {
+        loadCacheStats();
+    }, []);
+
+    const loadCacheStats = async () => {
+        try {
+            const stats = await getCacheStats();
+            setCacheStats(stats);
+        } catch (error) {
+            console.error('Error loading cache stats:', error);
+        }
+    };
+
+    const handleClearCache = async () => {
+        Alert.alert(
+            'Clear Meal Planner Cache',
+            'This will clear all cached recipes and force fresh data to be loaded. Are you sure?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await clearMealPlannerCache();
+                            await loadCacheStats();
+                            Alert.alert('Success', 'Meal planner cache cleared successfully');
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to clear cache. Please try again.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const handleLogout = async () => {
         try {
@@ -19,6 +57,8 @@ const SettingsScreen = () => {
             Alert.alert('Logout Error', 'Failed to log out. Please try again.');
         }
     };
+
+
 
     return (
         <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]} edges={["top", "left", "right"]}>
@@ -94,6 +134,23 @@ const SettingsScreen = () => {
                 </View>
 
                 <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Community</Text>
+                    <View style={styles.card}>
+                        <TouchableOpacity
+                            style={[styles.item, styles.lastItem]}
+                            onPress={() => navigation.navigate("FeatureRequests")}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.iconBubble, { backgroundColor: '#32CD3230' }]}>
+                                <Ionicons name="bulb-outline" size={20} color="#32CD32" />
+                            </View>
+                            <Text style={styles.itemText}>Feature Requests</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Privacy & Security</Text>
                     <View style={styles.card}>
                         <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("Notifications")}>
@@ -115,6 +172,30 @@ const SettingsScreen = () => {
                                 <Ionicons name="document-text-outline" size={20} color="#C0C0C0" />
                             </View>
                             <Text style={styles.itemText}>Privacy Policy</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Cache Management</Text>
+                    <View style={styles.card}>
+                        <View style={styles.item}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#32CD3230' }]}>
+                                <Ionicons name="server-outline" size={20} color="#32CD32" />
+                            </View>
+                            <View style={styles.cacheStatsContainer}>
+                                <Text style={styles.itemText}>Cache Statistics</Text>
+                                <Text style={styles.cacheStatsText}>
+                                    Active: {cacheStats.active} | Expired: {cacheStats.expired} | Total: {cacheStats.total}
+                                </Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={handleClearCache}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#FF453A30' }]}>
+                                <Ionicons name="trash-outline" size={20} color="#FF453A" />
+                            </View>
+                            <Text style={styles.itemText}>Clear Recipe Cache</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
                     </View>
@@ -272,6 +353,15 @@ const styles = StyleSheet.create({
     },
     logoutIcon: {
         marginRight: 10,
+    },
+    cacheStatsContainer: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    cacheStatsText: {
+        fontSize: 12,
+        color: '#777',
+        marginTop: 2,
     },
 });
 

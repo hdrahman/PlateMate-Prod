@@ -15,6 +15,7 @@ import {
     cleanupOldTempOnboardingSessions,
     ensureDatabaseReady
 } from '../utils/database';
+import supabaseAuth from '../utils/supabaseAuth';
 
 interface OnboardingContextType {
     // Basic onboarding state
@@ -502,6 +503,18 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 }
             } catch (error) {
                 console.error('❌ Error loading onboarding state:', error);
+                // Handle invalid/expired Supabase sessions gracefully
+                if (
+                    (error as any)?.code === 'refresh_token_already_used' ||
+                    (error as any)?.name === 'AuthSessionMissingError'
+                ) {
+                    try {
+                        console.log('🔒 Invalid Supabase session detected during onboarding load – forcing logout');
+                        await supabaseAuth.signOut();
+                    } catch (signOutErr) {
+                        console.warn('Error during forced logout:', signOutErr);
+                    }
+                }
                 // Set defaults on error
                 setOnboardingComplete(false);
                 setCurrentStep(1);

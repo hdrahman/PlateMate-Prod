@@ -118,8 +118,21 @@ export const supabaseAuth = {
             const { data: { user }, error } = await supabase.auth.getUser();
             if (error) throw error;
             return user;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error getting current user:', error);
+            // Auto-logout on invalid/expired session so UI can redirect to login
+            if (
+                error?.code === 'refresh_token_already_used' ||
+                error?.code === 'invalid_refresh_token' ||
+                error?.name === 'AuthSessionMissingError'
+            ) {
+                try {
+                    console.log('🔒 Invalid Supabase session detected – forcing logout');
+                    await supabase.auth.signOut();
+                } catch (signOutErr) {
+                    console.warn('Error during forced logout:', signOutErr);
+                }
+            }
             return null;
         }
     },
@@ -130,8 +143,20 @@ export const supabaseAuth = {
             const { data: { session }, error } = await supabase.auth.getSession();
             if (error) throw error;
             return session;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error getting current session:', error);
+            if (
+                error?.code === 'refresh_token_already_used' ||
+                error?.code === 'invalid_refresh_token' ||
+                error?.name === 'AuthSessionMissingError'
+            ) {
+                try {
+                    console.log('🔒 Invalid Supabase session detected – forcing logout');
+                    await supabase.auth.signOut();
+                } catch (signOutErr) {
+                    console.warn('Error during forced logout:', signOutErr);
+                }
+            }
             return null;
         }
     },

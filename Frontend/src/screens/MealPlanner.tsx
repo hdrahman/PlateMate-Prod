@@ -13,6 +13,7 @@ import { getRandomRecipes, getRecipesByMealType, searchRecipes, Recipe } from '.
 import { useFavorites } from '../context/FavoritesContext';
 import apiService from '../utils/apiService';
 import { ServiceTokenType } from '../utils/tokenManager';
+import { getCachedFeaturedRecipes, cacheFeaturedRecipes, cleanupExpiredCache } from '../utils/database';
 
 // Define food categories locally since they were removed from the API
 const foodCategories = [
@@ -615,13 +616,26 @@ export default function MealPlanner() {
         loadUserData();
     }, [user, onboardingProfile, isOnboardingLoading, nutrientTotals, lastUpdated]);
 
-    // Function to load featured gym-friendly recipes - NOW WITH CACHING & GYM-FRIENDLY SEARCH
+    // Function to load featured gym-friendly recipes - NOW WITH DAILY CACHING!
     const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
 
-            // Search for gym-friendly recipes instead of just "healthy" salads
-            console.log('Loading featured recipes (using cache if available)');
+            // Clean up expired cache entries first
+            await cleanupExpiredCache();
+
+            // Check if we have cached featured recipes for today
+            console.log('🔍 Checking for cached featured recipes...');
+            const cachedRecipes = await getCachedFeaturedRecipes();
+
+            if (cachedRecipes && cachedRecipes.length > 0) {
+                console.log('✅ Using cached featured recipes from today');
+                setFeaturedRecipes(cachedRecipes);
+                return;
+            }
+
+            // No cache found, fetch fresh recipes
+            console.log('🌐 Fetching fresh featured recipes...');
 
             // Mix of gym-friendly search terms to get variety - NO QUINOA SPAM!
             const gymFriendlySearchTerms = [
@@ -656,7 +670,9 @@ export default function MealPlanner() {
                 const recipesToShow = validRecipes.slice(0, 5);
                 setFeaturedRecipes(recipesToShow);
 
-                console.log('Featured recipes loaded and cached successfully');
+                // Cache the recipes for today
+                await cacheFeaturedRecipes(recipesToShow);
+                console.log('💾 Featured recipes cached for today');
             } else {
                 // Fallback to random recipes if search fails
                 console.log('No recipes found, falling back to random recipes');
@@ -664,7 +680,12 @@ export default function MealPlanner() {
                 const validFallback = fallbackRecipes.filter(recipe =>
                     recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')
                 );
-                setFeaturedRecipes(validFallback.slice(0, 5));
+                const recipesToShow = validFallback.slice(0, 5);
+                setFeaturedRecipes(recipesToShow);
+
+                // Cache the fallback recipes too
+                await cacheFeaturedRecipes(recipesToShow);
+                console.log('💾 Fallback recipes cached for today');
             }
         } catch (error) {
             console.error('Error loading featured recipes:', error);

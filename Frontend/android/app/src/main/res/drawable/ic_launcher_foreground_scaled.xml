@@ -6,6 +6,6 @@
     android:insetBottom="5%">
 
     <bitmap
-        android:src="@mipmap/ic_launcher_foreground"
+        android:src="@drawable/platemate_foreground"
         android:gravity="center" />
 </inset> 

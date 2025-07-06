@@ -230,17 +230,29 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS nutrition_goals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        firebase_uid TEXT UNIQUE NOT NULL,
+        firebase_uid TEXT NOT NULL,
         target_weight REAL,
-        daily_calorie_goal INTEGER,
+        calorie_goal INTEGER,
         protein_goal INTEGER,
         carb_goal INTEGER,
         fat_goal INTEGER,
-        weight_goal TEXT CHECK(weight_goal IN ('lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5')),
-        activity_level TEXT CHECK(activity_level IN ('sedentary', 'light', 'moderate', 'active', 'very_active')),
+        fitness_goal TEXT,
+        weight_goal TEXT,
+        activity_level TEXT,
+        weekly_workouts INTEGER,
+        step_goal INTEGER,
+        water_goal INTEGER,
+        sleep_goal INTEGER,
+        cheat_day_enabled INTEGER DEFAULT 0,
+        cheat_day_frequency INTEGER DEFAULT 7,
+        preferred_cheat_day_of_week INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         synced INTEGER DEFAULT 0,
         sync_action TEXT DEFAULT 'create',
-        last_modified TEXT NOT NULL
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid),
+        UNIQUE(firebase_uid)
       )
     `);
         console.log('✅ nutrition_goals table created successfully');
@@ -302,7 +314,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       CREATE TABLE IF NOT EXISTS steps (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER DEFAULT 1,
-        step_count INTEGER NOT NULL,
+        count INTEGER NOT NULL,
         date TEXT NOT NULL,
         synced INTEGER DEFAULT 0,
         sync_action TEXT DEFAULT 'create',
@@ -328,19 +340,51 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ streak_tracking table created successfully');
 
-        // Create api_tokens table for token management
+        // Create API tokens table for secure token management
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS api_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         service_name TEXT UNIQUE NOT NULL,
         token TEXT NOT NULL,
-        token_type TEXT DEFAULT 'Bearer',
-        expiry_time INTEGER NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        token_type TEXT NOT NULL DEFAULT 'Bearer',
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       )
     `);
         console.log('✅ api_tokens table created successfully');
+
+        // Create cache table for daily meal planner features
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS meal_planner_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cache_key TEXT UNIQUE NOT NULL,
+        cache_data TEXT NOT NULL,
+        cache_date TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+        console.log('✅ meal_planner_cache table created successfully');
+
+        // Create user_steps table for step tracking
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS user_steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        goal INTEGER DEFAULT 10000,
+        manual_entry INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid),
+        UNIQUE(firebase_uid, date)
+      )
+    `);
+        console.log('✅ user_steps table created successfully');
 
         // Set initialization flags
         global.dbInitialized = true;
@@ -3868,50 +3912,230 @@ const convertFrontendProfileToSQLiteFormatHelper = (frontendProfile: any, fireba
 
 // NEW: Unified profile retrieval function that works with both Firebase and Supabase UIDs
 export const getUserProfile = async (uid: string) => {
-    if (!db || !global.dbInitialized) {
-        console.error('⚠️ Attempting to get user profile before database initialization');
-        throw new Error('Database not initialized');
-    }
-
     try {
-        console.log(`🔍 Looking up user profile for UID: ${uid}`);
-
-        const profile = await db.getFirstAsync<UserProfile>(
-            `SELECT * FROM user_profiles WHERE firebase_uid = ?`,
-            [uid]
-        );
-
-        if (!profile) {
-            console.log(`ℹ️ No profile found for UID: ${uid}`);
-            return null;
+        const profile = await getUserProfileBySupabaseUid(uid);
+        if (profile) {
+            return profile;
         }
-
-        console.log(`✅ Profile found for UID: ${uid}`);
-
-        // Parse JSON strings back to objects
-        return {
-            ...profile,
-            dietary_restrictions: profile.dietary_restrictions ? JSON.parse(profile.dietary_restrictions) : [],
-            food_allergies: profile.food_allergies ? JSON.parse(profile.food_allergies) : [],
-            cuisine_preferences: profile.cuisine_preferences ? JSON.parse(profile.cuisine_preferences) : [],
-            health_conditions: profile.health_conditions ? JSON.parse(profile.health_conditions) : [],
-            nutrient_focus: profile.nutrient_focus ? JSON.parse(profile.nutrient_focus) : null,
-            push_notifications_enabled: Boolean(profile.push_notifications_enabled),
-            email_notifications_enabled: Boolean(profile.email_notifications_enabled),
-            sms_notifications_enabled: Boolean(profile.sms_notifications_enabled),
-            marketing_emails_enabled: Boolean(profile.marketing_emails_enabled),
-            dark_mode: Boolean(profile.dark_mode),
-            sync_data_offline: Boolean(profile.sync_data_offline),
-            onboarding_complete: Boolean(profile.onboarding_complete),
-            diet_type: profile.diet_type,
-            use_metric_system: profile.use_metric_system,
-            premium: Boolean(profile.premium)
-        };
+        return await getUserProfileByFirebaseUid(uid);
     } catch (error) {
-        console.error('❌ Error getting user profile:', error);
+        console.error('Error getting user profile:', error);
         throw error;
     }
 };
 
-// Alias functions for backward compatibility
-export const getUserProfileByAnyUid = getUserProfile;
+// ==================== MEAL PLANNER CACHE MANAGEMENT ====================
+
+/**
+ * Get today's date in YYYY-MM-DD format
+ */
+const getTodayDateString = (): string => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+};
+
+/**
+ * Get tomorrow's date in YYYY-MM-DD format for cache expiration
+ */
+const getTomorrowDateString = (): string => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+};
+
+/**
+ * Cache featured recipes for the meal planner (daily cache)
+ */
+export const cacheFeaturedRecipes = async (recipes: any[]): Promise<void> => {
+    try {
+        const db = await getDatabase();
+        const cacheKey = 'featured_recipes';
+        const cacheData = JSON.stringify(recipes);
+        const cacheDate = getTodayDateString();
+        const expiresAt = getTomorrowDateString();
+
+        // Insert or replace cache entry
+        await db.runAsync(`
+            INSERT OR REPLACE INTO meal_planner_cache 
+            (cache_key, cache_data, cache_date, expires_at)
+            VALUES (?, ?, ?, ?)
+        `, [cacheKey, cacheData, cacheDate, expiresAt]);
+
+        console.log('✅ Featured recipes cached successfully for', cacheDate);
+    } catch (error) {
+        console.error('❌ Error caching featured recipes:', error);
+    }
+};
+
+/**
+ * Get cached featured recipes if they exist and are still valid for today
+ */
+export const getCachedFeaturedRecipes = async (): Promise<any[] | null> => {
+    try {
+        const db = await getDatabase();
+        const cacheKey = 'featured_recipes';
+        const todayDate = getTodayDateString();
+
+        const result = await db.getFirstAsync(`
+            SELECT cache_data, cache_date, expires_at 
+            FROM meal_planner_cache 
+            WHERE cache_key = ? AND cache_date = ?
+        `, [cacheKey, todayDate]);
+
+        if (result) {
+            const { cache_data, cache_date, expires_at } = result as any;
+            
+            // Check if cache is still valid (not expired)
+            const today = new Date();
+            const expiryDate = new Date(expires_at);
+            
+            if (today < expiryDate) {
+                const cachedRecipes = JSON.parse(cache_data);
+                console.log('✅ Using cached featured recipes from', cache_date);
+                return cachedRecipes;
+            } else {
+                console.log('⏰ Featured recipes cache expired, will fetch fresh data');
+                // Clean up expired cache
+                await cleanupExpiredCache();
+                return null;
+            }
+        }
+
+        console.log('📭 No featured recipes cache found for today');
+        return null;
+    } catch (error) {
+        console.error('❌ Error getting cached featured recipes:', error);
+        return null;
+    }
+};
+
+/**
+ * Cache recipe category data (daily cache)
+ */
+export const cacheRecipeCategory = async (categoryId: string, recipes: any[]): Promise<void> => {
+    try {
+        const db = await getDatabase();
+        const cacheKey = `category_${categoryId}`;
+        const cacheData = JSON.stringify(recipes);
+        const cacheDate = getTodayDateString();
+        const expiresAt = getTomorrowDateString();
+
+        // Insert or replace cache entry
+        await db.runAsync(`
+            INSERT OR REPLACE INTO meal_planner_cache 
+            (cache_key, cache_data, cache_date, expires_at)
+            VALUES (?, ?, ?, ?)
+        `, [cacheKey, cacheData, cacheDate, expiresAt]);
+
+        console.log(`✅ Recipe category ${categoryId} cached successfully for`, cacheDate);
+    } catch (error) {
+        console.error(`❌ Error caching recipe category ${categoryId}:`, error);
+    }
+};
+
+/**
+ * Get cached recipe category data if it exists and is still valid for today
+ */
+export const getCachedRecipeCategory = async (categoryId: string): Promise<any[] | null> => {
+    try {
+        const db = await getDatabase();
+        const cacheKey = `category_${categoryId}`;
+        const todayDate = getTodayDateString();
+
+        const result = await db.getFirstAsync(`
+            SELECT cache_data, cache_date, expires_at 
+            FROM meal_planner_cache 
+            WHERE cache_key = ? AND cache_date = ?
+        `, [cacheKey, todayDate]);
+
+        if (result) {
+            const { cache_data, cache_date, expires_at } = result as any;
+            
+            // Check if cache is still valid (not expired)
+            const today = new Date();
+            const expiryDate = new Date(expires_at);
+            
+            if (today < expiryDate) {
+                const cachedRecipes = JSON.parse(cache_data);
+                console.log(`✅ Using cached recipe category ${categoryId} from`, cache_date);
+                return cachedRecipes;
+            } else {
+                console.log(`⏰ Recipe category ${categoryId} cache expired, will fetch fresh data`);
+                return null;
+            }
+        }
+
+        console.log(`📭 No recipe category ${categoryId} cache found for today`);
+        return null;
+    } catch (error) {
+        console.error(`❌ Error getting cached recipe category ${categoryId}:`, error);
+        return null;
+    }
+};
+
+/**
+ * Clean up expired cache entries
+ */
+export const cleanupExpiredCache = async (): Promise<void> => {
+    try {
+        const db = await getDatabase();
+        const today = new Date().toISOString().split('T')[0];
+
+        const result = await db.runAsync(`
+            DELETE FROM meal_planner_cache 
+            WHERE expires_at < ?
+        `, [today]);
+
+        console.log('🧹 Cleaned up expired cache entries:', result.changes);
+    } catch (error) {
+        console.error('❌ Error cleaning up expired cache:', error);
+    }
+};
+
+/**
+ * Clear all meal planner cache (useful for debugging or forced refresh)
+ */
+export const clearMealPlannerCache = async (): Promise<void> => {
+    try {
+        const db = await getDatabase();
+        
+        const result = await db.runAsync('DELETE FROM meal_planner_cache');
+        
+        console.log('🗑️ Cleared all meal planner cache:', result.changes, 'entries removed');
+    } catch (error) {
+        console.error('❌ Error clearing meal planner cache:', error);
+    }
+};
+
+/**
+ * Get cache statistics (useful for debugging)
+ */
+export const getCacheStats = async (): Promise<{ total: number, active: number, expired: number }> => {
+    try {
+        const db = await getDatabase();
+        const today = new Date().toISOString().split('T')[0];
+        
+        const totalResult = await db.getFirstAsync(`
+            SELECT COUNT(*) as count FROM meal_planner_cache
+        `);
+        
+        const activeResult = await db.getFirstAsync(`
+            SELECT COUNT(*) as count FROM meal_planner_cache 
+            WHERE expires_at >= ?
+        `, [today]);
+        
+        const expiredResult = await db.getFirstAsync(`
+            SELECT COUNT(*) as count FROM meal_planner_cache 
+            WHERE expires_at < ?
+        `, [today]);
+        
+        return {
+            total: (totalResult as any)?.count || 0,
+            active: (activeResult as any)?.count || 0,
+            expired: (expiredResult as any)?.count || 0
+        };
+    } catch (error) {
+        console.error('❌ Error getting cache stats:', error);
+        return { total: 0, active: 0, expired: 0 };
+    }
+};

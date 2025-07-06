@@ -25,6 +25,8 @@ import BarcodeScanner from '../screens/BarcodeScanner';
 import Manual from '../screens/Manual';
 import MealGallery from '../screens/MealGallery';
 import Home from '../screens/Home';
+import FeatureRequestsScreen from '../screens/FeatureRequests';
+import CreateFeatureRequestScreen from '../screens/CreateFeatureRequest';
 // Import other screens as needed - these would be your existing screens
 // import ExerciseScreen from '../screens/ExerciseScreen';
 
@@ -49,6 +51,8 @@ type RootStackParamList = {
     BarcodeScanner: undefined;
     Manual: { mealType: string; sourcePage?: string };
     MealGallery: undefined;
+    FeatureRequests: undefined;
+    CreateFeatureRequest: undefined;
     // Add other screens as needed
 };
 
@@ -123,6 +127,8 @@ const AppNavigator = () => {
                 <Stack.Screen name="BarcodeScanner" component={BarcodeScanner} />
                 <Stack.Screen name="Manual" component={Manual} />
                 <Stack.Screen name="MealGallery" component={MealGallery} />
+                <Stack.Screen name="FeatureRequests" component={FeatureRequestsScreen} />
+                <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequestScreen} />
                 {/* Add your other screens here */}
             </Stack.Navigator>
         </NavigationContainer>

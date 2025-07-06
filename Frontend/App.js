@@ -59,6 +59,8 @@ import Auth from "./src/screens/Auth";
 import Onboarding from "./src/screens/Onboarding";
 import Analytics from "./src/screens/Analytics";
 import PremiumSubscription from './src/screens/PremiumSubscription';
+import FeatureRequests from './src/screens/FeatureRequests';
+import CreateFeatureRequest from './src/screens/CreateFeatureRequest';
 import { navigationRef } from './src/navigation/RootNavigation';
 
 const { width } = Dimensions.get("window");
@@ -355,6 +357,8 @@ function AuthenticatedContent() {
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
       <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
       <Stack.Screen name="Analytics" component={Analytics} />
+      <Stack.Screen name="FeatureRequests" component={FeatureRequests} />
+      <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequest} />
     </Stack.Navigator>
   );
 }

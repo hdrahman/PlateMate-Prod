@@ -1,7 +1,9 @@
 {
   "devDependencies": {
     "@types/firebase": "^3.2.3",
-    "babel-plugin-module-resolver": "^5.0.2"
+    "babel-plugin-module-resolver": "^5.0.2",
+    "typescript": "~5.8.3",
+    "@types/react": "~19.0.10"
   },
   "dependencies": {
     "@firebase/auth": "^1.10.2",

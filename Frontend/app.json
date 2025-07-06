@@ -2,7 +2,7 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -15,17 +15,26 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.platemate.app"
+      "bundleIdentifier": "com.platemate.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fitness",
+          "fetch"
+        ],
+        "NSMotionUsageDescription": "PlateMate uses motion and fitness data to track your daily steps and help you achieve your fitness goals."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a1a2e"
+        "foregroundImage": "./assets/platemate-fg.png",
+        "backgroundColor": "#1B1B1F"
       },
       "package": "com.platemate.app",
+      "versionCode": 3,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION"
       ]
     },
     "web": {
@@ -39,6 +48,8 @@
         }
       ],
       "expo-sqlite",
+      "expo-background-fetch",
+      "expo-task-manager",
       "./notifee.plugin.js"
     ],
     "extra": {
