@@ -59,72 +59,42 @@ async def create_feature_request(
     try:
         firebase_uid = current_user.get("supabase_uid")
         if not firebase_uid:
-            logger.error(f"User ID not found in current_user: {current_user}")
             raise HTTPException(status_code=401, detail="User ID not found")
-
-        logger.info(f"Creating feature request for user: {firebase_uid}")
-        logger.debug(f"Current user data: {current_user}")
 
         supabase = get_supabase_client()
         
         # Get or create user in users table
+        logger.info(f"Looking up user with firebase_uid: {firebase_uid}")
         user_result = supabase.table("users").select("id").eq("firebase_uid", firebase_uid).execute()
-        logger.debug(f"User lookup result: {user_result}")
+        logger.info(f"User lookup result: {user_result.data}")
         
         if not user_result.data:
-            logger.info(f"User not found, creating new user for firebase_uid: {firebase_uid}")
-            
             # Create user if doesn't exist
+            logger.info(f"User not found, creating new user. Current user data: {current_user}")
             email = current_user.get("email", "")
             user_metadata = current_user.get("user_metadata", {})
-            
-            # Extract name from different possible sources
-            first_name = (
-                user_metadata.get("first_name") or 
-                user_metadata.get("given_name") or 
-                user_metadata.get("name", "").split()[0] if user_metadata.get("name") else "Anonymous"
-            )
-            
-            last_name = (
-                user_metadata.get("last_name") or 
-                user_metadata.get("family_name") or 
-                " ".join(user_metadata.get("name", "").split()[1:]) if user_metadata.get("name") and len(user_metadata.get("name", "").split()) > 1 else ""
-            )
             
             new_user_data = {
                 "firebase_uid": firebase_uid,
                 "email": email,
-                "first_name": first_name,
-                "last_name": last_name,
+                "first_name": user_metadata.get("first_name", "Anonymous"),
+                "last_name": user_metadata.get("last_name", ""),
                 "onboarding_complete": True  # Assume complete if user is accessing feature requests
             }
             
             logger.info(f"Creating user with data: {new_user_data}")
+            create_result = supabase.table("users").insert(new_user_data).execute()
+            logger.info(f"User creation result: {create_result}")
             
-            try:
-                create_result = supabase.table("users").insert(new_user_data).execute()
-                logger.debug(f"User creation result: {create_result}")
-                
-                if not create_result.data:
-                    logger.error(f"Failed to create user - no data returned: {create_result}")
-                    raise HTTPException(status_code=500, detail="Failed to create user in database")
-                
-                user_id = create_result.data[0]["id"]
-                logger.info(f"Successfully created new user {user_id} for firebase_uid {firebase_uid}")
-                
-            except Exception as e:
-                logger.error(f"Error creating user: {str(e)}")
-                # If user creation fails, it might be due to existing user with different case or other DB constraint
-                # Try to fetch the user again
-                retry_result = supabase.table("users").select("id").eq("firebase_uid", firebase_uid).execute()
-                if retry_result.data:
-                    user_id = retry_result.data[0]["id"]
-                    logger.info(f"User found on retry: {user_id}")
-                else:
-                    raise HTTPException(status_code=500, detail=f"Failed to create or find user: {str(e)}")
+            if not create_result.data:
+                logger.error("Failed to create user - no data returned")
+                raise HTTPException(status_code=500, detail="Failed to create user in database")
+            
+            user_id = create_result.data[0]["id"]
+            logger.info(f"Created new user {user_id} for firebase_uid {firebase_uid}")
         else:
             user_id = user_result.data[0]["id"]
-            logger.info(f"Found existing user: {user_id}")
+            logger.info(f"Found existing user with ID: {user_id}")
         
         # Create the feature request
         result = supabase.table("feature_requests").insert({
