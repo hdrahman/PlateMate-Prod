@@ -85,8 +85,12 @@ async def create_feature_request(
         # Create the feature request directly using firebase_uid (no users table needed)
         logger.info(f"Creating feature request for firebase_uid: {firebase_uid}")
         
+        # `user_id` has a NOT NULL constraint and foreign-key reference to
+        # Supabase `auth.users.id`.  We therefore populate it with the
+        # authenticated user's UID so the constraint is satisfied while still
+        # storing the readable `firebase_uid` for convenience.
         result = supabase.table("feature_requests").insert({
-            "user_id": None,  # No longer needed thanks to our schema update
+            "user_id": firebase_uid,
             "firebase_uid": firebase_uid,
             "title": request.title,
             "description": request.description,
