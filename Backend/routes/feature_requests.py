@@ -41,9 +41,30 @@ class FeatureRequestResponse(BaseModel):
     author_name: str
 
 # Helper function to get Supabase client
-def get_supabase_client() -> Client:
-    """Get Supabase client"""
-    return create_client(SUPABASE_URL, os.getenv("SUPABASE_ANON_KEY"))
+# Accepts `service_key` flag to optionally use the service-role key (bypasses RLS)
+# Default behaviour keeps the safer anon key for read-only endpoints.
+def get_supabase_client(service_key: bool = False) -> Client:
+    """Return a configured Supabase client.
+
+    Args:
+        service_key (bool): If True the Service-Role key will be used which has
+            elevated privileges (bypasses Row Level Security).  Use this ONLY
+            for trusted, backend-only operations that cannot rely on the user's
+            JWT – e.g. server-side writes where the client cannot supply a
+            Supabase session token.  Defaults to False (anon key).
+    """
+    key_env = "SUPABASE_SERVICE_ROLE_KEY" if service_key else "SUPABASE_ANON_KEY"
+    supabase_key = os.getenv(key_env)
+    if not supabase_key:
+        # Fallback to anon key to avoid crashing the entire endpoint, but log a
+        # clear warning so the missing configuration can be fixed quickly.
+        fallback_key = os.getenv("SUPABASE_ANON_KEY")
+        logger.warning(
+            f"{key_env} is not set. Falling back to SUPABASE_ANON_KEY. This may cause RLS errors if the operation needs elevated permissions."
+        )
+        supabase_key = fallback_key
+
+    return create_client(SUPABASE_URL, supabase_key)
 
 @router.post("/", response_model=Dict[str, Any])
 async def create_feature_request(
@@ -56,7 +77,10 @@ async def create_feature_request(
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        supabase = get_supabase_client()
+        # Use service-role key so the backend can create rows without hitting
+        # RLS restrictions.  The caller is already authenticated via Firebase
+        # and we attach their firebase_uid to the new record for auditing.
+        supabase = get_supabase_client(service_key=True)
         
         # Create the feature request directly using firebase_uid (no users table needed)
         logger.info(f"Creating feature request for firebase_uid: {firebase_uid}")
