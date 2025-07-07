@@ -63,14 +63,14 @@ async def create_feature_request(
 
         supabase = get_supabase_client()
         
-        # Get or create user in users table
+        # Get or create user in users table using service key to bypass RLS
         logger.info(f"Looking up user with firebase_uid: {firebase_uid}")
         user_result = supabase.table("users").select("id").eq("firebase_uid", firebase_uid).execute()
         logger.info(f"User lookup result: {user_result.data}")
         
         if not user_result.data:
-            # Create user if doesn't exist
-            logger.info(f"User not found, creating new user. Current user data: {current_user}")
+            # Create user using service key to bypass RLS policies
+            logger.info(f"User not found, creating new user with service key")
             email = current_user.get("email", "")
             user_metadata = current_user.get("user_metadata", {})
             
@@ -79,12 +79,13 @@ async def create_feature_request(
                 "email": email,
                 "first_name": user_metadata.get("first_name", "Anonymous"),
                 "last_name": user_metadata.get("last_name", ""),
-                "onboarding_complete": True  # Assume complete if user is accessing feature requests
+                "onboarding_complete": True
             }
             
-            logger.info(f"Creating user with data: {new_user_data}")
-            create_result = supabase.table("users").insert(new_user_data).execute()
-            logger.info(f"User creation result: {create_result}")
+            # Use service key client to bypass RLS
+            service_supabase = get_supabase_client(service_key=True)
+            create_result = service_supabase.table("users").insert(new_user_data).execute()
+            logger.info(f"User creation result with service key: {create_result}")
             
             if not create_result.data:
                 logger.error("Failed to create user - no data returned")
@@ -97,6 +98,7 @@ async def create_feature_request(
             logger.info(f"Found existing user with ID: {user_id}")
         
         # Create the feature request
+        logger.info(f"Creating feature request for user_id: {user_id}")
         result = supabase.table("feature_requests").insert({
             "user_id": user_id,
             "firebase_uid": firebase_uid,
