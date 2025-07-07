@@ -63,12 +63,33 @@ async def create_feature_request(
 
         supabase = get_supabase_client()
         
-        # Get or create user in users table using service key to bypass RLS
+        # Debug: Check if RLS is blocking user lookups - try with service key
         logger.info(f"Looking up user with firebase_uid: {firebase_uid}")
-        user_result = supabase.table("users").select("id").eq("firebase_uid", firebase_uid).execute()
-        logger.info(f"User lookup result: {user_result.data}")
         
-        if not user_result.data:
+        # Try with service key first to see if RLS is blocking reads
+        if not SUPABASE_SERVICE_KEY:
+            logger.error("SUPABASE_SERVICE_KEY not configured - cannot bypass RLS")
+            raise HTTPException(status_code=500, detail="Server configuration error: missing service key")
+        
+        service_supabase = get_supabase_client(service_key=True)
+        
+        # Check what's in the users table with admin access
+        debug_result = service_supabase.table("users").select("*").limit(5).execute()
+        logger.info(f"Sample users table data (service key): {debug_result.data}")
+        
+        # Try lookup with service key
+        service_user_result = service_supabase.table("users").select("id, firebase_uid, email").eq("firebase_uid", firebase_uid).execute()
+        logger.info(f"User lookup result (service key): {service_user_result.data}")
+        
+        # Also try with regular client
+        user_result = supabase.table("users").select("id, firebase_uid, email").eq("firebase_uid", firebase_uid).execute()
+        logger.info(f"User lookup result (regular client): {user_result.data}")
+        
+        # Use service key result if available, otherwise regular client result
+        final_user_result = service_user_result if service_user_result.data else user_result
+        logger.info(f"Final user result to use: {final_user_result.data}")
+        
+        if not final_user_result.data:
             # Create user using service key to bypass RLS policies
             logger.info(f"User not found, creating new user with service key")
             email = current_user.get("email", "")
@@ -94,7 +115,7 @@ async def create_feature_request(
             user_id = create_result.data[0]["id"]
             logger.info(f"Created new user {user_id} for firebase_uid {firebase_uid}")
         else:
-            user_id = user_result.data[0]["id"]
+            user_id = final_user_result.data[0]["id"]
             logger.info(f"Found existing user with ID: {user_id}")
         
         # Create the feature request
