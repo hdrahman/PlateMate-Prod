@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 
 # Initialize Supabase client
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://noyieuwbhalbmdntoxoj.supabase.co")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # Service key for admin operations
-
-if not SUPABASE_SERVICE_KEY:
-    logger.warning("SUPABASE_SERVICE_KEY not found in environment variables")
 
 # Create router
 router = APIRouter(prefix="/feature-requests", tags=["feature-requests"])
@@ -45,10 +41,9 @@ class FeatureRequestResponse(BaseModel):
     author_name: str
 
 # Helper function to get Supabase client
-def get_supabase_client(service_key: bool = False) -> Client:
-    """Get Supabase client - use service key for admin operations"""
-    key = SUPABASE_SERVICE_KEY if service_key and SUPABASE_SERVICE_KEY else os.getenv("SUPABASE_ANON_KEY")
-    return create_client(SUPABASE_URL, key)
+def get_supabase_client() -> Client:
+    """Get Supabase client"""
+    return create_client(SUPABASE_URL, os.getenv("SUPABASE_ANON_KEY"))
 
 @router.post("/", response_model=Dict[str, Any])
 async def create_feature_request(
@@ -63,65 +58,11 @@ async def create_feature_request(
 
         supabase = get_supabase_client()
         
-        # Debug: Check if RLS is blocking user lookups - try with service key
-        logger.info(f"Looking up user with firebase_uid: {firebase_uid}")
+        # Create the feature request directly using firebase_uid (no users table needed)
+        logger.info(f"Creating feature request for firebase_uid: {firebase_uid}")
         
-        # Try with service key first to see if RLS is blocking reads
-        if not SUPABASE_SERVICE_KEY:
-            logger.error("SUPABASE_SERVICE_KEY not configured - cannot bypass RLS")
-            raise HTTPException(status_code=500, detail="Server configuration error: missing service key")
-        
-        service_supabase = get_supabase_client(service_key=True)
-        
-        # Check what's in the users table with admin access
-        debug_result = service_supabase.table("users").select("*").limit(5).execute()
-        logger.info(f"Sample users table data (service key): {debug_result.data}")
-        
-        # Try lookup with service key
-        service_user_result = service_supabase.table("users").select("id, firebase_uid, email").eq("firebase_uid", firebase_uid).execute()
-        logger.info(f"User lookup result (service key): {service_user_result.data}")
-        
-        # Also try with regular client
-        user_result = supabase.table("users").select("id, firebase_uid, email").eq("firebase_uid", firebase_uid).execute()
-        logger.info(f"User lookup result (regular client): {user_result.data}")
-        
-        # Use service key result if available, otherwise regular client result
-        final_user_result = service_user_result if service_user_result.data else user_result
-        logger.info(f"Final user result to use: {final_user_result.data}")
-        
-        if not final_user_result.data:
-            # Create user using service key to bypass RLS policies
-            logger.info(f"User not found, creating new user with service key")
-            email = current_user.get("email", "")
-            user_metadata = current_user.get("user_metadata", {})
-            
-            new_user_data = {
-                "firebase_uid": firebase_uid,
-                "email": email,
-                "first_name": user_metadata.get("first_name", "Anonymous"),
-                "last_name": user_metadata.get("last_name", ""),
-                "onboarding_complete": True
-            }
-            
-            # Use service key client to bypass RLS
-            service_supabase = get_supabase_client(service_key=True)
-            create_result = service_supabase.table("users").insert(new_user_data).execute()
-            logger.info(f"User creation result with service key: {create_result}")
-            
-            if not create_result.data:
-                logger.error("Failed to create user - no data returned")
-                raise HTTPException(status_code=500, detail="Failed to create user in database")
-            
-            user_id = create_result.data[0]["id"]
-            logger.info(f"Created new user {user_id} for firebase_uid {firebase_uid}")
-        else:
-            user_id = final_user_result.data[0]["id"]
-            logger.info(f"Found existing user with ID: {user_id}")
-        
-        # Create the feature request
-        logger.info(f"Creating feature request for user_id: {user_id}")
         result = supabase.table("feature_requests").insert({
-            "user_id": user_id,
+            "user_id": None,  # No longer needed thanks to our schema update
             "firebase_uid": firebase_uid,
             "title": request.title,
             "description": request.description,
