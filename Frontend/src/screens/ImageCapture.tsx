@@ -92,6 +92,10 @@ const ImageCapture: React.FC = () => {
     const [notes, setNotes] = useState('');
     const [foodName, setFoodName] = useState(foodData?.food_name || '');
     const [loading, setLoading] = useState(false);
+    
+    // New state for UI improvements
+    const [showSideView, setShowSideView] = useState(false);
+    const [showOptionalDetails, setShowOptionalDetails] = useState(false);
 
     // Add state for GPT-generated description
     const [gptDescription, setGptDescription] = useState('');
@@ -107,7 +111,12 @@ const ImageCapture: React.FC = () => {
                 Alert.alert('Permission required', 'Camera permission is required to take photos');
             }
         })();
-    }, []);
+        
+        // If we have an initial photo URI, show the side view option
+        if (initialPhotoUri) {
+            setShowSideView(true);
+        }
+    }, [initialPhotoUri]);
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
@@ -668,16 +677,20 @@ const ImageCapture: React.FC = () => {
             }
         }
 
-        // Check if at least 2 images are taken when not using barcode data
+        // Check if at least 1 image is taken when not using barcode data
         const filledImages = images.filter(img => img.uri !== '');
         if (filledImages.length < 1) {
-            Alert.alert('Error', 'Please take at least 1 image (top view)');
+            Alert.alert('Required', 'Please take at least one photo of your meal to continue', [
+                { text: 'OK', style: 'default' }
+            ]);
             return;
         }
 
-        // Check if the first required image is taken
+        // Check if the primary image is taken
         if (!images[0].uri) {
-            Alert.alert('Error', 'Please take a top view image');
+            Alert.alert('Required', 'Please take a photo of your meal to continue', [
+                { text: 'OK', style: 'default' }
+            ]);
             return;
         }
 
@@ -855,6 +868,12 @@ const ImageCapture: React.FC = () => {
     const renderImagePlaceholder = (index: number) => {
         const image = images[index];
         const isRequired = index === 0;
+        const isSideView = index === 1;
+
+        // Don't render side view unless it's been activated
+        if (isSideView && !showSideView && !image.uri) {
+            return null;
+        }
 
         // Function to remove an image
         const handleRemoveImage = () => {
@@ -868,9 +887,13 @@ const ImageCapture: React.FC = () => {
         };
 
         return (
-            <View style={styles.imagePlaceholderWrapper}>
+            <View style={[
+                styles.imagePlaceholderWrapper, 
+                index === 0 && styles.primaryImageWrapper,
+                index === 1 && styles.sideImageWrapper
+            ]}>
                 <LinearGradient
-                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                    colors={isRequired ? ["#FF00F5", "#9B00FF", "#00CFFF"] : ["#4a4a4a", "#666", "#4a4a4a"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.imagePlaceholderGradient}
@@ -894,25 +917,120 @@ const ImageCapture: React.FC = () => {
                                 style={styles.placeholderContent}
                                 onPress={() => handleTakePhoto(index)}
                             >
-                                <Ionicons name="camera" size={40} color="#8A2BE2" />
-                                <Text style={styles.placeholderText}>
-                                    {index === 0 ? 'Top View' : index === 1 ? 'Side View' : 'Additional'}
+                                <Ionicons name="camera" size={index === 0 ? 50 : 40} color={isRequired ? "#8A2BE2" : "#666"} />
+                                <Text style={[styles.placeholderText, { color: isRequired ? "#8A2BE2" : "#888" }]}>
+                                    {index === 0 ? 'Tap to capture your meal' : 'Side view (optional)'}
                                 </Text>
                                 {isRequired && <Text style={styles.requiredText}>Required</Text>}
                             </TouchableOpacity>
                         )}
 
-                        {/* Keep only the gallery button at the bottom */}
-                        <View style={styles.imageActions}>
-                            <TouchableOpacity
-                                style={[styles.imageButton, styles.galleryButton]}
-                                onPress={() => handlePickImage(index)}
-                            >
-                                <Ionicons name="images" size={20} color="#fff" />
-                            </TouchableOpacity>
-                        </View>
+                        {/* Gallery button */}
+                        <TouchableOpacity
+                            style={[styles.galleryButton, { backgroundColor: isRequired ? "#8A2BE2" : "#4a4a4a" }]}
+                            onPress={() => handlePickImage(index)}
+                        >
+                            <Ionicons name="images" size={16} color="#fff" />
+                        </TouchableOpacity>
                     </View>
                 </LinearGradient>
+            </View>
+        );
+    };
+
+    const renderAddSideViewButton = () => {
+        if (showSideView || images[1].uri) return null;
+        
+        return (
+            <TouchableOpacity 
+                style={styles.addSideViewButton}
+                onPress={() => setShowSideView(true)}
+            >
+                <LinearGradient
+                    colors={["#4a4a4a", "#666", "#4a4a4a"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.addSideViewGradient}
+                    locations={[0, 0.5, 1]}
+                >
+                    <View style={styles.addSideViewContent}>
+                        <Ionicons name="add" size={24} color="#fff" />
+                        <Text style={styles.addSideViewText}>Add side view (optional)</Text>
+                        <Text style={styles.addSideViewSubtext}>For better nutrition analysis</Text>
+                    </View>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderOptionalDetailsSection = () => {
+        return (
+            <View style={styles.optionalDetailsWrapper}>
+                <TouchableOpacity 
+                    style={styles.sectionHeader}
+                    onPress={() => setShowOptionalDetails(!showOptionalDetails)}
+                >
+                    <View style={styles.sectionHeaderContent}>
+                        <Ionicons name="settings-outline" size={20} color="#8A2BE2" />
+                        <Text style={styles.sectionHeaderTitle}>Additional Details</Text>
+                        <Text style={styles.sectionHeaderSubtitle}>Optional</Text>
+                    </View>
+                    <Ionicons 
+                        name={showOptionalDetails ? "chevron-up" : "chevron-down"} 
+                        size={24} 
+                        color="#8A2BE2" 
+                    />
+                </TouchableOpacity>
+
+                {showOptionalDetails && (
+                    <View style={styles.optionalDetailsContent}>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Food Name</Text>
+                            <TextInput
+                                style={styles.modernInput}
+                                value={foodName}
+                                onChangeText={setFoodName}
+                                placeholder="e.g., Grilled Chicken Salad"
+                                placeholderTextColor="#666"
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Brand/Restaurant</Text>
+                            <TextInput
+                                style={styles.modernInput}
+                                value={brandName}
+                                onChangeText={setBrandName}
+                                placeholder="e.g., McDonald's, Homemade"
+                                placeholderTextColor="#666"
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Quantity</Text>
+                            <TextInput
+                                style={styles.modernInput}
+                                value={quantity}
+                                onChangeText={setQuantity}
+                                placeholder="e.g., 1 serving, 200g, 1 cup"
+                                placeholderTextColor="#666"
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Notes</Text>
+                            <TextInput
+                                style={[styles.modernInput, styles.textAreaInput]}
+                                value={notes}
+                                onChangeText={setNotes}
+                                placeholder="Any additional notes..."
+                                placeholderTextColor="#666"
+                                multiline
+                                numberOfLines={3}
+                            />
+                        </View>
+                    </View>
+                )}
             </View>
         );
     };
@@ -1021,106 +1139,49 @@ const ImageCapture: React.FC = () => {
                 locations={[0, 0.5, 1]}
             />
 
-            <ScrollView style={styles.content}>
-                <Text style={styles.instructions}>
-                    Please take at least 1 image of your food. The first image (top view) is required. You can also take a second image (side view) to provide additional detail about your meal.
-                </Text>
-                <LinearGradient
-                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                    start={{ x: 1, y: 0 }}
-                    end={{ x: 0, y: 0 }}
-                    style={styles.descriptionBar}
-                    locations={[0, 0.5, 1]}
-                />
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                <View style={styles.instructionsContainer}>
+                    <Text style={styles.instructionsTitle}>Capture Your Meal</Text>
+                    <Text style={styles.instructionsText}>
+                        Take a slightly angled photo of your food for best results. If any parts are hidden from view, use the optional side view to capture those areas. You can also add additional context and details if needed.
+                    </Text>
+                </View>
 
                 <View style={styles.imagesContainer}>
                     {renderImagePlaceholder(0)}
+                    {renderAddSideViewButton()}
                     {renderImagePlaceholder(1)}
                 </View>
 
-                <View style={styles.foodDetailsWrapper}>
-                    <LinearGradient
-                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.gradientWrapper, { borderRadius: 8 }]}
-                        locations={[0, 0.5, 1]}
+                {renderOptionalDetailsSection()}
+
+                <View style={styles.submitSection}>
+                    <TouchableOpacity
+                        style={styles.submitButton}
+                        onPress={handleSubmit}
+                        disabled={loading}
                     >
-                        <View style={styles.foodDetailsContainer}>
-                            <View style={{ flexDirection: 'row' }}>
-                                <Text style={[styles.sectionTitle, styles.underlinedTitle]}>Food Details</Text>
-                                <Text style={[styles.sectionTitle, styles.optionalText]}> (Optional)</Text>
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Brand/Restaurant Name</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={brandName}
-                                    onChangeText={setBrandName}
-                                    placeholder="Enter brand or restaurant name"
-                                    placeholderTextColor="#888"
-                                />
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Food Name</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={foodName}
-                                    onChangeText={setFoodName}
-                                    placeholder="Enter food name"
-                                    placeholderTextColor="#888"
-                                />
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Quantity</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={quantity}
-                                    onChangeText={setQuantity}
-                                    placeholder="Enter quantity (e.g., 1 serving, 200g)"
-                                    placeholderTextColor="#888"
-                                />
-                            </View>
-
-                            <View style={[styles.inputContainer, { marginBottom: 0 }]}>
-                                <Text style={styles.label}>Additional Notes</Text>
-                                <TextInput
-                                    style={[styles.input, styles.textArea]}
-                                    value={notes}
-                                    onChangeText={setNotes}
-                                    placeholder="Enter any additional notes"
-                                    placeholderTextColor="#888"
-                                    multiline
-                                    numberOfLines={4}
-                                />
-                            </View>
-                        </View>
-                    </LinearGradient>
-                </View>
-
-                <View style={styles.submitButtonWrapper}>
-                    <LinearGradient
-                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.gradientWrapper, { borderRadius: 8 }]}
-                        locations={[0, 0.5, 1]}
-                    >
-                        <TouchableOpacity
-                            style={styles.submitButton}
-                            onPress={handleSubmit}
-                            disabled={loading}
+                        <LinearGradient
+                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.submitGradient}
+                            locations={[0, 0.5, 1]}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#fff" />
+                                <View style={styles.loadingContainer}>
+                                    <ActivityIndicator color="#fff" size="small" />
+                                    <Text style={styles.submitText}>Processing...</Text>
+                                </View>
                             ) : (
-                                <Text style={styles.submitButtonText}>Submit</Text>
+                                <Text style={styles.submitText}>Analyze My Meal</Text>
                             )}
-                        </TouchableOpacity>
-                    </LinearGradient>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                    
+                    <Text style={styles.submitDescription}>
+                        We'll analyze your food and provide detailed nutrition information
+                    </Text>
                 </View>
             </ScrollView>
 
@@ -1148,7 +1209,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         backgroundColor: '#000',
-        zIndex: 10, // Ensure header is above other content
+        zIndex: 10,
     },
     backButton: {
         padding: 4,
@@ -1158,9 +1219,6 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    headerTitleContainer: {
-        // Remove this style that had position: 'absolute'
     },
     dropdownIconContainer: {
         backgroundColor: '#161618',
@@ -1184,39 +1242,45 @@ const styles = StyleSheet.create({
         paddingTop: 10,
         paddingBottom: 20,
     },
-    sectionTitle: {
-        fontSize: 20,
+    instructionsContainer: {
+        marginBottom: 24,
+        paddingHorizontal: 4,
+    },
+    instructionsTitle: {
+        fontSize: 24,
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: 10,
-    },
-    instructions: {
-        fontSize: 14,
-        color: '#aaa',
-        marginBottom: 20,
-        marginTop: -8,
-    },
-    imagesContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
         marginBottom: 8,
     },
+    instructionsText: {
+        fontSize: 15,
+        color: '#aaa',
+        lineHeight: 22,
+    },
+    imagesContainer: {
+        marginBottom: 24,
+    },
     imagePlaceholderWrapper: {
-        width: (width - 50) / 2,
-        height: (width - 50) / 2,
-        marginBottom: 10,
-        borderRadius: 10,
+        width: '100%',
+        height: 280, // Make primary image square-ish
+        marginBottom: 16,
+        borderRadius: 12,
         overflow: 'hidden',
+    },
+    primaryImageWrapper: {
+        height: 280, // Square aspect ratio for primary image
+    },
+    sideImageWrapper: {
+        height: 160, // Rectangular aspect ratio for side image
     },
     imagePlaceholderGradient: {
         flex: 1,
-        padding: 1.5, // Reduced from 2px to be slightly thinner
+        padding: 2,
     },
     imagePlaceholder: {
         flex: 1,
-        backgroundColor: '#1e1e1e',
-        borderRadius: 8,
+        backgroundColor: '#1a1a1a',
+        borderRadius: 10,
         overflow: 'hidden',
         position: 'relative',
     },
@@ -1224,82 +1288,176 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 20,
     },
     placeholderText: {
-        color: '#8A2BE2',
-        marginTop: 10,
-        fontSize: 14,
+        fontSize: 16,
+        marginTop: 12,
+        textAlign: 'center',
+        fontWeight: '500',
     },
     requiredText: {
         color: '#ff6b6b',
         fontSize: 12,
-        marginTop: 5,
+        marginTop: 8,
+        fontWeight: '600',
     },
     image: {
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
     },
-    imageActions: {
-        position: 'absolute',
-        bottom: 10,
-        right: 10,
-        flexDirection: 'row',
+    imageContainer: {
+        width: '100%',
+        height: '100%',
+        position: 'relative',
     },
-    imageButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    removeImageButton: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        borderRadius: 16,
+        width: 32,
+        height: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 8,
-    },
-    cameraButton: {
-        backgroundColor: '#8A2BE2',
+        zIndex: 10,
     },
     galleryButton: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: '#4a4a4a',
     },
-    inputContainer: {
-        marginBottom: 20,
+    addSideViewButton: {
+        marginBottom: 16,
+        borderRadius: 12,
+        overflow: 'hidden',
+        height: 80, // Smaller height for compact button
     },
-    label: {
+    addSideViewGradient: {
+        flex: 1,
+        padding: 2,
+    },
+    addSideViewContent: {
+        backgroundColor: '#1a1a1a',
+        borderRadius: 10,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    addSideViewText: {
         fontSize: 16,
         color: '#fff',
-        marginBottom: 8,
+        fontWeight: '600',
+        marginTop: 8,
     },
-    input: {
-        backgroundColor: '#1e1e1e',
-        borderRadius: 8,
-        padding: 12,
-        color: '#fff',
-        fontSize: 16,
+    addSideViewSubtext: {
+        fontSize: 13,
+        color: '#aaa',
+        marginTop: 4,
     },
-    textArea: {
-        height: 100,
-        textAlignVertical: 'top',
-    },
-    submitButtonWrapper: {
-        marginTop: 6,
-        marginBottom: 20,
-        borderRadius: 8,
+    optionalDetailsWrapper: {
+        marginBottom: 24,
+        borderRadius: 12,
+        backgroundColor: '#1a1a1a',
         overflow: 'hidden',
     },
-    gradientWrapper: {
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#1a1a1a',
+    },
+    sectionHeaderContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
         flex: 1,
-        padding: 1.5, // Reduced from 2px to be slightly thinner
+    },
+    sectionHeaderTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#fff',
+        marginLeft: 12,
+    },
+    sectionHeaderSubtitle: {
+        fontSize: 14,
+        color: '#8A2BE2',
+        marginLeft: 8,
+        fontWeight: '500',
+    },
+    optionalDetailsContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        backgroundColor: '#1a1a1a',
+    },
+    inputGroup: {
+        marginBottom: 20,
+    },
+    inputLabel: {
+        fontSize: 14,
+        color: '#fff',
+        marginBottom: 8,
+        fontWeight: '500',
+    },
+    modernInput: {
+        backgroundColor: '#2a2a2a',
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        color: '#fff',
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    textAreaInput: {
+        height: 80,
+        textAlignVertical: 'top',
+        paddingTop: 12,
+    },
+    submitSection: {
+        marginTop: 8,
+        alignItems: 'center',
     },
     submitButton: {
-        backgroundColor: '#1e1e1e',
-        padding: 15,
-        alignItems: 'center',
         width: '100%',
-        borderRadius: 6,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 12,
     },
-    submitButtonText: {
-        color: '#fff',
+    submitGradient: {
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 56,
+    },
+    submitText: {
         fontSize: 18,
         fontWeight: 'bold',
+        color: '#fff',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    submitDescription: {
+        fontSize: 13,
+        color: '#aaa',
+        textAlign: 'center',
+        lineHeight: 18,
+        paddingHorizontal: 20,
     },
     mealTypeSelector: {
         flexDirection: 'row',
@@ -1342,45 +1500,75 @@ const styles = StyleSheet.create({
         color: '#8A2BE2',
         fontWeight: 'bold',
     },
-    gptAnalysisWrapper: {
+    headerBar: {
+        height: 2,
+        marginBottom: 15,
+        alignSelf: 'center',
+        zIndex: 5,
+    },
+    // Legacy styles for backward compatibility
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 10,
+    },
+    instructions: {
+        fontSize: 14,
+        color: '#aaa',
+        marginBottom: 20,
+        marginTop: -8,
+    },
+    inputContainer: {
+        marginBottom: 20,
+    },
+    label: {
+        fontSize: 16,
+        color: '#fff',
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#1e1e1e',
+        borderRadius: 8,
+        padding: 12,
+        color: '#fff',
+        fontSize: 16,
+    },
+    textArea: {
+        height: 100,
+        textAlignVertical: 'top',
+    },
+    submitButtonWrapper: {
         marginTop: 6,
-        marginBottom: 6,
+        marginBottom: 20,
         borderRadius: 8,
         overflow: 'hidden',
     },
-    gptAnalysisContainer: {
-        backgroundColor: '#1e1e1e',
-        borderRadius: 6,
-        padding: 15,
-        width: '100%',
+    gradientWrapper: {
+        flex: 1,
+        padding: 1.5,
     },
-    gptAnalysisTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#8A2BE2',
-        marginBottom: 8,
-    },
-    gptAnalysisText: {
-        fontSize: 14,
+    submitButtonText: {
         color: '#fff',
-        lineHeight: 20,
+        fontSize: 18,
+        fontWeight: 'bold',
     },
-    imageContainer: {
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-    },
-    removeImageButton: {
+    imageActions: {
         position: 'absolute',
-        top: 8,
-        left: 8,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        borderRadius: 12,
-        width: 24,
-        height: 24,
+        bottom: 10,
+        right: 10,
+        flexDirection: 'row',
+    },
+    imageButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        zIndex: 10,
+        marginLeft: 8,
+    },
+    cameraButton: {
+        backgroundColor: '#8A2BE2',
     },
     optionalText: {
         fontSize: 16,
@@ -1406,11 +1594,28 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         marginTop: -5,
     },
-    headerBar: {
-        height: 2,
-        marginBottom: 15,
-        alignSelf: 'center',
-        zIndex: 5,
+    gptAnalysisWrapper: {
+        marginTop: 6,
+        marginBottom: 6,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    gptAnalysisContainer: {
+        backgroundColor: '#1e1e1e',
+        borderRadius: 6,
+        padding: 15,
+        width: '100%',
+    },
+    gptAnalysisTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#8A2BE2',
+        marginBottom: 8,
+    },
+    gptAnalysisText: {
+        fontSize: 14,
+        color: '#fff',
+        lineHeight: 20,
     },
 });
 
