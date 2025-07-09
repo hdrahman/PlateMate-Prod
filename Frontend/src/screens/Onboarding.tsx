@@ -162,18 +162,10 @@ const Onboarding = () => {
             case 5:
                 return <BasicInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 6:
-                return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 7:
-                return <ActivityLevelStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 8:
                 return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 9:
-                return <DietaryPreferencesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 10:
-                return <FutureSelfMotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 11:
+            case 7:
                 return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
-            case 12:
+            case 8:
                 return <SubscriptionStep profile={profile} onComplete={handleCompleteOnboarding} />;
             default:
                 // This case should ideally not be reached if totalSteps is accurate.
@@ -182,7 +174,7 @@ const Onboarding = () => {
         }
     };
 
-    const TOTAL_ONBOARDING_STEPS = 11; // Number of steps after the welcome screen
+    const TOTAL_ONBOARDING_STEPS = 7; // Number of steps after the welcome screen
 
     return (
         <SafeAreaView style={styles.container}>
@@ -192,7 +184,7 @@ const Onboarding = () => {
                 style={styles.background}
             />
             <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-                {currentStep > 1 && currentStep <= 12 && (
+                {currentStep > 1 && currentStep <= 8 && (
                     <View style={styles.progressContainer}>
                         {Array.from({ length: TOTAL_ONBOARDING_STEPS }).map((_, index) => (
                             <View

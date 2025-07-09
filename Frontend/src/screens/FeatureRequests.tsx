@@ -179,6 +179,7 @@ const FeatureRequestsScreen = () => {
         isRefreshing: isRefreshingAll,
         error: errorAll,
         networkStatus,
+        initialNetworkCheckDone,
         refresh: refreshAll,
         loadMore: loadMoreAll,
         handleUpvoteChange
@@ -375,7 +376,7 @@ const FeatureRequestsScreen = () => {
             </View>
 
             {/* Connection status */}
-            {!networkStatus && (
+            {!networkStatus && initialNetworkCheckDone && (
                 <View style={styles.offlineIndicator}>
                     <Ionicons name="cloud-offline-outline" size={16} color="#FF9500" />
                     <Text style={styles.offlineText}>Offline - showing cached data</Text>

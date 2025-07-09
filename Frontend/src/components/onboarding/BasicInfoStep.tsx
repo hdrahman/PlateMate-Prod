@@ -22,10 +22,9 @@ interface BasicInfoStepProps {
 
 const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, onNext }) => {
     const [firstName, setFirstName] = useState(profile.firstName || '');
-    const [lastName, setLastName] = useState(profile.lastName || '');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState(profile.password || '');
-    const [dateOfBirth, setDateOfBirth] = useState(profile.dateOfBirth || '');
+    const [age, setAge] = useState(profile.age?.toString() || '');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -48,18 +47,14 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
         prefillEmail();
     }, [profile.email]);
 
-    // Handle DOB formatting
-    const formatDateOfBirth = (text: string) => {
+    // Handle age input (only allow numbers)
+    const handleAgeInput = (text: string) => {
         // Remove any non-digit characters
         const cleaned = text.replace(/\D/g, '');
 
-        // Format with slashes
+        // Limit to reasonable age range (2 digits max)
         if (cleaned.length <= 2) {
-            setDateOfBirth(cleaned);
-        } else if (cleaned.length <= 4) {
-            setDateOfBirth(`${cleaned.slice(0, 2)}/${cleaned.slice(2)}`);
-        } else if (cleaned.length <= 8) {
-            setDateOfBirth(`${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4)}`);
+            setAge(cleaned);
         }
     };
 
@@ -68,30 +63,9 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
         return emailRegex.test(email);
     };
 
-    const validateDateOfBirth = (dob: string): boolean => {
-        // Basic format validation (MM/DD/YYYY)
-        const dobRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
-        if (!dobRegex.test(dob)) {
-            return false;
-        }
-
-        // Check if it's a valid date and user is at least 13 years old
-        const parts = dob.split('/');
-        const birthDate = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
-
-        if (isNaN(birthDate.getTime())) {
-            return false;
-        }
-
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-
-        return age >= 13;
+    const validateAge = (ageStr: string): boolean => {
+        const ageNum = parseInt(ageStr);
+        return !isNaN(ageNum) && ageNum >= 13 && ageNum <= 120;
     };
 
     const handleSubmit = async () => {
@@ -110,40 +84,24 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             return;
         }
 
-        if (!dateOfBirth) {
-            Alert.alert('Missing Information', 'Please enter your date of birth');
+        if (!age) {
+            Alert.alert('Missing Information', 'Please enter your age');
             return;
         }
 
-        if (!validateDateOfBirth(dateOfBirth)) {
-            Alert.alert('Invalid Date of Birth', 'Please enter a valid date (MM/DD/YYYY) and ensure you are at least 13 years old');
+        if (!validateAge(age)) {
+            Alert.alert('Invalid Age', 'Please enter a valid age between 13 and 120');
             return;
         }
 
         try {
             setIsLoading(true);
 
-            // Calculate age if date of birth is provided
-            let age = null;
-            if (dateOfBirth) {
-                const parts = dateOfBirth.split('/');
-                const birthDate = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
-                const today = new Date();
-                age = today.getFullYear() - birthDate.getFullYear();
-                const monthDiff = today.getMonth() - birthDate.getMonth();
-
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                    age--;
-                }
-            }
-
             await updateProfile({
                 firstName: firstName.trim(),
-                lastName: lastName.trim(),
                 email: email.trim(),
                 password: password,
-                dateOfBirth: dateOfBirth,
-                age: age,
+                age: parseInt(age),
             });
 
             onNext();
@@ -160,12 +118,11 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
         // We purposely do not await this promise to avoid blocking UI updates
         updateProfile({
             firstName,
-            lastName,
             email,
             password,
-            dateOfBirth,
+            age: age ? parseInt(age) : null,
         }).catch(console.error);
-    }, [firstName, lastName, email, password, dateOfBirth]);
+    }, [firstName, email, password, age]);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -189,19 +146,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                     </View>
                 </View>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Last Name <Text style={styles.optional}>(optional)</Text></Text>
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your last name"
-                            placeholderTextColor="#666"
-                            value={lastName}
-                            onChangeText={setLastName}
-                            autoCapitalize="words"
-                        />
-                    </View>
-                </View>
+
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Email</Text>
@@ -245,14 +190,14 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                 </View>
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Date of Birth</Text>
+                    <Text style={styles.label}>Age</Text>
                     <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
-                            placeholder="MM/DD/YYYY"
+                            placeholder="Enter your age"
                             placeholderTextColor="#666"
-                            value={dateOfBirth}
-                            onChangeText={formatDateOfBirth}
+                            value={age}
+                            onChangeText={handleAgeInput}
                             keyboardType="numeric"
                         />
                     </View>

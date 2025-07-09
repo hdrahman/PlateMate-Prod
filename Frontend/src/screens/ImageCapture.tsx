@@ -33,7 +33,17 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { navigateToFoodLog } from '../navigation/RootNavigation';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Define responsive dimensions
+const getResponsiveDimensions = () => {
+    // Calculate dimensions based on screen width
+    const imageHeight = Math.min(280, width * 0.7);
+    const sidePadding = Math.max(16, width * 0.05);
+    return { imageHeight, sidePadding };
+};
+
+const { imageHeight, sidePadding } = getResponsiveDimensions();
 
 // Define navigation types
 type RootStackParamList = {
@@ -92,7 +102,7 @@ const ImageCapture: React.FC = () => {
     const [notes, setNotes] = useState('');
     const [foodName, setFoodName] = useState(foodData?.food_name || '');
     const [loading, setLoading] = useState(false);
-    
+
     // New state for UI improvements
     const [showSideView, setShowSideView] = useState(false);
     const [showOptionalDetails, setShowOptionalDetails] = useState(false);
@@ -111,7 +121,7 @@ const ImageCapture: React.FC = () => {
                 Alert.alert('Permission required', 'Camera permission is required to take photos');
             }
         })();
-        
+
         // If we have an initial photo URI, show the side view option
         if (initialPhotoUri) {
             setShowSideView(true);
@@ -888,7 +898,7 @@ const ImageCapture: React.FC = () => {
 
         return (
             <View style={[
-                styles.imagePlaceholderWrapper, 
+                styles.imagePlaceholderWrapper,
                 index === 0 && styles.primaryImageWrapper,
                 index === 1 && styles.sideImageWrapper
             ]}>
@@ -940,9 +950,9 @@ const ImageCapture: React.FC = () => {
 
     const renderAddSideViewButton = () => {
         if (showSideView || images[1].uri) return null;
-        
+
         return (
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={styles.addSideViewButton}
                 onPress={() => setShowSideView(true)}
             >
@@ -966,7 +976,7 @@ const ImageCapture: React.FC = () => {
     const renderOptionalDetailsSection = () => {
         return (
             <View style={styles.optionalDetailsWrapper}>
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={styles.sectionHeader}
                     onPress={() => setShowOptionalDetails(!showOptionalDetails)}
                 >
@@ -975,10 +985,10 @@ const ImageCapture: React.FC = () => {
                         <Text style={styles.sectionHeaderTitle}>Additional Details</Text>
                         <Text style={styles.sectionHeaderSubtitle}>Optional</Text>
                     </View>
-                    <Ionicons 
-                        name={showOptionalDetails ? "chevron-up" : "chevron-down"} 
-                        size={24} 
-                        color="#8A2BE2" 
+                    <Ionicons
+                        name={showOptionalDetails ? "chevron-up" : "chevron-down"}
+                        size={24}
+                        color="#8A2BE2"
                     />
                 </TouchableOpacity>
 
@@ -1178,7 +1188,7 @@ const ImageCapture: React.FC = () => {
                             )}
                         </LinearGradient>
                     </TouchableOpacity>
-                    
+
                     <Text style={styles.submitDescription}>
                         We'll analyze your food and provide detailed nutrition information
                     </Text>
@@ -1206,7 +1216,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
+        paddingHorizontal: sidePadding,
         paddingVertical: 12,
         backgroundColor: '#000',
         zIndex: 10,
@@ -1238,7 +1248,7 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: sidePadding,
         paddingTop: 10,
         paddingBottom: 20,
     },
@@ -1262,16 +1272,16 @@ const styles = StyleSheet.create({
     },
     imagePlaceholderWrapper: {
         width: '100%',
-        height: 280, // Make primary image square-ish
+        height: imageHeight, // Use responsive height
         marginBottom: 16,
         borderRadius: 12,
         overflow: 'hidden',
     },
     primaryImageWrapper: {
-        height: 280, // Square aspect ratio for primary image
+        height: imageHeight, // Use responsive height
     },
     sideImageWrapper: {
-        height: 160, // Rectangular aspect ratio for side image
+        height: imageHeight * 0.57, // Make side image proportional to main image
     },
     imagePlaceholderGradient: {
         flex: 1,

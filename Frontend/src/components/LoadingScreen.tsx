@@ -6,6 +6,23 @@ import { Easing } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
+// Calculate responsive dimensions based on screen size
+const getResponsiveDimensions = () => {
+    const logoSize = Math.min(120, width * 0.28); // Adjust logo size based on screen width
+    const logoRadius = logoSize * 0.2;
+    const textWidth = Math.min(250, width * 0.7);
+    const textHeight = Math.min(45, height * 0.05);
+    const spinnerSize = Math.min(40, width * 0.1);
+
+    return {
+        logoSize,
+        logoRadius,
+        textWidth,
+        textHeight,
+        spinnerSize
+    };
+};
+
 interface LoadingScreenProps {
     message?: string;
 }
@@ -14,6 +31,8 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const rotateAnim = useRef(new Animated.Value(0)).current;
+
+    const { logoSize, logoRadius, textWidth, textHeight, spinnerSize } = getResponsiveDimensions();
 
     useEffect(() => {
         // Fade in and scale animation for logo
@@ -68,7 +87,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                 {/* Logo */}
                 <View
                     style={{
-                        marginBottom: 40,
+                        marginBottom: height * 0.05,
                         alignItems: 'center',
                         justifyContent: 'center',
                         shadowColor: "#FF00F5",
@@ -81,9 +100,9 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                     <Image
                         source={require('../../assets/icon2 - Edited.png')}
                         style={{
-                            width: 120,
-                            height: 120,
-                            borderRadius: 25,
+                            width: logoSize,
+                            height: logoSize,
+                            borderRadius: logoRadius,
                         }}
                     />
                 </View>
@@ -91,7 +110,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                 {/* App Name with Gradient */}
                 <View
                     style={{
-                        marginBottom: 50,
+                        marginBottom: height * 0.06,
                         shadowColor: "#FF00F5",
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.8,
@@ -104,7 +123,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                         maskElement={
                             <Text
                                 style={{
-                                    fontSize: 32,
+                                    fontSize: Math.min(32, width * 0.08),
                                     fontWeight: "700",
                                     letterSpacing: 2,
                                     textTransform: "uppercase",
@@ -120,8 +139,8 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={{
-                                width: 250,
-                                height: 45,
+                                width: textWidth,
+                                height: textHeight,
                             }}
                         />
                     </MaskedView>
@@ -131,14 +150,14 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                 <Animated.View
                     style={{
                         transform: [{ rotate: spin }],
-                        marginBottom: 30,
+                        marginBottom: height * 0.03,
                     }}
                 >
                     <View
                         style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 20,
+                            width: spinnerSize,
+                            height: spinnerSize,
+                            borderRadius: spinnerSize / 2,
                             borderWidth: 3,
                             borderColor: 'transparent',
                             borderTopColor: '#FF00F5',
@@ -151,7 +170,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                 <Text
                     style={{
                         color: '#888',
-                        fontSize: 16,
+                        fontSize: Math.min(16, width * 0.04),
                         textAlign: 'center',
                         letterSpacing: 1,
                         fontWeight: '400',

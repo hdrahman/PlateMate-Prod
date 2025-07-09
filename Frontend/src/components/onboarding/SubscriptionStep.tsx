@@ -73,14 +73,14 @@ const subscriptionPlans = [
 
 const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete }) => {
     const insets = useSafeAreaInsets();
-    const [selectedPlan, setSelectedPlan] = useState<string>('free_trial');
     const [isLoading, setIsLoading] = useState(false);
+    const [showTrialPopup, setShowTrialPopup] = useState(true);
     const navigation = useNavigation();
-    const { completeOnboarding, profile: onboardingProfile } = useOnboarding();
+    const { completeOnboarding, updateProfile } = useOnboarding();
     const { signUp } = useAuth();
 
-    const handleSubscribe = async () => {
-        // Automatically create account using collected profile data
+    const handleStartTrial = async () => {
+        // Automatically create account and start 15-day premium trial
         if (profile.email && profile.password) {
             setIsLoading(true);
             try {
@@ -90,6 +90,18 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                 await signUp(profile.email, profile.password);
 
                 console.log('Account created successfully');
+
+                // Calculate trial end date (15 days from now)
+                const trialEndDate = new Date();
+                trialEndDate.setDate(trialEndDate.getDate() + 15);
+
+                // Auto-start 15-day premium trial
+                await updateProfile({
+                    premium: true,
+                    trialEndDate: trialEndDate.toISOString(),
+                });
+
+                console.log('✅ 15-day premium trial activated');
 
                 // Wait for auth state to fully propagate
                 console.log('⏳ Waiting for auth state to propagate...');
@@ -117,36 +129,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                     }
                 }
 
-                if (selectedPlan === 'free_trial') {
-                    // Let the parent onboarding component handle navigation
-                    onComplete();
-                } else {
-                    // Let the parent onboarding component handle navigation first
-                    onComplete();
-
-                    // Then show premium options after navigation is complete
-                    setTimeout(() => {
-                        Alert.alert(
-                            'Upgrade to Premium',
-                            'Would you like to view premium subscription options now?',
-                            [
-                                {
-                                    text: 'Not Now',
-                                    style: 'cancel'
-                                },
-                                {
-                                    text: 'View Options',
-                                    onPress: () => {
-                                        // Navigate to premium screen after the main app is loaded
-                                        setTimeout(() => {
-                                            navigation.navigate('PremiumSubscription' as never);
-                                        }, 1000);
-                                    }
-                                },
-                            ]
-                        );
-                    }, 500);
-                }
+                onComplete();
             } catch (error) {
                 console.error('Account creation error:', error);
                 Alert.alert('Error', 'Failed to create account. Please try again.');
@@ -185,133 +168,131 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
     };
 
     return (
-        <ScrollView
-            contentContainerStyle={[styles.container, { paddingTop: insets.top + 40 }]}
-            showsVerticalScrollIndicator={false}
-        >
-            <Text style={styles.title}>Choose Your Plan</Text>
-            <Text style={styles.subtitle}>Start with a free trial or upgrade now</Text>
-
-            <View style={styles.plansContainer}>
-                {subscriptionPlans.map((plan) => (
-                    <TouchableOpacity
-                        key={plan.id}
-                        style={[
-                            styles.planCard,
-                            selectedPlan === plan.id && styles.selectedPlan,
-                        ]}
-                        onPress={() => setSelectedPlan(plan.id)}
+        <>
+            <ScrollView
+                contentContainerStyle={[styles.container, { paddingTop: insets.top + 40 }]}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.welcomeHeader}>
+                    <LinearGradient
+                        colors={['#0074dd', '#5c00dd', '#dd0095']}
+                        style={styles.crownIcon}
                     >
-                        {plan.isPopular && (
-                            <View style={styles.popularBadge}>
-                                <Text style={styles.popularText}>MOST POPULAR</Text>
+                        <MaterialCommunityIcons name="crown" size={32} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.title}>Welcome to PlateMate Premium!</Text>
+                    <Text style={styles.subtitle}>We've automatically started your 15-day free trial</Text>
+                </View>
+
+                <View style={styles.trialCard}>
+                    <View style={styles.trialHeader}>
+                        <View style={styles.trialIconContainer}>
+                            <Ionicons name="time-outline" size={24} color="#0074dd" />
+                        </View>
+                        <Text style={styles.trialTitle}>15-Day Premium Trial</Text>
+                    </View>
+                    <Text style={styles.trialDescription}>
+                        You now have full access to all premium features for 15 days, completely free!
+                    </Text>
+
+                    <View style={styles.featuresContainer}>
+                        {[
+                            'AI-powered meal recommendations',
+                            'Unlimited food photo analysis',
+                            'Comprehensive nutrition tracking',
+                            'Premium recipes & meal plans',
+                            'Priority support'
+                        ].map((feature, index) => (
+                            <View key={index} style={styles.featureRow}>
+                                <Ionicons name="checkmark-circle" size={16} color="#0074dd" style={styles.featureIcon} />
+                                <Text style={styles.featureText}>{feature}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
+                <View style={styles.extendTrialCard}>
+                    <View style={styles.extendHeader}>
+                        <Ionicons name="card-outline" size={20} color="#ff6b35" />
+                        <Text style={styles.extendTitle}>Want another 15 days?</Text>
+                    </View>
+                    <Text style={styles.extendDescription}>
+                        Add your credit card to extend your trial to 30 days total. No charge until after the trial ends.
+                    </Text>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.button}
+                    onPress={handleStartTrial}
+                    disabled={isLoading}
+                >
+                    <LinearGradient
+                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.buttonGradient}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={styles.buttonText}>Get Started with Free Trial</Text>
+                                <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
                             </View>
                         )}
+                    </LinearGradient>
+                </TouchableOpacity>
 
-                        <View style={styles.planHeader}>
-                            <LinearGradient
-                                colors={[plan.color, plan.color + '80']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.planIcon}
-                            >
-                                <MaterialCommunityIcons
-                                    name={
-                                        plan.id === 'free_trial'
-                                            ? 'clock-outline'
-                                            : plan.id === 'premium_annual'
-                                                ? 'star'
-                                                : 'crown'
-                                    }
-                                    size={24}
-                                    color="#fff"
-                                />
-                            </LinearGradient>
-                            <View style={styles.planTitleContainer}>
-                                <Text style={styles.planTitle}>{plan.title}</Text>
-                                <Text style={styles.planPrice}>{plan.price}</Text>
-                            </View>
-                            {selectedPlan === plan.id && (
-                                <View style={styles.checkmark}>
-                                    <Ionicons name="checkmark-circle" size={24} color="#0074dd" />
-                                </View>
-                            )}
-                        </View>
+                {/* Show collected user info */}
+                <View style={styles.userInfoContainer}>
+                    <View style={styles.profileIconContainer}>
+                        <Ionicons name="person-circle" size={40} color="#0074dd" />
+                    </View>
+                    <View style={styles.userInfoTextContainer}>
+                        <Text style={styles.userInfoText}>
+                            {profile.firstName}
+                        </Text>
+                        <Text style={styles.userInfoEmail}>{profile.email}</Text>
+                    </View>
+                    <View style={styles.checkmarkContainer}>
+                        <Ionicons name="checkmark-circle" size={24} color="#00dd74" />
+                    </View>
+                </View>
 
-                        <Text style={styles.planDescription}>{plan.description}</Text>
-
-                        <View style={styles.featuresContainer}>
-                            {plan.features.map((feature, index) => (
-                                <View key={index} style={styles.featureRow}>
-                                    <Ionicons name="checkmark-circle" size={16} color={plan.color} style={styles.featureIcon} />
-                                    <Text style={styles.featureText}>{feature}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <View style={styles.guaranteeContainer}>
-                <Ionicons name="shield-checkmark-outline" size={20} color="#999" style={styles.guaranteeIcon} />
-                <Text style={styles.guaranteeText}>
-                    30-day money-back guarantee. Cancel anytime.
+                <Text style={styles.termsText}>
+                    By continuing, you agree to our Terms of Service and Privacy Policy.
                 </Text>
-            </View>
+            </ScrollView>
 
-            <TouchableOpacity
-                style={styles.button}
-                onPress={handleSubscribe}
-                disabled={isLoading}
-            >
-                <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.buttonGradient}
-                >
-                    {isLoading ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.buttonText}>
-                                {selectedPlan === 'free_trial' ? 'Start Free Trial' : 'Subscribe Now'}
+            {/* Trial Notification Popup */}
+            {showTrialPopup && (
+                <View style={styles.popupOverlay}>
+                    <View style={styles.popupContainer}>
+                        <LinearGradient
+                            colors={['#0074dd', '#5c00dd']}
+                            style={styles.popupHeader}
+                        >
+                            <MaterialCommunityIcons name="gift" size={40} color="#fff" />
+                            <Text style={styles.popupTitle}>Welcome Gift!</Text>
+                        </LinearGradient>
+                        <View style={styles.popupContent}>
+                            <Text style={styles.popupText}>
+                                🎉 Congratulations! We've automatically activated your 15-day Premium trial.
                             </Text>
-                            <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+                            <Text style={styles.popupSubtext}>
+                                Enjoy all premium features free for 15 days. If you want to extend it to 30 days total, just add your credit card anytime.
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.popupButton}
+                                onPress={() => setShowTrialPopup(false)}
+                            >
+                                <Text style={styles.popupButtonText}>Awesome, Thanks!</Text>
+                            </TouchableOpacity>
                         </View>
-                    )}
-                </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Show collected user info */}
-            <View style={styles.userInfoContainer}>
-                <View style={styles.profileIconContainer}>
-                    <Ionicons name="person-circle" size={40} color="#0074dd" />
+                    </View>
                 </View>
-                <View style={styles.userInfoTextContainer}>
-                    <Text style={styles.userInfoText}>
-                        {profile.firstName} {profile.lastName}
-                    </Text>
-                    <Text style={styles.userInfoEmail}>{profile.email}</Text>
-                </View>
-                <View style={styles.checkmarkContainer}>
-                    <Ionicons name="checkmark-circle" size={24} color="#00dd74" />
-                </View>
-            </View>
-
-            <Text style={styles.termsText}>
-                By continuing, you agree to our Terms of Service and Privacy Policy. We'll send a receipt to your email.
-            </Text>
-
-            <View style={styles.paymentMethodsContainer}>
-                <View style={styles.paymentIconsRow}>
-                    <MaterialCommunityIcons name="credit-card" size={24} color="#999" style={styles.paymentIcon} />
-                    <MaterialCommunityIcons name="apple" size={24} color="#999" style={styles.paymentIcon} />
-                    <MaterialCommunityIcons name="google-play" size={24} color="#999" style={styles.paymentIcon} />
-                    <MaterialCommunityIcons name="currency-usd" size={24} color="#999" style={styles.paymentIcon} />
-                </View>
-            </View>
-        </ScrollView>
+            )}
+        </>
     );
 };
 
@@ -573,6 +554,137 @@ const styles = StyleSheet.create({
     },
     checkmarkContainer: {
         marginLeft: 12,
+    },
+    // New auto-trial UI styles
+    welcomeHeader: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    crownIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    trialCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 116, 221, 0.3)',
+        width: '100%',
+    },
+    trialHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    trialIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0, 116, 221, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    trialTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    trialDescription: {
+        color: '#ddd',
+        fontSize: 14,
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    extendTrialCard: {
+        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 107, 53, 0.3)',
+        width: '100%',
+    },
+    extendHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    extendTitle: {
+        color: '#ff6b35',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    extendDescription: {
+        color: '#ccc',
+        fontSize: 14,
+        lineHeight: 18,
+    },
+    // Popup styles
+    popupOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    popupContainer: {
+        backgroundColor: '#1a1a1a',
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginHorizontal: 20,
+        maxWidth: 350,
+        width: '100%',
+    },
+    popupHeader: {
+        padding: 24,
+        alignItems: 'center',
+    },
+    popupTitle: {
+        color: '#fff',
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginTop: 12,
+    },
+    popupContent: {
+        padding: 24,
+        paddingTop: 0,
+    },
+    popupText: {
+        color: '#fff',
+        fontSize: 16,
+        textAlign: 'center',
+        marginBottom: 12,
+        lineHeight: 22,
+    },
+    popupSubtext: {
+        color: '#aaa',
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    popupButton: {
+        backgroundColor: '#0074dd',
+        borderRadius: 12,
+        paddingVertical: 16,
+        alignItems: 'center',
+    },
+    popupButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 

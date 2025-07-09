@@ -23,6 +23,7 @@ export interface UseFeatureRequestsReturn {
     error: string | null;
     connectionStatus: string;
     networkStatus: boolean;
+    initialNetworkCheckDone: boolean;
     refresh: () => Promise<void>;
     loadMore: () => Promise<void>;
     handleUpvoteChange: (requestId: string, newUpvoteStatus: boolean) => void;
@@ -37,9 +38,10 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
-    const [networkStatus, setNetworkStatus] = useState(false);
+    const [networkStatus, setNetworkStatus] = useState(true); // Start optimistically online
     const [hasMore, setHasMore] = useState(true);
     const [offset, setOffset] = useState(0);
+    const [initialNetworkCheckDone, setInitialNetworkCheckDone] = useState(false);
 
     // Load data function
     const loadData = useCallback(async (isRefresh = false, loadOffset = 0) => {
@@ -54,8 +56,8 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
         try {
             let data: FeatureRequest[] = [];
             
-            if (!networkStatus) {
-                // Use cached data when offline
+            if (!networkStatus && initialNetworkCheckDone) {
+                // Use cached data when offline (only after initial network check is done)
                 if (cacheEnabled && loadOffset === 0) {
                     data = await getFeatureRequestsOffline();
                     setRequests(data);
@@ -127,7 +129,7 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, [status, networkStatus, cacheEnabled]);
+    }, [status, networkStatus, cacheEnabled, initialNetworkCheckDone]);
 
     // Refresh function
     const refresh = useCallback(async () => {
@@ -224,6 +226,11 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
             try {
                 const online = await isOnline();
                 
+                // Mark initial check as done
+                if (!initialNetworkCheckDone) {
+                    setInitialNetworkCheckDone(true);
+                }
+                
                 // Only update network status if it has actually changed
                 if (online !== networkStatus) {
                     setNetworkStatus(online);
@@ -235,7 +242,11 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
                 }
             } catch (err) {
                 console.error('Error checking network status:', err);
-                // Don't change network status if check fails
+                // Mark initial check as done even if it fails
+                if (!initialNetworkCheckDone) {
+                    setInitialNetworkCheckDone(true);
+                    setNetworkStatus(false); // Assume offline if initial check fails
+                }
             }
         };
 
@@ -246,7 +257,7 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
         const networkInterval = setInterval(checkNetworkStatus, 10000); // Changed from 3000 to 10000ms
         
         return () => clearInterval(networkInterval);
-    }, [networkStatus, refresh, error]); // Added error to dependencies
+    }, [networkStatus, refresh, error, initialNetworkCheckDone]); // Added initialNetworkCheckDone to dependencies
 
     // Initial load
     useEffect(() => {
@@ -260,6 +271,7 @@ export const useFeatureRequests = (options: UseFeatureRequestsOptions = {}): Use
         error,
         connectionStatus,
         networkStatus,
+        initialNetworkCheckDone,
         refresh,
         loadMore,
         handleUpvoteChange

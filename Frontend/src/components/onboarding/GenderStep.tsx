@@ -32,12 +32,6 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
             icon: 'female',
             color: '#ec407a',
         },
-        {
-            id: 'other',
-            label: 'Other',
-            icon: 'person',
-            color: '#7e57c2',
-        },
     ];
 
     const handleSubmit = async () => {

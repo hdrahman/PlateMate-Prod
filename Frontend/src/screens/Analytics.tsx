@@ -28,6 +28,23 @@ import {
 
 const { width, height } = Dimensions.get('window');
 
+// Define responsive dimensions that scale with screen size
+const getResponsiveDimensions = () => {
+    // Calculate dimensions based on screen width
+    const horizontalPadding = Math.max(16, width * 0.05);
+    const cardSpacing = Math.max(12, width * 0.03);
+    const cardRadius = Math.min(16, width * 0.04);
+
+    return {
+        horizontalPadding,
+        cardSpacing,
+        cardRadius
+    };
+};
+
+const responsiveDimensions = getResponsiveDimensions();
+const { horizontalPadding, cardSpacing, cardRadius } = responsiveDimensions;
+
 // Theme colors
 const COLORS = {
     PRIMARY_BG: '#000000',
@@ -61,8 +78,8 @@ interface MacroTrend {
 interface NutritionScore {
     overall: number;
     consistency: number;
-    balance: number;
-    timing: number;
+    recovery: number;
+    nutrition: number;
 }
 
 const GradientCard: React.FC<{ children: React.ReactNode; style?: any }> = ({ children, style }) => (
@@ -102,8 +119,8 @@ const Analytics: React.FC = () => {
     const [nutritionScore, setNutritionScore] = useState<NutritionScore>({
         overall: 0,
         consistency: 0,
-        balance: 0,
-        timing: 0
+        recovery: 0,
+        nutrition: 0
     });
     const [macroTrends, setMacroTrends] = useState<MacroTrend[]>([]);
     const [insights, setInsights] = useState<NutritionInsight[]>([]);
@@ -198,7 +215,7 @@ const Analytics: React.FC = () => {
     const calculateNutritionScore = (trends: MacroTrend[]) => {
         const validDays = trends.filter(day => day.calories > 0);
         if (validDays.length === 0) {
-            setNutritionScore({ overall: 0, consistency: 0, balance: 0, timing: 0 });
+            setNutritionScore({ overall: 0, consistency: 0, recovery: 0, nutrition: 0 });
             return;
         }
 
@@ -214,7 +231,18 @@ const Analytics: React.FC = () => {
 
         const consistencyScore = (calorieConsistency * 0.7 + weeklyConsistency * 0.3);
 
-        // Enhanced Balance Score (macro distribution + micronutrient diversity)
+        // Recovery Score (based on adequate nutrition for recovery)
+        const avgProtein = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
+        const proteinGoalGrams = userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal;
+
+        // Recovery factors: adequate protein, sufficient calories, consistent intake
+        const proteinRecoveryScore = Math.min(100, (avgProtein / proteinGoalGrams) * 100);
+        const calorieRecoveryScore = Math.min(100, (avgCalories / (userGoals?.targetCalories || calculateTDEE(userProfile).targetCalories)) * 100);
+        const recoveryConsistency = 100 - (Math.sqrt(variance) / avgCalories * 50); // Less penalty for recovery
+
+        const recoveryScore = (proteinRecoveryScore * 0.4 + calorieRecoveryScore * 0.3 + recoveryConsistency * 0.3);
+
+        // Nutrition Score (macro distribution + overall quality)
         const avgProteinPercent = validDays.reduce((sum, day) => {
             const totalCals = day.calories || 1;
             return sum + (day.protein * 4 / totalCals * 100);
@@ -253,29 +281,18 @@ const Analytics: React.FC = () => {
         const fatScore = 100 - Math.max(0, Math.abs(avgFatPercent - fatTarget) - fatTolerance) * 3;
 
         // Protein adequacy bonus (encourage adequate protein)
-        const avgProteinGrams = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
-        const proteinGoalGrams = userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal;
-        const proteinAdequacyBonus = Math.min(20, (avgProteinGrams / proteinGoalGrams) * 20); // Bonus up to 20 points for meeting protein goal
+        const proteinAdequacyBonus = Math.min(20, (avgProtein / proteinGoalGrams) * 20); // Bonus up to 20 points for meeting protein goal
 
-        const balanceScore = (Math.max(0, proteinScore) + Math.max(0, carbScore) + Math.max(0, fatScore)) / 3 + proteinAdequacyBonus;
-
-        // Enhanced Timing Score (meal distribution simulation)
-        // Simulate optimal meal timing based on calorie distribution
-        const dailyVariation = validDays.map(day => {
-            // Simulate that optimal eating has less extreme calorie days
-            const deviation = Math.abs(day.calories - avgCalories) / avgCalories;
-            return 100 - (deviation * 150); // Penalize extreme deviations
-        });
-        const timingScore = Math.max(50, dailyVariation.reduce((sum, score) => sum + score, 0) / dailyVariation.length);
+        const nutritionScore = (Math.max(0, proteinScore) + Math.max(0, carbScore) + Math.max(0, fatScore)) / 3 + proteinAdequacyBonus;
 
         // Enhanced Overall Score (weighted by importance)
-        const overallScore = (consistencyScore * 0.35 + balanceScore * 0.4 + timingScore * 0.25);
+        const overallScore = (consistencyScore * 0.35 + recoveryScore * 0.35 + nutritionScore * 0.3);
 
         setNutritionScore({
             overall: Math.min(100, Math.round(overallScore)),
             consistency: Math.round(consistencyScore),
-            balance: Math.min(100, Math.round(balanceScore)),
-            timing: Math.round(timingScore)
+            recovery: Math.min(100, Math.round(recoveryScore)),
+            nutrition: Math.min(100, Math.round(nutritionScore))
         });
     };
 
@@ -527,12 +544,12 @@ const Analytics: React.FC = () => {
                         <Text style={styles.scoreValue}>{nutritionScore.consistency}</Text>
                     </View>
                     <View style={styles.scoreItem}>
-                        <Text style={styles.scoreItemLabel}>Balance</Text>
-                        <Text style={styles.scoreValue}>{nutritionScore.balance}</Text>
+                        <Text style={styles.scoreItemLabel}>Recovery</Text>
+                        <Text style={styles.scoreValue}>{nutritionScore.recovery}</Text>
                     </View>
                     <View style={styles.scoreItem}>
-                        <Text style={styles.scoreItemLabel}>Timing</Text>
-                        <Text style={styles.scoreValue}>{nutritionScore.timing}</Text>
+                        <Text style={styles.scoreItemLabel}>Nutrition</Text>
+                        <Text style={styles.scoreValue}>{nutritionScore.nutrition}</Text>
                     </View>
                 </View>
             </View>
@@ -919,10 +936,11 @@ const Analytics: React.FC = () => {
         const needsMoreProtein = avgDailyNutrition.protein < proteinGoal;
         // Dynamic thresholds based on user experience and goals
         const consistencyThreshold = userProfile?.experience_level === 'beginner' ? 60 : 75; // More lenient for beginners
-        const balanceThreshold = userProfile?.fitness_goal === 'lose_weight' ? 65 : 70; // Slightly more lenient for weight loss
+        const nutritionThreshold = userProfile?.fitness_goal === 'lose_weight' ? 65 : 70; // Slightly more lenient for weight loss
 
         const inconsistentCalories = nutritionScore.consistency < consistencyThreshold;
-        const macroImbalance = nutritionScore.balance < balanceThreshold;
+        const poorNutrition = nutritionScore.nutrition < nutritionThreshold;
+        const poorRecovery = nutritionScore.recovery < 70;
 
         const tips = [];
         if (needsMoreProtein) {
@@ -939,11 +957,18 @@ const Analytics: React.FC = () => {
                 subtitle: 'Aim for similar calories each day'
             });
         }
-        if (macroImbalance) {
+        if (poorNutrition) {
             tips.push({
                 icon: '⚖️',
-                title: 'Balance macros',
+                title: 'Balance nutrition',
                 subtitle: 'Adjust protein/carb/fat ratios'
+            });
+        }
+        if (poorRecovery) {
+            tips.push({
+                icon: '💪',
+                title: 'Improve recovery',
+                subtitle: 'Focus on adequate protein and calories'
             });
         }
 
@@ -1079,7 +1104,8 @@ const Analytics: React.FC = () => {
         const metabolicAgeModifiers = {
             proteinIntake: avgDailyNutrition.protein >= proteinGoal ? -2 : avgDailyNutrition.protein >= proteinGoal * 0.8 ? 0 : 2,
             calorieConsistency: nutritionScore.consistency >= 80 ? -1 : nutritionScore.consistency >= 60 ? 0 : 2,
-            macroBalance: nutritionScore.balance >= 75 ? -1 : nutritionScore.balance >= 60 ? 0 : 1,
+            nutritionQuality: nutritionScore.nutrition >= 75 ? -1 : nutritionScore.nutrition >= 60 ? 0 : 1,
+            recoverySupport: nutritionScore.recovery >= 75 ? -1 : nutritionScore.recovery >= 60 ? 0 : 1,
         };
 
         const metabolicAge = Math.max(18, userAge + Object.values(metabolicAgeModifiers).reduce((sum, mod) => sum + mod, 0));
@@ -1217,7 +1243,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: horizontalPadding,
         paddingTop: 15,
         paddingBottom: 15,
     },
@@ -1233,14 +1259,14 @@ const styles = StyleSheet.create({
     },
     scrollView: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: horizontalPadding,
     },
     periodSelector: {
         flexDirection: 'row',
         backgroundColor: COLORS.CARD_BG,
-        borderRadius: 12,
+        borderRadius: cardRadius,
         padding: 4,
-        marginBottom: 20,
+        marginBottom: cardSpacing,
     },
     periodButton: {
         flex: 1,
@@ -1261,14 +1287,14 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     cardContainer: {
-        marginBottom: 20,
-        borderRadius: 16,
+        marginBottom: cardSpacing,
+        borderRadius: cardRadius,
         overflow: 'hidden',
     },
     gradientCard: {
         backgroundColor: COLORS.CARD_BG,
-        borderRadius: 16,
-        padding: 20,
+        borderRadius: cardRadius,
+        padding: horizontalPadding,
     },
     cardTitle: {
         fontSize: 18,

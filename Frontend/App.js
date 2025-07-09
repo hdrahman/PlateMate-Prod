@@ -64,10 +64,27 @@ import CreateFeatureRequest from './src/screens/CreateFeatureRequest';
 import { navigationRef } from './src/navigation/RootNavigation';
 
 const { width } = Dimensions.get("window");
-const BASE_BUTTON_SIZE = 55;
-const BUTTON_SIZE = Math.min(BASE_BUTTON_SIZE, width * 0.15);
-const BUTTON_RADIUS = BUTTON_SIZE / 2;
-const OFFSET = BUTTON_RADIUS; // to center the button
+
+// Calculate responsive dimensions
+const getResponsiveDimensions = () => {
+  const buttonSize = Math.min(55, width * 0.14); // Cap at 55px, scale down on small devices
+  const buttonRadius = buttonSize / 2;
+  const offset = buttonRadius;
+  const headerFontSize = Math.min(23, width * 0.055);
+  const headerWidth = Math.min(160, width * 0.4);
+  const iconSize = Math.min(35, width * 0.085);
+
+  return {
+    buttonSize,
+    buttonRadius,
+    offset,
+    headerFontSize,
+    headerWidth,
+    iconSize
+  };
+};
+
+const { buttonSize, buttonRadius, offset, headerFontSize, headerWidth, iconSize } = getResponsiveDimensions();
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -80,7 +97,7 @@ function CustomTabBarButton({ children }) {
         position: 'absolute',
         left: '50%',
         top: -20,
-        marginLeft: -OFFSET, // Center the container
+        marginLeft: -offset, // Center the container
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -89,9 +106,9 @@ function CustomTabBarButton({ children }) {
         style={{
           justifyContent: "center",
           alignItems: "center",
-          width: BUTTON_SIZE,
-          height: BUTTON_SIZE,
-          borderRadius: BUTTON_RADIUS,
+          width: buttonSize,
+          height: buttonSize,
+          borderRadius: buttonRadius,
           backgroundColor: "#000",
           shadowColor: "#FF00F5",
           shadowOffset: { width: 0, height: 0 },
@@ -160,7 +177,7 @@ function MainTabs() {
               maskElement={
                 <Text
                   style={{
-                    fontSize: 23,
+                    fontSize: headerFontSize,
                     letterSpacing: 1,
                     textTransform: "uppercase",
                     color: "white",
@@ -176,7 +193,7 @@ function MainTabs() {
                 end={{ x: 1, y: 0 }}
                 style={{
                   // Must be at least as big as the text
-                  width: 160,
+                  width: headerWidth,
                   height: 35,
                 }}
               />
@@ -191,7 +208,7 @@ function MainTabs() {
           <TouchableOpacity style={{ marginLeft: 15 }} onPress={() => navigation.navigate('EditProfile', { slideFrom: 'left' })}>
             <GlowIcon
               name="person-circle-outline"
-              size={35}
+              size={iconSize}
               gradientColors={["#5A60EA", "#FF00F5"]}
             />
           </TouchableOpacity>

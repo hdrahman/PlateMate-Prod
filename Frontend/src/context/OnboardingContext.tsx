@@ -128,6 +128,7 @@ export interface UserProfile {
     // Additional fields
     useMetricSystem: boolean;
     premium: boolean;
+    trialEndDate?: string | null;
     onboardingComplete: boolean;
 }
 
@@ -178,13 +179,14 @@ const defaultProfile: UserProfile = {
     deliveryInstructions: null,
     onboardingComplete: false,
     premium: false,
+    trialEndDate: null,
 };
 
 // Create context with default values
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 14, // Updated to include intro steps (3) + onboarding (11), account creation now integrated
+    totalSteps: 8, // Simplified onboarding: Welcome + 5 essential steps + Predictive + Subscription
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
