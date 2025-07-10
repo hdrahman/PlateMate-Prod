@@ -89,6 +89,8 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
 
     return (
         <View style={styles.container}>
+            {/* Make status bar transparent so background shows instead of black overlay */}
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <LinearGradient
                 colors={['#000000', '#0a0a1e', '#1a1a38']}
                 style={styles.background}
@@ -283,6 +285,8 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 40,
         justifyContent: 'flex-start',
+        // Refined offset to keep all text visible without extra gap
+        marginTop: -height * 0.1,
     },
     header: {
         alignItems: 'center',

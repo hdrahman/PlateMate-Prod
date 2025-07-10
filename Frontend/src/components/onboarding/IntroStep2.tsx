@@ -64,6 +64,7 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
 
     return (
         <View style={styles.container}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <LinearGradient
                 colors={['#000000', '#0a0a18', '#1a1a32']}
                 style={styles.background}
@@ -235,6 +236,8 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 80,
         justifyContent: 'space-between',
+        // Remove negative offset to reveal small tagline
+        marginTop: 0,
     },
     header: {
         alignItems: 'center',
