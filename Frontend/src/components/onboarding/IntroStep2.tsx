@@ -480,23 +480,27 @@ const styles = StyleSheet.create({
 
     cta: {
         alignItems: 'center',
+        marginTop: 25,
     },
     button: {
+        width: '100%',
+        height: 60,
+        borderRadius: 30,
+        marginHorizontal: 20,
+        overflow: 'hidden',
+        elevation: 8,
         shadowColor: '#5c00dd',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
         shadowRadius: 12,
-        elevation: 6,
-        marginTop: -125,
     },
     buttonGradient: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 32,
-        paddingVertical: 14,
-        borderRadius: 26,
-        minWidth: width * 0.7,
+        paddingHorizontal: 20,
+        gap: 8,
     },
     buttonText: {
         color: '#fff',
