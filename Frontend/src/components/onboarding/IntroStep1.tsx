@@ -98,7 +98,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={[styles.signInButton, { top: insets.top + 5 }]}
+                style={[styles.signInButton, { top: 0 }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >
@@ -285,8 +285,8 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 40,
         justifyContent: 'flex-start',
-        // Refined offset to keep all text visible without extra gap
-        marginTop: -height * 0.1,
+        // Final adjustment: remove negative offset so top text is fully visible
+        marginTop: 0,
     },
     header: {
         alignItems: 'center',
@@ -326,7 +326,8 @@ const styles = StyleSheet.create({
         marginBottom: 30,
         marginHorizontal: 20,
         paddingVertical: 0,
-        marginTop: 15,
+        // Reduce additional top gap under subtitle
+        marginTop: 5,
     },
     scannerFrame: {
         width: width * 0.95,
