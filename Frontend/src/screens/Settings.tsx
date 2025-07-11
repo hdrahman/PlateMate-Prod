@@ -123,11 +123,32 @@ const SettingsScreen = () => {
                             <Text style={styles.itemText}>Premium Subscription</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("ChangePassword")}>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("ChangePassword")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#9B00FF30' }]}>
                                 <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" />
                             </View>
                             <Text style={styles.itemText}>Change Password</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.item, styles.lastItem]}
+                            onPress={() => {
+                                console.log('🎬 Settings: Future Self Recording button pressed');
+                                try {
+                                    console.log('🚀 Testing navigation to FutureSelfRecordingSimple');
+                                    (navigation as any).navigate('FutureSelfRecordingSimple');
+
+                                    console.log('✅ Navigation call completed');
+                                } catch (error) {
+                                    console.error('❌ Navigation error:', error);
+                                    Alert.alert('Navigation Error', `Failed to open recording screen: ${error}`);
+                                }
+                            }}
+                        >
+                            <View style={[styles.iconBubble, { backgroundColor: '#4CAF5030' }]}>
+                                <Ionicons name="videocam-outline" size={20} color="#4CAF50" />
+                            </View>
+                            <Text style={styles.itemText}>Record Future Self Message</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
                     </View>

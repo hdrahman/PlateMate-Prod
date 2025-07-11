@@ -489,8 +489,9 @@ const EditProfile = () => {
             const baseProfileData = {
                 first_name: firstName,
                 last_name: lastName,
-                height: heightInCm,
-                weight: weightInKg,
+                // Conditionally include physical attributes only when they have valid (>0) values.
+                ...(heightInCm && heightInCm > 0 ? { height: heightInCm } : {}),
+                ...(weightInKg && weightInKg > 0 ? { weight: weightInKg } : {}),
                 gender: editedSex.toLowerCase(),
                 unit_preference: editedIsImperialUnits ? 'imperial' : 'metric',
                 timezone: editedTimeZone || 'UTC',
@@ -532,21 +533,26 @@ const EditProfile = () => {
                 setSex(editedSex.charAt(0).toUpperCase() + editedSex.slice(1));
                 setIsImperialUnits(editedIsImperialUnits);
 
-                // Update height based on units
                 if (editedIsImperialUnits) {
                     setHeightFeet(editedHeightFeet);
                     setHeightInches(editedHeightInches);
                     setHeight(`${editedHeightFeet}' ${editedHeightInches}"`);
                 } else {
-                    setHeight(`${heightInCm} cm`);
+                    if (heightInCm && heightInCm > 0) {
+                        setHeight(`${heightInCm} cm`);
+                    }
                 }
 
                 // Update weight based on units
                 if (editedIsImperialUnits) {
                     const lbs = parseFloat(editedWeight);
-                    setWeight(`${lbs} lbs`);
+                    if (!isNaN(lbs) && lbs > 0) {
+                        setWeight(`${lbs} lbs`);
+                    }
                 } else {
-                    setWeight(`${weightInKg} kg`);
+                    if (weightInKg && weightInKg > 0) {
+                        setWeight(`${weightInKg} kg`);
+                    }
                 }
 
                 setTimeZone(editedTimeZone);

@@ -42,6 +42,8 @@ import {
     FoodUnit
 } from '../utils/foodUnitConversion';
 import { formatNutritionalValue } from '../utils/helpers';
+import { shouldShowFirstFoodLogPopup, markFirstFoodLogPopupShown } from '../utils/firstFoodLogTracker';
+import FirstFoodLogPopup from '../components/FirstFoodLogPopup';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -151,6 +153,7 @@ const DiaryScreen: React.FC = () => {
     const [userProfile, setUserProfile] = useState<any>(null);
     const [mealIdFilter, setMealIdFilter] = useState<number | null>(null);
     const [isFilteredView, setIsFilteredView] = useState(false);
+    const [showFirstFoodLogPopup, setShowFirstFoodLogPopup] = useState(false);
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -227,13 +230,28 @@ const DiaryScreen: React.FC = () => {
     }, []);
 
     // Add a function to trigger refresh
-    const refreshMealData = () => {
+    const refreshMealData = async () => {
         console.log('Refreshing meal data and checking streak...');
         setRefreshTrigger(prev => prev + 1);
 
         // Also check and update streak if user has activity
         if (user?.uid) {
             checkAndUpdateUserStreak(user.uid);
+
+            // Check if we should show the first food log popup
+            try {
+                const shouldShow = await shouldShowFirstFoodLogPopup(user.uid);
+                console.log('🎯 Should show first food log popup:', shouldShow);
+
+                if (shouldShow) {
+                    // Small delay to ensure UI has refreshed before showing popup
+                    setTimeout(() => {
+                        setShowFirstFoodLogPopup(true);
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Error checking first food log popup:', error);
+            }
         }
     };
 
@@ -2437,6 +2455,39 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                         </View>
                     </TouchableWithoutFeedback>
                 </Modal>
+
+                {/* First Food Log Popup */}
+                <FirstFoodLogPopup
+                    visible={showFirstFoodLogPopup}
+                    onClose={async () => {
+                        setShowFirstFoodLogPopup(false);
+                        if (user?.uid) {
+                            await markFirstFoodLogPopupShown(user.uid);
+                        }
+                    }}
+                    onRecordNow={async () => {
+                        console.log('🎬 Record Now button pressed');
+                        setShowFirstFoodLogPopup(false);
+                        if (user?.uid) {
+                            await markFirstFoodLogPopupShown(user.uid);
+                        }
+                        try {
+                            console.log('🚀 Attempting to navigate to FutureSelfRecordingSimple');
+                            (navigation as any).navigate('FutureSelfRecordingSimple');
+                            console.log('✅ Navigation call completed');
+                        } catch (error) {
+                            console.error('❌ Navigation error:', error);
+                            Alert.alert('Navigation Error', 'Failed to open recording screen. Please try again.');
+                        }
+                    }}
+                    onRecordLater={async () => {
+                        setShowFirstFoodLogPopup(false);
+                        if (user?.uid) {
+                            await markFirstFoodLogPopupShown(user.uid);
+                        }
+                        // Just close the popup, user can find it in settings later
+                    }}
+                />
 
                 {/* Loading overlay */}
                 {loading && (

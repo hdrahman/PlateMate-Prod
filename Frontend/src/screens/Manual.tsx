@@ -25,7 +25,7 @@ import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
 import { FoodItem as FoodItemType } from '../services/BarcodeService';
 import { getRecentFoodEntries, FoodLogEntry } from '../api/foodLog';
-import { addFoodLog } from '../utils/database';
+import { useFoodLog } from '../context/FoodLogContext';
 import { debounce } from 'lodash';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
@@ -222,6 +222,7 @@ export default function Manual() {
     const defaultMealType = params?.mealType || 'Breakfast';
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
+    const { addFoodLog } = useFoodLog();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItemType[]>([]);
     const [recentEntries, setRecentEntries] = useState<FoodItemType[]>([]);
@@ -327,7 +328,8 @@ export default function Manual() {
 
             // Create food log entry using the EXACT same structure as ImageCapture
             const foodLog = {
-                meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
+                meal_id: Date.now(), // Generate a unique meal ID as number - same as ImageCapture
+                user_id: 1, // Placeholder - database function will override with actual user ID
                 food_name: food.food_name || 'Unknown Food',
                 brand_name: food.brand_name || '',
                 meal_type: finalMealType,
@@ -360,11 +362,7 @@ export default function Manual() {
 
             console.log('Saving manual/search food log to local database:', foodLog);
 
-            // Navigate immediately while database operation runs in background - same as ImageCapture
-            const refreshTimestamp = Date.now();
-            navigation.navigate('FoodLog', { refresh: refreshTimestamp });
-
-            // Continue with database operation after navigation has started - same as ImageCapture
+            // Use FoodLogContext which handles navigation and refresh automatically
             await addFoodLog(foodLog);
 
             // Hide food details modal if open

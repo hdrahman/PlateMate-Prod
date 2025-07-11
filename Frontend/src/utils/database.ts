@@ -1627,6 +1627,7 @@ interface UserProfile {
     future_self_message?: string;
     future_self_message_type?: string;
     future_self_message_created_at?: string;
+    future_self_message_uri?: string;
     diet_type?: string;
     use_metric_system?: number;
     premium?: number;
