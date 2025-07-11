@@ -381,6 +381,23 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         />
                     </MaskedView>
 
+                    {/* Back arrow in header */}
+                    {(isManualEntry || selectedActivity) && (
+                        <TouchableOpacity
+                            style={styles.headerBackButton}
+                            onPress={() => {
+                                if (isManualEntry) {
+                                    setIsManualEntry(false);
+                                } else if (selectedActivity) {
+                                    setSelectedActivity(null);
+                                }
+                            }}
+                        >
+                            <Ionicons name="arrow-back" size={28} color="#8A2BE2" />
+                        </TouchableOpacity>
+                    )}
+
+                    {/* Close (X) button */}
                     <TouchableOpacity
                         style={styles.exitButton}
                         onPress={handleClose}
@@ -531,18 +548,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                             </>
                         ) : isManualEntry ? (
                             /* Manual Entry Form */
-                            <View style={{ marginTop: 10 }}>
-                                <TouchableOpacity
-                                    style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        marginBottom: 15
-                                    }}
-                                    onPress={() => setIsManualEntry(false)}
-                                >
-                                    <Ionicons name="arrow-back" size={20} color={PURPLE_ACCENT} />
-                                    <Text style={{ color: PURPLE_ACCENT, marginLeft: 5 }}>Back to activity list</Text>
-                                </TouchableOpacity>
+                            <View>
+                                {/* Header back button now handles navigation; removed old row */}
 
                                 <Text style={styles.inputLabel}>Activity Name:</Text>
                                 <View style={styles.inputContainer}>
@@ -649,13 +656,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         ) : selectedActivity && (
                             <>
                                 {/* Header with Back Button */}
-                                <TouchableOpacity
-                                    style={styles.backButtonContainer}
-                                    onPress={() => setSelectedActivity(null)}
-                                >
-                                    <Ionicons name="arrow-back" size={22} color={PURPLE_ACCENT} />
-                                    <Text style={styles.backButtonText}>Back to activities</Text>
-                                </TouchableOpacity>
+                                {/* Header back button now handles navigation; removed old row */}
 
                                 {/* Exercise Header Card */}
                                 <View style={styles.exerciseHeaderCard}>
@@ -894,6 +895,13 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 10,
         right: 10,
+        padding: 5,
+        zIndex: 10
+    },
+    headerBackButton: {
+        position: 'absolute',
+        top: 10,
+        left: 10,
         padding: 5,
         zIndex: 10
     },
