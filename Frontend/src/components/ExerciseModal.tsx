@@ -360,494 +360,497 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
             visible={visible}
             onRequestClose={handleClose}
         >
-            <TouchableWithoutFeedback onPress={handleClose}>
-                <View style={styles.modalOverlay}>
-                    {/* Using a regular View instead of TouchableWithoutFeedback so it doesn't steal the scroll responder */}
-                    <View style={styles.exerciseModalContent}>
-                        <MaskedView
-                            maskElement={
-                                <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
-                            }
-                        >
-                            <LinearGradient
-                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={{ height: 30, width: '100%' }}
-                            />
-                        </MaskedView>
+            <View style={styles.modalOverlay}>
+                {/* Transparent background that captures outside taps */}
+                <TouchableWithoutFeedback onPress={handleClose}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
 
-                        <TouchableOpacity
-                            style={styles.exitButton}
-                            onPress={handleClose}
-                        >
-                            <Ionicons name="close" size={28} color="#8A2BE2" />
-                        </TouchableOpacity>
+                {/* Actual modal card */}
+                <View style={styles.exerciseModalContent}>
+                    <MaskedView
+                        maskElement={
+                            <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
+                        }
+                    >
+                        <LinearGradient
+                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{ height: 30, width: '100%' }}
+                        />
+                    </MaskedView>
 
-                        <View style={{ height: 15 }} />
+                    <TouchableOpacity
+                        style={styles.exitButton}
+                        onPress={handleClose}
+                    >
+                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                    </TouchableOpacity>
 
-                        {/* Make the content scrollable */}
-                        <ScrollView
-                            style={{ flex: 1 }}
-                            contentContainerStyle={styles.exerciseModalScrollContent}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {!selectedActivity && !isManualEntry ? (
-                                <>
-                                    {/* Manual Entry Card */}
-                                    <TouchableOpacity
-                                        style={[styles.popularActivitiesWrapper, { marginBottom: 8 }]}
-                                        onPress={() => setIsManualEntry(true)}
-                                    >
-                                        <LinearGradient
-                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                            style={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                right: 0,
-                                                top: 0,
-                                                bottom: 0,
-                                                borderRadius: 10,
-                                            }}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                        />
-                                        <View style={styles.popularActivitiesContainer}>
-                                            <View style={styles.popularActivitiesHeader}>
-                                                <Ionicons name="create-outline" size={20} color={PURPLE_ACCENT} />
-                                                <Text style={styles.popularActivitiesTitle}>Manual Entry</Text>
-                                            </View>
-                                            <Text style={[styles.activityMet, { marginBottom: 5 }]}>
-                                                Enter your own activity name and MET value
-                                            </Text>
-                                            <TouchableOpacity
-                                                style={[styles.intensityButton, {
-                                                    backgroundColor: 'transparent',
-                                                    width: '100%',
-                                                    marginTop: 10,
-                                                    borderWidth: 1,
-                                                    borderColor: PURPLE_ACCENT
-                                                }]}
-                                                onPress={() => setIsManualEntry(true)}
-                                            >
-                                                <Text style={[styles.intensityButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>Enter Manually</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </TouchableOpacity>
+                    <View style={{ height: 15 }} />
 
-                                    {/* Or divider */}
-                                    <View style={[styles.orDivider, { marginVertical: 8 }]}>
-                                        <View style={styles.dividerLine} />
-                                        <Text style={styles.orText}>OR</Text>
-                                        <View style={styles.dividerLine} />
-                                    </View>
-
-                                    {/* Search Input */}
-                                    <View style={styles.searchInputContainer}>
-                                        <Ionicons name="search" size={20} color="#999" />
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search activities..."
-                                            placeholderTextColor="#999"
-                                            value={searchQuery}
-                                            onChangeText={setSearchQuery}
-                                        />
-                                    </View>
-
-                                    {/* Activities List */}
-                                    <View style={styles.activitiesContainer}>
-                                        {searchQuery === '' ? (
-                                            <View style={styles.popularActivitiesWrapper}>
-                                                <LinearGradient
-                                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        left: 0,
-                                                        right: 0,
-                                                        top: 0,
-                                                        bottom: 0,
-                                                        borderRadius: 10,
-                                                    }}
-                                                    start={{ x: 0, y: 0 }}
-                                                    end={{ x: 1, y: 0 }}
-                                                />
-                                                <View style={styles.popularActivitiesContainer}>
-                                                    <ScrollView
-                                                        nestedScrollEnabled={true}
-                                                        style={styles.popularActivitiesScroll}
-                                                        contentContainerStyle={{
-                                                            paddingBottom: 15
-                                                        }}
-                                                        showsVerticalScrollIndicator={false}
-                                                    >
-                                                        <Text style={[styles.sectionHeader, {
-                                                            marginTop: 0,
-                                                            borderTopWidth: 0,
-                                                            paddingTop: 0
-                                                        }]}>Popular Activities</Text>
-                                                        {groupedActivities.popular.map((activity, index) =>
-                                                            <React.Fragment key={`popular-${activity.name}`}>
-                                                                {renderActivityItem({ item: activity })}
-                                                            </React.Fragment>
-                                                        )}
-
-                                                        <Text style={styles.sectionHeader}>Light Activities ({"<"} 3 METs)</Text>
-                                                        {groupedActivities.light.map((activity, index) =>
-                                                            <React.Fragment key={`light-${activity.name}`}>
-                                                                {renderActivityItem({ item: activity })}
-                                                            </React.Fragment>
-                                                        )}
-
-                                                        <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
-                                                        {groupedActivities.moderate.map((activity, index) =>
-                                                            <React.Fragment key={`moderate-${activity.name}`}>
-                                                                {renderActivityItem({ item: activity })}
-                                                            </React.Fragment>
-                                                        )}
-
-                                                        <Text style={styles.sectionHeader}>Vigorous Activities ({">"} 6 METs)</Text>
-                                                        {groupedActivities.vigorous.map((activity, index) =>
-                                                            <React.Fragment key={`vigorous-${activity.name}`}>
-                                                                {renderActivityItem({ item: activity })}
-                                                            </React.Fragment>
-                                                        )}
-                                                    </ScrollView>
-                                                </View>
-                                            </View>
-                                        ) : (
-                                            <FlatList
-                                                data={filteredActivities}
-                                                renderItem={renderActivityItem}
-                                                keyExtractor={(item) => item.name}
-                                                nestedScrollEnabled={true}
-                                                showsVerticalScrollIndicator={false}
-                                            />
-                                        )}
-                                    </View>
-                                </>
-                            ) : isManualEntry ? (
-                                /* Manual Entry Form */
-                                <View style={{ marginTop: 10 }}>
-                                    <TouchableOpacity
+                    {/* Make the content scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        contentContainerStyle={styles.exerciseModalScrollContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {!selectedActivity && !isManualEntry ? (
+                            <>
+                                {/* Manual Entry Card */}
+                                <TouchableOpacity
+                                    style={[styles.popularActivitiesWrapper, { marginBottom: 8 }]}
+                                    onPress={() => setIsManualEntry(true)}
+                                >
+                                    <LinearGradient
+                                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                                         style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            marginBottom: 15
+                                            position: 'absolute',
+                                            left: 0,
+                                            right: 0,
+                                            top: 0,
+                                            bottom: 0,
+                                            borderRadius: 10,
                                         }}
-                                        onPress={() => setIsManualEntry(false)}
-                                    >
-                                        <Ionicons name="arrow-back" size={20} color={PURPLE_ACCENT} />
-                                        <Text style={{ color: PURPLE_ACCENT, marginLeft: 5 }}>Back to activity list</Text>
-                                    </TouchableOpacity>
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                    />
+                                    <View style={styles.popularActivitiesContainer}>
+                                        <View style={styles.popularActivitiesHeader}>
+                                            <Ionicons name="create-outline" size={20} color={PURPLE_ACCENT} />
+                                            <Text style={styles.popularActivitiesTitle}>Manual Entry</Text>
+                                        </View>
+                                        <Text style={[styles.activityMet, { marginBottom: 5 }]}>
+                                            Enter your own activity name and MET value
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={[styles.intensityButton, {
+                                                backgroundColor: 'transparent',
+                                                width: '100%',
+                                                marginTop: 10,
+                                                borderWidth: 1,
+                                                borderColor: PURPLE_ACCENT
+                                            }]}
+                                            onPress={() => setIsManualEntry(true)}
+                                        >
+                                            <Text style={[styles.intensityButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>Enter Manually</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </TouchableOpacity>
 
-                                    <Text style={styles.inputLabel}>Activity Name:</Text>
-                                    <View style={styles.inputContainer}>
+                                {/* Or divider */}
+                                <View style={[styles.orDivider, { marginVertical: 8 }]}>
+                                    <View style={styles.dividerLine} />
+                                    <Text style={styles.orText}>OR</Text>
+                                    <View style={styles.dividerLine} />
+                                </View>
+
+                                {/* Search Input */}
+                                <View style={styles.searchInputContainer}>
+                                    <Ionicons name="search" size={20} color="#999" />
+                                    <TextInput
+                                        style={styles.searchInput}
+                                        placeholder="Search activities..."
+                                        placeholderTextColor="#999"
+                                        value={searchQuery}
+                                        onChangeText={setSearchQuery}
+                                    />
+                                </View>
+
+                                {/* Activities List */}
+                                <View style={styles.activitiesContainer}>
+                                    {searchQuery === '' ? (
+                                        <View style={styles.popularActivitiesWrapper}>
+                                            <LinearGradient
+                                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    right: 0,
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    borderRadius: 10,
+                                                }}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                            />
+                                            <View style={styles.popularActivitiesContainer}>
+                                                <ScrollView
+                                                    nestedScrollEnabled={true}
+                                                    style={styles.popularActivitiesScroll}
+                                                    contentContainerStyle={{
+                                                        paddingBottom: 15
+                                                    }}
+                                                    showsVerticalScrollIndicator={false}
+                                                >
+                                                    <Text style={[styles.sectionHeader, {
+                                                        marginTop: 0,
+                                                        borderTopWidth: 0,
+                                                        paddingTop: 0
+                                                    }]}>Popular Activities</Text>
+                                                    {groupedActivities.popular.map((activity, index) =>
+                                                        <React.Fragment key={`popular-${activity.name}`}>
+                                                            {renderActivityItem({ item: activity })}
+                                                        </React.Fragment>
+                                                    )}
+
+                                                    <Text style={styles.sectionHeader}>Light Activities ({"<"} 3 METs)</Text>
+                                                    {groupedActivities.light.map((activity, index) =>
+                                                        <React.Fragment key={`light-${activity.name}`}>
+                                                            {renderActivityItem({ item: activity })}
+                                                        </React.Fragment>
+                                                    )}
+
+                                                    <Text style={styles.sectionHeader}>Moderate Activities (3-6 METs)</Text>
+                                                    {groupedActivities.moderate.map((activity, index) =>
+                                                        <React.Fragment key={`moderate-${activity.name}`}>
+                                                            {renderActivityItem({ item: activity })}
+                                                        </React.Fragment>
+                                                    )}
+
+                                                    <Text style={styles.sectionHeader}>Vigorous Activities ({">"} 6 METs)</Text>
+                                                    {groupedActivities.vigorous.map((activity, index) =>
+                                                        <React.Fragment key={`vigorous-${activity.name}`}>
+                                                            {renderActivityItem({ item: activity })}
+                                                        </React.Fragment>
+                                                    )}
+                                                </ScrollView>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <FlatList
+                                            data={filteredActivities}
+                                            renderItem={renderActivityItem}
+                                            keyExtractor={(item) => item.name}
+                                            nestedScrollEnabled={true}
+                                            showsVerticalScrollIndicator={false}
+                                        />
+                                    )}
+                                </View>
+                            </>
+                        ) : isManualEntry ? (
+                            /* Manual Entry Form */
+                            <View style={{ marginTop: 10 }}>
+                                <TouchableOpacity
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        marginBottom: 15
+                                    }}
+                                    onPress={() => setIsManualEntry(false)}
+                                >
+                                    <Ionicons name="arrow-back" size={20} color={PURPLE_ACCENT} />
+                                    <Text style={{ color: PURPLE_ACCENT, marginLeft: 5 }}>Back to activity list</Text>
+                                </TouchableOpacity>
+
+                                <Text style={styles.inputLabel}>Activity Name:</Text>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={manualActivityName}
+                                        onChangeText={setManualActivityName}
+                                        placeholder="e.g., Tennis with friends"
+                                        placeholderTextColor="#777"
+                                    />
+                                </View>
+
+                                <View style={styles.inputRow}>
+                                    <Text style={styles.inputLabel}>MET Value:</Text>
+                                    <View style={styles.durationInputContainer}>
                                         <TextInput
                                             style={styles.input}
-                                            value={manualActivityName}
-                                            onChangeText={setManualActivityName}
-                                            placeholder="e.g., Tennis with friends"
-                                            placeholderTextColor="#777"
+                                            keyboardType="numeric"
+                                            value={manualMET}
+                                            onChangeText={setManualMET}
                                         />
                                     </View>
+                                </View>
 
-                                    <View style={styles.inputRow}>
-                                        <Text style={styles.inputLabel}>MET Value:</Text>
-                                        <View style={styles.durationInputContainer}>
-                                            <TextInput
-                                                style={styles.input}
-                                                keyboardType="numeric"
-                                                value={manualMET}
-                                                onChangeText={setManualMET}
-                                            />
+                                {/* Divider before Duration */}
+                                <View style={styles.exerciseModalDivider} />
+
+                                <View style={styles.inputRow}>
+                                    <Text style={styles.inputLabel}>Duration (minutes):</Text>
+                                    <View style={styles.durationInputContainer}>
+                                        <TextInput
+                                            style={styles.input}
+                                            keyboardType="number-pad"
+                                            value={exerciseDuration}
+                                            onChangeText={setExerciseDuration}
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* Divider before Intensity */}
+                                <View style={styles.exerciseModalDivider} />
+
+                                {/* Intensity Selection - For manual entry */}
+                                <View style={styles.inputRow}>
+                                    <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.intensityButton,
+                                            { marginRight: 3 }
+                                        ]}
+                                        onPress={() => setExerciseIntensity('light')}
+                                    >
+                                        <Text style={[
+                                            styles.intensityButtonText,
+                                            exerciseIntensity === 'light' && styles.intensityButtonTextSelected
+                                        ]}>Light</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.intensityButton,
+                                            { marginRight: 3 }
+                                        ]}
+                                        onPress={() => setExerciseIntensity('moderate')}
+                                    >
+                                        <Text style={[
+                                            styles.intensityButtonText,
+                                            exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
+                                        ]}>Moderate</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.intensityButton
+                                        ]}
+                                        onPress={() => setExerciseIntensity('vigorous')}
+                                    >
+                                        <Text style={[
+                                            styles.intensityButtonText,
+                                            exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
+                                        ]}>Vigorous</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Divider after Intensity */}
+                                <View style={styles.exerciseModalDivider} />
+
+                                {/* Calories Result */}
+                                <View style={styles.caloriesResult}>
+                                    <Text style={styles.caloriesFormula}>
+                                        {exerciseIntensity === 'moderate' ? (
+                                            `MET: ${manualMET} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                        ) : exerciseIntensity === 'light' ? (
+                                            `MET: ${manualMET} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                        ) : (
+                                            `MET: ${manualMET} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                        )}
+                                    </Text>
+                                    <Text style={styles.caloriesResultText}>
+                                        = {Math.round((parseFloat(manualMET) || 5.0) *
+                                            (exerciseIntensity === 'light' ? 0.8 : exerciseIntensity === 'vigorous' ? 1.2 : 1.0) *
+                                            3.5 * userWeight * (parseInt(exerciseDuration) || 30) / 200)} calories
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : selectedActivity && (
+                            <>
+                                {/* Header with Back Button */}
+                                <TouchableOpacity
+                                    style={styles.backButtonContainer}
+                                    onPress={() => setSelectedActivity(null)}
+                                >
+                                    <Ionicons name="arrow-back" size={22} color={PURPLE_ACCENT} />
+                                    <Text style={styles.backButtonText}>Back to activities</Text>
+                                </TouchableOpacity>
+
+                                {/* Exercise Header Card */}
+                                <View style={styles.exerciseHeaderCard}>
+                                    <View style={styles.exerciseIconContainer}>
+                                        <Ionicons
+                                            name={selectedActivity.category === 'light' ? 'walk' :
+                                                selectedActivity.category === 'moderate' ? 'fitness' : 'flash'}
+                                            size={32}
+                                            color={PURPLE_ACCENT}
+                                        />
+                                    </View>
+                                    <View style={styles.exerciseHeaderInfo}>
+                                        <Text style={styles.exerciseHeaderTitle}>{selectedActivity.name}</Text>
+                                        <View style={styles.exerciseMetBadge}>
+                                            <Text style={styles.exerciseMetText}>
+                                                {selectedActivity.met} MET • {selectedActivity.category.toUpperCase()}
+                                            </Text>
                                         </View>
                                     </View>
+                                </View>
 
-                                    {/* Divider before Duration */}
-                                    <View style={styles.exerciseModalDivider} />
-
-                                    <View style={styles.inputRow}>
-                                        <Text style={styles.inputLabel}>Duration (minutes):</Text>
-                                        <View style={styles.durationInputContainer}>
-                                            <TextInput
-                                                style={styles.input}
-                                                keyboardType="number-pad"
-                                                value={exerciseDuration}
-                                                onChangeText={setExerciseDuration}
-                                            />
+                                {/* Duration Section */}
+                                <View style={styles.configSection}>
+                                    <Text style={styles.configSectionTitle}>Duration</Text>
+                                    <View style={styles.durationCardWrapper}>
+                                        <LinearGradient
+                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            style={styles.durationCardGradient}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                        />
+                                        <View style={styles.durationCard}>
+                                            <View style={styles.durationInputWrapper}>
+                                                <TextInput
+                                                    style={styles.durationInput}
+                                                    keyboardType="number-pad"
+                                                    value={exerciseDuration}
+                                                    onChangeText={setExerciseDuration}
+                                                    placeholderTextColor={SUBDUED}
+                                                    placeholder="30"
+                                                />
+                                                <Text style={styles.durationUnit}>minutes</Text>
+                                            </View>
+                                            <View style={styles.durationPresets}>
+                                                {[15, 30, 45, 60].map((duration) => (
+                                                    <TouchableOpacity
+                                                        key={duration}
+                                                        style={[
+                                                            styles.durationPreset,
+                                                            exerciseDuration === duration.toString() && styles.durationPresetSelected
+                                                        ]}
+                                                        onPress={() => setExerciseDuration(duration.toString())}
+                                                    >
+                                                        <Text style={[
+                                                            styles.durationPresetText,
+                                                            exerciseDuration === duration.toString() && styles.durationPresetTextSelected
+                                                        ]}>
+                                                            {duration}m
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
                                         </View>
                                     </View>
+                                </View>
 
-                                    {/* Divider before Intensity */}
-                                    <View style={styles.exerciseModalDivider} />
-
-                                    {/* Intensity Selection - For manual entry */}
-                                    <View style={styles.inputRow}>
-                                        <Text style={[styles.inputLabel, { marginRight: 2, width: 60 }]}>Intensity:</Text>
+                                {/* Intensity Section */}
+                                <View style={styles.configSection}>
+                                    <Text style={styles.configSectionTitle}>Intensity Level</Text>
+                                    <View style={styles.intensityGrid}>
                                         <TouchableOpacity
                                             style={[
-                                                styles.intensityButton,
-                                                { marginRight: 3 }
+                                                styles.intensityCard,
+                                                exerciseIntensity === 'light' && styles.intensityCardSelected
                                             ]}
                                             onPress={() => setExerciseIntensity('light')}
                                         >
+                                            <Ionicons
+                                                name="leaf-outline"
+                                                size={24}
+                                                color={exerciseIntensity === 'light' ? PURPLE_ACCENT : SUBDUED}
+                                            />
                                             <Text style={[
-                                                styles.intensityButtonText,
-                                                exerciseIntensity === 'light' && styles.intensityButtonTextSelected
+                                                styles.intensityCardTitle,
+                                                exerciseIntensity === 'light' && styles.intensityCardTitleSelected
                                             ]}>Light</Text>
+                                            <Text style={styles.intensityCardSubtitle}>0.8x multiplier</Text>
                                         </TouchableOpacity>
+
                                         <TouchableOpacity
                                             style={[
-                                                styles.intensityButton,
-                                                { marginRight: 3 }
+                                                styles.intensityCard,
+                                                exerciseIntensity === 'moderate' && styles.intensityCardSelected
                                             ]}
                                             onPress={() => setExerciseIntensity('moderate')}
                                         >
+                                            <Ionicons
+                                                name="fitness-outline"
+                                                size={24}
+                                                color={exerciseIntensity === 'moderate' ? PURPLE_ACCENT : SUBDUED}
+                                            />
                                             <Text style={[
-                                                styles.intensityButtonText,
-                                                exerciseIntensity === 'moderate' && styles.intensityButtonTextSelected
+                                                styles.intensityCardTitle,
+                                                exerciseIntensity === 'moderate' && styles.intensityCardTitleSelected
                                             ]}>Moderate</Text>
+                                            <Text style={styles.intensityCardSubtitle}>1.0x multiplier</Text>
                                         </TouchableOpacity>
+
                                         <TouchableOpacity
                                             style={[
-                                                styles.intensityButton
+                                                styles.intensityCard,
+                                                exerciseIntensity === 'vigorous' && styles.intensityCardSelected
                                             ]}
                                             onPress={() => setExerciseIntensity('vigorous')}
                                         >
+                                            <Ionicons
+                                                name="flash-outline"
+                                                size={24}
+                                                color={exerciseIntensity === 'vigorous' ? PURPLE_ACCENT : SUBDUED}
+                                            />
                                             <Text style={[
-                                                styles.intensityButtonText,
-                                                exerciseIntensity === 'vigorous' && styles.intensityButtonTextSelected
+                                                styles.intensityCardTitle,
+                                                exerciseIntensity === 'vigorous' && styles.intensityCardTitleSelected
                                             ]}>Vigorous</Text>
+                                            <Text style={styles.intensityCardSubtitle}>1.2x multiplier</Text>
                                         </TouchableOpacity>
                                     </View>
+                                </View>
 
-                                    {/* Divider after Intensity */}
-                                    <View style={styles.exerciseModalDivider} />
+                                {/* Calories Calculation Card */}
+                                <View style={styles.caloriesCalculationCard}>
+                                    <View style={styles.caloriesHeader}>
+                                        <Ionicons name="calculator-outline" size={24} color={PURPLE_ACCENT} />
+                                        <Text style={styles.caloriesHeaderTitle}>Estimated Calories Burned</Text>
+                                    </View>
 
-                                    {/* Calories Result */}
-                                    <View style={styles.caloriesResult}>
-                                        <Text style={styles.caloriesFormula}>
-                                            {exerciseIntensity === 'moderate' ? (
-                                                `MET: ${manualMET} × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
-                                            ) : exerciseIntensity === 'light' ? (
-                                                `MET: ${manualMET} × 0.8 (light) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
-                                            ) : (
-                                                `MET: ${manualMET} × 1.2 (vigorous) × 3.5 × ${userWeight} kg × ${exerciseDuration} min ÷ 200`
+                                    <View style={styles.caloriesMainResult}>
+                                        <Text style={styles.caloriesNumber}>
+                                            {calculateCaloriesBurned(
+                                                selectedActivity,
+                                                parseInt(exerciseDuration) || 30,
+                                                userWeight
                                             )}
                                         </Text>
-                                        <Text style={styles.caloriesResultText}>
-                                            = {Math.round((parseFloat(manualMET) || 5.0) *
-                                                (exerciseIntensity === 'light' ? 0.8 : exerciseIntensity === 'vigorous' ? 1.2 : 1.0) *
-                                                3.5 * userWeight * (parseInt(exerciseDuration) || 30) / 200)} calories
+                                        <Text style={styles.caloriesUnit}>calories</Text>
+                                    </View>
+
+                                    <View style={styles.formulaContainer}>
+                                        <Text style={styles.formulaLabel}>Calculation:</Text>
+                                        <Text style={styles.formulaText}>
+                                            {exerciseIntensity === 'moderate' ? (
+                                                `${selectedActivity.met} MET × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
+                                            ) : exerciseIntensity === 'light' ? (
+                                                `${selectedActivity.met} MET × 0.8 × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
+                                            ) : (
+                                                `${selectedActivity.met} MET × 1.2 × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
+                                            )}
                                         </Text>
                                     </View>
                                 </View>
-                            ) : selectedActivity && (
-                                <>
-                                    {/* Header with Back Button */}
-                                    <TouchableOpacity
-                                        style={styles.backButtonContainer}
-                                        onPress={() => setSelectedActivity(null)}
-                                    >
-                                        <Ionicons name="arrow-back" size={22} color={PURPLE_ACCENT} />
-                                        <Text style={styles.backButtonText}>Back to activities</Text>
-                                    </TouchableOpacity>
+                            </>
+                        )}
 
-                                    {/* Exercise Header Card */}
-                                    <View style={styles.exerciseHeaderCard}>
-                                        <View style={styles.exerciseIconContainer}>
-                                            <Ionicons
-                                                name={selectedActivity.category === 'light' ? 'walk' :
-                                                    selectedActivity.category === 'moderate' ? 'fitness' : 'flash'}
-                                                size={32}
-                                                color={PURPLE_ACCENT}
-                                            />
-                                        </View>
-                                        <View style={styles.exerciseHeaderInfo}>
-                                            <Text style={styles.exerciseHeaderTitle}>{selectedActivity.name}</Text>
-                                            <View style={styles.exerciseMetBadge}>
-                                                <Text style={styles.exerciseMetText}>
-                                                    {selectedActivity.met} MET • {selectedActivity.category.toUpperCase()}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    </View>
+                        {/* Add margin at bottom to ensure space for buttons */}
+                        <View style={{ marginBottom: 20 }} />
+                    </ScrollView>
 
-                                    {/* Duration Section */}
-                                    <View style={styles.configSection}>
-                                        <Text style={styles.configSectionTitle}>Duration</Text>
-                                        <View style={styles.durationCardWrapper}>
-                                            <LinearGradient
-                                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                                style={styles.durationCardGradient}
-                                                start={{ x: 0, y: 0 }}
-                                                end={{ x: 1, y: 1 }}
-                                            />
-                                            <View style={styles.durationCard}>
-                                                <View style={styles.durationInputWrapper}>
-                                                    <TextInput
-                                                        style={styles.durationInput}
-                                                        keyboardType="number-pad"
-                                                        value={exerciseDuration}
-                                                        onChangeText={setExerciseDuration}
-                                                        placeholderTextColor={SUBDUED}
-                                                        placeholder="30"
-                                                    />
-                                                    <Text style={styles.durationUnit}>minutes</Text>
-                                                </View>
-                                                <View style={styles.durationPresets}>
-                                                    {[15, 30, 45, 60].map((duration) => (
-                                                        <TouchableOpacity
-                                                            key={duration}
-                                                            style={[
-                                                                styles.durationPreset,
-                                                                exerciseDuration === duration.toString() && styles.durationPresetSelected
-                                                            ]}
-                                                            onPress={() => setExerciseDuration(duration.toString())}
-                                                        >
-                                                            <Text style={[
-                                                                styles.durationPresetText,
-                                                                exerciseDuration === duration.toString() && styles.durationPresetTextSelected
-                                                            ]}>
-                                                                {duration}m
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    ))}
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    {/* Intensity Section */}
-                                    <View style={styles.configSection}>
-                                        <Text style={styles.configSectionTitle}>Intensity Level</Text>
-                                        <View style={styles.intensityGrid}>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.intensityCard,
-                                                    exerciseIntensity === 'light' && styles.intensityCardSelected
-                                                ]}
-                                                onPress={() => setExerciseIntensity('light')}
-                                            >
-                                                <Ionicons
-                                                    name="leaf-outline"
-                                                    size={24}
-                                                    color={exerciseIntensity === 'light' ? PURPLE_ACCENT : SUBDUED}
-                                                />
-                                                <Text style={[
-                                                    styles.intensityCardTitle,
-                                                    exerciseIntensity === 'light' && styles.intensityCardTitleSelected
-                                                ]}>Light</Text>
-                                                <Text style={styles.intensityCardSubtitle}>0.8x multiplier</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.intensityCard,
-                                                    exerciseIntensity === 'moderate' && styles.intensityCardSelected
-                                                ]}
-                                                onPress={() => setExerciseIntensity('moderate')}
-                                            >
-                                                <Ionicons
-                                                    name="fitness-outline"
-                                                    size={24}
-                                                    color={exerciseIntensity === 'moderate' ? PURPLE_ACCENT : SUBDUED}
-                                                />
-                                                <Text style={[
-                                                    styles.intensityCardTitle,
-                                                    exerciseIntensity === 'moderate' && styles.intensityCardTitleSelected
-                                                ]}>Moderate</Text>
-                                                <Text style={styles.intensityCardSubtitle}>1.0x multiplier</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.intensityCard,
-                                                    exerciseIntensity === 'vigorous' && styles.intensityCardSelected
-                                                ]}
-                                                onPress={() => setExerciseIntensity('vigorous')}
-                                            >
-                                                <Ionicons
-                                                    name="flash-outline"
-                                                    size={24}
-                                                    color={exerciseIntensity === 'vigorous' ? PURPLE_ACCENT : SUBDUED}
-                                                />
-                                                <Text style={[
-                                                    styles.intensityCardTitle,
-                                                    exerciseIntensity === 'vigorous' && styles.intensityCardTitleSelected
-                                                ]}>Vigorous</Text>
-                                                <Text style={styles.intensityCardSubtitle}>1.2x multiplier</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-
-                                    {/* Calories Calculation Card */}
-                                    <View style={styles.caloriesCalculationCard}>
-                                        <View style={styles.caloriesHeader}>
-                                            <Ionicons name="calculator-outline" size={24} color={PURPLE_ACCENT} />
-                                            <Text style={styles.caloriesHeaderTitle}>Estimated Calories Burned</Text>
-                                        </View>
-
-                                        <View style={styles.caloriesMainResult}>
-                                            <Text style={styles.caloriesNumber}>
-                                                {calculateCaloriesBurned(
-                                                    selectedActivity,
-                                                    parseInt(exerciseDuration) || 30,
-                                                    userWeight
-                                                )}
-                                            </Text>
-                                            <Text style={styles.caloriesUnit}>calories</Text>
-                                        </View>
-
-                                        <View style={styles.formulaContainer}>
-                                            <Text style={styles.formulaLabel}>Calculation:</Text>
-                                            <Text style={styles.formulaText}>
-                                                {exerciseIntensity === 'moderate' ? (
-                                                    `${selectedActivity.met} MET × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
-                                                ) : exerciseIntensity === 'light' ? (
-                                                    `${selectedActivity.met} MET × 0.8 × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
-                                                ) : (
-                                                    `${selectedActivity.met} MET × 1.2 × 3.5 × ${userWeight}kg × ${exerciseDuration}min ÷ 200`
-                                                )}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </>
-                            )}
-
-                            {/* Add margin at bottom to ensure space for buttons */}
-                            <View style={{ marginBottom: 20 }} />
-                        </ScrollView>
-
-                        {/* Buttons - fixed at bottom */}
-                        <View style={styles.buttonRow}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.modalAddButton,
-                                    {
-                                        flex: 1,
-                                        backgroundColor: 'transparent',
-                                        width: '100%',
-                                        borderWidth: 1,
-                                        borderColor: PURPLE_ACCENT,
-                                        shadowColor: 'transparent',
-                                        shadowOffset: { width: 0, height: 0 },
-                                        shadowOpacity: 0,
-                                        shadowRadius: 0,
-                                        elevation: 0
-                                    },
-                                    (!selectedActivity && !isManualEntry) && { opacity: 0.5 },
-                                    (isManualEntry && !manualActivityName.trim()) && { opacity: 0.5 }
-                                ]}
-                                onPress={addNewExercise}
-                                disabled={(!selectedActivity && !isManualEntry) || (isManualEntry && !manualActivityName.trim())}
-                            >
-                                <Text style={[styles.modalButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>ADD EXERCISE</Text>
-                            </TouchableOpacity>
-                        </View>
+                    {/* Buttons - fixed at bottom */}
+                    <View style={styles.buttonRow}>
+                        <TouchableOpacity
+                            style={[
+                                styles.modalAddButton,
+                                {
+                                    flex: 1,
+                                    backgroundColor: 'transparent',
+                                    width: '100%',
+                                    borderWidth: 1,
+                                    borderColor: PURPLE_ACCENT,
+                                    shadowColor: 'transparent',
+                                    shadowOffset: { width: 0, height: 0 },
+                                    shadowOpacity: 0,
+                                    shadowRadius: 0,
+                                    elevation: 0
+                                },
+                                (!selectedActivity && !isManualEntry) && { opacity: 0.5 },
+                                (isManualEntry && !manualActivityName.trim()) && { opacity: 0.5 }
+                            ]}
+                            onPress={addNewExercise}
+                            disabled={(!selectedActivity && !isManualEntry) || (isManualEntry && !manualActivityName.trim())}
+                        >
+                            <Text style={[styles.modalButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>ADD EXERCISE</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
-            </TouchableWithoutFeedback>
+            </View>
         </Modal>
     );
 };
