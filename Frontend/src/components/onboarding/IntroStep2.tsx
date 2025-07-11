@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
         height: height * 0.6,
         position: 'relative',
         marginHorizontal: -25,
-        marginBottom: 20,
+        marginBottom: 50,
         borderRadius: 20,
         overflow: 'hidden',
     },
