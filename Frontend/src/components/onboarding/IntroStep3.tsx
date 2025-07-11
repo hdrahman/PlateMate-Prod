@@ -252,8 +252,8 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 30,
         paddingTop: 0,
-        paddingBottom: 80,
-        justifyContent: 'space-between',
+        paddingBottom: 40,
+        justifyContent: 'flex-start',
         // Remove negative offset to reveal small tagline
         marginTop: 0,
     },
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     bottomContent: {
-        marginBottom: 30,
+        marginBottom: 10,
         paddingHorizontal: 20,
     },
     quickProgress: {
