@@ -1153,7 +1153,7 @@ const ImageCapture: React.FC = () => {
                 <View style={styles.instructionsContainer}>
                     <Text style={styles.instructionsTitle}>Capture Your Meal</Text>
                     <Text style={styles.instructionsText}>
-                        Take a slightly angled photo of your food for best results. If any parts are hidden from view, use the optional side view to capture those areas. You can also add additional context and details if needed.
+                        Angle your photo for best results. Use an optional side view for hidden parts, and add extra details if you like.
                     </Text>
                 </View>
 
@@ -1253,7 +1253,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     instructionsContainer: {
-        marginBottom: 24,
+        marginBottom: 16,
         paddingHorizontal: 4,
     },
     instructionsTitle: {
@@ -1268,7 +1268,7 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
     imagesContainer: {
-        marginBottom: 24,
+        marginBottom: 16,
     },
     imagePlaceholderWrapper: {
         width: '100%',
@@ -1376,7 +1376,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     optionalDetailsWrapper: {
-        marginBottom: 24,
+        marginBottom: 16,
         borderRadius: 12,
         backgroundColor: '#1a1a1a',
         overflow: 'hidden',
@@ -1386,7 +1386,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingVertical: 12,
         backgroundColor: '#1a1a1a',
     },
     sectionHeaderContent: {
