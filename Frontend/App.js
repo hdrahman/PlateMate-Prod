@@ -62,6 +62,7 @@ import PremiumSubscription from './src/screens/PremiumSubscription';
 import FeatureRequests from './src/screens/FeatureRequests';
 import CreateFeatureRequest from './src/screens/CreateFeatureRequest';
 import { navigationRef } from './src/navigation/RootNavigation';
+import FutureSelfRecordingSimple from './src/screens/FutureSelfRecordingSimple';
 
 const { width } = Dimensions.get("window");
 
@@ -385,6 +386,7 @@ function AuthenticatedContent() {
       <Stack.Screen name="Analytics" component={Analytics} />
       <Stack.Screen name="FeatureRequests" component={FeatureRequests} />
       <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequest} />
+      <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />
     </Stack.Navigator>
   );
 }
