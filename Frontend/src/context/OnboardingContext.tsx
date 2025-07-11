@@ -23,6 +23,7 @@ interface OnboardingContextType {
     currentStep: number;
     totalSteps: number;
     isLoading: boolean;
+    justCompletedOnboarding: boolean;
 
     // User profile data
     profile: UserProfile;
@@ -35,6 +36,7 @@ interface OnboardingContextType {
     resetOnboarding: () => Promise<void>;
     saveOnboardingProgress: () => Promise<void>;
     setCurrentStep: (step: number) => void;
+    markWelcomeModalShown: () => void;
 }
 
 // User profile data structure
@@ -186,7 +188,7 @@ const defaultProfile: UserProfile = {
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 8, // Simplified onboarding: Welcome + 5 essential steps + Predictive + Subscription
+    totalSteps: 8, // Simplified onboarding: Welcome + 6 essential steps + Physical Attributes + Predictive
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -196,6 +198,8 @@ const OnboardingContext = createContext<OnboardingContextType>({
     saveOnboardingProgress: async () => { },
     setCurrentStep: () => { },
     isLoading: true,
+    justCompletedOnboarding: false,
+    markWelcomeModalShown: () => { },
 });
 
 // Helper to convert SQLite profile to frontend format
@@ -338,6 +342,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const [currentStep, setCurrentStep] = useState(1);
     const [profile, setProfile] = useState<UserProfile>(defaultProfile);
     const [isLoading, setIsLoading] = useState(true);
+    const [justCompletedOnboarding, setJustCompletedOnboarding] = useState(false);
     const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
     const [tempSessionId, setTempSessionId] = useState<string>('');
 
@@ -835,6 +840,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             // Mark onboarding as complete in state IMMEDIATELY
             console.log('🎯 Setting onboarding complete state immediately');
             setOnboardingComplete(true);
+            setJustCompletedOnboarding(true);
             setCurrentStep(totalSteps);
 
             // Force a small delay to ensure state propagation
@@ -882,6 +888,11 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         }
     };
 
+    // Function to mark welcome modal as shown
+    const markWelcomeModalShown = () => {
+        setJustCompletedOnboarding(false);
+    };
+
     return (
         <OnboardingContext.Provider
             value={{
@@ -897,6 +908,8 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 saveOnboardingProgress,
                 setCurrentStep,
                 isLoading,
+                justCompletedOnboarding,
+                markWelcomeModalShown,
             }}
         >
             {children}

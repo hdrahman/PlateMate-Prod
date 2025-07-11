@@ -22,6 +22,7 @@ import {
   clearWeightHistoryLocal
 } from '../utils/database';
 import { useOnboarding } from '../context/OnboardingContext';
+import WelcomePremiumModal from '../components/WelcomePremiumModal';
 
 import {
   View,
@@ -118,7 +119,7 @@ export default function Home() {
   const navigation = useNavigation();
   const { isDarkTheme } = useContext(ThemeContext);
   const { user } = useAuth();
-  const { onboardingComplete } = useOnboarding();
+  const { onboardingComplete, justCompletedOnboarding, markWelcomeModalShown } = useOnboarding();
   const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
   // Keep track of which "page" (card) we are on in the horizontal scroll
@@ -183,6 +184,9 @@ export default function Home() {
     enabled: false
   });
   const [cheatDayLoading, setCheatDayLoading] = useState(true);
+
+  // Add state for welcome modal
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   // Load user profile and calculate nutrition goals
   useEffect(() => {
@@ -322,6 +326,23 @@ export default function Home() {
         .catch(error => console.error('Error loading streak:', error));
     }
   }, [user]);
+
+  // Show welcome modal when onboarding is just completed
+  useEffect(() => {
+    console.log('🔍 Checking for welcome modal:', {
+      justCompletedOnboarding,
+      userUid: user?.uid,
+      showWelcomeModal
+    });
+
+    if (justCompletedOnboarding && user?.uid && !showWelcomeModal) {
+      console.log('✅ Showing welcome modal for just completed onboarding');
+      // Small delay to ensure the home screen is fully loaded
+      setTimeout(() => {
+        setShowWelcomeModal(true);
+      }, 1500);
+    }
+  }, [justCompletedOnboarding, user, showWelcomeModal]);
 
   // Load today's nutrition data from the food log context
   useEffect(() => {
@@ -1416,6 +1437,13 @@ export default function Home() {
         </View>
       </ScrollView>
       {renderWeightModal()}
+      <WelcomePremiumModal
+        visible={showWelcomeModal}
+        onClose={() => {
+          setShowWelcomeModal(false);
+          markWelcomeModalShown();
+        }}
+      />
     </SafeAreaView>
   );
 }

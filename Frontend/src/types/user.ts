@@ -48,6 +48,7 @@ export interface UserProfile {
     // App state
     onboardingComplete: boolean;
     premium: boolean;
+    trialEndDate?: string | null;
     lastSyncDate?: string;
 
     // Cheat day preferences

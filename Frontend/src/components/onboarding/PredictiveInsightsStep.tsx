@@ -8,10 +8,14 @@ import {
     Dimensions,
     Animated,
     Easing,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { useAuth } from '../../context/AuthContext';
+import { useOnboarding } from '../../context/OnboardingContext';
 import Svg, {
     Path,
     Circle,
@@ -49,7 +53,7 @@ try {
 interface PredictiveInsightsStepProps {
     profile: UserProfile;
     updateProfile: (data: Partial<UserProfile>) => Promise<void>;
-    onNext: () => void;
+    onComplete: () => void;
 }
 
 interface Milestone {
@@ -70,7 +74,7 @@ interface SuccessMetric {
 
 const { width, height } = Dimensions.get('window');
 
-const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile, updateProfile, onNext }) => {
+const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile, updateProfile, onComplete }) => {
     const [targetDate, setTargetDate] = useState<string>('');
     const [dailyCalories, setDailyCalories] = useState<number>(0);
     const [macros, setMacros] = useState({ protein: 0, carbs: 0, fat: 0 });
@@ -573,22 +577,84 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
         </Animated.View>
     );
 
-    const handleSubmit = async () => {
-        try {
-            await updateProfile({
-                dailyCalorieTarget: dailyCalories,
-                projectedCompletionDate: targetDate,
-                estimatedDurationWeeks: estimatedWeeks,
-                nutrientFocus: {
-                    protein: macros.protein,
-                    carbs: macros.carbs,
-                    fat: macros.fat,
-                }
-            });
+    const { signUp } = useAuth();
+    const { completeOnboarding } = useOnboarding();
+    const [isLoading, setIsLoading] = useState(false);
 
-            onNext();
-        } catch (error) {
-            console.error('Error updating profile:', error);
+    const handleSubmit = async () => {
+        // Automatically create account and start 15-day premium trial
+        if (profile.email && profile.password) {
+            setIsLoading(true);
+            try {
+                console.log('Creating account with collected profile data:', profile.email);
+
+                // First update the profile with calculated metrics
+                await updateProfile({
+                    dailyCalorieTarget: dailyCalories,
+                    projectedCompletionDate: targetDate,
+                    estimatedDurationWeeks: estimatedWeeks,
+                    nutrientFocus: {
+                        protein: macros.protein,
+                        carbs: macros.carbs,
+                        fat: macros.fat,
+                    }
+                });
+
+                // Create the account using collected info
+                await signUp(profile.email, profile.password);
+
+                console.log('Account created successfully');
+
+                // Calculate trial end date (15 days from now)
+                const trialEndDate = new Date();
+                trialEndDate.setDate(trialEndDate.getDate() + 15);
+
+                // Auto-start 15-day premium trial
+                await updateProfile({
+                    premium: true,
+                    trialEndDate: trialEndDate.toISOString(),
+                });
+
+                console.log('✅ 15-day premium trial activated:', {
+                    premium: true,
+                    trialEndDate: trialEndDate.toISOString()
+                });
+
+                // Wait for auth state to fully propagate
+                console.log('⏳ Waiting for auth state to propagate...');
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
+                // Retry mechanism for completing onboarding
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                while (retryCount < maxRetries) {
+                    try {
+                        await completeOnboarding();
+                        console.log('✅ Onboarding completed successfully');
+                        break;
+                    } catch (error) {
+                        retryCount++;
+                        console.log(`⚠️ Onboarding completion attempt ${retryCount} failed:`, error);
+
+                        if (retryCount < maxRetries) {
+                            console.log(`🔄 Retrying in ${retryCount} seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                onComplete();
+            } catch (error) {
+                console.error('Account creation error:', error);
+                Alert.alert('Error', 'Failed to create account. Please try again.');
+            } finally {
+                setIsLoading(false);
+            }
+        } else {
+            Alert.alert('Error', 'Missing account information. Please go back and complete your profile.');
         }
     };
 
@@ -603,9 +669,19 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
             {renderCompletionCard()}
 
             <Animated.View style={{ opacity: fadeAnim }}>
-                <TouchableOpacity style={styles.nextButton} onPress={handleSubmit}>
-                    <Text style={styles.nextButtonText}>Start My Journey</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
+                <TouchableOpacity
+                    style={[styles.nextButton, isLoading && styles.nextButtonDisabled]}
+                    onPress={handleSubmit}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <>
+                            <Text style={styles.nextButtonText}>Start My Journey</Text>
+                            <Ionicons name="arrow-forward" size={20} color="#fff" />
+                        </>
+                    )}
                 </TouchableOpacity>
             </Animated.View>
         </ScrollView>
@@ -957,6 +1033,9 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         marginRight: 8,
+    },
+    nextButtonDisabled: {
+        opacity: 0.6,
     },
 });
 

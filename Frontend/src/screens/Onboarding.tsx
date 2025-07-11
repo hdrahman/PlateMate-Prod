@@ -36,7 +36,6 @@ import GenderStep from '../components/onboarding/GenderStep';
 import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesStep';
 import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
 import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
-import SubscriptionStep from '../components/onboarding/SubscriptionStep';
 
 const { width, height } = Dimensions.get('window');
 
@@ -164,9 +163,9 @@ const Onboarding = () => {
             case 6:
                 return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 7:
-                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 8:
-                return <SubscriptionStep profile={profile} onComplete={handleCompleteOnboarding} />;
+                return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onComplete={handleCompleteOnboarding} />;
             default:
                 // This case should ideally not be reached if totalSteps is accurate.
                 // Fallback to the first step.
