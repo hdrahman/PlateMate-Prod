@@ -46,13 +46,7 @@
       "expo-sqlite",
       "expo-background-fetch",
       "expo-task-manager",
-      "./notifee.plugin.js",
-      [
-        "react-native-purchases",
-        {
-          "iOSUsesStoreKit2IfAvailable": false
-        }
-      ]
+      "./notifee.plugin.js"
     ],
     "extra": {
       "eas": {

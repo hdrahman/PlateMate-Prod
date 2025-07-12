@@ -1,39 +1,17 @@
 import { Platform } from 'react-native';
 import { SubscriptionDetails, SubscriptionStatus } from '../types/user';
 
-// Mock types for react-native-purchases until the package is installed
-interface PurchasesOffering {
-  identifier: string;
-  serverDescription: string;
-  availablePackages: PurchasesPackage[];
-}
+// Import RevenueCat SDK
+import Purchases, { 
+  CustomerInfo, 
+  PurchasesOffering, 
+  PurchasesPackage, 
+  PurchasesStoreProduct,
+  INTRO_ELIGIBILITY_STATUS 
+} from 'react-native-purchases';
 
-interface PurchasesPackage {
-  identifier: string;
-  packageType: string;
-  product: PurchasesStoreProduct;
-  offeringIdentifier: string;
-}
-
-interface PurchasesStoreProduct {
-  identifier: string;
-  description: string;
-  title: string;
-  price: number;
-  priceString: string;
-  currencyCode: string;
-}
-
-interface CustomerInfo {
-  entitlements: {
-    active: { [key: string]: EntitlementInfo };
-    all: { [key: string]: EntitlementInfo };
-  };
-  originalPurchaseDate: string;
-  latestExpirationDate?: string;
-}
-
-interface EntitlementInfo {
+// Define EntitlementInfo type locally (it's part of CustomerInfo but not exported separately)
+type EntitlementInfo = {
   identifier: string;
   productIdentifier: string;
   isActive: boolean;
@@ -42,67 +20,6 @@ interface EntitlementInfo {
   expirationDate?: string;
   unsubscribeDetectedAt?: string;
   billingIssueDetectedAt?: string;
-}
-
-enum INTRO_ELIGIBILITY_STATUS {
-  INTRO_ELIGIBILITY_STATUS_UNKNOWN = 0,
-  INTRO_ELIGIBILITY_STATUS_INELIGIBLE = 1,
-  INTRO_ELIGIBILITY_STATUS_ELIGIBLE = 2,
-  INTRO_ELIGIBILITY_STATUS_NO_INTRO_AVAILABLE = 3,
-}
-
-// Mock Purchases object for development
-const Purchases = {
-  configure: async (config: { apiKey: string; appUserID: string }) => {
-    console.log('Mock: Purchases configured with', config);
-  },
-  getOfferings: async (): Promise<{ current: PurchasesOffering | null }> => {
-    console.log('Mock: Getting offerings');
-    return { current: null };
-  },
-  getProducts: async (productIds: string[]): Promise<PurchasesStoreProduct[]> => {
-    console.log('Mock: Getting products', productIds);
-    return [];
-  },
-  purchasePackage: async (packageToPurchase: PurchasesPackage) => {
-    console.log('Mock: Purchasing package', packageToPurchase);
-    throw new Error('Mock purchase - not implemented');
-  },
-  purchaseStoreProduct: async (productIdentifier: string) => {
-    console.log('Mock: Purchasing product', productIdentifier);
-    throw new Error('Mock purchase - not implemented');
-  },
-  restorePurchases: async (): Promise<CustomerInfo> => {
-    console.log('Mock: Restoring purchases');
-    return {
-      entitlements: { active: {}, all: {} },
-      originalPurchaseDate: new Date().toISOString(),
-    };
-  },
-  getCustomerInfo: async (): Promise<CustomerInfo> => {
-    console.log('Mock: Getting customer info');
-    return {
-      entitlements: { active: {}, all: {} },
-      originalPurchaseDate: new Date().toISOString(),
-    };
-  },
-  logOut: async () => {
-    console.log('Mock: Logging out');
-  },
-  logIn: async (userId: string) => {
-    console.log('Mock: Logging in', userId);
-    return {
-      customerInfo: {
-        entitlements: { active: {}, all: {} },
-        originalPurchaseDate: new Date().toISOString(),
-      },
-      created: false,
-    };
-  },
-  checkTrialOrIntroductoryPriceEligibility: async (productIds: string[]) => {
-    console.log('Mock: Checking trial eligibility', productIds);
-    return {};
-  },
 };
 
 // Configure your RevenueCat API keys
@@ -188,7 +105,13 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
-      const { customerInfo, productIdentifier: purchasedProductId } = await Purchases.purchaseStoreProduct(productIdentifier);
+      // First get the product, then purchase it
+      const products = await Purchases.getProducts([productIdentifier]);
+      if (products.length === 0) {
+        throw new Error(`Product not found: ${productIdentifier}`);
+      }
+      
+      const { customerInfo, productIdentifier: purchasedProductId } = await Purchases.purchaseStoreProduct(products[0]);
       console.log('✅ Purchase successful:', purchasedProductId);
       return { customerInfo, productIdentifier: purchasedProductId };
     } catch (error) {
@@ -243,7 +166,16 @@ class SubscriptionService {
   async checkTrialEligibility(productIdentifiers: string[]): Promise<{ [productId: string]: INTRO_ELIGIBILITY_STATUS }> {
     try {
       const eligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility(productIdentifiers);
-      return eligibility;
+      
+      // Convert IntroEligibility to INTRO_ELIGIBILITY_STATUS
+      const result: { [productId: string]: INTRO_ELIGIBILITY_STATUS } = {};
+      
+      Object.keys(eligibility).forEach(productId => {
+        const introEligibility = eligibility[productId];
+        result[productId] = introEligibility.status;
+      });
+      
+      return result;
     } catch (error) {
       console.error('❌ Error checking trial eligibility:', error);
       return {};

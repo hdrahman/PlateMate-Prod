@@ -67,6 +67,7 @@ GoogleService-Info.plist
 *secrets*.json
 *auth*.json
 firebase-adminsdk-*.json
+client_secret_*.json
 
 # =======================
 # ✅ TypeScript Build Info

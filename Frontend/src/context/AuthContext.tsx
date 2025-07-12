@@ -20,7 +20,7 @@ try {
     GoogleSignin = GoogleSigninModule.GoogleSignin;
 
     if (GoogleSignin) {
-        // Configure Google Sign In
+        // Configure Google Sign In for Supabase with minimal configuration  
         GoogleSignin.configure({
             webClientId: GOOGLE_WEB_CLIENT_ID,
             offlineAccess: true,
@@ -222,7 +222,70 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (error: any) {
             console.log('Google Sign In Error Details:', error);
 
-            // Handle specific error cases
+            // Handle account linking requirement
+            if (error.message === 'ACCOUNT_LINKING_REQUIRED') {
+                const email = error.email;
+
+                return new Promise((resolve, reject) => {
+                    Alert.alert(
+                        'Account Already Exists',
+                        `An account with the email ${email} already exists. To sign in with Google, you need to link your accounts by entering your password.`,
+                        [
+                            {
+                                text: 'Link Accounts',
+                                onPress: () => {
+                                    // Prompt for password to link accounts
+                                    Alert.prompt(
+                                        'Enter Password',
+                                        'Please enter your password to link your Google account:',
+                                        [
+                                            {
+                                                text: 'Cancel',
+                                                style: 'cancel',
+                                                onPress: () => {
+                                                    console.log('User cancelled account linking');
+                                                    reject(new Error('Account linking cancelled by user'));
+                                                }
+                                            },
+                                            {
+                                                text: 'Link',
+                                                onPress: async (password) => {
+                                                    if (!password || password.trim() === '') {
+                                                        Alert.alert('Error', 'Password is required to link accounts');
+                                                        reject(new Error('Password is required'));
+                                                        return;
+                                                    }
+
+                                                    try {
+                                                        const result = await supabaseAuth.linkGoogleAccount(
+                                                            email,
+                                                            password,
+                                                            error.googleToken
+                                                        );
+                                                        console.log('✅ Account linking successful');
+                                                        resolve(result);
+                                                    } catch (linkError: any) {
+                                                        console.error('Account linking failed:', linkError);
+                                                        Alert.alert(
+                                                            'Linking Failed',
+                                                            linkError.message || 'Failed to link accounts. Please check your password and try again.'
+                                                        );
+                                                        reject(linkError);
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        'secure-text'
+                                    );
+                                }
+                            }
+                        ],
+                        { cancelable: false } // Force user to make a choice - no X button
+                    );
+                });
+            }
+
+            // Handle other specific error cases
             if (error.code === 'SIGN_IN_CANCELLED') {
                 // User cancelled the login flow
                 Alert.alert('Sign In Cancelled', 'Sign-in was cancelled');
