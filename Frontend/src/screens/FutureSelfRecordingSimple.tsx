@@ -285,14 +285,14 @@ const FutureSelfRecordingSimple: React.FC = () => {
     const startVideoRecording = async () => {
         try {
             console.log('Requesting video recording permissions...');
-            
+
             // Request permissions
             const cam = await requestCameraPermission();
             const mic = await Audio.requestPermissionsAsync();
-            
+
             console.log('Camera permission:', cam.granted);
             console.log('Microphone permission:', mic.granted);
-            
+
             if (!cam.granted || !mic.granted) {
                 Alert.alert('Permission needed', 'Camera and microphone permissions are required for video recording.');
                 return;
@@ -342,7 +342,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                 const fileName = `video_message_${Date.now()}.mp4`;
                 const dest = FileSystem.documentDirectory + fileName;
                 await FileSystem.copyAsync({ from: videoData.uri, to: dest });
-                
+
                 // Check if file was copied successfully
                 const fileInfo = await FileSystem.getInfoAsync(dest);
                 if (fileInfo.exists) {
@@ -358,7 +358,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
             console.error('Video recording error:', error);
             Alert.alert('Recording Error', 'Failed to record video. Please try again.');
         }
-        
+
         // Always clean up after recording completes or errors
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -416,7 +416,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
 
     const handleSave = async () => {
         console.log('Save button pressed:', { messageType, recordingUri, textMessage: textMessage.trim() });
-        
+
         if (!user?.uid) {
             Alert.alert('Not signed in', 'Please sign in again.');
             return;
@@ -658,14 +658,14 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                                     />
                                                 </LinearGradient>
                                             </TouchableOpacity>
-                                            
+
                                             <View style={styles.audioInfo}>
                                                 <Text style={styles.audioTitle}>Voice Message</Text>
                                                 <Text style={styles.audioLabel}>
                                                     {isPlaying ? 'Playing...' : 'Tap to play'}
                                                 </Text>
                                             </View>
-                                            
+
                                             <View style={styles.audioWaveform}>
                                                 <Ionicons name="pulse" size={24} color={COLORS.PURPLE_ACCENT} />
                                             </View>
@@ -686,7 +686,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                                     }
                                                 }}
                                             />
-                                            
+
                                             {/* Video overlay controls */}
                                             <View style={styles.videoOverlay}>
                                                 <TouchableOpacity
@@ -702,7 +702,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                                     </View>
                                                 </TouchableOpacity>
                                             </View>
-                                            
+
                                             {/* Fullscreen button */}
                                             <TouchableOpacity
                                                 style={styles.fullscreenButton}
@@ -710,7 +710,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                             >
                                                 <Ionicons name="expand" size={20} color={COLORS.WHITE} />
                                             </TouchableOpacity>
-                                            
+
                                             {/* Video status indicator */}
                                             <View style={styles.videoStatusContainer}>
                                                 <View style={styles.videoStatusDot} />
@@ -746,7 +746,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
             >
                 <View style={styles.fullscreenContainer}>
                     <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY_BG} />
-                    
+
                     {/* Fullscreen video */}
                     <Video
                         ref={videoRef}
@@ -760,7 +760,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                             }
                         }}
                     />
-                    
+
                     {/* Fullscreen controls */}
                     <View style={styles.fullscreenOverlay}>
                         <TouchableOpacity
@@ -769,7 +769,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                         >
                             <Ionicons name="close" size={28} color={COLORS.WHITE} />
                         </TouchableOpacity>
-                        
+
                         <TouchableOpacity
                             style={styles.fullscreenPlayButton}
                             onPress={isVideoPlaying ? pauseVideo : playVideo}
