@@ -1,36 +1,13 @@
 // Import Supabase Auth components
 import { supabase } from '../utils/supabaseClient';
-import supabaseAuth from '../utils/supabaseAuth';
+import supabaseAuth from '../utils/supabaseAuth'; // Use the new clean implementation
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GOOGLE_WEB_CLIENT_ID } from '@env';
 import tokenManager from '../utils/tokenManager';
 import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
 import { getUserProfileBySupabaseUid } from '../utils/database';
-
-// Import Google Sign In safely
-let GoogleSignin = null;
-
-// Initialize Google Sign-In
-try {
-    // Import properly with require
-    const GoogleSigninModule = require('@react-native-google-signin/google-signin');
-    GoogleSignin = GoogleSigninModule.GoogleSignin;
-
-    if (GoogleSignin) {
-        // Configure Google Sign In for Supabase with minimal configuration  
-        GoogleSignin.configure({
-            webClientId: GOOGLE_WEB_CLIENT_ID,
-            offlineAccess: true,
-        });
-        console.log('Supabase Auth initialized successfully');
-        console.log('Google Sign-In configured successfully');
-    }
-} catch (error) {
-    console.log('Google Sign-In not available', error);
-}
 
 // We've removed the Apple Authentication module
 console.log('Apple Authentication not available');
@@ -218,88 +195,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Sign in with Google
     const signInWithGoogle = async () => {
         try {
-            return await supabaseAuth.signInWithGoogle();
+            console.log('🟠 AuthContext: Starting Google Sign-In...');
+            const result = await supabaseAuth.signInWithGoogle();
+            console.log('🟠 AuthContext: Google Sign-In result received:', result);
+            return result;
         } catch (error: any) {
-            console.log('Google Sign In Error Details:', error);
-
-            // Handle account linking requirement
-            if (error.message === 'ACCOUNT_LINKING_REQUIRED') {
-                const email = error.email;
-
-                return new Promise((resolve, reject) => {
-                    Alert.alert(
-                        'Account Already Exists',
-                        `An account with the email ${email} already exists. To sign in with Google, you need to link your accounts by entering your password.`,
-                        [
-                            {
-                                text: 'Link Accounts',
-                                onPress: () => {
-                                    // Prompt for password to link accounts
-                                    Alert.prompt(
-                                        'Enter Password',
-                                        'Please enter your password to link your Google account:',
-                                        [
-                                            {
-                                                text: 'Cancel',
-                                                style: 'cancel',
-                                                onPress: () => {
-                                                    console.log('User cancelled account linking');
-                                                    reject(new Error('Account linking cancelled by user'));
-                                                }
-                                            },
-                                            {
-                                                text: 'Link',
-                                                onPress: async (password) => {
-                                                    if (!password || password.trim() === '') {
-                                                        Alert.alert('Error', 'Password is required to link accounts');
-                                                        reject(new Error('Password is required'));
-                                                        return;
-                                                    }
-
-                                                    try {
-                                                        const result = await supabaseAuth.linkGoogleAccount(
-                                                            email,
-                                                            password,
-                                                            error.googleToken
-                                                        );
-                                                        console.log('✅ Account linking successful');
-                                                        resolve(result);
-                                                    } catch (linkError: any) {
-                                                        console.error('Account linking failed:', linkError);
-                                                        Alert.alert(
-                                                            'Linking Failed',
-                                                            linkError.message || 'Failed to link accounts. Please check your password and try again.'
-                                                        );
-                                                        reject(linkError);
-                                                    }
-                                                }
-                                            }
-                                        ],
-                                        'secure-text'
-                                    );
-                                }
-                            }
-                        ],
-                        { cancelable: false } // Force user to make a choice - no X button
-                    );
-                });
-            }
-
-            // Handle other specific error cases
-            if (error.code === 'SIGN_IN_CANCELLED') {
-                // User cancelled the login flow
-                Alert.alert('Sign In Cancelled', 'Sign-in was cancelled');
-            } else if (error.code === 'IN_PROGRESS') {
-                // Operation in progress already
-                Alert.alert('Sign In in Progress', 'Sign-in operation already in progress');
-            } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
-                // Play services not available or outdated
-                Alert.alert('Play Services Error', 'Google Play Services is not available or outdated');
-            } else {
-                // Other errors
-                Alert.alert('Google Sign In Error', error.message || 'An error occurred during Google sign in');
-            }
-
+            console.log('🔴 AuthContext: Google Sign In Error Details:', error);
+            Alert.alert('Google Sign In Error', error.message || 'An error occurred during Google sign-in');
             throw error;
         }
     };

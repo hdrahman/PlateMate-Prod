@@ -94,7 +94,7 @@ const Auth = ({ navigation, route }: any) => {
     const [isAppleAuthAvailable, setIsAppleAuthAvailable] = useState(false);
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
-    const { signIn, signUp, signInWithGoogle, signInWithApple, signInAnonymously, user } = useAuth();
+    const { signIn, signUp, signInWithGoogle, signInWithApple, user } = useAuth();
 
     // Animation refs
     const logoScale = useRef(new Animated.Value(0.9)).current;
@@ -193,13 +193,18 @@ const Auth = ({ navigation, route }: any) => {
     };
 
     const handleGoogleSignIn = async () => {
+        console.log('🔵 Google Sign-In button pressed');
         setIsLoading(true);
         try {
-            await signInWithGoogle();
+            console.log('🔵 Calling signInWithGoogle...');
+            const result = await signInWithGoogle();
+            console.log('🔵 Google Sign-In result:', result);
         } catch (error) {
+            console.error('🔴 Google Sign-In error in Auth component:', error);
             // Error is already handled in auth context
         } finally {
             setIsLoading(false);
+            console.log('🔵 Google Sign-In process completed');
         }
     };
 
@@ -207,17 +212,6 @@ const Auth = ({ navigation, route }: any) => {
         setIsLoading(true);
         try {
             await signInWithApple();
-        } catch (error) {
-            // Error is already handled in auth context
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleAnonymousSignIn = async () => {
-        setIsLoading(true);
-        try {
-            await signInAnonymously();
         } catch (error) {
             // Error is already handled in auth context
         } finally {
@@ -475,17 +469,6 @@ const Auth = ({ navigation, route }: any) => {
                                 <Ionicons name="logo-google" size={20} color="#FFF" style={styles.socialIcon} />
                                 <Text style={styles.socialButtonText}>Continue with Google</Text>
                             </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.guestButton}
-                            onPress={handleAnonymousSignIn}
-                            disabled={isLoading}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.guestButtonText}>
-                                <Ionicons name="person-outline" size={16} color="#9B00FF" /> Continue as Guest
-                            </Text>
                         </TouchableOpacity>
                     </Animated.View>
                 </ScrollView>
@@ -755,15 +738,6 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '500',
         color: '#FFF',
-    },
-    guestButton: {
-        alignItems: 'center',
-        paddingVertical: 16,
-    },
-    guestButtonText: {
-        fontSize: 14,
-        color: '#9B00FF',
-        fontWeight: '500',
     },
 });
 

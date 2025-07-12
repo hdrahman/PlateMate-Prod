@@ -1,25 +1,4 @@
 import { supabase } from './supabaseClient';
-import { GOOGLE_WEB_CLIENT_ID } from '@env';
-
-// Import Google Sign In safely
-let GoogleSignin = null;
-try {
-    const GoogleSigninModule = require('@react-native-google-signin/google-signin');
-    GoogleSignin = GoogleSigninModule.GoogleSignin;
-
-    if (GoogleSignin) {
-        console.log('Google Sign-In module loaded, available methods:', Object.keys(GoogleSignin));
-        
-        // Configure Google Sign In for Supabase with minimal configuration
-        GoogleSignin.configure({
-            webClientId: GOOGLE_WEB_CLIENT_ID,
-            offlineAccess: true,
-        });
-        console.log('Google Sign-In configured for Supabase Auth');
-    }
-} catch (error) {
-    console.log('Google Sign-In not available', error);
-}
 
 // Auth service for Supabase
 export const supabaseAuth = {
@@ -61,40 +40,27 @@ export const supabaseAuth = {
         }
     },
 
-    // Sign in with Google using native Google Sign-In + Supabase
+    // Sign in with Google using Supabase OAuth
     signInWithGoogle: async () => {
         try {
-            console.log('🟡 Starting Google Sign-In flow...');
+            console.log('🟡 Starting Supabase Google OAuth flow...');
             
-            if (!GoogleSignin) {
-                throw new Error('Google Sign-In not available');
-            }
-
-            // Get Google ID token
-            await GoogleSignin.hasPlayServices();
-            const userInfo = await GoogleSignin.signIn();
-            
-            console.log('🟡 Google Sign-In successful, getting ID token...');
-            const { idToken } = await GoogleSignin.getTokens();
-            
-            if (!idToken) {
-                throw new Error('No ID token received from Google');
-            }
-
-            console.log('🟡 Signing in to Supabase with Google ID token...');
-            
-            // Sign in to Supabase with the Google ID token
-            const { data, error } = await supabase.auth.signInWithIdToken({
+            // Use Supabase's built-in OAuth flow for Google
+            const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
-                token: idToken,
+                options: {
+                    redirectTo: undefined, // Let Supabase handle the redirect
+                    scopes: 'email profile', // Request email and profile info
+                }
             });
 
+            console.log('🟡 Supabase Google OAuth initiated successfully');
+
             if (error) {
-                console.error('🔴 Supabase sign-in error:', error);
+                console.error('🔴 Supabase Google OAuth error:', error);
                 throw error;
             }
 
-            console.log('🟢 Successfully signed in with Google');
             return data;
         } catch (error) {
             console.error('🔴 Error signing in with Google:', error);
@@ -105,15 +71,6 @@ export const supabaseAuth = {
     // Sign out
     signOut: async () => {
         try {
-            // Sign out from Google if available
-            if (GoogleSignin) {
-                try {
-                    await GoogleSignin.signOut();
-                } catch (googleError) {
-                    console.log('Google sign out error (non-critical):', googleError);
-                }
-            }
-            
             // Sign out from Supabase
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
