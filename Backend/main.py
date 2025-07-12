@@ -33,6 +33,7 @@ from routes.food import router as food_router
 from routes.recipes import router as recipes_router
 from routes.health import router as health_router
 from routes.feature_requests import router as feature_requests_router
+from routes.subscription import router as subscription_router
 
 # Add the import for connection pool
 from services.connection_pool import start_connection_pool, stop_connection_pool
@@ -197,6 +198,7 @@ app.include_router(food_router, prefix='/food', tags=['food'])
 app.include_router(recipes_router, prefix='/recipes', tags=['recipes'])
 app.include_router(health_router, tags=['health'])
 app.include_router(feature_requests_router)  # Using prefix from router definition
+app.include_router(subscription_router)  # Using prefix from router definition
 
 # Health check endpoints
 @app.get("/")

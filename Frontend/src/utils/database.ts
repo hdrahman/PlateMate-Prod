@@ -87,14 +87,27 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       CREATE TABLE IF NOT EXISTS user_subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         firebase_uid TEXT UNIQUE NOT NULL,
-        subscription_status TEXT NOT NULL DEFAULT 'free',
+        subscription_status TEXT NOT NULL DEFAULT 'free_trial',
         start_date TEXT NOT NULL,
         end_date TEXT,
+        trial_start_date TEXT,
+        trial_end_date TEXT,
+        extended_trial_granted INTEGER DEFAULT 0,
+        extended_trial_start_date TEXT,
+        extended_trial_end_date TEXT,
         auto_renew INTEGER DEFAULT 0,
         payment_method TEXT,
         subscription_id TEXT,
-        trial_ends_at TEXT,
+        original_transaction_id TEXT,
+        latest_receipt_data TEXT,
+        receipt_validation_date TEXT,
+        app_store_subscription_id TEXT,
+        play_store_subscription_id TEXT,
         canceled_at TEXT,
+        cancellation_reason TEXT,
+        grace_period_end_date TEXT,
+        is_in_intro_offer_period INTEGER DEFAULT 0,
+        intro_offer_end_date TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         synced INTEGER DEFAULT 0,
@@ -3227,10 +3240,14 @@ export const getSubscriptionStatus = async (firebaseUid: string): Promise<Subscr
     try {
         const db = await getDatabase();
         const result = await db.getFirstAsync(
-            `SELECT subscription_status, start_date, end_date, auto_renew, payment_method, 
-       trial_ends_at, canceled_at
-       FROM user_subscriptions
-       WHERE firebase_uid = ?`,
+            `SELECT subscription_status, start_date, end_date, trial_start_date, trial_end_date,
+             extended_trial_granted, extended_trial_start_date, extended_trial_end_date,
+             auto_renew, payment_method, subscription_id, original_transaction_id,
+             latest_receipt_data, receipt_validation_date, app_store_subscription_id,
+             play_store_subscription_id, canceled_at, cancellation_reason,
+             grace_period_end_date, is_in_intro_offer_period, intro_offer_end_date
+             FROM user_subscriptions
+             WHERE firebase_uid = ?`,
             [firebaseUid]
         );
 
@@ -3240,10 +3257,24 @@ export const getSubscriptionStatus = async (firebaseUid: string): Promise<Subscr
             status: result.subscription_status as SubscriptionStatus,
             startDate: result.start_date,
             endDate: result.end_date,
+            trialStartDate: result.trial_start_date,
+            trialEndDate: result.trial_end_date,
+            extendedTrialGranted: !!result.extended_trial_granted,
+            extendedTrialStartDate: result.extended_trial_start_date,
+            extendedTrialEndDate: result.extended_trial_end_date,
             autoRenew: !!result.auto_renew,
             paymentMethod: result.payment_method,
-            trialEndsAt: result.trial_ends_at,
-            canceledAt: result.canceled_at
+            subscriptionId: result.subscription_id,
+            originalTransactionId: result.original_transaction_id,
+            latestReceiptData: result.latest_receipt_data,
+            receiptValidationDate: result.receipt_validation_date,
+            appStoreSubscriptionId: result.app_store_subscription_id,
+            playStoreSubscriptionId: result.play_store_subscription_id,
+            canceledAt: result.canceled_at,
+            cancellationReason: result.cancellation_reason,
+            gracePeriodEndDate: result.grace_period_end_date,
+            isInIntroOfferPeriod: !!result.is_in_intro_offer_period,
+            introOfferEndDate: result.intro_offer_end_date,
         };
     } catch (error) {
         console.error('Error getting subscription status:', error);
@@ -3270,17 +3301,37 @@ export const updateSubscriptionStatus = async (
             // Create new subscription
             await db.runAsync(
                 `INSERT INTO user_subscriptions (
-          firebase_uid, subscription_status, start_date, end_date,
-          auto_renew, payment_method, trial_ends_at, last_modified
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          firebase_uid, subscription_status, start_date, end_date, trial_start_date, 
+          trial_end_date, extended_trial_granted, extended_trial_start_date, 
+          extended_trial_end_date, auto_renew, payment_method, subscription_id,
+          original_transaction_id, latest_receipt_data, receipt_validation_date,
+          app_store_subscription_id, play_store_subscription_id, canceled_at,
+          cancellation_reason, grace_period_end_date, is_in_intro_offer_period,
+          intro_offer_end_date, last_modified
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     firebaseUid,
-                    details.status || 'free',
+                    details.status || 'free_trial',
                     details.startDate || now,
                     details.endDate || null,
+                    details.trialStartDate || null,
+                    details.trialEndDate || null,
+                    details.extendedTrialGranted ? 1 : 0,
+                    details.extendedTrialStartDate || null,
+                    details.extendedTrialEndDate || null,
                     details.autoRenew ? 1 : 0,
                     details.paymentMethod || null,
-                    details.trialEndsAt || null,
+                    details.subscriptionId || null,
+                    details.originalTransactionId || null,
+                    details.latestReceiptData || null,
+                    details.receiptValidationDate || null,
+                    details.appStoreSubscriptionId || null,
+                    details.playStoreSubscriptionId || null,
+                    details.canceledAt || null,
+                    details.cancellationReason || null,
+                    details.gracePeriodEndDate || null,
+                    details.isInIntroOfferPeriod ? 1 : 0,
+                    details.introOfferEndDate || null,
                     now
                 ]
             );
@@ -3304,6 +3355,31 @@ export const updateSubscriptionStatus = async (
                 updateValues.push(details.endDate);
             }
 
+            if (details.trialStartDate !== undefined) {
+                updateFields.push('trial_start_date = ?');
+                updateValues.push(details.trialStartDate);
+            }
+
+            if (details.trialEndDate !== undefined) {
+                updateFields.push('trial_end_date = ?');
+                updateValues.push(details.trialEndDate);
+            }
+
+            if (details.extendedTrialGranted !== undefined) {
+                updateFields.push('extended_trial_granted = ?');
+                updateValues.push(details.extendedTrialGranted ? 1 : 0);
+            }
+
+            if (details.extendedTrialStartDate !== undefined) {
+                updateFields.push('extended_trial_start_date = ?');
+                updateValues.push(details.extendedTrialStartDate);
+            }
+
+            if (details.extendedTrialEndDate !== undefined) {
+                updateFields.push('extended_trial_end_date = ?');
+                updateValues.push(details.extendedTrialEndDate);
+            }
+
             if (details.autoRenew !== undefined) {
                 updateFields.push('auto_renew = ?');
                 updateValues.push(details.autoRenew ? 1 : 0);
@@ -3314,14 +3390,59 @@ export const updateSubscriptionStatus = async (
                 updateValues.push(details.paymentMethod);
             }
 
-            if (details.trialEndsAt !== undefined) {
-                updateFields.push('trial_ends_at = ?');
-                updateValues.push(details.trialEndsAt);
+            if (details.subscriptionId !== undefined) {
+                updateFields.push('subscription_id = ?');
+                updateValues.push(details.subscriptionId);
+            }
+
+            if (details.originalTransactionId !== undefined) {
+                updateFields.push('original_transaction_id = ?');
+                updateValues.push(details.originalTransactionId);
+            }
+
+            if (details.latestReceiptData !== undefined) {
+                updateFields.push('latest_receipt_data = ?');
+                updateValues.push(details.latestReceiptData);
+            }
+
+            if (details.receiptValidationDate !== undefined) {
+                updateFields.push('receipt_validation_date = ?');
+                updateValues.push(details.receiptValidationDate);
+            }
+
+            if (details.appStoreSubscriptionId !== undefined) {
+                updateFields.push('app_store_subscription_id = ?');
+                updateValues.push(details.appStoreSubscriptionId);
+            }
+
+            if (details.playStoreSubscriptionId !== undefined) {
+                updateFields.push('play_store_subscription_id = ?');
+                updateValues.push(details.playStoreSubscriptionId);
             }
 
             if (details.canceledAt !== undefined) {
                 updateFields.push('canceled_at = ?');
                 updateValues.push(details.canceledAt);
+            }
+
+            if (details.cancellationReason !== undefined) {
+                updateFields.push('cancellation_reason = ?');
+                updateValues.push(details.cancellationReason);
+            }
+
+            if (details.gracePeriodEndDate !== undefined) {
+                updateFields.push('grace_period_end_date = ?');
+                updateValues.push(details.gracePeriodEndDate);
+            }
+
+            if (details.isInIntroOfferPeriod !== undefined) {
+                updateFields.push('is_in_intro_offer_period = ?');
+                updateValues.push(details.isInIntroOfferPeriod ? 1 : 0);
+            }
+
+            if (details.introOfferEndDate !== undefined) {
+                updateFields.push('intro_offer_end_date = ?');
+                updateValues.push(details.introOfferEndDate);
             }
 
             // Always update modified timestamp
