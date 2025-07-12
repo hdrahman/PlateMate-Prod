@@ -10,6 +10,7 @@ import {
     StatusBar,
     ActivityIndicator,
     Dimensions,
+    Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,6 +49,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
     const [isRecording, setIsRecording] = useState<boolean>(false);
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
+    const [isVideoFullscreen, setIsVideoFullscreen] = useState<boolean>(false);
     const [recordingTimeLeft, setRecordingTimeLeft] = useState<number>(30);
     const [showCamera, setShowCamera] = useState<boolean>(false);
     const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
@@ -260,6 +262,10 @@ const FutureSelfRecordingSimple: React.FC = () => {
                 console.error('Video pause error', error);
             }
         }
+    };
+
+    const toggleVideoFullscreen = () => {
+        setIsVideoFullscreen(!isVideoFullscreen);
     };
 
     const handleMessageTypeChange = (newType: MessageKind) => {
@@ -697,6 +703,14 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                                 </TouchableOpacity>
                                             </View>
                                             
+                                            {/* Fullscreen button */}
+                                            <TouchableOpacity
+                                                style={styles.fullscreenButton}
+                                                onPress={toggleVideoFullscreen}
+                                            >
+                                                <Ionicons name="expand" size={20} color={COLORS.WHITE} />
+                                            </TouchableOpacity>
+                                            
                                             {/* Video status indicator */}
                                             <View style={styles.videoStatusContainer}>
                                                 <View style={styles.videoStatusDot} />
@@ -722,6 +736,55 @@ const FutureSelfRecordingSimple: React.FC = () => {
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
+
+            {/* Fullscreen Video Modal */}
+            <Modal
+                visible={isVideoFullscreen}
+                animationType="fade"
+                supportedOrientations={['portrait', 'landscape']}
+                onRequestClose={() => setIsVideoFullscreen(false)}
+            >
+                <View style={styles.fullscreenContainer}>
+                    <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY_BG} />
+                    
+                    {/* Fullscreen video */}
+                    <Video
+                        ref={videoRef}
+                        style={styles.fullscreenVideo}
+                        source={{ uri: recordingUri }}
+                        useNativeControls={false}
+                        resizeMode={ResizeMode.CONTAIN}
+                        onPlaybackStatusUpdate={(status: any) => {
+                            if (status.isLoaded && status.didJustFinish) {
+                                setIsVideoPlaying(false);
+                            }
+                        }}
+                    />
+                    
+                    {/* Fullscreen controls */}
+                    <View style={styles.fullscreenOverlay}>
+                        <TouchableOpacity
+                            style={styles.fullscreenCloseButton}
+                            onPress={() => setIsVideoFullscreen(false)}
+                        >
+                            <Ionicons name="close" size={28} color={COLORS.WHITE} />
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                            style={styles.fullscreenPlayButton}
+                            onPress={isVideoPlaying ? pauseVideo : playVideo}
+                        >
+                            <View style={styles.fullscreenPlayButtonInner}>
+                                <Ionicons
+                                    name={isVideoPlaying ? 'pause' : 'play'}
+                                    size={40}
+                                    color={COLORS.WHITE}
+                                />
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -918,7 +981,7 @@ const styles = StyleSheet.create({
     },
     video: {
         width: '100%',
-        height: 220,
+        height: 280,
     },
     videoOverlay: {
         position: 'absolute',
@@ -1084,6 +1147,58 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         width: 30,
         height: 30,
+    },
+
+    // Fullscreen Modal Styles
+    fullscreenContainer: {
+        flex: 1,
+        backgroundColor: COLORS.PRIMARY_BG,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullscreenVideo: {
+        width: '100%',
+        height: '100%',
+    },
+    fullscreenOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullscreenCloseButton: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        padding: 12,
+        borderRadius: 30,
+        zIndex: 10,
+    },
+    fullscreenPlayButton: {
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        borderRadius: 50,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 8,
+    },
+    fullscreenPlayButtonInner: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fullscreenButton: {
+        position: 'absolute',
+        bottom: 15,
+        right: 15,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        padding: 8,
+        borderRadius: 20,
     },
 });
 
