@@ -47,6 +47,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
     const [recordingUri, setRecordingUri] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState<boolean>(false);
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
+    const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
     const [recordingTimeLeft, setRecordingTimeLeft] = useState<number>(30);
     const [showCamera, setShowCamera] = useState<boolean>(false);
     const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
@@ -90,6 +91,11 @@ const FutureSelfRecordingSimple: React.FC = () => {
         };
     }, [user?.uid]);
 
+    // Debug effect to track recordingUri changes
+    useEffect(() => {
+        console.log('Recording URI changed:', recordingUri, 'Message type:', messageType);
+    }, [recordingUri, messageType]);
+
     const cleanup = async () => {
         try {
             if (timerRef.current) {
@@ -101,6 +107,9 @@ const FutureSelfRecordingSimple: React.FC = () => {
             }
             if (soundRef.current) {
                 await soundRef.current.unloadAsync();
+            }
+            if (videoRef.current) {
+                await videoRef.current.unloadAsync();
             }
         } catch (error) {
             console.error('Cleanup error:', error);
@@ -231,32 +240,77 @@ const FutureSelfRecordingSimple: React.FC = () => {
         }
     };
 
+    const playVideo = async () => {
+        if (!recordingUri || !videoRef.current) return;
+        try {
+            setIsVideoPlaying(true);
+            await videoRef.current.playAsync();
+        } catch (error) {
+            console.error('Video playback error', error);
+            setIsVideoPlaying(false);
+        }
+    };
+
+    const pauseVideo = async () => {
+        if (videoRef.current) {
+            try {
+                await videoRef.current.pauseAsync();
+                setIsVideoPlaying(false);
+            } catch (error) {
+                console.error('Video pause error', error);
+            }
+        }
+    };
+
+    const handleMessageTypeChange = (newType: MessageKind) => {
+        if (newType !== messageType) {
+            // Clear previous recording when switching types
+            setRecordingUri(null);
+            setIsPlaying(false);
+            setIsVideoPlaying(false);
+        }
+        setMessageType(newType);
+    };
+
     /* -------------------------------------------------- */
     /*                   VIDEO RECORDING                  */
     /* -------------------------------------------------- */
 
     const startVideoRecording = async () => {
         try {
+            console.log('Requesting video recording permissions...');
+            
             // Request permissions
             const cam = await requestCameraPermission();
             const mic = await Audio.requestPermissionsAsync();
+            
+            console.log('Camera permission:', cam.granted);
+            console.log('Microphone permission:', mic.granted);
+            
             if (!cam.granted || !mic.granted) {
-                Alert.alert('Permission needed', 'Camera and microphone permissions are required.');
+                Alert.alert('Permission needed', 'Camera and microphone permissions are required for video recording.');
                 return;
             }
 
+            console.log('Permissions granted, opening camera...');
             setRecordingUri(null);
+            setIsVideoPlaying(false);
             setShowCamera(true);
             setCameraReady(false);
         } catch (error) {
             console.error('startVideoRecording error', error);
+            Alert.alert('Error', 'Could not start video recording. Please try again.');
         }
     };
 
     const beginCameraRecording = async () => {
-        if (!cameraRef.current || !cameraReady) return;
+        if (!cameraRef.current || !cameraReady) {
+            console.log('Camera not ready for recording');
+            return;
+        }
 
         try {
+            console.log('Starting video recording...');
             setIsRecording(true);
             setRecordingTimeLeft(30);
 
@@ -275,24 +329,38 @@ const FutureSelfRecordingSimple: React.FC = () => {
                 maxDuration: 30,
             });
 
+            console.log('Video recording completed:', videoData);
+
             if (videoData?.uri) {
                 // Save to permanent location
                 const fileName = `video_message_${Date.now()}.mp4`;
                 const dest = FileSystem.documentDirectory + fileName;
                 await FileSystem.copyAsync({ from: videoData.uri, to: dest });
-                setRecordingUri(dest);
+                
+                // Check if file was copied successfully
+                const fileInfo = await FileSystem.getInfoAsync(dest);
+                if (fileInfo.exists) {
+                    setRecordingUri(dest);
+                    console.log('Video saved successfully to:', dest);
+                } else {
+                    console.error('Failed to save video file');
+                }
+            } else {
+                console.log('No video data received from recording');
             }
         } catch (error) {
-            console.error('recordAsync error', error);
-        } finally {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
-            setIsRecording(false);
-            setShowCamera(false);
-            setCameraReady(false);
+            console.error('Video recording error:', error);
+            Alert.alert('Recording Error', 'Failed to record video. Please try again.');
         }
+        
+        // Always clean up after recording completes or errors
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+        setIsRecording(false);
+        setShowCamera(false);
+        setCameraReady(false);
     };
 
     const stopCameraRecording = async () => {
@@ -332,6 +400,8 @@ const FutureSelfRecordingSimple: React.FC = () => {
                             await soundRef.current.unloadAsync();
                             soundRef.current = null;
                         }
+                        // Reset video playing state as well
+                        setIsVideoPlaying(false);
                     },
                 },
             ]
@@ -339,6 +409,8 @@ const FutureSelfRecordingSimple: React.FC = () => {
     };
 
     const handleSave = async () => {
+        console.log('Save button pressed:', { messageType, recordingUri, textMessage: textMessage.trim() });
+        
         if (!user?.uid) {
             Alert.alert('Not signed in', 'Please sign in again.');
             return;
@@ -392,6 +464,8 @@ const FutureSelfRecordingSimple: React.FC = () => {
                     ref={cameraRef}
                     style={styles.camera}
                     facing={cameraFacing}
+                    mode="video"
+                    videoQuality="720p"
                     onCameraReady={() => setCameraReady(true)}
                 />
 
@@ -484,7 +558,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                     styles.messageTypeButton,
                                     messageType === option.type && styles.messageTypeButtonActive,
                                 ]}
-                                onPress={() => setMessageType(option.type as MessageKind)}
+                                onPress={() => handleMessageTypeChange(option.type as MessageKind)}
                             >
                                 <Ionicons
                                     name={option.icon as any}
@@ -582,9 +656,29 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                             ref={videoRef}
                                             style={styles.video}
                                             source={{ uri: recordingUri }}
-                                            useNativeControls
+                                            useNativeControls={false}
                                             resizeMode={ResizeMode.CONTAIN}
+                                            onPlaybackStatusUpdate={(status: any) => {
+                                                if (status.isLoaded && status.didJustFinish) {
+                                                    setIsVideoPlaying(false);
+                                                }
+                                            }}
                                         />
+                                        <View style={styles.videoControls}>
+                                            <TouchableOpacity
+                                                style={styles.playButton}
+                                                onPress={isVideoPlaying ? pauseVideo : playVideo}
+                                            >
+                                                <Ionicons
+                                                    name={isVideoPlaying ? 'pause' : 'play'}
+                                                    size={24}
+                                                    color={COLORS.WHITE}
+                                                />
+                                            </TouchableOpacity>
+                                            <Text style={styles.videoLabel}>
+                                                {isVideoPlaying ? 'Playing...' : 'Tap to play'}
+                                            </Text>
+                                        </View>
                                     </View>
                                 )}
 
@@ -751,6 +845,19 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 200,
         borderRadius: 12,
+    },
+    videoControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.CARD_BG,
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 12,
+    },
+    videoLabel: {
+        marginLeft: 16,
+        fontSize: 16,
+        color: COLORS.WHITE,
     },
     deleteButton: {
         flexDirection: 'row',
