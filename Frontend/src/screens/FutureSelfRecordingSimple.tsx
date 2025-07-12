@@ -635,49 +635,75 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                 <Text style={styles.label}>Your {messageType} message:</Text>
 
                                 {messageType === 'voice' ? (
-                                    <View style={styles.audioPlayer}>
-                                        <TouchableOpacity
-                                            style={styles.playButton}
-                                            onPress={isPlaying ? stopAudio : playAudio}
-                                        >
-                                            <Ionicons
-                                                name={isPlaying ? 'pause' : 'play'}
-                                                size={24}
-                                                color={COLORS.WHITE}
-                                            />
-                                        </TouchableOpacity>
-                                        <Text style={styles.audioLabel}>
-                                            {isPlaying ? 'Playing...' : 'Tap to play'}
-                                        </Text>
+                                    <View style={styles.audioPlayerContainer}>
+                                        <View style={styles.audioPlayer}>
+                                            <TouchableOpacity
+                                                style={styles.audioPlayButton}
+                                                onPress={isPlaying ? stopAudio : playAudio}
+                                            >
+                                                <LinearGradient
+                                                    colors={[COLORS.PURPLE_ACCENT, '#8A00E0']}
+                                                    style={styles.audioPlayButtonGradient}
+                                                >
+                                                    <Ionicons
+                                                        name={isPlaying ? 'pause' : 'play'}
+                                                        size={28}
+                                                        color={COLORS.WHITE}
+                                                    />
+                                                </LinearGradient>
+                                            </TouchableOpacity>
+                                            
+                                            <View style={styles.audioInfo}>
+                                                <Text style={styles.audioTitle}>Voice Message</Text>
+                                                <Text style={styles.audioLabel}>
+                                                    {isPlaying ? 'Playing...' : 'Tap to play'}
+                                                </Text>
+                                            </View>
+                                            
+                                            <View style={styles.audioWaveform}>
+                                                <Ionicons name="pulse" size={24} color={COLORS.PURPLE_ACCENT} />
+                                            </View>
+                                        </View>
                                     </View>
                                 ) : (
                                     <View style={styles.videoPlayer}>
-                                        <Video
-                                            ref={videoRef}
-                                            style={styles.video}
-                                            source={{ uri: recordingUri }}
-                                            useNativeControls={false}
-                                            resizeMode={ResizeMode.CONTAIN}
-                                            onPlaybackStatusUpdate={(status: any) => {
-                                                if (status.isLoaded && status.didJustFinish) {
-                                                    setIsVideoPlaying(false);
-                                                }
-                                            }}
-                                        />
-                                        <View style={styles.videoControls}>
-                                            <TouchableOpacity
-                                                style={styles.playButton}
-                                                onPress={isVideoPlaying ? pauseVideo : playVideo}
-                                            >
-                                                <Ionicons
-                                                    name={isVideoPlaying ? 'pause' : 'play'}
-                                                    size={24}
-                                                    color={COLORS.WHITE}
-                                                />
-                                            </TouchableOpacity>
-                                            <Text style={styles.videoLabel}>
-                                                {isVideoPlaying ? 'Playing...' : 'Tap to play'}
-                                            </Text>
+                                        <View style={styles.videoContainer}>
+                                            <Video
+                                                ref={videoRef}
+                                                style={styles.video}
+                                                source={{ uri: recordingUri }}
+                                                useNativeControls={false}
+                                                resizeMode={ResizeMode.CONTAIN}
+                                                onPlaybackStatusUpdate={(status: any) => {
+                                                    if (status.isLoaded && status.didJustFinish) {
+                                                        setIsVideoPlaying(false);
+                                                    }
+                                                }}
+                                            />
+                                            
+                                            {/* Video overlay controls */}
+                                            <View style={styles.videoOverlay}>
+                                                <TouchableOpacity
+                                                    style={styles.videoPlayButton}
+                                                    onPress={isVideoPlaying ? pauseVideo : playVideo}
+                                                >
+                                                    <View style={styles.videoPlayButtonInner}>
+                                                        <Ionicons
+                                                            name={isVideoPlaying ? 'pause' : 'play'}
+                                                            size={32}
+                                                            color={COLORS.WHITE}
+                                                        />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            </View>
+                                            
+                                            {/* Video status indicator */}
+                                            <View style={styles.videoStatusContainer}>
+                                                <View style={styles.videoStatusDot} />
+                                                <Text style={styles.videoStatusText}>
+                                                    {isVideoPlaying ? 'Playing video message' : 'Tap to play video message'}
+                                                </Text>
+                                            </View>
                                         </View>
                                     </View>
                                 )}
@@ -816,13 +842,51 @@ const styles = StyleSheet.create({
     playbackSection: {
         alignItems: 'center',
     },
+    audioPlayerContainer: {
+        width: '100%',
+        marginBottom: 16,
+    },
     audioPlayer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.CARD_BG,
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
+        borderRadius: 16,
+        padding: 20,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+    },
+    audioPlayButton: {
+        borderRadius: 30,
+        overflow: 'hidden',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+    },
+    audioPlayButtonGradient: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    audioInfo: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    audioTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.WHITE,
+        marginBottom: 4,
+    },
+    audioWaveform: {
+        marginLeft: 16,
+        opacity: 0.7,
     },
     playButton: {
         width: 50,
@@ -841,10 +905,71 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 16,
     },
+    videoContainer: {
+        position: 'relative',
+        backgroundColor: COLORS.CARD_BG,
+        borderRadius: 16,
+        overflow: 'hidden',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+    },
     video: {
         width: '100%',
-        height: 200,
-        borderRadius: 12,
+        height: 220,
+    },
+    videoOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    videoPlayButton: {
+        opacity: 0.9,
+    },
+    videoPlayButtonInner: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: 'rgba(170, 0, 255, 0.9)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
+        borderColor: COLORS.WHITE,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+        elevation: 6,
+    },
+    videoStatusContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    videoStatusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: COLORS.PURPLE_ACCENT,
+        marginRight: 10,
+    },
+    videoStatusText: {
+        fontSize: 14,
+        color: COLORS.WHITE,
+        fontWeight: '500',
     },
     videoControls: {
         flexDirection: 'row',
