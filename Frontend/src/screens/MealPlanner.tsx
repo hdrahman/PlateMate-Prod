@@ -568,9 +568,9 @@ export default function MealPlanner() {
                 if (currentProfile) {
                     calculatedGoals = calculateNutritionGoals(currentProfile);
                 }
-                
+
                 let finalGoals = calculatedGoals;
-                
+
                 if (user) {
                     const userGoals = await getUserGoals(user.uid);
                     if (userGoals && userGoals.calorieGoal) {
