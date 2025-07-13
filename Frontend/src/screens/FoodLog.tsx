@@ -530,10 +530,10 @@ const DiaryScreen: React.FC = () => {
                         sodium: 2300
                     };
 
-                    // Only use calculated goals if we don't have stored goals in the database
-                    if (dbGoals.calories > 0) {
+                    // Use stored goals if they exist (including 0 values), otherwise calculate from profile
+                    if (userGoals.calorieGoal !== undefined && userGoals.calorieGoal !== null) {
                         setNutritionGoals(dbGoals);
-                        console.log('📊 Using nutrition goals from database:', dbGoals);
+                        console.log('📊 FoodLog using nutrition goals from database:', dbGoals);
                     } else if (profile) {
                         // Create a properly formatted UserProfile object for the calculator
                         const userProfileForCalc = {
@@ -579,7 +579,7 @@ const DiaryScreen: React.FC = () => {
                         const calculatedGoals = calculateNutritionGoals(userProfileForCalc);
 
                         setNutritionGoals(calculatedGoals);
-                        console.log('📊 Using calculated nutrition goals:', calculatedGoals);
+                        console.log('📊 FoodLog using calculated nutrition goals:', calculatedGoals);
                     }
                 }
             } catch (error) {

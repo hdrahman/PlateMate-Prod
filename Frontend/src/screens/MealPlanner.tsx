@@ -53,7 +53,7 @@ const autocompleteIngredients = async (query: string): Promise<{ id: number; nam
 // Custom imports for user data
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
-import { getTodayExerciseCalories, getUserProfileBySupabaseUid } from '../utils/database';
+import { getTodayExerciseCalories, getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
 import { NutritionGoals, calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { UserProfile } from '../types/user';
 import { useFoodLog } from '../context/FoodLogContext';
@@ -563,16 +563,34 @@ export default function MealPlanner() {
                     }
                 }
 
-                // Calculate nutrition goals
+                // Get user goals from database first, then calculate if needed
                 let calculatedGoals = getDefaultNutritionGoals();
-
                 if (currentProfile) {
                     calculatedGoals = calculateNutritionGoals(currentProfile);
-                    setUserGoals(calculatedGoals);
-                } else {
-                    // If profile still not found, use defaults
-                    setUserGoals(getDefaultNutritionGoals());
                 }
+                
+                let finalGoals = calculatedGoals;
+                
+                if (user) {
+                    const userGoals = await getUserGoals(user.uid);
+                    if (userGoals && userGoals.calorieGoal) {
+                        // Use stored goals from database
+                        finalGoals = {
+                            calories: userGoals.calorieGoal,
+                            protein: userGoals.proteinGoal || calculatedGoals.protein,
+                            carbs: userGoals.carbGoal || calculatedGoals.carbs,
+                            fat: userGoals.fatGoal || calculatedGoals.fat,
+                            fiber: calculatedGoals.fiber,
+                            sugar: calculatedGoals.sugar,
+                            sodium: calculatedGoals.sodium
+                        };
+                        console.log('📊 MealPlanner using stored goals from database:', finalGoals);
+                    } else {
+                        console.log('📊 MealPlanner using calculated goals:', finalGoals);
+                    }
+                }
+
+                setUserGoals(finalGoals);
                 setIsProfileLoading(false);
 
                 setIsDailyNutrientsLoading(true);
@@ -583,7 +601,7 @@ export default function MealPlanner() {
                     // Get today's exercise calories
                     const todayExerciseCals = await getTodayExerciseCalories();
 
-                    const goalCalories = calculatedGoals.calories;
+                    const goalCalories = finalGoals.calories;
                     const remaining = goalCalories - nutrientTotals.calories + todayExerciseCals;
 
                     setDailyNutrition(prev => ({
@@ -601,7 +619,7 @@ export default function MealPlanner() {
                     setDailyNutrition(prev => ({
                         ...prev,
                         calories: 0, protein: 0, fat: 0, carbs: 0,
-                        remainingCalories: calculatedGoals.calories
+                        remainingCalories: finalGoals.calories
                     }));
                 } finally {
                     setIsDailyNutrientsLoading(false);
