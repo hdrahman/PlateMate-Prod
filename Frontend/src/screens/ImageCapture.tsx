@@ -49,6 +49,16 @@ const { imageHeight, sidePadding } = getResponsiveDimensions();
 type RootStackParamList = {
     FoodLog: { refresh?: number };
     ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
+    NutritionFactsResult: {
+        nutritionData: any[];
+        mealId: string;
+        mealType: string;
+        brandName?: string;
+        quantity?: string;
+        notes?: string;
+        foodName?: string;
+        localImagePaths?: string[];
+    };
     Camera: undefined;
     BarcodeScanner: undefined;
     // Add other screens as needed
@@ -728,108 +738,18 @@ const ImageCapture: React.FC = () => {
             // Hide the analysis modal immediately to improve perceived performance
             setShowAnalysisModal(false);
 
-            // Check if we have an array of nutrition data
-            if (Array.isArray(result.nutrition_data) && result.nutrition_data.length > 0) {
-                // Process each food item in the array
-                const foodLogsToInsert = [];
-
-                for (let index = 0; index < result.nutrition_data.length; index++) {
-                    const nutritionData = result.nutrition_data[index];
-                    // Use the first local image path for all food items from the same meal
-                    const primaryImagePath = result.localImagePaths && result.localImagePaths.length > 0
-                        ? result.localImagePaths[0]
-                        : imageUris[0]; // Fallback to original URI if local path not available
-
-                    // Create a food log entry with all required fields
-                    const foodLog = {
-                        meal_id: result.meal_id.toString(),
-                        food_name: foodName || nutritionData.food_name || 'Unknown Food',
-                        calories: nutritionData.calories || 0,
-                        proteins: nutritionData.proteins || 0,
-                        carbs: nutritionData.carbs || 0,
-                        fats: nutritionData.fats || 0,
-                        fiber: nutritionData.fiber || 0,
-                        sugar: nutritionData.sugar || 0,
-                        saturated_fat: nutritionData.saturated_fat || 0,
-                        polyunsaturated_fat: nutritionData.polyunsaturated_fat || 0,
-                        monounsaturated_fat: nutritionData.monounsaturated_fat || 0,
-                        trans_fat: nutritionData.trans_fat || 0,
-                        cholesterol: nutritionData.cholesterol || 0,
-                        sodium: nutritionData.sodium || 0,
-                        potassium: nutritionData.potassium || 0,
-                        vitamin_a: nutritionData.vitamin_a || 0,
-                        vitamin_c: nutritionData.vitamin_c || 0,
-                        calcium: nutritionData.calcium || 0,
-                        iron: nutritionData.iron || 0,
-                        image_url: primaryImagePath,
-                        file_key: 'default_key',
-                        healthiness_rating: nutritionData.healthiness_rating || 5,
-                        date: formattedDate,
-                        meal_type: mealType,
-                        brand_name: brandName,
-                        quantity: quantity,
-                        notes: notes
-                    };
-
-                    foodLogsToInsert.push(foodLog);
-                }
-
-                // Navigate before database operation to prevent UI blocking
-                console.log('🚀 About to navigate to FoodLog...');
-                navigateToFoodLog();
-
-                // Continue with database operation after navigation has started
-                console.log(`Saving ${foodLogsToInsert.length} food logs to local database in batch`);
-                await addMultipleFoodLogs(foodLogsToInsert);
-                console.log(`Saved ${result.nutrition_data.length} food items to database`);
-            } else {
-                // Fallback to old behavior if not an array or empty
-                const nutritionData = result.nutrition_data[0] || {};
-
-                // Use the first local image path or fallback to original URI
-                const primaryImagePath = result.localImagePaths && result.localImagePaths.length > 0
-                    ? result.localImagePaths[0]
-                    : imageUris[0]; // Fallback to original URI if local path not available
-
-                // Create a food log entry with all required fields
-                const foodLog = {
-                    meal_id: result.meal_id.toString(),
-                    food_name: foodName || nutritionData.food_name || 'Unknown Food',
-                    calories: nutritionData.calories || 0,
-                    proteins: nutritionData.proteins || 0,
-                    carbs: nutritionData.carbs || 0,
-                    fats: nutritionData.fats || 0,
-                    fiber: nutritionData.fiber || 0,
-                    sugar: nutritionData.sugar || 0,
-                    saturated_fat: nutritionData.saturated_fat || 0,
-                    polyunsaturated_fat: nutritionData.polyunsaturated_fat || 0,
-                    monounsaturated_fat: nutritionData.monounsaturated_fat || 0,
-                    trans_fat: nutritionData.trans_fat || 0,
-                    cholesterol: nutritionData.cholesterol || 0,
-                    sodium: nutritionData.sodium || 0,
-                    potassium: nutritionData.potassium || 0,
-                    vitamin_a: nutritionData.vitamin_a || 0,
-                    vitamin_c: nutritionData.vitamin_c || 0,
-                    calcium: nutritionData.calcium || 0,
-                    iron: nutritionData.iron || 0,
-                    image_url: primaryImagePath,
-                    file_key: 'default_key',
-                    healthiness_rating: nutritionData.healthiness_rating || 5,
-                    date: formattedDate,
-                    meal_type: mealType,
-                    brand_name: brandName,
-                    quantity: quantity,
-                    notes: notes
-                };
-
-                // Navigate before database operation to prevent UI blocking
-                console.log('🚀 About to navigate to FoodLog...');
-                navigateToFoodLog();
-
-                // Continue with database operation after navigation has started
-                console.log('Saving food log to local database:', foodLog);
-                await addFoodLog(foodLog);
-            }
+            // Navigate to NutritionFactsResult screen instead of directly adding to food log
+            console.log('🚀 About to navigate to NutritionFactsResult...');
+            navigation.navigate('NutritionFactsResult', {
+                nutritionData: result.nutrition_data,
+                mealId: result.meal_id.toString(),
+                mealType: mealType,
+                brandName: brandName,
+                quantity: quantity,
+                notes: notes,
+                foodName: foodName,
+                localImagePaths: result.localImagePaths || []
+            });
         } catch (error) {
             setShowAnalysisModal(false);
             console.error('Error submitting food:', error);

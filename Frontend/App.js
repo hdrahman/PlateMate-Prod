@@ -42,6 +42,7 @@ import DataSharing from './src/screens/DataSharing';
 import PrivacyPolicy from './src/screens/PrivacyPolicy';
 import CameraScreen from './src/screens/Camera';
 import ImageCaptureScreen from './src/screens/ImageCapture';
+import NutritionFactsResult from './src/screens/NutritionFactsResult';
 import Nutrients from './src/screens/Nutrients';
 import BarcodeScannerScreen from './src/screens/BarcodeScanner';
 import BarcodeResults from './src/screens/BarcodeResults';
@@ -361,6 +362,7 @@ function AuthenticatedContent() {
       <Stack.Screen name="Main" component={MainTabs} />
       <Stack.Screen name="Camera" component={CameraScreen} />
       <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
+      <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
       <Stack.Screen name="Nutrients" component={Nutrients} />
       <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
       <Stack.Screen name="BarcodeResults" component={BarcodeResults} />

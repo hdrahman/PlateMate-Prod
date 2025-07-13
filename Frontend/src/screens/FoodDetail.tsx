@@ -685,7 +685,7 @@ const FoodDetailScreen: React.FC = () => {
                     >
                         <View style={styles.quickAddButtonContent}>
                             <Ionicons name="add" size={18} color="#4CAF50" />
-                            <Text style={styles.quickAddButtonTextBottom}>Quick Add</Text>
+                            <Text style={styles.quickAddButtonTextBottom}>Add</Text>
                         </View>
                     </TouchableOpacity>
 

@@ -18,6 +18,7 @@ import PrivacyPolicy from '../screens/PrivacyPolicy';
 import DebugOnboarding from '../components/DebugOnboarding';
 import FoodLog from '../screens/FoodLog';
 import FoodDetail from '../screens/FoodDetail';
+import NutritionFactsResult from '../screens/NutritionFactsResult';
 import Chatbot from '../screens/Chatbot';
 import ImageCapture from '../screens/ImageCapture';
 import Camera from '../screens/Camera';
@@ -46,6 +47,16 @@ type RootStackParamList = {
     PrivacyPolicy: undefined;
     DebugOnboarding: undefined;
     FoodDetail: { foodId: number };
+    NutritionFactsResult: {
+        nutritionData: any[];
+        mealId: string;
+        mealType: string;
+        brandName?: string;
+        quantity?: string;
+        notes?: string;
+        foodName?: string;
+        localImagePaths?: string[];
+    };
     Chatbot: undefined;
     ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
     Camera: undefined;
@@ -123,6 +134,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
                 <Stack.Screen name="DebugOnboarding" component={DebugOnboarding} />
                 <Stack.Screen name="FoodDetail" component={FoodDetail} />
+                <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
                 <Stack.Screen name="Chatbot" component={Chatbot} />
                 <Stack.Screen name="ImageCapture" component={ImageCapture} />
                 <Stack.Screen name="Camera" component={Camera} />
@@ -138,4 +150,4 @@ const AppNavigator = () => {
     );
 };
 
-export default AppNavigator; 
+export default AppNavigator;
