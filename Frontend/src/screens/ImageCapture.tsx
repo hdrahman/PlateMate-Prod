@@ -37,10 +37,12 @@ const { width, height } = Dimensions.get('window');
 
 // Define responsive dimensions
 const getResponsiveDimensions = () => {
-    // Calculate dimensions based on screen width
-    const imageHeight = Math.min(280, width * 0.7);
+    // Calculate available screen space for better layout
+    const availableHeight = height - 200; // Account for header, status bar, and bottom padding
+    const baseImageHeight = Math.min(320, width * 0.8); // Increased base height
+    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.45); // Use max 45% of available height
     const sidePadding = Math.max(16, width * 0.05);
-    return { imageHeight, sidePadding };
+    return { imageHeight: dynamicImageHeight, sidePadding };
 };
 
 const { imageHeight, sidePadding } = getResponsiveDimensions();
@@ -1108,10 +1110,6 @@ const ImageCapture: React.FC = () => {
                             )}
                         </LinearGradient>
                     </TouchableOpacity>
-
-                    <Text style={styles.submitDescription}>
-                        We'll analyze your food and provide detailed nutrition information
-                    </Text>
                 </View>
             </ScrollView>
 
@@ -1169,11 +1167,11 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: sidePadding,
-        paddingTop: 10,
-        paddingBottom: 20,
+        paddingTop: 8, // Reduced from 10
+        paddingBottom: 16, // Reduced from 20
     },
     instructionsContainer: {
-        marginBottom: 16,
+        marginBottom: 12, // Reduced from 16 for tighter spacing
         paddingHorizontal: 4,
     },
     instructionsTitle: {
@@ -1183,17 +1181,17 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     instructionsText: {
-        fontSize: 15,
+        fontSize: 14, // Reduced from 15
         color: '#aaa',
-        lineHeight: 22,
+        lineHeight: 20, // Reduced from 22 for more compact spacing
     },
     imagesContainer: {
-        marginBottom: 16,
+        marginBottom: 12, // Reduced from 16 for tighter spacing
     },
     imagePlaceholderWrapper: {
         width: '100%',
         height: imageHeight, // Use responsive height
-        marginBottom: 16,
+        marginBottom: 12, // Reduced from 16 for tighter spacing
         borderRadius: 12,
         overflow: 'hidden',
     },
@@ -1201,7 +1199,7 @@ const styles = StyleSheet.create({
         height: imageHeight, // Use responsive height
     },
     sideImageWrapper: {
-        height: imageHeight * 0.57, // Make side image proportional to main image
+        height: imageHeight * 0.50, // Reduced from 0.57 to make it smaller proportionally
     },
     imagePlaceholderGradient: {
         flex: 1,
@@ -1266,10 +1264,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#4a4a4a',
     },
     addSideViewButton: {
-        marginBottom: 16,
+        marginBottom: 12, // Reduced from 16 for tighter spacing
         borderRadius: 12,
         overflow: 'hidden',
-        height: 80, // Smaller height for compact button
+        height: 70, // Reduced from 80 to save space
     },
     addSideViewGradient: {
         flex: 1,
@@ -1296,7 +1294,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     optionalDetailsWrapper: {
-        marginBottom: 16,
+        marginBottom: 12, // Reduced from 16 for tighter spacing
         borderRadius: 12,
         backgroundColor: '#1a1a1a',
         overflow: 'hidden',
@@ -1381,13 +1379,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    submitDescription: {
-        fontSize: 13,
-        color: '#aaa',
-        textAlign: 'center',
-        lineHeight: 18,
-        paddingHorizontal: 20,
     },
     mealTypeSelector: {
         flexDirection: 'row',
