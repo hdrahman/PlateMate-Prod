@@ -130,9 +130,9 @@ class FileManager:
             raise e
     
     @staticmethod
-    def optimize_image(file_path: str, max_width: int = 1200, quality: int = 85) -> bool:
+    def optimize_image(file_path: str, max_width: int = 2000, quality: int = 95) -> bool:
         """
-        Optimize image for web delivery
+        Optimize image for web delivery while maintaining high quality for AI analysis
         Returns: True if optimization successful, False otherwise
         """
         try:
@@ -147,7 +147,7 @@ class FileManager:
                     new_height = int(img.height * ratio)
                     img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
                 
-                # Save optimized image
+                # Save optimized image with higher quality
                 img.save(file_path, "JPEG", quality=quality, optimize=True)
                 
             print(f"✅ Optimized image: {file_path}")
@@ -244,4 +244,37 @@ class FileManager:
             }
         except Exception as e:
             print(f"❌ Error getting storage stats: {e}")
-            return {"error": str(e)} 
+            return {"error": str(e)"}
+    
+    @staticmethod
+    def prepare_image_for_ai_analysis(file_path: str) -> str:
+        """
+        Create a high-quality version of the image specifically for OpenAI analysis
+        Returns: Path to the high-quality image file
+        """
+        try:
+            # Create a separate high-quality file path
+            base_path = Path(file_path)
+            ai_analysis_path = base_path.parent / f"ai_analysis_{base_path.name}"
+            
+            with Image.open(file_path) as img:
+                # Convert to RGB if necessary
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                
+                # Only resize if extremely large (>3000px) to prevent memory issues
+                if img.width > 3000:
+                    ratio = 3000 / img.width
+                    new_height = int(img.height * ratio)
+                    img = img.resize((3000, new_height), Image.Resampling.LANCZOS)
+                
+                # Save with maximum quality for AI analysis
+                img.save(str(ai_analysis_path), "JPEG", quality=98, optimize=False)
+                
+            print(f"✅ Created high-quality AI analysis image: {ai_analysis_path}")
+            return str(ai_analysis_path)
+            
+        except Exception as e:
+            print(f"⚠️ Failed to create AI analysis image {file_path}: {e}")
+            # Fall back to original file if creation fails
+            return file_path

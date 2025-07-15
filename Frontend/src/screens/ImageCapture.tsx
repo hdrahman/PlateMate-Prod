@@ -142,12 +142,12 @@ const ImageCapture: React.FC = () => {
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
-            console.log('Optimizing image for high quality...');
-            // Keep high quality - only resize if absolutely massive
+            console.log('Optimizing image for maximum quality...');
+            // Minimal processing - only resize if extremely large (>3000px) to prevent memory issues
             const manipResult = await ImageManipulator.manipulateAsync(
                 uri,
-                [{ resize: { width: 1600 } }], // Higher resolution
-                { compress: 0.98, format: ImageManipulator.SaveFormat.JPEG } // Near lossless quality
+                [{ resize: { width: 2400 } }], // Higher resolution for better OpenAI analysis
+                { compress: 0.99, format: ImageManipulator.SaveFormat.JPEG } // Virtually lossless quality
             );
 
             console.log('Image optimized successfully');

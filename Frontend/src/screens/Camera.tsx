@@ -127,7 +127,7 @@ export default function CameraScreen() {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             const photo = await cameraRef.current.takePictureAsync({
-                quality: 0.8,
+                quality: 0.95,
                 base64: false,
                 exif: false,
             });

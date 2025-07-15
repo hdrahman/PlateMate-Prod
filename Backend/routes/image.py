@@ -153,25 +153,37 @@ async def upload_image(
             print(f"✅ Image saved to: {file_path}")
             print(f"✅ Image URL: {url_path}")
             
-            # Optimize the saved image
+            # Optimize the saved image for web delivery
             FileManager.optimize_image(file_path)
+            
+            # Create high-quality version for OpenAI analysis
+            ai_analysis_path = FileManager.prepare_image_for_ai_analysis(file_path)
             
         except Exception as e:
             print(f"❌ Error saving image file: {e}")
             raise HTTPException(status_code=500, detail=f"Error saving image: {str(e)}")
 
-        # Encode image for OpenAI analysis
+        # Encode the high-quality image for OpenAI analysis
         try:
-            # Reset file pointer and encode
-            await image.seek(0)
-            image_data = encode_image(image.file)
-            print("✅ Image encoded for OpenAI analysis")
+            # Use the high-quality version for OpenAI
+            with open(ai_analysis_path, 'rb') as f:
+                image_data = encode_image(f)
+            print("✅ High-quality image encoded for OpenAI analysis")
         except Exception as e:
-            print(f"❌ Error encoding image: {e}")
-            # Clean up saved file on encoding error
-            if file_path:
-                FileManager.delete_file(file_path)
-            raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
+            print(f"❌ Error encoding high-quality image: {e}")
+            # Fallback to original image encoding
+            try:
+                await image.seek(0)
+                image_data = encode_image(image.file)
+                print("✅ Fallback: Original image encoded for OpenAI analysis")
+            except Exception as e2:
+                print(f"❌ Error encoding original image: {e2}")
+                # Clean up saved files on encoding error
+                if file_path:
+                    FileManager.delete_file(file_path)
+                if ai_analysis_path and ai_analysis_path != file_path:
+                    FileManager.delete_file(ai_analysis_path)
+                raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e2)}")
 
         # Check if OpenAI client is available
         if client is None:
@@ -273,6 +285,10 @@ Important:
             overall_time = time.time() - overall_start_time
             print(f"✅ Total processing time: {overall_time:.2f} seconds")
             
+            # Clean up AI analysis file after successful processing
+            if ai_analysis_path and ai_analysis_path != file_path:
+                FileManager.delete_file(ai_analysis_path)
+            
             return {
                 "message": "✅ Image uploaded and analyzed successfully", 
                 "meal_id": meal_id, 
@@ -283,17 +299,21 @@ Important:
 
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
-            # Clean up saved file on analysis error
+            # Clean up saved files on analysis error
             if file_path:
                 FileManager.delete_file(file_path)
+            if ai_analysis_path and ai_analysis_path != file_path:
+                FileManager.delete_file(ai_analysis_path)
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
 
     except Exception as e:
         error_trace = traceback.format_exc()
         print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
-        # Clean up saved file on any error
+        # Clean up saved files on any error
         if file_path:
             FileManager.delete_file(file_path)
+        if 'ai_analysis_path' in locals() and ai_analysis_path and ai_analysis_path != file_path:
+            FileManager.delete_file(ai_analysis_path)
         raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
 
 
@@ -316,26 +336,38 @@ async def upload_multiple_images(
             saved_files = FileManager.save_multiple_images(images, user_id)
             print(f"✅ Saved {len(saved_files)} images to disk")
             
-            # Optimize all saved images
+            # Optimize all saved images for web delivery
+            ai_analysis_paths = []
             for file_path, _ in saved_files:
                 FileManager.optimize_image(file_path)
+                # Create high-quality version for OpenAI analysis
+                ai_path = FileManager.prepare_image_for_ai_analysis(file_path)
+                ai_analysis_paths.append(ai_path)
                 
         except Exception as e:
             print(f"❌ Error saving image files: {e}")
             raise HTTPException(status_code=500, detail=f"Error saving images: {str(e)}")
         
-        # Encode all images for OpenAI analysis
+        # Encode all high-quality images for OpenAI analysis
         encoding_start_time = time.time()
         encoded_images = []
-        for i, image in enumerate(images):
+        for i, ai_path in enumerate(ai_analysis_paths):
             try:
-                await image.seek(0)
-                image_data = encode_image(image.file)
+                with open(ai_path, 'rb') as f:
+                    image_data = encode_image(f)
                 encoded_images.append(image_data)
-                print(f"✅ Image {i+1} encoded successfully")
+                print(f"✅ High-quality image {i+1} encoded successfully")
             except Exception as e:
-                print(f"❌ Error encoding image {i+1}: {e}")
-                # Clean up all saved files on encoding error
+                print(f"❌ Error encoding high-quality image {i+1}: {e}")
+                # Fallback to original image encoding
+                try:
+                    await images[i].seek(0)
+                    image_data = encode_image(images[i].file)
+                    encoded_images.append(image_data)
+                    print(f"✅ Fallback: Original image {i+1} encoded successfully")
+                except Exception as e2:
+                    print(f"❌ Error encoding original image {i+1}: {e2}")
+                    # Clean up all saved files on encoding error
                 FileManager.cleanup_files([fp for fp, _ in saved_files])
                 raise HTTPException(status_code=500, detail=f"Error encoding image {i+1}: {str(e)}")
         
