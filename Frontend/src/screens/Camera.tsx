@@ -232,19 +232,6 @@ export default function CameraScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
-            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Scanner</Text>
-                <TouchableOpacity onPress={toggleFlashMode} style={styles.flashButton}>
-                    <Ionicons
-                        name={flashMode === 'on' ? "flash" : "flash-off"}
-                        size={24}
-                        color="#FFF"
-                    />
-                </TouchableOpacity>
-            </View>
 
             <View style={styles.cameraContainer}>
                 {isCameraReady && (
@@ -257,6 +244,20 @@ export default function CameraScreen() {
                         onCameraReady={() => console.log('Camera ready')}
                         onMountError={(error) => console.error('Camera mount error:', error)}
                     >
+                        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                                <Ionicons name="arrow-back" size={28} color="#FFF" />
+                            </TouchableOpacity>
+                            <Text style={styles.headerTitle}>Scanner</Text>
+                            <TouchableOpacity onPress={toggleFlashMode} style={styles.flashButton}>
+                                <Ionicons
+                                    name={flashMode === 'on' ? "flash" : "flash-off"}
+                                    size={24}
+                                    color="#FFF"
+                                />
+                            </TouchableOpacity>
+                        </View>
+
                         <View style={styles.cameraOverlay}>
                             {/* Animated Camera frame with corners */}
                             <Animated.View
@@ -328,7 +329,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
-        paddingTop: StatusBar.currentHeight || 16,
         backgroundColor: 'transparent',
         position: 'absolute',
         top: 0,
@@ -369,14 +369,11 @@ const styles = StyleSheet.create({
     },
     cameraContainer: {
         flex: 1,
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
     },
     camera: {
         flex: 1,
+        width: '100%',
+        height: '100%',
     },
     cameraOverlay: {
         ...StyleSheet.absoluteFillObject,
