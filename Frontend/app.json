@@ -43,6 +43,13 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
         }
       ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "$(PRODUCT_NAME) needs access to your Camera to take photos and videos.",
+          "enableMicrophonePermission": false
+        }
+      ],
       "expo-sqlite",
       "expo-background-fetch",
       "expo-task-manager",

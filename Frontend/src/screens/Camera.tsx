@@ -244,6 +244,7 @@ export default function CameraScreen() {
                         onCameraReady={() => console.log('Camera ready')}
                         onMountError={(error) => console.error('Camera mount error:', error)}
                     >
+                        {/* Overlay elements positioned inside the camera */}
                         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                                 <Ionicons name="arrow-back" size={28} color="#FFF" />
@@ -369,11 +370,10 @@ const styles = StyleSheet.create({
     },
     cameraContainer: {
         flex: 1,
+        position: 'relative',
     },
     camera: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
+        ...StyleSheet.absoluteFillObject,
     },
     cameraOverlay: {
         ...StyleSheet.absoluteFillObject,
