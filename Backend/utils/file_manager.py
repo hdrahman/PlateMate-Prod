@@ -244,7 +244,7 @@ class FileManager:
             }
         except Exception as e:
             print(f"❌ Error getting storage stats: {e}")
-            return {"error": str(e)"}
+            return {"error": str(e)}
     
     @staticmethod
     def prepare_image_for_ai_analysis(file_path: str) -> str:
