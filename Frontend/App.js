@@ -459,6 +459,10 @@ export default function App() {
       try {
         // Always initialize database (needed for basic functionality)
         await getDatabase();
+        console.log('✅ Database initialization completed');
+
+        // Small delay to ensure database is fully ready
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Check if we're running in Expo Go
         const isExpoGo = global.isExpoGo === true;
@@ -471,12 +475,17 @@ export default function App() {
         try {
           // Initialize background step tracker
           console.log('Initializing background step tracker...');
-          const stepAvailability = await BackgroundStepTrackerInstance.isAvailable();
-          if (stepAvailability.supported) {
-            await BackgroundStepTrackerInstance.startTracking();
-            console.log('Background step tracking started successfully');
-          } else {
-            console.log('Step tracking not supported on this device');
+          try {
+            const stepAvailability = await BackgroundStepTrackerInstance.isAvailable();
+            if (stepAvailability.supported) {
+              await BackgroundStepTrackerInstance.startTracking();
+              console.log('Background step tracking started successfully');
+            } else {
+              console.log('Step tracking not supported on this device');
+            }
+          } catch (stepError) {
+            console.error('Failed to initialize step tracking:', stepError);
+            // Continue app initialization even if step tracking fails
           }
 
           // Initialize enhanced permanent notification service

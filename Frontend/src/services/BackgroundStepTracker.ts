@@ -3,12 +3,14 @@ import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps, getStepsForDate } from '../utils/database';
 import { registerStepBackgroundTask, unregisterStepBackgroundTask } from '../tasks/StepCountTask';
+import PersistentStepTracker from './PersistentStepTracker';
 
 // Keys for AsyncStorage
 const STEP_TRACKER_ENABLED_KEY = 'STEP_TRACKER_ENABLED';
 const LAST_STEP_COUNT_KEY = 'LAST_STEP_COUNT';
 const LAST_RESET_DATE_KEY = 'LAST_RESET_DATE';
 const LAST_SYNC_STEP_COUNT_KEY = 'LAST_SYNC_STEP_COUNT';
+const PERSISTENT_TRACKING_ENABLED_KEY = 'PERSISTENT_TRACKING_ENABLED';
 
 // For iOS HealthKit integration (when available)
 let AppleHealthKit: any = null;
@@ -114,6 +116,13 @@ class BackgroundStepTracker {
             // Register background task for step syncing
             await registerStepBackgroundTask();
             console.log('✅ Background step sync task registered');
+
+            // Initialize persistent step tracking (with delay to ensure database is ready)
+            setTimeout(() => {
+                this.initializePersistentTracking().catch(error => {
+                    console.error('❌ Error initializing persistent step tracking:', error);
+                });
+            }, 3000); // Wait 3 seconds
         } catch (error) {
             console.error('Error initializing background step tracker:', error);
         }
@@ -169,6 +178,100 @@ class BackgroundStepTracker {
         }
 
         console.log('📱 Step tracker optimized for foreground');
+    }
+
+    /**
+     * Initialize persistent step tracking that runs even when app is closed
+     */
+    private async initializePersistentTracking() {
+        try {
+            // Set up event listeners for the persistent service
+            PersistentStepTracker.setupEventListeners();
+
+            // Check if persistent tracking was enabled before
+            const wasPersistentEnabled = await PersistentStepTracker.wasPersistentTrackingEnabled();
+            if (wasPersistentEnabled) {
+                console.log('🔄 Restarting persistent step tracking...');
+                try {
+                    // Use retry mechanism to handle database initialization timing
+                    await PersistentStepTracker.startPersistentTrackingWithRetry();
+                } catch (persistentError) {
+                    console.error('❌ Failed to start persistent tracking, disabling it:', persistentError);
+                    // Disable persistent tracking if it fails to start
+                    await AsyncStorage.setItem('PERSISTENT_STEP_SERVICE_ENABLED', 'false');
+                    await AsyncStorage.setItem(PERSISTENT_TRACKING_ENABLED_KEY, 'false');
+                    console.warn('⚠️ Continuing without persistent step tracking');
+                }
+            }
+
+            console.log('✅ Persistent step tracking initialized');
+        } catch (error) {
+            console.error('❌ Error initializing persistent step tracking:', error);
+            // Don't crash the app, just continue without persistent tracking
+            console.warn('⚠️ Continuing without persistent step tracking');
+        }
+    }
+
+    /**
+     * Enable persistent step tracking (always-on background service)
+     */
+    public async enablePersistentTracking(): Promise<boolean> {
+        try {
+            await PersistentStepTracker.startPersistentTrackingWithRetry();
+            await AsyncStorage.setItem(PERSISTENT_TRACKING_ENABLED_KEY, 'true');
+            console.log('✅ Persistent step tracking enabled');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to enable persistent step tracking:', error);
+            
+            // Check if it's a foreground service error
+            if (error.message && (
+                error.message.includes('ForegroundService') ||
+                error.message.includes('foreground service') ||
+                error.message.includes('FOREGROUND_SERVICE')
+            )) {
+                console.error('❌ Android foreground service restrictions - persistent tracking disabled');
+                await AsyncStorage.setItem(PERSISTENT_TRACKING_ENABLED_KEY, 'false');
+            }
+            
+            // Don't crash the app, just return false
+            return false;
+        }
+    }
+
+    /**
+     * Disable persistent step tracking
+     */
+    public async disablePersistentTracking(): Promise<boolean> {
+        try {
+            await PersistentStepTracker.stopPersistentTracking();
+            await AsyncStorage.setItem(PERSISTENT_TRACKING_ENABLED_KEY, 'false');
+            console.log('✅ Persistent step tracking disabled');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to disable persistent step tracking:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Check if persistent tracking is enabled
+     */
+    public async isPersistentTrackingEnabled(): Promise<boolean> {
+        try {
+            const enabled = await AsyncStorage.getItem(PERSISTENT_TRACKING_ENABLED_KEY);
+            return enabled === 'true';
+        } catch (error) {
+            console.error('❌ Error checking persistent tracking state:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Get the current status of persistent tracking
+     */
+    public isPersistentTrackingRunning(): boolean {
+        return PersistentStepTracker.isPersistentTrackingRunning();
     }
 
     private async initializeHealthKit() {
@@ -290,6 +393,18 @@ class BackgroundStepTracker {
 
             // Start optimized background sync
             this.startBackgroundSync();
+
+            // Enable persistent tracking for always-on step counting (with delay)
+            // Only if not already running or enabled
+            if (!PersistentStepTracker.isPersistentTrackingRunning()) {
+                setTimeout(() => {
+                    this.enablePersistentTracking().catch(error => {
+                        console.warn('⚠️ Failed to enable persistent tracking:', error);
+                        // Don't crash the app, just continue without persistent tracking
+                        console.warn('⚠️ Continuing with regular step tracking only');
+                    });
+                }, 5000); // Wait 5 seconds for database to be fully ready
+            }
 
             this.isTracking = true;
             console.log('👣 Background step tracking started');
@@ -480,6 +595,9 @@ class BackgroundStepTracker {
             this.isTracking = false;
             await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'false');
             
+            // Disable persistent tracking
+            await this.disablePersistentTracking();
+            
             // Unregister background task
             await unregisterStepBackgroundTask();
 
@@ -652,4 +770,4 @@ class BackgroundStepTracker {
 export default BackgroundStepTracker.getInstance();
 
 // Also export the class for static method access
-export { BackgroundStepTracker }; 
+export { BackgroundStepTracker };

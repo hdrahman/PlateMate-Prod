@@ -6,15 +6,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCacheStats, clearMealPlannerCache } from "../utils/database";
+import BackgroundStepTrackerInstance from "../services/BackgroundStepTracker";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
     const { signOut } = useAuth();
     const [cacheStats, setCacheStats] = useState<{ total: number, active: number, expired: number }>({ total: 0, active: 0, expired: 0 });
+    const [isPersistentTrackingEnabled, setIsPersistentTrackingEnabled] = useState(false);
+    const [isLoadingStepSettings, setIsLoadingStepSettings] = useState(false);
 
     useEffect(() => {
         loadCacheStats();
+        loadStepTrackingSettings();
     }, []);
 
     const loadCacheStats = async () => {
@@ -23,6 +27,53 @@ const SettingsScreen = () => {
             setCacheStats(stats);
         } catch (error) {
             console.error('Error loading cache stats:', error);
+        }
+    };
+
+    const loadStepTrackingSettings = async () => {
+        try {
+            const enabled = await BackgroundStepTrackerInstance.isPersistentTrackingEnabled();
+            setIsPersistentTrackingEnabled(enabled);
+        } catch (error) {
+            console.error('Error loading step tracking settings:', error);
+        }
+    };
+
+    const handlePersistentTrackingToggle = async (enabled: boolean) => {
+        if (isLoadingStepSettings) return;
+
+        setIsLoadingStepSettings(true);
+        try {
+            if (enabled) {
+                const success = await BackgroundStepTrackerInstance.enablePersistentTracking();
+                if (success) {
+                    setIsPersistentTrackingEnabled(true);
+                    Alert.alert(
+                        'Always-On Step Tracking Enabled',
+                        'Step counting will now continue even when the app is closed. You may see a persistent notification.',
+                        [{ text: 'OK' }]
+                    );
+                } else {
+                    Alert.alert('Error', 'Failed to enable always-on step tracking. Please try again.');
+                }
+            } else {
+                const success = await BackgroundStepTrackerInstance.disablePersistentTracking();
+                if (success) {
+                    setIsPersistentTrackingEnabled(false);
+                    Alert.alert(
+                        'Always-On Step Tracking Disabled',
+                        'Step counting will now only work when the app is open.',
+                        [{ text: 'OK' }]
+                    );
+                } else {
+                    Alert.alert('Error', 'Failed to disable always-on step tracking. Please try again.');
+                }
+            }
+        } catch (error) {
+            console.error('Error toggling persistent tracking:', error);
+            Alert.alert('Error', 'Failed to change step tracking settings. Please try again.');
+        } finally {
+            setIsLoadingStepSettings(false);
         }
     };
 
@@ -93,6 +144,8 @@ const SettingsScreen = () => {
                     </View>
                 </View>
 
+
+
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Account</Text>
                     <View style={styles.card}>
@@ -110,6 +163,29 @@ const SettingsScreen = () => {
                             <Text style={styles.itemText}>Edit Goals</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
+                        <View style={styles.itemRow}>
+                            <View style={styles.iconTextContainer}>
+                                <View style={[styles.iconBubble, { backgroundColor: '#FF00F530' }]}>
+                                    <Ionicons name="footsteps-outline" size={20} color="#FF00F5" />
+                                </View>
+                                <View style={styles.stepTrackingTextContainer}>
+                                    <Text style={styles.itemText}>Always-On Step Tracking</Text>
+                                    <Text style={styles.itemSubtext}>
+                                        Keep counting steps even when app is closed
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.switchContainer}>
+                                <Switch
+                                    value={isPersistentTrackingEnabled}
+                                    onValueChange={handlePersistentTrackingToggle}
+                                    disabled={isLoadingStepSettings}
+                                    trackColor={{ false: "#3e3e3e", true: "#FF00F540" }}
+                                    thumbColor={isPersistentTrackingEnabled ? "#FF00F5" : "#f4f3f4"}
+                                    ios_backgroundColor="#3e3e3e"
+                                />
+                            </View>
+                        </View>
                         <TouchableOpacity
                             style={styles.item}
                             onPress={() => {
@@ -221,6 +297,8 @@ const SettingsScreen = () => {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+
 
                 <View style={[styles.section, styles.bottomSection]}>
                     <View style={styles.logoutContainer}>
@@ -383,6 +461,16 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#777',
         marginTop: 2,
+    },
+    stepTrackingTextContainer: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    itemSubtext: {
+        fontSize: 12,
+        color: '#777',
+        marginTop: 2,
+        lineHeight: 16,
     },
 });
 
