@@ -37,6 +37,26 @@ TaskManager.defineTask(TASK_NAME, async () => {
  */
 export async function registerStepBackgroundTask() {
   try {
+    // Check if background fetch is available
+    const status = await BackgroundFetch.getStatusAsync();
+    
+    if (status === BackgroundFetch.BackgroundFetchStatus.Denied) {
+      console.warn('⚠️ Background fetch is denied by user');
+      return false;
+    }
+    
+    if (status === BackgroundFetch.BackgroundFetchStatus.Restricted) {
+      console.warn('⚠️ Background fetch is restricted (parental controls, etc.)');
+      return false;
+    }
+    
+    if (status !== BackgroundFetch.BackgroundFetchStatus.Available) {
+      console.warn('⚠️ Background fetch is not available. Status:', status);
+      return false;
+    }
+    
+    console.log('✅ Background fetch is available');
+    
     const isRegistered = await TaskManager.isTaskRegisteredAsync(TASK_NAME);
     
     if (!isRegistered) {
@@ -50,8 +70,11 @@ export async function registerStepBackgroundTask() {
     } else {
       console.log('ℹ️ Background step sync task already registered');
     }
+    
+    return true;
   } catch (error) {
     console.error('❌ Failed to register background step sync task:', error);
+    return false;
   }
 }
 

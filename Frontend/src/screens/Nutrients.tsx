@@ -293,7 +293,7 @@ const NutrientsScreen: React.FC = () => {
     useEffect(() => {
         if (profileLoading) return;
         fetchNutrientData();
-    }, [currentDate, profileLoading, lastUpdated]);
+    }, [currentDate, profileLoading, lastUpdated, nutrientTotals]);
 
     // Function to fetch nutrient data from the food log context
     const fetchNutrientData = async () => {
@@ -303,17 +303,26 @@ const NutrientsScreen: React.FC = () => {
         try {
             setLoading(true);
 
-            // Ensure the date is in the correct format
-            console.log('Fetching nutrient data for date:', formatDateToString(currentDate));
+            // Check if we're viewing today's data
+            const today = new Date();
+            const isToday = formatDateToString(currentDate) === formatDateToString(today);
 
-            // Check database readiness
-            if (!isDatabaseReady()) {
-                console.log('Database not ready, initializing...');
-                await initDatabase();
+            let totals;
+            if (isToday) {
+                // Use context data for today to ensure consistency with Home screen
+                console.log('📊 Using context nutrient totals for today:', nutrientTotals);
+                totals = nutrientTotals;
+
+                // If context data is empty, fetch fresh data
+                if (totals.calories === 0 && totals.protein === 0 && totals.carbs === 0 && totals.fat === 0) {
+                    console.log('📊 Context data is empty, fetching fresh data for today');
+                    totals = await getTotalsByDate(currentDate);
+                }
+            } else {
+                // Fetch data for other dates
+                console.log('📊 Fetching data for non-today date:', formatDateToString(currentDate));
+                totals = await getTotalsByDate(currentDate);
             }
-
-            // Don't refresh logs unnecessarily - just get totals for the selected date
-            const totals = await getTotalsByDate(currentDate);
 
             // Update nutrient data with the fetched totals
             const updatedData = { ...nutrientData };
@@ -334,6 +343,15 @@ const NutrientsScreen: React.FC = () => {
             updatedData.vitaminC.current = totals.vitaminC;
             updatedData.calcium.current = totals.calcium;
             updatedData.iron.current = totals.iron;
+
+            console.log('📊 Nutrients screen values:', {
+                protein: totals.protein,
+                carbs: totals.carbs,
+                fat: totals.fat,
+                calories: totals.calories,
+                isToday: isToday,
+                date: formatDateToString(currentDate)
+            });
 
             setNutrientData(updatedData);
         } catch (error) {
@@ -583,14 +601,25 @@ const NutrientsScreen: React.FC = () => {
             ? ''
             : unit;
 
+        // Format the remaining value display
+        const formatRemainingValue = (remaining: number, unit: string) => {
+            if (remaining > 0) {
+                return `${Math.round(remaining)}${unit}`;
+            } else if (remaining < 0) {
+                return `${Math.round(Math.abs(remaining))}${unit} over`;
+            } else {
+                return `Goal met`;
+            }
+        };
+
         return (
             <View key={label} style={styles.nutrientRow}>
                 <View style={styles.nutrientValues}>
                     <View style={styles.leftValues}>
-                        <Text style={styles.remainingValue}>{remaining}{displayUnit}</Text>
+                        <Text style={styles.remainingValue}>{formatRemainingValue(remaining, displayUnit)}</Text>
                     </View>
                     <Text style={styles.nutrientLabel}>{label}</Text>
-                    <Text style={styles.rightValue}>{current}/{goal}</Text>
+                    <Text style={styles.rightValue}>{Math.round(current)}/{Math.round(goal)}</Text>
                 </View>
                 <View style={[styles.progressBarContainer, { backgroundColor: backgroundBarColor }]}>
                     <LinearGradient

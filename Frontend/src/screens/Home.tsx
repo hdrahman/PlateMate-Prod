@@ -144,10 +144,7 @@ export default function Home() {
   const [exerciseCalories, setExerciseCalories] = useState(0);
   const [exerciseLoading, setExerciseLoading] = useState(true);
 
-  // Macro state
-  const [protein, setProtein] = useState(0);
-  const [carbs, setCarbs] = useState(0);
-  const [fats, setFats] = useState(0);
+  // Macros loading state
   const [macrosLoading, setMacrosLoading] = useState(true);
 
   // Use the step context instead of the hook directly
@@ -360,9 +357,28 @@ export default function Home() {
 
         // Get the nutrition values from the context
         setConsumedCalories(nutrientTotals.calories);
-        setProtein(nutrientTotals.protein);
-        setCarbs(nutrientTotals.carbs);
-        setFats(nutrientTotals.fat);
+
+        console.log('🏠 Home screen nutrient values:', {
+          protein: nutrientTotals.protein,
+          carbs: nutrientTotals.carbs,
+          fat: nutrientTotals.fat,
+          calories: nutrientTotals.calories,
+          lastUpdated: lastUpdated
+        });
+
+        console.log('🏠 Home screen macro goals:', {
+          protein: macroGoals.protein,
+          carbs: macroGoals.carbs,
+          fat: macroGoals.fat,
+          profileLoading: profileLoading
+        });
+
+        console.log('🏠 Home screen macro calculations:', {
+          proteinDiff: macroGoals.protein - nutrientTotals.protein,
+          carbsDiff: macroGoals.carbs - nutrientTotals.carbs,
+          fatDiff: macroGoals.fat - nutrientTotals.fat,
+          macrosLoading: macrosLoading
+        });
 
         // Load exercise calories
         const todayExerciseCals = await getTodayExerciseCalories();
@@ -401,7 +417,7 @@ export default function Home() {
     };
 
     loadTodayNutrients();
-  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user]);
+  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user, macroGoals]);
 
   // Load weight history only once when the component mounts
   useEffect(() => {
@@ -1369,9 +1385,27 @@ export default function Home() {
         {/* MACROS CARD */}
         <GradientBorderCard>
           <View style={styles.macrosRow}>
-            <MacroRing label="PROTEIN" percent={macrosLoading ? 0 : (protein / macroGoals.protein) * 100} current={macrosLoading ? 0 : protein} goal={macroGoals.protein} />
-            <MacroRing label="CARBS" percent={macrosLoading ? 0 : (carbs / macroGoals.carbs) * 100} current={macrosLoading ? 0 : carbs} goal={macroGoals.carbs} />
-            <MacroRing label="FATS" percent={macrosLoading ? 0 : (fats / macroGoals.fat) * 100} current={macrosLoading ? 0 : fats} goal={macroGoals.fat} />
+            <MacroRing
+              key={`protein-${nutrientTotals.protein}-${macroGoals.protein}-${lastUpdated}`}
+              label="PROTEIN"
+              percent={macrosLoading ? 0 : (nutrientTotals.protein / macroGoals.protein) * 100}
+              current={macrosLoading ? 0 : nutrientTotals.protein}
+              goal={macroGoals.protein}
+            />
+            <MacroRing
+              key={`carbs-${nutrientTotals.carbs}-${macroGoals.carbs}-${lastUpdated}`}
+              label="CARBS"
+              percent={macrosLoading ? 0 : (nutrientTotals.carbs / macroGoals.carbs) * 100}
+              current={macrosLoading ? 0 : nutrientTotals.carbs}
+              goal={macroGoals.carbs}
+            />
+            <MacroRing
+              key={`fats-${nutrientTotals.fat}-${macroGoals.fat}-${lastUpdated}`}
+              label="FATS"
+              percent={macrosLoading ? 0 : (nutrientTotals.fat / macroGoals.fat) * 100}
+              current={macrosLoading ? 0 : nutrientTotals.fat}
+              goal={macroGoals.fat}
+            />
             <MacroRing
               label="OTHER"
               percent={100}
@@ -1999,26 +2033,39 @@ interface MacroRingProps {
   onPress?: () => void;
 }
 
-function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
+const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroRingProps) => {
   const MACRO_STROKE_WIDTH = 6;
   const isOther = label.toUpperCase() === 'OTHER';
+  
+  // Always recalculate diff to ensure it's fresh
   const diff = goal - current;
   let subText = '';
   let subTextColor = '';
 
+  // Always recalculate subText based on current diff
   if (!isOther) {
     if (diff > 0) {
-      subText = `${diff}g Left`;
+      subText = `${Math.round(diff)}g Left`;
       subTextColor = '#9E9E9E';
     } else if (diff < 0) {
-      subText = `${Math.abs(diff)}g over`;
+      subText = `${Math.round(Math.abs(diff))}g over`;
       subTextColor = '#FF8A80';
     } else {
       subText = 'Goal met';
-      subTextColor = '#ccc';
+      subTextColor = '#4CAF50';
     }
   } else {
     subTextColor = '#9E9E9E'; // "Nutrients"
+  }
+
+  // Debug logging AFTER calculating subText
+  if (!isOther) {
+    console.log(`🔍 MacroRing ${label}:`, { 
+      current: Math.round(current * 100) / 100, 
+      goal: Math.round(goal * 100) / 100, 
+      diff: Math.round(diff * 100) / 100, 
+      subText: subText
+    });
   }
 
   const radius = (MACRO_RING_SIZE - MACRO_STROKE_WIDTH) / 2;
@@ -2169,7 +2216,7 @@ function MacroRing({ label, percent, current, goal, onPress }: MacroRingProps) {
       </Text>
     </Container>
   );
-}
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STYLES

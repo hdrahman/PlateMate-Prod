@@ -517,6 +517,11 @@ export default function App() {
           // Continue app initialization even if services fail
         }
 
+        // Debug utilities (development only)
+        if (__DEV__) {
+          import('./src/utils/stepTrackingDebug');
+        }
+
         // App is ready
         setAppIsReady(true);
       } catch (e) {
