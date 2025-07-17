@@ -399,6 +399,23 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ user_steps table created successfully');
 
+        // Create water_intake table for hydration tracking
+        await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS water_intake (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebase_uid TEXT NOT NULL,
+        amount_ml INTEGER NOT NULL,
+        container_type TEXT DEFAULT 'custom',
+        date TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        synced INTEGER DEFAULT 0,
+        sync_action TEXT DEFAULT 'create',
+        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
+      )
+    `);
+        console.log('✅ water_intake table created successfully');
+
         // Set initialization flags
         global.dbInitialized = true;
         isInitializing = false;
@@ -1085,6 +1102,151 @@ export const deleteExercise = async (id: number) => {
         return true;
     } catch (error) {
         console.error('❌ Error deleting exercise:', error);
+        throw error;
+    }
+};
+
+// ===== WATER INTAKE TRACKING FUNCTIONS =====
+
+// Container types for water intake
+export const WATER_CONTAINER_TYPES = {
+    GLASS: { name: 'Glass', ml: 250, emoji: '🥤' },
+    BOTTLE: { name: 'Bottle', ml: 500, emoji: '🍼' },
+    LARGE_BOTTLE: { name: 'Large Bottle', ml: 1000, emoji: '🍼' },
+    CUP: { name: 'Cup', ml: 200, emoji: '☕' },
+    CUSTOM: { name: 'Custom', ml: 0, emoji: '💧' }
+};
+
+// Add water intake entry
+export const addWaterIntake = async (amountMl: number, containerType: string = 'custom') => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to add water intake before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    const timestamp = getCurrentDate();
+    const date = timestamp.split('T')[0]; // YYYY-MM-DD format
+
+    try {
+        const result = await db.runAsync(
+            `INSERT INTO water_intake (firebase_uid, amount_ml, container_type, date, timestamp, last_modified) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [firebaseUserId, amountMl, containerType, date, timestamp, timestamp]
+        );
+
+        console.log(`✅ Water intake added: ${amountMl}ml (${containerType})`);
+        
+        // Trigger database change notification
+        await notifyDatabaseChanged('addWaterIntake');
+        
+        return result;
+    } catch (error) {
+        console.error('❌ Error adding water intake:', error);
+        throw error;
+    }
+};
+
+// Get water intake for a specific date
+export const getWaterIntakeByDate = async (date: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get water intake before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    const normalizedDate = date.split('T')[0]; // Remove any time component
+
+    try {
+        const result = await db.getAllAsync(
+            `SELECT * FROM water_intake WHERE date = ? AND firebase_uid = ? ORDER BY timestamp DESC`,
+            [normalizedDate, firebaseUserId]
+        );
+        return result;
+    } catch (error) {
+        console.error('❌ Error getting water intake:', error);
+        throw error;
+    }
+};
+
+// Get total water intake for a date
+export const getTotalWaterIntakeByDate = async (date: string): Promise<number> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get total water intake before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    const normalizedDate = date.split('T')[0]; // Remove any time component
+
+    try {
+        const result = await db.getFirstAsync<{ total: number }>(
+            `SELECT COALESCE(SUM(amount_ml), 0) as total FROM water_intake WHERE date = ? AND firebase_uid = ?`,
+            [normalizedDate, firebaseUserId]
+        );
+        return result?.total || 0;
+    } catch (error) {
+        console.error('❌ Error getting total water intake:', error);
+        throw error;
+    }
+};
+
+// Delete water intake entry
+export const deleteWaterIntake = async (id: number) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to delete water intake before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+
+    try {
+        // First verify that this water intake belongs to the current user
+        const waterEntry = await db.getFirstAsync(
+            `SELECT * FROM water_intake WHERE id = ? AND firebase_uid = ?`,
+            [id, firebaseUserId]
+        );
+
+        if (!waterEntry) {
+            console.error('❌ Attempting to delete water intake that does not belong to current user');
+            throw new Error('Water intake not found or unauthorized');
+        }
+
+        await db.runAsync('DELETE FROM water_intake WHERE id = ?', [id]);
+        
+        // Trigger database change notification
+        await notifyDatabaseChanged('deleteWaterIntake');
+        
+        console.log(`✅ Water intake deleted: ${id}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Error deleting water intake:', error);
+        throw error;
+    }
+};
+
+// Get water intake history for last N days
+export const getWaterIntakeHistory = async (days: number = 7): Promise<Array<{ date: string; total: number }>> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get water intake history before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+
+    try {
+        const result = await db.getAllAsync<{ date: string; total: number }>(
+            `SELECT date, SUM(amount_ml) as total 
+             FROM water_intake 
+             WHERE firebase_uid = ? 
+             GROUP BY date 
+             ORDER BY date DESC 
+             LIMIT ?`,
+            [firebaseUserId, days]
+        );
+        return result;
+    } catch (error) {
+        console.error('❌ Error getting water intake history:', error);
         throw error;
     }
 };

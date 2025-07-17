@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 13; // Increment to version 13 for robust column addition fix
+const CURRENT_VERSION = 14; // Increment to version 14 for water intake table
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -363,6 +363,36 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                         }
 
                         console.log(`✅ Migration to version 13 complete. Added ${addedCount} new columns.`);
+                    }
+                },
+                // Migration to version 14 - Add water intake table
+                async () => {
+                    if (currentVersion < 14) {
+                        console.log('Running migration to version 14 - Adding water intake table...');
+                        
+                        try {
+                            // Create water_intake table
+                            await db.execAsync(`
+                                CREATE TABLE IF NOT EXISTS water_intake (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    firebase_uid TEXT NOT NULL,
+                                    amount_ml INTEGER NOT NULL,
+                                    container_type TEXT DEFAULT 'custom',
+                                    date TEXT NOT NULL,
+                                    timestamp TEXT NOT NULL,
+                                    synced INTEGER DEFAULT 0,
+                                    sync_action TEXT DEFAULT 'create',
+                                    last_modified TEXT NOT NULL DEFAULT (datetime('now')),
+                                    FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
+                                )
+                            `);
+                            
+                            console.log('✅ water_intake table created successfully');
+                            console.log('✅ Migration to version 14 complete');
+                        } catch (error) {
+                            console.error('❌ Error creating water_intake table:', error);
+                            throw error;
+                        }
                     }
                 }
             ];

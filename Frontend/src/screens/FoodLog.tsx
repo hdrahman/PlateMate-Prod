@@ -26,11 +26,12 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
+import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileBySupabaseUid, getUserGoals, getWaterIntakeByDate, getTotalWaterIntakeByDate, deleteWaterIntake } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ExerciseModal from '../components/ExerciseModal';
+import WaterIntakeModal from '../components/WaterIntakeModal';
 import { useAuth } from '../context/AuthContext';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import {
@@ -154,6 +155,13 @@ const DiaryScreen: React.FC = () => {
     const [mealIdFilter, setMealIdFilter] = useState<number | null>(null);
     const [isFilteredView, setIsFilteredView] = useState(false);
     const [showFirstFoodLogPopup, setShowFirstFoodLogPopup] = useState(false);
+
+    // Water tracking state
+    const [waterIntake, setWaterIntake] = useState<any[]>([]);
+    const [totalWaterIntake, setTotalWaterIntake] = useState(0);
+    const [waterIntakeModalVisible, setWaterIntakeModalVisible] = useState(false);
+    const [waterActionModalVisible, setWaterActionModalVisible] = useState(false);
+    const [selectedWaterItem, setSelectedWaterItem] = useState<{ id?: number, amount: number, index: number } | null>(null);
 
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -444,6 +452,19 @@ const DiaryScreen: React.FC = () => {
                     console.error('Error fetching exercises:', error);
                 }
 
+                // Try to fetch water intake as well
+                try {
+                    if (isDatabaseReady()) {
+                        const waterIntakeEntries = await getWaterIntakeByDate(formattedDate);
+                        const totalWater = await getTotalWaterIntakeByDate(formattedDate);
+                        console.log(`Found ${waterIntakeEntries.length} water intake entries for date ${formattedDate}, total: ${totalWater}ml`);
+                        setWaterIntake(waterIntakeEntries);
+                        setTotalWaterIntake(totalWater);
+                    }
+                } catch (error) {
+                    console.error('Error fetching water intake:', error);
+                }
+
                 // After loading local data, set processed flag to true
                 processedMealData.current = true;
 
@@ -499,6 +520,8 @@ const DiaryScreen: React.FC = () => {
 
         setMealData(emptyMeals);
         setExerciseList([]);
+        setWaterIntake([]);
+        setTotalWaterIntake(0);
         localMealDataRef.current = null;
 
         // The fetchMeals effect will run after this since it also depends on currentDate
@@ -625,6 +648,61 @@ const DiaryScreen: React.FC = () => {
     // Replace the original addTestExercise function with the new modal-opening function
     const openExerciseModal = () => {
         setExerciseModalVisible(true);
+    };
+
+    // Water intake modal functions
+    const openWaterIntakeModal = () => {
+        setWaterIntakeModalVisible(true);
+    };
+
+    const handleWaterIntakeAdded = () => {
+        // Refresh the water intake data
+        refreshMealData();
+    };
+
+    const handleWaterItemLongPress = (waterId: number | undefined, amount: number, index: number) => {
+        setSelectedWaterItem({ id: waterId, amount, index });
+        setWaterActionModalVisible(true);
+    };
+
+    const handleDeleteWaterItem = async () => {
+        if (selectedWaterItem && selectedWaterItem.id) {
+            try {
+                await deleteWaterIntake(selectedWaterItem.id);
+                refreshMealData(); // Refresh data after deletion
+                setWaterActionModalVisible(false);
+            } catch (error) {
+                console.error('Error deleting water intake:', error);
+                Alert.alert('Error', 'Failed to delete water intake. Please try again.');
+            }
+        } else {
+            setWaterActionModalVisible(false);
+            Alert.alert('Error', 'Cannot delete this water intake entry. Try again later.');
+        }
+    };
+
+    const renderWaterIntakeList = () => {
+        if (waterIntake.length === 0) {
+            return null;
+        }
+
+        return waterIntake.map((entry: any, index: number) => (
+            <TouchableOpacity
+                key={entry.id}
+                style={styles.logRow}
+                onLongPress={() => handleWaterItemLongPress(entry.id, entry.amount_ml, index)}
+            >
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.logItemText}>
+                        {entry.amount_ml}ml ({entry.container_type})
+                    </Text>
+                    <Text style={styles.logItemDuration}>
+                        {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                </View>
+                <Text style={styles.logCalText}>💧</Text>
+            </TouchableOpacity>
+        ));
     };
 
     // Gradient border card wrapper component
@@ -763,6 +841,15 @@ const DiaryScreen: React.FC = () => {
         filterBannerGradient: ViewStyle;
         filterBannerContent: ViewStyle;
         filterBannerText: TextStyle;
+
+        // Water progress styles
+        waterProgressContainer: ViewStyle;
+        waterProgressBar: ViewStyle;
+        waterProgressFill: ViewStyle;
+        waterProgressText: TextStyle;
+        waterHeaderRight: ViewStyle;
+        waterCurrentAmount: TextStyle;
+        waterGoalAmount: TextStyle;
     };
 
     const styles = StyleSheet.create({
@@ -1298,6 +1385,46 @@ const DiaryScreen: React.FC = () => {
             fontSize: 14,
             fontWeight: '600',
         },
+
+        // Water progress styles
+        waterProgressContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 8,
+        },
+        waterProgressBar: {
+            flex: 1,
+            height: 8,
+            backgroundColor: '#333',
+            borderRadius: 4,
+            overflow: 'hidden',
+            marginRight: 12,
+        },
+        waterProgressFill: {
+            height: '100%',
+            borderRadius: 4,
+            backgroundColor: PURPLE_ACCENT,
+        },
+        waterProgressText: {
+            color: WHITE,
+            fontSize: 12,
+            fontWeight: '600',
+            minWidth: 35,
+        },
+        waterHeaderRight: {
+            flexDirection: 'row',
+            alignItems: 'baseline',
+        },
+        waterCurrentAmount: {
+            color: PURPLE_ACCENT,
+            fontSize: 14,
+            fontWeight: '600',
+        },
+        waterGoalAmount: {
+            color: SUBDUED,
+            fontSize: 12,
+            fontWeight: '400',
+        },
     });
 
     // Add dummy handlers for functions called in JSX
@@ -1346,6 +1473,8 @@ const DiaryScreen: React.FC = () => {
 
         setMealData(emptyMeals);
         setExerciseList([]);
+        setWaterIntake([]);
+        setTotalWaterIntake(0);
         localMealDataRef.current = null;
 
         // Change the date (which will trigger the effects)
@@ -1389,6 +1518,8 @@ const DiaryScreen: React.FC = () => {
 
         setMealData(emptyMeals);
         setExerciseList([]);
+        setWaterIntake([]);
+        setTotalWaterIntake(0);
         localMealDataRef.current = null;
 
         // Change the date (which will trigger the effects)
@@ -2209,11 +2340,40 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                             <GradientBorderCard style={styles.mealSection}>
                                 <View style={styles.mealHeader}>
                                     <Text style={styles.mealTitle}>Water</Text>
+                                    <View style={styles.waterHeaderRight}>
+                                        <Text style={styles.waterCurrentAmount}>{totalWaterIntake}</Text>
+                                        <Text style={styles.waterGoalAmount}>/{userProfile?.water_goal || 2500}ml</Text>
+                                    </View>
                                 </View>
+
+                                {/* Water progress bar */}
+                                <View style={styles.waterProgressContainer}>
+                                    <View style={styles.waterProgressBar}>
+                                        <View
+                                            style={[
+                                                styles.waterProgressFill,
+                                                {
+                                                    width: `${Math.min(100, (totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%`,
+                                                    backgroundColor: totalWaterIntake >= (userProfile?.water_goal || 2500) ? '#4CAF50' : '#AA00FF'
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.waterProgressText}>
+                                        {Math.round((totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%
+                                    </Text>
+                                </View>
+
                                 {/* Divider line under heading */}
                                 <View style={styles.dividerLine} />
 
-                                <TouchableOpacity style={styles.addBtn}>
+                                {/* Water intake entries */}
+                                {renderWaterIntakeList()}
+
+                                {/* Only show divider line if there are water entries already */}
+                                {waterIntake.length > 0 && <View style={styles.dividerLine} />}
+
+                                <TouchableOpacity style={styles.addBtn} onPress={openWaterIntakeModal}>
                                     <Text style={styles.addBtnText}>ADD WATER</Text>
                                 </TouchableOpacity>
                             </GradientBorderCard>
@@ -2420,6 +2580,49 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                     onExerciseAdded={refreshMealData}
                     currentDate={currentDate}
                 />
+
+                {/* Water Intake Modal */}
+                <WaterIntakeModal
+                    visible={waterIntakeModalVisible}
+                    onClose={() => setWaterIntakeModalVisible(false)}
+                    onWaterAdded={handleWaterIntakeAdded}
+                    currentDate={currentDate}
+                />
+
+                {/* Water Action Modal */}
+                <Modal
+                    animationType="fade"
+                    transparent={true}
+                    visible={waterActionModalVisible}
+                    onRequestClose={() => setWaterActionModalVisible(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setWaterActionModalVisible(false)}>
+                        <View style={styles.modalOverlay}>
+                            <TouchableWithoutFeedback>
+                                <View style={styles.actionModalContent}>
+                                    <Text style={styles.actionModalTitle}>Water Intake Options</Text>
+
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, styles.deleteButton]}
+                                        onPress={handleDeleteWaterItem}
+                                    >
+                                        <Ionicons name="trash" size={20} color="#FF5252" />
+                                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                                            Delete Water Entry
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.cancelButton}
+                                        onPress={() => setWaterActionModalVisible(false)}
+                                    >
+                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableWithoutFeedback>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
 
                 {/* Exercise Action Modal */}
                 <Modal
