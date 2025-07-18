@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { addFoodLog } from '../utils/database';
@@ -82,27 +82,36 @@ const BarcodeResults: React.FC = () => {
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
     // Fetch user's daily goals
-    useEffect(() => {
-        const fetchDailyGoals = async () => {
-            if (user?.uid) {
-                try {
-                    const goals = await getUserGoals(user.uid);
-                    setDailyGoals(goals);
-                } catch (error) {
-                    console.error('Error fetching daily goals:', error);
-                    // Set default goals if fetch fails
-                    setDailyGoals({
-                        calorieGoal: 2000,
-                        proteinGoal: 100,
-                        carbGoal: 250,
-                        fatGoal: 67
-                    });
-                }
+    const fetchDailyGoals = useCallback(async () => {
+        if (user?.uid) {
+            try {
+                const goals = await getUserGoals(user.uid);
+                setDailyGoals(goals);
+                console.log('📊 BarcodeResults updated daily goals:', goals);
+            } catch (error) {
+                console.error('Error fetching daily goals:', error);
+                // Set default goals if fetch fails
+                setDailyGoals({
+                    calorieGoal: 2000,
+                    proteinGoal: 100,
+                    carbGoal: 250,
+                    fatGoal: 67
+                });
             }
-        };
-
-        fetchDailyGoals();
+        }
     }, [user]);
+
+    useEffect(() => {
+        fetchDailyGoals();
+    }, [fetchDailyGoals]);
+
+    // Add focus effect to refresh goals when returning from other screens  
+    useFocusEffect(
+        useCallback(() => {
+            console.log('BarcodeResults screen focused, refreshing goals...');
+            fetchDailyGoals();
+        }, [fetchDailyGoals])
+    );
 
     // Initialize available units and nutrition on mount
     useEffect(() => {
