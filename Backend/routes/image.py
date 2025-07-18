@@ -109,8 +109,17 @@ def parse_gpt4_response(response_text):
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
         if json_match:
             json_str = json_match.group(1).strip()
+            print(f"📦 Extracted JSON from code block in parse_gpt4_response")
         else:
-            json_str = response_text.strip()
+            # If no code block, try to find JSON array/object in the response
+            json_pattern = r'(\[[\s\S]*\]|\{[\s\S]*\})'
+            json_match = re.search(json_pattern, response_text)
+            if json_match:
+                json_str = json_match.group(1).strip()
+                print(f"📦 Extracted JSON pattern from response in parse_gpt4_response")
+            else:
+                json_str = response_text.strip()
+                print("📦 Using full response as JSON in parse_gpt4_response")
         
         # If the response is clearly not JSON (doesn't start with [ or {)
         if not (json_str.startswith('[') or json_str.startswith('{')):
@@ -243,7 +252,7 @@ async def upload_image(
                 """Analyzes a food image using OpenAI's GPT-4o model."""
                 api_start_time = time.time()
                 content = [
-                    {"type": "text", "text": "Analyze this food image and identify each item appropriately. Group sandwiches, burgers, etc. as a single item, but list separate items on a plate (like meat, rice, vegetables) individually."},
+                    {"type": "text", "text": "Analyze this food image and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
                 ]
                 
@@ -543,7 +552,7 @@ async def upload_multiple_images(
         print(f"✅ All images encoded in {encoding_time:.2f} seconds")
         
         # Create content array with all images
-        content = [{"type": "text", "text": "Analyze these food images together as they are part of the same meal. Group sandwiches, burgers, etc. as a single item, but list separate items on a plate (like meat, rice, vegetables) individually."}]
+        content = [{"type": "text", "text": "Analyze these food images and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."}]
         
         # Add all encoded images to the content array
         for image_data in encoded_images:
@@ -791,7 +800,28 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                     )
                 
                 # Parse JSON response
-                nutrition_data = json.loads(response_content)
+                try:
+                    # Try to extract JSON from code block first
+                    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_content)
+                    if json_match:
+                        json_str = json_match.group(1).strip()
+                        print(f"📦 Extracted JSON from code block: {json_str[:100]}...")
+                    else:
+                        # If no code block, try to find JSON array/object in the response
+                        json_pattern = r'(\[[\s\S]*\]|\{[\s\S]*\})'
+                        json_match = re.search(json_pattern, response_content)
+                        if json_match:
+                            json_str = json_match.group(1).strip()
+                            print(f"📦 Extracted JSON from response: {json_str[:100]}...")
+                        else:
+                            json_str = response_content.strip()
+                            print("📦 Using full response as JSON")
+                    
+                    nutrition_data = json.loads(json_str)
+                except json.JSONDecodeError as e:
+                    print(f"❌ Failed to parse extracted JSON: {e}")
+                    print(f"📝 Attempted to parse: {json_str[:200] if 'json_str' in locals() else 'No JSON extracted'}...")
+                    raise e
                 
                 if not isinstance(nutrition_data, list):
                     raise ValueError("Response is not a list")
