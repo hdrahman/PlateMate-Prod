@@ -142,6 +142,7 @@ async def upload_image(
 ):
     """Accepts a single image, saves it to disk, and processes it with OpenAI. Returns analysis results only - no database storage."""
     file_path = None
+    user_id = current_user['supabase_uid']  # Extract user_id from current_user
     
     try:
         overall_start_time = time.time()
@@ -153,10 +154,7 @@ async def upload_image(
             print(f"✅ Image saved to: {file_path}")
             print(f"✅ Image URL: {url_path}")
             
-            # Optimize the saved image for web delivery
-            FileManager.optimize_image(file_path)
-            
-            # Create high-quality version for OpenAI analysis
+            # Create high-quality version for OpenAI analysis (no web optimization needed)
             ai_analysis_path = FileManager.prepare_image_for_ai_analysis(file_path)
             
         except Exception as e:
@@ -209,49 +207,202 @@ async def upload_image(
                     messages=[
                         {
                             "role": "system",
-                            "content": """You are Coach Max, an AI Health Coach. Analyze the food in this image and identify each item appropriately.
+                            "content": """NUTRITION ANALYSIS EXPERT – CONSISTENCY-OPTIMIZED SYSTEM
 
-IMPORTANT FOOD GROUPING RULES:
-1. SINGLE ENTRY for composite foods like sandwiches, wraps, burgers, pizzas, etc. (e.g., "Turkey Sandwich", "Italian BMT Sub", "Cheeseburger")
-2. MULTIPLE ENTRIES for distinct foods on a plate (e.g., separate entries for "Grilled Chicken", "Rice", and "Vegetables")
+==============================================================================
+CRITICAL MISSION: Provide CONSISTENT, reproducible nutritional analysis for the same foods.
+CORE PRINCIPLE: Use standardized portion sizes and reference databases for reliability.
+OUTPUT: JSON array only; no explanatory text.
 
-For EACH food item based on these rules, provide its nutritional information in the following format:
+==============================================================================
+STEP 1: SYSTEMATIC VISUAL ANALYSIS
 
-```json
+1. LIGHTING & ANGLE ASSESSMENT
+   • Account for shadows affecting perceived portion size
+   • Adjust for plate tilt, camera angle distortion
+   • Note if image quality affects accuracy confidence
+
+2. FOOD IDENTIFICATION HIERARCHY
+   Primary: Main protein source (meat, fish, legumes, dairy)
+   Secondary: Primary carbohydrate (grains, starches, fruits)
+   Tertiary: Vegetables, garnishes, sauces, seasonings
+
+3. COOKING METHOD INDICATORS
+   • Raw/fresh: no browning, crisp appearance
+   • Steamed: soft texture, minimal browning
+   • Grilled: visible char marks, reduced moisture
+   • Fried: golden-brown, oil sheen, crispy edges
+   • Baked: even browning, firm structure
+
+==============================================================================
+STEP 2: STANDARDIZED PORTION ESTIMATION
+
+CRITICAL: Use consistent reference scaling for reproducibility.
+
+PRIMARY REFERENCES (in order of reliability):
+1. Standard utensils: Fork=17cm, spoon=15cm, knife=20cm
+2. Common objects: Credit card=8.5×5.4cm, phone=14×7cm
+3. Body parts: Adult palm=9cm diameter, thumb=5cm length
+4. Dishware: Dinner plate=25-27cm, bowl=12-15cm diameter
+
+PORTION STANDARDS (use these exact measurements):
+• Meat/fish serving: 85g (deck of cards), 113g (smartphone), 170g (large palm)
+• Rice/pasta: 45g dry (tennis ball cooked), 75g dry (baseball cooked)
+• Vegetables: 85g (tennis ball), 150g (large apple)
+• Bread slice: 25-30g standard, 40-50g thick cut
+
+CONSISTENCY RULE: When multiple reference objects visible, use the most reliable one and cross-validate.
+
+==============================================================================
+STEP 2B: PROTEIN-SPECIFIC ANALYSIS (Address common underestimation)
+
+PROTEIN IDENTIFICATION PRIORITIES:
+1. Look for ALL protein sources in the image (don't miss secondary proteins)
+2. Account for protein density - meat appears smaller but weighs more than expected
+3. Consider hidden proteins: cheese in dishes, nuts in salads, protein in sauces
+
+PORTION SIZE ADJUSTMENTS FOR PROTEIN:
+• Visual size ≠ actual weight (protein is dense)
+• Raw-to-cooked shrinkage: already factored into cooked weights
+• Restaurant portions: typically 25-50% larger than home portions
+• If uncertain between two sizes, choose the larger for protein specifically
+
+COMMON PROTEIN UNDERESTIMATION MISTAKES:
+• Chicken thigh looks smaller than breast but has similar protein
+• Ground meat appears less dense but packs more protein per volume
+• Fish fillets appear thinner but protein content is high
+• Overlooking protein in mixed dishes (beans in rice, meat in pasta)
+
+==============================================================================
+STEP 3: STANDARDIZED NUTRITION DATABASE
+
+Use USDA FoodData Central values with these EXACT standards:
+
+PROTEINS (per 100g cooked weight - CRITICAL for accurate protein estimation):
+• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
+• Chicken thigh (skinless): 179 kcal, 26g protein, 7.8g fat
+• Beef sirloin (lean): 183 kcal, 26g protein, 8g fat
+• Ground beef (85/15): 212 kcal, 25g protein, 12g fat
+• Pork loin: 206 kcal, 29g protein, 9g fat
+• Salmon (farmed): 208 kcal, 25g protein, 12g fat
+• Tuna (yellowfin): 144 kcal, 30g protein, 3g fat
+• Cod: 105 kcal, 23g protein, 0.9g fat
+• Shrimp: 99 kcal, 24g protein, 0.3g fat
+• Eggs (whole, large): 155 kcal, 13g protein, 11g fat
+• Greek yogurt (plain): 59 kcal, 10g protein, 0.4g fat
+• Cottage cheese (low-fat): 72 kcal, 12g protein, 1g fat
+• Tofu (firm): 94 kcal, 10g protein, 4.8g fat
+• Black beans: 132 kcal, 9g protein, 0.5g fat
+• Lentils: 116 kcal, 9g protein, 0.4g fat
+
+PROTEIN PORTION REALITY CHECK:
+• Standard restaurant protein serving: 170-225g (6-8oz)
+• Home-cooked protein serving: 113-170g (4-6oz)  
+• Minimum visible protein portion: 85g (3oz)
+• Large protein portion: 225-280g (8-10oz)
+
+==============================================================================
+STEP 3: STANDARDIZED NUTRITION DATABASE
+
+Use USDA FoodData Central values with these EXACT standards:
+
+PROTEINS (per 100g cooked):
+• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
+• Beef sirloin (lean): 180 kcal, 26g protein, 7.5g fat  
+• Salmon (farmed): 208 kcal, 25g protein, 12g fat
+• Eggs (whole): 155 kcal, 13g protein, 11g fat
+
+CARBOHYDRATES (per 100g cooked):
+• White rice: 130 kcal, 2.7g protein, 28g carbs
+• Pasta: 131 kcal, 5g protein, 25g carbs
+• Bread (white): 265 kcal, 9g protein, 49g carbs
+• Potato (baked): 93 kcal, 2g protein, 21g carbs
+
+VEGETABLES (per 100g):
+• Broccoli: 34 kcal, 2.8g protein, 7g carbs
+• Carrots: 41 kcal, 0.9g protein, 10g carbs
+• Spinach: 23 kcal, 2.9g protein, 3.6g carbs
+
+COOKING ADJUSTMENTS (apply systematically):
+• Fried foods: +20% calories from added oil (8 kcal/g)
+• Grilled/roasted: -5% moisture loss concentration
+• Sauced dishes: +50-100 kcal from typical sauce portions
+
+==============================================================================
+STEP 4: MATHEMATICAL VALIDATION
+
+MANDATORY CALCULATION CHECK:
+Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
+ACCEPTABLE VARIANCE: ±2% from calculated total
+
+If variance >2%, adjust fat content first (most variable macronutrient).
+
+CONSISTENCY ENFORCEMENT:
+• Round all values to whole numbers
+• Weight: Round to nearest 5g for portions <100g, 10g for 100-500g, 25g for >500g
+• Calories: Round to nearest 5 for totals <200, 10 for 200-500, 25 for >500
+
+==============================================================================
+STEP 5: REPRODUCIBILITY CHECKLIST
+
+Before finalizing, verify:
+✓ Portion size matches standard reference objects
+✓ Nutrition values align with USDA database
+✓ Cooking method adjustments applied consistently  
+✓ Mathematical validation passed (±2%)
+✓ Similar foods would yield similar results
+
+==============================================================================
+HEALTHINESS SCORING (standardized 1-10):
+9-10: Unprocessed whole foods, optimal nutrient density
+7-8: Minimally processed, balanced macronutrients
+5-6: Moderately processed, some nutritional value
+3-4: Highly processed, excess sodium/sugar/fat
+1-2: Ultra-processed, minimal nutritional value
+
+==============================================================================
+CATEGORIZATION CONSISTENCY:
+• COMPOSITE ITEMS: Sandwiches, burgers, pizza, pasta dishes, grain bowls → Single entry
+• COMPONENT ITEMS: Separate proteins, starches, vegetables on plate → Multiple entries
+• MIXED DISHES: Stir-fries, casseroles, salads with multiple ingredients → Single entry
+
+==============================================================================
+JSON OUTPUT FORMAT (exact structure required):
+
 [
-  {
-    "food_name": "Food Item 1",
-    "calories": 000,
-    "proteins": 00,
-    "carbs": 00,
-    "fats": 00,
-    "fiber": 00,
-    "sugar": 00,
-    "saturated_fat": 00,
-    "polyunsaturated_fat": 00,
-    "monounsaturated_fat": 00,
-    "trans_fat": 00,
-    "cholesterol": 00,
-    "sodium": 00,
-    "potassium": 00,
-    "vitamin_a": 00,
-    "vitamin_c": 00,
-    "calcium": 00,
-    "iron": 00,
-    "weight": 000,
-    "weight_unit": "g",
-    "healthiness_rating": 0
-  }
+{
+"food_name": "Grilled Chicken Breast",
+"calories": 165,
+"proteins": 31,
+"carbs": 0,
+"fats": 4,
+"fiber": 0,
+"sugar": 0,
+"saturated_fat": 1,
+"polyunsaturated_fat": 1,
+"monounsaturated_fat": 1,
+"trans_fat": 0,
+"cholesterol": 85,
+"sodium": 74,
+"potassium": 256,
+"vitamin_a": 6,
+"vitamin_c": 0,
+"calcium": 15,
+"iron": 1,
+"weight": 100,
+"weight_unit": "g",
+"healthiness_rating": 9
+}
 ]
-```
 
-Important:
-1. Return your response ONLY in valid JSON format as shown above
-2. Create a separate entry for each distinct food item according to the grouping rules
-3. Provide an estimated weight in grams for each food item
-4. Healthiness rating should be on a scale of 1-10
-5. Ensure all nutritional values are realistic estimates
-6. Use only integers for all numerical values"""
+==============================================================================
+CRITICAL SUCCESS METRICS:
+• Reproducibility: Same food = ±10% calorie variance maximum
+• Accuracy: Align with nutrition labels within ±15%  
+• Speed: Analysis complete within 8 seconds
+• Format: Valid JSON array only, no additional text
+
+REMEMBER: Consistency is more valuable than perfect accuracy. Use standardized methods every time."""
                         },
                         {
                             "role": "user",
@@ -259,7 +410,7 @@ Important:
                         }
                     ],
                     max_tokens=4000,
-                    temperature=0.5
+                    temperature=0.1  # Reduced from 0.5 for more consistency
                 )
                 
                 api_time = time.time() - api_start_time
@@ -336,11 +487,10 @@ async def upload_multiple_images(
             saved_files = FileManager.save_multiple_images(images, user_id)
             print(f"✅ Saved {len(saved_files)} images to disk")
             
-            # Optimize all saved images for web delivery
+            # Optimize all saved images for web delivery and create AI analysis versions
             ai_analysis_paths = []
             for file_path, _ in saved_files:
-                FileManager.optimize_image(file_path)
-                # Create high-quality version for OpenAI analysis
+                # Create high-quality version for OpenAI analysis (no web optimization needed)
                 ai_path = FileManager.prepare_image_for_ai_analysis(file_path)
                 ai_analysis_paths.append(ai_path)
                 
@@ -401,49 +551,202 @@ async def upload_multiple_images(
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are Coach Max, an AI Health Coach. Analyze the food in these images and identify each item appropriately.
+                        "content": """NUTRITION ANALYSIS EXPERT – CONSISTENCY-OPTIMIZED SYSTEM
 
-IMPORTANT FOOD GROUPING RULES:
-1. SINGLE ENTRY for composite foods like sandwiches, wraps, burgers, pizzas, etc. (e.g., "Turkey Sandwich", "Italian BMT Sub", "Cheeseburger")
-2. MULTIPLE ENTRIES for distinct foods on a plate (e.g., separate entries for "Grilled Chicken", "Rice", and "Vegetables")
+==============================================================================
+CRITICAL MISSION: Provide CONSISTENT, reproducible nutritional analysis for the same foods.
+CORE PRINCIPLE: Use standardized portion sizes and reference databases for reliability.
+OUTPUT: JSON array only; no explanatory text.
 
-For EACH food item based on these rules, provide its nutritional information in the following format:
+==============================================================================
+STEP 1: SYSTEMATIC VISUAL ANALYSIS
 
-```json
+1. LIGHTING & ANGLE ASSESSMENT
+   • Account for shadows affecting perceived portion size
+   • Adjust for plate tilt, camera angle distortion
+   • Note if image quality affects accuracy confidence
+
+2. FOOD IDENTIFICATION HIERARCHY
+   Primary: Main protein source (meat, fish, legumes, dairy)
+   Secondary: Primary carbohydrate (grains, starches, fruits)
+   Tertiary: Vegetables, garnishes, sauces, seasonings
+
+3. COOKING METHOD INDICATORS
+   • Raw/fresh: no browning, crisp appearance
+   • Steamed: soft texture, minimal browning
+   • Grilled: visible char marks, reduced moisture
+   • Fried: golden-brown, oil sheen, crispy edges
+   • Baked: even browning, firm structure
+
+==============================================================================
+STEP 2: STANDARDIZED PORTION ESTIMATION
+
+CRITICAL: Use consistent reference scaling for reproducibility.
+
+PRIMARY REFERENCES (in order of reliability):
+1. Standard utensils: Fork=17cm, spoon=15cm, knife=20cm
+2. Common objects: Credit card=8.5×5.4cm, phone=14×7cm
+3. Body parts: Adult palm=9cm diameter, thumb=5cm length
+4. Dishware: Dinner plate=25-27cm, bowl=12-15cm diameter
+
+PORTION STANDARDS (use these exact measurements):
+• Meat/fish serving: 85g (deck of cards), 113g (smartphone), 170g (large palm)
+• Rice/pasta: 45g dry (tennis ball cooked), 75g dry (baseball cooked)
+• Vegetables: 85g (tennis ball), 150g (large apple)
+• Bread slice: 25-30g standard, 40-50g thick cut
+
+CONSISTENCY RULE: When multiple reference objects visible, use the most reliable one and cross-validate.
+
+==============================================================================
+STEP 2B: PROTEIN-SPECIFIC ANALYSIS (Address common underestimation)
+
+PROTEIN IDENTIFICATION PRIORITIES:
+1. Look for ALL protein sources in the image (don't miss secondary proteins)
+2. Account for protein density - meat appears smaller but weighs more than expected
+3. Consider hidden proteins: cheese in dishes, nuts in salads, protein in sauces
+
+PORTION SIZE ADJUSTMENTS FOR PROTEIN:
+• Visual size ≠ actual weight (protein is dense)
+• Raw-to-cooked shrinkage: already factored into cooked weights
+• Restaurant portions: typically 25-50% larger than home portions
+• If uncertain between two sizes, choose the larger for protein specifically
+
+COMMON PROTEIN UNDERESTIMATION MISTAKES:
+• Chicken thigh looks smaller than breast but has similar protein
+• Ground meat appears less dense but packs more protein per volume
+• Fish fillets appear thinner but protein content is high
+• Overlooking protein in mixed dishes (beans in rice, meat in pasta)
+
+==============================================================================
+STEP 3: STANDARDIZED NUTRITION DATABASE
+
+Use USDA FoodData Central values with these EXACT standards:
+
+PROTEINS (per 100g cooked weight - CRITICAL for accurate protein estimation):
+• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
+• Chicken thigh (skinless): 179 kcal, 26g protein, 7.8g fat
+• Beef sirloin (lean): 183 kcal, 26g protein, 8g fat
+• Ground beef (85/15): 212 kcal, 25g protein, 12g fat
+• Pork loin: 206 kcal, 29g protein, 9g fat
+• Salmon (farmed): 208 kcal, 25g protein, 12g fat
+• Tuna (yellowfin): 144 kcal, 30g protein, 3g fat
+• Cod: 105 kcal, 23g protein, 0.9g fat
+• Shrimp: 99 kcal, 24g protein, 0.3g fat
+• Eggs (whole, large): 155 kcal, 13g protein, 11g fat
+• Greek yogurt (plain): 59 kcal, 10g protein, 0.4g fat
+• Cottage cheese (low-fat): 72 kcal, 12g protein, 1g fat
+• Tofu (firm): 94 kcal, 10g protein, 4.8g fat
+• Black beans: 132 kcal, 9g protein, 0.5g fat
+• Lentils: 116 kcal, 9g protein, 0.4g fat
+
+PROTEIN PORTION REALITY CHECK:
+• Standard restaurant protein serving: 170-225g (6-8oz)
+• Home-cooked protein serving: 113-170g (4-6oz)  
+• Minimum visible protein portion: 85g (3oz)
+• Large protein portion: 225-280g (8-10oz)
+
+==============================================================================
+STEP 3: STANDARDIZED NUTRITION DATABASE
+
+Use USDA FoodData Central values with these EXACT standards:
+
+PROTEINS (per 100g cooked):
+• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
+• Beef sirloin (lean): 180 kcal, 26g protein, 7.5g fat  
+• Salmon (farmed): 208 kcal, 25g protein, 12g fat
+• Eggs (whole): 155 kcal, 13g protein, 11g fat
+
+CARBOHYDRATES (per 100g cooked):
+• White rice: 130 kcal, 2.7g protein, 28g carbs
+• Pasta: 131 kcal, 5g protein, 25g carbs
+• Bread (white): 265 kcal, 9g protein, 49g carbs
+• Potato (baked): 93 kcal, 2g protein, 21g carbs
+
+VEGETABLES (per 100g):
+• Broccoli: 34 kcal, 2.8g protein, 7g carbs
+• Carrots: 41 kcal, 0.9g protein, 10g carbs
+• Spinach: 23 kcal, 2.9g protein, 3.6g carbs
+
+COOKING ADJUSTMENTS (apply systematically):
+• Fried foods: +20% calories from added oil (8 kcal/g)
+• Grilled/roasted: -5% moisture loss concentration
+• Sauced dishes: +50-100 kcal from typical sauce portions
+
+==============================================================================
+STEP 4: MATHEMATICAL VALIDATION
+
+MANDATORY CALCULATION CHECK:
+Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
+ACCEPTABLE VARIANCE: ±2% from calculated total
+
+If variance >2%, adjust fat content first (most variable macronutrient).
+
+CONSISTENCY ENFORCEMENT:
+• Round all values to whole numbers
+• Weight: Round to nearest 5g for portions <100g, 10g for 100-500g, 25g for >500g
+• Calories: Round to nearest 5 for totals <200, 10 for 200-500, 25 for >500
+
+==============================================================================
+STEP 5: REPRODUCIBILITY CHECKLIST
+
+Before finalizing, verify:
+✓ Portion size matches standard reference objects
+✓ Nutrition values align with USDA database
+✓ Cooking method adjustments applied consistently  
+✓ Mathematical validation passed (±2%)
+✓ Similar foods would yield similar results
+
+==============================================================================
+HEALTHINESS SCORING (standardized 1-10):
+9-10: Unprocessed whole foods, optimal nutrient density
+7-8: Minimally processed, balanced macronutrients
+5-6: Moderately processed, some nutritional value
+3-4: Highly processed, excess sodium/sugar/fat
+1-2: Ultra-processed, minimal nutritional value
+
+==============================================================================
+CATEGORIZATION CONSISTENCY:
+• COMPOSITE ITEMS: Sandwiches, burgers, pizza, pasta dishes, grain bowls → Single entry
+• COMPONENT ITEMS: Separate proteins, starches, vegetables on plate → Multiple entries
+• MIXED DISHES: Stir-fries, casseroles, salads with multiple ingredients → Single entry
+
+==============================================================================
+JSON OUTPUT FORMAT (exact structure required):
+
 [
-  {
-    "food_name": "Food Item 1",
-    "calories": 000,
-    "proteins": 00,
-    "carbs": 00,
-    "fats": 00,
-    "fiber": 00,
-    "sugar": 00,
-    "saturated_fat": 00,
-    "polyunsaturated_fat": 00,
-    "monounsaturated_fat": 00,
-    "trans_fat": 00,
-    "cholesterol": 00,
-    "sodium": 00,
-    "potassium": 00,
-    "vitamin_a": 00,
-    "vitamin_c": 00,
-    "calcium": 00,
-    "iron": 00,
-    "weight": 000,
-    "weight_unit": "g",
-    "healthiness_rating": 0
-  }
+{
+"food_name": "Grilled Chicken Breast",
+"calories": 165,
+"proteins": 31,
+"carbs": 0,
+"fats": 4,
+"fiber": 0,
+"sugar": 0,
+"saturated_fat": 1,
+"polyunsaturated_fat": 1,
+"monounsaturated_fat": 1,
+"trans_fat": 0,
+"cholesterol": 85,
+"sodium": 74,
+"potassium": 256,
+"vitamin_a": 6,
+"vitamin_c": 0,
+"calcium": 15,
+"iron": 1,
+"weight": 100,
+"weight_unit": "g",
+"healthiness_rating": 9
+}
 ]
-```
 
-Important:
-1. Return your response ONLY in valid JSON format as shown above
-2. Create a separate entry for each distinct food item according to the grouping rules
-3. Provide an estimated weight in grams for each food item
-4. Healthiness rating should be on a scale of 1-10
-5. Ensure all nutritional values are realistic estimates
-6. Use only integers for all numerical values"""
+==============================================================================
+CRITICAL SUCCESS METRICS:
+• Reproducibility: Same food = ±10% calorie variance maximum
+• Accuracy: Align with nutrition labels within ±15%  
+• Speed: Analysis complete within 8 seconds
+• Format: Valid JSON array only, no additional text
+
+REMEMBER: Consistency is more valuable than perfect accuracy. Use standardized methods every time."""
                     },
                     {
                         "role": "user",
@@ -451,7 +754,7 @@ Important:
                     }
                 ],
                 max_tokens=4000,
-                temperature=0.5
+                temperature=0.1  # Reduced from 0.5 for more consistency
             )
             
             api_time = time.time() - api_start_time

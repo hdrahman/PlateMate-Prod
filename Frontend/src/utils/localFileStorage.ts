@@ -35,14 +35,14 @@ export const saveImageLocally = async (imageUri: string, userId: string): Promis
         const filename = generateUniqueFilename(userId);
         const localPath = `${MEAL_IMAGES_DIR}${filename}`;
 
-        // Optimize image while maintaining high quality
+        // Optimize image while maintaining high quality for AI analysis
         let optimizedImage;
         try {
             optimizedImage = await manipulateAsync(
                 imageUri,
-                [{ resize: { width: 1200 } }], // Keep higher resolution 1200px width
+                [{ resize: { width: 1500 } }], // Increased resolution for better AI analysis
                 {
-                    compress: 0.95, // Much higher quality (95% vs 80%)
+                    compress: 0.98, // Higher quality (98% vs 95%)
                     format: SaveFormat.JPEG
                 }
             );
