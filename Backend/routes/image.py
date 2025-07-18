@@ -47,8 +47,24 @@ def encode_image(image_file):
     """Encodes image file to base64"""
     try:
         start_time = time.time()
-        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        image_data = image_file.read()
+        
+        # Validate image data
+        if len(image_data) == 0:
+            raise ValueError("Image file is empty")
+        
+        if len(image_data) > 20 * 1024 * 1024:  # 20MB limit
+            print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB)")
+        
+        encoded_string = base64.b64encode(image_data).decode('utf-8')
+        
+        # Validate base64 encoding
+        if not encoded_string or len(encoded_string) < 100:
+            raise ValueError("Base64 encoding produced invalid result")
+        
         print(f"✅ Image encoding took {time.time() - start_time:.2f} seconds")
+        print(f"📊 Original size: {len(image_data)} bytes, Base64 size: {len(encoded_string)} characters")
+        
         return encoded_string
     except Exception as e:
         print(f"❌ Error encoding image: {e}")
@@ -61,6 +77,33 @@ def parse_gpt4_response(response_text):
         # Basic sanity checks
         if not response_text or len(response_text) < 10:
             raise ValueError("Response text is too short")
+        
+        # Check for OpenAI content policy refusal
+        refusal_patterns = [
+            "I'm sorry, I can't assist",
+            "I cannot identify",
+            "I'm not able to",
+            "I can't analyze",
+            "unable to identify",
+            "cannot analyze",
+            "not able to provide"
+        ]
+        
+        response_lower = response_text.lower()
+        for pattern in refusal_patterns:
+            if pattern.lower() in response_lower:
+                print(f"❌ OpenAI refused to analyze image: {response_text[:500]}...")
+                print("🔍 Common causes for food image refusal:")
+                print("  1. Image too blurry/dark to identify food clearly")
+                print("  2. Image contains people (faces trigger safety filters)")
+                print("  3. Image contains text/logos that look like branding")
+                print("  4. Image doesn't actually contain identifiable food")
+                print("  5. Image quality issues during upload/encoding")
+                
+                raise HTTPException(
+                    status_code=400,
+                    detail="OpenAI could not analyze this image. This usually happens when: 1) The image is too blurry or dark, 2) No food is clearly visible, 3) The image contains people or text. Please try taking a clearer photo focused on the food."
+                )
             
         # Try to extract JSON if it's enclosed in a code block
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
@@ -106,6 +149,9 @@ def parse_gpt4_response(response_text):
             
         return extracted_foods
         
+    except HTTPException:
+        # Re-raise HTTPException as-is
+        raise
     except Exception as e:
         print(f"❌ Error parsing GPT response: {e}")
         # Return a fallback empty array instead of raising an exception
@@ -515,6 +561,11 @@ async def upload_multiple_images(
 
         try:
             print("📤 Sending multiple images to OpenAI for analysis...")
+            print(f"🔍 Debug info:")
+            print(f"  - Number of images: {len(encoded_images)}")
+            print(f"  - Content array length: {len(content)}")
+            print(f"  - First image data length: {len(encoded_images[0]) if encoded_images else 0} characters")
+            print(f"  - Using model: gpt-4o")
             
             # Real API call
             api_start_time = time.time()
@@ -706,7 +757,38 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
             # Process the response
             try:
                 response_content = response.choices[0].message.content
-                print(f"📥 OpenAI response: {response_content[:200]}...")
+                print(f"📥 OpenAI response: {response_content[:500]}...")
+                
+                # Check if OpenAI refused to analyze the image due to content policy
+                refusal_indicators = [
+                    "I'm sorry, I can't assist",
+                    "I cannot identify", 
+                    "I'm not able to",
+                    "I can't analyze",
+                    "unable to identify",
+                    "cannot analyze",
+                    "not able to provide"
+                ]
+                
+                response_lower = response_content.lower()
+                is_refusal = any(indicator.lower() in response_lower for indicator in refusal_indicators)
+                
+                if is_refusal:
+                    print("❌ OpenAI refused to analyze image")
+                    print(f"📝 Full response: {response_content}")
+                    print("🔍 Possible causes:")
+                    print("  - Image quality too poor")
+                    print("  - Image doesn't clearly show food")
+                    print("  - Image contains text/people that triggered safety filters")
+                    print("  - Image file corrupted during upload")
+                    print("  - Base64 encoding issue")
+                    
+                    # Clean up saved files and return specific error
+                    FileManager.cleanup_files([fp for fp, _ in saved_files])
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="OpenAI could not analyze this image. This usually happens when: 1) The image is too blurry or dark, 2) No food is clearly visible, 3) The image contains people or text. Please try taking a clearer photo focused on the food."
+                    )
                 
                 # Parse JSON response
                 nutrition_data = json.loads(response_content)
@@ -718,10 +800,35 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                 
             except json.JSONDecodeError as e:
                 print(f"❌ JSON parsing error: {e}")
-                print(f"Raw response: {response_content}")
-                # Clean up saved files and return error
+                print(f"📝 Full response content: {response_content}")
+                print("🔍 Response analysis:")
+                print(f"  - Length: {len(response_content)} characters")
+                print(f"  - Starts with: '{response_content[:50]}...'")
+                print(f"  - Ends with: '...{response_content[-50:]}'")
+                
+                # Check if the response indicates content policy refusal
+                refusal_indicators = [
+                    "I'm sorry, I can't assist",
+                    "I cannot identify",
+                    "I'm not able to",
+                    "I can't analyze"
+                ]
+                
+                response_lower = response_content.lower()
+                is_refusal = any(indicator.lower() in response_lower for indicator in refusal_indicators)
+                
+                if is_refusal:
+                    print("🚨 This appears to be a refusal, not a JSON parsing error")
+                    # Clean up saved files and return specific error
+                    FileManager.cleanup_files([fp for fp, _ in saved_files])
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="OpenAI could not analyze this image. This usually happens when: 1) The image is too blurry or dark, 2) No food is clearly visible, 3) The image contains people or text. Please try taking a clearer photo focused on the food."
+                    )
+                
+                # Clean up saved files and return parsing error
                 FileManager.cleanup_files([fp for fp, _ in saved_files])
-                raise HTTPException(status_code=500, detail=f"Error parsing nutrition data from OpenAI: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Error parsing nutrition data from OpenAI. Response was not valid JSON: {str(e)}")
             except Exception as e:
                 print(f"❌ Error processing OpenAI response: {e}")
                 # Clean up saved files and return error

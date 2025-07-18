@@ -544,6 +544,25 @@ const ImageCapture: React.FC = () => {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`❌ Upload failed with status ${response.status}:`, errorText);
+                
+                // Handle specific error cases
+                if (response.status === 400) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        // Check if it's an image content policy error
+                        if (errorData.detail && errorData.detail.includes('image cannot be analyzed')) {
+                            throw new Error('IMAGE_CONTENT_POLICY');
+                        }
+                    } catch (parseError) {
+                        // If we can't parse the error, check the raw text
+                        if (errorText.includes('image cannot be analyzed') || 
+                            errorText.includes('inappropriate content') ||
+                            errorText.includes('better lighting')) {
+                            throw new Error('IMAGE_CONTENT_POLICY');
+                        }
+                    }
+                }
+                
                 throw new Error(`Upload failed: ${response.status} - ${errorText}`);
             }
 
@@ -760,7 +779,25 @@ const ImageCapture: React.FC = () => {
         } catch (error) {
             setShowAnalysisModal(false);
             console.error('Error submitting food:', error);
-            Alert.alert('Error', 'Failed to submit food. Please try again.');
+            
+            // Handle specific error types
+            if (error instanceof Error && error.message === 'IMAGE_CONTENT_POLICY') {
+                Alert.alert(
+                    'Image Cannot Be Analyzed', 
+                    'OpenAI could not process this image. Common reasons:\n\n• Image is too blurry or dark\n• No food clearly visible\n• Image contains people or faces\n• Poor lighting or focus\n\nPlease take a clearer photo focused only on the food.',
+                    [
+                        { text: 'Retake Photo', onPress: () => {
+                            // Reset the first image to allow retaking
+                            const newImages = [...images];
+                            newImages[0] = { uri: '', type: 'top', uploaded: false };
+                            setImages(newImages);
+                        }},
+                        { text: 'OK', style: 'default' }
+                    ]
+                );
+            } else {
+                Alert.alert('Error', 'Failed to submit food. Please try again.');
+            }
         } finally {
             setLoading(false);
             setIsAnalyzing(false);
