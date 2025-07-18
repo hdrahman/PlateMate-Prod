@@ -9,6 +9,7 @@ const StepContext = createContext<UseStepTrackerResult>({
     isTracking: false,
     startTracking: async () => { },
     stopTracking: () => { },
+    refreshStepData: async () => { },
     loading: true
 });
 

@@ -1106,6 +1106,83 @@ export const deleteExercise = async (id: number) => {
     }
 };
 
+// Sync automatic steps with exercise log
+export const syncStepsWithExerciseLog = async (stepCount: number, date: string) => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to sync steps before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    const normalizedDate = date.split('T')[0]; // Remove any time component
+
+    try {
+        // Query for user ID
+        const userIdResult = await db.getFirstAsync<{ id: number }>(
+            `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
+            [firebaseUserId]
+        );
+
+        // If user not found, use default
+        const userId = userIdResult?.id || 1;
+
+        // Check if we already have an automatic step entry for today
+        const existingEntry = await db.getFirstAsync<{ id: number, calories_burned: number }>(
+            `SELECT id, calories_burned FROM exercises 
+             WHERE user_id = ? AND date = ? AND exercise_name LIKE 'Daily Steps%'`,
+            [userId, normalizedDate]
+        );
+
+        // Calculate estimated calories (roughly 0.04 calories per step for average person)
+        const caloriesBurned = Math.round(stepCount * 0.04);
+        const exerciseName = `Daily Steps (${stepCount} steps)`;
+        const duration = Math.round(stepCount / 100); // Estimate: ~100 steps per minute
+        const notes = `Automatically tracked: ${stepCount} steps`;
+        const now = new Date().toISOString();
+
+        if (existingEntry) {
+            // Update existing entry
+            await db.runAsync(
+                `UPDATE exercises 
+                 SET exercise_name = ?, calories_burned = ?, duration = ?, notes = ?, 
+                     last_modified = ?, synced = 0, sync_action = 'update'
+                 WHERE id = ?`,
+                [exerciseName, caloriesBurned, duration, notes, now, existingEntry.id]
+            );
+            console.log(`✅ Updated automatic step entry: ${stepCount} steps, ${caloriesBurned} calories`);
+        } else {
+            // Create new entry
+            await db.runAsync(
+                `INSERT INTO exercises (
+                    user_id, exercise_name, calories_burned, duration, 
+                    date, notes, synced, sync_action, last_modified
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    userId,
+                    exerciseName,
+                    caloriesBurned,
+                    duration,
+                    normalizedDate,
+                    notes,
+                    0, // Not synced by default
+                    'create', // Default action is create
+                    now // Last modified timestamp
+                ]
+            );
+            console.log(`✅ Created automatic step entry: ${stepCount} steps, ${caloriesBurned} calories`);
+        }
+
+        // Emit change notification
+        notifyDatabaseChanged();
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error syncing steps with exercise log:', error);
+        throw error;
+    }
+};
+
 // ===== WATER INTAKE TRACKING FUNCTIONS =====
 
 // Container types for water intake

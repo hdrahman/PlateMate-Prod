@@ -18,6 +18,8 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatDateToString } from '../utils/dateUtils';
 import { addExercise, getCurrentUserIdAsync, getUserProfile } from '../utils/database';
+import { useSteps } from '../context/StepContext';
+import BackgroundStepTracker from '../services/BackgroundStepTracker';
 
 // Define the Exercise interface
 interface Exercise {
@@ -65,6 +67,11 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
     const [manualMET, setManualMET] = useState('5.0');
     const [manualActivityName, setManualActivityName] = useState('');
     const [isManualEntry, setIsManualEntry] = useState(false);
+    const [isStepsEntry, setIsStepsEntry] = useState(false);
+    const [stepsCount, setStepsCount] = useState('');
+
+    // Get step context for syncing with home screen
+    const { todaySteps } = useSteps();
 
     // Fetch the current user's weight from their profile
     useEffect(() => {
@@ -95,6 +102,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
         setManualMET('5.0');
         setManualActivityName('');
         setIsManualEntry(false);
+        setIsStepsEntry(false);
+        setStepsCount('');
     };
 
     // Function to handle modal close
@@ -255,13 +264,18 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
 
     // Add a new exercise
     const addNewExercise = async () => {
-        if (!selectedActivity && !isManualEntry) {
-            Alert.alert('Select Activity', 'Please select an activity from the list or use manual entry');
+        if (!selectedActivity && !isManualEntry && !isStepsEntry) {
+            Alert.alert('Select Activity', 'Please select an activity from the list, use manual entry, or log steps');
             return;
         }
 
         if (isManualEntry && !manualActivityName.trim()) {
             Alert.alert('Activity Name Required', 'Please enter a name for your activity');
+            return;
+        }
+
+        if (isStepsEntry && (!stepsCount.trim() || parseInt(stepsCount) <= 0)) {
+            Alert.alert('Steps Required', 'Please enter a valid number of steps');
             return;
         }
 
@@ -275,7 +289,17 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
             let activityName = '';
             let metValue = 0;
 
-            if (isManualEntry) {
+            if (isStepsEntry) {
+                // Handle steps entry
+                const steps = parseInt(stepsCount);
+
+                // Use BackgroundStepTracker to add steps - this will update database, internal state, and notify listeners
+                // The BackgroundStepTracker will handle creating the exercise entry automatically
+                await BackgroundStepTracker.addManualSteps(steps);
+
+                console.log(`Added ${steps} steps to step tracker`);
+
+            } else if (isManualEntry) {
                 metValue = parseFloat(manualMET) || 5.0;
                 activityName = manualActivityName.trim();
 
@@ -286,27 +310,41 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
 
                 // Formula: Exercise calories = (MET level of activity x 3.5 x Weight (kg) x minutes of activity) / 200
                 caloriesBurned = Math.round((metValue * intensityMultiplier * 3.5 * userWeight * duration) / 200);
+
+                // Get intensity multiplier for notes
+                let intensityMultiplierStr = "1.0";
+                if (exerciseIntensity === 'light') intensityMultiplierStr = "0.8";
+                if (exerciseIntensity === 'vigorous') intensityMultiplierStr = "1.2";
+
+                const exerciseData = {
+                    exercise_name: activityName,
+                    calories_burned: caloriesBurned,
+                    duration: duration,
+                    date: formattedDate,
+                    notes: `MET: ${metValue}, Intensity: ${exerciseIntensity} (${intensityMultiplierStr}x multiplier)`
+                };
+
+                await addExercise(exerciseData);
             } else {
                 caloriesBurned = calculateCaloriesBurned(selectedActivity!, duration, userWeight);
                 activityName = selectedActivity!.name;
                 metValue = selectedActivity!.met;
+
+                // Get intensity multiplier for notes
+                let intensityMultiplierStr = "1.0";
+                if (exerciseIntensity === 'light') intensityMultiplierStr = "0.8";
+                if (exerciseIntensity === 'vigorous') intensityMultiplierStr = "1.2";
+
+                const exerciseData = {
+                    exercise_name: activityName,
+                    calories_burned: caloriesBurned,
+                    duration: duration,
+                    date: formattedDate,
+                    notes: `MET: ${metValue}, Intensity: ${exerciseIntensity} (${intensityMultiplierStr}x multiplier)`
+                };
+
+                await addExercise(exerciseData);
             }
-
-            // Get intensity multiplier for notes
-            let intensityMultiplier = "1.0";
-            if (exerciseIntensity === 'light') intensityMultiplier = "0.8";
-            if (exerciseIntensity === 'vigorous') intensityMultiplier = "1.2";
-
-            const exerciseData = {
-                exercise_name: activityName,
-                calories_burned: caloriesBurned,
-                duration: duration,
-                date: formattedDate,
-                notes: `MET: ${metValue}, Intensity: ${exerciseIntensity} (${intensityMultiplier}x multiplier)`
-            };
-
-            const result = await addExercise(exerciseData);
-            console.log('Exercise added with ID:', result);
 
             // Reset form fields
             resetForm();
@@ -382,12 +420,14 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                     </MaskedView>
 
                     {/* Back arrow in header */}
-                    {(isManualEntry || selectedActivity) && (
+                    {(isManualEntry || selectedActivity || isStepsEntry) && (
                         <TouchableOpacity
                             style={styles.headerBackButton}
                             onPress={() => {
                                 if (isManualEntry) {
                                     setIsManualEntry(false);
+                                } else if (isStepsEntry) {
+                                    setIsStepsEntry(false);
                                 } else if (selectedActivity) {
                                     setSelectedActivity(null);
                                 }
@@ -413,8 +453,34 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         contentContainerStyle={styles.exerciseModalScrollContent}
                         showsVerticalScrollIndicator={false}
                     >
-                        {!selectedActivity && !isManualEntry ? (
+                        {!selectedActivity && !isManualEntry && !isStepsEntry ? (
                             <>
+                                {/* Steps Entry Card */}
+                                <TouchableOpacity
+                                    style={[styles.popularActivitiesWrapper, { marginBottom: 8 }]}
+                                    onPress={() => setIsStepsEntry(true)}
+                                >
+                                    <LinearGradient
+                                        colors={["#66BB6A", "#4CAF50", "#388E3C"]}
+                                        style={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            right: 0,
+                                            top: 0,
+                                            bottom: 0,
+                                            borderRadius: 10,
+                                        }}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                    />
+                                    <View style={[styles.popularActivitiesContainer, { padding: 16 }]}>
+                                        <View style={[styles.popularActivitiesHeader, { marginBottom: 0 }]}>
+                                            <Ionicons name="walk" size={24} color="#4CAF50" />
+                                            <Text style={[styles.popularActivitiesTitle, { color: '#4CAF50', fontWeight: 'bold' }]}>Add Steps</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+
                                 {/* Manual Entry Card */}
                                 <TouchableOpacity
                                     style={[styles.popularActivitiesWrapper, { marginBottom: 8 }]}
@@ -653,6 +719,117 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     </Text>
                                 </View>
                             </View>
+                        ) : isStepsEntry ? (
+                            /* Steps Entry Form */
+                            <View>
+                                {/* Header already has back button */}
+
+                                {/* Steps Header Card */}
+                                <View style={styles.exerciseHeaderCard}>
+                                    <View style={styles.exerciseIconContainer}>
+                                        <Ionicons
+                                            name="walk"
+                                            size={32}
+                                            color="#4CAF50"
+                                        />
+                                    </View>
+                                    <View style={styles.exerciseHeaderInfo}>
+                                        <Text style={styles.exerciseHeaderTitle}>Log Steps</Text>
+                                        <View style={[styles.exerciseMetBadge, { backgroundColor: 'rgba(76, 175, 80, 0.2)' }]}>
+                                            <Text style={[styles.exerciseMetText, { color: '#4CAF50' }]}>
+                                                WALKING • MODERATE
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Current Steps Display */}
+                                <View style={styles.configSection}>
+                                    <Text style={styles.configSectionTitle}>Current Steps Today</Text>
+                                    <View style={[styles.caloriesResult, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
+                                        <Text style={[styles.caloriesResultText, { color: '#4CAF50' }]}>
+                                            {todaySteps} steps
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Steps Input */}
+                                <View style={styles.configSection}>
+                                    <Text style={styles.configSectionTitle}>Steps to Add</Text>
+                                    <View style={styles.durationCardWrapper}>
+                                        <LinearGradient
+                                            colors={["#66BB6A", "#4CAF50", "#388E3C"]}
+                                            style={styles.durationCardGradient}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                        />
+                                        <View style={styles.durationCard}>
+                                            <View style={styles.durationInputWrapper}>
+                                                <TextInput
+                                                    style={styles.durationInput}
+                                                    keyboardType="number-pad"
+                                                    value={stepsCount}
+                                                    onChangeText={setStepsCount}
+                                                    placeholderTextColor={SUBDUED}
+                                                    placeholder="1000"
+                                                />
+                                                <Text style={styles.durationUnit}>steps</Text>
+                                            </View>
+                                            <View style={styles.durationPresets}>
+                                                {[500, 1000, 2000, 5000].map((steps, index) => (
+                                                    <TouchableOpacity
+                                                        key={index}
+                                                        style={[
+                                                            styles.durationPreset,
+                                                            stepsCount === steps.toString() && styles.durationPresetSelected
+                                                        ]}
+                                                        onPress={() => setStepsCount(steps.toString())}
+                                                    >
+                                                        <Text style={[
+                                                            styles.durationPresetText,
+                                                            stepsCount === steps.toString() && styles.durationPresetTextSelected
+                                                        ]}>
+                                                            {steps}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Calories Calculation */}
+                                <View style={styles.configSection}>
+                                    <View style={styles.caloriesCalculationCard}>
+                                        <View style={styles.caloriesHeader}>
+                                            <Ionicons name="flame" size={20} color={PURPLE_ACCENT} />
+                                            <Text style={styles.caloriesHeaderTitle}>Estimated Calories</Text>
+                                        </View>
+                                        <View style={styles.caloriesMainResult}>
+                                            <Text style={styles.caloriesNumber}>
+                                                {Math.round((parseInt(stepsCount) || 0) * 0.04 * (userWeight / 70))}
+                                            </Text>
+                                            <Text style={styles.caloriesUnit}>calories</Text>
+                                        </View>
+                                        <View style={styles.formulaContainer}>
+                                            <Text style={styles.formulaLabel}>Formula:</Text>
+                                            <Text style={styles.formulaText}>
+                                                {stepsCount || 0} steps × 0.04 × ({userWeight}kg ÷ 70kg)
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* New Total Display */}
+                                <View style={styles.configSection}>
+                                    <Text style={styles.configSectionTitle}>New Total</Text>
+                                    <View style={[styles.caloriesResult, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
+                                        <Text style={[styles.caloriesResultText, { color: '#4CAF50' }]}>
+                                            {todaySteps + (parseInt(stepsCount) || 0)} steps
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
                         ) : selectedActivity && (
                             <>
                                 {/* Header with Back Button */}
@@ -841,13 +1018,18 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     shadowRadius: 0,
                                     elevation: 0
                                 },
-                                (!selectedActivity && !isManualEntry) && { opacity: 0.5 },
-                                (isManualEntry && !manualActivityName.trim()) && { opacity: 0.5 }
+                                (!selectedActivity && !isManualEntry && !isStepsEntry) && { opacity: 0.5 },
+                                (isManualEntry && !manualActivityName.trim()) && { opacity: 0.5 },
+                                (isStepsEntry && (!stepsCount.trim() || parseInt(stepsCount) <= 0)) && { opacity: 0.5 }
                             ]}
                             onPress={addNewExercise}
-                            disabled={(!selectedActivity && !isManualEntry) || (isManualEntry && !manualActivityName.trim())}
+                            disabled={(!selectedActivity && !isManualEntry && !isStepsEntry) ||
+                                (isManualEntry && !manualActivityName.trim()) ||
+                                (isStepsEntry && (!stepsCount.trim() || parseInt(stepsCount) <= 0))}
                         >
-                            <Text style={[styles.modalButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>ADD EXERCISE</Text>
+                            <Text style={[styles.modalButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>
+                                {isStepsEntry ? 'ADD STEPS' : 'ADD EXERCISE'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>

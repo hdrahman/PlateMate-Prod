@@ -14,6 +14,7 @@ export interface UseStepTrackerResult {
     isTracking: boolean;
     startTracking: () => Promise<void>;
     stopTracking: () => void;
+    refreshStepData: () => Promise<void>;
     loading: boolean;
 }
 
@@ -104,6 +105,25 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         setIsTracking(false);
     };
 
+    // Refresh step data (useful when steps are manually added)
+    const refreshStepData = async () => {
+        try {
+            console.log('🔄 Refreshing step data...');
+            
+            // Get updated today's steps
+            const steps = await BackgroundStepTracker.getTodaySteps();
+            setTodaySteps(steps);
+
+            // Get updated step history
+            const history = await BackgroundStepTracker.getStepHistory(historyDays);
+            setStepHistory(history);
+            
+            console.log('✅ Step data refreshed');
+        } catch (error) {
+            console.error('❌ Error refreshing step data:', error);
+        }
+    };
+
     return {
         todaySteps,
         stepHistory,
@@ -111,6 +131,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         isTracking,
         startTracking,
         stopTracking,
+        refreshStepData,
         loading
     };
 } 

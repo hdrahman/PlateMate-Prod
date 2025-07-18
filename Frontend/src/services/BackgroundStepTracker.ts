@@ -1,7 +1,7 @@
 import { Platform, PermissionsAndroid, DeviceEventEmitter, NativeEventEmitter, NativeModules, AppState, AppStateStatus } from 'react-native';
 import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateTodaySteps, getStepsForDate } from '../utils/database';
+import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../utils/database';
 import { registerStepBackgroundTask, unregisterStepBackgroundTask } from '../tasks/StepCountTask';
 import PersistentStepTracker from './PersistentStepTracker';
 import { showStepTrackingPermissionAlert, showBackgroundFetchAlert } from '../utils/stepTrackingPermissions';
@@ -87,7 +87,14 @@ class BackgroundStepTracker {
             // 1a) Immediately persist today's step count if it hasn't been synced yet
             try {
                 if (this.lastSyncStepCount !== this.lastStepCount) {
+                    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
                     await updateTodaySteps(this.lastStepCount);
+                    
+                    // Also sync with exercise log (only if steps > 0)
+                    if (this.lastStepCount > 0) {
+                        await syncStepsWithExerciseLog(this.lastStepCount, today);
+                    }
+                    
                     this.lastSyncStepCount = this.lastStepCount;
                     await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastSyncStepCount.toString());
                 }
@@ -585,13 +592,19 @@ class BackgroundStepTracker {
     private async smartSyncToDatabase() {
         try {
             const stepDifference = Math.abs(this.lastStepCount - this.lastSyncStepCount);
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
             await updateTodaySteps(this.lastStepCount);
+
+            // Also sync with exercise log (only if steps > 0)
+            if (this.lastStepCount > 0) {
+                await syncStepsWithExerciseLog(this.lastStepCount, today);
+            }
 
             this.lastSyncStepCount = this.lastStepCount;
             await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastStepCount.toString());
 
-            console.log(`📊 Steps synced to database: ${this.lastStepCount} (difference: ${stepDifference})`);
+            console.log(`📊 Steps synced to database and exercise log: ${this.lastStepCount} (difference: ${stepDifference})`);
         } catch (error) {
             console.error('Error syncing steps to database:', error);
         }
@@ -600,12 +613,19 @@ class BackgroundStepTracker {
     private async syncStepsToDatabase() {
         // Force sync regardless of threshold (used when app goes to background)
         try {
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+            
             await updateTodaySteps(this.lastStepCount);
+
+            // Also sync with exercise log (only if steps > 0)
+            if (this.lastStepCount > 0) {
+                await syncStepsWithExerciseLog(this.lastStepCount, today);
+            }
 
             this.lastSyncStepCount = this.lastStepCount;
             await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastStepCount.toString());
 
-            console.log(`📊 Steps force synced to database: ${this.lastStepCount}`);
+            console.log(`📊 Steps force synced to database and exercise log: ${this.lastStepCount}`);
         } catch (error) {
             console.error('Error force syncing steps to database:', error);
         }
@@ -760,7 +780,13 @@ class BackgroundStepTracker {
                 await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, finalStepCount.toString());
                 
                 // Sync to database
+                const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
                 await updateTodaySteps(finalStepCount);
+                
+                // Also sync with exercise log (only if steps > 0)
+                if (finalStepCount > 0) {
+                    await syncStepsWithExerciseLog(finalStepCount, today);
+                }
                 
                 // Notify listeners
                 this.notifyListeners(finalStepCount);
@@ -828,6 +854,46 @@ class BackgroundStepTracker {
         } catch (error) {
             console.error('❌ Manual step sync failed:', error);
             return false;
+        }
+    }
+
+    /**
+     * Add steps manually and update all tracking systems
+     * This is used when user manually adds steps through the exercise modal
+     */
+    async addManualSteps(stepsToAdd: number) {
+        try {
+            console.log(`🚶 Adding ${stepsToAdd} manual steps...`);
+            
+            // Get current step count from database (source of truth)
+            const today = new Date().toISOString().split('T')[0];
+            const currentSteps = await getStepsForDate(today);
+            const newStepCount = currentSteps + stepsToAdd;
+            
+            // Update internal state
+            this.lastStepCount = newStepCount;
+            this.lastSyncStepCount = newStepCount;
+            
+            // Update AsyncStorage
+            await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, newStepCount.toString());
+            await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, newStepCount.toString());
+            
+            // Update database
+            await updateTodaySteps(newStepCount);
+            
+            // Sync with exercise log
+            if (newStepCount > 0) {
+                await syncStepsWithExerciseLog(newStepCount, today);
+            }
+            
+            // Notify all listeners (this will update the home screen)
+            this.notifyListeners(newStepCount);
+            
+            console.log(`✅ Manual steps added: ${stepsToAdd}, new total: ${newStepCount}`);
+            return newStepCount;
+        } catch (error) {
+            console.error('❌ Error adding manual steps:', error);
+            throw error;
         }
     }
 }
