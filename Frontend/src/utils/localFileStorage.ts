@@ -35,17 +35,13 @@ export const saveImageLocally = async (imageUri: string, userId: string): Promis
         const filename = generateUniqueFilename(userId);
         const localPath = `${MEAL_IMAGES_DIR}${filename}`;
 
-        // Optimize image while maintaining high quality for AI analysis
+        // Since images are already optimized by optimizeImage() function,
+        // just copy directly without additional compression to preserve quality
         let optimizedImage;
         try {
-            optimizedImage = await manipulateAsync(
-                imageUri,
-                [{ resize: { width: 1500 } }], // Increased resolution for better AI analysis
-                {
-                    compress: 0.98, // Higher quality (98% vs 95%)
-                    format: SaveFormat.JPEG
-                }
-            );
+            // No additional processing needed - use the already optimized image
+            optimizedImage = { uri: imageUri };
+            console.log('✅ Using pre-optimized image for local storage (no additional compression)');
         } catch (manipulateError) {
             console.warn('⚠️ Image manipulation failed, using original image:', manipulateError);
             // If image manipulation fails, create a fallback object with the original URI

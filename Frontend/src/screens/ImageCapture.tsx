@@ -142,13 +142,13 @@ const ImageCapture: React.FC = () => {
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
-            console.log('Optimizing image for maximum quality...');
+            console.log('Optimizing image for maximum quality (single compression point)...');
             // Get image info first to avoid unnecessary resizing
             const imageInfo = await ImageManipulator.manipulateAsync(uri, []);
-            
+
             // Only resize if extremely large (>3000px) to prevent memory issues and preserve quality
             const resizeTransforms = imageInfo.width > 3000 ? [{ resize: { width: 3000 } }] : [];
-            
+
             const manipResult = await ImageManipulator.manipulateAsync(
                 uri,
                 resizeTransforms, // Only resize if necessary

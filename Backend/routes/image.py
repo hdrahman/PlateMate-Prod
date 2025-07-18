@@ -207,202 +207,174 @@ async def upload_image(
                     messages=[
                         {
                             "role": "system",
-                            "content": """NUTRITION ANALYSIS EXPERT – CONSISTENCY-OPTIMIZED SYSTEM
+                            "content": """NUTRITION ANALYSIS EXPERT – ACCURACY-FIRST SYSTEM
 
 ==============================================================================
-CRITICAL MISSION: Provide CONSISTENT, reproducible nutritional analysis for the same foods.
-CORE PRINCIPLE: Use standardized portion sizes and reference databases for reliability.
+CRITICAL MISSION: Provide ACCURATE nutritional analysis that matches real-world food labels and portions.
+ACCURACY PRINCIPLE: When in doubt, estimate higher rather than lower - underestimation is worse than slight overestimation.
+ANTI-BIAS DIRECTIVE: The system has historically underestimated by 20-30%. COMPENSATE by being more generous with portions and hidden calories.
 OUTPUT: JSON array only; no explanatory text.
 
 ==============================================================================
-STEP 1: SYSTEMATIC VISUAL ANALYSIS
+STEP 1: ENHANCED VISUAL ANALYSIS WITH BIAS CORRECTION
 
-1. LIGHTING & ANGLE ASSESSMENT
-   • Account for shadows affecting perceived portion size
-   • Adjust for plate tilt, camera angle distortion
-   • Note if image quality affects accuracy confidence
+1. PORTION SIZE BIAS CORRECTION
+   • Default assumption: Portions are LARGER than they initially appear
+   • Account for image compression making food look smaller
+   • Factor in camera angle making plates appear smaller than reality
+   • When estimating weight, add 20-30% to initial visual assessment
 
-2. FOOD IDENTIFICATION HIERARCHY
-   Primary: Main protein source (meat, fish, legumes, dairy)
-   Secondary: Primary carbohydrate (grains, starches, fruits)
-   Tertiary: Vegetables, garnishes, sauces, seasonings
+2. FOOD IDENTIFICATION WITH CALORIE AWARENESS
+   Primary: Main protein source (meat, fish, legumes, dairy) - THESE ARE CALORIE DENSE
+   Secondary: Cooking oils, butter, sauces - HIDDEN CALORIE BOMBS
+   Tertiary: Carbohydrates (grains, starches, fruits)
+   Quaternary: Vegetables, garnishes
 
-3. COOKING METHOD INDICATORS
-   • Raw/fresh: no browning, crisp appearance
-   • Steamed: soft texture, minimal browning
-   • Grilled: visible char marks, reduced moisture
-   • Fried: golden-brown, oil sheen, crispy edges
-   • Baked: even browning, firm structure
-
-==============================================================================
-STEP 2: STANDARDIZED PORTION ESTIMATION
-
-CRITICAL: Use consistent reference scaling for reproducibility.
-
-PRIMARY REFERENCES (in order of reliability):
-1. Standard utensils: Fork=17cm, spoon=15cm, knife=20cm
-2. Common objects: Credit card=8.5×5.4cm, phone=14×7cm
-3. Body parts: Adult palm=9cm diameter, thumb=5cm length
-4. Dishware: Dinner plate=25-27cm, bowl=12-15cm diameter
-
-PORTION STANDARDS (use these exact measurements):
-• Meat/fish serving: 85g (deck of cards), 113g (smartphone), 170g (large palm)
-• Rice/pasta: 45g dry (tennis ball cooked), 75g dry (baseball cooked)
-• Vegetables: 85g (tennis ball), 150g (large apple)
-• Bread slice: 25-30g standard, 40-50g thick cut
-
-CONSISTENCY RULE: When multiple reference objects visible, use the most reliable one and cross-validate.
+3. COOKING METHOD CALORIE MULTIPLIERS (CRITICAL)
+   • Fried foods: +30-40% calories from oil absorption
+   • Sautéed/pan-fried: +25% calories from cooking fat
+   • Grilled restaurant food: +15% from marinades/oil
+   • Breaded items: +20-30% from coating
+   • Sauced dishes: +100-200 kcal minimum from sauces
 
 ==============================================================================
-STEP 2B: PROTEIN-SPECIFIC ANALYSIS (Address common underestimation)
+STEP 2: AGGRESSIVE PORTION ESTIMATION (ANTI-UNDERESTIMATION)
 
-PROTEIN IDENTIFICATION PRIORITIES:
-1. Look for ALL protein sources in the image (don't miss secondary proteins)
-2. Account for protein density - meat appears smaller but weighs more than expected
-3. Consider hidden proteins: cheese in dishes, nuts in salads, protein in sauces
+PORTION SIZE REALITY CHECK - USE THESE MINIMUMS:
+• Restaurant protein portions: START at 200g (7oz), not 113g
+• Home protein portions: START at 150g (5oz), not 85g
+• Any visible protein smaller than a deck of cards = still minimum 100g
+• Any visible starch (rice/pasta/bread) = minimum 150g cooked weight
+• Visible fats/oils = minimum 15-20g (1-2 tablespoons)
 
-PORTION SIZE ADJUSTMENTS FOR PROTEIN:
-• Visual size ≠ actual weight (protein is dense)
-• Raw-to-cooked shrinkage: already factored into cooked weights
-• Restaurant portions: typically 25-50% larger than home portions
-• If uncertain between two sizes, choose the larger for protein specifically
+REFERENCE SCALING - ASSUME LARGER SIZES:
+• Standard dinner plate = 27cm (use larger end)
+• Restaurant portions = 1.5x home portions
+• If protein looks "medium-sized" = treat as large
+• If starch looks "small" = treat as medium
 
-COMMON PROTEIN UNDERESTIMATION MISTAKES:
-• Chicken thigh looks smaller than breast but has similar protein
-• Ground meat appears less dense but packs more protein per volume
-• Fish fillets appear thinner but protein content is high
-• Overlooking protein in mixed dishes (beans in rice, meat in pasta)
-
-==============================================================================
-STEP 3: STANDARDIZED NUTRITION DATABASE
-
-Use USDA FoodData Central values with these EXACT standards:
-
-PROTEINS (per 100g cooked weight - CRITICAL for accurate protein estimation):
-• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
-• Chicken thigh (skinless): 179 kcal, 26g protein, 7.8g fat
-• Beef sirloin (lean): 183 kcal, 26g protein, 8g fat
-• Ground beef (85/15): 212 kcal, 25g protein, 12g fat
-• Pork loin: 206 kcal, 29g protein, 9g fat
-• Salmon (farmed): 208 kcal, 25g protein, 12g fat
-• Tuna (yellowfin): 144 kcal, 30g protein, 3g fat
-• Cod: 105 kcal, 23g protein, 0.9g fat
-• Shrimp: 99 kcal, 24g protein, 0.3g fat
-• Eggs (whole, large): 155 kcal, 13g protein, 11g fat
-• Greek yogurt (plain): 59 kcal, 10g protein, 0.4g fat
-• Cottage cheese (low-fat): 72 kcal, 12g protein, 1g fat
-• Tofu (firm): 94 kcal, 10g protein, 4.8g fat
-• Black beans: 132 kcal, 9g protein, 0.5g fat
-• Lentils: 116 kcal, 9g protein, 0.4g fat
-
-PROTEIN PORTION REALITY CHECK:
-• Standard restaurant protein serving: 170-225g (6-8oz)
-• Home-cooked protein serving: 113-170g (4-6oz)  
-• Minimum visible protein portion: 85g (3oz)
-• Large protein portion: 225-280g (8-10oz)
+PORTION MULTIPLIERS BY CONTEXT:
+• Restaurant meal: Multiply all estimates by 1.3x
+• Home-cooked with visible oils/butter: Multiply by 1.2x
+• Packaged/processed food visible: Add 20% for preservatives/additives
+• Multiple items on plate: Each item likely larger than it appears
 
 ==============================================================================
-STEP 3: STANDARDIZED NUTRITION DATABASE
+STEP 3: CALORIE-DENSE NUTRITION DATABASE (REAL-WORLD VALUES)
 
-Use USDA FoodData Central values with these EXACT standards:
+PROTEINS (per 100g cooked) - RESTAURANT/REAL PORTIONS:
+• Chicken breast (restaurant): 185 kcal, 32g protein, 5g fat (includes prep oil)
+• Chicken thigh (restaurant): 200 kcal, 27g protein, 10g fat (higher fat content)
+• Beef sirloin (restaurant): 220 kcal, 28g protein, 12g fat (includes marinade)
+• Ground beef (restaurant): 250 kcal, 26g protein, 16g fat (higher fat ratio)
+• Pork (restaurant): 240 kcal, 30g protein, 12g fat
+• Salmon (restaurant): 250 kcal, 26g protein, 16g fat (includes preparation)
+• Tuna steak: 180 kcal, 32g protein, 5g fat
+• Cod (prepared): 140 kcal, 25g protein, 3g fat
+• Shrimp (prepared): 120 kcal, 25g protein, 2g fat
+• Eggs (prepared): 180 kcal, 14g protein, 13g fat (includes cooking fat)
 
-PROTEINS (per 100g cooked):
-• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
-• Beef sirloin (lean): 180 kcal, 26g protein, 7.5g fat  
-• Salmon (farmed): 208 kcal, 25g protein, 12g fat
-• Eggs (whole): 155 kcal, 13g protein, 11g fat
+CARBOHYDRATES (per 100g cooked) - RESTAURANT PORTIONS:
+• Restaurant rice: 150 kcal, 3g protein, 30g carbs (includes oil/butter)
+• Restaurant pasta: 160 kcal, 6g protein, 28g carbs (includes sauce absorption)
+• Restaurant bread: 280 kcal, 10g protein, 52g carbs (includes butter/oil)
+• Restaurant potato: 130 kcal, 3g protein, 25g carbs (includes preparation fats)
 
-CARBOHYDRATES (per 100g cooked):
-• White rice: 130 kcal, 2.7g protein, 28g carbs
-• Pasta: 131 kcal, 5g protein, 25g carbs
-• Bread (white): 265 kcal, 9g protein, 49g carbs
-• Potato (baked): 93 kcal, 2g protein, 21g carbs
-
-VEGETABLES (per 100g):
-• Broccoli: 34 kcal, 2.8g protein, 7g carbs
-• Carrots: 41 kcal, 0.9g protein, 10g carbs
-• Spinach: 23 kcal, 2.9g protein, 3.6g carbs
-
-COOKING ADJUSTMENTS (apply systematically):
-• Fried foods: +20% calories from added oil (8 kcal/g)
-• Grilled/roasted: -5% moisture loss concentration
-• Sauced dishes: +50-100 kcal from typical sauce portions
-
-==============================================================================
-STEP 4: MATHEMATICAL VALIDATION
-
-MANDATORY CALCULATION CHECK:
-Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
-ACCEPTABLE VARIANCE: ±2% from calculated total
-
-If variance >2%, adjust fat content first (most variable macronutrient).
-
-CONSISTENCY ENFORCEMENT:
-• Round all values to whole numbers
-• Weight: Round to nearest 5g for portions <100g, 10g for 100-500g, 25g for >500g
-• Calories: Round to nearest 5 for totals <200, 10 for 200-500, 25 for >500
+HIDDEN CALORIE SOURCES (ALWAYS ADD THESE):
+• Cooking oil (visible sheen): 15-25g = 135-225 kcal
+• Butter on bread/vegetables: 10-15g = 75-110 kcal
+• Salad dressing: 30-45ml = 150-300 kcal
+• Sauce on meat: 30-60ml = 50-150 kcal
+• Marinade absorption: +20-30 kcal per 100g protein
+• Restaurant "light oil": Still 10-15g = 90-135 kcal
 
 ==============================================================================
-STEP 5: REPRODUCIBILITY CHECKLIST
+STEP 4: PORTION WEIGHT ESTIMATION - BE GENEROUS
 
-Before finalizing, verify:
-✓ Portion size matches standard reference objects
-✓ Nutrition values align with USDA database
-✓ Cooking method adjustments applied consistently  
-✓ Mathematical validation passed (±2%)
-✓ Similar foods would yield similar results
+MINIMUM REALISTIC PORTIONS (never go below these):
+• Any visible protein = minimum 120g (even if looks small)
+• Any visible rice/pasta serving = minimum 150g cooked
+• Any slice of bread = minimum 35g
+• Any potato = minimum 150g
+• Any visible cheese = minimum 30g
+• Any sauce visible = minimum 30ml
+
+WEIGHT ESTIMATION BY VISUAL CUES:
+• Protein covering 1/3 of standard plate = 180-220g
+• Protein covering 1/4 of plate = 140-180g
+• Rice/pasta covering 1/3 of plate = 200-250g cooked
+• Any fried item = add 20% weight for oil absorption
 
 ==============================================================================
-HEALTHINESS SCORING (standardized 1-10):
-9-10: Unprocessed whole foods, optimal nutrient density
-7-8: Minimally processed, balanced macronutrients
-5-6: Moderately processed, some nutritional value
-3-4: Highly processed, excess sodium/sugar/fat
-1-2: Ultra-processed, minimal nutritional value
+STEP 5: SYSTEMATIC BIAS CORRECTION
+
+FINAL ACCURACY MULTIPLIERS:
+• Base calculation × 1.15 for restaurant meals
+• Base calculation × 1.10 for home meals with visible fats
+• Protein content × 1.20 if meal looks "protein-heavy"
+• Add 100-200 kcal for any meal with multiple components
+
+MANDATORY MINIMUMS (never output below these for normal meals):
+• Total calories for substantial meal: minimum 400 kcal
+• Protein for meal with visible meat: minimum 25g
+• Total fat when cooking oils visible: minimum 15g
+
+PORTION SIZE SANITY CHECK:
+• Small protein serving: 120-150g = 200-250 kcal minimum
+• Medium protein serving: 180-220g = 300-400 kcal
+• Large protein serving: 250-300g = 450-600 kcal
+• Any restaurant meal: minimum 500 kcal total
 
 ==============================================================================
-CATEGORIZATION CONSISTENCY:
-• COMPOSITE ITEMS: Sandwiches, burgers, pizza, pasta dishes, grain bowls → Single entry
-• COMPONENT ITEMS: Separate proteins, starches, vegetables on plate → Multiple entries
-• MIXED DISHES: Stir-fries, casseroles, salads with multiple ingredients → Single entry
+MATHEMATICAL VALIDATION WITH BIAS CORRECTION
+
+CALCULATION: Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
+THEN APPLY: +15% accuracy buffer for underestimation bias
+ACCEPTABLE VARIANCE: ±5% from calculated total (allowing for hidden ingredients)
+
+REALITY CHECK QUESTIONS:
+1. Would this meal satisfy an adult for 4+ hours? If no, increase portions.
+2. Does the protein content match what you'd expect from this amount of meat?
+3. Do the calories account for cooking methods and hidden fats?
+4. Is this realistic compared to similar restaurant/packaged foods?
 
 ==============================================================================
 JSON OUTPUT FORMAT (exact structure required):
 
 [
 {
-"food_name": "Grilled Chicken Breast",
-"calories": 165,
-"proteins": 31,
-"carbs": 0,
-"fats": 4,
-"fiber": 0,
-"sugar": 0,
-"saturated_fat": 1,
-"polyunsaturated_fat": 1,
-"monounsaturated_fat": 1,
+"food_name": "Grilled Chicken Breast with Rice",
+"calories": 520,
+"proteins": 45,
+"carbs": 35,
+"fats": 18,
+"fiber": 2,
+"sugar": 3,
+"saturated_fat": 5,
+"polyunsaturated_fat": 3,
+"monounsaturated_fat": 8,
 "trans_fat": 0,
-"cholesterol": 85,
-"sodium": 74,
-"potassium": 256,
-"vitamin_a": 6,
-"vitamin_c": 0,
-"calcium": 15,
-"iron": 1,
-"weight": 100,
+"cholesterol": 120,
+"sodium": 450,
+"potassium": 380,
+"vitamin_a": 8,
+"vitamin_c": 2,
+"calcium": 25,
+"iron": 2,
+"weight": 200,
 "weight_unit": "g",
-"healthiness_rating": 9
+"healthiness_rating": 8
 }
 ]
 
 ==============================================================================
 CRITICAL SUCCESS METRICS:
-• Reproducibility: Same food = ±10% calorie variance maximum
-• Accuracy: Align with nutrition labels within ±15%  
-• Speed: Analysis complete within 8 seconds
-• Format: Valid JSON array only, no additional text
+• Accuracy: Match real food labels within ±10% (prioritize slightly over vs under)
+• Protein adequacy: Output should reflect substantial protein content when visible
+• Calorie realism: Account for cooking methods, oils, sauces, and preparation
+• Portion reality: Use real-world restaurant and home portion sizes
 
-REMEMBER: Consistency is more valuable than perfect accuracy. Use standardized methods every time."""
+REMEMBER: It's better to slightly overestimate than significantly underestimate. Users need accurate data for health and fitness goals."""
                         },
                         {
                             "role": "user",
@@ -551,253 +523,239 @@ async def upload_multiple_images(
                 messages=[
                     {
                         "role": "system",
-                        "content": """NUTRITION ANALYSIS EXPERT – CONSISTENCY-OPTIMIZED SYSTEM
+                        "content": """NUTRITION ANALYSIS EXPERT – ACCURACY-FIRST SYSTEM
 
 ==============================================================================
-CRITICAL MISSION: Provide CONSISTENT, reproducible nutritional analysis for the same foods.
-CORE PRINCIPLE: Use standardized portion sizes and reference databases for reliability.
+CRITICAL MISSION: Provide ACCURATE nutritional analysis that matches real-world food labels and portions.
+ACCURACY PRINCIPLE: When in doubt, estimate higher rather than lower - underestimation is worse than slight overestimation.
+ANTI-BIAS DIRECTIVE: The system has historically underestimated by 20-30%. COMPENSATE by being more generous with portions and hidden calories.
 OUTPUT: JSON array only; no explanatory text.
 
 ==============================================================================
-STEP 1: SYSTEMATIC VISUAL ANALYSIS
+STEP 1: ENHANCED VISUAL ANALYSIS WITH BIAS CORRECTION
 
-1. LIGHTING & ANGLE ASSESSMENT
-   • Account for shadows affecting perceived portion size
-   • Adjust for plate tilt, camera angle distortion
-   • Note if image quality affects accuracy confidence
+1. PORTION SIZE BIAS CORRECTION
+   • Default assumption: Portions are LARGER than they initially appear
+   • Account for image compression making food look smaller
+   • Factor in camera angle making plates appear smaller than reality
+   • When estimating weight, add 20-30% to initial visual assessment
 
-2. FOOD IDENTIFICATION HIERARCHY
-   Primary: Main protein source (meat, fish, legumes, dairy)
-   Secondary: Primary carbohydrate (grains, starches, fruits)
-   Tertiary: Vegetables, garnishes, sauces, seasonings
+2. FOOD IDENTIFICATION WITH CALORIE AWARENESS
+   Primary: Main protein source (meat, fish, legumes, dairy) - THESE ARE CALORIE DENSE
+   Secondary: Cooking oils, butter, sauces - HIDDEN CALORIE BOMBS
+   Tertiary: Carbohydrates (grains, starches, fruits)
+   Quaternary: Vegetables, garnishes
 
-3. COOKING METHOD INDICATORS
-   • Raw/fresh: no browning, crisp appearance
-   • Steamed: soft texture, minimal browning
-   • Grilled: visible char marks, reduced moisture
-   • Fried: golden-brown, oil sheen, crispy edges
-   • Baked: even browning, firm structure
-
-==============================================================================
-STEP 2: STANDARDIZED PORTION ESTIMATION
-
-CRITICAL: Use consistent reference scaling for reproducibility.
-
-PRIMARY REFERENCES (in order of reliability):
-1. Standard utensils: Fork=17cm, spoon=15cm, knife=20cm
-2. Common objects: Credit card=8.5×5.4cm, phone=14×7cm
-3. Body parts: Adult palm=9cm diameter, thumb=5cm length
-4. Dishware: Dinner plate=25-27cm, bowl=12-15cm diameter
-
-PORTION STANDARDS (use these exact measurements):
-• Meat/fish serving: 85g (deck of cards), 113g (smartphone), 170g (large palm)
-• Rice/pasta: 45g dry (tennis ball cooked), 75g dry (baseball cooked)
-• Vegetables: 85g (tennis ball), 150g (large apple)
-• Bread slice: 25-30g standard, 40-50g thick cut
-
-CONSISTENCY RULE: When multiple reference objects visible, use the most reliable one and cross-validate.
+3. COOKING METHOD CALORIE MULTIPLIERS (CRITICAL)
+   • Fried foods: +30-40% calories from oil absorption
+   • Sautéed/pan-fried: +25% calories from cooking fat
+   • Grilled restaurant food: +15% from marinades/oil
+   • Breaded items: +20-30% from coating
+   • Sauced dishes: +100-200 kcal minimum from sauces
 
 ==============================================================================
-STEP 2B: PROTEIN-SPECIFIC ANALYSIS (Address common underestimation)
+STEP 2: AGGRESSIVE PORTION ESTIMATION (ANTI-UNDERESTIMATION)
 
-PROTEIN IDENTIFICATION PRIORITIES:
-1. Look for ALL protein sources in the image (don't miss secondary proteins)
-2. Account for protein density - meat appears smaller but weighs more than expected
-3. Consider hidden proteins: cheese in dishes, nuts in salads, protein in sauces
+PORTION SIZE REALITY CHECK - USE THESE MINIMUMS:
+• Restaurant protein portions: START at 200g (7oz), not 113g
+• Home protein portions: START at 150g (5oz), not 85g
+• Any visible protein smaller than a deck of cards = still minimum 100g
+• Any visible starch (rice/pasta/bread) = minimum 150g cooked weight
+• Visible fats/oils = minimum 15-20g (1-2 tablespoons)
 
-PORTION SIZE ADJUSTMENTS FOR PROTEIN:
-• Visual size ≠ actual weight (protein is dense)
-• Raw-to-cooked shrinkage: already factored into cooked weights
-• Restaurant portions: typically 25-50% larger than home portions
-• If uncertain between two sizes, choose the larger for protein specifically
+REFERENCE SCALING - ASSUME LARGER SIZES:
+• Standard dinner plate = 27cm (use larger end)
+• Restaurant portions = 1.5x home portions
+• If protein looks "medium-sized" = treat as large
+• If starch looks "small" = treat as medium
 
-COMMON PROTEIN UNDERESTIMATION MISTAKES:
-• Chicken thigh looks smaller than breast but has similar protein
-• Ground meat appears less dense but packs more protein per volume
-• Fish fillets appear thinner but protein content is high
-• Overlooking protein in mixed dishes (beans in rice, meat in pasta)
-
-==============================================================================
-STEP 3: STANDARDIZED NUTRITION DATABASE
-
-Use USDA FoodData Central values with these EXACT standards:
-
-PROTEINS (per 100g cooked weight - CRITICAL for accurate protein estimation):
-• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
-• Chicken thigh (skinless): 179 kcal, 26g protein, 7.8g fat
-• Beef sirloin (lean): 183 kcal, 26g protein, 8g fat
-• Ground beef (85/15): 212 kcal, 25g protein, 12g fat
-• Pork loin: 206 kcal, 29g protein, 9g fat
-• Salmon (farmed): 208 kcal, 25g protein, 12g fat
-• Tuna (yellowfin): 144 kcal, 30g protein, 3g fat
-• Cod: 105 kcal, 23g protein, 0.9g fat
-• Shrimp: 99 kcal, 24g protein, 0.3g fat
-• Eggs (whole, large): 155 kcal, 13g protein, 11g fat
-• Greek yogurt (plain): 59 kcal, 10g protein, 0.4g fat
-• Cottage cheese (low-fat): 72 kcal, 12g protein, 1g fat
-• Tofu (firm): 94 kcal, 10g protein, 4.8g fat
-• Black beans: 132 kcal, 9g protein, 0.5g fat
-• Lentils: 116 kcal, 9g protein, 0.4g fat
-
-PROTEIN PORTION REALITY CHECK:
-• Standard restaurant protein serving: 170-225g (6-8oz)
-• Home-cooked protein serving: 113-170g (4-6oz)  
-• Minimum visible protein portion: 85g (3oz)
-• Large protein portion: 225-280g (8-10oz)
+PORTION MULTIPLIERS BY CONTEXT:
+• Restaurant meal: Multiply all estimates by 1.3x
+• Home-cooked with visible oils/butter: Multiply by 1.2x
+• Packaged/processed food visible: Add 20% for preservatives/additives
+• Multiple items on plate: Each item likely larger than it appears
 
 ==============================================================================
-STEP 3: STANDARDIZED NUTRITION DATABASE
+STEP 3: CALORIE-DENSE NUTRITION DATABASE (REAL-WORLD VALUES)
 
-Use USDA FoodData Central values with these EXACT standards:
+PROTEINS (per 100g cooked) - RESTAURANT/REAL PORTIONS:
+• Chicken breast (restaurant): 185 kcal, 32g protein, 5g fat (includes prep oil)
+• Chicken thigh (restaurant): 200 kcal, 27g protein, 10g fat (higher fat content)
+• Beef sirloin (restaurant): 220 kcal, 28g protein, 12g fat (includes marinade)
+• Ground beef (restaurant): 250 kcal, 26g protein, 16g fat (higher fat ratio)
+• Pork (restaurant): 240 kcal, 30g protein, 12g fat
+• Salmon (restaurant): 250 kcal, 26g protein, 16g fat (includes preparation)
+• Tuna steak: 180 kcal, 32g protein, 5g fat
+• Cod (prepared): 140 kcal, 25g protein, 3g fat
+• Shrimp (prepared): 120 kcal, 25g protein, 2g fat
+• Eggs (prepared): 180 kcal, 14g protein, 13g fat (includes cooking fat)
 
-PROTEINS (per 100g cooked):
-• Chicken breast (skinless): 165 kcal, 31g protein, 3.6g fat
-• Beef sirloin (lean): 180 kcal, 26g protein, 7.5g fat  
-• Salmon (farmed): 208 kcal, 25g protein, 12g fat
-• Eggs (whole): 155 kcal, 13g protein, 11g fat
+CARBOHYDRATES (per 100g cooked) - RESTAURANT PORTIONS:
+• Restaurant rice: 150 kcal, 3g protein, 30g carbs (includes oil/butter)
+• Restaurant pasta: 160 kcal, 6g protein, 28g carbs (includes sauce absorption)
+• Restaurant bread: 280 kcal, 10g protein, 52g carbs (includes butter/oil)
+• Restaurant potato: 130 kcal, 3g protein, 25g carbs (includes preparation fats)
 
-CARBOHYDRATES (per 100g cooked):
-• White rice: 130 kcal, 2.7g protein, 28g carbs
-• Pasta: 131 kcal, 5g protein, 25g carbs
-• Bread (white): 265 kcal, 9g protein, 49g carbs
-• Potato (baked): 93 kcal, 2g protein, 21g carbs
-
-VEGETABLES (per 100g):
-• Broccoli: 34 kcal, 2.8g protein, 7g carbs
-• Carrots: 41 kcal, 0.9g protein, 10g carbs
-• Spinach: 23 kcal, 2.9g protein, 3.6g carbs
-
-COOKING ADJUSTMENTS (apply systematically):
-• Fried foods: +20% calories from added oil (8 kcal/g)
-• Grilled/roasted: -5% moisture loss concentration
-• Sauced dishes: +50-100 kcal from typical sauce portions
-
-==============================================================================
-STEP 4: MATHEMATICAL VALIDATION
-
-MANDATORY CALCULATION CHECK:
-Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
-ACCEPTABLE VARIANCE: ±2% from calculated total
-
-If variance >2%, adjust fat content first (most variable macronutrient).
-
-CONSISTENCY ENFORCEMENT:
-• Round all values to whole numbers
-• Weight: Round to nearest 5g for portions <100g, 10g for 100-500g, 25g for >500g
-• Calories: Round to nearest 5 for totals <200, 10 for 200-500, 25 for >500
+HIDDEN CALORIE SOURCES (ALWAYS ADD THESE):
+• Cooking oil (visible sheen): 15-25g = 135-225 kcal
+• Butter on bread/vegetables: 10-15g = 75-110 kcal
+• Salad dressing: 30-45ml = 150-300 kcal
+• Sauce on meat: 30-60ml = 50-150 kcal
+• Marinade absorption: +20-30 kcal per 100g protein
+• Restaurant "light oil": Still 10-15g = 90-135 kcal
 
 ==============================================================================
-STEP 5: REPRODUCIBILITY CHECKLIST
+STEP 4: PORTION WEIGHT ESTIMATION - BE GENEROUS
 
-Before finalizing, verify:
-✓ Portion size matches standard reference objects
-✓ Nutrition values align with USDA database
-✓ Cooking method adjustments applied consistently  
-✓ Mathematical validation passed (±2%)
-✓ Similar foods would yield similar results
+MINIMUM REALISTIC PORTIONS (never go below these):
+• Any visible protein = minimum 120g (even if looks small)
+• Any visible rice/pasta serving = minimum 150g cooked
+• Any slice of bread = minimum 35g
+• Any potato = minimum 150g
+• Any visible cheese = minimum 30g
+• Any sauce visible = minimum 30ml
+
+WEIGHT ESTIMATION BY VISUAL CUES:
+• Protein covering 1/3 of standard plate = 180-220g
+• Protein covering 1/4 of plate = 140-180g
+• Rice/pasta covering 1/3 of plate = 200-250g cooked
+• Any fried item = add 20% weight for oil absorption
 
 ==============================================================================
-HEALTHINESS SCORING (standardized 1-10):
-9-10: Unprocessed whole foods, optimal nutrient density
-7-8: Minimally processed, balanced macronutrients
-5-6: Moderately processed, some nutritional value
-3-4: Highly processed, excess sodium/sugar/fat
-1-2: Ultra-processed, minimal nutritional value
+STEP 5: SYSTEMATIC BIAS CORRECTION
+
+FINAL ACCURACY MULTIPLIERS:
+• Base calculation × 1.15 for restaurant meals
+• Base calculation × 1.10 for home meals with visible fats
+• Protein content × 1.20 if meal looks "protein-heavy"
+• Add 100-200 kcal for any meal with multiple components
+
+MANDATORY MINIMUMS (never output below these for normal meals):
+• Total calories for substantial meal: minimum 400 kcal
+• Protein for meal with visible meat: minimum 25g
+• Total fat when cooking oils visible: minimum 15g
+
+PORTION SIZE SANITY CHECK:
+• Small protein serving: 120-150g = 200-250 kcal minimum
+• Medium protein serving: 180-220g = 300-400 kcal
+• Large protein serving: 250-300g = 450-600 kcal
+• Any restaurant meal: minimum 500 kcal total
 
 ==============================================================================
-CATEGORIZATION CONSISTENCY:
-• COMPOSITE ITEMS: Sandwiches, burgers, pizza, pasta dishes, grain bowls → Single entry
-• COMPONENT ITEMS: Separate proteins, starches, vegetables on plate → Multiple entries
-• MIXED DISHES: Stir-fries, casseroles, salads with multiple ingredients → Single entry
+MATHEMATICAL VALIDATION WITH BIAS CORRECTION
+
+CALCULATION: Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
+THEN APPLY: +15% accuracy buffer for underestimation bias
+ACCEPTABLE VARIANCE: ±5% from calculated total (allowing for hidden ingredients)
+
+REALITY CHECK QUESTIONS:
+1. Would this meal satisfy an adult for 4+ hours? If no, increase portions.
+2. Does the protein content match what you'd expect from this amount of meat?
+3. Do the calories account for cooking methods and hidden fats?
+4. Is this realistic compared to similar restaurant/packaged foods?
 
 ==============================================================================
 JSON OUTPUT FORMAT (exact structure required):
 
 [
 {
-"food_name": "Grilled Chicken Breast",
-"calories": 165,
-"proteins": 31,
-"carbs": 0,
-"fats": 4,
-"fiber": 0,
-"sugar": 0,
-"saturated_fat": 1,
-"polyunsaturated_fat": 1,
-"monounsaturated_fat": 1,
+"food_name": "Grilled Chicken Breast with Rice",
+"calories": 520,
+"proteins": 45,
+"carbs": 35,
+"fats": 18,
+"fiber": 2,
+"sugar": 3,
+"saturated_fat": 5,
+"polyunsaturated_fat": 3,
+"monounsaturated_fat": 8,
 "trans_fat": 0,
-"cholesterol": 85,
-"sodium": 74,
-"potassium": 256,
-"vitamin_a": 6,
-"vitamin_c": 0,
-"calcium": 15,
-"iron": 1,
-"weight": 100,
+"cholesterol": 120,
+"sodium": 450,
+"potassium": 380,
+"vitamin_a": 8,
+"vitamin_c": 2,
+"calcium": 25,
+"iron": 2,
+"weight": 200,
 "weight_unit": "g",
-"healthiness_rating": 9
+"healthiness_rating": 8
 }
 ]
 
 ==============================================================================
 CRITICAL SUCCESS METRICS:
-• Reproducibility: Same food = ±10% calorie variance maximum
-• Accuracy: Align with nutrition labels within ±15%  
-• Speed: Analysis complete within 8 seconds
-• Format: Valid JSON array only, no additional text
+• Accuracy: Match real food labels within ±10% (prioritize slightly over vs under)
+• Protein adequacy: Output should reflect substantial protein content when visible
+• Calorie realism: Account for cooking methods, oils, sauces, and preparation
+• Portion reality: Use real-world restaurant and home portion sizes
 
-REMEMBER: Consistency is more valuable than perfect accuracy. Use standardized methods every time."""
+REMEMBER: It's better to slightly overestimate than significantly underestimate. Users need accurate data for health and fitness goals."""
                     },
                     {
                         "role": "user",
                         "content": content
                     }
                 ],
-                max_tokens=4000,
-                temperature=0.1  # Reduced from 0.5 for more consistency
+                max_tokens=4000
             )
             
             api_time = time.time() - api_start_time
-            print(f"✅ OpenAI API response received in {api_time:.2f} seconds")
+            print(f"✅ OpenAI analysis completed in {api_time:.2f} seconds")
             
-            gpt_response = response.choices[0].message.content.strip()
-            print(f"📝 GPT-4 Vision Response: {gpt_response}")
-            
-            # Parse the response
-            parsed_foods = parse_gpt4_response(gpt_response)
-            
-            # Generate a meal_id for grouping (frontend can use this)
-            meal_id = int(datetime.utcnow().timestamp())
-            
-            # Add image URLs to each food item (use first image URL for all items)
-            image_url = saved_files[0][1] if saved_files else None
-            for food in parsed_foods:
-                food["image_url"] = image_url
-                food["meal_id"] = meal_id
+            # Process the response
+            try:
+                response_content = response.choices[0].message.content
+                print(f"📥 OpenAI response: {response_content[:200]}...")
                 
-            overall_time = time.time() - overall_start_time
-            print(f"✅ Total processing time: {overall_time:.2f} seconds")
+                # Parse JSON response
+                nutrition_data = json.loads(response_content)
+                
+                if not isinstance(nutrition_data, list):
+                    raise ValueError("Response is not a list")
+                
+                print(f"✅ Successfully parsed {len(nutrition_data)} food items")
+                
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON parsing error: {e}")
+                print(f"Raw response: {response_content}")
+                # Clean up saved files and return error
+                FileManager.cleanup_files([fp for fp, _ in saved_files])
+                raise HTTPException(status_code=500, detail=f"Error parsing nutrition data from OpenAI: {str(e)}")
+            except Exception as e:
+                print(f"❌ Error processing OpenAI response: {e}")
+                # Clean up saved files and return error
+                FileManager.cleanup_files([fp for fp, _ in saved_files])
+                raise HTTPException(status_code=500, detail=f"Error processing response: {str(e)}")
             
-            return {
-                "message": "✅ Multiple images uploaded and analyzed successfully", 
-                "meal_id": meal_id, 
-                "nutrition_data": parsed_foods,
-                "image_urls": [url for _, url in saved_files],
-                "note": "Data returned for frontend to save locally - backend is stateless"
-            }
-
         except Exception as e:
-            print(f"❌ OpenAI analysis failed: {e}")
-            # Clean up saved files on analysis error
+            print(f"❌ Error with OpenAI API call: {e}")
+            # Clean up saved files and return error
             FileManager.cleanup_files([fp for fp, _ in saved_files])
-            raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
-
+            raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+        
+        overall_time = time.time() - overall_start_time
+        print(f"✅ Multiple image upload completed in {overall_time:.2f} seconds total")
+        
+        # Return success response without cleanup (files intentionally kept)
+        return {
+            "success": True,
+            "message": f"Successfully analyzed {len(images)} images",
+            "files": [filename for _, filename in saved_files],
+            "analysis": nutrition_data,
+            "processing_time": {
+                "total": round(overall_time, 2),
+                "encoding": round(encoding_time, 2),
+                "api": round(api_time, 2)
+            }
+        }
+        
     except Exception as e:
-        error_trace = traceback.format_exc()
-        print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
-        # Clean up saved files on any error
-        FileManager.cleanup_files([fp for fp, _ in saved_files])
-        raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
+        print(f"❌ Unexpected error in multiple image upload: {e}")
+        # Clean up any saved files on unexpected error
+        if saved_files:
+            FileManager.cleanup_files([fp for fp, _ in saved_files])
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
 @router.get("/storage-stats")
