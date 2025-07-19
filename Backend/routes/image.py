@@ -879,7 +879,7 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
             "success": True,
             "message": f"Successfully analyzed {len(images)} images",
             "files": [filename for _, filename in saved_files],
-            "analysis": nutrition_data,
+            "nutrition_data": nutrition_data,
             "processing_time": {
                 "total": round(overall_time, 2),
                 "encoding": round(encoding_time, 2),
