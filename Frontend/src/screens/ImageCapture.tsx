@@ -544,7 +544,7 @@ const ImageCapture: React.FC = () => {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`❌ Upload failed with status ${response.status}:`, errorText);
-                
+
                 // Handle specific error cases
                 if (response.status === 400) {
                     try {
@@ -555,32 +555,36 @@ const ImageCapture: React.FC = () => {
                         }
                     } catch (parseError) {
                         // If we can't parse the error, check the raw text
-                        if (errorText.includes('image cannot be analyzed') || 
+                        if (errorText.includes('image cannot be analyzed') ||
                             errorText.includes('inappropriate content') ||
                             errorText.includes('better lighting')) {
                             throw new Error('IMAGE_CONTENT_POLICY');
                         }
                     }
                 }
-                
+
                 throw new Error(`Upload failed: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
             console.log('📥 Received response from backend:', data);
 
-            if (!data.nutrition_data || !Array.isArray(data.nutrition_data)) {
+            // Backend returns nutrition data in 'analysis' field (based on actual logs)
+            // but code shows 'nutrition_data' - handle both for compatibility
+            const nutritionData = data.analysis || data.nutrition_data;
+            if (!nutritionData || !Array.isArray(nutritionData)) {
+                console.error('❌ No valid nutrition data found. Response fields:', Object.keys(data));
                 throw new Error('Invalid nutrition data received from backend');
             }
 
             setAnalysisStage('processing');
 
-            console.log(`✅ Successfully processed ${data.nutrition_data.length} food items`);
+            console.log(`✅ Successfully processed ${nutritionData.length} food items`);
             console.log(`🖼️ Local images status: ${localImagePaths.length} paths available`);
 
             return {
                 meal_id: data.meal_id,
-                nutrition_data: data.nutrition_data,
+                nutrition_data: nutritionData,
                 localImagePaths: localImagePaths
             };
 
@@ -768,7 +772,7 @@ const ImageCapture: React.FC = () => {
             console.log('🚀 About to navigate to NutritionFactsResult...');
             navigation.navigate('NutritionFactsResult', {
                 nutritionData: result.nutrition_data,
-                mealId: result.meal_id.toString(),
+                mealId: (result.meal_id || Date.now()).toString(),
                 mealType: mealType,
                 brandName: brandName,
                 quantity: quantity,
@@ -779,19 +783,21 @@ const ImageCapture: React.FC = () => {
         } catch (error) {
             setShowAnalysisModal(false);
             console.error('Error submitting food:', error);
-            
+
             // Handle specific error types
             if (error instanceof Error && error.message === 'IMAGE_CONTENT_POLICY') {
                 Alert.alert(
-                    'Image Cannot Be Analyzed', 
+                    'Image Cannot Be Analyzed',
                     'OpenAI could not process this image. Common reasons:\n\n• Image is too blurry or dark\n• No food clearly visible\n• Image contains people or faces\n• Poor lighting or focus\n\nPlease take a clearer photo focused only on the food.',
                     [
-                        { text: 'Retake Photo', onPress: () => {
-                            // Reset the first image to allow retaking
-                            const newImages = [...images];
-                            newImages[0] = { uri: '', type: 'top', uploaded: false };
-                            setImages(newImages);
-                        }},
+                        {
+                            text: 'Retake Photo', onPress: () => {
+                                // Reset the first image to allow retaking
+                                const newImages = [...images];
+                                newImages[0] = { uri: '', type: 'top', uploaded: false };
+                                setImages(newImages);
+                            }
+                        },
                         { text: 'OK', style: 'default' }
                     ]
                 );

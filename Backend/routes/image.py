@@ -503,6 +503,8 @@ async def upload_multiple_images(
 ):
     """Accepts multiple images, saves them to disk, and processes them together with OpenAI. Returns analysis results only - no database storage."""
     saved_files = []
+    nutrition_data = []
+    meal_id = None
     
     try:
         overall_start_time = time.time()
@@ -828,6 +830,17 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                 
                 print(f"✅ Successfully parsed {len(nutrition_data)} food items")
                 
+                # Generate a meal_id for grouping (frontend can use this)
+                meal_id = int(datetime.utcnow().timestamp())
+                
+                # Add image URL and meal_id to each food item
+                for i, food in enumerate(nutrition_data):
+                    # Use the corresponding saved file for each food item
+                    if i < len(saved_files):
+                        _, filename = saved_files[i]
+                        food["image_url"] = filename
+                    food["meal_id"] = meal_id
+                
             except json.JSONDecodeError as e:
                 print(f"❌ JSON parsing error: {e}")
                 print(f"📝 Full response content: {response_content}")
@@ -874,10 +887,15 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
         overall_time = time.time() - overall_start_time
         print(f"✅ Multiple image upload completed in {overall_time:.2f} seconds total")
         
+        # Ensure meal_id is set (fallback if something went wrong)
+        if meal_id is None:
+            meal_id = int(datetime.utcnow().timestamp())
+        
         # Return success response without cleanup (files intentionally kept)
         return {
             "success": True,
             "message": f"Successfully analyzed {len(images)} images",
+            "meal_id": meal_id,
             "files": [filename for _, filename in saved_files],
             "nutrition_data": nutrition_data,
             "processing_time": {
