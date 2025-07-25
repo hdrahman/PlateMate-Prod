@@ -465,56 +465,94 @@ export default function App() {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Check if we're running in Expo Go
-        const isExpoGo = global.isExpoGo === true;
+        const isExpoGo = global.isExpoGo === true || global.__expo?.isExpoGo === true;
 
         if (isExpoGo) {
           console.log('Running in Expo Go - Some features like permanent notifications will be disabled');
-        }
-
-        // Initialize enhanced services
-        try {
-          // Initialize background step tracker
-          console.log('Initializing background step tracker...');
+          
+          // Skip native services initialization in Expo Go to prevent hanging
+          console.log('Skipping native services initialization in Expo Go');
+        } else {
+          // Initialize enhanced services (only in built app)
           try {
-            const stepAvailability = await BackgroundStepTrackerInstance.isAvailable();
-            if (stepAvailability.supported) {
-              await BackgroundStepTrackerInstance.startTracking();
-              console.log('Background step tracking started successfully');
-            } else {
-              console.log('Step tracking not supported on this device');
+            // Initialize background step tracker with timeout
+            console.log('Initializing background step tracker...');
+            try {
+              const stepAvailabilityPromise = BackgroundStepTrackerInstance.isAvailable();
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Step tracker availability check timed out')), 3000)
+              );
+              
+              const stepAvailability = await Promise.race([stepAvailabilityPromise, timeoutPromise]);
+              if (stepAvailability.supported) {
+                const startTrackingPromise = BackgroundStepTrackerInstance.startTracking();
+                const startTimeoutPromise = new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Step tracker start timed out')), 3000)
+                );
+                
+                await Promise.race([startTrackingPromise, startTimeoutPromise]);
+                console.log('Background step tracking started successfully');
+              } else {
+                console.log('Step tracking not supported on this device');
+              }
+            } catch (stepError) {
+              console.error('Failed to initialize step tracking:', stepError);
+              // Continue app initialization even if step tracking fails
             }
-          } catch (stepError) {
-            console.error('Failed to initialize step tracking:', stepError);
-            // Continue app initialization even if step tracking fails
-          }
 
-          // Initialize enhanced permanent notification service
-          console.log('Initializing enhanced permanent notifications...');
-          await EnhancedPermanentNotificationService.initialize();
+            // Initialize enhanced permanent notification service with timeout
+            console.log('Initializing enhanced permanent notifications...');
+            try {
+              const initPromise = EnhancedPermanentNotificationService.initialize();
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Enhanced notification service initialization timed out')), 3000)
+              );
+              
+              await Promise.race([initPromise, timeoutPromise]);
 
-          if (EnhancedPermanentNotificationService.isNotificationAvailable()) {
-            await EnhancedPermanentNotificationService.startPermanentNotification();
-            console.log('Enhanced permanent notifications started successfully');
-          } else {
-            if (isExpoGo) {
-              console.log('Enhanced notifications available in limited mode in Expo Go (iOS scheduled notifications only)');
-            } else {
-              console.log('Enhanced notifications not available on this platform/configuration');
+              if (EnhancedPermanentNotificationService.isNotificationAvailable()) {
+                const startPromise = EnhancedPermanentNotificationService.startPermanentNotification();
+                const startTimeoutPromise = new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Enhanced notification service start timed out')), 3000)
+                );
+                
+                await Promise.race([startPromise, startTimeoutPromise]);
+                console.log('Enhanced permanent notifications started successfully');
+              } else {
+                console.log('Enhanced notifications not available on this platform/configuration');
+              }
+            } catch (notificationError) {
+              console.error('Failed to initialize enhanced notifications:', notificationError);
             }
-          }
 
-          // Keep legacy notification service as fallback
-          await PermanentNotificationService.initialize();
-          const settings = await SettingsService.getNotificationSettings();
-          if (settings.permanentNotification?.enabled && !EnhancedPermanentNotificationService.isNotificationRunning()) {
-            if (PermanentNotificationService.isNotificationAvailable()) {
-              await PermanentNotificationService.startPermanentNotification();
-              console.log('Legacy permanent notification started as fallback');
+            // Keep legacy notification service as fallback with timeout
+            try {
+              const legacyInitPromise = PermanentNotificationService.initialize();
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Legacy notification service initialization timed out')), 3000)
+              );
+              
+              await Promise.race([legacyInitPromise, timeoutPromise]);
+              
+              const settings = await SettingsService.getNotificationSettings();
+              if (settings.permanentNotification?.enabled && !EnhancedPermanentNotificationService.isNotificationRunning()) {
+                if (PermanentNotificationService.isNotificationAvailable()) {
+                  const startLegacyPromise = PermanentNotificationService.startPermanentNotification();
+                  const startTimeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Legacy notification service start timed out')), 3000)
+                  );
+                  
+                  await Promise.race([startLegacyPromise, startTimeoutPromise]);
+                  console.log('Legacy permanent notification started as fallback');
+                }
+              }
+            } catch (legacyError) {
+              console.error('Failed to initialize legacy notification service:', legacyError);
             }
+          } catch (error) {
+            console.error('Failed to initialize enhanced services:', error);
+            // Continue app initialization even if services fail
           }
-        } catch (error) {
-          console.error('Failed to initialize enhanced services:', error);
-          // Continue app initialization even if services fail
         }
 
         // Debug utilities (development only)
