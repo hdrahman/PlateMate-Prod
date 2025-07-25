@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { initDatabase, isDatabaseReady, getUserProfileBySupabaseUid } from '../utils/database';
+import { initDatabase, isDatabaseReady, getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '../context/AuthContext';
 import { useFoodLog } from '../context/FoodLogContext';
@@ -205,6 +205,14 @@ const NutrientsScreen: React.FC = () => {
                 const profile = await getUserProfileBySupabaseUid(user.id);
 
                 if (profile) {
+                    // Get user goals for custom macro goals (same as Home screen)
+                    const userGoals = await getUserGoals(user.id);
+                    console.log('📊 Loaded user goals from database (Nutrients):', {
+                        proteinGoal: userGoals?.proteinGoal,
+                        carbGoal: userGoals?.carbGoal,
+                        fatGoal: userGoals?.fatGoal
+                    });
+
                     // Calculate nutrition goals based on user profile
                     const goals = calculateNutritionGoals({
                         firstName: profile.first_name,
@@ -240,15 +248,23 @@ const NutrientsScreen: React.FC = () => {
                         syncDataOffline: profile.sync_data_offline
                     });
 
-                    // Apply calculated goals to nutrient data
+                    // Apply calculated goals to nutrient data (same logic as Home screen)
                     const updatedNutrientData = { ...nutrientData };
-                    updatedNutrientData.calories.goal = goals.calories;
-                    updatedNutrientData.protein.goal = goals.protein;
-                    updatedNutrientData.carbs.goal = goals.carbs;
-                    updatedNutrientData.fat.goal = goals.fat;
+                    updatedNutrientData.calories.goal = userGoals?.calorieGoal || goals.calories;
+                    updatedNutrientData.protein.goal = userGoals?.proteinGoal || goals.protein;
+                    updatedNutrientData.carbs.goal = userGoals?.carbGoal || goals.carbs;
+                    updatedNutrientData.fat.goal = userGoals?.fatGoal || goals.fat;
                     updatedNutrientData.fiber.goal = goals.fiber;
                     updatedNutrientData.sugar.goal = goals.sugar;
                     updatedNutrientData.saturatedFat.goal = goals.saturatedFat || 20;
+                    
+                    console.log('📊 Nutrients screen goals applied:', {
+                        protein: updatedNutrientData.protein.goal,
+                        carbs: updatedNutrientData.carbs.goal,
+                        fat: updatedNutrientData.fat.goal,
+                        source: userGoals ? 'Custom user goals + calculated' : 'Calculated only'
+                    });
+                    
                     setNutrientData(updatedNutrientData);
                 }
             } catch (error) {
@@ -290,6 +306,7 @@ const NutrientsScreen: React.FC = () => {
     }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
 
     // Fetch nutrient data when date changes or when the food log is updated
+    // Critical: This ensures both Home and Nutrients screens show identical data
     useEffect(() => {
         if (profileLoading) return;
         fetchNutrientData();
@@ -309,13 +326,14 @@ const NutrientsScreen: React.FC = () => {
 
             let totals;
             if (isToday) {
-                // Use context data for today to ensure consistency with Home screen
+                // Always use context data for today to ensure 100% consistency with Home screen
                 console.log('📊 Using context nutrient totals for today:', nutrientTotals);
                 totals = nutrientTotals;
-
-                // If context data is empty, fetch fresh data
-                if (totals.calories === 0 && totals.protein === 0 && totals.carbs === 0 && totals.fat === 0) {
-                    console.log('📊 Context data is empty, fetching fresh data for today');
+                
+                // Only fetch fresh data if context data is completely uninitialized (all values undefined/null)
+                // This prevents false positives when user actually has 0 values for nutrients
+                if (totals.calories === undefined || totals.protein === undefined || totals.carbs === undefined) {
+                    console.log('📊 Context data is uninitialized, fetching fresh data for today');
                     totals = await getTotalsByDate(currentDate);
                 }
             } else {
@@ -344,13 +362,16 @@ const NutrientsScreen: React.FC = () => {
             updatedData.calcium.current = totals.calcium;
             updatedData.iron.current = totals.iron;
 
-            console.log('📊 Nutrients screen values:', {
+            console.log('📊 Nutrients screen values (FIXED):', {
                 protein: totals.protein,
                 carbs: totals.carbs,
                 fat: totals.fat,
                 calories: totals.calories,
                 isToday: isToday,
-                date: formatDateToString(currentDate)
+                date: formatDateToString(currentDate),
+                dataSource: isToday ? 'FoodLogContext' : 'Database',
+                contextRaw: isToday ? nutrientTotals : 'N/A',
+                lastUpdated: lastUpdated
             });
 
             setNutrientData(updatedData);

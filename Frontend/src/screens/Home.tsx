@@ -350,20 +350,21 @@ export default function Home() {
         setFoodLoading(true);
         setMacrosLoading(true);
 
-        // Only refresh logs if needed (first load or when explicitly required)
-        if (nutrientTotals.calories === 0) {
+        // Only refresh logs if context data is uninitialized (avoid false positives for 0 values)
+        if (nutrientTotals.calories === undefined || nutrientTotals.protein === undefined) {
           await refreshLogs();
         }
 
         // Get the nutrition values from the context
         setConsumedCalories(nutrientTotals.calories);
 
-        console.log('🏠 Home screen nutrient values:', {
+        console.log('🏠 Home screen nutrient values (FIXED):', {
           protein: nutrientTotals.protein,
           carbs: nutrientTotals.carbs,
           fat: nutrientTotals.fat,
           calories: nutrientTotals.calories,
-          lastUpdated: lastUpdated
+          lastUpdated: lastUpdated,
+          dataSource: 'FoodLogContext'
         });
 
         console.log('🏠 Home screen macro goals:', {

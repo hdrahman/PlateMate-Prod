@@ -77,31 +77,52 @@ export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals =>
         tdee = profile.dailyCalorieTarget;
     }
 
-    // Calculate macronutrient distribution based on goal
-    let proteinPct, carbsPct, fatPct;
-
+    // Calculate protein based on latest evidence-based recommendations (g/kg body weight)
+    // rather than percentage of calories, as per 2024-2025 research
+    let proteinGPerKg;
+    
     if (profile.weightGoal?.startsWith('lose')) {
-        // Higher protein for weight loss (preserve muscle)
-        proteinPct = 0.30;
-        carbsPct = 0.40;
-        fatPct = 0.30;
+        // Higher protein for weight loss to preserve muscle mass
+        // Latest research: 1.6-2.0 g/kg for weight loss with exercise
+        proteinGPerKg = profile.activityLevel === 'sedentary' ? 1.2 : 1.8;
     } else if (profile.weightGoal?.startsWith('gain')) {
-        // Balanced for muscle gain
-        proteinPct = 0.25;
-        carbsPct = 0.50; // Higher carbs for energy
-        fatPct = 0.25;
+        // Muscle building recommendations: 1.6-2.0 g/kg
+        proteinGPerKg = profile.activityLevel === 'sedentary' ? 1.4 : 1.8;
     } else {
-        // Maintenance
-        proteinPct = 0.25;
-        carbsPct = 0.45;
-        fatPct = 0.30;
+        // Maintenance - varies by activity level
+        // Sedentary: 1.0-1.2 g/kg, Active: 1.2-1.6 g/kg
+        proteinGPerKg = profile.activityLevel === 'sedentary' ? 1.0 : 1.4;
     }
-
-    // Calculate macros in grams
-    // 1g protein = 4 calories, 1g carbs = 4 calories, 1g fat = 9 calories
-    const proteinG = Math.round((tdee * proteinPct) / 4);
-    const carbsG = Math.round((tdee * carbsPct) / 4);
+    
+    // Calculate protein in grams based on body weight
+    const proteinG = Math.round(profile.weight * proteinGPerKg);
+    const proteinCalories = proteinG * 4;
+    
+    // Calculate fat within AMDR guidelines (20-35% of total calories)
+    // Adjust based on goal while staying within healthy ranges
+    let fatPct;
+    if (profile.weightGoal?.startsWith('lose')) {
+        fatPct = 0.25; // 25% for weight loss
+    } else if (profile.weightGoal?.startsWith('gain')) {
+        fatPct = 0.30; // 30% for weight gain (more energy dense)
+    } else {
+        fatPct = 0.28; // 28% for maintenance
+    }
+    
     const fatG = Math.round((tdee * fatPct) / 9);
+    const fatCalories = fatG * 9;
+    
+    // Remaining calories go to carbohydrates (within AMDR 45-65%)
+    const remainingCalories = tdee - proteinCalories - fatCalories;
+    const carbsG = Math.round(Math.max(remainingCalories, 0) / 4);
+    
+    // Verify we're within AMDR guidelines
+    const finalCarbsPct = (carbsG * 4) / tdee;
+    const finalProteinPct = proteinCalories / tdee;
+    const finalFatPct = fatCalories / tdee;
+    
+    // Log the percentages for verification (can be removed in production)
+    console.log(`📊 Macro distribution: ${Math.round(finalProteinPct * 100)}% protein, ${Math.round(finalCarbsPct * 100)}% carbs, ${Math.round(finalFatPct * 100)}% fat`);
     const fiberG = Math.round(14 * (tdee / 1000)); // ~14g per 1000 calories
     const sugarsG = Math.min(Math.round(tdee * 0.10 / 4), 50); // max 50g
     const sodiumMg = 2300; // Standard recommendation
@@ -132,14 +153,30 @@ export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals =>
 };
 
 // Default nutrition goals for when user profile is incomplete
+// Based on 2000 calorie diet with evidence-based macronutrient distribution
 export const getDefaultNutritionGoals = (): NutritionGoals => {
+    const defaultCalories = 2000;
+    
+    // Assume 70kg adult for protein calculation (1.2 g/kg = ~84g)
+    // But use 90g to be slightly more generous for unknown activity levels
+    const defaultProtein = 90; // ~18% of calories
+    const proteinCalories = defaultProtein * 4;
+    
+    // 28% fat (within AMDR 20-35%)
+    const defaultFat = Math.round((defaultCalories * 0.28) / 9); // ~62g
+    const fatCalories = defaultFat * 9;
+    
+    // Remaining calories to carbs (~54% - within AMDR 45-65%)
+    const remainingCalories = defaultCalories - proteinCalories - fatCalories;
+    const defaultCarbs = Math.round(remainingCalories / 4); // ~272g
+    
     return {
-        calories: 2000,
-        protein: 100,
-        carbs: 250,
-        fat: 67,
-        fiber: 30,
-        sugar: 50,
+        calories: defaultCalories,
+        protein: defaultProtein,
+        carbs: defaultCarbs,
+        fat: defaultFat,
+        fiber: 28, // 14g per 1000 calories
+        sugar: 50, // <10% of calories
         sodium: 2300
     };
 }; 
