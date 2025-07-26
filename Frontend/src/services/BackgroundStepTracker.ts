@@ -72,13 +72,23 @@ class BackgroundStepTracker {
             const today = new Date().toISOString().split('T')[0];
             const stepsFromDb = await getStepsForDate(today);
             
-            // Database is the ONLY source of truth - use it always
-            this.lastStepCount = stepsFromDb;
-            this.lastSyncStepCount = stepsFromDb;
+            // Get any cached steps from AsyncStorage (might be higher if app was killed)
+            const cachedSteps = await AsyncStorage.getItem(LAST_STEP_COUNT_KEY);
+            const cachedStepCount = cachedSteps ? parseInt(cachedSteps, 10) : 0;
             
-            console.log(`📊 Initialized with ${stepsFromDb} steps from database for ${today}`);
+            // Use the higher value between database and cache to avoid losing steps
+            const initialStepCount = Math.max(stepsFromDb, cachedStepCount);
+            
+            this.lastStepCount = initialStepCount;
+            this.lastSyncStepCount = initialStepCount;
+            
+            console.log(`📊 Initialized with ${initialStepCount} steps (db: ${stepsFromDb}, cache: ${cachedStepCount}) for ${today}`);
 
-            // Update AsyncStorage to match database state
+            // Update both database and AsyncStorage to sync state
+            if (initialStepCount > stepsFromDb) {
+                await updateTodaySteps(initialStepCount);
+                console.log(`📊 Updated database with higher cached value: ${initialStepCount}`);
+            }
             await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, this.lastStepCount.toString());
             await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastSyncStepCount.toString());
 
@@ -157,12 +167,28 @@ class BackgroundStepTracker {
         const wasActive = this.isAppActive;
         this.isAppActive = nextAppState === 'active';
 
+        console.log(`📱 App state changing from ${wasActive ? 'active' : 'inactive'} to ${nextAppState}`);
+
         if (nextAppState === 'background' && wasActive) {
-            // App going to background - reduce sync frequency
+            // App going to background - ensure all data is saved
+            console.log('📱 App going to background - saving step data');
             this.optimizeForBackground();
+            
+            // Force save current state to multiple storage locations
+            this.forceSaveStepData();
         } else if (nextAppState === 'active' && !wasActive) {
-            // App becoming active - restore normal sync
+            // App becoming active - restore normal sync and check for missed steps
+            console.log('📱 App becoming active - restoring step tracking');
             this.optimizeForForeground();
+            
+            // Immediate recovery check when app becomes active
+            this.performAppResumeRecovery().catch(error => {
+                console.warn('⚠️ App resume recovery failed:', error);
+            });
+        } else if (nextAppState === 'inactive') {
+            // App becoming inactive (user might be switching apps)
+            console.log('📱 App becoming inactive - preparing for potential background');
+            this.forceSaveStepData();
         }
     }
 
@@ -194,6 +220,78 @@ class BackgroundStepTracker {
     }
 
     /**
+     * Perform recovery when app resumes from background/restart
+     */
+    private async performAppResumeRecovery() {
+        try {
+            console.log('🔄 Performing comprehensive app resume recovery...');
+            
+            // 1. Get step counts from all possible sources
+            const today = new Date().toISOString().split('T')[0];
+            const [dbSteps, cachedSteps, persistentSteps] = await Promise.all([
+                getStepsForDate(today).catch(() => 0),
+                AsyncStorage.getItem(LAST_STEP_COUNT_KEY).then(val => val ? parseInt(val, 10) : 0).catch(() => 0),
+                PersistentStepTracker.getLastBackgroundStepCount().catch(() => 0)
+            ]);
+            
+            console.log(`📊 Recovery sources - DB: ${dbSteps}, Cached: ${cachedSteps}, Persistent: ${persistentSteps}, Current: ${this.lastStepCount}`);
+            
+            // 2. Use the highest value to avoid losing steps
+            const highestStepCount = Math.max(dbSteps, cachedSteps, persistentSteps, this.lastStepCount);
+            
+            if (highestStepCount > this.lastStepCount) {
+                console.log(`📊 Updating step count from ${this.lastStepCount} to ${highestStepCount} during recovery`);
+                this.lastStepCount = highestStepCount;
+                this.lastSyncStepCount = highestStepCount;
+                
+                // Update all storage locations with the recovered value
+                await Promise.all([
+                    AsyncStorage.setItem(LAST_STEP_COUNT_KEY, highestStepCount.toString()),
+                    AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, highestStepCount.toString()),
+                    AsyncStorage.setItem('LAST_BACKGROUND_STEP_COUNT', highestStepCount.toString()),
+                    updateTodaySteps(highestStepCount)
+                ]);
+                
+                // Sync with exercise log if steps > 0
+                if (highestStepCount > 0) {
+                    await syncStepsWithExerciseLog(highestStepCount, today);
+                }
+                
+                // Notify listeners of the recovered step count
+                this.notifyListeners(highestStepCount);
+            }
+            
+            // 3. Restart services if they're not running but should be
+            if (this.isTracking) {
+                // Check and restart persistent tracking if needed
+                try {
+                    const wasRestarted = await PersistentStepTracker.checkAndRestartIfNeeded();
+                    if (wasRestarted) {
+                        console.log('🔄 Persistent tracking was restarted during recovery');
+                    } else if (!PersistentStepTracker.isPersistentTrackingRunning()) {
+                        console.log('🔄 Starting persistent tracking after app resume');
+                        await this.enablePersistentTracking();
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to restart persistent tracking:', error);
+                }
+                
+                // Force sensor resync after recovery
+                try {
+                    const sensorSteps = await this.resyncFromSensor();
+                    console.log(`📊 Sensor resync completed: ${sensorSteps} steps`);
+                } catch (error) {
+                    console.warn('⚠️ Sensor resync failed during recovery:', error);
+                }
+            }
+            
+            console.log('✅ Comprehensive app resume recovery completed');
+        } catch (error) {
+            console.error('❌ App resume recovery failed:', error);
+        }
+    }
+
+    /**
      * Initialize persistent step tracking that runs even when app is closed
      */
     private async initializePersistentTracking() {
@@ -201,20 +299,18 @@ class BackgroundStepTracker {
             // Set up event listeners for the persistent service
             PersistentStepTracker.setupEventListeners();
 
-            // Check if persistent tracking was enabled before
-            const wasPersistentEnabled = await PersistentStepTracker.wasPersistentTrackingEnabled();
-            if (wasPersistentEnabled) {
-                console.log('🔄 Restarting persistent step tracking...');
-                try {
-                    // Use retry mechanism to handle database initialization timing
-                    await PersistentStepTracker.startPersistentTrackingWithRetry();
-                } catch (persistentError) {
-                    console.error('❌ Failed to start persistent tracking, disabling it:', persistentError);
-                    // Disable persistent tracking if it fails to start
-                    await AsyncStorage.setItem('PERSISTENT_STEP_SERVICE_ENABLED', 'false');
-                    await AsyncStorage.setItem(PERSISTENT_TRACKING_ENABLED_KEY, 'false');
-                    console.warn('⚠️ Continuing without persistent step tracking');
-                }
+            // Always try to start persistent tracking for better background support
+            console.log('🔄 Starting persistent step tracking...');
+            try {
+                // Use retry mechanism to handle database initialization timing
+                await PersistentStepTracker.startPersistentTrackingWithRetry();
+                console.log('✅ Persistent step tracking started successfully');
+            } catch (persistentError) {
+                console.error('❌ Failed to start persistent tracking, disabling it:', persistentError);
+                // Disable persistent tracking if it fails to start
+                await AsyncStorage.setItem('PERSISTENT_STEP_SERVICE_ENABLED', 'false');
+                await AsyncStorage.setItem(PERSISTENT_TRACKING_ENABLED_KEY, 'false');
+                console.warn('⚠️ Continuing without persistent step tracking');
             }
 
             console.log('✅ Persistent step tracking initialized');
@@ -366,13 +462,22 @@ class BackgroundStepTracker {
         const lastResetDate = await AsyncStorage.getItem(LAST_RESET_DATE_KEY);
 
         if (lastResetDate !== today) {
-            // It's a new day, reset the step counter
+            // It's a new day, reset the step counter in memory and cache
+            // but don't reset database since it handles dates separately
             this.lastStepCount = 0;
             this.lastSyncStepCount = 0;
             await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, '0');
             await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, '0');
             await AsyncStorage.setItem(LAST_RESET_DATE_KEY, today);
             console.log('📅 Step counter reset for new day:', today);
+            
+            // Also reset persistent tracker cache for new day
+            try {
+                await AsyncStorage.setItem('LAST_BACKGROUND_STEP_COUNT', '0');
+                await AsyncStorage.setItem('LAST_BACKGROUND_SYNC_DATE', today);
+            } catch (error) {
+                console.warn('⚠️ Failed to reset persistent tracker cache:', error);
+            }
         }
     }
 
@@ -408,8 +513,8 @@ class BackgroundStepTracker {
             // Start optimized background sync
             this.startBackgroundSync();
 
-            // Enable persistent tracking for always-on step counting (with delay)
-            // Only if not already running or enabled
+            // Persistent tracking is now automatically started in initialization
+            // No need to start it again here unless it's not running
             if (!PersistentStepTracker.isPersistentTrackingRunning()) {
                 setTimeout(() => {
                     this.enablePersistentTracking().catch(error => {
@@ -417,7 +522,7 @@ class BackgroundStepTracker {
                         // Don't crash the app, just continue without persistent tracking
                         console.warn('⚠️ Continuing with regular step tracking only');
                     });
-                }, 5000); // Wait 5 seconds for database to be fully ready
+                }, 2000); // Reduced wait time since initialization handles most cases
             }
 
             this.isTracking = true;
@@ -559,11 +664,31 @@ class BackgroundStepTracker {
         // Only start sync interval if app is active
         if (this.isAppActive) {
             // Reduced frequency: sync every 30 minutes instead of 5 minutes when app is active
-            this.backgroundUpdateInterval = setInterval(() => {
-                this.smartSyncToDatabase();
+            this.backgroundUpdateInterval = setInterval(async () => {
+                await this.smartSyncToDatabase();
+                
+                // Also perform a health check on persistent services
+                await this.performServiceHealthCheck();
             }, 30 * 60 * 1000); // 30 minutes
 
-            console.log('⏰ Smart step sync started (30-minute intervals)');
+            console.log('⏰ Smart step sync with health checks started (30-minute intervals)');
+        }
+    }
+
+    /**
+     * Perform health check on step tracking services
+     */
+    private async performServiceHealthCheck() {
+        try {
+            if (this.isTracking) {
+                // Check if persistent service needs to be restarted
+                const wasRestarted = await PersistentStepTracker.checkAndRestartIfNeeded();
+                if (wasRestarted) {
+                    console.log('🔄 Persistent service was automatically restarted during health check');
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Service health check failed:', error);
         }
     }
 
@@ -631,6 +756,31 @@ class BackgroundStepTracker {
         }
     }
 
+    /**
+     * Force save step data to all storage locations (for app backgrounding/killing scenarios)
+     */
+    private async forceSaveStepData() {
+        try {
+            console.log(`📊 Force saving step data: ${this.lastStepCount} steps`);
+            
+            // Save to AsyncStorage immediately
+            await Promise.all([
+                AsyncStorage.setItem(LAST_STEP_COUNT_KEY, this.lastStepCount.toString()),
+                AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, this.lastStepCount.toString())
+            ]);
+            
+            // Save to database
+            await this.syncStepsToDatabase();
+            
+            // Also update persistent tracker cache to keep it in sync
+            await AsyncStorage.setItem('LAST_BACKGROUND_STEP_COUNT', this.lastStepCount.toString());
+            
+            console.log(`✅ Step data force saved successfully: ${this.lastStepCount} steps`);
+        } catch (error) {
+            console.error('❌ Error force saving step data:', error);
+        }
+    }
+
     async stopTracking() {
         if (!this.isTracking) return;
 
@@ -653,8 +803,15 @@ class BackgroundStepTracker {
             this.isTracking = false;
             await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'false');
             
-            // Disable persistent tracking
+            // Stop all background services
             await this.disablePersistentTracking();
+            
+            // Stop foreground service
+            try {
+                await ForegroundStepService.stopService();
+            } catch (error) {
+                console.warn('⚠️ Failed to stop foreground service:', error);
+            }
             
             // Unregister background task
             await unregisterStepBackgroundTask();
@@ -765,11 +922,15 @@ class BackgroundStepTracker {
             
             console.log(`📊 Resync: Retrieved ${steps} steps from sensor, current stored: ${this.lastStepCount}`);
             
-            // Use the higher of the two values (sensor or stored) to avoid losing steps
-            const finalStepCount = Math.max(steps, this.lastStepCount);
+            // Get current database value to ensure we don't lose persisted data
+            const today = new Date().toISOString().split('T')[0];
+            const dbSteps = await getStepsForDate(today);
+            
+            // Use the highest value among sensor, stored, and database to avoid losing steps
+            const finalStepCount = Math.max(steps, this.lastStepCount, dbSteps);
             
             if (finalStepCount !== this.lastStepCount) {
-                console.log(`📊 Updating step count from ${this.lastStepCount} to ${finalStepCount}`);
+                console.log(`📊 Updating step count from ${this.lastStepCount} to ${finalStepCount} (sensor: ${steps}, db: ${dbSteps})`);
                 
                 // Update our in-memory counters
                 this.lastStepCount = finalStepCount;
@@ -780,7 +941,6 @@ class BackgroundStepTracker {
                 await AsyncStorage.setItem(LAST_SYNC_STEP_COUNT_KEY, finalStepCount.toString());
                 
                 // Sync to database
-                const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
                 await updateTodaySteps(finalStepCount);
                 
                 // Also sync with exercise log (only if steps > 0)
@@ -884,6 +1044,13 @@ class BackgroundStepTracker {
             // Sync with exercise log
             if (newStepCount > 0) {
                 await syncStepsWithExerciseLog(newStepCount, today);
+            }
+            
+            // Also update persistent tracker cache to keep it in sync
+            try {
+                await AsyncStorage.setItem('LAST_BACKGROUND_STEP_COUNT', newStepCount.toString());
+            } catch (error) {
+                console.warn('⚠️ Failed to update persistent tracker cache:', error);
             }
             
             // Notify all listeners (this will update the home screen)

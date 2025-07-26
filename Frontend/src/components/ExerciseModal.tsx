@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatDateToString } from '../utils/dateUtils';
 import { addExercise, getCurrentUserIdAsync, getUserProfile } from '../utils/database';
 import { useSteps } from '../context/StepContext';
-import BackgroundStepTracker from '../services/BackgroundStepTracker';
+import UnifiedStepTracker from '../services/UnifiedStepTracker';
 
 // Define the Exercise interface
 interface Exercise {
@@ -293,9 +293,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 // Handle steps entry
                 const steps = parseInt(stepsCount);
 
-                // Use BackgroundStepTracker to add steps - this will update database, internal state, and notify listeners
-                // The BackgroundStepTracker will handle creating the exercise entry automatically
-                await BackgroundStepTracker.addManualSteps(steps);
+                // Use UnifiedStepTracker to add steps - this will update database, internal state, and notify listeners
+                await UnifiedStepTracker.addManualSteps(steps);
 
                 console.log(`Added ${steps} steps to step tracker`);
 

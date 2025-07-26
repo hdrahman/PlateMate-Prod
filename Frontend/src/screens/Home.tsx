@@ -152,7 +152,8 @@ export default function Home() {
     todaySteps,
     stepHistory,
     isAvailable,
-    loading: stepsLoading
+    loading: stepsLoading,
+    refreshStepData
   } = useSteps();
 
   // Add state for weight history
@@ -297,11 +298,18 @@ export default function Home() {
       loadUserProfile();
       // Reload cheat day data to get the latest settings
       loadCheatDayData();
+      
+      // Refresh step data to ensure latest count
+      if (refreshStepData) {
+        refreshStepData().catch(error => {
+          console.warn('Failed to refresh step data on focus:', error);
+        });
+      }
     });
 
     // Clean up the listener when component unmounts
     return unsubscribe;
-  }, [user, navigation]);
+  }, [user, navigation, refreshStepData]);
 
   // Set up food log watching when component mounts
   useEffect(() => {

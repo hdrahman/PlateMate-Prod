@@ -28,7 +28,7 @@ const isDatabaseReady = async (): Promise<boolean> => {
 class PersistentStepTracker {
     private static instance: PersistentStepTracker;
     private isServiceRunning: boolean = false;
-    private syncInterval: number = 60000; // 60 seconds - increased from 30 seconds
+    private syncInterval: number = 30000; // 30 seconds for better responsiveness
     private lastKnownStepCount: number = 0;
     private retryAttempts: number = 0;
     private maxRetryAttempts: number = 10;
@@ -116,46 +116,88 @@ class PersistentStepTracker {
                 console.log('📅 Reset step count for new day:', today);
             }
 
-            // Get steps from the pedometer
-            const isAvailable = await Pedometer.isAvailableAsync();
-            if (!isAvailable) {
-                console.log('⚠️ Pedometer not available in background');
-                return;
+            // First, try to get the step count from the main BackgroundStepTracker's cached value
+            // This ensures consistency with the main app's step count
+            let currentSteps = this.lastKnownStepCount;
+            
+            try {
+                // Get the most up-to-date step count from various sources
+                const [dbSteps, mainTrackerSteps, sensorSteps] = await Promise.all([
+                    // Database steps
+                    import('../utils/database').then(({ getStepsForDate }) => getStepsForDate(today)).catch(() => 0),
+                    // Main tracker's cached steps
+                    AsyncStorage.getItem('LAST_STEP_COUNT').then(val => val ? parseInt(val, 10) : 0).catch(() => 0),
+                    // Direct sensor reading (as fallback)
+                    this.getSensorSteps().catch(() => 0)
+                ]);
+                
+                // Use the highest value to avoid losing steps
+                currentSteps = Math.max(dbSteps, mainTrackerSteps, sensorSteps, this.lastKnownStepCount);
+                
+                console.log(`📊 Step sync sources - DB: ${dbSteps}, MainTracker: ${mainTrackerSteps}, Sensor: ${sensorSteps}, Using: ${currentSteps}`);
+            } catch (error) {
+                console.warn('⚠️ Error getting step counts from sources, using last known:', error);
             }
-
-            // Get steps from midnight until now - simplified without timeout
-            const sinceMidnight = new Date();
-            sinceMidnight.setHours(0, 0, 0, 0);
             
-            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-            const currentSteps = result.steps;
+            // Always attempt to sync even if no change (in case previous sync failed)
+            const stepChange = Math.abs(currentSteps - this.lastKnownStepCount);
             
-            console.log(`📊 Current steps: ${currentSteps}, Last known: ${this.lastKnownStepCount}`);
-            
-            // Only update if there's a change
-            if (currentSteps !== this.lastKnownStepCount) {
+            if (stepChange > 0 || this.consecutiveErrors > 0) {
                 // Try to update database with error handling
                 try {
                     await updateTodaySteps(currentSteps);
                     console.log(`📊 Background sync: ${currentSteps} steps updated in database`);
+                    
+                    // Reset error count on successful sync
+                    this.consecutiveErrors = 0;
                 } catch (dbError) {
                     console.warn('⚠️ Database update failed in background:', dbError);
-                    // Don't throw error, just continue with local storage
+                    this.consecutiveErrors++;
+                    
+                    // If too many consecutive errors, reduce sync frequency
+                    if (this.consecutiveErrors >= 3) {
+                        console.warn('⚠️ Multiple sync failures, reducing sync frequency');
+                        this.syncInterval = Math.min(this.syncInterval * 1.5, 300000); // Max 5 minutes
+                    }
                 }
                 
                 this.lastKnownStepCount = currentSteps;
                 await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, currentSteps.toString());
                 
-                // Update the notification with current step count
-                await this.updateNotification(currentSteps);
-                
-                console.log(`📊 Background sync completed: ${currentSteps} steps updated`);
+                console.log(`📊 Background sync completed: ${currentSteps} steps updated (+${stepChange})`);
             } else {
-                console.log('📊 No step count change, skipping update');
+                console.log('📊 No step count change detected');
             }
+            
+            // Always update the notification with the latest step count
+            await this.updateNotification(currentSteps);
+            
         } catch (error) {
             console.error('❌ Error in background step sync:', error);
             // Don't throw error to keep the background service running
+        }
+    }
+
+    /**
+     * Get steps directly from sensor (fallback method)
+     */
+    private async getSensorSteps(): Promise<number> {
+        try {
+            const isAvailable = await Pedometer.isAvailableAsync();
+            if (!isAvailable) {
+                console.log('⚠️ Pedometer not available in background');
+                return 0;
+            }
+
+            // Get steps from midnight until now
+            const sinceMidnight = new Date();
+            sinceMidnight.setHours(0, 0, 0, 0);
+            
+            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+            return result.steps;
+        } catch (error) {
+            console.warn('⚠️ Error getting sensor steps:', error);
+            return 0;
         }
     }
 
@@ -164,12 +206,35 @@ class PersistentStepTracker {
      */
     private async updateNotification(steps: number): Promise<void> {
         try {
+            // Only update if the service is actually running
+            if (!this.isServiceRunning || !BackgroundService.isRunning()) {
+                console.log('⚠️ Background service not running, skipping notification update');
+                return;
+            }
+
             const todayDate = new Date().toLocaleDateString();
+            const formattedSteps = steps.toLocaleString();
+            
             await BackgroundService.updateNotification({
-                taskDesc: `${steps} steps recorded today (${todayDate})`,
+                taskName: 'PlateMate Step Tracker',
+                taskTitle: '🚶 Step Tracking Active',
+                taskDesc: `${formattedSteps} steps today (${todayDate})\nPlateMate is counting your steps`,
+                taskIcon: {
+                    name: 'ic_launcher',
+                    type: 'mipmap',
+                },
             });
+            
+            console.log(`📱 Notification updated: ${formattedSteps} steps`);
         } catch (error) {
             console.error('❌ Error updating notification:', error);
+            
+            // If notification update fails, the service might have been killed
+            // Mark as not running so it can be restarted
+            if (error.message && error.message.includes('not running')) {
+                console.warn('⚠️ Background service appears to have stopped, marking as not running');
+                this.isServiceRunning = false;
+            }
         }
     }
 
@@ -207,8 +272,8 @@ class PersistentStepTracker {
 
             const options = {
                 taskName: 'PlateMate Step Tracker',
-                taskTitle: 'PlateMate Step Tracking',
-                taskDesc: 'Tracking your steps throughout the day',
+                taskTitle: '🚶 Step Tracking Active',
+                taskDesc: `${this.lastKnownStepCount.toLocaleString()} steps today - Keep moving!`,
                 taskIcon: {
                     name: 'ic_launcher',
                     type: 'mipmap',
@@ -320,7 +385,36 @@ class PersistentStepTracker {
      * Check if the persistent service is running
      */
     public isPersistentTrackingRunning(): boolean {
-        return this.isServiceRunning && BackgroundService.isRunning();
+        const actuallyRunning = this.isServiceRunning && BackgroundService.isRunning();
+        
+        // If we think it's running but it's actually not, update our state
+        if (this.isServiceRunning && !BackgroundService.isRunning()) {
+            console.warn('⚠️ Persistent service state mismatch detected, correcting...');
+            this.isServiceRunning = false;
+        }
+        
+        return actuallyRunning;
+    }
+
+    /**
+     * Check and restart the service if it should be running but isn't
+     */
+    public async checkAndRestartIfNeeded(): Promise<boolean> {
+        try {
+            const shouldBeRunning = await this.wasPersistentTrackingEnabled();
+            const isActuallyRunning = this.isPersistentTrackingRunning();
+            
+            if (shouldBeRunning && !isActuallyRunning) {
+                console.log('🔄 Persistent service should be running but isn\'t, restarting...');
+                await this.startPersistentTrackingWithRetry();
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('❌ Error checking/restarting persistent service:', error);
+            return false;
+        }
     }
 
     /**
@@ -346,6 +440,33 @@ class PersistentStepTracker {
         } catch (error) {
             console.error('❌ Error getting last background step count:', error);
             return 0;
+        }
+    }
+
+    /**
+     * Force sync current steps immediately
+     */
+    public async forceSyncSteps(): Promise<number> {
+        try {
+            console.log('🔄 Forcing immediate step sync...');
+            
+            // Get current steps directly from sensor
+            const sinceMidnight = new Date();
+            sinceMidnight.setHours(0, 0, 0, 0);
+            
+            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+            const currentSteps = result.steps;
+            
+            // Update database and cache
+            await updateTodaySteps(currentSteps);
+            this.lastKnownStepCount = currentSteps;
+            await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, currentSteps.toString());
+            
+            console.log(`✅ Force sync completed: ${currentSteps} steps`);
+            return currentSteps;
+        } catch (error) {
+            console.error('❌ Force sync failed:', error);
+            return this.lastKnownStepCount;
         }
     }
 

@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import BackgroundStepTracker, { BackgroundStepTracker as BackgroundStepTrackerClass } from '../services/BackgroundStepTracker';
+import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import EnhancedPermanentNotificationService from '../services/EnhancedPermanentNotificationService';
 
 interface SettingsSection {
@@ -46,16 +46,14 @@ const BackgroundServicesSettings: React.FC = () => {
     const loadSettings = async () => {
         try {
             const notificationService = EnhancedPermanentNotificationService.getInstance();
-            const stepTracker = BackgroundStepTracker.getInstance();
-
             // Load notification settings
             const notifSettings = notificationService.getSettings();
             setNotificationSettings(notifSettings);
 
             // Load step tracker settings
             const stepSettings = {
-                isTracking: BackgroundStepTracker.isCurrentlyTracking(),
-                threshold: BackgroundStepTracker.getStepThreshold(),
+                isTracking: UnifiedStepTracker.isTracking(),
+                threshold: 25, // Fixed threshold for unified tracker
             };
             setStepTrackerSettings(stepSettings);
 
@@ -90,16 +88,14 @@ const BackgroundServicesSettings: React.FC = () => {
 
     const handleStepTrackerToggle = async (enabled: boolean) => {
         try {
-            const stepTracker = BackgroundStepTracker.getInstance();
-
             if (enabled) {
-                const success = await stepTracker.startTracking();
+                const success = await UnifiedStepTracker.startTracking();
                 if (!success) {
                     Alert.alert('Permission Required', 'Please grant activity recognition permissions to enable step tracking.');
                     return;
                 }
             } else {
-                await stepTracker.stopTracking();
+                await UnifiedStepTracker.stopTracking();
             }
 
             setStepTrackerSettings(prev => ({ ...prev, isTracking: enabled }));
@@ -111,8 +107,7 @@ const BackgroundServicesSettings: React.FC = () => {
 
     const handleStepThresholdChange = (threshold: number) => {
         try {
-            const stepTracker = BackgroundStepTracker.getInstance();
-            stepTracker.setStepThreshold(threshold);
+            // Unified tracker has a fixed threshold, but we can update the UI
             setStepTrackerSettings(prev => ({ ...prev, threshold }));
         } catch (error) {
             console.error('Error updating step threshold:', error);

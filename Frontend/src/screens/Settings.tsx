@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCacheStats, clearMealPlannerCache } from "../utils/database";
-import BackgroundStepTrackerInstance from "../services/BackgroundStepTracker";
+import UnifiedStepTracker from "../services/UnifiedStepTracker";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
@@ -32,7 +32,7 @@ const SettingsScreen = () => {
 
     const loadStepTrackingSettings = async () => {
         try {
-            const enabled = await BackgroundStepTrackerInstance.isPersistentTrackingEnabled();
+            const enabled = UnifiedStepTracker.isTracking();
             setIsPersistentTrackingEnabled(enabled);
         } catch (error) {
             console.error('Error loading step tracking settings:', error);
@@ -45,29 +45,25 @@ const SettingsScreen = () => {
         setIsLoadingStepSettings(true);
         try {
             if (enabled) {
-                const success = await BackgroundStepTrackerInstance.enablePersistentTracking();
+                const success = await UnifiedStepTracker.startTracking();
                 if (success) {
                     setIsPersistentTrackingEnabled(true);
                     Alert.alert(
-                        'Always-On Step Tracking Enabled',
-                        'Step counting will now continue even when the app is closed. You may see a persistent notification.',
+                        'Step Tracking Enabled',
+                        'Step counting is now active with real-time notifications.',
                         [{ text: 'OK' }]
                     );
                 } else {
-                    Alert.alert('Error', 'Failed to enable always-on step tracking. Please try again.');
+                    Alert.alert('Error', 'Failed to enable step tracking. Please check permissions.');
                 }
             } else {
-                const success = await BackgroundStepTrackerInstance.disablePersistentTracking();
-                if (success) {
-                    setIsPersistentTrackingEnabled(false);
-                    Alert.alert(
-                        'Always-On Step Tracking Disabled',
-                        'Step counting will now only work when the app is open.',
-                        [{ text: 'OK' }]
-                    );
-                } else {
-                    Alert.alert('Error', 'Failed to disable always-on step tracking. Please try again.');
-                }
+                await UnifiedStepTracker.stopTracking();
+                setIsPersistentTrackingEnabled(false);
+                Alert.alert(
+                    'Step Tracking Disabled',
+                    'Step counting has been stopped.',
+                    [{ text: 'OK' }]
+                );
             }
         } catch (error) {
             console.error('Error toggling persistent tracking:', error);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import BackgroundStepTracker, { BackgroundStepTracker as BackgroundStepTrackerClass } from '../services/BackgroundStepTracker';
+import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import { Pedometer } from 'expo-sensors';
 
 export interface StepHistoryItem {
@@ -46,11 +46,12 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             setLoading(true);
             try {
                 // Get today's steps
-                const steps = await BackgroundStepTracker.getTodaySteps();
+                const steps = UnifiedStepTracker.getCurrentSteps();
                 setTodaySteps(steps);
 
-                // Get step history
-                const history = await BackgroundStepTracker.getStepHistory(historyDays);
+                // Get step history (simplified for now - unified tracker focuses on today)
+                const today = new Date().toISOString().split('T')[0];
+                const history = [{ date: today, steps }];
                 setStepHistory(history);
             } catch (error) {
                 console.error('Error loading step data:', error);
@@ -64,7 +65,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
     // Set up step counter listener
     useEffect(() => {
-        const unsubscribe = BackgroundStepTracker.addListener((steps) => {
+        const unsubscribe = UnifiedStepTracker.addListener((steps) => {
             setTodaySteps(steps);
 
             // Also update history for today
@@ -85,6 +86,9 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             });
         });
 
+        // Update tracking status
+        setIsTracking(UnifiedStepTracker.isTracking());
+
         // Cleanup listener on unmount
         return () => {
             unsubscribe();
@@ -95,14 +99,14 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
     const startTracking = async () => {
         if (!isAvailable) return;
 
-        await BackgroundStepTracker.startTracking();
-        setIsTracking(true);
+        await UnifiedStepTracker.startTracking();
+        setIsTracking(UnifiedStepTracker.isTracking());
     };
 
     // Stop tracking steps
-    const stopTracking = () => {
-        BackgroundStepTracker.stopTracking();
-        setIsTracking(false);
+    const stopTracking = async () => {
+        await UnifiedStepTracker.stopTracking();
+        setIsTracking(UnifiedStepTracker.isTracking());
     };
 
     // Refresh step data (useful when steps are manually added)
@@ -110,12 +114,16 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         try {
             console.log('🔄 Refreshing step data...');
             
+            // Force sync unified tracker
+            await UnifiedStepTracker.forceSync();
+            
             // Get updated today's steps
-            const steps = await BackgroundStepTracker.getTodaySteps();
+            const steps = UnifiedStepTracker.getCurrentSteps();
             setTodaySteps(steps);
 
-            // Get updated step history
-            const history = await BackgroundStepTracker.getStepHistory(historyDays);
+            // Update history for today
+            const today = new Date().toISOString().split('T')[0];
+            const history = [{ date: today, steps }];
             setStepHistory(history);
             
             console.log('✅ Step data refreshed');

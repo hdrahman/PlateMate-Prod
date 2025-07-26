@@ -24,7 +24,8 @@ import tokenManager from './src/utils/tokenManager';
 // Import Enhanced Services
 import PermanentNotificationService from './src/services/PermanentNotificationService';
 import EnhancedPermanentNotificationService from './src/services/EnhancedPermanentNotificationService';
-import BackgroundStepTrackerInstance, { BackgroundStepTracker } from './src/services/BackgroundStepTracker';
+import UnifiedStepTracker from './src/services/UnifiedStepTracker';
+import StepTrackingPermissionService from './src/services/StepTrackingPermissionService';
 import SettingsService from './src/services/SettingsService';
 
 import Home from "./src/screens/Home";
@@ -64,6 +65,7 @@ import FeatureRequests from './src/screens/FeatureRequests';
 import CreateFeatureRequest from './src/screens/CreateFeatureRequest';
 import { navigationRef } from './src/navigation/RootNavigation';
 import FutureSelfRecordingSimple from './src/screens/FutureSelfRecordingSimple';
+import StepTrackingSettings from './src/screens/StepTrackingSettings';
 
 const { width } = Dimensions.get("window");
 
@@ -389,6 +391,7 @@ function AuthenticatedContent() {
       <Stack.Screen name="FeatureRequests" component={FeatureRequests} />
       <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequest} />
       <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />
+      <Stack.Screen name="StepTrackingSettings" component={StepTrackingSettings} />
     </Stack.Navigator>
   );
 }
@@ -475,28 +478,23 @@ export default function App() {
         } else {
           // Initialize enhanced services (only in built app)
           try {
-            // Initialize background step tracker with timeout
-            console.log('Initializing background step tracker...');
+            // Initialize unified step tracking system
+            console.log('Initializing unified step tracking system...');
             try {
-              const stepAvailabilityPromise = BackgroundStepTrackerInstance.isAvailable();
+              const startTrackingPromise = UnifiedStepTracker.startTracking();
               const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Step tracker availability check timed out')), 3000)
+                setTimeout(() => reject(new Error('Step tracker start timed out')), 10000)
               );
               
-              const stepAvailability = await Promise.race([stepAvailabilityPromise, timeoutPromise]);
-              if (stepAvailability.supported) {
-                const startTrackingPromise = BackgroundStepTrackerInstance.startTracking();
-                const startTimeoutPromise = new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Step tracker start timed out')), 3000)
-                );
-                
-                await Promise.race([startTrackingPromise, startTimeoutPromise]);
-                console.log('Background step tracking started successfully');
+              const success = await Promise.race([startTrackingPromise, timeoutPromise]);
+              
+              if (success) {
+                console.log('✅ Unified step tracking system started successfully');
               } else {
-                console.log('Step tracking not supported on this device');
+                console.log('⚠️ Step tracking failed to start');
               }
             } catch (stepError) {
-              console.error('Failed to initialize step tracking:', stepError);
+              console.error('❌ Failed to initialize step tracking system:', stepError);
               // Continue app initialization even if step tracking fails
             }
 
