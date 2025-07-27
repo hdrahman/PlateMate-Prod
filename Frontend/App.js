@@ -21,12 +21,13 @@ import { FoodLogProvider } from './src/context/FoodLogContext';
 
 // Import Supabase token manager for optimized authentication
 import tokenManager from './src/utils/tokenManager';
-// Import Enhanced Services
-import PermanentNotificationService from './src/services/PermanentNotificationService';
-import EnhancedPermanentNotificationService from './src/services/EnhancedPermanentNotificationService';
-import UnifiedStepTracker from './src/services/UnifiedStepTracker';
-import StepTrackingPermissionService from './src/services/StepTrackingPermissionService';
-import SettingsService from './src/services/SettingsService';
+// Import Simple Step Tracker
+import SimpleStepTracker from './src/services/SimpleStepTracker';
+
+// Import debug utilities (development only)
+if (__DEV__) {
+  import('./src/utils/stepTestDebug');
+}
 
 import Home from "./src/screens/Home";
 import FoodLog from "./src/screens/FoodLog";
@@ -478,75 +479,39 @@ export default function App() {
         } else {
           // Initialize enhanced services (only in built app)
           try {
-            // Initialize unified step tracking system
-            console.log('Initializing unified step tracking system...');
+            // Stop any old background services first
+            console.log('Cleaning up any old background services...');
             try {
-              const startTrackingPromise = UnifiedStepTracker.startTracking();
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Step tracker start timed out')), 10000)
-              );
-              
-              const success = await Promise.race([startTrackingPromise, timeoutPromise]);
-              
-              if (success) {
-                console.log('✅ Unified step tracking system started successfully');
-              } else {
-                console.log('⚠️ Step tracking failed to start');
+              const BackgroundService = require('react-native-background-actions').default;
+              if (BackgroundService.isRunning()) {
+                console.log('🛑 Stopping old background service...');
+                await BackgroundService.stop();
+                console.log('✅ Old background service stopped');
               }
+            } catch (cleanupError) {
+              console.log('ℹ️ No old background services to cleanup:', cleanupError.message);
+            }
+
+            // Unregister old background tasks that use getStepCountAsync on Android
+            try {
+              const { unregisterStepBackgroundTask } = require('./src/tasks/StepCountTask');
+              await unregisterStepBackgroundTask();
+              console.log('✅ Old background tasks cleaned up');
+            } catch (cleanupError) {
+              console.log('ℹ️ No old background tasks to cleanup:', cleanupError.message);
+            }
+
+            // Initialize simple step tracking
+            console.log('Initializing simple step tracking...');
+            try {
+              await SimpleStepTracker.autoStart();
+              console.log('✅ Simple step tracking initialized');
             } catch (stepError) {
-              console.error('❌ Failed to initialize step tracking system:', stepError);
+              console.error('❌ Error starting step tracking:', stepError);
               // Continue app initialization even if step tracking fails
             }
 
-            // Initialize enhanced permanent notification service with timeout
-            console.log('Initializing enhanced permanent notifications...');
-            try {
-              const initPromise = EnhancedPermanentNotificationService.initialize();
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Enhanced notification service initialization timed out')), 3000)
-              );
-              
-              await Promise.race([initPromise, timeoutPromise]);
-
-              if (EnhancedPermanentNotificationService.isNotificationAvailable()) {
-                const startPromise = EnhancedPermanentNotificationService.startPermanentNotification();
-                const startTimeoutPromise = new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Enhanced notification service start timed out')), 3000)
-                );
-                
-                await Promise.race([startPromise, startTimeoutPromise]);
-                console.log('Enhanced permanent notifications started successfully');
-              } else {
-                console.log('Enhanced notifications not available on this platform/configuration');
-              }
-            } catch (notificationError) {
-              console.error('Failed to initialize enhanced notifications:', notificationError);
-            }
-
-            // Keep legacy notification service as fallback with timeout
-            try {
-              const legacyInitPromise = PermanentNotificationService.initialize();
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Legacy notification service initialization timed out')), 3000)
-              );
-              
-              await Promise.race([legacyInitPromise, timeoutPromise]);
-              
-              const settings = await SettingsService.getNotificationSettings();
-              if (settings.permanentNotification?.enabled && !EnhancedPermanentNotificationService.isNotificationRunning()) {
-                if (PermanentNotificationService.isNotificationAvailable()) {
-                  const startLegacyPromise = PermanentNotificationService.startPermanentNotification();
-                  const startTimeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Legacy notification service start timed out')), 3000)
-                  );
-                  
-                  await Promise.race([startLegacyPromise, startTimeoutPromise]);
-                  console.log('Legacy permanent notification started as fallback');
-                }
-              }
-            } catch (legacyError) {
-              console.error('Failed to initialize legacy notification service:', legacyError);
-            }
+            console.log('✅ Simple step tracking initialization complete');
           } catch (error) {
             console.error('Failed to initialize enhanced services:', error);
             // Continue app initialization even if services fail

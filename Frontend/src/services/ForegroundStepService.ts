@@ -348,10 +348,21 @@ class ForegroundStepService {
     private async startPedometerTracking(): Promise<void> {
         try {
             // Get baseline steps for this session
-            const sinceMidnight = new Date();
-            sinceMidnight.setHours(0, 0, 0, 0);
+            let dailySteps = 0;
             
-            const { steps: dailySteps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+            // Android doesn't support getStepCountAsync
+            if (Platform.OS === 'ios') {
+                const sinceMidnight = new Date();
+                sinceMidnight.setHours(0, 0, 0, 0);
+                
+                const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+                dailySteps = result.steps;
+            } else {
+                console.log('🤖 Android: getStepCountAsync not supported, using stored value');
+                // On Android, use the stored value from database/AsyncStorage
+                const today = new Date().toISOString().split('T')[0];
+                dailySteps = await getStepsForDate(today);
+            }
             
             // Use higher of current stored value or device reading
             this.state.currentSteps = Math.max(this.state.currentSteps, dailySteps);
@@ -432,10 +443,19 @@ class ForegroundStepService {
 
     private async syncFromDevice(): Promise<void> {
         try {
-            const sinceMidnight = new Date();
-            sinceMidnight.setHours(0, 0, 0, 0);
+            let deviceSteps = 0;
             
-            const { steps: deviceSteps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+            // Android doesn't support getStepCountAsync
+            if (Platform.OS === 'ios') {
+                const sinceMidnight = new Date();
+                sinceMidnight.setHours(0, 0, 0, 0);
+                
+                const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+                deviceSteps = result.steps;
+            } else {
+                console.log('🤖 Android: getStepCountAsync not supported, using current value');
+                deviceSteps = this.state.currentSteps;
+            }
             
             // Get database value
             const today = new Date().toISOString().split('T')[0];

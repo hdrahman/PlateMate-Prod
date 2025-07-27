@@ -9,7 +9,14 @@ TaskManager.defineTask(TASK_NAME, async () => {
   try {
     console.log('🔄 Background step sync task started');
     
-    // Get steps from midnight (00:00) of today until now
+    // Check platform - Android doesn't support getStepCountAsync
+    if (require('react-native').Platform.OS === 'android') {
+      console.log('🤖 Android: Background task disabled - getStepCountAsync not supported');
+      console.log('ℹ️ Using SimpleStepTracker foreground service instead');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+    
+    // Get steps from midnight (00:00) of today until now (iOS only)
     const sinceMidnight = new Date();
     sinceMidnight.setHours(0, 0, 0, 0);
     
@@ -18,12 +25,12 @@ TaskManager.defineTask(TASK_NAME, async () => {
       new Date()
     );
 
-    console.log(`📊 Background sync: Retrieved ${steps} steps from system`);
+    console.log(`📊 iOS Background sync: Retrieved ${steps} steps from system`);
     
     // Persist to SQLite database
     await updateTodaySteps(steps);
     
-    console.log('✅ Background step sync completed successfully');
+    console.log('✅ iOS Background step sync completed successfully');
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (err) {
     console.warn('[StepCountTask] Background sync failed:', err);

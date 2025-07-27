@@ -3,7 +3,11 @@
     "allow": [
       "Bash(find:*)",
       "Bash(keytool:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx expo config:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)"
     ],
     "deny": []
   }

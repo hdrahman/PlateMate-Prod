@@ -54,14 +54,12 @@ class BackgroundStepTracker {
 
     private async initialize() {
         try {
-            // Check if HealthKit is available (iOS only)
+            // Initialize platform-specific step tracking services
             if (Platform.OS === 'ios' && AppleHealthKit) {
                 this.isHealthKitAvailable = true;
                 await this.initializeHealthKit();
-            }
-
-            // Request Android permissions
-            if (Platform.OS === 'android') {
+            } else if (Platform.OS === 'android') {
+                // Request Android permissions
                 await this.requestAndroidPermissions();
             }
 
@@ -506,7 +504,7 @@ class BackgroundStepTracker {
                 // Use HealthKit for iOS background tracking
                 await this.startHealthKitTracking();
             } else {
-                // Use Expo Pedometer for foreground tracking
+                // Use Expo Pedometer for Android and other platforms
                 await this.startPedometerTracking();
             }
 
@@ -631,6 +629,12 @@ class BackgroundStepTracker {
     private async syncDailyStepsFromDevice() {
         try {
             // Get steps from midnight (00:00) of today until now
+            // Android doesn't support getStepCountAsync
+            if (Platform.OS === 'android') {
+                console.log('🤖 Android: getStepCountAsync not supported, using fallback');
+                return 0;
+            }
+
             const startOfToday = new Date();
             startOfToday.setHours(0, 0, 0, 0);
             
@@ -806,8 +810,12 @@ class BackgroundStepTracker {
             // Stop all background services
             await this.disablePersistentTracking();
             
+            // Additional cleanup for Android if needed
+            console.log('✅ Step tracking cleanup completed');
+            
             // Stop foreground service
             try {
+                const { default: ForegroundStepService } = await import('./ForegroundStepService');
                 await ForegroundStepService.stopService();
             } catch (error) {
                 console.warn('⚠️ Failed to stop foreground service:', error);
@@ -911,16 +919,27 @@ class BackgroundStepTracker {
         try {
             console.log('🔄 Resyncing steps from sensor...');
             
+            let steps = 0;
+            
             // Get steps from midnight of today until now
+            // Android doesn't support getStepCountAsync
+            if (Platform.OS === 'android') {
+                console.log('🤖 Android: getStepCountAsync not supported in manual sync');
+                return this.lastStepCount;
+            }
+
             const sinceMidnight = new Date();
             sinceMidnight.setHours(0, 0, 0, 0);
             
-            const { steps } = await Pedometer.getStepCountAsync(
+            const { steps: deviceSteps } = await Pedometer.getStepCountAsync(
                 sinceMidnight,
                 new Date()
             );
             
+            steps = deviceSteps;
             console.log(`📊 Resync: Retrieved ${steps} steps from sensor, current stored: ${this.lastStepCount}`);
+            
+            console.log(`📊 Current stored: ${this.lastStepCount}`);
             
             // Get current database value to ensure we don't lose persisted data
             const today = new Date().toISOString().split('T')[0];

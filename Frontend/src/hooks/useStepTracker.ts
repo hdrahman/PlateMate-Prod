@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import UnifiedStepTracker from '../services/UnifiedStepTracker';
+import SimpleStepTracker from '../services/SimpleStepTracker';
 import { Pedometer } from 'expo-sensors';
 
 export interface StepHistoryItem {
@@ -46,7 +46,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             setLoading(true);
             try {
                 // Get today's steps
-                const steps = UnifiedStepTracker.getCurrentSteps();
+                const steps = SimpleStepTracker.getCurrentSteps();
                 setTodaySteps(steps);
 
                 // Get step history (simplified for now - unified tracker focuses on today)
@@ -65,7 +65,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
     // Set up step counter listener
     useEffect(() => {
-        const unsubscribe = UnifiedStepTracker.addListener((steps) => {
+        const unsubscribe = SimpleStepTracker.addListener((steps) => {
             setTodaySteps(steps);
 
             // Also update history for today
@@ -87,7 +87,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         });
 
         // Update tracking status
-        setIsTracking(UnifiedStepTracker.isTracking());
+        setIsTracking(SimpleStepTracker.isCurrentlyTracking());
 
         // Cleanup listener on unmount
         return () => {
@@ -99,14 +99,14 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
     const startTracking = async () => {
         if (!isAvailable) return;
 
-        await UnifiedStepTracker.startTracking();
-        setIsTracking(UnifiedStepTracker.isTracking());
+        await SimpleStepTracker.startTracking();
+        setIsTracking(SimpleStepTracker.isCurrentlyTracking());
     };
 
     // Stop tracking steps
     const stopTracking = async () => {
-        await UnifiedStepTracker.stopTracking();
-        setIsTracking(UnifiedStepTracker.isTracking());
+        await SimpleStepTracker.stopTracking();
+        setIsTracking(SimpleStepTracker.isCurrentlyTracking());
     };
 
     // Refresh step data (useful when steps are manually added)
@@ -114,11 +114,8 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         try {
             console.log('🔄 Refreshing step data...');
             
-            // Force sync unified tracker
-            await UnifiedStepTracker.forceSync();
-            
             // Get updated today's steps
-            const steps = UnifiedStepTracker.getCurrentSteps();
+            const steps = SimpleStepTracker.getCurrentSteps();
             setTodaySteps(steps);
 
             // Update history for today

@@ -179,7 +179,7 @@ class PersistentStepTracker {
     }
 
     /**
-     * Get steps directly from sensor (fallback method)
+     * Get steps directly from sensor (fallback method) - Android compatible
      */
     private async getSensorSteps(): Promise<number> {
         try {
@@ -189,7 +189,13 @@ class PersistentStepTracker {
                 return 0;
             }
 
-            // Get steps from midnight until now
+            // Android doesn't support getStepCountAsync, so return 0 as fallback
+            if (Platform.OS === 'android') {
+                console.log('🤖 Android: getStepCountAsync not supported, returning 0');
+                return 0;
+            }
+
+            // Get steps from midnight until now (iOS only)
             const sinceMidnight = new Date();
             sinceMidnight.setHours(0, 0, 0, 0);
             
@@ -302,16 +308,22 @@ class PersistentStepTracker {
             } catch (startError) {
                 console.error('❌ Failed to start background service:', startError);
                 
-                // Better error handling for different types of errors
+                // Enhanced error handling for Android 14+ compatibility issues
                 if (startError.message) {
                     if (startError.message.includes('ForegroundService') || 
                         startError.message.includes('foreground service') ||
-                        startError.message.includes('FOREGROUND_SERVICE')) {
-                        console.error('❌ Android foreground service error - check manifest permissions');
+                        startError.message.includes('FOREGROUND_SERVICE') ||
+                        startError.message.includes('PendingIntent') ||
+                        startError.message.includes('FLAG_MUTABLE') ||
+                        startError.message.includes('SDK_INT >= 34')) {
+                        console.error('❌ Android 14+ compatibility error - foreground service restrictions');
                         // Don't throw error, just log and continue without persistent tracking
                         this.isServiceRunning = false;
                         await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
-                        console.warn('⚠️ Continuing without persistent step tracking due to foreground service restrictions');
+                        console.warn('⚠️ Continuing without persistent step tracking due to Android 14+ restrictions');
+                        
+                        // Continue without persistent tracking on Android 14+
+                        console.warn('⚠️ Background service not available on this Android version');
                         return;
                     }
                     
@@ -444,18 +456,30 @@ class PersistentStepTracker {
     }
 
     /**
-     * Force sync current steps immediately
+     * Force sync current steps immediately - Android compatible
      */
     public async forceSyncSteps(): Promise<number> {
         try {
             console.log('🔄 Forcing immediate step sync...');
             
-            // Get current steps directly from sensor
-            const sinceMidnight = new Date();
-            sinceMidnight.setHours(0, 0, 0, 0);
+            let currentSteps = this.lastKnownStepCount;
             
-            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-            const currentSteps = result.steps;
+            // Only try sensor reading on iOS
+            if (Platform.OS === 'ios') {
+                try {
+                    // Get current steps directly from sensor
+                    const sinceMidnight = new Date();
+                    sinceMidnight.setHours(0, 0, 0, 0);
+                    
+                    const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+                    currentSteps = result.steps;
+                    console.log(`📊 iOS force sync: ${currentSteps} steps from sensor`);
+                } catch (sensorError) {
+                    console.warn('⚠️ iOS sensor reading failed, using cached value:', sensorError);
+                }
+            } else {
+                console.log('🤖 Android: Force sync using cached step count:', currentSteps);
+            }
             
             // Update database and cache
             await updateTodaySteps(currentSteps);

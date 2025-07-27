@@ -271,6 +271,12 @@ class UnifiedStepTracker {
 
     private async syncFromSensor(): Promise<void> {
         try {
+            // Android doesn't support getStepCountAsync
+            if (Platform.OS === 'android') {
+                console.log('🤖 Android: getStepCountAsync not supported, skipping sensor sync');
+                return;
+            }
+            
             const sinceMidnight = new Date();
             sinceMidnight.setHours(0, 0, 0, 0);
             
@@ -347,7 +353,14 @@ class UnifiedStepTracker {
         
         while (BackgroundService.isRunning()) {
             try {
-                // Get current step count from sensor
+                // Android doesn't support getStepCountAsync
+                if (Platform.OS === 'android') {
+                    console.log('🤖 Android: getStepCountAsync not supported in background task');
+                    await this.sleep(delay);
+                    continue;
+                }
+                
+                // Get current step count from sensor (iOS only)
                 const sinceMidnight = new Date();
                 sinceMidnight.setHours(0, 0, 0, 0);
                 
