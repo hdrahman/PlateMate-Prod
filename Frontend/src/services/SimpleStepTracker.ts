@@ -1,8 +1,9 @@
 import { Platform, PermissionsAndroid, AppState, AppStateStatus } from 'react-native';
 import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../utils/database';
+import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog, getTodayCalories, getUserGoals, getCurrentUserId } from '../utils/database';
 import BackgroundService from 'react-native-background-actions';
+import SettingsService from './SettingsService';
 
 // Simple storage keys
 const STEP_TRACKING_ENABLED_KEY = 'STEP_TRACKING_ENABLED';
@@ -27,6 +28,15 @@ class SimpleStepTracker {
 
     private constructor() {
         this.setupAppStateHandler();
+        this.initializeNotificationService();
+    }
+
+    /**
+     * Initialize the notification service - REMOVED
+     * Now using background service notification directly
+     */
+    private async initializeNotificationService(): Promise<void> {
+        // No longer needed - using background service notification
     }
 
     public static getInstance(): SimpleStepTracker {
@@ -84,6 +94,8 @@ class SimpleStepTracker {
             console.log('📊 Performing initial step sync...');
             await this.updateStepsFromDevice();
 
+            // Initial notification is shown by background service
+
             console.log('✅ Step tracking started successfully');
             return true;
         } catch (error) {
@@ -115,6 +127,8 @@ class SimpleStepTracker {
             // Final save
             await this.saveSteps();
 
+            // Background service notification automatically hidden when service stops
+
             console.log('✅ Step tracking stopped');
         } catch (error) {
             console.error('❌ Error stopping step tracking:', error);
@@ -141,6 +155,17 @@ class SimpleStepTracker {
     public addListener(callback: (steps: number) => void): () => void {
         this.listeners.add(callback);
         return () => this.listeners.delete(callback);
+    }
+
+    /**
+     * Update notification with current step count
+     * Now uses background service notification directly
+     */
+    public async updateNotificationGoal(): Promise<void> {
+        // Update background service notification with comprehensive data
+        if (this.isTracking) {
+            await this.updateNotification();
+        }
     }
 
     /**
@@ -185,7 +210,7 @@ class SimpleStepTracker {
                 // Load existing steps
                 const savedSteps = await AsyncStorage.getItem(TODAY_STEPS_KEY);
                 const dbSteps = await getStepsForDate(today);
-                
+
                 // Use the higher value
                 this.currentSteps = Math.max(
                     savedSteps ? parseInt(savedSteps, 10) : 0,
@@ -205,10 +230,12 @@ class SimpleStepTracker {
      */
     private async startAndroidBackgroundService(): Promise<void> {
         try {
+            const { title, desc } = await this.getNotificationData();
+            
             const options = {
                 taskName: 'PlateMate Step Counter',
-                taskTitle: '🚶 Counting your steps',
-                taskDesc: `${this.currentSteps.toLocaleString()} steps today`,
+                taskTitle: title,
+                taskDesc: desc,
                 taskIcon: {
                     name: 'ic_launcher',
                     type: 'mipmap',
@@ -220,7 +247,7 @@ class SimpleStepTracker {
 
             await BackgroundService.start(this.backgroundTask, options);
             this.backgroundServiceRunning = true;
-            console.log('✅ Android background service started');
+            console.log('✅ Android background service started with comprehensive notification');
         } catch (error) {
             console.error('❌ Failed to start Android background service:', error);
             // Fallback to foreground tracking
@@ -233,24 +260,24 @@ class SimpleStepTracker {
      */
     private backgroundTask = async (taskDataArguments: any) => {
         const { delay = 30000 } = taskDataArguments || {};
-        
+
         console.log('🔄 Background task started with delay:', delay);
-        
+
         try {
             // Set up step watching for Android background
             this.setupStepWatching();
-            
+
             // Keep the background service alive
             while (BackgroundService.isRunning()) {
                 try {
                     console.log(`📊 Background heartbeat: ${this.currentSteps} steps`);
-                    
-                    // Update notification periodically
+
+                    // Update notification with comprehensive data
                     await this.updateNotification();
-                    
+
                     // Save steps periodically
                     await this.saveSteps();
-                    
+
                 } catch (error) {
                     console.error('❌ Background heartbeat error:', error);
                 }
@@ -260,7 +287,7 @@ class SimpleStepTracker {
         } catch (error) {
             console.error('❌ Background task setup error:', error);
         }
-        
+
         console.log('🔴 Background task ended');
     };
 
@@ -270,20 +297,20 @@ class SimpleStepTracker {
     private setupStepWatching(): void {
         try {
             console.log('📊 Setting up step watching...');
-            
+
             // Clean up existing subscription
             if (this.stepWatchSubscription) {
                 this.stepWatchSubscription.remove();
             }
-            
+
             let isFirstReading = true;
-            
+
             // Use watchStepCount which works on Android
             this.stepWatchSubscription = Pedometer.watchStepCount((result) => {
                 const sessionSteps = result.steps; // Steps since watching started
-                
+
                 console.log(`📊 Step watch: ${sessionSteps} session steps`);
-                
+
                 if (isFirstReading) {
                     // First reading - establish baseline
                     this.sessionBaseline = sessionSteps;
@@ -291,32 +318,34 @@ class SimpleStepTracker {
                     console.log(`📊 Session baseline set: ${this.sessionBaseline}`);
                     return;
                 }
-                
+
                 // Handle session resets (can happen after background/OS optimizations)
                 if (sessionSteps < this.sessionBaseline) {
                     console.log('🔄 Session reset detected, adjusting baseline');
                     this.sessionBaseline = sessionSteps;
                     return;
                 }
-                
+
                 // Calculate new steps taken in this session
                 const newStepsTaken = Math.max(0, sessionSteps - this.sessionBaseline);
-                
+
                 if (newStepsTaken > 0) {
                     // Add new steps to our current total
                     const newTotalSteps = this.currentSteps + newStepsTaken;
-                    
+
                     console.log(`📊 New steps detected: +${newStepsTaken} steps (${this.currentSteps} → ${newTotalSteps})`);
-                    
+
                     // Update the session baseline for next calculation
                     this.sessionBaseline = sessionSteps;
-                    
+
                     // Update step count
                     this.currentSteps = newTotalSteps;
                     this.notifyListeners();
+
+                    // Notification will be updated by background task
                 }
             });
-            
+
             console.log('✅ Step watching set up successfully');
         } catch (error) {
             console.error('❌ Error setting up step watching:', error);
@@ -329,7 +358,7 @@ class SimpleStepTracker {
     private startForegroundTracking(): void {
         // Set up step watching
         this.setupStepWatching();
-        
+
         // Update steps every 30 seconds when app is active
         this.updateInterval = setInterval(async () => {
             if (AppState.currentState === 'active') {
@@ -347,29 +376,31 @@ class SimpleStepTracker {
     private async updateStepsFromDevice(): Promise<void> {
         try {
             console.log('📊 Updating steps from device...');
-            
+
             // On Android, we can't use getStepCountAsync, so we rely on the step watching
             // This method now just ensures step watching is active and saves current state
             if (Platform.OS === 'android') {
                 console.log('🤖 Android: Ensuring step watching is active...');
-                
+
                 // Make sure step watching is set up
                 if (!this.stepWatchSubscription) {
                     this.setupStepWatching();
                 }
-                
+
                 // Save current steps and notify listeners
                 await this.saveSteps();
                 this.notifyListeners();
-                
+
+                // Background service handles notification updates
+
                 console.log(`📊 Android step update: ${this.currentSteps} steps (using watch-based tracking)`);
                 return;
             }
-            
+
             // iOS can still use getStepCountAsync
             const sinceMidnight = new Date();
             sinceMidnight.setHours(0, 0, 0, 0);
-            
+
             const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
             const deviceSteps = result.steps;
 
@@ -379,20 +410,25 @@ class SimpleStepTracker {
             if (deviceSteps > this.currentSteps || this.currentSteps === 0) {
                 const previousSteps = this.currentSteps;
                 this.currentSteps = deviceSteps;
-                
+
                 console.log(`📊 iOS updating from ${previousSteps} to ${this.currentSteps} steps`);
-                
+
                 await this.saveSteps();
                 this.notifyListeners();
+
+                // Background service handles notification updates
             } else {
                 console.log('📊 iOS: No update needed');
             }
         } catch (error) {
             console.error('❌ Error updating steps from device:', error);
-            
+
             // On error, just save current state and continue
             await this.saveSteps();
             this.notifyListeners();
+
+            // Update notification
+            await StepNotificationService.updateNotification(this.currentSteps);
         }
     }
 
@@ -402,34 +438,125 @@ class SimpleStepTracker {
     private async saveSteps(): Promise<void> {
         try {
             const today = new Date().toISOString().split('T')[0];
-            
+
             // Save to AsyncStorage
             await AsyncStorage.setItem(TODAY_STEPS_KEY, this.currentSteps.toString());
-            
+
             // Save to database
             await updateTodaySteps(this.currentSteps);
-            
+
             // Sync with exercise log
             if (this.currentSteps > 0) {
                 await syncStepsWithExerciseLog(this.currentSteps, today);
             }
 
             this.notifyListeners();
+
+            // Background service handles notification updates
         } catch (error) {
             console.error('Error saving steps:', error);
         }
     }
 
     /**
-     * Update Android notification
+     * Get comprehensive notification data
+     */
+    private async getNotificationData(): Promise<{ title: string; desc: string }> {
+        try {
+            const userId = await getCurrentUserId();
+            if (!userId) {
+                return {
+                    title: `${this.currentSteps.toLocaleString()} steps today`,
+                    desc: 'Ready to track your nutrition and fitness journey'
+                };
+            }
+
+            const [todayCalories, userGoals] = await Promise.all([
+                getTodayCalories(),
+                getUserGoals(userId)
+            ]);
+
+            const calorieGoal = userGoals?.calorieGoal || 2000;
+            const caloriesRemaining = Math.max(0, calorieGoal - todayCalories);
+            const nextMealTime = await this.getNextMealTime();
+
+            return {
+                title: `${caloriesRemaining} calories remaining`,
+                desc: `${this.currentSteps.toLocaleString()} steps today • ${nextMealTime}`
+            };
+        } catch (error) {
+            console.error('Error getting notification data:', error);
+            return {
+                title: `${this.currentSteps.toLocaleString()} steps today`,
+                desc: 'Tracking your nutrition and fitness journey'
+            };
+        }
+    }
+
+    /**
+     * Get next meal time
+     */
+    private async getNextMealTime(): Promise<string> {
+        try {
+            const settings = await SettingsService.getNotificationSettings();
+            const mealTimes = {
+                breakfast: settings.mealReminders.breakfast || '07:00',
+                lunch: settings.mealReminders.lunch || '12:00',
+                dinner: settings.mealReminders.dinner || '19:00',
+            };
+
+            const now = new Date();
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const timeToMinutes = (timeStr: string) => {
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes;
+            };
+
+            const currentMinutes = timeToMinutes(currentTime);
+            const breakfastMinutes = timeToMinutes(mealTimes.breakfast);
+            const lunchMinutes = timeToMinutes(mealTimes.lunch);
+            const dinnerMinutes = timeToMinutes(mealTimes.dinner);
+
+            if (currentMinutes < breakfastMinutes) {
+                const minutesUntil = breakfastMinutes - currentMinutes;
+                const hours = Math.floor(minutesUntil / 60);
+                const mins = minutesUntil % 60;
+                return hours > 0 ? `${hours}h ${mins}m until breakfast` : `${mins}m until breakfast`;
+            } else if (currentMinutes < lunchMinutes) {
+                const minutesUntil = lunchMinutes - currentMinutes;
+                const hours = Math.floor(minutesUntil / 60);
+                const mins = minutesUntil % 60;
+                return hours > 0 ? `${hours}h ${mins}m until lunch` : `${mins}m until lunch`;
+            } else if (currentMinutes < dinnerMinutes) {
+                const minutesUntil = dinnerMinutes - currentMinutes;
+                const hours = Math.floor(minutesUntil / 60);
+                const mins = minutesUntil % 60;
+                return hours > 0 ? `${hours}h ${mins}m until dinner` : `${mins}m until dinner`;
+            } else {
+                const minutesUntilTomorrow = (24 * 60) - currentMinutes + breakfastMinutes;
+                const hours = Math.floor(minutesUntilTomorrow / 60);
+                const mins = minutesUntilTomorrow % 60;
+                return hours > 0 ? `${hours}h until breakfast` : `${mins}m until breakfast`;
+            }
+        } catch (error) {
+            console.error('Error calculating next meal time:', error);
+            return '1h 30m until next meal';
+        }
+    }
+
+    /**
+     * Update Android notification with comprehensive data
      */
     private async updateNotification(): Promise<void> {
         if (Platform.OS === 'android' && this.backgroundServiceRunning) {
             try {
+                const { title, desc } = await this.getNotificationData();
+                
                 await BackgroundService.updateNotification({
                     taskName: 'PlateMate Step Counter',
-                    taskTitle: '🚶 Counting your steps',
-                    taskDesc: `${this.currentSteps.toLocaleString()} steps today`,
+                    taskTitle: title,
+                    taskDesc: desc,
                     taskIcon: {
                         name: 'ic_launcher',
                         type: 'mipmap',
@@ -475,10 +602,10 @@ class SimpleStepTracker {
     public async autoStart(): Promise<void> {
         try {
             console.log('🔄 SimpleStepTracker autoStart called');
-            
+
             const wasEnabled = await AsyncStorage.getItem(STEP_TRACKING_ENABLED_KEY);
             console.log('📊 Previous step tracking state:', wasEnabled);
-            
+
             if (wasEnabled === 'true') {
                 console.log('🔄 Auto-starting step tracking (was previously enabled)...');
                 await this.startTracking();

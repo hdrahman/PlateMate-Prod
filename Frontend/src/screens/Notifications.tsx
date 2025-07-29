@@ -22,7 +22,7 @@ import { NotificationSettings } from '../types/notifications';
 import SettingsService from '../services/SettingsService';
 import NotificationService from '../services/NotificationService';
 import WheelPicker from '../components/WheelPicker';
-import PermanentNotificationService from '../services/PermanentNotificationService';
+import StepNotificationService from '../services/StepNotificationService';
 
 // Define theme colors - matching the app's dark theme
 const PRIMARY_BG = '#000000';
@@ -436,11 +436,11 @@ export default function NotificationsScreen() {
             }
 
             if (enabled) {
-                // Start the permanent notification service
-                await PermanentNotificationService.startPermanentNotification();
+                // Start the step notification service
+                await StepNotificationService.showStepNotification(0);
             } else {
-                // Stop the permanent notification service
-                await PermanentNotificationService.stopPermanentNotification();
+                // Stop the step notification service
+                await StepNotificationService.hideNotification();
             }
         } catch (error) {
             console.error('Error toggling permanent notification:', error);
@@ -452,9 +452,9 @@ export default function NotificationsScreen() {
         try {
             await handleToggle(`permanentNotification.${path}`, value);
 
-            // If the permanent notification is currently running, update it
-            if (PermanentNotificationService.isNotificationRunning()) {
-                await PermanentNotificationService.updateNotificationContent();
+            // If the step notification is currently running, update it
+            if (await StepNotificationService.isNotificationActive()) {
+                await StepNotificationService.updateNotification(0);
             }
         } catch (error) {
             console.error(`Error updating permanent notification setting ${path}:`, error);

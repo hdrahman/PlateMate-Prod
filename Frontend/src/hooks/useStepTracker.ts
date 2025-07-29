@@ -15,6 +15,7 @@ export interface UseStepTrackerResult {
     startTracking: () => Promise<void>;
     stopTracking: () => void;
     refreshStepData: () => Promise<void>;
+    setCalorieGoal: (calories: number) => Promise<void>;
     loading: boolean;
 }
 
@@ -129,6 +130,11 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         }
     };
 
+    // Set calorie goal for notifications
+    const setCalorieGoal = async (calories: number) => {
+        await SimpleStepTracker.setCalorieGoal(calories);
+    };
+
     return {
         todaySteps,
         stepHistory,
@@ -137,6 +143,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         startTracking,
         stopTracking,
         refreshStepData,
+        setCalorieGoal,
         loading
     };
 } 

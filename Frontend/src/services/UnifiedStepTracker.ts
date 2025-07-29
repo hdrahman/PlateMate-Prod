@@ -3,6 +3,7 @@ import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../utils/database';
 import BackgroundService from 'react-native-background-actions';
+import StepNotificationService from './StepNotificationService';
 
 // Conditional imports
 let notifee: any = null;
@@ -51,7 +52,7 @@ class UnifiedStepTracker {
     private listeners: Set<(steps: number) => void> = new Set();
     private sessionBaseline: number = 0;
     private isFirstReading: boolean = true;
-    private notificationUpdateInterval: NodeJS.Timeout | null = null;
+    // Notifications are now handled by StepNotificationService
 
     private constructor() {
         this.initialize();
@@ -105,7 +106,7 @@ class UnifiedStepTracker {
 
                 const granted = await PermissionsAndroid.requestMultiple(permissions);
                 const activityGranted = granted[PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION] === PermissionsAndroid.RESULTS.GRANTED;
-                
+
                 this.state.hasPermissions = activityGranted;
                 console.log(`📱 Android permissions: Activity=${activityGranted}`);
             } else {
@@ -161,7 +162,7 @@ class UnifiedStepTracker {
     private async saveCurrentState(): Promise<void> {
         try {
             console.log(`💾 Saving current state: ${this.state.currentSteps} steps`);
-            
+
             await Promise.all([
                 AsyncStorage.setItem(LAST_STEP_COUNT_KEY, this.state.currentSteps.toString()),
                 this.syncToDatabase()
@@ -174,16 +175,16 @@ class UnifiedStepTracker {
     private async performAppResumeRecovery(): Promise<void> {
         try {
             console.log('🔄 Performing app resume recovery...');
-            
+
             // Get latest step count from sensor
             await this.syncFromSensor();
-            
+
             // Restart background service if needed
             if (this.state.isTracking && !this.state.isBackgroundServiceRunning) {
                 console.log('🔄 Restarting background service...');
                 await this.startBackgroundService();
             }
-            
+
             console.log('✅ App resume recovery completed');
         } catch (error) {
             console.error('❌ App resume recovery failed:', error);
@@ -276,12 +277,12 @@ class UnifiedStepTracker {
                 console.log('🤖 Android: getStepCountAsync not supported, skipping sensor sync');
                 return;
             }
-            
+
             const sinceMidnight = new Date();
             sinceMidnight.setHours(0, 0, 0, 0);
-            
+
             const { steps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-            
+
             if (steps > this.state.currentSteps) {
                 console.log(`📊 Syncing from sensor: ${steps} steps`);
                 this.updateStepCount(steps);
@@ -320,8 +321,7 @@ class UnifiedStepTracker {
             await BackgroundService.start(this.backgroundTask, options);
             this.state.isBackgroundServiceRunning = true;
 
-            // Start notification updates
-            this.startNotificationUpdates();
+            // Background service notification is handled by the service itself
 
             console.log('✅ Background service started');
         } catch (error) {
@@ -350,7 +350,7 @@ class UnifiedStepTracker {
 
     private backgroundTask = async (taskDataArguments: any) => {
         const { delay = 5000 } = taskDataArguments || {};
-        
+
         while (BackgroundService.isRunning()) {
             try {
                 // Android doesn't support getStepCountAsync
@@ -359,36 +359,36 @@ class UnifiedStepTracker {
                     await this.sleep(delay);
                     continue;
                 }
-                
+
                 // Get current step count from sensor (iOS only)
                 const sinceMidnight = new Date();
                 sinceMidnight.setHours(0, 0, 0, 0);
-                
+
                 const { steps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-                
+
                 // Update if different
                 if (steps !== this.state.currentSteps) {
                     this.state.currentSteps = steps;
-                    
+
                     // Save to storage
                     await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString());
-                    
+
                     // Update database periodically (every 50 steps or 5 minutes)
                     const now = Date.now();
                     const lastUpdate = parseInt(await AsyncStorage.getItem('LAST_DB_UPDATE') || '0');
-                    
+
                     if (steps % 50 === 0 || (now - lastUpdate) > 300000) { // 5 minutes
                         await this.syncToDatabase();
                         await AsyncStorage.setItem('LAST_DB_UPDATE', now.toString());
                     }
-                    
+
                     // Update notification immediately
                     await this.updateNotification();
-                    
+
                     // Notify app listeners
                     this.notifyListeners(steps);
                 }
-                
+
                 await this.sleep(delay);
             } catch (error) {
                 console.error('❌ Background task error:', error);
@@ -401,35 +401,7 @@ class UnifiedStepTracker {
         return new Promise((resolve) => setTimeout(resolve, time));
     };
 
-    private startNotificationUpdates(): void {
-        if (this.notificationUpdateInterval) return;
-
-        // Update notification every 2 seconds for real-time feel
-        this.notificationUpdateInterval = setInterval(() => {
-            this.updateNotification();
-        }, 2000);
-    }
-
-    private async updateNotification(): Promise<void> {
-        if (!this.state.isBackgroundServiceRunning) return;
-
-        try {
-            const today = new Date().toLocaleDateString();
-            const formattedSteps = this.state.currentSteps.toLocaleString();
-            
-            await BackgroundService.updateNotification({
-                taskName: 'PlateMate Step Tracker',
-                taskTitle: '🚶 Step Tracking Active',
-                taskDesc: `${formattedSteps} steps today (${today})`,
-                taskIcon: {
-                    name: 'ic_launcher',
-                    type: 'mipmap',
-                },
-            });
-        } catch (error) {
-            console.error('❌ Error updating notification:', error);
-        }
-    }
+    // Notification updates are now handled by StepNotificationService
 
     private updateStepCount(steps: number): void {
         if (steps === this.state.currentSteps) return;
@@ -440,6 +412,8 @@ class UnifiedStepTracker {
         // Save to cache immediately
         AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString());
 
+        // Background service handles its own notification updates
+
         // Notify listeners
         this.notifyListeners(steps);
 
@@ -449,9 +423,9 @@ class UnifiedStepTracker {
     private async syncToDatabase(): Promise<void> {
         try {
             const today = new Date().toISOString().split('T')[0];
-            
+
             await updateTodaySteps(this.state.currentSteps);
-            
+
             if (this.state.currentSteps > 0) {
                 await syncStepsWithExerciseLog(this.state.currentSteps, today);
             }
@@ -483,11 +457,7 @@ class UnifiedStepTracker {
                 this.state.isBackgroundServiceRunning = false;
             }
 
-            // Stop notification updates
-            if (this.notificationUpdateInterval) {
-                clearInterval(this.notificationUpdateInterval);
-                this.notificationUpdateInterval = null;
-            }
+            // Background service notification automatically removed
 
             // Update state
             this.state.isTracking = false;
@@ -531,15 +501,15 @@ class UnifiedStepTracker {
     public async addManualSteps(stepsToAdd: number): Promise<number> {
         try {
             console.log(`🚶 Adding ${stepsToAdd} manual steps...`);
-            
+
             const newStepCount = this.state.currentSteps + stepsToAdd;
-            
+
             // Update step count
             this.updateStepCount(newStepCount);
-            
+
             // Sync to database immediately
             await this.syncToDatabase();
-            
+
             console.log(`✅ Manual steps added: ${stepsToAdd}, new total: ${newStepCount}`);
             return newStepCount;
         } catch (error) {
@@ -554,10 +524,7 @@ class UnifiedStepTracker {
             this.appStateSubscription = null;
         }
 
-        if (this.notificationUpdateInterval) {
-            clearInterval(this.notificationUpdateInterval);
-            this.notificationUpdateInterval = null;
-        }
+        // Cleanup is now handled by StepNotificationService
 
         this.listeners.clear();
         console.log('🧹 Unified Step Tracker destroyed');
