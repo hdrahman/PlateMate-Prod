@@ -355,8 +355,12 @@ export default function Home() {
       if (profileLoading) return;
 
       try {
-        setFoodLoading(true);
-        setMacrosLoading(true);
+        // Only set loading states if we don't have data yet (prevent flickering on refresh)
+        const hasExistingData = consumedCalories !== 0 || nutrientTotals.calories !== undefined;
+        if (!hasExistingData) {
+          setFoodLoading(true);
+          setMacrosLoading(true);
+        }
 
         // Only refresh logs if context data is uninitialized (avoid false positives for 0 values)
         if (nutrientTotals.calories === undefined || nutrientTotals.protein === undefined) {
@@ -389,7 +393,10 @@ export default function Home() {
           macrosLoading: macrosLoading
         });
 
-        // Load exercise calories
+        // Load exercise calories (only set loading if we don't have data yet)
+        if (exerciseCalories === 0) {
+          setExerciseLoading(true);
+        }
         const todayExerciseCals = await getTodayExerciseCalories();
         setExerciseCalories(todayExerciseCals);
 
@@ -419,6 +426,7 @@ export default function Home() {
       } catch (error) {
         console.error('Error loading today nutrients:', error);
       } finally {
+        // Always reset loading states
         setFoodLoading(false);
         setMacrosLoading(false);
         setExerciseLoading(false);
@@ -426,7 +434,7 @@ export default function Home() {
     };
 
     loadTodayNutrients();
-  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user, macroGoals]);
+  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user, macroGoals, consumedCalories, exerciseCalories]);
 
   // Load weight history only once when the component mounts
   useEffect(() => {
