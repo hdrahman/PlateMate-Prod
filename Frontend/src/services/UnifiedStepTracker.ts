@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../utils/database';
 import BackgroundService from 'react-native-background-actions';
 import StepNotificationService from './StepNotificationService';
+import HealthKitStepCounter from './HealthKitStepCounter';
+import NativeStepCounter from './NativeStepCounter';
 
 // Conditional imports
 let notifee: any = null;
@@ -36,6 +38,9 @@ interface StepTrackerState {
     currentSteps: number;
     hasPermissions: boolean;
     isBackgroundServiceRunning: boolean;
+    healthKitInitialized: boolean;
+    nativeStepCounterAvailable: boolean;
+    isInitialized: boolean;
 }
 
 class UnifiedStepTracker {
@@ -44,7 +49,10 @@ class UnifiedStepTracker {
         isTracking: false,
         currentSteps: 0,
         hasPermissions: false,
-        isBackgroundServiceRunning: false
+        isBackgroundServiceRunning: false,
+        healthKitInitialized: false,
+        nativeStepCounterAvailable: false,
+        isInitialized: false
     };
 
     private pedometerSubscription: { remove: () => void } | null = null;
@@ -55,7 +63,8 @@ class UnifiedStepTracker {
     // Notifications are now handled by StepNotificationService
 
     private constructor() {
-        this.initialize();
+        // Don't initialize immediately - wait for explicit call
+        console.log('🔧 UnifiedStepTracker constructor called');
     }
 
     public static getInstance(): UnifiedStepTracker {
@@ -70,27 +79,57 @@ class UnifiedStepTracker {
             console.log('🚀 Initializing Unified Step Tracker...');
 
             // Set up app state listener
-            this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+            try {
+                this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+                console.log('✅ App state listener set up');
+            } catch (error) {
+                console.error('❌ Failed to set up app state listener:', error);
+            }
 
             // Check date and reset if needed
-            await this.checkDateAndResetIfNeeded();
+            try {
+                await this.checkDateAndResetIfNeeded();
+                console.log('✅ Date check completed');
+            } catch (error) {
+                console.error('❌ Failed to check date:', error);
+            }
 
             // Load previous state
-            await this.loadPreviousState();
+            try {
+                await this.loadPreviousState();
+                console.log('✅ Previous state loaded');
+            } catch (error) {
+                console.error('❌ Failed to load previous state:', error);
+            }
 
             // Request permissions
-            await this.requestAllPermissions();
+            try {
+                await this.requestAllPermissions();
+                console.log('✅ Permissions requested');
+            } catch (error) {
+                console.error('❌ Failed to request permissions:', error);
+            }
 
             // Check if tracking was enabled before
-            const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
-            if (wasEnabled === 'true' && this.state.hasPermissions) {
-                console.log('🔄 Restarting step tracking after app restart');
-                await this.startTracking();
+            try {
+                const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
+                if (wasEnabled === 'true' && this.state.hasPermissions) {
+                    console.log('🔄 Restarting step tracking after app restart');
+                    await this.startTracking();
+                }
+            } catch (error) {
+                console.error('❌ Failed to restart tracking:', error);
             }
 
             console.log('✅ Unified Step Tracker initialized');
         } catch (error) {
             console.error('❌ Failed to initialize Unified Step Tracker:', error);
+            // Continue initialization to prevent app crash
+            console.log('ℹ️ Continuing with degraded step tracking capabilities');
+        } finally {
+            // Mark as initialized even if there were errors
+            this.state.isInitialized = true;
+            console.log('✅ UnifiedStepTracker marked as initialized');
         }
     }
 
@@ -99,6 +138,7 @@ class UnifiedStepTracker {
             console.log('📱 Requesting step tracking permissions...');
 
             if (isAndroid) {
+                // Android permissions
                 const permissions = [
                     PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
                     'android.permission.BODY_SENSORS'
@@ -108,8 +148,36 @@ class UnifiedStepTracker {
                 const activityGranted = granted[PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION] === PermissionsAndroid.RESULTS.GRANTED;
 
                 this.state.hasPermissions = activityGranted;
-                console.log(`📱 Android permissions: Activity=${activityGranted}`);
+                
+                // Check native step counter availability
+                try {
+                    console.log('🔍 Checking native step counter availability...');
+                    this.state.nativeStepCounterAvailable = await NativeStepCounter.isAvailable();
+                    console.log('✅ Native step counter check completed:', this.state.nativeStepCounterAvailable);
+                } catch (error) {
+                    console.error('❌ Failed to check native step counter availability:', error);
+                    this.state.nativeStepCounterAvailable = false;
+                }
+                
+                console.log(`📱 Android permissions: Activity=${activityGranted}, NativeStepCounter=${this.state.nativeStepCounterAvailable}`);
             } else {
+                // iOS - Initialize HealthKit
+                try {
+                    console.log('🔍 Checking HealthKit availability...');
+                    const healthKitAvailable = await HealthKitStepCounter.isAvailable();
+                    console.log('✅ HealthKit availability check completed:', healthKitAvailable);
+                    
+                    if (healthKitAvailable) {
+                        console.log('🔄 Initializing HealthKit...');
+                        const healthKitInitialized = await HealthKitStepCounter.initialize();
+                        this.state.healthKitInitialized = healthKitInitialized;
+                        console.log(`📱 iOS HealthKit initialized: ${healthKitInitialized}`);
+                    }
+                } catch (error) {
+                    console.error('❌ HealthKit initialization failed:', error);
+                    this.state.healthKitInitialized = false;
+                }
+                
                 this.state.hasPermissions = true;
             }
 
@@ -199,6 +267,12 @@ class UnifiedStepTracker {
 
         try {
             console.log('🚀 Starting unified step tracking...');
+            
+            // Initialize if not already done
+            if (!this.appStateSubscription) {
+                console.log('🔧 Performing deferred initialization...');
+                await this.initialize();
+            }
 
             if (!this.state.hasPermissions) {
                 const hasPermissions = await this.requestAllPermissions();
@@ -228,64 +302,127 @@ class UnifiedStepTracker {
 
     private async startPedometerTracking(): Promise<void> {
         try {
-            const available = await Pedometer.isAvailableAsync();
-            if (!available) {
-                throw new Error('Pedometer not available on this device');
+            console.log('🚀 Starting step tracking with native sensors...');
+
+            if (Platform.OS === 'android') {
+                // Android: Use native step counter
+                if (this.state.nativeStepCounterAvailable) {
+                    console.log('🤖 Starting Android native step counter...');
+                    const started = await NativeStepCounter.startStepCounting();
+                    if (!started) {
+                        throw new Error('Failed to start native step counter');
+                    }
+                    
+                    // Set up listener for native step counter events
+                    this.pedometerSubscription = NativeStepCounter.addStepListener((data) => {
+                        console.log('📊 Native step update:', data.steps);
+                        this.updateStepCount(data.steps);
+                    });
+                    
+                    console.log('✅ Native Android step counter started');
+                } else {
+                    throw new Error('Native step counter not available');
+                }
+            } else {
+                // iOS: Use HealthKit or fallback to Expo Pedometer
+                if (this.state.healthKitInitialized) {
+                    console.log('🍎 Using HealthKit for step tracking...');
+                    // HealthKit doesn't have real-time listeners, so we'll use periodic sync
+                    console.log('✅ HealthKit tracking enabled (uses periodic sync)');
+                } else {
+                    // Fallback to Expo Pedometer for iOS
+                    console.log('🍎 Falling back to Expo Pedometer...');
+                    const available = await Pedometer.isAvailableAsync();
+                    if (!available) {
+                        throw new Error('Pedometer not available on this device');
+                    }
+
+                    // Start real-time tracking with Expo Pedometer
+                    this.pedometerSubscription = Pedometer.watchStepCount((result) => {
+                        const sessionSteps = result.steps;
+
+                        if (this.isFirstReading) {
+                            this.sessionBaseline = sessionSteps;
+                            this.isFirstReading = false;
+                            console.log(`📱 Session baseline set: ${sessionSteps}`);
+                            return;
+                        }
+
+                        // Handle pedometer resets
+                        if (sessionSteps < this.sessionBaseline) {
+                            console.log('🔄 Pedometer reset detected');
+                            this.sessionBaseline = sessionSteps;
+                            return;
+                        }
+
+                        // Calculate new steps
+                        const newSteps = sessionSteps - this.sessionBaseline;
+                        if (newSteps > 0) {
+                            const newTotal = this.state.currentSteps + newSteps;
+                            this.updateStepCount(newTotal);
+                            this.sessionBaseline = sessionSteps;
+                        }
+                    });
+                    
+                    console.log('✅ Expo Pedometer fallback started');
+                }
             }
 
             // Get current daily steps first
             await this.syncFromSensor();
 
-            // Start real-time tracking
-            this.pedometerSubscription = Pedometer.watchStepCount((result) => {
-                const sessionSteps = result.steps;
-
-                if (this.isFirstReading) {
-                    this.sessionBaseline = sessionSteps;
-                    this.isFirstReading = false;
-                    console.log(`📱 Session baseline set: ${sessionSteps}`);
-                    return;
-                }
-
-                // Handle pedometer resets
-                if (sessionSteps < this.sessionBaseline) {
-                    console.log('🔄 Pedometer reset detected');
-                    this.sessionBaseline = sessionSteps;
-                    return;
-                }
-
-                // Calculate new steps
-                const newSteps = sessionSteps - this.sessionBaseline;
-                if (newSteps > 0) {
-                    const newTotal = this.state.currentSteps + newSteps;
-                    this.updateStepCount(newTotal);
-                    this.sessionBaseline = sessionSteps;
-                }
-            });
-
-            console.log('✅ Pedometer tracking started');
+            console.log('✅ Step tracking started successfully');
         } catch (error) {
-            console.error('❌ Failed to start pedometer tracking:', error);
+            console.error('❌ Failed to start step tracking:', error);
             throw error;
         }
     }
 
     private async syncFromSensor(): Promise<void> {
         try {
-            // Android doesn't support getStepCountAsync
             if (Platform.OS === 'android') {
-                console.log('🤖 Android: getStepCountAsync not supported, skipping sensor sync');
+                // Use native Android step counter if available
+                if (this.state.nativeStepCounterAvailable) {
+                    try {
+                        console.log('🤖 Android: Syncing from native step counter...');
+                        const steps = await NativeStepCounter.getCurrentSteps();
+                        if (steps > this.state.currentSteps) {
+                            console.log(`📊 Android native sync: ${steps} steps`);
+                            this.updateStepCount(steps);
+                        }
+                        return;
+                    } catch (error) {
+                        console.warn('⚠️ Native step counter sync failed:', error);
+                    }
+                }
+                console.log('🤖 Android: Native step counter not available, skipping sensor sync');
                 return;
-            }
+            } else {
+                // iOS: Use HealthKit if available, fallback to Expo Pedometer
+                if (this.state.healthKitInitialized) {
+                    try {
+                        console.log('🍎 iOS: Syncing from HealthKit...');
+                        const steps = await HealthKitStepCounter.getTodaySteps();
+                        if (steps > this.state.currentSteps) {
+                            console.log(`📊 HealthKit sync: ${steps} steps`);
+                            this.updateStepCount(steps);
+                        }
+                        return;
+                    } catch (error) {
+                        console.warn('⚠️ HealthKit sync failed, falling back to Expo Pedometer:', error);
+                    }
+                }
+                
+                // Fallback to Expo Pedometer
+                const sinceMidnight = new Date();
+                sinceMidnight.setHours(0, 0, 0, 0);
 
-            const sinceMidnight = new Date();
-            sinceMidnight.setHours(0, 0, 0, 0);
+                const { steps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
 
-            const { steps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-
-            if (steps > this.state.currentSteps) {
-                console.log(`📊 Syncing from sensor: ${steps} steps`);
-                this.updateStepCount(steps);
+                if (steps > this.state.currentSteps) {
+                    console.log(`📊 Expo Pedometer sync: ${steps} steps`);
+                    this.updateStepCount(steps);
+                }
             }
         } catch (error) {
             console.error('❌ Error syncing from sensor:', error);
@@ -339,7 +476,6 @@ class UnifiedStepTracker {
                 name: 'Step Tracking',
                 description: 'Real-time step counting',
                 importance: AndroidImportance.LOW,
-                sound: null,
                 vibration: false,
                 lights: false,
             });
@@ -353,18 +489,40 @@ class UnifiedStepTracker {
 
         while (BackgroundService.isRunning()) {
             try {
-                // Android doesn't support getStepCountAsync
+                let steps = this.state.currentSteps;
+
                 if (Platform.OS === 'android') {
-                    console.log('🤖 Android: getStepCountAsync not supported in background task');
-                    await this.sleep(delay);
-                    continue;
+                    // Use native Android step counter if available
+                    if (this.state.nativeStepCounterAvailable) {
+                        try {
+                            steps = await NativeStepCounter.getCurrentSteps();
+                        } catch (error) {
+                            console.warn('⚠️ Background: Native step counter failed:', error);
+                        }
+                    } else {
+                        console.log('🤖 Android: Native step counter not available in background');
+                    }
+                } else {
+                    // iOS: Use HealthKit if available, fallback to Expo Pedometer
+                    if (this.state.healthKitInitialized) {
+                        try {
+                            steps = await HealthKitStepCounter.getTodaySteps();
+                        } catch (error) {
+                            console.warn('⚠️ Background: HealthKit failed, using Expo Pedometer:', error);
+                            // Fallback to Expo Pedometer
+                            const sinceMidnight = new Date();
+                            sinceMidnight.setHours(0, 0, 0, 0);
+                            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+                            steps = result.steps;
+                        }
+                    } else {
+                        // Use Expo Pedometer
+                        const sinceMidnight = new Date();
+                        sinceMidnight.setHours(0, 0, 0, 0);
+                        const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+                        steps = result.steps;
+                    }
                 }
-
-                // Get current step count from sensor (iOS only)
-                const sinceMidnight = new Date();
-                sinceMidnight.setHours(0, 0, 0, 0);
-
-                const { steps } = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
 
                 // Update if different
                 if (steps !== this.state.currentSteps) {
@@ -470,15 +628,62 @@ class UnifiedStepTracker {
     }
 
     // Public API
+    public isInitialized(): boolean {
+        return this.state.isInitialized;
+    }
+
     public getCurrentSteps(): number {
+        if (!this.state.isInitialized) {
+            console.warn('⚠️ getCurrentSteps called before initialization complete');
+            return 0;
+        }
         return this.state.currentSteps;
     }
 
     public isTracking(): boolean {
+        if (!this.state.isInitialized) {
+            console.warn('⚠️ isTracking called before initialization complete');
+            return false;
+        }
         return this.state.isTracking;
     }
 
+    public getTrackingStatus(): {
+        isTracking: boolean;
+        hasPermissions: boolean;
+        trackingMethod: string;
+        isBackgroundServiceRunning: boolean;
+    } {
+        let trackingMethod = 'none';
+        
+        if (Platform.OS === 'android') {
+            if (this.state.nativeStepCounterAvailable) {
+                trackingMethod = 'native-android-sensor';
+            } else {
+                trackingMethod = 'android-fallback';
+            }
+        } else {
+            if (this.state.healthKitInitialized) {
+                trackingMethod = 'healthkit';
+            } else {
+                trackingMethod = 'expo-pedometer';
+            }
+        }
+
+        return {
+            isTracking: this.state.isTracking,
+            hasPermissions: this.state.hasPermissions,
+            trackingMethod,
+            isBackgroundServiceRunning: this.state.isBackgroundServiceRunning
+        };
+    }
+
     public addListener(callback: (steps: number) => void): () => void {
+        if (!this.state.isInitialized) {
+            console.warn('⚠️ addListener called before initialization complete');
+            // Return a no-op cleanup function
+            return () => {};
+        }
         this.listeners.add(callback);
         return () => this.listeners.delete(callback);
     }

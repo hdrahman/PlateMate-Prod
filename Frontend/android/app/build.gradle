@@ -90,7 +90,7 @@ android {
     namespace 'com.platemate.app'
     defaultConfig {
         applicationId 'com.platemate.app'
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 5
         versionName "1.0.4"

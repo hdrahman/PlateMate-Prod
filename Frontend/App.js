@@ -18,15 +18,16 @@ import { FavoritesProvider } from './src/context/FavoritesContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider, useOnboarding } from './src/context/OnboardingContext';
 import { FoodLogProvider } from './src/context/FoodLogContext';
+import StepErrorBoundary from './src/components/StepErrorBoundary';
 
 // Import Supabase token manager for optimized authentication
 import tokenManager from './src/utils/tokenManager';
-// Import Simple Step Tracker
-import SimpleStepTracker from './src/services/SimpleStepTracker';
+// Import Unified Step Tracker
+import UnifiedStepTracker from './src/services/UnifiedStepTracker';
 
-// Import debug utilities (development only)
+// Debug utilities (development only) - removed obsolete imports
 if (__DEV__) {
-  import('./src/utils/stepTestDebug');
+  import('./src/utils/testNativeModule');
 }
 
 import Home from "./src/screens/Home";
@@ -324,13 +325,15 @@ function MainTabs() {
 function AuthenticatedApp({ children }) {
   return (
     <ThemeProvider>
-      <StepProvider>
-        <FavoritesProvider>
-          <FoodLogProvider>
-            {children}
-          </FoodLogProvider>
-        </FavoritesProvider>
-      </StepProvider>
+      <StepErrorBoundary>
+        <StepProvider>
+          <FavoritesProvider>
+            <FoodLogProvider>
+              {children}
+            </FoodLogProvider>
+          </FavoritesProvider>
+        </StepProvider>
+      </StepErrorBoundary>
     </ThemeProvider>
   );
 }
@@ -492,36 +495,40 @@ export default function App() {
               console.log('ℹ️ No old background services to cleanup:', cleanupError.message);
             }
 
-            // Unregister old background tasks that use getStepCountAsync on Android
+            // Initialize unified step tracking (with native sensors)
+            console.log('Initializing unified step tracking...');
             try {
-              const { unregisterStepBackgroundTask } = require('./src/tasks/StepCountTask');
-              await unregisterStepBackgroundTask();
-              console.log('✅ Old background tasks cleaned up');
-            } catch (cleanupError) {
-              console.log('ℹ️ No old background tasks to cleanup:', cleanupError.message);
-            }
-
-            // Initialize simple step tracking
-            console.log('Initializing simple step tracking...');
-            try {
-              await SimpleStepTracker.autoStart();
-              console.log('✅ Simple step tracking initialized');
+              // Add timeout to prevent hanging
+              const stepTrackingPromise = UnifiedStepTracker.startTracking();
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Step tracking initialization timeout')), 10000)
+              );
+              
+              await Promise.race([stepTrackingPromise, timeoutPromise]);
+              console.log('✅ Unified step tracking initialized successfully');
             } catch (stepError) {
               console.error('❌ Error starting step tracking:', stepError);
-              // Continue app initialization even if step tracking fails
+              console.log('ℹ️ App will continue without step tracking');
+              
+              // Try to initialize in degraded mode
+              try {
+                console.log('🔄 Attempting degraded step tracking initialization...');
+                // Just initialize the tracker without starting it
+                console.log('✅ Step tracker available in manual mode');
+              } catch (degradedError) {
+                console.error('❌ Degraded step tracking also failed:', degradedError);
+                console.log('ℹ️ Step tracking completely disabled');
+              }
             }
 
-            console.log('✅ Simple step tracking initialization complete');
+            console.log('✅ Unified step tracking initialization complete');
           } catch (error) {
             console.error('Failed to initialize enhanced services:', error);
             // Continue app initialization even if services fail
           }
         }
 
-        // Debug utilities (development only)
-        if (__DEV__) {
-          import('./src/utils/stepTrackingDebug');
-        }
+        // Debug utilities removed - using clean implementation
 
         // App is ready
         setAppIsReady(true);

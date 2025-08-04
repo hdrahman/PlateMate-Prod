@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
-import StepTrackingPermissionService from '../services/StepTrackingPermissionService';
+import { Platform, PermissionsAndroid } from 'react-native';
 
 interface PermissionStatus {
     notifications: boolean;
@@ -26,6 +26,92 @@ interface PermissionStatus {
 interface ServiceStatus {
     unifiedTracker: boolean;
 }
+
+// Permission handling functions
+const checkPermissionStatus = async (): Promise<PermissionStatus> => {
+    if (Platform.OS !== 'android') {
+        return {
+            notifications: true,
+            activityRecognition: true,
+            bodySensors: true,
+            allGranted: true
+        };
+    }
+
+    try {
+        const notifications = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        const activityRecognition = await PermissionsAndroid.check('android.permission.ACTIVITY_RECOGNITION');
+        const bodySensors = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BODY_SENSORS);
+
+        const allGranted = notifications && activityRecognition && bodySensors;
+
+        return {
+            notifications,
+            activityRecognition,
+            bodySensors,
+            allGranted
+        };
+    } catch (error) {
+        console.error('Error checking permissions:', error);
+        return {
+            notifications: false,
+            activityRecognition: false,
+            bodySensors: false,
+            allGranted: false
+        };
+    }
+};
+
+const requestAllPermissions = async (showRationale: boolean = true): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+        return true;
+    }
+
+    try {
+        const permissions = [
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            'android.permission.ACTIVITY_RECOGNITION',
+            PermissionsAndroid.PERMISSIONS.BODY_SENSORS
+        ];
+
+        const results = await PermissionsAndroid.requestMultiple(permissions);
+        
+        const allGranted = Object.values(results).every(
+            result => result === PermissionsAndroid.RESULTS.GRANTED
+        );
+
+        return allGranted;
+    } catch (error) {
+        console.error('Error requesting permissions:', error);
+        return false;
+    }
+};
+
+const getPermissionStatusMessage = async (): Promise<string> => {
+    const status = await checkPermissionStatus();
+    
+    if (status.allGranted) {
+        return 'All permissions granted - Step tracking ready';
+    }
+    
+    const missing = [];
+    if (!status.notifications) missing.push('Notifications');
+    if (!status.activityRecognition) missing.push('Activity Recognition');
+    if (!status.bodySensors) missing.push('Body Sensors');
+    
+    return `Missing permissions: ${missing.join(', ')}`;
+};
+
+const showBatteryOptimizationDialog = () => {
+    console.log('Battery optimization dialog requested');
+    // This would typically open Android settings for battery optimization
+    // For now, just show an alert with instructions
+    Alert.alert(
+        'Battery Optimization', 
+        'To ensure accurate step tracking, please disable battery optimization for PlateMate in your device settings.',
+        [{ text: 'OK' }]
+    );
+};
 
 export default function StepTrackingSettings() {
     const navigation = useNavigation();
@@ -52,7 +138,7 @@ export default function StepTrackingSettings() {
     const loadStatus = async () => {
         try {
             // Load permissions
-            const permissionStatus = await StepTrackingPermissionService.checkPermissionStatus();
+            const permissionStatus = await checkPermissionStatus();
             setPermissions(permissionStatus);
 
             // Load service status
@@ -66,7 +152,7 @@ export default function StepTrackingSettings() {
             setCurrentSteps(steps);
 
             // Load status message
-            const message = await StepTrackingPermissionService.getPermissionStatusMessage();
+            const message = await getPermissionStatusMessage();
             setStatusMessage(message);
 
             setLoading(false);
@@ -79,7 +165,7 @@ export default function StepTrackingSettings() {
     const handleRequestPermissions = async () => {
         try {
             setLoading(true);
-            const granted = await StepTrackingPermissionService.requestAllPermissions(true);
+            const granted = await requestAllPermissions(true);
 
             if (granted) {
                 // Try to start services after getting permissions
@@ -99,7 +185,7 @@ export default function StepTrackingSettings() {
 
             if (enabled) {
                 if (!permissions.allGranted) {
-                    const granted = await StepTrackingPermissionService.requestAllPermissions(true);
+                    const granted = await requestAllPermissions(true);
                     if (!granted) {
                         setLoading(false);
                         return;
@@ -137,7 +223,7 @@ export default function StepTrackingSettings() {
     };
 
     const handleShowBatteryOptimization = () => {
-        StepTrackingPermissionService.showBatteryOptimizationDialog();
+        showBatteryOptimizationDialog();
     };
 
     const renderPermissionItem = (title: string, granted: boolean, description: string) => (

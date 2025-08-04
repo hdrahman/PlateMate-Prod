@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import SimpleStepTracker from '../services/SimpleStepTracker';
+import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import { Pedometer } from 'expo-sensors';
 
 export interface StepHistoryItem {
@@ -46,16 +46,41 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         async function loadStepData() {
             setLoading(true);
             try {
+                // Wait for UnifiedStepTracker to be initialized
+                if (!UnifiedStepTracker.isInitialized()) {
+                    console.log('⏳ Waiting for UnifiedStepTracker initialization...');
+                    // Set a reasonable timeout and retry
+                    let retries = 0;
+                    const maxRetries = 50; // 5 seconds with 100ms intervals
+                    
+                    while (!UnifiedStepTracker.isInitialized() && retries < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        retries++;
+                    }
+                    
+                    if (!UnifiedStepTracker.isInitialized()) {
+                        console.warn('⚠️ UnifiedStepTracker not initialized after timeout');
+                        setTodaySteps(0);
+                        setStepHistory([]);
+                        return;
+                    }
+                }
+
                 // Get today's steps
-                const steps = SimpleStepTracker.getCurrentSteps();
+                const steps = UnifiedStepTracker.getCurrentSteps();
                 setTodaySteps(steps);
 
                 // Get step history (simplified for now - unified tracker focuses on today)
                 const today = new Date().toISOString().split('T')[0];
                 const history = [{ date: today, steps }];
                 setStepHistory(history);
+                
+                console.log('✅ Step data loaded successfully');
             } catch (error) {
-                console.error('Error loading step data:', error);
+                console.error('❌ Error loading step data:', error);
+                // Set safe defaults
+                setTodaySteps(0);
+                setStepHistory([]);
             } finally {
                 setLoading(false);
             }
@@ -66,57 +91,99 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
     // Set up step counter listener
     useEffect(() => {
-        const unsubscribe = SimpleStepTracker.addListener((steps) => {
-            setTodaySteps(steps);
+        let unsubscribe: (() => void) | null = null;
+        
+        // Only set up listener if tracker is initialized
+        if (UnifiedStepTracker.isInitialized()) {
+            try {
+                unsubscribe = UnifiedStepTracker.addListener((steps) => {
+                    setTodaySteps(steps);
 
-            // Also update history for today
-            setStepHistory(prevHistory => {
-                // Look for today's date in the history
-                const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-                const todayIndex = prevHistory.findIndex(item => item.date === today);
+                    // Also update history for today
+                    setStepHistory(prevHistory => {
+                        // Look for today's date in the history
+                        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+                        const todayIndex = prevHistory.findIndex(item => item.date === today);
 
-                if (todayIndex >= 0) {
-                    // Update today's entry
-                    const newHistory = [...prevHistory];
-                    newHistory[todayIndex] = { ...newHistory[todayIndex], steps };
-                    return newHistory;
-                } else {
-                    // Add a new entry for today
-                    return [...prevHistory, { date: today, steps }];
-                }
-            });
-        });
+                        if (todayIndex >= 0) {
+                            // Update today's entry
+                            const newHistory = [...prevHistory];
+                            newHistory[todayIndex] = { ...newHistory[todayIndex], steps };
+                            return newHistory;
+                        } else {
+                            // Add a new entry for today
+                            return [...prevHistory, { date: today, steps }];
+                        }
+                    });
+                });
 
-        // Update tracking status
-        setIsTracking(SimpleStepTracker.isCurrentlyTracking());
+                // Update tracking status
+                setIsTracking(UnifiedStepTracker.isTracking());
+                console.log('✅ Step counter listener set up successfully');
+            } catch (error) {
+                console.error('❌ Error setting up step counter listener:', error);
+            }
+        } else {
+            console.log('⏳ Deferring listener setup until tracker is initialized');
+        }
 
         // Cleanup listener on unmount
         return () => {
-            unsubscribe();
+            if (unsubscribe) {
+                unsubscribe();
+            }
         };
     }, []);
 
     // Start tracking steps
     const startTracking = async () => {
-        if (!isAvailable) return;
+        if (!isAvailable) {
+            console.warn('⚠️ Step tracking not available on this device');
+            return;
+        }
 
-        await SimpleStepTracker.startTracking();
-        setIsTracking(SimpleStepTracker.isCurrentlyTracking());
+        if (!UnifiedStepTracker.isInitialized()) {
+            console.warn('⚠️ UnifiedStepTracker not initialized, cannot start tracking');
+            return;
+        }
+
+        try {
+            await UnifiedStepTracker.startTracking();
+            setIsTracking(UnifiedStepTracker.isTracking());
+            console.log('✅ Step tracking started from hook');
+        } catch (error) {
+            console.error('❌ Error starting step tracking from hook:', error);
+        }
     };
 
     // Stop tracking steps
     const stopTracking = async () => {
-        await SimpleStepTracker.stopTracking();
-        setIsTracking(SimpleStepTracker.isCurrentlyTracking());
+        if (!UnifiedStepTracker.isInitialized()) {
+            console.warn('⚠️ UnifiedStepTracker not initialized, cannot stop tracking');
+            return;
+        }
+
+        try {
+            await UnifiedStepTracker.stopTracking();
+            setIsTracking(UnifiedStepTracker.isTracking());
+            console.log('✅ Step tracking stopped from hook');
+        } catch (error) {
+            console.error('❌ Error stopping step tracking from hook:', error);
+        }
     };
 
     // Refresh step data (useful when steps are manually added)
     const refreshStepData = async () => {
+        if (!UnifiedStepTracker.isInitialized()) {
+            console.warn('⚠️ UnifiedStepTracker not initialized, cannot refresh data');
+            return;
+        }
+
         try {
             console.log('🔄 Refreshing step data...');
             
             // Get updated today's steps
-            const steps = SimpleStepTracker.getCurrentSteps();
+            const steps = UnifiedStepTracker.getCurrentSteps();
             setTodaySteps(steps);
 
             // Update history for today
@@ -130,9 +197,10 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         }
     };
 
-    // Set calorie goal for notifications
+    // Set calorie goal for notifications (simplified - UnifiedStepTracker doesn't have this method)
     const setCalorieGoal = async (calories: number) => {
-        await SimpleStepTracker.setCalorieGoal(calories);
+        // UnifiedStepTracker focuses on step counting, not calorie goals
+        console.log('Calorie goal setting not implemented in UnifiedStepTracker');
     };
 
     return {

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps } from '../utils/database';
+import NativeStepCounter from './NativeStepCounter';
 
 // Keys for AsyncStorage
 const PERSISTENT_STEP_SERVICE_KEY = 'PERSISTENT_STEP_SERVICE_ENABLED';
@@ -116,7 +117,7 @@ class PersistentStepTracker {
                 console.log('📅 Reset step count for new day:', today);
             }
 
-            // First, try to get the step count from the main BackgroundStepTracker's cached value
+            // Get the most up-to-date step count from various sources
             // This ensures consistency with the main app's step count
             let currentSteps = this.lastKnownStepCount;
             
@@ -179,28 +180,37 @@ class PersistentStepTracker {
     }
 
     /**
-     * Get steps directly from sensor (fallback method) - Android compatible
+     * Get steps directly from sensor using native implementation
      */
     private async getSensorSteps(): Promise<number> {
         try {
-            const isAvailable = await Pedometer.isAvailableAsync();
-            if (!isAvailable) {
-                console.log('⚠️ Pedometer not available in background');
-                return 0;
-            }
-
-            // Android doesn't support getStepCountAsync, so return 0 as fallback
             if (Platform.OS === 'android') {
-                console.log('🤖 Android: getStepCountAsync not supported, returning 0');
-                return 0;
-            }
+                // Use native Android step counter
+                const isAvailable = await NativeStepCounter.isAvailable();
+                if (!isAvailable) {
+                    console.log('⚠️ Native step counter not available');
+                    return 0;
+                }
+                
+                const steps = await NativeStepCounter.getCurrentSteps();
+                console.log(`🤖 Android native sensor steps: ${steps}`);
+                return steps;
+            } else {
+                // iOS: Use Expo Pedometer as fallback for now
+                const isAvailable = await Pedometer.isAvailableAsync();
+                if (!isAvailable) {
+                    console.log('⚠️ Pedometer not available in background');
+                    return 0;
+                }
 
-            // Get steps from midnight until now (iOS only)
-            const sinceMidnight = new Date();
-            sinceMidnight.setHours(0, 0, 0, 0);
-            
-            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-            return result.steps;
+                // Get steps from midnight until now (iOS only)
+                const sinceMidnight = new Date();
+                sinceMidnight.setHours(0, 0, 0, 0);
+                
+                const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
+                console.log(`🍎 iOS pedometer steps: ${result.steps}`);
+                return result.steps;
+            }
         } catch (error) {
             console.warn('⚠️ Error getting sensor steps:', error);
             return 0;
@@ -254,11 +264,30 @@ class PersistentStepTracker {
                 return;
             }
 
-            // Check if pedometer is available
-            const isAvailable = await Pedometer.isAvailableAsync();
-            if (!isAvailable) {
-                console.error('❌ Pedometer not available - cannot start persistent tracking');
-                return;
+            // Check if step counter is available
+            let isAvailable = false;
+            if (Platform.OS === 'android') {
+                isAvailable = await NativeStepCounter.isAvailable();
+                if (!isAvailable) {
+                    console.error('❌ Native step counter not available - cannot start persistent tracking');
+                    return;
+                }
+                
+                // Initialize native step counter
+                console.log('🚀 Starting native step counter...');
+                const started = await NativeStepCounter.startStepCounting();
+                if (!started) {
+                    console.error('❌ Failed to start native step counter');
+                    return;
+                }
+                console.log('✅ Native step counter started');
+            } else {
+                // iOS: Check Expo Pedometer availability
+                isAvailable = await Pedometer.isAvailableAsync();
+                if (!isAvailable) {
+                    console.error('❌ Pedometer not available - cannot start persistent tracking');
+                    return;
+                }
             }
 
             // Test database connection before starting - more robust check
@@ -367,6 +396,16 @@ class PersistentStepTracker {
             await BackgroundService.stop();
             this.isServiceRunning = false;
             
+            // Stop native step counter on Android
+            if (Platform.OS === 'android') {
+                try {
+                    await NativeStepCounter.stopStepCounting();
+                    console.log('✅ Native step counter stopped');
+                } catch (error) {
+                    console.warn('⚠️ Error stopping native step counter:', error);
+                }
+            }
+            
             // Mark as disabled in storage
             await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
             
@@ -464,10 +503,18 @@ class PersistentStepTracker {
             
             let currentSteps = this.lastKnownStepCount;
             
-            // Only try sensor reading on iOS
-            if (Platform.OS === 'ios') {
+            // Get current steps from appropriate sensor
+            if (Platform.OS === 'android') {
                 try {
-                    // Get current steps directly from sensor
+                    // Use native Android step counter
+                    currentSteps = await NativeStepCounter.getCurrentSteps();
+                    console.log(`📊 Android force sync: ${currentSteps} steps from native sensor`);
+                } catch (sensorError) {
+                    console.warn('⚠️ Android sensor reading failed, using cached value:', sensorError);
+                }
+            } else {
+                // iOS sensor reading
+                try {
                     const sinceMidnight = new Date();
                     sinceMidnight.setHours(0, 0, 0, 0);
                     
@@ -477,8 +524,6 @@ class PersistentStepTracker {
                 } catch (sensorError) {
                     console.warn('⚠️ iOS sensor reading failed, using cached value:', sensorError);
                 }
-            } else {
-                console.log('🤖 Android: Force sync using cached step count:', currentSteps);
             }
             
             // Update database and cache
@@ -586,6 +631,32 @@ class PersistentStepTracker {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
+        }
+    }
+
+    /**
+     * Reset daily step baseline (for new day)
+     */
+    public async resetDailyBaseline(): Promise<void> {
+        try {
+            console.log('📅 Resetting daily step baseline...');
+            
+            if (Platform.OS === 'android') {
+                // Use native Android step counter reset
+                await NativeStepCounter.resetDailyBaseline();
+                console.log('✅ Native Android step baseline reset');
+            }
+            
+            // Reset our internal tracking
+            this.lastKnownStepCount = 0;
+            await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, '0');
+            
+            const today = new Date().toISOString().split('T')[0];
+            await AsyncStorage.setItem(LAST_BACKGROUND_SYNC_DATE_KEY, today);
+            
+            console.log('✅ Daily step baseline reset completed');
+        } catch (error) {
+            console.error('❌ Error resetting daily baseline:', error);
         }
     }
 }

@@ -1,22 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-  <!-- Essential step tracking permissions -->
-  <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
-  <uses-permission android:name="android.permission.BODY_SENSORS"/>
-  
-  <!-- Foreground service permissions for Android 14+ -->
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH"/>
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
-  
-  <!-- Wake lock for background step tracking -->
-  <uses-permission android:name="android.permission.WAKE_LOCK"/>
-  
-  <!-- Notification permissions for persistent service -->
+  <!-- Notification permissions -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-  
-  <!-- Boot completed for service restart -->
-  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   
   <!-- Other app permissions -->
   <uses-permission android:name="android.permission.CAMERA"/>
@@ -28,6 +12,12 @@
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  
+  <!-- Step tracking permissions (minimal like Pacer) -->
+  <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -39,27 +29,6 @@
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
-    <!-- Notifee foreground service for step tracking notifications -->
-    <service 
-        android:name="app.notifee.core.ForegroundService" 
-        android:foregroundServiceType="health|specialUse" 
-        android:exported="false"
-        android:enabled="true">
-      <property 
-          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" 
-          android:value="Continuous health monitoring and step tracking for fitness goals. Displays persistent notifications with step count and health metrics to help users maintain active lifestyle throughout the day."/>
-    </service>
-    
-    <!-- React Native Background Actions service for step data persistence -->
-    <service 
-        android:name="com.asterinet.react.bgactions.RNBackgroundActionsTask" 
-        android:foregroundServiceType="health|dataSync" 
-        android:exported="false"
-        android:enabled="true">
-      <property 
-          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" 
-          android:value="Synchronizes step tracking data to local database and maintains step count accuracy when app is closed. Essential for continuous health monitoring and fitness tracking."/>
-    </service>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
@@ -72,5 +41,19 @@
         <data android:scheme="exp+platemate"/>
       </intent-filter>
     </activity>
+    <receiver android:name=".StepTrackingBootReceiver" android:enabled="true" android:exported="true">
+      <intent-filter android:priority="1000">
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+        <action android:name="android.intent.action.PACKAGE_REPLACED"/>
+        <data android:scheme="package"/>
+      </intent-filter>
+    </receiver>
+    
+    <!-- Background Actions Service for step tracking -->
+    <service 
+      android:name="com.asterinet.react.bgactions.RNBackgroundActionsTask" 
+      android:foregroundServiceType="dataSync"
+      android:exported="false" />
   </application>
 </manifest>
