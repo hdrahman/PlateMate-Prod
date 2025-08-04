@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import { Pedometer } from 'expo-sensors';
 
@@ -56,9 +57,12 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                         initialSteps = parseInt(cached, 10) || 0;
                         setTodaySteps(initialSteps);
                         console.log(`📱 Loaded cached steps immediately: ${initialSteps}`);
+                    } else {
+                        console.log('📱 No cached steps found, starting with 0');
                     }
                 } catch (error) {
-                    console.warn('⚠️ Failed to load cached steps:', error);
+                    console.error('❌ Failed to load cached steps (AsyncStorage error):', error);
+                    console.error('❌ This indicates a missing import or AsyncStorage configuration issue');
                 }
 
                 // Wait for UnifiedStepTracker to be initialized (with shorter timeout)
