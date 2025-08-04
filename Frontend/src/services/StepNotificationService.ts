@@ -121,7 +121,7 @@ class StepNotificationService {
       );
 
       const consumedCalories = result?.totalCalories || 0;
-      const remainingCalories = Math.max(0, caloriesGoal - consumedCalories);
+      const remainingCalories = caloriesGoal - consumedCalories;
 
       console.log('📊 Calorie data:', { goal: caloriesGoal, consumed: consumedCalories, remaining: remainingCalories });
 
@@ -218,8 +218,10 @@ class StepNotificationService {
   private formatNotificationContent(data: NotificationData): { title: string; body: string } {
     const { steps, caloriesRemaining, protein, nextMealTime } = data;
 
-    // Title shows calories remaining
-    const title = `${caloriesRemaining} calories remaining`;
+    // Title shows calories remaining or over
+    const title = caloriesRemaining >= 0 
+      ? `${caloriesRemaining} calories remaining`
+      : `${Math.abs(caloriesRemaining)} calories over`;
 
     // Body shows steps, protein, and time until next meal
     const body = `${steps.toLocaleString()} steps • ${protein}g protein • ${nextMealTime}`;
@@ -254,15 +256,6 @@ class StepNotificationService {
             type: AndroidStyle.BIGTEXT,
             text: body,
           },
-          actions: [
-            {
-              title: '📊 View Progress',
-              pressAction: {
-                id: 'view-progress',
-                launchActivity: 'default',
-              },
-            },
-          ],
         },
         ios: {
           categoryId: 'step-tracking',
