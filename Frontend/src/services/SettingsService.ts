@@ -43,13 +43,6 @@ class SettingsService {
             quietEnd: '07:00',
             enabled: true,
         },
-        permanentNotification: {
-            enabled: false,
-            showCalories: true,
-            showProtein: true,
-            showNextMeal: true,
-            updateFrequency: 15, // Update every 15 minutes
-        },
     };
 
     private readonly defaultDataSharingSettings: DataSharingSettings = {

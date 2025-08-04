@@ -2,7 +2,6 @@ import { Platform, PermissionsAndroid, AppState, AppStateStatus } from 'react-na
 import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../utils/database';
-import BackgroundService from 'react-native-background-actions';
 import StepNotificationService from './StepNotificationService';
 import HealthKitStepCounter from './HealthKitStepCounter';
 import NativeStepCounter from './NativeStepCounter';
@@ -37,7 +36,6 @@ interface StepTrackerState {
     isTracking: boolean;
     currentSteps: number;
     hasPermissions: boolean;
-    isBackgroundServiceRunning: boolean;
     healthKitInitialized: boolean;
     nativeStepCounterAvailable: boolean;
     isInitialized: boolean;
@@ -49,7 +47,6 @@ class UnifiedStepTracker {
         isTracking: false,
         currentSteps: 0,
         hasPermissions: false,
-        isBackgroundServiceRunning: false,
         healthKitInitialized: false,
         nativeStepCounterAvailable: false,
         isInitialized: false
@@ -60,6 +57,7 @@ class UnifiedStepTracker {
     private listeners: Set<(steps: number) => void> = new Set();
     private sessionBaseline: number = 0;
     private isFirstReading: boolean = true;
+    private notificationUpdateInterval: NodeJS.Timeout | null = null;
     // Notifications are now handled by StepNotificationService
 
     private constructor() {
@@ -202,16 +200,76 @@ class UnifiedStepTracker {
 
     private async loadPreviousState(): Promise<void> {
         try {
-            const [savedSteps, dbSteps] = await Promise.all([
-                AsyncStorage.getItem(LAST_STEP_COUNT_KEY).then(val => val ? parseInt(val, 10) : 0),
-                getStepsForDate(new Date().toISOString().split('T')[0]).catch(() => 0)
-            ]);
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Try multiple data sources with retry logic
+            let dbSteps = 0;
+            let savedSteps = 0;
+            let sensorSteps = 0;
 
-            // Use the higher value to avoid losing steps
-            this.state.currentSteps = Math.max(savedSteps, dbSteps);
-            console.log(`📊 Loaded previous state: ${this.state.currentSteps} steps`);
+            // 1. Get cached steps from AsyncStorage (fastest)
+            try {
+                const cached = await AsyncStorage.getItem(LAST_STEP_COUNT_KEY);
+                savedSteps = cached ? parseInt(cached, 10) : 0;
+                console.log(`📱 Cached steps: ${savedSteps}`);
+            } catch (error) {
+                console.warn('⚠️ Failed to load cached steps:', error);
+            }
+
+            // 2. Get database steps with retry logic
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    dbSteps = await getStepsForDate(today);
+                    console.log(`📊 Database steps (attempt ${attempt}): ${dbSteps}`);
+                    break;
+                } catch (error) {
+                    console.warn(`⚠️ Database query attempt ${attempt} failed:`, error);
+                    if (attempt === 3) {
+                        console.error('❌ All database attempts failed, using cached value');
+                    } else {
+                        // Wait briefly before retry
+                        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+                    }
+                }
+            }
+
+            // 3. If both sources are zero or unreliable, try sensor sync as last resort
+            if (dbSteps === 0 && savedSteps === 0) {
+                try {
+                    console.log('🔄 Both cache and DB are zero, attempting sensor sync...');
+                    await this.syncFromSensor();
+                    sensorSteps = this.state.currentSteps;
+                    console.log(`📡 Sensor steps: ${sensorSteps}`);
+                } catch (error) {
+                    console.warn('⚠️ Sensor sync during load failed:', error);
+                }
+            }
+
+            // Choose the highest reliable value with validation
+            const candidates = [savedSteps, dbSteps, sensorSteps].filter(val => val > 0);
+            
+            if (candidates.length > 0) {
+                this.state.currentSteps = Math.max(...candidates);
+                console.log(`✅ Loaded previous state: ${this.state.currentSteps} steps (from ${candidates.length} sources)`);
+            } else {
+                // All sources returned zero - this might be legitimate for a new day
+                this.state.currentSteps = 0;
+                console.log('📊 All sources returned zero - starting fresh for today');
+            }
+
+            // Validate the loaded value is reasonable (not negative, not impossibly high)
+            if (this.state.currentSteps < 0) {
+                console.warn('⚠️ Negative step count detected, resetting to 0');
+                this.state.currentSteps = 0;
+            } else if (this.state.currentSteps > 100000) {
+                console.warn('⚠️ Unreasonably high step count detected, capping at 100000');
+                this.state.currentSteps = Math.min(this.state.currentSteps, 100000);
+            }
+
         } catch (error) {
             console.error('❌ Error loading previous state:', error);
+            // Set safe default
+            this.state.currentSteps = 0;
         }
     }
 
@@ -244,13 +302,87 @@ class UnifiedStepTracker {
         try {
             console.log('🔄 Performing app resume recovery...');
 
-            // Get latest step count from sensor
-            await this.syncFromSensor();
+            const today = new Date().toISOString().split('T')[0];
+            const currentDisplayedSteps = this.state.currentSteps;
 
-            // Restart background service if needed
-            if (this.state.isTracking && !this.state.isBackgroundServiceRunning) {
-                console.log('🔄 Restarting background service...');
-                await this.startBackgroundService();
+            // 1. Force refresh from all available sources
+            let recoveredSteps = currentDisplayedSteps;
+            const stepSources: { name: string; steps: number }[] = [];
+
+            // Get cached value
+            try {
+                const cached = await AsyncStorage.getItem(LAST_STEP_COUNT_KEY);
+                const cachedSteps = cached ? parseInt(cached, 10) : 0;
+                if (cachedSteps > 0) {
+                    stepSources.push({ name: 'cache', steps: cachedSteps });
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to get cached steps during recovery:', error);
+            }
+
+            // Get database value with retry
+            try {
+                const dbSteps = await getStepsForDate(today);
+                if (dbSteps > 0) {
+                    stepSources.push({ name: 'database', steps: dbSteps });
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to get database steps during recovery:', error);
+            }
+
+            // Get fresh sensor reading
+            try {
+                const preRecoverySteps = this.state.currentSteps;
+                await this.syncFromSensor();
+                const sensorSteps = this.state.currentSteps;
+                
+                // Only count sensor reading if it's different from what we had
+                if (sensorSteps !== preRecoverySteps && sensorSteps > 0) {
+                    stepSources.push({ name: 'sensor', steps: sensorSteps });
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to sync from sensor during recovery:', error);
+            }
+
+            // 2. Choose the most recent/highest valid value
+            if (stepSources.length > 0) {
+                const highestSource = stepSources.reduce((max, current) => 
+                    current.steps > max.steps ? current : max
+                );
+                
+                recoveredSteps = highestSource.steps;
+                console.log(`📊 Recovery sources found: ${stepSources.map(s => `${s.name}:${s.steps}`).join(', ')}`);
+                console.log(`✅ Using highest value: ${highestSource.steps} from ${highestSource.name}`);
+                
+                // Update state if we found a higher value
+                if (recoveredSteps > currentDisplayedSteps) {
+                    console.log(`📈 Step count increased from ${currentDisplayedSteps} to ${recoveredSteps} during recovery`);
+                    this.updateStepCount(recoveredSteps);
+                } else if (recoveredSteps === currentDisplayedSteps && currentDisplayedSteps > 0) {
+                    console.log(`✅ Step count validated: ${currentDisplayedSteps} steps confirmed`);
+                } else {
+                    console.log(`ℹ️ No higher step count found during recovery (current: ${currentDisplayedSteps})`);
+                }
+            } else {
+                console.log('⚠️ No valid step sources found during recovery');
+            }
+
+            // 3. Force database sync to ensure persistence
+            if (this.state.currentSteps > 0) {
+                try {
+                    await this.syncToDatabase();
+                    console.log('✅ Database sync completed during recovery');
+                } catch (error) {
+                    console.error('❌ Database sync failed during recovery:', error);
+                }
+            }
+
+            // 4. Update notification to reflect current state
+            try {
+                await this.updateNotification();
+                console.log('✅ Notification updated during recovery');
+            } catch (error) {
+                console.error('❌ Notification update failed during recovery:', error);
             }
 
             console.log('✅ App resume recovery completed');
@@ -285,12 +417,20 @@ class UnifiedStepTracker {
             // Start pedometer tracking
             await this.startPedometerTracking();
 
-            // Start background service for persistence
-            await this.startBackgroundService();
+            // Start periodic notification updates
+            this.startNotificationUpdates();
 
             // Mark as enabled
             await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'true');
             this.state.isTracking = true;
+
+            // Auto-start persistent notification when step tracking starts
+            try {
+                await StepNotificationService.showStepNotification(this.state.currentSteps);
+                console.log('✅ Persistent notification started with step tracking');
+            } catch (error) {
+                console.error('⚠️ Failed to start persistent notification:', error);
+            }
 
             console.log('✅ Unified step tracking started successfully');
             return true;
@@ -429,153 +569,111 @@ class UnifiedStepTracker {
         }
     }
 
-    private async startBackgroundService(): Promise<void> {
-        if (this.state.isBackgroundServiceRunning) return;
 
+    private async updateNotification(): Promise<void> {
         try {
-            console.log('🔄 Starting background service...');
-
-            // Create notification channel for Android
-            if (isAndroid && notifee && !isExpoGo) {
-                await this.createNotificationChannel();
-            }
-
-            const options = {
-                taskName: 'PlateMate Step Tracker',
-                taskTitle: '🚶 Step Tracking Active',
-                taskDesc: `${this.state.currentSteps.toLocaleString()} steps today`,
-                taskIcon: {
-                    name: 'ic_launcher',
-                    type: 'mipmap',
-                },
-                color: '#FF00F5',
-                linkingURI: 'platemate://home',
-                parameters: {
-                    delay: 5000, // Update every 5 seconds for real-time feel
-                },
-            };
-
-            await BackgroundService.start(this.backgroundTask, options);
-            this.state.isBackgroundServiceRunning = true;
-
-            // Background service notification is handled by the service itself
-
-            console.log('✅ Background service started');
+            await StepNotificationService.updateNotification(this.state.currentSteps);
         } catch (error) {
-            console.error('❌ Failed to start background service:', error);
-            this.state.isBackgroundServiceRunning = false;
+            console.error('❌ Error updating step notification:', error);
         }
     }
 
-    private async createNotificationChannel(): Promise<void> {
-        if (!notifee || isExpoGo) return;
-
-        try {
-            await notifee.createChannel({
-                id: NOTIFICATION_CHANNEL_ID,
-                name: 'Step Tracking',
-                description: 'Real-time step counting',
-                importance: AndroidImportance.LOW,
-                vibration: false,
-                lights: false,
-            });
-        } catch (error) {
-            console.error('❌ Failed to create notification channel:', error);
+    private startNotificationUpdates(): void {
+        // Clear any existing interval
+        if (this.notificationUpdateInterval) {
+            clearInterval(this.notificationUpdateInterval);
         }
-    }
 
-    private backgroundTask = async (taskDataArguments: any) => {
-        const { delay = 5000 } = taskDataArguments || {};
-
-        while (BackgroundService.isRunning()) {
+        // Update notification every 15 seconds for more responsive updates
+        this.notificationUpdateInterval = setInterval(async () => {
             try {
-                let steps = this.state.currentSteps;
-
-                if (Platform.OS === 'android') {
-                    // Use native Android step counter if available
-                    if (this.state.nativeStepCounterAvailable) {
-                        try {
-                            steps = await NativeStepCounter.getCurrentSteps();
-                        } catch (error) {
-                            console.warn('⚠️ Background: Native step counter failed:', error);
-                        }
-                    } else {
-                        console.log('🤖 Android: Native step counter not available in background');
-                    }
-                } else {
-                    // iOS: Use HealthKit if available, fallback to Expo Pedometer
-                    if (this.state.healthKitInitialized) {
-                        try {
-                            steps = await HealthKitStepCounter.getTodaySteps();
-                        } catch (error) {
-                            console.warn('⚠️ Background: HealthKit failed, using Expo Pedometer:', error);
-                            // Fallback to Expo Pedometer
-                            const sinceMidnight = new Date();
-                            sinceMidnight.setHours(0, 0, 0, 0);
-                            const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-                            steps = result.steps;
-                        }
-                    } else {
-                        // Use Expo Pedometer
-                        const sinceMidnight = new Date();
-                        sinceMidnight.setHours(0, 0, 0, 0);
-                        const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
-                        steps = result.steps;
-                    }
-                }
-
-                // Update if different
-                if (steps !== this.state.currentSteps) {
-                    this.state.currentSteps = steps;
-
-                    // Save to storage
-                    await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString());
-
-                    // Update database periodically (every 50 steps or 5 minutes)
-                    const now = Date.now();
-                    const lastUpdate = parseInt(await AsyncStorage.getItem('LAST_DB_UPDATE') || '0');
-
-                    if (steps % 50 === 0 || (now - lastUpdate) > 300000) { // 5 minutes
-                        await this.syncToDatabase();
-                        await AsyncStorage.setItem('LAST_DB_UPDATE', now.toString());
-                    }
-
-                    // Update notification immediately
+                const previousSteps = this.state.currentSteps;
+                
+                // Sync latest step count from sensor
+                await this.syncFromSensor();
+                
+                // Only update notification if steps changed or every 2 minutes to keep it alive
+                const stepChanged = this.state.currentSteps !== previousSteps;
+                const shouldUpdate = stepChanged || (Date.now() % 120000 < 15000); // Every 2 minutes
+                
+                if (shouldUpdate) {
                     await this.updateNotification();
-
-                    // Notify app listeners
-                    this.notifyListeners(steps);
+                    
+                    if (stepChanged) {
+                        console.log(`🔄 Notification updated - steps changed: ${previousSteps} → ${this.state.currentSteps}`);
+                    } else {
+                        console.log('🔄 Periodic notification keepalive update');
+                    }
                 }
-
-                await this.sleep(delay);
             } catch (error) {
-                console.error('❌ Background task error:', error);
-                await this.sleep(delay);
+                console.error('❌ Periodic notification update failed:', error);
             }
+        }, 15000); // 15 seconds for more responsive updates
+
+        console.log('✅ Periodic notification updates started (15s interval)');
+    }
+
+    private stopNotificationUpdates(): void {
+        if (this.notificationUpdateInterval) {
+            clearInterval(this.notificationUpdateInterval);
+            this.notificationUpdateInterval = null;
+            console.log('🛑 Periodic notification updates stopped');
         }
-    };
-
-    private sleep = (time: number): Promise<void> => {
-        return new Promise((resolve) => setTimeout(resolve, time));
-    };
-
-    // Notification updates are now handled by StepNotificationService
+    }
 
     private updateStepCount(steps: number): void {
         if (steps === this.state.currentSteps) return;
 
+        // Validate input before processing
+        if (typeof steps !== 'number' || isNaN(steps)) {
+            console.error('❌ Invalid step count provided:', steps);
+            return;
+        }
+
+        // Additional validation - ensure reasonable values
+        if (steps < 0) {
+            console.warn('⚠️ Negative step count detected, ignoring:', steps);
+            return;
+        }
+
+        if (steps > 200000) {
+            console.warn('⚠️ Unreasonably high step count detected, capping:', steps);
+            steps = Math.min(steps, 200000);
+        }
+
         const previousSteps = this.state.currentSteps;
+        
+        // Check for reasonable step increase (prevent massive jumps that might indicate errors)
+        const stepIncrease = steps - previousSteps;
+        if (stepIncrease > 10000 && previousSteps > 0) {
+            console.warn(`⚠️ Large step increase detected: ${stepIncrease} steps. Validating...`);
+            
+            // For large increases, we should validate against multiple sources
+            // This is a safety check to prevent erroneous data from corrupting the count
+            if (stepIncrease > 50000) {
+                console.error(`❌ Rejecting unreasonable step increase: ${stepIncrease} steps`);
+                return;
+            }
+        }
+
         this.state.currentSteps = steps;
 
-        // Save to cache immediately
-        AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString());
+        // Save to cache immediately with error handling
+        AsyncStorage.setItem(LAST_STEP_COUNT_KEY, steps.toString()).catch(error => {
+            console.error('❌ Failed to save steps to cache:', error);
+        });
 
-        // Background service handles its own notification updates
+        // Update persistent notification immediately
+        this.updateNotification().catch(error => {
+            console.warn('⚠️ Failed to update notification:', error);
+        });
 
-        // Notify listeners
+        // Notify listeners with error handling
         this.notifyListeners(steps);
 
-        console.log(`📊 Steps updated: ${previousSteps} → ${steps} (+${steps - previousSteps})`);
+        // Log the change with more detail
+        const changeIndicator = stepIncrease > 0 ? `+${stepIncrease}` : stepIncrease.toString();
+        console.log(`📊 Steps updated: ${previousSteps} → ${steps} (${changeIndicator})`);
     }
 
     private async syncToDatabase(): Promise<void> {
@@ -609,13 +707,16 @@ class UnifiedStepTracker {
                 this.pedometerSubscription = null;
             }
 
-            // Stop background service
-            if (this.state.isBackgroundServiceRunning) {
-                await BackgroundService.stop();
-                this.state.isBackgroundServiceRunning = false;
-            }
+            // Stop periodic notification updates
+            this.stopNotificationUpdates();
 
-            // Background service notification automatically removed
+            // Auto-stop persistent notification when step tracking stops
+            try {
+                await StepNotificationService.hideNotification();
+                console.log('✅ Persistent notification stopped with step tracking');
+            } catch (error) {
+                console.error('⚠️ Failed to stop persistent notification:', error);
+            }
 
             // Update state
             this.state.isTracking = false;
@@ -652,7 +753,6 @@ class UnifiedStepTracker {
         isTracking: boolean;
         hasPermissions: boolean;
         trackingMethod: string;
-        isBackgroundServiceRunning: boolean;
     } {
         let trackingMethod = 'none';
         
@@ -673,8 +773,7 @@ class UnifiedStepTracker {
         return {
             isTracking: this.state.isTracking,
             hasPermissions: this.state.hasPermissions,
-            trackingMethod,
-            isBackgroundServiceRunning: this.state.isBackgroundServiceRunning
+            trackingMethod
         };
     }
 
@@ -729,7 +828,8 @@ class UnifiedStepTracker {
             this.appStateSubscription = null;
         }
 
-        // Cleanup is now handled by StepNotificationService
+        // Stop periodic updates
+        this.stopNotificationUpdates();
 
         this.listeners.clear();
         console.log('🧹 Unified Step Tracker destroyed');

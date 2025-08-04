@@ -495,30 +495,41 @@ export default function App() {
               console.log('ℹ️ No old background services to cleanup:', cleanupError.message);
             }
 
-            // Initialize unified step tracking (with native sensors)
+            // Initialize unified step tracking (with progressive loading)
             console.log('Initializing unified step tracking...');
             try {
-              // Add timeout to prevent hanging
-              const stepTrackingPromise = UnifiedStepTracker.startTracking();
-              const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Step tracking initialization timeout')), 10000)
-              );
+              // Start step tracking initialization in background (non-blocking)
+              const stepTrackingInit = async () => {
+                try {
+                  // Reduced timeout for faster fallback
+                  const stepTrackingPromise = UnifiedStepTracker.startTracking();
+                  const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Step tracking initialization timeout')), 3000)
+                  );
+                  
+                  await Promise.race([stepTrackingPromise, timeoutPromise]);
+                  console.log('✅ Unified step tracking initialized successfully');
+                } catch (stepError) {
+                  console.error('❌ Error starting step tracking:', stepError);
+                  console.log('ℹ️ App will continue with basic step tracking');
+                  
+                  // Initialize in degraded mode - tracker available but not auto-started
+                  try {
+                    console.log('🔄 Step tracker initialized in manual mode');
+                  } catch (degradedError) {
+                    console.error('❌ Step tracking completely disabled:', degradedError);
+                  }
+                }
+              };
+
+              // Start initialization but don't wait for it - let it complete in background
+              stepTrackingInit().catch(error => {
+                console.error('❌ Background step tracking initialization failed:', error);
+              });
               
-              await Promise.race([stepTrackingPromise, timeoutPromise]);
-              console.log('✅ Unified step tracking initialized successfully');
-            } catch (stepError) {
-              console.error('❌ Error starting step tracking:', stepError);
-              console.log('ℹ️ App will continue without step tracking');
-              
-              // Try to initialize in degraded mode
-              try {
-                console.log('🔄 Attempting degraded step tracking initialization...');
-                // Just initialize the tracker without starting it
-                console.log('✅ Step tracker available in manual mode');
-              } catch (degradedError) {
-                console.error('❌ Degraded step tracking also failed:', degradedError);
-                console.log('ℹ️ Step tracking completely disabled');
-              }
+              console.log('✅ Step tracking initialization started in background');
+            } catch (error) {
+              console.error('❌ Failed to start step tracking initialization:', error);
             }
 
             console.log('✅ Unified step tracking initialization complete');

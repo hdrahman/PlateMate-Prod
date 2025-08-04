@@ -1,7 +1,7 @@
 import notifee, { AndroidImportance, AndroidStyle } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserGoals } from '../utils/database';
+import { getUserGoals, getCurrentUserId } from '../utils/database';
 import SettingsService from './SettingsService';
 
 // Notification constants
@@ -19,6 +19,7 @@ export interface NotificationData {
   steps: number;
   caloriesRemaining: number;
   caloriesGoal: number;
+  protein: number;
   nextMealTime: string;
 }
 
@@ -67,6 +68,36 @@ class StepNotificationService {
   }
 
   /**
+   * Get protein data from today's food log
+   */
+  private async getProteinData(): Promise<number> {
+    try {
+      // Get today's consumed protein from food log
+      const today = new Date().toISOString().split('T')[0];
+      const firebaseUserId = getCurrentUserId();
+
+      // Import the database utilities to get today's food log entries
+      const { getDatabase } = await import('../utils/database');
+      const db = await getDatabase();
+
+      const result = await db.getFirstAsync<{ totalProtein: number }>(
+        `SELECT SUM(proteins) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+        [`${today}%`, firebaseUserId]
+      );
+
+      const consumedProtein = result?.totalProtein || 0;
+
+      console.log('🥩 Protein data:', { consumed: consumedProtein });
+
+      return Math.round(consumedProtein);
+    } catch (error) {
+      console.error('Error getting protein data:', error);
+      // Fallback to 0
+      return 0;
+    }
+  }
+
+  /**
    * Get calorie goal and consumed calories from the app's database
    */
   private async getCalorieData(): Promise<{ goal: number; consumed: number; remaining: number }> {
@@ -78,17 +109,18 @@ class StepNotificationService {
       // Get today's consumed calories from food log
       // This should match the calculation in FoodLogContext
       const today = new Date().toISOString().split('T')[0];
+      const firebaseUserId = getCurrentUserId();
 
       // Import the database utilities to get today's food log entries
       const { getDatabase } = await import('../utils/database');
       const db = await getDatabase();
 
-      const result = await db.executeSql(
-        `SELECT SUM(calories) as totalCalories FROM food_log WHERE date = ? AND user_id = 1`,
-        [today]
+      const result = await db.getFirstAsync<{ totalCalories: number }>(
+        `SELECT SUM(calories) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+        [`${today}%`, firebaseUserId]
       );
 
-      const consumedCalories = result[0]?.rows?.item(0)?.totalCalories || 0;
+      const consumedCalories = result?.totalCalories || 0;
       const remainingCalories = Math.max(0, caloriesGoal - consumedCalories);
 
       console.log('📊 Calorie data:', { goal: caloriesGoal, consumed: consumedCalories, remaining: remainingCalories });
@@ -165,13 +197,17 @@ class StepNotificationService {
    * Get notification data for current step count
    */
   private async getNotificationData(steps: number): Promise<NotificationData> {
-    const calorieData = await this.getCalorieData();
-    const nextMealTime = await this.getNextMealTime();
+    const [calorieData, protein, nextMealTime] = await Promise.all([
+      this.getCalorieData(),
+      this.getProteinData(),
+      this.getNextMealTime()
+    ]);
 
     return {
       steps,
       caloriesRemaining: calorieData.remaining,
       caloriesGoal: calorieData.goal,
+      protein,
       nextMealTime,
     };
   }
@@ -180,13 +216,13 @@ class StepNotificationService {
    * Format notification title and body according to user requirements
    */
   private formatNotificationContent(data: NotificationData): { title: string; body: string } {
-    const { steps, caloriesRemaining, nextMealTime } = data;
+    const { steps, caloriesRemaining, protein, nextMealTime } = data;
 
     // Title shows calories remaining
     const title = `${caloriesRemaining} calories remaining`;
 
-    // Body shows steps today and next meal time
-    const body = `${steps.toLocaleString()} steps today • ${nextMealTime}`;
+    // Body shows steps, protein, and time until next meal
+    const body = `${steps.toLocaleString()} steps • ${protein}g protein • ${nextMealTime}`;
 
     return { title, body };
   }
@@ -247,6 +283,11 @@ class StepNotificationService {
    * Update the notification with new step count
    */
   public async updateNotification(steps: number): Promise<void> {
+    // Check if notification is still active, recreate if needed
+    const isActive = await this.isNotificationActive();
+    if (!isActive) {
+      console.log('🔄 Notification was dismissed, recreating...');
+    }
     await this.showStepNotification(steps);
   }
 

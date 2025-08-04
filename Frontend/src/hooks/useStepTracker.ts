@@ -41,17 +41,31 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         checkAvailability();
     }, []);
 
-    // Load initial step data
+    // Load initial step data with improved error handling and progressive loading
     useEffect(() => {
         async function loadStepData() {
             setLoading(true);
             try {
-                // Wait for UnifiedStepTracker to be initialized
+                // Start with immediate loading from available sources
+                let initialSteps = 0;
+                
+                // Try to get cached steps immediately (fastest) - use correct key
+                try {
+                    const cached = await AsyncStorage.getItem('UNIFIED_LAST_STEP_COUNT');
+                    if (cached) {
+                        initialSteps = parseInt(cached, 10) || 0;
+                        setTodaySteps(initialSteps);
+                        console.log(`📱 Loaded cached steps immediately: ${initialSteps}`);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to load cached steps:', error);
+                }
+
+                // Wait for UnifiedStepTracker to be initialized (with shorter timeout)
                 if (!UnifiedStepTracker.isInitialized()) {
                     console.log('⏳ Waiting for UnifiedStepTracker initialization...');
-                    // Set a reasonable timeout and retry
                     let retries = 0;
-                    const maxRetries = 50; // 5 seconds with 100ms intervals
+                    const maxRetries = 30; // 3 seconds with 100ms intervals (reduced from 5s)
                     
                     while (!UnifiedStepTracker.isInitialized() && retries < maxRetries) {
                         await new Promise(resolve => setTimeout(resolve, 100));
@@ -59,28 +73,38 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                     }
                     
                     if (!UnifiedStepTracker.isInitialized()) {
-                        console.warn('⚠️ UnifiedStepTracker not initialized after timeout');
-                        setTodaySteps(0);
-                        setStepHistory([]);
+                        console.warn('⚠️ UnifiedStepTracker not initialized after timeout, using cached data');
+                        // Keep the cached value we already set
+                        const today = new Date().toISOString().split('T')[0];
+                        setStepHistory([{ date: today, steps: initialSteps }]);
                         return;
                     }
                 }
 
-                // Get today's steps
-                const steps = UnifiedStepTracker.getCurrentSteps();
-                setTodaySteps(steps);
+                // Get authoritative steps from tracker
+                const trackerSteps = UnifiedStepTracker.getCurrentSteps();
+                
+                // Use the higher value between cached and tracker
+                const finalSteps = Math.max(initialSteps, trackerSteps);
+                
+                if (finalSteps !== initialSteps) {
+                    setTodaySteps(finalSteps);
+                    console.log(`📊 Updated steps from tracker: ${initialSteps} → ${finalSteps}`);
+                }
 
                 // Get step history (simplified for now - unified tracker focuses on today)
                 const today = new Date().toISOString().split('T')[0];
-                const history = [{ date: today, steps }];
+                const history = [{ date: today, steps: finalSteps }];
                 setStepHistory(history);
                 
                 console.log('✅ Step data loaded successfully');
             } catch (error) {
                 console.error('❌ Error loading step data:', error);
-                // Set safe defaults
-                setTodaySteps(0);
-                setStepHistory([]);
+                // Keep any cached value we managed to load, or use 0
+                if (todaySteps === 0) {
+                    setTodaySteps(0);
+                    setStepHistory([]);
+                }
             } finally {
                 setLoading(false);
             }

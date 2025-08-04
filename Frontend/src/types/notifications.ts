@@ -31,13 +31,6 @@ export interface NotificationSettings {
         quietEnd: string;
         enabled: boolean;
     };
-    permanentNotification: {
-        enabled: boolean;
-        showCalories: boolean;
-        showProtein: boolean;
-        showNextMeal: boolean;
-        updateFrequency: number; // minutes between updates
-    };
 }
 
 export interface NotificationSchedule {
