@@ -5,6 +5,7 @@ import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../
 import StepNotificationService from './StepNotificationService';
 import HealthKitStepCounter from './HealthKitStepCounter';
 import NativeStepCounter from './NativeStepCounter';
+import StepEventBus from './StepEventBus';
 
 // Conditional imports
 let notifee: any = null;
@@ -668,7 +669,10 @@ class UnifiedStepTracker {
             console.warn('⚠️ Failed to update notification:', error);
         });
 
-        // Notify listeners with error handling
+        // Direct EventBus notification (replicates notification approach)
+        StepEventBus.notifyStepUpdate(steps);
+
+        // Notify listeners with error handling (legacy pattern - keeping for now)
         this.notifyListeners(steps);
 
         // Log the change with more detail
@@ -779,11 +783,45 @@ class UnifiedStepTracker {
 
     public addListener(callback: (steps: number) => void): () => void {
         if (!this.state.isInitialized) {
-            console.warn('⚠️ addListener called before initialization complete');
-            // Return a no-op cleanup function
-            return () => {};
+            console.warn('⚠️ addListener called before initialization complete, deferring...');
+            
+            // Instead of failing, defer the listener setup
+            const deferredSetup = async () => {
+                let retries = 0;
+                const maxRetries = 30;
+                
+                while (!this.state.isInitialized && retries < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    retries++;
+                }
+                
+                if (this.state.isInitialized) {
+                    this.listeners.add(callback);
+                    console.log('✅ Deferred listener setup completed successfully');
+                } else {
+                    console.error('❌ Failed to setup deferred listener - tracker never initialized');
+                }
+            };
+            
+            deferredSetup();
+            
+            // Return cleanup function that removes the listener when it's eventually added
+            return () => this.listeners.delete(callback);
         }
+        
         this.listeners.add(callback);
+        
+        // Immediately notify with current step count if available
+        if (this.state.currentSteps > 0) {
+            setTimeout(() => {
+                try {
+                    callback(this.state.currentSteps);
+                } catch (error) {
+                    console.error('❌ Error in immediate listener callback:', error);
+                }
+            }, 0);
+        }
+        
         return () => this.listeners.delete(callback);
     }
 
@@ -793,6 +831,8 @@ class UnifiedStepTracker {
                 callback(steps);
             } catch (error) {
                 console.error('❌ Error notifying listener:', error);
+                // Remove faulty listeners to prevent repeated errors
+                this.listeners.delete(callback);
             }
         });
     }

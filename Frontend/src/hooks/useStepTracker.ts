@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
+import StepEventBus from '../services/StepEventBus';
 import { Pedometer } from 'expo-sensors';
 
 export interface StepHistoryItem {
@@ -65,15 +66,24 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                     console.error('❌ This indicates a missing import or AsyncStorage configuration issue');
                 }
 
-                // Wait for UnifiedStepTracker to be initialized (with shorter timeout)
+                // Wait for UnifiedStepTracker to be initialized with progressive loading
+                let finalSteps = initialSteps;
+                
                 if (!UnifiedStepTracker.isInitialized()) {
                     console.log('⏳ Waiting for UnifiedStepTracker initialization...');
                     let retries = 0;
-                    const maxRetries = 30; // 3 seconds with 100ms intervals (reduced from 5s)
+                    const maxRetries = 50; // More retries with better strategy
                     
                     while (!UnifiedStepTracker.isInitialized() && retries < maxRetries) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        // Use exponential backoff but start fast
+                        const delay = Math.min(50 * Math.pow(1.1, retries), 500);
+                        await new Promise(resolve => setTimeout(resolve, delay));
                         retries++;
+                        
+                        // Try to get updated data during wait if tracker becomes available
+                        if (UnifiedStepTracker.isInitialized()) {
+                            break;
+                        }
                     }
                     
                     if (!UnifiedStepTracker.isInitialized()) {
@@ -89,11 +99,24 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                 const trackerSteps = UnifiedStepTracker.getCurrentSteps();
                 
                 // Use the higher value between cached and tracker
-                const finalSteps = Math.max(initialSteps, trackerSteps);
+                finalSteps = Math.max(initialSteps, trackerSteps);
                 
                 if (finalSteps !== initialSteps) {
                     setTodaySteps(finalSteps);
                     console.log(`📊 Updated steps from tracker: ${initialSteps} → ${finalSteps}`);
+                }
+                
+                // Force a sync to ensure we have latest data
+                try {
+                    await UnifiedStepTracker.forceSync();
+                    const syncedSteps = UnifiedStepTracker.getCurrentSteps();
+                    if (syncedSteps > finalSteps) {
+                        setTodaySteps(syncedSteps);
+                        finalSteps = syncedSteps;
+                        console.log(`📊 Updated steps after force sync: ${finalSteps} → ${syncedSteps}`);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Force sync failed during load:', error);
                 }
 
                 // Get step history (simplified for now - unified tracker focuses on today)
@@ -117,49 +140,45 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         loadStepData();
     }, [historyDays]);
 
-    // Set up step counter listener
+    // Simple direct step counter subscription (replicates notification approach)
     useEffect(() => {
-        let unsubscribe: (() => void) | null = null;
+        let mounted = true;
         
-        // Only set up listener if tracker is initialized
+        // Direct subscription to EventBus - no complex initialization needed
+        const unsubscribe = StepEventBus.subscribe((steps) => {
+            if (!mounted) return; // Don't update if component unmounted
+            
+            console.log(`📱 Direct step update received: ${steps}`);
+            setTodaySteps(steps);
+
+            // Update history for today
+            setStepHistory(prevHistory => {
+                const today = new Date().toISOString().split('T')[0];
+                const todayIndex = prevHistory.findIndex(item => item.date === today);
+
+                if (todayIndex >= 0) {
+                    // Update today's entry
+                    const newHistory = [...prevHistory];
+                    newHistory[todayIndex] = { ...newHistory[todayIndex], steps };
+                    return newHistory;
+                } else {
+                    // Add a new entry for today
+                    return [...prevHistory, { date: today, steps }];
+                }
+            });
+        });
+
+        // Update tracking status if tracker is available
         if (UnifiedStepTracker.isInitialized()) {
-            try {
-                unsubscribe = UnifiedStepTracker.addListener((steps) => {
-                    setTodaySteps(steps);
-
-                    // Also update history for today
-                    setStepHistory(prevHistory => {
-                        // Look for today's date in the history
-                        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-                        const todayIndex = prevHistory.findIndex(item => item.date === today);
-
-                        if (todayIndex >= 0) {
-                            // Update today's entry
-                            const newHistory = [...prevHistory];
-                            newHistory[todayIndex] = { ...newHistory[todayIndex], steps };
-                            return newHistory;
-                        } else {
-                            // Add a new entry for today
-                            return [...prevHistory, { date: today, steps }];
-                        }
-                    });
-                });
-
-                // Update tracking status
-                setIsTracking(UnifiedStepTracker.isTracking());
-                console.log('✅ Step counter listener set up successfully');
-            } catch (error) {
-                console.error('❌ Error setting up step counter listener:', error);
-            }
-        } else {
-            console.log('⏳ Deferring listener setup until tracker is initialized');
+            setIsTracking(UnifiedStepTracker.isTracking());
         }
+        
+        console.log('✅ Direct step subscription set up successfully');
 
-        // Cleanup listener on unmount
+        // Simple cleanup on unmount
         return () => {
-            if (unsubscribe) {
-                unsubscribe();
-            }
+            mounted = false;
+            unsubscribe();
         };
     }, []);
 

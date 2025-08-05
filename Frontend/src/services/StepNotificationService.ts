@@ -1,7 +1,7 @@
 import notifee, { AndroidImportance, AndroidStyle } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserGoals, getCurrentUserId } from '../utils/database';
+import { getUserGoals, getCurrentUserIdAsync, getTodayExerciseCalories } from '../utils/database';
 import SettingsService from './SettingsService';
 
 // Notification constants
@@ -74,7 +74,21 @@ class StepNotificationService {
     try {
       // Get today's consumed protein from food log
       const today = new Date().toISOString().split('T')[0];
-      const firebaseUserId = getCurrentUserId();
+      
+      // Get authenticated user ID with retry logic for notification context
+      let firebaseUserId: string;
+      try {
+        firebaseUserId = await getCurrentUserIdAsync();
+      } catch (authError) {
+        console.warn('⚠️ User not authenticated for protein data, retrying once...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          firebaseUserId = await getCurrentUserIdAsync();
+        } catch (retryError) {
+          console.error('❌ User still not authenticated after retry for protein data');
+          throw new Error('User not authenticated for protein data');
+        }
+      }
 
       // Import the database utilities to get today's food log entries
       const { getDatabase } = await import('../utils/database');
@@ -91,7 +105,7 @@ class StepNotificationService {
 
       return Math.round(consumedProtein);
     } catch (error) {
-      console.error('Error getting protein data:', error);
+      console.error('❌ Error getting protein data:', error);
       // Fallback to 0
       return 0;
     }
@@ -99,17 +113,33 @@ class StepNotificationService {
 
   /**
    * Get calorie goal and consumed calories from the app's database
+   * This matches the calculation in Home screen: adjustedGoal = baseGoal + exerciseCalories
    */
   private async getCalorieData(): Promise<{ goal: number; consumed: number; remaining: number }> {
     try {
+      // Get authenticated user ID with retry logic for notification context
+      let firebaseUserId: string;
+      try {
+        firebaseUserId = await getCurrentUserIdAsync();
+      } catch (authError) {
+        console.warn('⚠️ User not authenticated in notification service, retrying once...');
+        // Wait briefly and retry once (user might be in the process of authenticating)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          firebaseUserId = await getCurrentUserIdAsync();
+        } catch (retryError) {
+          console.error('❌ User still not authenticated after retry in notification service');
+          throw new Error('User not authenticated in notification context');
+        }
+      }
+      
       // Get user goals from database (this matches how the app calculates calories)
       const userGoals = await getUserGoals();
-      const caloriesGoal = userGoals?.calories || 2000;
+      const baseCaloriesGoal = userGoals?.calories || 2000;
 
       // Get today's consumed calories from food log
       // This should match the calculation in FoodLogContext
       const today = new Date().toISOString().split('T')[0];
-      const firebaseUserId = getCurrentUserId();
 
       // Import the database utilities to get today's food log entries
       const { getDatabase } = await import('../utils/database');
@@ -121,18 +151,33 @@ class StepNotificationService {
       );
 
       const consumedCalories = result?.totalCalories || 0;
-      const remainingCalories = caloriesGoal - consumedCalories;
 
-      console.log('📊 Calorie data:', { goal: caloriesGoal, consumed: consumedCalories, remaining: remainingCalories });
+      // Get today's exercise calories (CRITICAL: this was missing!)
+      const exerciseCalories = await getTodayExerciseCalories();
+
+      // Calculate adjusted goal (base + exercise calories) - matches Home screen logic
+      const adjustedCaloriesGoal = baseCaloriesGoal + exerciseCalories;
+      const remainingCalories = adjustedCaloriesGoal - consumedCalories;
+
+      console.log('📊 Calorie data:', { 
+        baseGoal: baseCaloriesGoal, 
+        exerciseCalories, 
+        adjustedGoal: adjustedCaloriesGoal, 
+        consumed: consumedCalories, 
+        remaining: remainingCalories 
+      });
 
       return {
-        goal: caloriesGoal,
+        goal: adjustedCaloriesGoal,
         consumed: consumedCalories,
         remaining: remainingCalories
       };
     } catch (error) {
-      console.error('Error getting calorie data:', error);
-      // Fallback to default values
+      console.error('❌ Error getting calorie data:', error);
+      // Fallback to default values - but log the specific error
+      if (error instanceof Error && error.message.includes('not authenticated')) {
+        console.error('❌ User not authenticated in notification service');
+      }
       return { goal: 2000, consumed: 0, remaining: 2000 };
     }
   }
@@ -269,6 +314,33 @@ class StepNotificationService {
       console.log('🔔 Step notification updated:', { steps, title, body });
     } catch (error) {
       console.error('❌ Error showing step notification:', error);
+      
+      // Show a basic notification with just steps if the full data fails
+      try {
+        const fallbackNotification = {
+          id: NOTIFICATION_ID,
+          title: `${steps.toLocaleString()} steps`,
+          body: 'Step tracking active',
+          android: {
+            channelId: CHANNEL_ID,
+            importance: AndroidImportance.LOW,
+            ongoing: true,
+            autoCancel: false,
+            smallIcon: 'ic_launcher',
+            color: '#FF00F5',
+          },
+          ios: {
+            categoryId: 'step-tracking',
+            threadId: 'step-tracking',
+          },
+        };
+
+        await notifee.displayNotification(fallbackNotification);
+        this.currentNotificationId = NOTIFICATION_ID;
+        console.log('🔔 Fallback step notification shown:', { steps });
+      } catch (fallbackError) {
+        console.error('❌ Even fallback notification failed:', fallbackError);
+      }
     }
   }
 
