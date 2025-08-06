@@ -32,6 +32,7 @@ import { saveImageLocally, saveMultipleImagesLocally } from '../utils/localFileS
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { navigateToFoodLog } from '../navigation/RootNavigation';
+import { validateUserContext, createLLMContextPayload, UserContextData, validateFoodName, validateBrandName, validateQuantity, validateNotes, getCharacterLimits, isApproachingLimit } from '../utils/inputValidation';
 
 const { width, height } = Dimensions.get('window');
 
@@ -125,6 +126,9 @@ const ImageCapture: React.FC = () => {
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const scrollViewRef = React.useRef<ScrollView>(null);
     
+    // State for input validation
+    const [inputErrors, setInputErrors] = useState<{ [key: string]: string[] }>({});
+    const [inputWarnings, setInputWarnings] = useState<{ [key: string]: boolean }>({});
 
     // Add state for GPT-generated description
     const [gptDescription, setGptDescription] = useState('');
@@ -147,6 +151,67 @@ const ImageCapture: React.FC = () => {
         }
     }, [initialPhotoUri]);
     
+    // Validation handlers for real-time input validation
+    const validateAndSetFoodName = (text: string) => {
+        setFoodName(text);
+        const result = validateFoodName(text);
+        const limits = getCharacterLimits();
+        
+        setInputErrors(prev => ({
+            ...prev,
+            foodName: result.errors
+        }));
+        
+        setInputWarnings(prev => ({
+            ...prev,
+            foodName: isApproachingLimit(text, 'foodName', 0.8)
+        }));
+    };
+
+    const validateAndSetBrandName = (text: string) => {
+        setBrandName(text);
+        const result = validateBrandName(text);
+        
+        setInputErrors(prev => ({
+            ...prev,
+            brandName: result.errors
+        }));
+        
+        setInputWarnings(prev => ({
+            ...prev,
+            brandName: isApproachingLimit(text, 'brandName', 0.8)
+        }));
+    };
+
+    const validateAndSetQuantity = (text: string) => {
+        setQuantity(text);
+        const result = validateQuantity(text);
+        
+        setInputErrors(prev => ({
+            ...prev,
+            quantity: result.errors
+        }));
+        
+        setInputWarnings(prev => ({
+            ...prev,
+            quantity: isApproachingLimit(text, 'quantity', 0.8)
+        }));
+    };
+
+    const validateAndSetNotes = (text: string) => {
+        setNotes(text);
+        const result = validateNotes(text);
+        
+        setInputErrors(prev => ({
+            ...prev,
+            notes: result.errors
+        }));
+        
+        setInputWarnings(prev => ({
+            ...prev,
+            notes: isApproachingLimit(text, 'notes', 0.8)
+        }));
+    };
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
@@ -323,14 +388,24 @@ const ImageCapture: React.FC = () => {
         }
     };
 
-    // New function to analyze food with GPT
-    const analyzeFoodWithGPT = async (imageUrls: string[], foodName: string): Promise<string> => {
+    // New function to analyze food with GPT including additional user context
+    const analyzeFoodWithGPT = async (imageUrls: string[], userContext: UserContextData): Promise<string> => {
         try {
             if (!imageUrls || imageUrls.length === 0) {
                 throw new Error('No image URLs provided for GPT analysis');
             }
 
             console.log(`Analyzing ${imageUrls.length} images with GPT`);
+
+            // Validate and sanitize user input
+            const validationResult = validateUserContext(userContext);
+            if (!validationResult.isValid) {
+                console.warn('User context validation failed:', validationResult.errors);
+                // Log validation errors but continue with sanitized data
+            }
+
+            // Use sanitized data
+            const sanitizedContext = validationResult.sanitizedData;
 
             // Make sure we have full URLs for the images
             const fullImageUrls = imageUrls.map(url => {
@@ -355,17 +430,24 @@ const ImageCapture: React.FC = () => {
             }
             const token = session.access_token;
 
+            // Create structured payload with additional context
+            const contextPayload = createLLMContextPayload(sanitizedContext);
+            
+            const requestBody = {
+                image_urls: fullImageUrls,
+                meal_type: mealType,
+                ...contextPayload
+            };
+
+            console.log('Sending request with user context:', requestBody);
+
             const response = await fetch(`${BACKEND_URL}/gpt/analyze-food`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    image_urls: fullImageUrls,
-                    food_name: foodName || 'Unknown Food',
-                    meal_type: mealType
-                }),
+                body: JSON.stringify(requestBody),
             });
 
             if (!response.ok) {
@@ -432,11 +514,22 @@ const ImageCapture: React.FC = () => {
     };
 
     // Function to upload multiple images to backend and get ChatGPT analysis
-    const uploadMultipleImages = async (imageUris: string[]): Promise<{ meal_id: number, nutrition_data: any, localImagePaths: string[] }> => {
+    const uploadMultipleImages = async (imageUris: string[], userContext: UserContextData): Promise<{ meal_id: number, nutrition_data: any, localImagePaths: string[] }> => {
         try {
             console.log('🚀 Uploading multiple images to backend with ChatGPT analysis...');
             const startTime = Date.now();
             setAnalysisStage('uploading');
+
+            // Validate and sanitize user input
+            const validationResult = validateUserContext(userContext);
+            if (!validationResult.isValid) {
+                console.warn('User context validation failed:', validationResult.errors);
+                // Log validation errors but continue with sanitized data
+            }
+
+            // Use sanitized data
+            const sanitizedContext = validationResult.sanitizedData;
+            console.log('Using sanitized user context:', sanitizedContext);
 
             // Get current user ID for local storage
             const userId = getCurrentUserId();
@@ -463,6 +556,23 @@ const ImageCapture: React.FC = () => {
             // Create FormData with Android-compatible file handling
             const formData = new FormData();
             formData.append('user_id', '1');
+            
+            // Add additional context for LLM analysis
+            formData.append('meal_type', mealType);
+            if (sanitizedContext.foodName) {
+                formData.append('food_name', sanitizedContext.foodName);
+            }
+            if (sanitizedContext.brandName) {
+                formData.append('brand_name', sanitizedContext.brandName);
+            }
+            if (sanitizedContext.quantity) {
+                formData.append('quantity', sanitizedContext.quantity);
+            }
+            if (sanitizedContext.notes) {
+                formData.append('additional_notes', sanitizedContext.notes);
+            }
+            // Add context label to help backend understand this is user-provided additional info
+            formData.append('context_label', 'USER_PROVIDED_ADDITIONAL_INFO');
 
             // Process each image for Android compatibility
             for (let i = 0; i < imageUris.length; i++) {
@@ -773,9 +883,17 @@ const ImageCapture: React.FC = () => {
             // Get all image URIs
             const imageUris = filledImages.map(img => img.uri);
 
+            // Prepare user context data
+            const userContextData: UserContextData = {
+                foodName,
+                brandName,
+                quantity,
+                notes
+            };
+
             // Use backend ChatGPT integration instead of local processing
             console.log('🚀 Using backend ChatGPT integration for food analysis...');
-            const result = await uploadMultipleImages(imageUris);
+            const result = await uploadMultipleImages(imageUris, userContextData);
             console.log('Backend ChatGPT analysis completed successfully');
 
             // Format current date as ISO string (YYYY-MM-DD)
@@ -1187,49 +1305,98 @@ const ImageCapture: React.FC = () => {
                 {showOptionalDetails && (
                     <View style={styles.optionalDetailsContent}>
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Food Name</Text>
+                            <View style={styles.inputLabelRow}>
+                                <Text style={styles.inputLabel}>Food Name</Text>
+                                <Text style={styles.characterCount}>
+                                    {foodName.length}/{getCharacterLimits().foodName}
+                                </Text>
+                            </View>
                             <TextInput
-                                style={styles.modernInput}
+                                style={[
+                                    styles.modernInput,
+                                    inputErrors.foodName?.length > 0 && styles.inputError,
+                                    inputWarnings.foodName && styles.inputWarning
+                                ]}
                                 value={foodName}
-                                onChangeText={setFoodName}
+                                onChangeText={validateAndSetFoodName}
                                 placeholder="e.g., Grilled Chicken Salad"
                                 placeholderTextColor="#666"
                             />
+                            {inputErrors.foodName?.length > 0 && (
+                                <Text style={styles.errorText}>{inputErrors.foodName[0]}</Text>
+                            )}
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Brand/Restaurant</Text>
+                            <View style={styles.inputLabelRow}>
+                                <Text style={styles.inputLabel}>Brand/Restaurant</Text>
+                                <Text style={styles.characterCount}>
+                                    {brandName.length}/{getCharacterLimits().brandName}
+                                </Text>
+                            </View>
                             <TextInput
-                                style={styles.modernInput}
+                                style={[
+                                    styles.modernInput,
+                                    inputErrors.brandName?.length > 0 && styles.inputError,
+                                    inputWarnings.brandName && styles.inputWarning
+                                ]}
                                 value={brandName}
-                                onChangeText={setBrandName}
+                                onChangeText={validateAndSetBrandName}
                                 placeholder="e.g., McDonald's, Homemade"
                                 placeholderTextColor="#666"
                             />
+                            {inputErrors.brandName?.length > 0 && (
+                                <Text style={styles.errorText}>{inputErrors.brandName[0]}</Text>
+                            )}
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Quantity</Text>
+                            <View style={styles.inputLabelRow}>
+                                <Text style={styles.inputLabel}>Quantity</Text>
+                                <Text style={styles.characterCount}>
+                                    {quantity.length}/{getCharacterLimits().quantity}
+                                </Text>
+                            </View>
                             <TextInput
-                                style={styles.modernInput}
+                                style={[
+                                    styles.modernInput,
+                                    inputErrors.quantity?.length > 0 && styles.inputError,
+                                    inputWarnings.quantity && styles.inputWarning
+                                ]}
                                 value={quantity}
-                                onChangeText={setQuantity}
+                                onChangeText={validateAndSetQuantity}
                                 placeholder="e.g., 1 serving, 200g, 1 cup"
                                 placeholderTextColor="#666"
                             />
+                            {inputErrors.quantity?.length > 0 && (
+                                <Text style={styles.errorText}>{inputErrors.quantity[0]}</Text>
+                            )}
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Notes</Text>
+                            <View style={styles.inputLabelRow}>
+                                <Text style={styles.inputLabel}>Notes</Text>
+                                <Text style={styles.characterCount}>
+                                    {notes.length}/{getCharacterLimits().notes}
+                                </Text>
+                            </View>
                             <TextInput
-                                style={[styles.modernInput, styles.textAreaInput]}
+                                style={[
+                                    styles.modernInput,
+                                    styles.textAreaInput,
+                                    inputErrors.notes?.length > 0 && styles.inputError,
+                                    inputWarnings.notes && styles.inputWarning
+                                ]}
                                 value={notes}
-                                onChangeText={setNotes}
+                                onChangeText={validateAndSetNotes}
                                 placeholder="Any additional notes..."
                                 placeholderTextColor="#666"
                                 multiline
                                 numberOfLines={3}
                             />
+                            {inputErrors.notes?.length > 0 && (
+                                <Text style={styles.errorText}>{inputErrors.notes[0]}</Text>
+                            )}
                         </View>
                     </View>
                 )}
@@ -1891,6 +2058,32 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#fff',
         lineHeight: 20,
+    },
+    // Validation-related styles
+    inputLabelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    characterCount: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
+    },
+    inputError: {
+        borderColor: '#ff6b6b',
+        borderWidth: 1.5,
+    },
+    inputWarning: {
+        borderColor: '#ffa726',
+        borderWidth: 1,
+    },
+    errorText: {
+        fontSize: 12,
+        color: '#ff6b6b',
+        marginTop: 4,
+        marginLeft: 2,
     },
 });
 
