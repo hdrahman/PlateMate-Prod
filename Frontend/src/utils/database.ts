@@ -290,6 +290,20 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
         console.log('✅ cheat_day_settings table created successfully');
 
+        // Check and add missing columns to nutrition_goals table
+        try {
+            const nutritionGoalsInfo = await db.getAllAsync("PRAGMA table_info(nutrition_goals)");
+            const dailyCalorieGoalColumn = nutritionGoalsInfo.find((col: any) => col.name === 'daily_calorie_goal');
+            
+            if (!dailyCalorieGoalColumn) {
+                console.log('🔄 Adding daily_calorie_goal column to nutrition_goals table...');
+                await db.execAsync(`ALTER TABLE nutrition_goals ADD COLUMN daily_calorie_goal INTEGER`);
+                console.log('✅ daily_calorie_goal column added to nutrition_goals table');
+            }
+        } catch (error) {
+            console.error('❌ Error checking/adding daily_calorie_goal column:', error);
+        }
+
         // Run database migrations to ensure all columns exist
         console.log('🔄 Running database migrations...');
         await updateDatabaseSchema(db);
@@ -4498,5 +4512,132 @@ export const getCacheStats = async (): Promise<{ total: number, active: number, 
     } catch (error) {
         console.error('❌ Error getting cache stats:', error);
         return { total: 0, active: 0, expired: 0 };
+    }
+};
+
+// ========================================================================================
+// BMR (Basal Metabolic Rate) Management Functions
+// ========================================================================================
+
+/**
+ * Store or update user's BMR (Basal Metabolic Rate) in the profile
+ * @param firebaseUid User's Firebase UID
+ * @param bmr Calculated BMR value
+ * @param maintenanceCalories Maintenance calories (TDEE)
+ * @param dailyTarget Final daily calorie target (including weight goal adjustments)
+ */
+export const updateUserBMR = async (
+    firebaseUid: string, 
+    bmr: number, 
+    maintenanceCalories: number, 
+    dailyTarget: number
+): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to update BMR before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        console.log(`🔄 Updating BMR data for user ${firebaseUid}:`, {
+            bmr,
+            maintenanceCalories,
+            dailyTarget
+        });
+
+        // First ensure the BMR column exists in the user_profiles table
+        await ensureBMRColumnExists();
+
+        const result = await db.runAsync(`
+            UPDATE user_profiles 
+            SET bmr = ?, maintenance_calories = ?, daily_calorie_target = ?, last_modified = ?
+            WHERE firebase_uid = ?
+        `, [bmr, maintenanceCalories, dailyTarget, getCurrentDate(), firebaseUid]);
+
+        if (result.changes === 0) {
+            console.warn(`⚠️ No profile found to update BMR for user ${firebaseUid}`);
+        } else {
+            console.log(`✅ BMR updated successfully for user ${firebaseUid}`);
+        }
+    } catch (error) {
+        console.error('❌ Error updating user BMR:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get user's BMR and related calorie data from profile
+ * @param firebaseUid User's Firebase UID
+ * @returns Object containing BMR, maintenance calories, and daily target
+ */
+export const getUserBMRData = async (firebaseUid: string): Promise<{
+    bmr: number | null;
+    maintenanceCalories: number | null;
+    dailyTarget: number | null;
+} | null> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to get BMR data before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        await ensureBMRColumnExists();
+
+        const result = await db.getFirstAsync<{
+            bmr: number;
+            maintenance_calories: number;
+            daily_calorie_target: number;
+        }>(`
+            SELECT bmr, maintenance_calories, daily_calorie_target 
+            FROM user_profiles 
+            WHERE firebase_uid = ?
+        `, [firebaseUid]);
+
+        if (!result) {
+            console.log(`ℹ️ No BMR data found for user ${firebaseUid}`);
+            return null;
+        }
+
+        return {
+            bmr: result.bmr || null,
+            maintenanceCalories: result.maintenance_calories || null,
+            dailyTarget: result.daily_calorie_target || null
+        };
+    } catch (error) {
+        console.error('❌ Error getting user BMR data:', error);
+        return null;
+    }
+};
+
+/**
+ * Ensure BMR-related columns exist in user_profiles table
+ */
+export const ensureBMRColumnExists = async (): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to ensure BMR column before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    try {
+        const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+        
+        const bmrColumn = tableInfo.find((col: any) => col.name === 'bmr');
+        const maintenanceColumn = tableInfo.find((col: any) => col.name === 'maintenance_calories');
+        
+        if (!bmrColumn) {
+            console.log('🔄 Adding BMR column to user_profiles table...');
+            await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN bmr REAL`);
+            console.log('✅ BMR column added successfully');
+        }
+        
+        if (!maintenanceColumn) {
+            console.log('🔄 Adding maintenance_calories column to user_profiles table...');
+            await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN maintenance_calories REAL`);
+            console.log('✅ maintenance_calories column added successfully');
+        }
+
+        console.log('✅ BMR columns verified/added successfully');
+    } catch (error) {
+        console.error('❌ Error ensuring BMR columns exist:', error);
+        throw error;
     }
 };

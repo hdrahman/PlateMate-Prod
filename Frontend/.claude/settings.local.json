@@ -3,7 +3,8 @@
     "allow": [
       "Bash(rm:*)",
       "Bash(node:*)",
-      "Bash(timeout 15 npm start)"
+      "Bash(timeout 15 npm start)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

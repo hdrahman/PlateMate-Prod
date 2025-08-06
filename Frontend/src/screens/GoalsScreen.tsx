@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { getUserGoals } from '../utils/database';
+import { getUserGoals, getUserBMRData } from '../utils/database';
 import { getProfile } from '../api/profileApi';
 import { kgToLbs } from '../utils/unitConversion';
 
@@ -29,6 +29,13 @@ const GoalsScreen = () => {
     const { user } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
     const [isImperialUnits, setIsImperialUnits] = useState(false);
+    
+    // Add state for BMR and calorie data
+    const [bmrData, setBmrData] = useState<{
+        bmr: number | null;
+        maintenanceCalories: number | null;
+        dailyTarget: number | null;
+    } | null>(null);
 
     // Initial goals state with empty/default values
     const [goals, setGoals] = useState({
@@ -81,6 +88,11 @@ const GoalsScreen = () => {
                 const targetWeight = profileData?.profile?.target_weight ||
                     (profileData?.nutrition_goals?.target_weight) ||
                     userGoals?.targetWeight || null;
+
+                // Get BMR data
+                const userBMRData = await getUserBMRData(user.id);
+                setBmrData(userBMRData);
+                console.log('📊 BMR Data loaded:', userBMRData);
 
                 // Update the goals state with fetched data
                 setGoals(prevGoals => ({
@@ -184,6 +196,41 @@ const GoalsScreen = () => {
                         <Text style={styles.goalValue}>{goals.activityLevel}</Text>
                     </View>
                 </View>
+
+                {/* BMR and Calorie Breakdown */}
+                {bmrData && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionHeader}>Calorie Breakdown</Text>
+                        
+                        <View style={styles.goalRow}>
+                            <Text style={styles.goalLabel}>BMR (Basal Metabolic Rate)</Text>
+                            <Text style={styles.goalValue}>{bmrData.bmr || '---'} cal</Text>
+                        </View>
+
+                        <View style={styles.goalRow}>
+                            <Text style={styles.goalLabel}>Maintenance Calories (TDEE)</Text>
+                            <Text style={styles.goalValue}>{bmrData.maintenanceCalories || '---'} cal</Text>
+                        </View>
+
+                        <View style={styles.goalRow}>
+                            <Text style={styles.goalLabel}>Daily Target</Text>
+                            <Text style={styles.goalValue}>{bmrData.dailyTarget || '---'} cal</Text>
+                        </View>
+
+                        {bmrData.maintenanceCalories && bmrData.dailyTarget && (
+                            <View style={styles.goalRow}>
+                                <Text style={styles.goalLabel}>Goal Adjustment</Text>
+                                <Text style={[
+                                    styles.goalValue, 
+                                    { color: bmrData.dailyTarget - bmrData.maintenanceCalories >= 0 ? '#4CAF50' : '#F44336' }
+                                ]}>
+                                    {bmrData.dailyTarget - bmrData.maintenanceCalories > 0 ? '+' : ''}
+                                    {bmrData.dailyTarget - bmrData.maintenanceCalories} cal
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 {/* Nutrition Goals */}
                 <View style={styles.section}>

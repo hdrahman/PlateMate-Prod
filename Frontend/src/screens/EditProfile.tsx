@@ -36,6 +36,7 @@ import {
     formatHeight,
     formatWeight
 } from '../utils/unitConversion';
+import { calculateAndStoreBMR } from '../utils/nutritionCalculator';
 import _ from 'lodash'; // Import lodash for deep cloning
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -484,6 +485,9 @@ const EditProfile = () => {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.length > 1 ? nameParts[1] : '';
 
+            // Calculate age from date of birth if available
+            const calculatedAge = dateOfBirth && dateOfBirth !== '---' ? calculateAge(dateOfBirth) : null;
+
             // Create profile data object based strictly on the fields that exist in user_profiles table
             // Exclude location first in case it's not supported
             const baseProfileData = {
@@ -495,7 +499,10 @@ const EditProfile = () => {
                 gender: editedSex.toLowerCase(),
                 unit_preference: editedIsImperialUnits ? 'imperial' : 'metric',
                 timezone: editedTimeZone || 'UTC',
-                email: email
+                email: email,
+                // Include date of birth and calculated age
+                ...(dateOfBirth && dateOfBirth !== '---' ? { date_of_birth: dateOfBirth } : {}),
+                ...(calculatedAge !== null ? { age: calculatedAge } : {})
             };
 
             // Save the location value regardless of whether we could save it to the database
@@ -556,6 +563,48 @@ const EditProfile = () => {
                 }
 
                 setTimeZone(editedTimeZone);
+
+                // Recalculate and store BMR after profile update
+                try {
+                    const updatedProfile = {
+                        ...baseProfileData,
+                        location: locationToDisplay,
+                        // Ensure we have all required fields for BMR calculation
+                        height: heightInCm > 0 ? heightInCm : null,
+                        weight: weightInKg > 0 ? weightInKg : null,
+                        gender: editedSex.toLowerCase(),
+                        // Note: age and activityLevel would need to be set separately if available
+                        // For now, we'll recalculate BMR in the background if possible
+                    };
+
+                    // Attempt to recalculate BMR with updated profile data
+                    // This will only work if the profile has all required BMR fields
+                    console.log('🔄 Attempting to recalculate BMR after profile update...');
+                    
+                    // Get the full profile to ensure we have all BMR calculation fields
+                    const fullProfile = await getUserProfileByFirebaseUid(user.uid);
+                    if (fullProfile && fullProfile.height && fullProfile.weight && fullProfile.age && 
+                        fullProfile.gender && fullProfile.activity_level) {
+                        
+                        // Update the profile with new values for BMR calculation
+                        const profileForBMR = {
+                            ...fullProfile,
+                            height: heightInCm > 0 ? heightInCm : fullProfile.height,
+                            weight: weightInKg > 0 ? weightInKg : fullProfile.weight,
+                            gender: editedSex.toLowerCase() || fullProfile.gender,
+                            // Use calculated age from DOB if available, otherwise use current age
+                            age: calculatedAge !== null ? calculatedAge : (age > 0 ? age : fullProfile.age)
+                        };
+                        
+                        await calculateAndStoreBMR(profileForBMR, user.uid);
+                        console.log('✅ BMR recalculated successfully after profile update');
+                    } else {
+                        console.log('ℹ️ Cannot recalculate BMR - missing required profile fields');
+                    }
+                } catch (bmrError) {
+                    console.warn('⚠️ Failed to recalculate BMR after profile update:', bmrError);
+                    // Don't fail the profile update if BMR calculation fails
+                }
 
                 // Reset unsaved changes flag after successful save
                 setHasUnsavedChanges(false);

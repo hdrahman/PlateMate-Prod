@@ -832,6 +832,40 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 console.error('❌ Profile verification failed - could not retrieve saved profile');
             }
 
+            // NEW: Calculate and store BMR if we have the required profile data
+            if (savedProfile && savedProfile.height && savedProfile.weight && savedProfile.age && 
+                savedProfile.gender && savedProfile.activity_level) {
+                console.log('🧮 Calculating initial BMR for new user...');
+                
+                try {
+                    const { calculateAndStoreBMR } = await import('../utils/nutritionCalculator');
+                    
+                    // Create a profile object compatible with the BMR calculator
+                    const profileForBMR = {
+                        ...savedProfile,
+                        activityLevel: savedProfile.activity_level,
+                        weightGoal: savedProfile.weight_goal || savedProfile.fitness_goal,
+                        dailyCalorieTarget: savedProfile.daily_calorie_target
+                    };
+                    
+                    const bmrResult = await calculateAndStoreBMR(profileForBMR, currentUser.id);
+                    if (bmrResult) {
+                        console.log('✅ Initial BMR calculated and stored:', {
+                            bmr: bmrResult.bmr,
+                            maintenance: bmrResult.maintenanceCalories,
+                            dailyTarget: bmrResult.dailyTarget
+                        });
+                    } else {
+                        console.log('ℹ️ Could not calculate BMR - missing required data');
+                    }
+                } catch (bmrError) {
+                    console.warn('⚠️ Failed to calculate initial BMR:', bmrError);
+                    // Don't fail onboarding if BMR calculation fails
+                }
+            } else {
+                console.log('ℹ️ Cannot calculate initial BMR - missing required profile fields');
+            }
+
             // Clean up temporary data
             if (tempSessionId) {
                 await cleanupOldTempOnboardingSessions();

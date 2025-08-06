@@ -1,4 +1,5 @@
 import { UserProfile } from '../types/user';
+import { updateUserBMR } from './database';
 
 // Interface for nutrition goals
 export interface NutritionGoals {
@@ -11,14 +12,21 @@ export interface NutritionGoals {
     sodium: number;   // in mg
 }
 
+// Interface for BMR calculation results
+export interface BMRCalculationResult {
+    bmr: number;                    // Base Metabolic Rate (calories at rest)
+    maintenanceCalories: number;    // BMR * activity multiplier (TDEE)
+    dailyTarget: number;           // Final target including weight goal adjustments
+    weightGoalAdjustment: number;  // Calorie adjustment for weight goal (+/-)
+}
+
 /**
- * Calculate daily calorie and macronutrient needs based on user profile
- * Using the Mifflin-St Jeor Equation for BMR and appropriate activity multipliers
+ * Calculate BMR and related calorie data based on user profile
+ * Using the Mifflin-St Jeor Equation for BMR and proper weight goal adjustments
  */
-export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals => {
+export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | null => {
     if (!profile.height || !profile.weight || !profile.age || !profile.gender || !profile.activityLevel) {
-        // Return default values if missing required data
-        return getDefaultNutritionGoals();
+        return null;
     }
 
     // Calculate BMR using Mifflin-St Jeor Equation
@@ -46,36 +54,83 @@ export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals =>
             break;
     }
 
-    // Calculate TDEE (Total Daily Energy Expenditure)
-    let tdee = Math.round(bmr * activityMultiplier);
+    // Calculate maintenance calories (TDEE)
+    const maintenanceCalories = Math.round(bmr * activityMultiplier);
 
-    // Adjust based on weight goal
-    if (profile.weightGoal?.startsWith('lose')) {
-        if (profile.weightGoal === 'lose_light') {
-            tdee -= 250; // 0.25kg/week loss
-        } else if (profile.weightGoal === 'lose_moderate') {
-            tdee -= 500; // 0.5kg/week loss
-        } else if (profile.weightGoal === 'lose_aggressive') {
-            tdee -= 750; // 0.75kg/week loss
-        }
-    } else if (profile.weightGoal?.startsWith('gain')) {
-        if (profile.weightGoal === 'gain_light') {
-            tdee += 250; // 0.25kg/week gain
-        } else if (profile.weightGoal === 'gain_moderate') {
-            tdee += 500; // 0.5kg/week gain
-        } else if (profile.weightGoal === 'gain_aggressive') {
-            tdee += 750; // 0.75kg/week gain
+    // Calculate weight goal adjustment based on kg per week targets
+    let weightGoalAdjustment = 0;
+    if (profile.weightGoal) {
+        // Map weight goals to calorie adjustments (7700 cal = 1kg of fat)
+        // Divide by 7 for daily adjustment
+        switch (profile.weightGoal) {
+            case 'lose_0.25':
+            case 'lose_light':
+                weightGoalAdjustment = -250; // 0.25kg/week loss
+                break;
+            case 'lose_0.5':
+            case 'lose_moderate':
+                weightGoalAdjustment = -500; // 0.5kg/week loss
+                break;
+            case 'lose_0.75':
+            case 'lose_aggressive':
+                weightGoalAdjustment = -750; // 0.75kg/week loss
+                break;
+            case 'lose_1':
+                weightGoalAdjustment = -1000; // 1kg/week loss
+                break;
+            case 'gain_0.25':
+            case 'gain_light':
+                weightGoalAdjustment = 250; // 0.25kg/week gain
+                break;
+            case 'gain_0.5':
+            case 'gain_moderate':
+                weightGoalAdjustment = 500; // 0.5kg/week gain
+                break;
+            case 'gain_0.75':
+            case 'gain_aggressive':
+                weightGoalAdjustment = 750; // 0.75kg/week gain
+                break;
         }
     }
 
-    // Ensure minimum calories
+    // Calculate daily target with weight goal adjustment
+    let dailyTarget = maintenanceCalories + weightGoalAdjustment;
+
+    // Ensure minimum calories for safety
     const minCalories = profile.gender === 'male' ? 1500 : 1200;
-    tdee = Math.max(tdee, minCalories);
+    dailyTarget = Math.max(dailyTarget, minCalories);
 
     // If user has set a custom calorie target, use that instead
     if (profile.dailyCalorieTarget && profile.dailyCalorieTarget > 0) {
-        tdee = profile.dailyCalorieTarget;
+        dailyTarget = profile.dailyCalorieTarget;
+        weightGoalAdjustment = dailyTarget - maintenanceCalories; // Recalculate adjustment
     }
+
+    return {
+        bmr: Math.round(bmr),
+        maintenanceCalories,
+        dailyTarget,
+        weightGoalAdjustment
+    };
+};
+
+/**
+ * Calculate daily calorie and macronutrient needs based on user profile
+ * Using the Mifflin-St Jeor Equation for BMR and appropriate activity multipliers
+ */
+export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals => {
+    if (!profile.height || !profile.weight || !profile.age || !profile.gender || !profile.activityLevel) {
+        // Return default values if missing required data
+        return getDefaultNutritionGoals();
+    }
+
+    // Use the new BMR calculation function
+    const bmrData = calculateBMRData(profile);
+    if (!bmrData) {
+        return getDefaultNutritionGoals();
+    }
+
+    const tdee = bmrData.dailyTarget;
 
     // Calculate protein based on latest evidence-based recommendations (g/kg body weight)
     // rather than percentage of calories, as per 2024-2025 research
@@ -179,4 +234,40 @@ export const getDefaultNutritionGoals = (): NutritionGoals => {
         sugar: 50, // <10% of calories
         sodium: 2300
     };
+};
+
+/**
+ * Calculate BMR and store it in the user's profile
+ * This should be called whenever profile data changes (weight, height, age, gender, activity level, weight goals)
+ */
+export const calculateAndStoreBMR = async (profile: UserProfile, firebaseUid: string): Promise<BMRCalculationResult | null> => {
+    try {
+        console.log('🧮 Calculating and storing BMR for user:', firebaseUid);
+        
+        const bmrData = calculateBMRData(profile);
+        if (!bmrData) {
+            console.log('⚠️ Could not calculate BMR - missing profile data');
+            return null;
+        }
+
+        // Store BMR data in the database
+        await updateUserBMR(
+            firebaseUid, 
+            bmrData.bmr, 
+            bmrData.maintenanceCalories, 
+            bmrData.dailyTarget
+        );
+
+        console.log('✅ BMR calculated and stored successfully:', {
+            bmr: bmrData.bmr,
+            maintenance: bmrData.maintenanceCalories,
+            dailyTarget: bmrData.dailyTarget,
+            adjustment: bmrData.weightGoalAdjustment
+        });
+
+        return bmrData;
+    } catch (error) {
+        console.error('❌ Error calculating and storing BMR:', error);
+        return null;
+    }
 }; 

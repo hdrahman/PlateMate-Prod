@@ -13,7 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid } from '../utils/database';
+import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid, getUserProfileByFirebaseUid } from '../utils/database';
+import { calculateAndStoreBMR } from '../utils/nutritionCalculator';
 
 const PRIMARY_BG = '#000000';
 const CARD_BG = '#1C1C1E';
@@ -95,6 +96,34 @@ const EditGoalsScreen = () => {
             };
 
             await updateUserGoals(user.id, goalsToSave);
+
+            // Recalculate BMR if activity level changed (affects TDEE and daily targets)
+            if (goals.activityLevel) {
+                try {
+                    console.log('🔄 Recalculating BMR after activity level change...');
+                    const fullProfile = await getUserProfileByFirebaseUid(user.uid);
+                    
+                    if (fullProfile && fullProfile.height && fullProfile.weight && fullProfile.age && 
+                        fullProfile.gender && goals.activityLevel) {
+                        
+                        const profileForBMR = {
+                            ...fullProfile,
+                            activityLevel: goals.activityLevel,
+                            // Use new fitness goal if it was updated
+                            weightGoal: goals.fitnessGoal || fullProfile.weight_goal || fullProfile.fitness_goal
+                        };
+                        
+                        await calculateAndStoreBMR(profileForBMR, user.uid);
+                        console.log('✅ BMR recalculated after activity level update');
+                    } else {
+                        console.log('ℹ️ Cannot recalculate BMR - missing required profile fields');
+                    }
+                } catch (bmrError) {
+                    console.warn('⚠️ Failed to recalculate BMR after goals update:', bmrError);
+                    // Don't fail the goals update if BMR calculation fails
+                }
+            }
+
             Alert.alert('Success', 'Your goals have been updated!');
             navigation.goBack();
         } catch (error) {

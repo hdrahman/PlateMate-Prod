@@ -11,7 +11,8 @@ import {
   getUserProfileBySupabaseUid,
   getUserProfileByFirebaseUid,
   getUserGoals,
-  updateUserProfile
+  updateUserProfile,
+  getUserBMRData
 } from '../utils/database';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
@@ -272,9 +273,22 @@ export default function Home() {
             fat: goals.fat
           });
 
-          // Update state with calculated goals, prioritizing the database value
-          const finalCalorieGoal = userGoals?.calorieGoal || goals.calories;
-          console.log('📋 Final calorie goal selected:', finalCalorieGoal);
+          // Try to get BMR data first (if available, it will have more accurate calorie targets)
+          const bmrData = await getUserBMRData(user.uid);
+          console.log('📊 BMR data loaded:', bmrData);
+
+          // Update state with calculated goals, prioritizing BMR data, then database, then calculated
+          let finalCalorieGoal = goals.calories;
+          
+          if (bmrData?.dailyTarget) {
+            finalCalorieGoal = bmrData.dailyTarget;
+            console.log('📋 Using BMR daily target as calorie goal:', finalCalorieGoal);
+          } else if (userGoals?.calorieGoal) {
+            finalCalorieGoal = userGoals.calorieGoal;
+            console.log('📋 Using database calorie goal:', finalCalorieGoal);
+          } else {
+            console.log('📋 Using calculated calorie goal:', finalCalorieGoal);
+          }
 
           setDailyCalorieGoal(finalCalorieGoal);
           setMacroGoals({
