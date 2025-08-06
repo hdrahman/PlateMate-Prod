@@ -39,13 +39,15 @@ const { width, height } = Dimensions.get('window');
 const getResponsiveDimensions = () => {
     // Calculate available screen space for better layout
     const availableHeight = height - 200; // Account for header, status bar, and bottom padding
-    const baseImageHeight = Math.min(320, width * 0.8); // Increased base height
-    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.45); // Use max 45% of available height
     const sidePadding = Math.max(16, width * 0.05);
-    return { imageHeight: dynamicImageHeight, sidePadding };
+    const availableWidth = width - (sidePadding * 2); // Account for side padding
+    const baseImageHeight = Math.min(600, availableWidth * 1.4); // Use available width, not full screen width
+    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.70); // Use even more available height
+    const sideViewButtonHeight = 80; // Fixed height for side view button
+    return { imageHeight: dynamicImageHeight, sidePadding, sideViewButtonHeight };
 };
 
-const { imageHeight, sidePadding } = getResponsiveDimensions();
+const { imageHeight, sidePadding, sideViewButtonHeight } = getResponsiveDimensions();
 
 // Define navigation types
 type RootStackParamList = {
@@ -118,6 +120,11 @@ const ImageCapture: React.FC = () => {
     // New state for UI improvements
     const [showSideView, setShowSideView] = useState(false);
     const [showOptionalDetails, setShowOptionalDetails] = useState(false);
+    
+    // State for image navigation
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const scrollViewRef = React.useRef<ScrollView>(null);
+    
 
     // Add state for GPT-generated description
     const [gptDescription, setGptDescription] = useState('');
@@ -139,6 +146,7 @@ const ImageCapture: React.FC = () => {
             setShowSideView(true);
         }
     }, [initialPhotoUri]);
+    
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
@@ -186,6 +194,11 @@ const ImageCapture: React.FC = () => {
                     uploaded: false
                 };
                 setImages(newImages);
+                
+                // If this was a side view image (index 1) and both images now exist, switch to show it
+                if (index === 1 && newImages[0].uri && newImages[1].uri) {
+                    setActiveImageIndex(1); // Switch to show the side view (second image)
+                }
             }
         } catch (error) {
             console.error('Error taking photo:', error);
@@ -212,6 +225,11 @@ const ImageCapture: React.FC = () => {
                     uploaded: false
                 };
                 setImages(newImages);
+                
+                // If this was a side view image (index 1) and both images now exist, switch to show it
+                if (index === 1 && newImages[0].uri && newImages[1].uri) {
+                    setActiveImageIndex(1); // Switch to show the side view (second image)
+                }
             }
         } catch (error) {
             console.error('Error picking image:', error);
@@ -796,6 +814,11 @@ const ImageCapture: React.FC = () => {
                                 const newImages = [...images];
                                 newImages[0] = { uri: '', type: 'top', uploaded: false };
                                 setImages(newImages);
+                
+                // If this was a side view image (index 1) and both images now exist, switch to show it
+                if (index === 1 && newImages[0].uri && newImages[1].uri) {
+                    setActiveImageIndex(1); // Switch to show the side view (second image)
+                }
                             }
                         },
                         { text: 'OK', style: 'default' }
@@ -942,6 +965,205 @@ const ImageCapture: React.FC = () => {
             </TouchableOpacity>
         );
     };
+    
+    // Render side view button (matches additional details design exactly)
+    const renderSideViewButton = () => {
+        const sideImage = images[1];
+        const hasBothImages = images[0].uri && images[1].uri;
+        
+        return (
+            <View style={styles.optionalDetailsWrapper}>
+                <TouchableOpacity
+                    style={styles.sectionHeader}
+                    onPress={() => {
+                        if (sideImage.uri) {
+                            if (hasBothImages) {
+                                // If in swipe mode, switch to side image
+                                setActiveImageIndex(1);
+                            }
+                        } else {
+                            // If no side image, take photo
+                            handleTakePhoto(1);
+                        }
+                    }}
+                >
+                    <View style={styles.sectionHeaderContent}>
+                        <Ionicons name="camera-outline" size={20} color="#8A2BE2" />
+                        <Text style={styles.sectionHeaderTitle}>Side View</Text>
+                        <Text style={styles.sectionHeaderSubtitle}>{sideImage.uri ? 'Added' : 'Optional'}</Text>
+                    </View>
+                    {sideImage.uri ? (
+                        <View style={styles.sideImagePreview}>
+                            <Image source={{ uri: sideImage.uri }} style={styles.sideImageThumbnail} />
+                            <TouchableOpacity
+                                style={styles.removeSideImageButton}
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    const newImages = [...images];
+                                    newImages[1] = {
+                                        ...newImages[1],
+                                        uri: '',
+                                        uploaded: false
+                                    };
+                                    setImages(newImages);
+                                    setActiveImageIndex(0); // Switch back to main image
+                                }}
+                            >
+                                <Ionicons name="close" size={12} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <Ionicons
+                            name="add"
+                            size={24}
+                            color="#8A2BE2"
+                        />
+                    )}
+                </TouchableOpacity>
+            </View>
+        );
+    };
+    
+    // Handle scroll end to update active index
+    const handleScrollEnd = (event: any) => {
+        const { contentOffset } = event.nativeEvent;
+        const slideWidth = width - (sidePadding * 2);
+        const pageIndex = Math.round(contentOffset.x / slideWidth);
+        setActiveImageIndex(pageIndex);
+    };
+    
+    // Function to scroll to specific image
+    const scrollToImage = (index: number) => {
+        if (scrollViewRef.current) {
+            const slideWidth = width - (sidePadding * 2);
+            scrollViewRef.current.scrollTo({ x: index * slideWidth, animated: true });
+        }
+        setActiveImageIndex(index);
+    };
+    
+    // Render swipeable images with ScrollView
+    const renderSwipeableImages = () => {
+        const filledImages = images.filter(img => img.uri !== '');
+        const showNavigation = filledImages.length > 1;
+        
+        return (
+            <View style={styles.swipeableContainer}>
+                <ScrollView
+                    ref={scrollViewRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={handleScrollEnd}
+                    style={[styles.imagePlaceholderWrapper, styles.imageScrollView]}
+                >
+                        {filledImages.length > 0 ? (
+                            filledImages.map((image, index) => (
+                                <View key={index} style={styles.imageSlide}>
+                                    <LinearGradient
+                                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.imagePlaceholderGradient}
+                                        locations={[0, 0.5, 1]}
+                                    >
+                                        <View style={styles.imagePlaceholder}>
+                                            <View style={styles.imageContainer}>
+                                                <Image source={{ uri: image.uri }} style={styles.image} />
+                                                <TouchableOpacity
+                                                    style={styles.removeImageButton}
+                                                    onPress={() => {
+                                                        const imageIndex = images.findIndex(img => img.uri === image.uri);
+                                                        if (imageIndex !== -1) {
+                                                            const newImages = [...images];
+                                                            newImages[imageIndex] = {
+                                                                ...newImages[imageIndex],
+                                                                uri: '',
+                                                                uploaded: false
+                                                            };
+                                                            setImages(newImages);
+                                                            
+                                                            // Reset active image index if needed
+                                                            const updatedFilledImages = newImages.filter(img => img.uri !== '');
+                                                            if (activeImageIndex >= updatedFilledImages.length) {
+                                                                setActiveImageIndex(Math.max(0, updatedFilledImages.length - 1));
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    <Ionicons name="close" size={16} color="#fff" />
+                                                </TouchableOpacity>
+                                            </View>
+                                            
+                                            {/* Gallery button */}
+                                            <TouchableOpacity
+                                                style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
+                                                onPress={() => {
+                                                    const imageIndex = images.findIndex(img => img.uri === image.uri);
+                                                    handlePickImage(imageIndex);
+                                                }}
+                                            >
+                                                <Ionicons name="images" size={16} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </LinearGradient>
+                                </View>
+                            ))
+                        ) : (
+                            // Show placeholder when no images
+                            <View style={styles.imageSlide}>
+                                <LinearGradient
+                                    colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.imagePlaceholderGradient}
+                                    locations={[0, 0.5, 1]}
+                                >
+                                    <View style={styles.imagePlaceholder}>
+                                        <TouchableOpacity
+                                            style={styles.placeholderContent}
+                                            onPress={() => handleTakePhoto(0)}
+                                        >
+                                            <Ionicons name="camera" size={50} color="#8A2BE2" />
+                                            <Text style={[styles.placeholderText, { color: "#8A2BE2" }]}>
+                                                Tap to capture your meal
+                                            </Text>
+                                            <Text style={styles.requiredText}>Required</Text>
+                                        </TouchableOpacity>
+                                        
+                                        {/* Gallery button */}
+                                        <TouchableOpacity
+                                            style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
+                                            onPress={() => handlePickImage(0)}
+                                        >
+                                            <Ionicons name="images" size={16} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </LinearGradient>
+                            </View>
+                        )}
+                </ScrollView>
+                
+                {/* Navigation dots */}
+                {showNavigation && (
+                    <View style={styles.dotsContainer}>
+                        {filledImages.map((_, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={[
+                                    styles.dot,
+                                    activeImageIndex === index && styles.activeDot
+                                ]}
+                                onPress={() => scrollToImage(index)}
+                            />
+                        ))}
+                    </View>
+                )}
+            </View>
+        );
+    };
+    
+    
+
 
     const renderOptionalDetailsSection = () => {
         return (
@@ -1031,6 +1253,7 @@ const ImageCapture: React.FC = () => {
         setIsAnalyzing(false);
         Alert.alert('Cancelled', 'Image analysis has been cancelled.');
     };
+    
 
     return (
         <SafeAreaView style={[styles.container, containerStyle]}>
@@ -1128,10 +1351,17 @@ const ImageCapture: React.FC = () => {
                 </View>
 
                 <View style={styles.imagesContainer}>
-                    {renderImagePlaceholder(0)}
-                    {renderAddSideViewButton()}
-                    {renderImagePlaceholder(1)}
+                    {images[0].uri && images[1].uri ? (
+                        // Both images exist - show swipeable version
+                        renderSwipeableImages()
+                    ) : (
+                        // Show normal single image
+                        renderImagePlaceholder(0)
+                    )}
                 </View>
+
+                {/* Side view button - only show when not in swipe mode */}
+                {!(images[0].uri && images[1].uri) && renderSideViewButton()}
 
                 {renderOptionalDetailsSection()}
 
@@ -1239,15 +1469,121 @@ const styles = StyleSheet.create({
     imagePlaceholderWrapper: {
         width: '100%',
         height: imageHeight, // Use responsive height
-        marginBottom: 12, // Reduced from 16 for tighter spacing
+        marginBottom: 6, // Further reduced spacing
         borderRadius: 12,
         overflow: 'hidden',
     },
     primaryImageWrapper: {
         height: imageHeight, // Use responsive height
     },
-    sideImageWrapper: {
-        height: imageHeight * 0.50, // Reduced from 0.57 to make it smaller proportionally
+    addSideViewButton: {
+        marginBottom: 12, // Reduced from 16 for tighter spacing
+        borderRadius: 12,
+        overflow: 'hidden',
+        height: 70, // Reduced from 80 to save space
+    },
+    addSideViewGradient: {
+        flex: 1,
+        padding: 2,
+    },
+    addSideViewContent: {
+        backgroundColor: '#1a1a1a',
+        borderRadius: 10,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    addSideViewText: {
+        fontSize: 16,
+        color: '#fff',
+        fontWeight: '600',
+        marginTop: 8,
+    },
+    addSideViewSubtext: {
+        fontSize: 13,
+        color: '#aaa',
+        marginTop: 4,
+    },
+    swipeableContainer: {
+        marginBottom: 6, // Reduced spacing
+    },
+    dotsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingHorizontal: 16,
+    },
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#666',
+        marginHorizontal: 4,
+    },
+    activeDot: {
+        backgroundColor: '#8A2BE2',
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    imageScrollView: {
+        height: imageHeight, // Fixed height to match single image
+    },
+    imageSlide: {
+        width: width - (sidePadding * 2), // Use available width, not full screen
+        height: imageHeight, // Fixed height to match single image
+    },
+    sideImageButton: {
+        flex: 1,
+    },
+    sideImageOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    sideImageText: {
+        fontSize: 16,
+        color: '#fff',
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    sideImageSubtext: {
+        fontSize: 13,
+        color: '#aaa',
+        marginTop: 4,
+        textAlign: 'center',
+    },
+    sideImagePreview: {
+        position: 'relative',
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    sideImageThumbnail: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    removeSideImageButton: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        borderRadius: 10,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     imagePlaceholderGradient: {
         flex: 1,
@@ -1281,7 +1617,7 @@ const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover',
+        resizeMode: 'contain', // Changed from 'cover' to 'contain' to prevent cropping
     },
     imageContainer: {
         width: '100%',
@@ -1311,38 +1647,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#4a4a4a',
     },
-    addSideViewButton: {
-        marginBottom: 12, // Reduced from 16 for tighter spacing
-        borderRadius: 12,
-        overflow: 'hidden',
-        height: 70, // Reduced from 80 to save space
-    },
-    addSideViewGradient: {
-        flex: 1,
-        padding: 2,
-    },
-    addSideViewContent: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 10,
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flex: 1,
-    },
-    addSideViewText: {
-        fontSize: 16,
-        color: '#fff',
-        fontWeight: '600',
-        marginTop: 8,
-    },
-    addSideViewSubtext: {
-        fontSize: 13,
-        color: '#aaa',
-        marginTop: 4,
-    },
     optionalDetailsWrapper: {
-        marginBottom: 12, // Reduced from 16 for tighter spacing
+        marginBottom: 12, // Keep normal spacing for sections
         borderRadius: 12,
         backgroundColor: '#1a1a1a',
         overflow: 'hidden',
