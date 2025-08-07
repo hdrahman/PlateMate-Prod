@@ -55,8 +55,9 @@ class StepNotificationService {
           id: CHANNEL_ID,
           name: 'Step Tracking',
           description: 'Persistent notifications for step tracking and calorie monitoring',
-          importance: AndroidImportance.LOW, // Low importance for persistent notifications
+          importance: AndroidImportance.DEFAULT, // Default importance for foreground services
           sound: undefined, // No sound for persistent notifications
+          badge: false, // No badge for step tracking
         });
       }
 
@@ -292,7 +293,7 @@ class StepNotificationService {
         body,
         android: {
           channelId: CHANNEL_ID,
-          importance: AndroidImportance.LOW,
+          importance: AndroidImportance.DEFAULT,
           ongoing: true, // Makes notification persistent
           autoCancel: false,
           smallIcon: 'ic_launcher',
@@ -300,8 +301,7 @@ class StepNotificationService {
           style: {
             type: AndroidStyle.BIGTEXT,
             text: body,
-          },
-          asForegroundService: true, // Critical: This makes it a foreground service
+          }
         },
         ios: {
           categoryId: 'step-tracking',
@@ -309,14 +309,23 @@ class StepNotificationService {
         },
       };
 
-      // Start as foreground service (Android) or regular notification (iOS)
-      if (Platform.OS === 'android') {
-        await notifee.startForegroundService(notification);
-        console.log('🚀 Foreground service started for step tracking');
-      } else {
-        await notifee.displayNotification(notification);
-        console.log('🔔 iOS step notification displayed');
-      }
+      // Display notification as foreground service
+      await notifee.displayNotification({
+        ...notification,
+        android: {
+          ...notification.android,
+          asForegroundService: true, // This now works with proper service registration
+          actions: [
+            {
+              title: 'Stop',
+              pressAction: {
+                id: 'stop',
+              },
+            },
+          ],
+        }
+      });
+      console.log('🚀 Foreground service notification displayed');
       
       this.currentNotificationId = NOTIFICATION_ID;
       console.log('✅ Step tracking service active:', { steps, title, body });
@@ -331,12 +340,11 @@ class StepNotificationService {
           body: 'Step tracking active',
           android: {
             channelId: CHANNEL_ID,
-            importance: AndroidImportance.LOW,
+            importance: AndroidImportance.DEFAULT,
             ongoing: true,
             autoCancel: false,
             smallIcon: 'ic_launcher',
-            color: '#FF00F5',
-            asForegroundService: Platform.OS === 'android',
+            color: '#FF00F5'
           },
           ios: {
             categoryId: 'step-tracking',
@@ -344,11 +352,21 @@ class StepNotificationService {
           },
         };
 
-        if (Platform.OS === 'android') {
-          await notifee.startForegroundService(fallbackNotification);
-        } else {
-          await notifee.displayNotification(fallbackNotification);
-        }
+        await notifee.displayNotification({
+          ...fallbackNotification,
+          android: {
+            ...fallbackNotification.android,
+            asForegroundService: true,
+            actions: [
+              {
+                title: 'Stop',
+                pressAction: {
+                  id: 'stop',
+                },
+              },
+            ],
+          }
+        });
         
         this.currentNotificationId = NOTIFICATION_ID;
         console.log('🔔 Fallback foreground service started:', { steps });
@@ -384,14 +402,10 @@ class StepNotificationService {
   public async stopForegroundService(): Promise<void> {
     try {
       if (this.currentNotificationId) {
-        // Stop foreground service on Android, cancel notification on iOS
-        if (Platform.OS === 'android') {
-          await notifee.stopForegroundService();
-          console.log('🛑 Foreground service stopped');
-        } else {
-          await notifee.cancelNotification(this.currentNotificationId);
-          console.log('🔕 iOS step notification cancelled');
-        }
+        // Stop foreground service and cancel notification
+        await notifee.stopForegroundService();
+        await notifee.cancelNotification(this.currentNotificationId);
+        console.log('🛑 Foreground service stopped');
         
         this.currentNotificationId = null;
         console.log('✅ Step tracking service stopped');

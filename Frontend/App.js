@@ -24,6 +24,8 @@ import StepErrorBoundary from './src/components/StepErrorBoundary';
 import tokenManager from './src/utils/tokenManager';
 // Import Unified Step Tracker
 import UnifiedStepTracker from './src/services/UnifiedStepTracker';
+import notifee, { EventType } from '@notifee/react-native';
+import PersistentStepTracker from './src/services/PersistentStepTracker';
 
 // Debug utilities (development only) - removed obsolete imports
 if (__DEV__) {
@@ -470,6 +472,39 @@ export default function App() {
 
         // Small delay to ensure database is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Register Notifee foreground service for step tracking
+        try {
+          notifee.registerForegroundService((notification) => {
+            return new Promise(() => {
+              console.log('🚀 Foreground service registered and running');
+              
+              // Handle foreground service events (stop button, etc.)
+              notifee.onForegroundEvent(({ type, detail }) => {
+                if (type === EventType.ACTION_PRESS && detail.pressAction.id === 'stop') {
+                  console.log('🛑 Stop action pressed, stopping step tracking');
+                  // Stop both trackers
+                  Promise.all([
+                    UnifiedStepTracker.stopTracking(),
+                    PersistentStepTracker.stopService()
+                  ]).then(() => {
+                    notifee.stopForegroundService();
+                    console.log('✅ All step tracking stopped from notification');
+                  }).catch(error => {
+                    console.error('❌ Error stopping step tracking:', error);
+                    notifee.stopForegroundService();
+                  });
+                }
+              });
+
+              // Keep the service running - this promise never resolves
+              // The service will continue until explicitly stopped
+            });
+          });
+          console.log('✅ Notifee foreground service registered');
+        } catch (error) {
+          console.error('❌ Failed to register foreground service:', error);
+        }
 
         // Check if we're running in Expo Go
         const isExpoGo = global.isExpoGo === true || global.__expo?.isExpoGo === true;

@@ -4,6 +4,7 @@ import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps } from '../utils/database';
 import NativeStepCounter from './NativeStepCounter';
+import StepNotificationService from './StepNotificationService';
 
 // Keys for AsyncStorage
 const PERSISTENT_STEP_SERVICE_KEY = 'PERSISTENT_STEP_SERVICE_ENABLED';
@@ -243,9 +244,11 @@ class PersistentStepTracker {
                 return;
             }
 
+            // Update both the background service notification AND the foreground service notification
             const todayDate = new Date().toLocaleDateString();
             const formattedSteps = steps.toLocaleString();
             
+            // Update background service notification
             await BackgroundService.updateNotification({
                 taskName: 'PlateMate Step Tracker',
                 taskTitle: '🚶 Step Tracking Active',
@@ -256,7 +259,15 @@ class PersistentStepTracker {
                 },
             });
             
-            console.log(`📱 Notification updated: ${formattedSteps} steps`);
+            // Update foreground service notification with detailed info
+            try {
+                await StepNotificationService.updateNotification(steps);
+                console.log(`📱 Both notifications updated: ${formattedSteps} steps`);
+            } catch (fgError) {
+                console.log(`📱 Background notification updated: ${formattedSteps} steps`);
+                console.warn('⚠️ Foreground service notification update failed:', fgError);
+            }
+            
         } catch (error) {
             console.error('❌ Error updating notification:', error);
             
@@ -673,6 +684,53 @@ class PersistentStepTracker {
         } catch (error) {
             console.error('❌ Error resetting daily baseline:', error);
         }
+    }
+
+    /**
+     * Start service (alias for compatibility with settings)
+     */
+    public async startService(): Promise<void> {
+        console.log('🚀 Starting persistent step tracking service...');
+        
+        // Start the background service
+        await this.startPersistentTrackingWithRetry();
+        
+        // Start the Notifee foreground service notification
+        try {
+            const currentSteps = await this.getLastBackgroundStepCount();
+            await StepNotificationService.startForegroundService(currentSteps);
+            console.log('✅ Notifee foreground service started with step tracking');
+        } catch (error) {
+            console.error('❌ Failed to start Notifee foreground service:', error);
+            // Continue with background service even if notification fails
+        }
+    }
+
+    /**
+     * Stop service (alias for compatibility with settings)
+     */
+    public async stopService(): Promise<void> {
+        console.log('🛑 Stopping persistent step tracking service...');
+        
+        // Stop the background service
+        await this.stopPersistentTracking();
+        
+        // Stop the Notifee foreground service
+        try {
+            await StepNotificationService.stopForegroundService();
+            console.log('✅ Notifee foreground service stopped with step tracking');
+        } catch (error) {
+            console.error('❌ Failed to stop Notifee foreground service:', error);
+        }
+    }
+
+    /**
+     * Check if service is running (async for settings compatibility)
+     */
+    public async isServiceRunning(): Promise<boolean> {
+        const running = this.isPersistentTrackingRunning();
+        console.log(`📊 Persistent service running: ${running}`);
+        return running;
     }
 }
 
