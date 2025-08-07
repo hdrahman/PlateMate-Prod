@@ -17,7 +17,6 @@
   <!-- Step tracking permissions (minimal like Pacer) -->
   <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>

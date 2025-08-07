@@ -92,7 +92,7 @@ android {
         applicationId 'com.platemate.app'
         minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
+        versionCode 7
         versionName "1.0.4"
     }
     signingConfigs {

@@ -33,14 +33,11 @@
     },
     "android": {
       "package": "com.platemate.app",
-      "versionCode": 3,
+      "versionCode": 6,
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.BODY_SENSORS",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_HEALTH",
-        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
-        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
         "android.permission.WAKE_LOCK",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
