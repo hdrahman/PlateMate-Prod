@@ -27,7 +27,7 @@ import { PanGestureHandler, GestureHandlerRootView, State as GestureState } from
 import axios from 'axios';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileBySupabaseUid, getUserGoals, getWaterIntakeByDate, getTotalWaterIntakeByDate, deleteWaterIntake } from '../utils/database';
+import { getFoodLogsByDate, getFoodLogsByMealId, getExercisesByDate, addExercise, deleteFoodLog, updateFoodLog, isDatabaseReady, deleteExercise, getUserStreak, checkAndUpdateStreak, hasActivityForToday, getUserProfileBySupabaseUid, getUserGoals, getWaterIntakeByDate, getTotalWaterIntakeByDate, deleteWaterIntake, getUserBMRData } from '../utils/database';
 import { isOnline } from '../utils/syncService';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -156,6 +156,13 @@ const DiaryScreen: React.FC = () => {
     const [mealIdFilter, setMealIdFilter] = useState<number | null>(null);
     const [isFilteredView, setIsFilteredView] = useState(false);
     const [showFirstFoodLogPopup, setShowFirstFoodLogPopup] = useState(false);
+    
+    // Add BMR data state
+    const [bmrData, setBmrData] = useState<{
+        bmr: number | null;
+        maintenanceCalories: number | null;
+        dailyTarget: number | null;
+    } | null>(null);
 
     // Water tracking state
     const [waterIntake, setWaterIntake] = useState<any[]>([]);
@@ -537,6 +544,11 @@ const DiaryScreen: React.FC = () => {
             // Get user profile from local database
             const profile = await getUserProfileBySupabaseUid(user.id);
             setUserProfile(profile); // Store the profile data for use elsewhere
+
+            // Get BMR data for accurate calorie calculations
+            const userBMRData = await getUserBMRData(user.id);
+            setBmrData(userBMRData);
+            console.log('📊 Loaded BMR data for food log:', userBMRData);
 
             // Get the user's goals directly from the database (including nutrition goals)
             const userGoals = await getUserGoals(user.uid);
@@ -2085,34 +2097,84 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
 
     // Add this function before the return statement
     const calculateWeightPrediction = () => {
-        // Get total calories for the day
-        const dailyCalories = mealData.reduce((sum, meal) => sum + meal.total, 0);
+        // Get total calories consumed for the day
+        const dailyCaloriesConsumed = mealData.reduce((sum, meal) => sum + meal.total, 0);
 
         // Check if profile data exists and has necessary values
-        if (!user || profileLoading) return null;
+        if (!user || profileLoading || !bmrData) return null;
 
-        // Calculate calorie difference from maintenance
-        const maintenanceCalories = nutritionGoals.calories;
-        const dailyDifference = dailyCalories - maintenanceCalories;
+        // Calculate total daily calories available:
+        // Raw BMR × Activity Level + Exercise calories logged today
+        const totalExerciseCalories = exerciseList.reduce((total, exercise) => total + exercise.calories_burned, 0);
+        
+        // Get raw BMR and apply activity multiplier to get TRUE maintenance calories
+        const rawBMR = bmrData.bmr || 2000; // Fallback if BMR not available
+        
+        // Get activity level from user profile and apply multiplier
+        let activityMultiplier = 1.2; // Sedentary default
+        if (userProfile?.activity_level) {
+            switch (userProfile.activity_level) {
+                case 'light':
+                    activityMultiplier = 1.375;
+                    break;
+                case 'moderate':
+                    activityMultiplier = 1.55;
+                    break;
+                case 'active':
+                    activityMultiplier = 1.725;
+                    break;
+                case 'extreme':
+                    activityMultiplier = 1.9;
+                    break;
+            }
+        }
+        
+        // Calculate TRUE maintenance calories (not adjusted for weight goals)
+        const trueMaintenance = Math.round(rawBMR * activityMultiplier);
+        const totalAvailableCalories = trueMaintenance + totalExerciseCalories;
+        
+        console.log('📊 Weight prediction calculation:', {
+            dailyCaloriesConsumed,
+            rawBMR,
+            activityLevel: userProfile?.activity_level,
+            activityMultiplier,
+            trueMaintenance,
+            exerciseCalories: totalExerciseCalories,
+            totalAvailableCalories,
+            realDeficit: totalAvailableCalories - dailyCaloriesConsumed,
+            // For comparison - show the old way
+            oldMaintenanceCalories: bmrData.maintenanceCalories,
+            oldDeficit: (bmrData.maintenanceCalories || 0) + totalExerciseCalories - dailyCaloriesConsumed
+        });
+
+        // Calculate calorie deficit/surplus (positive = deficit, negative = surplus)
+        const dailyDeficit = totalAvailableCalories - dailyCaloriesConsumed;
 
         // 1 kg of weight is approximately 7700 calories
         const caloriesPerKg = 7700;
 
-        // Calculate projected weight change over 30 days
-        const projectedWeightChangeKg = (dailyDifference * 30) / caloriesPerKg;
+        // Calculate projected weight change over 30 days (4 weeks)
+        // Positive deficit = weight loss (negative change), negative deficit = weight gain (positive change)
+        const projectedWeightChangeKg = -(dailyDeficit * 30) / caloriesPerKg;
 
         // Use the minimum calories from nutrition calculator
         const minMaleCalories = 1500;
         const minFemaleCalories = 1200;
-        const defaultMinCalories = nutritionGoals.calories * 0.75; // Default to 75% of calories if gender unknown
+        const defaultMinCalories = totalAvailableCalories * 0.75; // Default to 75% of available calories if gender unknown
 
         // We'll determine gender-based minimum while rendering, since we have the profile data there
 
         return {
-            meetsMinimumRequirement: dailyCalories >= defaultMinCalories, // At least 75% of needed calories
+            meetsMinimumRequirement: dailyCaloriesConsumed >= defaultMinCalories, // At least 75% of needed calories
             projectedWeightChangeKg,
             minMaleCalories,
-            minFemaleCalories
+            minFemaleCalories,
+            totalAvailableCalories,
+            dailyDeficit,
+            exerciseCalories: totalExerciseCalories,
+            trueMaintenance,
+            rawBMR,
+            activityMultiplier
         };
     };
 
@@ -2447,24 +2509,36 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                     const prediction = calculateWeightPrediction();
                                     if (!prediction || !userProfile) return null;
 
-                                    // Get daily calories and prepare data
-                                    const dailyCalories = mealData.reduce((sum, meal) => sum + meal.total, 0);
+                                    // Get daily calories consumed and prepare data
+                                    const dailyCaloriesConsumed = mealData.reduce((sum, meal) => sum + meal.total, 0);
                                     const baseWeight = userProfile?.weight || 70;
                                     const estimatedWeight = baseWeight + prediction.projectedWeightChangeKg;
 
-                                    // Default message is weight prediction
-                                    let displayText = `If you eat like this every day, in 1 month you're estimated to weigh ${estimatedWeight.toFixed(1)}kg.`;
+                                    // Enhanced message with deficit/surplus info
+                                    let displayText = '';
                                     let textColor = '#AAAAAA';
 
-                                    // Check gender-specific minimum requirements
-                                    if (userProfile?.gender) {
-                                        const isMale = userProfile.gender === 'male';
-                                        const minimumCalories = isMale ? prediction.minMaleCalories : prediction.minFemaleCalories;
+                                    // Show deficit/surplus information
+                                    const deficitText = prediction.dailyDeficit > 0 
+                                        ? `${Math.round(prediction.dailyDeficit)} calorie deficit` 
+                                        : `${Math.abs(Math.round(prediction.dailyDeficit))} calorie surplus`;
+                                    
+                                    const weightChangeText = prediction.projectedWeightChangeKg > 0 
+                                        ? `gain ${Math.abs(prediction.projectedWeightChangeKg).toFixed(1)}kg`
+                                        : `lose ${Math.abs(prediction.projectedWeightChangeKg).toFixed(1)}kg`;
 
-                                        if (dailyCalories < minimumCalories) {
-                                            displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
-                                            textColor = '#FF5252';
-                                        }
+                                    displayText = `True ${deficitText} (${dailyCaloriesConsumed}/${Math.round(prediction.totalAvailableCalories)} cal from BMR+activity+exercise), you'd ${weightChangeText} in 1 month, weighing ${estimatedWeight.toFixed(1)}kg.`;
+
+                                    // Simple minimum calorie check - show warning if eating less than 1500 calories
+                                    if (dailyCaloriesConsumed < 1500) {
+                                        displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
+                                        textColor = '#FF5252';
+                                    } else if (prediction.dailyDeficit < -500) {
+                                        // Large surplus - caution
+                                        textColor = '#FFD740';
+                                    } else if (prediction.dailyDeficit > 1000) {
+                                        // Very large deficit - caution
+                                        textColor = '#FFD740';
                                     }
 
                                     // Check if below 75% of target calories
