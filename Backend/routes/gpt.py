@@ -33,6 +33,23 @@ class MealAnalysisRequest(BaseModel):
     food_items: List[dict]  # List of food items with nutritional data
     meal_type: Optional[str] = "meal"
 
+# Pydantic model for nutrition estimation request
+class NutritionEstimationRequest(BaseModel):
+    food_name: str
+    quantity: str
+    serving_unit: str
+
+# Pydantic model for nutrition estimation response
+class NutritionEstimationResponse(BaseModel):
+    calories: float
+    proteins: float
+    carbs: float
+    fats: float
+    fiber: float
+    sugar: float
+    healthiness_rating: int
+    confidence: str  # "high", "medium", "low"
+
 # Pydantic model for response
 class FoodAnalysisResponse(BaseModel):
     description: str
@@ -286,4 +303,160 @@ async def analyze_meal(
         logger.error(f"Error analyzing meal: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error analyzing meal: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error analyzing meal: {str(e)}")
+
+
+@router.post("/estimate-nutrition", response_model=NutritionEstimationResponse)
+async def estimate_nutrition(
+    request: NutritionEstimationRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Estimate nutritional information for a food item using GPT-4o.
+    Provides calories, macronutrients, and additional nutrients based on food name and quantity.
+    """
+    if not openai.api_key:
+        logger.warning("Warning: OPENAI_API_KEY not found in environment variables")
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+    
+    try:
+        logger.info(f"Estimating nutrition for: {request.food_name}, {request.quantity} {request.serving_unit} (user: {current_user['supabase_uid']})")
+        
+        # Validate input
+        if not request.food_name.strip():
+            raise HTTPException(status_code=400, detail="Food name is required")
+        
+        if not request.quantity.strip():
+            raise HTTPException(status_code=400, detail="Quantity is required")
+            
+        # Prepare the prompt for GPT-4o
+        prompt = f"""
+        You are a nutrition expert. Estimate the nutritional information for {request.quantity} {request.serving_unit} of {request.food_name}.
+
+        Please provide a JSON response with the following exact structure (no additional text):
+        {{
+            "calories": <number>,
+            "proteins": <number>,
+            "carbs": <number>,
+            "fats": <number>,
+            "fiber": <number>,
+            "sugar": <number>,
+            "healthiness_rating": <integer from 1-10>,
+            "confidence": "<high/medium/low>"
+        }}
+
+        Guidelines:
+        - All nutritional values should be in grams except calories
+        - Healthiness rating: 1-3 = poor, 4-6 = fair, 7-8 = good, 9-10 = excellent
+        - Confidence: "high" for common foods, "medium" for less common, "low" for very specific/unusual items
+        - Be realistic with portion sizes and nutritional density
+        - Consider the serving unit provided (e.g., "1 cup" vs "100g" vs "1 medium")
+
+        Food: {request.food_name}
+        Quantity: {request.quantity} {request.serving_unit}
+        """
+        
+        logger.info("Sending nutrition estimation request to OpenAI")
+        
+        # Make the API request to OpenAI
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {openai.api_key}"
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a precise nutrition expert. Always respond with valid JSON only, no additional text."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "max_tokens": 500,
+                    "temperature": 0.3  # Lower temperature for more consistent results
+                },
+                timeout=30.0
+            )
+        
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+            raise HTTPException(status_code=500, detail=f"OpenAI API error: {response.status_code}")
+        
+        logger.info("Successfully received response from OpenAI API")
+        
+        response_data = response.json()
+        ai_response = response_data["choices"][0]["message"]["content"].strip()
+        
+        logger.info(f"AI response: {ai_response}")
+        
+        # Parse the JSON response
+        import json
+        try:
+            nutrition_data = json.loads(ai_response)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response as JSON: {ai_response}")
+            # Fallback: try to extract JSON from the response
+            import re
+            json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+            if json_match:
+                try:
+                    nutrition_data = json.loads(json_match.group())
+                except json.JSONDecodeError:
+                    raise HTTPException(status_code=500, detail="Failed to parse AI response")
+            else:
+                raise HTTPException(status_code=500, detail="AI response not in expected format")
+        
+        # Validate and sanitize the response
+        required_fields = ['calories', 'proteins', 'carbs', 'fats', 'fiber', 'sugar', 'healthiness_rating', 'confidence']
+        for field in required_fields:
+            if field not in nutrition_data:
+                raise HTTPException(status_code=500, detail=f"Missing field in AI response: {field}")
+        
+        # Ensure numeric values are valid
+        for field in ['calories', 'proteins', 'carbs', 'fats', 'fiber', 'sugar']:
+            try:
+                nutrition_data[field] = float(nutrition_data[field])
+                if nutrition_data[field] < 0:
+                    nutrition_data[field] = 0.0
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid {field} value, defaulting to 0")
+                nutrition_data[field] = 0.0
+        
+        # Validate healthiness rating
+        try:
+            rating = int(nutrition_data['healthiness_rating'])
+            nutrition_data['healthiness_rating'] = max(1, min(10, rating))
+        except (ValueError, TypeError):
+            logger.warning("Invalid healthiness rating, defaulting to 5")
+            nutrition_data['healthiness_rating'] = 5
+        
+        # Validate confidence level
+        if nutrition_data['confidence'].lower() not in ['high', 'medium', 'low']:
+            logger.warning("Invalid confidence level, defaulting to medium")
+            nutrition_data['confidence'] = 'medium'
+        
+        logger.info(f"Nutrition estimation completed successfully for {request.food_name}")
+        
+        # Return the estimation
+        return NutritionEstimationResponse(
+            calories=nutrition_data['calories'],
+            proteins=nutrition_data['proteins'],
+            carbs=nutrition_data['carbs'],
+            fats=nutrition_data['fats'],
+            fiber=nutrition_data['fiber'],
+            sugar=nutrition_data['sugar'],
+            healthiness_rating=nutrition_data['healthiness_rating'],
+            confidence=nutrition_data['confidence']
+        )
+        
+    except Exception as e:
+        logger.error(f"Error estimating nutrition: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error estimating nutrition: {str(e)}")

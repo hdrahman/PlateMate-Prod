@@ -23,6 +23,7 @@ import Animated, {
     clamp
 } from 'react-native-reanimated';
 import { FoodItem } from '../services/BarcodeService';
+import apiService from '../utils/apiService';
 
 // Define theme colors
 const PRIMARY_BG = '#000000';
@@ -88,6 +89,9 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
     // Optional nutrients with default value 0
     const [fiber, setFiber] = useState<string>('0');
     const [sugar, setSugar] = useState<string>('0');
+
+    // AI estimation state
+    const [isEstimating, setIsEstimating] = useState<boolean>(false);
 
     // Health rating state and animation values
     const [healthRating, setHealthRating] = useState<number>(5);
@@ -177,6 +181,72 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         setQuantity('1');
         setServingUnit('serving');
         setHealthRating(5);
+        setIsEstimating(false);
+    };
+
+    // Handle AI nutrition estimation
+    const handleAIEstimation = async () => {
+        if (!foodName.trim()) {
+            Alert.alert('Error', 'Please enter a food name first');
+            return;
+        }
+
+        if (isEstimating) {
+            return; // Already estimating
+        }
+
+        setIsEstimating(true);
+
+        try {
+            console.log('Starting AI nutrition estimation for:', foodName);
+
+            // Make API call to estimate nutrition using apiService
+            const response = await apiService.post('/gpt/estimate-nutrition', {
+                food_name: foodName.trim(),
+                quantity: quantity || '1',
+                serving_unit: servingUnit || 'serving'
+            });
+
+            if (response) {
+                const estimation = response;
+                console.log('AI estimation received:', estimation);
+
+                // Update form fields with AI estimation
+                setCalories(estimation.calories.toString());
+                setProteins(estimation.proteins.toString());
+                setCarbs(estimation.carbs.toString());
+                setFats(estimation.fats.toString());
+                setFiber(estimation.fiber.toString());
+                setSugar(estimation.sugar.toString());
+                setHealthRating(estimation.healthiness_rating);
+
+                // Show success message with confidence level
+                const confidenceMessage = estimation.confidence === 'high'
+                    ? 'High confidence in estimates'
+                    : estimation.confidence === 'medium'
+                        ? 'Moderate confidence - please verify values'
+                        : 'Low confidence - please double-check values';
+
+                Alert.alert(
+                    'AI Estimation Complete',
+                    `Nutritional values have been estimated for "${foodName}". ${confidenceMessage}. You can still modify any values as needed.`,
+                    [{ text: 'OK' }]
+                );
+            }
+        } catch (error) {
+            console.error('Error estimating nutrition:', error);
+
+            let errorMessage = 'Failed to estimate nutrition. Please try again.';
+            if (error.response?.status === 401) {
+                errorMessage = 'Authentication failed. Please sign in again.';
+            } else if (error.response?.status === 500) {
+                errorMessage = 'Server error. Please try again later.';
+            }
+
+            Alert.alert('Error', errorMessage);
+        } finally {
+            setIsEstimating(false);
+        }
     };
 
     // Handle save
@@ -293,7 +363,32 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
 
                         {/* Basic Info */}
                         <GradientBorderCard style={styles.section}>
-                            <Text style={styles.sectionTitle}>Basic Information</Text>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Basic Information</Text>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.aiButton,
+                                        (!foodName.trim() || isEstimating) && styles.aiButtonDisabled
+                                    ]}
+                                    onPress={handleAIEstimation}
+                                    disabled={!foodName.trim() || isEstimating}
+                                >
+                                    {isEstimating ? (
+                                        <View style={styles.aiButtonContent}>
+                                            <Text style={styles.aiButtonText}>...</Text>
+                                        </View>
+                                    ) : (
+                                        <LinearGradient
+                                            colors={['#0074dd', '#5c00dd', '#dd0095']}
+                                            style={styles.aiButtonGradient}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                        >
+                                            <Text style={styles.aiButtonText}>AI</Text>
+                                        </LinearGradient>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
 
                             {/* Food Name */}
                             <View style={styles.inputGroup}>
@@ -845,5 +940,44 @@ const styles = StyleSheet.create({
     },
     disabledButtonText: {
         color: 'rgba(255, 255, 255, 0.5)',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    aiButton: {
+        width: 40,
+        height: 30,
+        borderRadius: 15,
+        overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    aiButtonDisabled: {
+        opacity: 0.5,
+    },
+    aiButtonGradient: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    aiButtonContent: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 15,
+    },
+    aiButtonText: {
+        color: WHITE,
+        fontSize: 12,
+        fontWeight: 'bold',
     },
 }); 
