@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
+import PersistentStepTracker from '../services/PersistentStepTracker';
 import { Platform, PermissionsAndroid } from 'react-native';
 
 interface PermissionStatus {
@@ -25,6 +26,8 @@ interface PermissionStatus {
 
 interface ServiceStatus {
     unifiedTracker: boolean;
+    persistentTracker: boolean;
+    combinedTracking: boolean;
 }
 
 // Permission handling functions
@@ -122,7 +125,9 @@ export default function StepTrackingSettings() {
         allGranted: false
     });
     const [services, setServices] = useState<ServiceStatus>({
-        unifiedTracker: false
+        unifiedTracker: false,
+        persistentTracker: false,
+        combinedTracking: false
     });
     const [currentSteps, setCurrentSteps] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -142,8 +147,12 @@ export default function StepTrackingSettings() {
             setPermissions(permissionStatus);
 
             // Load service status
+            const unifiedTracking = UnifiedStepTracker.isTracking();
+            const persistentTracking = await PersistentStepTracker.isServiceRunning();
             const serviceStatus: ServiceStatus = {
-                unifiedTracker: UnifiedStepTracker.isTracking()
+                unifiedTracker: unifiedTracking,
+                persistentTracker: persistentTracking,
+                combinedTracking: unifiedTracking && persistentTracking
             };
             setServices(serviceStatus);
 
@@ -192,9 +201,27 @@ export default function StepTrackingSettings() {
                     }
                 }
 
+                // Start both trackers for complete step tracking
+                console.log('🚀 Starting complete step tracking (unified + persistent)...');
+                
+                // Start unified tracker first
                 await UnifiedStepTracker.startTracking();
+                console.log('✅ Unified tracker started');
+                
+                // Start persistent/background tracker
+                await PersistentStepTracker.startService();
+                console.log('✅ Persistent tracker started');
+                
             } else {
-                await UnifiedStepTracker.stopTracking();
+                console.log('🛑 Stopping complete step tracking...');
+                
+                // Stop both trackers
+                await Promise.all([
+                    UnifiedStepTracker.stopTracking(),
+                    PersistentStepTracker.stopService()
+                ]);
+                
+                console.log('✅ All step tracking stopped');
             }
 
             await loadStatus();
@@ -310,7 +337,7 @@ export default function StepTrackingSettings() {
                             </Text>
                         </View>
                         <Switch
-                            value={services.unifiedTracker}
+                            value={services.combinedTracking}
                             onValueChange={handleToggleStepTracking}
                             trackColor={{ false: '#767577', true: '#FF00F5' }}
                             thumbColor={'#f4f3f4'}
@@ -353,7 +380,19 @@ export default function StepTrackingSettings() {
                     {renderServiceItem(
                         'Unified Step Tracker',
                         services.unifiedTracker,
-                        'All-in-one step tracking with real-time notifications'
+                        'Foreground step tracking with real-time updates'
+                    )}
+
+                    {renderServiceItem(
+                        'Background Service',
+                        services.persistentTracker,
+                        'Continues tracking when app is closed (requires foreground service)'
+                    )}
+
+                    {renderServiceItem(
+                        'Complete Tracking',
+                        services.combinedTracking,
+                        services.combinedTracking ? 'Full step tracking active' : 'Partial or no tracking active'
                     )}
                 </View>
 

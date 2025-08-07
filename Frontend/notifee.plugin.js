@@ -37,7 +37,7 @@ module.exports = function withNotifeeAndroid(config) {
             },
             {
                 $: {
-                    'android:name': 'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+                    'android:name': 'android.permission.FOREGROUND_SERVICE_HEALTH',
                 },
             },
         ];
@@ -64,17 +64,9 @@ module.exports = function withNotifeeAndroid(config) {
         const foregroundService = {
             $: {
                 'android:name': 'app.notifee.core.ForegroundService',
-                'android:foregroundServiceType': 'specialUse',
+                'android:foregroundServiceType': 'health',
                 'android:exported': 'false',
             },
-            'property': [
-                {
-                    $: {
-                        'android:name': 'android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE',
-                        'android:value': 'This foreground service displays nutrition information',
-                    },
-                },
-            ],
         };
 
         // Check if the service already exists

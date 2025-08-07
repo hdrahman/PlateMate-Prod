@@ -111,10 +111,25 @@ class PersistentStepTracker {
             
             // Check if we need to reset for a new day
             if (lastSyncDate !== today) {
+                console.log('📅 New day detected in background service, performing midnight reset');
+                
+                // Reset step count and cached data
                 this.lastKnownStepCount = 0;
                 await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, '0');
                 await AsyncStorage.setItem(LAST_BACKGROUND_SYNC_DATE_KEY, today);
-                console.log('📅 Reset step count for new day:', today);
+                
+                // Reset sensor baselines for consistent midnight reset
+                if (Platform.OS === 'android') {
+                    try {
+                        const NativeStepCounter = (await import('./NativeStepCounter')).default;
+                        await NativeStepCounter.resetDailyBaseline();
+                        console.log('✅ Android baseline reset in background service');
+                    } catch (error) {
+                        console.error('❌ Failed to reset Android baseline in background:', error);
+                    }
+                }
+                
+                console.log('✅ Background midnight reset completed for:', today);
             }
 
             // Get the most up-to-date step count from various sources

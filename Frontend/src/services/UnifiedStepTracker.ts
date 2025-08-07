@@ -59,6 +59,7 @@ class UnifiedStepTracker {
     private sessionBaseline: number = 0;
     private isFirstReading: boolean = true;
     private notificationUpdateInterval: NodeJS.Timeout | null = null;
+    private midnightResetInterval: NodeJS.Timeout | null = null;
     // Notifications are now handled by StepNotificationService
 
     private constructor() {
@@ -118,6 +119,14 @@ class UnifiedStepTracker {
                 }
             } catch (error) {
                 console.error('❌ Failed to restart tracking:', error);
+            }
+
+            // Start midnight reset timer
+            try {
+                this.startMidnightResetTimer();
+                console.log('✅ Midnight reset timer started');
+            } catch (error) {
+                console.error('❌ Failed to start midnight reset timer:', error);
             }
 
             console.log('✅ Unified Step Tracker initialized');
@@ -193,9 +202,76 @@ class UnifiedStepTracker {
 
         if (lastResetDate !== today) {
             console.log('📅 New day detected, resetting step counter');
+            await this.handleMidnightReset();
+        }
+    }
+
+    /**
+     * Start the midnight reset timer (copied from Home.tsx pattern)
+     */
+    private startMidnightResetTimer(): void {
+        // Clear any existing timer
+        if (this.midnightResetInterval) {
+            clearInterval(this.midnightResetInterval);
+        }
+
+        // Check for midnight every minute
+        const checkTimeAndReset = async () => {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+
+            // Check if it's midnight (00:00)
+            if (hours === 0 && minutes === 0) {
+                console.log('🕛 Midnight detected, triggering step reset');
+                await this.handleMidnightReset();
+            }
+        };
+
+        // Check every minute for midnight trigger
+        this.midnightResetInterval = setInterval(checkTimeAndReset, 60000);
+        console.log('⏰ Midnight reset timer started (checks every minute)');
+    }
+
+    /**
+     * Handle midnight reset - reset baselines and step counts
+     */
+    private async handleMidnightReset(): Promise<void> {
+        try {
+            console.log('🌅 Performing midnight reset...');
+            const today = new Date().toISOString().split('T')[0];
+
+            // Reset step count and cached data
             this.state.currentSteps = 0;
             await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, '0');
             await AsyncStorage.setItem(LAST_RESET_DATE_KEY, today);
+
+            // Reset sensor baselines
+            if (Platform.OS === 'android' && this.state.nativeStepCounterAvailable) {
+                try {
+                    const NativeStepCounter = (await import('./NativeStepCounter')).default;
+                    await NativeStepCounter.resetDailyBaseline();
+                    console.log('✅ Android baseline reset at midnight');
+                } catch (error) {
+                    console.error('❌ Failed to reset Android baseline:', error);
+                }
+            } else if (Platform.OS === 'ios') {
+                // Reset iOS session baseline
+                this.sessionBaseline = 0;
+                this.isFirstReading = true;
+                console.log('✅ iOS baseline reset at midnight');
+            }
+
+            // Sync to database
+            await this.syncToDatabase();
+
+            // Notify listeners of reset
+            this.notifyListeners(0);
+            StepEventBus.notifyStepUpdate(0);
+
+            console.log('✅ Midnight reset completed successfully');
+        } catch (error) {
+            console.error('❌ Midnight reset failed:', error);
         }
     }
 
@@ -425,12 +501,12 @@ class UnifiedStepTracker {
             await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'true');
             this.state.isTracking = true;
 
-            // Auto-start persistent notification when step tracking starts
+            // Auto-start foreground service when step tracking starts
             try {
-                await StepNotificationService.showStepNotification(this.state.currentSteps);
-                console.log('✅ Persistent notification started with step tracking');
+                await StepNotificationService.startForegroundService(this.state.currentSteps);
+                console.log('✅ Foreground service started with step tracking');
             } catch (error) {
-                console.error('⚠️ Failed to start persistent notification:', error);
+                console.error('⚠️ Failed to start foreground service:', error);
             }
 
             console.log('✅ Unified step tracking started successfully');
@@ -714,12 +790,12 @@ class UnifiedStepTracker {
             // Stop periodic notification updates
             this.stopNotificationUpdates();
 
-            // Auto-stop persistent notification when step tracking stops
+            // Auto-stop foreground service when step tracking stops
             try {
-                await StepNotificationService.hideNotification();
-                console.log('✅ Persistent notification stopped with step tracking');
+                await StepNotificationService.stopForegroundService();
+                console.log('✅ Foreground service stopped with step tracking');
             } catch (error) {
-                console.error('⚠️ Failed to stop persistent notification:', error);
+                console.error('⚠️ Failed to stop foreground service:', error);
             }
 
             // Update state
@@ -870,6 +946,13 @@ class UnifiedStepTracker {
 
         // Stop periodic updates
         this.stopNotificationUpdates();
+
+        // Stop midnight reset timer
+        if (this.midnightResetInterval) {
+            clearInterval(this.midnightResetInterval);
+            this.midnightResetInterval = null;
+            console.log('⏰ Midnight reset timer stopped');
+        }
 
         this.listeners.clear();
         console.log('🧹 Unified Step Tracker destroyed');

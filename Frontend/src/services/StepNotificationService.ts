@@ -275,9 +275,9 @@ class StepNotificationService {
   }
 
   /**
-   * Show or update the persistent step tracking notification
+   * Start the foreground service with step tracking notification
    */
-  public async showStepNotification(steps: number): Promise<void> {
+  public async startForegroundService(steps: number): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -301,6 +301,7 @@ class StepNotificationService {
             type: AndroidStyle.BIGTEXT,
             text: body,
           },
+          asForegroundService: true, // Critical: This makes it a foreground service
         },
         ios: {
           categoryId: 'step-tracking',
@@ -308,14 +309,21 @@ class StepNotificationService {
         },
       };
 
-      await notifee.displayNotification(notification);
-      this.currentNotificationId = NOTIFICATION_ID;
-
-      console.log('🔔 Step notification updated:', { steps, title, body });
-    } catch (error) {
-      console.error('❌ Error showing step notification:', error);
+      // Start as foreground service (Android) or regular notification (iOS)
+      if (Platform.OS === 'android') {
+        await notifee.startForegroundService(notification);
+        console.log('🚀 Foreground service started for step tracking');
+      } else {
+        await notifee.displayNotification(notification);
+        console.log('🔔 iOS step notification displayed');
+      }
       
-      // Show a basic notification with just steps if the full data fails
+      this.currentNotificationId = NOTIFICATION_ID;
+      console.log('✅ Step tracking service active:', { steps, title, body });
+    } catch (error) {
+      console.error('❌ Error starting foreground service:', error);
+      
+      // Fallback to regular notification
       try {
         const fallbackNotification = {
           id: NOTIFICATION_ID,
@@ -328,6 +336,7 @@ class StepNotificationService {
             autoCancel: false,
             smallIcon: 'ic_launcher',
             color: '#FF00F5',
+            asForegroundService: Platform.OS === 'android',
           },
           ios: {
             categoryId: 'step-tracking',
@@ -335,13 +344,26 @@ class StepNotificationService {
           },
         };
 
-        await notifee.displayNotification(fallbackNotification);
+        if (Platform.OS === 'android') {
+          await notifee.startForegroundService(fallbackNotification);
+        } else {
+          await notifee.displayNotification(fallbackNotification);
+        }
+        
         this.currentNotificationId = NOTIFICATION_ID;
-        console.log('🔔 Fallback step notification shown:', { steps });
+        console.log('🔔 Fallback foreground service started:', { steps });
       } catch (fallbackError) {
-        console.error('❌ Even fallback notification failed:', fallbackError);
+        console.error('❌ Even fallback foreground service failed:', fallbackError);
       }
     }
+  }
+
+  /**
+   * Show or update the persistent step tracking notification
+   */
+  public async showStepNotification(steps: number): Promise<void> {
+    // For backward compatibility, use startForegroundService
+    await this.startForegroundService(steps);
   }
 
   /**
@@ -357,18 +379,44 @@ class StepNotificationService {
   }
 
   /**
-   * Hide the persistent step tracking notification
+   * Stop the foreground service and hide notification
    */
-  public async hideNotification(): Promise<void> {
+  public async stopForegroundService(): Promise<void> {
     try {
       if (this.currentNotificationId) {
-        await notifee.cancelNotification(this.currentNotificationId);
+        // Stop foreground service on Android, cancel notification on iOS
+        if (Platform.OS === 'android') {
+          await notifee.stopForegroundService();
+          console.log('🛑 Foreground service stopped');
+        } else {
+          await notifee.cancelNotification(this.currentNotificationId);
+          console.log('🔕 iOS step notification cancelled');
+        }
+        
         this.currentNotificationId = null;
-        console.log('🔕 Step notification hidden');
+        console.log('✅ Step tracking service stopped');
       }
     } catch (error) {
-      console.error('❌ Error hiding step notification:', error);
+      console.error('❌ Error stopping foreground service:', error);
+      
+      // Fallback to regular notification cancellation
+      try {
+        if (this.currentNotificationId) {
+          await notifee.cancelNotification(this.currentNotificationId);
+          this.currentNotificationId = null;
+          console.log('🔕 Fallback: Step notification hidden');
+        }
+      } catch (fallbackError) {
+        console.error('❌ Even fallback notification cancellation failed:', fallbackError);
+      }
     }
+  }
+
+  /**
+   * Hide the persistent step tracking notification (backward compatibility)
+   */
+  public async hideNotification(): Promise<void> {
+    await this.stopForegroundService();
   }
 
   /**
