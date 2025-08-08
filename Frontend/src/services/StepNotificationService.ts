@@ -1,7 +1,7 @@
 import notifee, { AndroidImportance, AndroidStyle } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserGoals, getCurrentUserIdAsync, getTodayExerciseCalories } from '../utils/database';
+import { getUserGoals, getCurrentUserIdAsync, getCurrentUserId, getTodayExerciseCalories } from '../utils/database';
 import SettingsService from './SettingsService';
 
 // Notification constants
@@ -73,41 +73,77 @@ class StepNotificationService {
    */
   private async getProteinData(): Promise<number> {
     try {
-      // Get today's consumed protein from food log
-      const today = new Date().toISOString().split('T')[0];
+      // Get consumed protein from food log - try today first, then yesterday
+      const todayDate = new Date().toISOString().split('T')[0];
+      const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
-      // Get authenticated user ID with retry logic for notification context
-      let firebaseUserId: string;
-      try {
-        firebaseUserId = await getCurrentUserIdAsync();
-      } catch (authError) {
-        console.warn('⚠️ User not authenticated for protein data, retrying once...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use cached user ID (same pattern as getTodayExerciseCalories)
+      let firebaseUserId = getCurrentUserId();
+      
+      // Validate we have a valid user ID  
+      if (!firebaseUserId || firebaseUserId === 'anonymous') {
+        console.warn('⚠️ No valid cached user ID for protein data, trying async fallback');
         try {
           firebaseUserId = await getCurrentUserIdAsync();
-        } catch (retryError) {
-          console.error('❌ User still not authenticated after retry for protein data');
+          console.log('✅ Got user ID from async fallback for protein data:', firebaseUserId);
+        } catch (asyncError) {
+          console.error('❌ Both cached and async user ID retrieval failed for protein data');
           throw new Error('User not authenticated for protein data');
         }
       }
 
-      // Import the database utilities to get today's food log entries
+      // Import the database utilities to get food log entries
       const { getDatabase } = await import('../utils/database');
       const db = await getDatabase();
 
-      const result = await db.getFirstAsync<{ totalProtein: number }>(
+      // Try today first
+      let result = await db.getFirstAsync<{ totalProtein: number }>(
         `SELECT SUM(proteins) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
-        [`${today}%`, firebaseUserId]
+        [`${todayDate}%`, firebaseUserId]
       );
+      
+      let consumedProtein = result?.totalProtein || 0;
+      let activeDate = todayDate;
+      
+      // If no protein for today, try yesterday (user might be viewing yesterday's data)
+      if (consumedProtein === 0) {
+        const yesterdayResult = await db.getFirstAsync<{ totalProtein: number }>(
+          `SELECT SUM(proteins) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+          [`${yesterdayDate}%`, firebaseUserId]
+        );
+        const yesterdayProtein = yesterdayResult?.totalProtein || 0;
+        
+        if (yesterdayProtein > 0) {
+          consumedProtein = yesterdayProtein;
+          activeDate = yesterdayDate;
+          console.log(`📅 Using yesterday's protein data: ${yesterdayProtein}g from ${yesterdayDate}`);
+        }
+      }
 
-      const consumedProtein = result?.totalProtein || 0;
-
-      console.log('🥩 Protein data:', { consumed: consumedProtein });
+      console.log('🥩 Protein data for notification:', { 
+        userId: firebaseUserId, 
+        consumed: consumedProtein,
+        activeDate: activeDate,
+        todayResult: result?.totalProtein || 'null',
+        yesterdayUsed: activeDate === yesterdayDate
+      });
 
       return Math.round(consumedProtein);
     } catch (error) {
-      console.error('❌ Error getting protein data:', error);
-      // Fallback to 0
+      console.error('❌ Error getting protein data for notification:', error);
+      
+      // Log specific error details
+      if (error instanceof Error) {
+        if (error.message.includes('not authenticated')) {
+          console.error('❌ User not authenticated for protein data');
+        } else if (error.message.includes('database')) {
+          console.error('❌ Database error getting protein data');
+        } else {
+          console.error('❌ Unknown error in protein data retrieval:', error.message);
+        }
+      }
+      
+      console.warn('⚠️ Using fallback protein value (0) in notification');
       return 0;
     }
   }
@@ -118,54 +154,135 @@ class StepNotificationService {
    */
   private async getCalorieData(): Promise<{ goal: number; consumed: number; remaining: number }> {
     try {
-      // Get authenticated user ID with retry logic for notification context
-      let firebaseUserId: string;
-      try {
-        firebaseUserId = await getCurrentUserIdAsync();
-      } catch (authError) {
-        console.warn('⚠️ User not authenticated in notification service, retrying once...');
-        // Wait briefly and retry once (user might be in the process of authenticating)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use cached user ID (same pattern as getTodayExerciseCalories)
+      // This avoids Supabase auth issues in foreground service context
+      let firebaseUserId = getCurrentUserId();
+      
+      // Validate we have a valid user ID
+      if (!firebaseUserId || firebaseUserId === 'anonymous') {
+        console.warn('⚠️ No valid cached user ID in notification service, trying async fallback');
         try {
           firebaseUserId = await getCurrentUserIdAsync();
-        } catch (retryError) {
-          console.error('❌ User still not authenticated after retry in notification service');
+          console.log('✅ Got user ID from async fallback:', firebaseUserId);
+        } catch (asyncError) {
+          console.error('❌ Both cached and async user ID retrieval failed in notification service');
           throw new Error('User not authenticated in notification context');
         }
       }
       
-      // Get user goals from database (this matches how the app calculates calories)
-      const userGoals = await getUserGoals();
-      const baseCaloriesGoal = userGoals?.calories || 2000;
+      // Get user goals using the SAME method as Home screen (BMR daily target)
+      const { getUserBMRData } = await import('../utils/database');
+      const bmrData = await getUserBMRData(firebaseUserId);
+      let baseCaloriesGoal = 2000; // fallback
+      
+      if (bmrData?.dailyTarget && bmrData.dailyTarget > 0) {
+        baseCaloriesGoal = bmrData.dailyTarget;
+        console.log(`📋 Using BMR daily target as notification calorie goal: ${baseCaloriesGoal}`);
+      } else {
+        // Fallback to user goals if BMR not available
+        const userGoals = await getUserGoals(firebaseUserId);
+        baseCaloriesGoal = userGoals?.calories || 2000;
+        console.log(`📋 Using user goals as notification calorie goal: ${baseCaloriesGoal}`);
+      }
+      
+      // Validate base calorie goal is reasonable (between 1000-5000)
+      if (baseCaloriesGoal < 1000 || baseCaloriesGoal > 5000) {
+        console.warn(`⚠️ Unreasonable base calorie goal: ${baseCaloriesGoal}, using default 2000`);
+        baseCaloriesGoal = 2000;
+      }
 
-      // Get today's consumed calories from food log
-      // This should match the calculation in FoodLogContext
-      const today = new Date().toISOString().split('T')[0];
+      // Get consumed calories from food log - try today first, then yesterday
+      // The user might be viewing yesterday's data in the app
+      const todayDate = new Date().toISOString().split('T')[0];
+      const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      console.log(`📅 Checking food logs for dates: today=${todayDate}, yesterday=${yesterdayDate}`);
+      console.log(`👤 Using Firebase UID: ${firebaseUserId}`);
 
-      // Import the database utilities to get today's food log entries
+      // Import the database utilities to get food log entries
       const { getDatabase } = await import('../utils/database');
       const db = await getDatabase();
 
-      const result = await db.getFirstAsync<{ totalCalories: number }>(
+      // Try today first
+      let result = await db.getFirstAsync<{ totalCalories: number }>(
         `SELECT SUM(calories) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
-        [`${today}%`, firebaseUserId]
+        [`${todayDate}%`, firebaseUserId]
       );
+      
+      let consumedCalories = result?.totalCalories || 0;
+      let activeDate = todayDate;
+      console.log(`📊 Today's calories query result: ${consumedCalories} for date ${todayDate}`);
+      
+      // If no calories for today, try yesterday (user might be viewing yesterday's data)
+      if (consumedCalories === 0) {
+        const yesterdayResult = await db.getFirstAsync<{ totalCalories: number }>(
+          `SELECT SUM(calories) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+          [`${yesterdayDate}%`, firebaseUserId]
+        );
+        const yesterdayCalories = yesterdayResult?.totalCalories || 0;
+        
+        console.log(`📊 Yesterday's calories query result: ${yesterdayCalories} for date ${yesterdayDate}`);
+        if (yesterdayCalories > 0) {
+          consumedCalories = yesterdayCalories;
+          activeDate = yesterdayDate;
+          console.log(`📅 Using yesterday's food data: ${yesterdayCalories} calories from ${yesterdayDate}`);
+        } else {
+          console.log(`⚠️ No calories found for either today or yesterday`);
+        }
+      }
+      
+      console.log(`📊 Food log calories: ${consumedCalories} from date ${activeDate}`);
 
-      const consumedCalories = result?.totalCalories || 0;
-
-      // Get today's exercise calories (CRITICAL: this was missing!)
-      const exerciseCalories = await getTodayExerciseCalories();
+      // Get today's exercise calories - use same user ID as other queries
+      let exerciseCalories = 0;
+      try {
+        // Get the numeric user_id the same way getTodayExerciseCalories does
+        const userIdResult = await db.getFirstAsync<{ id: number }>(
+          `SELECT id FROM user_profiles WHERE firebase_uid = ?`,
+          [firebaseUserId]
+        );
+        const userId = userIdResult?.id || 1;
+        
+        // Query exercises table directly with our known user info
+        const today = new Date().toISOString().split('T')[0];
+        const exerciseResult = await db.getFirstAsync<{ total: number }>(
+          `SELECT SUM(calories_burned) as total FROM exercises WHERE date = ? AND user_id = ?`,
+          [today, userId]
+        );
+        exerciseCalories = exerciseResult?.total || 0;
+        
+        console.log(`🏃 Exercise calories: ${exerciseCalories} for user ${firebaseUserId} (numeric id: ${userId})`);
+      } catch (exerciseError) {
+        console.warn('⚠️ Failed to get exercise calories, using fallback:', exerciseError);
+        exerciseCalories = await getTodayExerciseCalories();
+      }
+      
+      // Validate exercise calories are reasonable (between 0-2000)
+      if (exerciseCalories < 0 || exerciseCalories > 2000) {
+        console.warn(`⚠️ Unreasonable exercise calories: ${exerciseCalories}, capping to reasonable range`);
+        exerciseCalories = Math.max(0, Math.min(exerciseCalories, 2000));
+      }
 
       // Calculate adjusted goal (base + exercise calories) - matches Home screen logic
       const adjustedCaloriesGoal = baseCaloriesGoal + exerciseCalories;
       const remainingCalories = adjustedCaloriesGoal - consumedCalories;
+      
+      // Validate final calculations are reasonable
+      if (adjustedCaloriesGoal > 8000) {
+        console.warn(`⚠️ Adjusted calorie goal seems too high: ${adjustedCaloriesGoal}`);
+      }
+      if (consumedCalories > 10000) {
+        console.warn(`⚠️ Consumed calories seem too high: ${consumedCalories}`);
+      }
 
-      console.log('📊 Calorie data:', { 
+      console.log('📊 Calorie data for notification:', { 
+        userId: firebaseUserId,
         baseGoal: baseCaloriesGoal, 
         exerciseCalories, 
         adjustedGoal: adjustedCaloriesGoal, 
         consumed: consumedCalories, 
-        remaining: remainingCalories 
+        remaining: remainingCalories,
+        bmrDataFound: !!bmrData?.dailyTarget
       });
 
       return {
@@ -174,11 +291,23 @@ class StepNotificationService {
         remaining: remainingCalories
       };
     } catch (error) {
-      console.error('❌ Error getting calorie data:', error);
-      // Fallback to default values - but log the specific error
-      if (error instanceof Error && error.message.includes('not authenticated')) {
-        console.error('❌ User not authenticated in notification service');
+      console.error('❌ Error getting calorie data for notification:', error);
+      
+      // Log specific error details
+      if (error instanceof Error) {
+        if (error.message.includes('not authenticated')) {
+          console.error('❌ User not authenticated in notification service');
+        } else if (error.message.includes('getUserGoals')) {
+          console.error('❌ Failed to get user goals in notification service');
+        } else if (error.message.includes('getTodayExerciseCalories')) {
+          console.error('❌ Failed to get exercise calories in notification service');
+        } else {
+          console.error('❌ Unknown error in calorie data retrieval:', error.message);
+        }
       }
+      
+      // Return safe fallback values
+      console.warn('⚠️ Using fallback calorie values in notification');
       return { goal: 2000, consumed: 0, remaining: 2000 };
     }
   }
