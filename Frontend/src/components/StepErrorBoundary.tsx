@@ -18,11 +18,37 @@ class StepErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     console.error('🚨 StepErrorBoundary caught error:', error);
+    
+    // Only catch step-related errors, let other errors bubble up
+    const errorMessage = error.message?.toLowerCase() || '';
+    const isStepRelatedError = 
+      errorMessage.includes('step') || 
+      errorMessage.includes('health') || 
+      errorMessage.includes('fitness') ||
+      error.stack?.includes('StepProvider') ||
+      error.stack?.includes('step');
+    
+    if (!isStepRelatedError) {
+      // Re-throw non-step errors so they don't get caught here
+      throw error;
+    }
+    
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('🚨 StepErrorBoundary error details:', error, errorInfo);
+    
+    // Only handle step-related errors
+    const errorMessage = error.message?.toLowerCase() || '';
+    const isStepRelatedError = 
+      errorMessage.includes('step') || 
+      errorMessage.includes('health') || 
+      errorMessage.includes('fitness');
+      
+    if (!isStepRelatedError) {
+      console.log('🔄 Non-step error, letting it bubble up:', error.message);
+    }
   }
 
   render() {
