@@ -372,11 +372,22 @@ class StepNotificationService {
    * Get notification data for current step count
    */
   private async getNotificationData(steps: number): Promise<NotificationData> {
+    console.log('🔍 [ANR DEBUG] Starting getNotificationData - 6 DB queries incoming');
+    const startTime = performance.now();
+    
     const [calorieData, protein, nextMealTime] = await Promise.all([
       this.getCalorieData(),
       this.getProteinData(),
       this.getNextMealTime()
     ]);
+
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    console.log(`🔍 [ANR DEBUG] getNotificationData completed in ${duration.toFixed(2)}ms`);
+    
+    if (duration > 1000) {
+      console.warn(`⚠️ [ANR WARNING] Notification data took ${duration.toFixed(2)}ms - this could cause ANR!`);
+    }
 
     return {
       steps,

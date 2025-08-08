@@ -60,6 +60,7 @@ class UnifiedStepTracker {
     private isFirstReading: boolean = true;
     private notificationUpdateInterval: NodeJS.Timeout | null = null;
     private midnightResetInterval: NodeJS.Timeout | null = null;
+    private isNotificationUpdateRunning: boolean = false; // Prevent interval pileups
     // Notifications are now handled by StepNotificationService
 
     private constructor() {
@@ -662,29 +663,57 @@ class UnifiedStepTracker {
         }
 
         // Update notification every 15 seconds for more responsive updates
-        this.notificationUpdateInterval = setInterval(async () => {
-            try {
-                const previousSteps = this.state.currentSteps;
-                
-                // Sync latest step count from sensor
-                await this.syncFromSensor();
-                
-                // Only update notification if steps changed or every 2 minutes to keep it alive
-                const stepChanged = this.state.currentSteps !== previousSteps;
-                const shouldUpdate = stepChanged || (Date.now() % 120000 < 15000); // Every 2 minutes
-                
-                if (shouldUpdate) {
-                    await this.updateNotification();
-                    
-                    if (stepChanged) {
-                        console.log(`🔄 Notification updated - steps changed: ${previousSteps} → ${this.state.currentSteps}`);
-                    } else {
-                        console.log('🔄 Periodic notification keepalive update');
-                    }
-                }
-            } catch (error) {
-                console.error('❌ Periodic notification update failed:', error);
+        this.notificationUpdateInterval = setInterval(() => {
+            // CRITICAL: Prevent interval pileups that cause ANR
+            if (this.isNotificationUpdateRunning) {
+                console.warn('⚠️ [ANR PREVENTION] Skipping notification update - previous one still running');
+                return;
             }
+            
+            // Move heavy operations off main thread to prevent ANR
+            setTimeout(async () => {
+                if (this.isNotificationUpdateRunning) {
+                    console.warn('⚠️ [ANR PREVENTION] Double-execution prevented');
+                    return;
+                }
+                
+                this.isNotificationUpdateRunning = true;
+                const startTime = performance.now();
+                
+                try {
+                    console.log('🔍 [ANR DEBUG] Starting notification update cycle');
+                    const previousSteps = this.state.currentSteps;
+                    
+                    // Sync latest step count from sensor
+                    await this.syncFromSensor();
+                    
+                    // Only update notification if steps changed or every 2 minutes to keep it alive
+                    const stepChanged = this.state.currentSteps !== previousSteps;
+                    const shouldUpdate = stepChanged || (Date.now() % 120000 < 15000); // Every 2 minutes
+                    
+                    if (shouldUpdate) {
+                        await this.updateNotification();
+                        
+                        if (stepChanged) {
+                            console.log(`🔄 Notification updated - steps changed: ${previousSteps} → ${this.state.currentSteps}`);
+                        } else {
+                            console.log('🔄 Periodic notification keepalive update');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Periodic notification update failed:', error);
+                } finally {
+                    const endTime = performance.now();
+                    const duration = endTime - startTime;
+                    console.log(`🔍 [ANR DEBUG] Notification cycle completed in ${duration.toFixed(2)}ms`);
+                    
+                    if (duration > 10000) {
+                        console.error(`🚨 [ANR CRITICAL] Update took ${duration.toFixed(2)}ms - ANR risk!`);
+                    }
+                    
+                    this.isNotificationUpdateRunning = false;
+                }
+            }, 0);
         }, 15000); // 15 seconds for more responsive updates
 
         console.log('✅ Periodic notification updates started (15s interval)');
