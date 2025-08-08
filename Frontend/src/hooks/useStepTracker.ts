@@ -74,33 +74,38 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                     console.error('❌ This indicates a missing import or AsyncStorage configuration issue');
                 }
 
-                // Wait for UnifiedStepTracker to be initialized with progressive loading
+                // Show cached data immediately, sync in background
                 let finalSteps = initialSteps;
                 
+                // Set initial history with cached data right away
+                const today = formatDateToString(new Date());
+                setStepHistory([{ date: today, steps: initialSteps }]);
+                
+                // If tracker isn't initialized yet, continue with cached data
                 if (!UnifiedStepTracker.isInitialized()) {
-                    console.log('⏳ Waiting for UnifiedStepTracker initialization...');
-                    let retries = 0;
-                    const maxRetries = 50; // More retries with better strategy
-                    
-                    while (!UnifiedStepTracker.isInitialized() && retries < maxRetries) {
-                        // Use exponential backoff but start fast
-                        const delay = Math.min(50 * Math.pow(1.1, retries), 500);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        retries++;
+                    console.log('📱 Using cached steps while tracker initializes in background');
+                    // Start background initialization but don't wait
+                    setTimeout(async () => {
+                        // Give tracker time to initialize in background
+                        let retries = 0;
+                        const maxRetries = 10; // Reduced retries, non-blocking
                         
-                        // Try to get updated data during wait if tracker becomes available
-                        if (UnifiedStepTracker.isInitialized()) {
-                            break;
+                        while (!UnifiedStepTracker.isInitialized() && retries < maxRetries) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                            retries++;
                         }
-                    }
-                    
-                    if (!UnifiedStepTracker.isInitialized()) {
-                        console.warn('⚠️ UnifiedStepTracker not initialized after timeout, using cached data');
-                        // Keep the cached value we already set
-                        const today = formatDateToString(new Date());
-                        setStepHistory([{ date: today, steps: initialSteps }]);
-                        return;
-                    }
+                        
+                        if (UnifiedStepTracker.isInitialized()) {
+                            // Update with tracker data when ready
+                            const trackerSteps = UnifiedStepTracker.getCurrentSteps();
+                            if (trackerSteps > finalSteps) {
+                                setTodaySteps(trackerSteps);
+                                setStepHistory([{ date: today, steps: trackerSteps }]);
+                                console.log('📊 Background step update:', trackerSteps);
+                            }
+                        }
+                    }, 0);
+                    return; // Don't block, continue with cached data
                 }
 
                 // Get authoritative steps from tracker
@@ -127,10 +132,8 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                     console.warn('⚠️ Force sync failed during load:', error);
                 }
 
-                // Get step history (simplified for now - unified tracker focuses on today)
-                const today = formatDateToString(new Date());
-                const history = [{ date: today, steps: finalSteps }];
-                setStepHistory(history);
+                // Update step history with final synced data
+                setStepHistory([{ date: today, steps: finalSteps }]);
                 
                 console.log('✅ Step data loaded successfully');
             } catch (error) {

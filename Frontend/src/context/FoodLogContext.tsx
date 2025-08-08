@@ -238,9 +238,9 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
 
             setLastRefreshTime(now);
 
-            // Only set loading on initial load, not on refreshes
-            // This prevents the blank screen flicker
-            if (isInitialLoadRef.current) {
+            // Don't block UI with loading state - SQLite queries are fast
+            // Only show loading for first-time users with no data
+            if (isInitialLoadRef.current && foodLogs.length === 0) {
                 setIsLoading(true);
             }
 
