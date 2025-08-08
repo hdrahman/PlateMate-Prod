@@ -4,6 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserGoals, getCurrentUserIdAsync, getCurrentUserId, getTodayExerciseCalories } from '../utils/database';
 import SettingsService from './SettingsService';
 
+// Helper function to format date as YYYY-MM-DD (matching database.ts)
+const formatDateToString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // Notification constants
 const CHANNEL_ID = 'step-tracking-channel';
 const NOTIFICATION_ID = 'step-tracking-persistent';
@@ -74,8 +82,8 @@ class StepNotificationService {
   private async getProteinData(): Promise<number> {
     try {
       // Get consumed protein from food log - try today first, then yesterday
-      const todayDate = new Date().toISOString().split('T')[0];
-      const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const todayDate = formatDateToString(new Date());
+      const yesterdayDate = formatDateToString(new Date(Date.now() - 24 * 60 * 60 * 1000));
       
       // Use cached user ID (same pattern as getTodayExerciseCalories)
       let firebaseUserId = getCurrentUserId();
@@ -193,8 +201,8 @@ class StepNotificationService {
 
       // Get consumed calories from food log - try today first, then yesterday
       // The user might be viewing yesterday's data in the app
-      const todayDate = new Date().toISOString().split('T')[0];
-      const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const todayDate = formatDateToString(new Date());
+      const yesterdayDate = formatDateToString(new Date(Date.now() - 24 * 60 * 60 * 1000));
       
       console.log(`📅 Checking food logs for dates: today=${todayDate}, yesterday=${yesterdayDate}`);
       console.log(`👤 Using Firebase UID: ${firebaseUserId}`);
@@ -244,7 +252,7 @@ class StepNotificationService {
         const userId = userIdResult?.id || 1;
         
         // Query exercises table directly with our known user info
-        const today = new Date().toISOString().split('T')[0];
+        const today = formatDateToString(new Date());
         const exerciseResult = await db.getFirstAsync<{ total: number }>(
           `SELECT SUM(calories_burned) as total FROM exercises WHERE date = ? AND user_id = ?`,
           [today, userId]
