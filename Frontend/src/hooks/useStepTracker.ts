@@ -4,6 +4,14 @@ import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import StepEventBus from '../services/StepEventBus';
 import { Pedometer } from 'expo-sensors';
 
+// Helper function to format date as YYYY-MM-DD (matching database.ts)
+const formatDateToString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export interface StepHistoryItem {
     date: string;
     steps: number;
@@ -89,7 +97,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                     if (!UnifiedStepTracker.isInitialized()) {
                         console.warn('⚠️ UnifiedStepTracker not initialized after timeout, using cached data');
                         // Keep the cached value we already set
-                        const today = new Date().toISOString().split('T')[0];
+                        const today = formatDateToString(new Date());
                         setStepHistory([{ date: today, steps: initialSteps }]);
                         return;
                     }
@@ -120,7 +128,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                 }
 
                 // Get step history (simplified for now - unified tracker focuses on today)
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatDateToString(new Date());
                 const history = [{ date: today, steps: finalSteps }];
                 setStepHistory(history);
                 
@@ -153,7 +161,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
             // Update history for today
             setStepHistory(prevHistory => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatDateToString(new Date());
                 const todayIndex = prevHistory.findIndex(item => item.date === today);
 
                 if (todayIndex >= 0) {
@@ -234,7 +242,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             setTodaySteps(steps);
 
             // Update history for today
-            const today = new Date().toISOString().split('T')[0];
+            const today = formatDateToString(new Date());
             const history = [{ date: today, steps }];
             setStepHistory(history);
             
