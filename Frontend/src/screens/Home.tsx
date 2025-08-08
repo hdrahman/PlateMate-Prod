@@ -123,6 +123,61 @@ export default function Home() {
   const { onboardingComplete, justCompletedOnboarding, markWelcomeModalShown } = useOnboarding();
   const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
+  // Date change detection for midnight rollover
+  useEffect(() => {
+    const formatDateToString = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const getMillisecondsUntilMidnight = (): number => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow.getTime() - now.getTime();
+    };
+
+    const refreshAllData = async () => {
+      console.log('🏠 Date changed - refreshing all home screen data...');
+      try {
+        await refreshLogs();
+        const todayExerciseCals = await getTodayExerciseCalories();
+        setExerciseCalories(todayExerciseCals);
+        if (refreshStepData) await refreshStepData();
+        if (user?.uid) {
+          const newStreak = await getUserStreak(user.uid);
+          setCurrentStreak(newStreak);
+        }
+      } catch (error) {
+        console.error('❌ Error refreshing data on date change:', error);
+      }
+    };
+
+    let currentDate = formatDateToString(new Date());
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNextCheck = () => {
+      const msUntilMidnight = getMillisecondsUntilMidnight();
+      timeoutId = setTimeout(() => {
+        const newDate = formatDateToString(new Date());
+        if (newDate !== currentDate) {
+          currentDate = newDate;
+          refreshAllData();
+        }
+        scheduleNextCheck(); // Schedule next midnight
+      }, msUntilMidnight);
+    };
+
+    scheduleNextCheck();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [refreshLogs, refreshStepData, user?.uid]);
+
   // Keep track of which "page" (card) we are on in the horizontal scroll
   const [activeIndex, setActiveIndex] = useState(0);
 
