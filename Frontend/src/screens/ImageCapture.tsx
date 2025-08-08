@@ -932,11 +932,6 @@ const ImageCapture: React.FC = () => {
                                 const newImages = [...images];
                                 newImages[0] = { uri: '', type: 'top', uploaded: false };
                                 setImages(newImages);
-                
-                // If this was a side view image (index 1) and both images now exist, switch to show it
-                if (index === 1 && newImages[0].uri && newImages[1].uri) {
-                    setActiveImageIndex(1); // Switch to show the side view (second image)
-                }
                             }
                         },
                         { text: 'OK', style: 'default' }
@@ -1642,6 +1637,9 @@ const styles = StyleSheet.create({
     },
     primaryImageWrapper: {
         height: imageHeight, // Use responsive height
+    },
+    sideImageWrapper: {
+        height: imageHeight, // Use same height as primary image
     },
     addSideViewButton: {
         marginBottom: 12, // Reduced from 16 for tighter spacing
