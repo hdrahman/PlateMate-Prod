@@ -264,11 +264,45 @@ const CreateFeatureRequestScreen = () => {
             }
         } catch (error) {
             console.error('Error submitting feature request:', error);
-            Alert.alert(
-                'Submission Failed',
-                error instanceof Error ? error.message : 'An error occurred while submitting your request. Please try again.',
-                [{ text: 'OK' }]
-            );
+            
+            // Provide specific error messages based on error type
+            let errorTitle = 'Submission Failed';
+            let errorMessage = 'An error occurred while submitting your request. Please try again.';
+            
+            if (error instanceof Error) {
+                const errorStr = error.message.toLowerCase();
+                
+                if (errorStr.includes('authentication error') || errorStr.includes('user not properly registered')) {
+                    errorTitle = 'Authentication Issue';
+                    errorMessage = 'There was an authentication problem. Please try logging out and back in, then try again.';
+                } else if (errorStr.includes('foreign key constraint') || errorStr.includes('constraint')) {
+                    errorTitle = 'Account Setup Required';
+                    errorMessage = 'Your account needs to be properly set up in our system. Please contact support or try again later.';
+                } else if (errorStr.includes('permission denied')) {
+                    errorTitle = 'Permission Error';
+                    errorMessage = 'You don\'t have permission to submit feature requests. Please check your account status.';
+                } else if (errorStr.includes('network') || errorStr.includes('connection')) {
+                    errorTitle = 'Connection Error';
+                    errorMessage = 'Please check your internet connection and try again.';
+                } else if (errorStr.includes('validation') || errorStr.includes('invalid')) {
+                    errorTitle = 'Validation Error';
+                    errorMessage = 'Please check that your title and description meet the requirements and try again.';
+                } else {
+                    errorMessage = error.message;
+                }
+            }
+            
+            Alert.alert(errorTitle, errorMessage, [
+                { text: 'OK' },
+                ...(errorTitle === 'Authentication Issue' ? [{
+                    text: 'Logout & Login',
+                    onPress: () => {
+                        // Note: You would need to implement logout functionality
+                        // For now, just show a message
+                        Alert.alert('Logout Required', 'Please manually logout and login again from the settings menu.');
+                    }
+                }] : [])
+            ]);
         } finally {
             setIsSubmitting(false);
         }

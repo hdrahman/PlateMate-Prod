@@ -100,14 +100,40 @@ export const createFeatureRequest = async (request: FeatureRequestCreate): Promi
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to create feature request');
+            let errorMessage = 'Failed to create feature request';
+            
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorMessage;
+                
+                // Handle specific HTTP status codes
+                if (response.status === 401) {
+                    errorMessage = 'Authentication error: Please log in again';
+                } else if (response.status === 403) {
+                    errorMessage = 'Permission denied: Unable to create feature request';
+                } else if (response.status === 422) {
+                    errorMessage = 'Validation error: Please check your input and try again';
+                } else if (response.status >= 500) {
+                    errorMessage = 'Server error: Please try again later';
+                }
+            } catch (parseError) {
+                console.error('Error parsing response:', parseError);
+                // Use default error message if response can't be parsed
+            }
+            
+            throw new Error(errorMessage);
         }
 
         const result = await response.json();
         return result;
     } catch (error) {
         console.error('Error creating feature request:', error);
+        
+        // Handle network errors
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            throw new Error('Network error: Please check your connection and try again');
+        }
+        
         throw error;
     }
 };
@@ -139,17 +165,39 @@ export const getFeatureRequests = async (
         });
 
         if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error('Feature requests service not found - backend may need update');
+            let errorMessage = 'Failed to fetch feature requests';
+            
+            try {
+                if (response.status === 404) {
+                    errorMessage = 'Feature requests service not found - please check if the database is set up correctly';
+                } else if (response.status === 401) {
+                    errorMessage = 'Authentication error: Please log in again';
+                } else if (response.status === 403) {
+                    errorMessage = 'Permission denied: Unable to access feature requests';
+                } else if (response.status >= 500) {
+                    errorMessage = 'Server error: Please try again later';
+                } else {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorMessage;
+                }
+            } catch (parseError) {
+                console.error('Error parsing error response:', parseError);
+                // Use default error message
             }
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to fetch feature requests');
+            
+            throw new Error(errorMessage);
         }
 
         const result = await response.json();
         return result;
     } catch (error) {
         console.error('Error fetching feature requests:', error);
+        
+        // Handle network errors
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            throw new Error('Network error: Please check your connection and try again');
+        }
+        
         throw error;
     }
 };

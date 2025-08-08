@@ -73,31 +73,34 @@ async def create_feature_request(
 ):
     """Create a new feature request"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        # Get the authenticated user's Firebase UID from the JWT token
+        firebase_uid = current_user.get("supabase_uid")  # This is actually the firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        # Use service-role key so the backend can create rows without hitting
-        # RLS restrictions.  The caller is already authenticated via Firebase
-        # and we attach their firebase_uid to the new record for auditing.
+        # Use service key to bypass RLS since we're handling auth in the backend
         supabase = get_supabase_client(service_key=True)
         
-        # Create the feature request directly using firebase_uid (no users table needed)
         logger.info(f"Creating feature request for firebase_uid: {firebase_uid}")
         
-        # `user_id` has a NOT NULL constraint and foreign-key reference to
-        # Supabase `auth.users.id`.  We therefore populate it with the
-        # authenticated user's UID so the constraint is satisfied while still
-        # storing the readable `firebase_uid` for convenience.
+        # Get the user's UUID from the public.users table using firebase_uid
+        user_result = supabase.table("users").select("id").eq("firebase_uid", firebase_uid).execute()
+        
+        if not user_result.data:
+            raise HTTPException(status_code=401, detail="User not found in system. Please complete your profile setup.")
+        
+        user_id = user_result.data[0]["id"]
+        
+        # Insert feature request with both user_id (UUID) and firebase_uid (string)
         result = supabase.table("feature_requests").insert({
-            "user_id": firebase_uid,
-            "firebase_uid": firebase_uid,
+            "user_id": user_id,  # UUID from public.users.id
+            "firebase_uid": firebase_uid,  # String from JWT token
             "title": request.title,
             "description": request.description,
             "status": "submitted"
         }).execute()
         
-        if result.data:
+        if result.data and len(result.data) > 0:
             logger.info(f"Feature request created successfully: {result.data[0]['id']}")
             return {
                 "success": True,
@@ -105,13 +108,20 @@ async def create_feature_request(
                 "data": result.data[0]
             }
         else:
-            raise HTTPException(status_code=500, detail="Failed to create feature request")
+            logger.error("No data returned from insert operation")
+            raise HTTPException(status_code=500, detail="Failed to create feature request - no data returned")
             
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating feature request: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Provide more specific error information
+        error_detail = str(e)
+        if "foreign key constraint" in error_detail.lower():
+            error_detail = "Authentication error: User not properly registered in the system"
+        elif "permission denied" in error_detail.lower():
+            error_detail = "Permission denied: Unable to create feature request"
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_detail}")
 
 @router.get("/", response_model=List[Dict[str, Any]])
 async def get_feature_requests(
@@ -122,13 +132,14 @@ async def get_feature_requests(
 ):
     """Get feature requests with optional status filter"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        firebase_uid = current_user.get("supabase_uid")  # Actually firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        supabase = get_supabase_client()
+        supabase = get_supabase_client(service_key=True)
         
         # Use the custom function to get feature requests with user upvote status
+        # Pass firebase_uid since our function expects it
         result = supabase.rpc("get_feature_requests_with_user_upvotes", {
             "p_firebase_uid": firebase_uid,
             "p_status": status
@@ -140,6 +151,7 @@ async def get_feature_requests(
             logger.info(f"Retrieved {len(paginated_data)} feature requests")
             return paginated_data
         else:
+            logger.info("No feature requests found")
             return []
             
     except HTTPException:
@@ -154,19 +166,20 @@ async def get_my_feature_requests(
 ):
     """Get feature requests created by the current user"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        firebase_uid = current_user.get("supabase_uid")  # Actually firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        supabase = get_supabase_client()
+        supabase = get_supabase_client(service_key=True)
         
-        # Get user's feature requests
+        # Get user's feature requests using firebase_uid
         result = supabase.table("feature_requests").select("*").eq("firebase_uid", firebase_uid).order("created_at", desc=True).execute()
         
         if result.data:
-            logger.info(f"Retrieved {len(result.data)} feature requests for user {firebase_uid}")
+            logger.info(f"Retrieved {len(result.data)} feature requests for user {supabase_uid}")
             return result.data
         else:
+            logger.info(f"No feature requests found for user {supabase_uid}")
             return []
             
     except HTTPException:
@@ -182,33 +195,43 @@ async def toggle_feature_upvote(
 ):
     """Toggle upvote for a feature request"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        firebase_uid = current_user.get("supabase_uid")  # Actually firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        supabase = get_supabase_client()
+        supabase = get_supabase_client(service_key=True)
         
-        # Use the toggle_feature_upvote function
+        # Use the toggle_feature_upvote function with firebase_uid
         result = supabase.rpc("toggle_feature_upvote", {
             "p_feature_request_id": request_id,
             "p_firebase_uid": firebase_uid
         }).execute()
         
         if result.data:
-            logger.info(f"Upvote toggled for feature request {request_id} by user {firebase_uid}")
+            logger.info(f"Upvote toggled for feature request {request_id} by user {supabase_uid}")
+            # The function returns a JSON object, so we need to extract values properly
+            response_data = result.data
+            if isinstance(response_data, list) and len(response_data) > 0:
+                response_data = response_data[0]
+                
             return {
-                "success": True,
-                "message": result.data.get("message", "Upvote toggled"),
-                "upvoted": result.data.get("upvoted", False)
+                "success": response_data.get("success", True),
+                "message": response_data.get("message", "Upvote toggled"),
+                "upvoted": response_data.get("upvoted", False)
             }
         else:
-            raise HTTPException(status_code=500, detail="Failed to toggle upvote")
+            raise HTTPException(status_code=500, detail="Failed to toggle upvote - no response from database")
             
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error toggling upvote: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        error_detail = str(e)
+        if "does not exist" in error_detail.lower():
+            error_detail = "Feature request not found"
+        elif "foreign key constraint" in error_detail.lower():
+            error_detail = "Authentication error: User not properly registered"
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_detail}")
 
 @router.put("/{request_id}", response_model=Dict[str, Any])
 async def update_feature_request(
@@ -218,13 +241,13 @@ async def update_feature_request(
 ):
     """Update a feature request (only owner can update title/description)"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        firebase_uid = current_user.get("supabase_uid")  # Actually firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        supabase = get_supabase_client()
+        supabase = get_supabase_client(service_key=True)
         
-        # Check if user owns the feature request
+        # Check if user owns the feature request using firebase_uid
         existing_request = supabase.table("feature_requests").select("*").eq("id", request_id).eq("firebase_uid", firebase_uid).execute()
         
         if not existing_request.data:
@@ -268,13 +291,13 @@ async def delete_feature_request(
 ):
     """Delete a feature request (only owner can delete)"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        firebase_uid = current_user.get("supabase_uid")  # Actually firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
-        supabase = get_supabase_client()
+        supabase = get_supabase_client(service_key=True)
         
-        # Check if user owns the feature request
+        # Check if user owns the feature request using firebase_uid
         existing_request = supabase.table("feature_requests").select("*").eq("id", request_id).eq("firebase_uid", firebase_uid).execute()
         
         if not existing_request.data:
@@ -307,7 +330,7 @@ async def update_feature_status(
 ):
     """Update feature request status (admin only)"""
     try:
-        firebase_uid = current_user.get("supabase_uid")
+        firebase_uid = current_user.get("supabase_uid")  # Actually firebase UID from JWT
         if not firebase_uid:
             raise HTTPException(status_code=401, detail="User ID not found")
 
@@ -334,12 +357,16 @@ async def update_feature_status(
         }).eq("id", request_id).execute()
         
         if result.data:
-            # Log status change
+            # Log status change - get admin's user_id from firebase_uid
+            admin_user_result = supabase.table("users").select("id").eq("firebase_uid", firebase_uid).execute()
+            admin_user_id = admin_user_result.data[0]["id"] if admin_user_result.data else None
+            
             supabase.table("feature_status_updates").insert({
                 "feature_request_id": request_id,
                 "old_status": old_status,
                 "new_status": status_update.status,
                 "admin_comment": status_update.admin_comment,
+                "admin_user_id": admin_user_id,
                 "admin_firebase_uid": firebase_uid
             }).execute()
             
