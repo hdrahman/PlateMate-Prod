@@ -530,44 +530,19 @@ export default function App() {
               console.log('ℹ️ No old background services to cleanup:', cleanupError.message);
             }
 
-            // Initialize unified step tracking (with progressive loading)
+            // Initialize step tracking without blocking app startup
             console.log('Initializing unified step tracking...');
-            try {
-              // Start step tracking initialization in background (non-blocking)
-              const stepTrackingInit = async () => {
-                try {
-                  // Reduced timeout for faster fallback
-                  const stepTrackingPromise = UnifiedStepTracker.startTracking();
-                  const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Step tracking initialization timeout')), 3000)
-                  );
-                  
-                  await Promise.race([stepTrackingPromise, timeoutPromise]);
-                  console.log('✅ Unified step tracking initialized successfully');
-                } catch (stepError) {
-                  console.error('❌ Error starting step tracking:', stepError);
-                  console.log('ℹ️ App will continue with basic step tracking');
-                  
-                  // Initialize in degraded mode - tracker available but not auto-started
-                  try {
-                    console.log('🔄 Step tracker initialized in manual mode');
-                  } catch (degradedError) {
-                    console.error('❌ Step tracking completely disabled:', degradedError);
-                  }
-                }
-              };
-
-              // Start initialization but don't wait for it - let it complete in background
-              stepTrackingInit().catch(error => {
-                console.error('❌ Background step tracking initialization failed:', error);
-              });
-              
-              console.log('✅ Step tracking initialization started in background');
-            } catch (error) {
-              console.error('❌ Failed to start step tracking initialization:', error);
-            }
-
-            console.log('✅ Unified step tracking initialization complete');
+            
+            // Start step tracking immediately but don't wait for permissions
+            // This will start basic tracking and show notification if permissions are already granted
+            UnifiedStepTracker.startTracking().then(() => {
+              console.log('✅ Unified step tracking initialized successfully');
+            }).catch(stepError => {
+              console.error('❌ Error starting step tracking:', stepError);
+              console.log('ℹ️ App will continue with basic step tracking');
+            });
+            
+            console.log('✅ App initialization complete');
           } catch (error) {
             console.error('Failed to initialize enhanced services:', error);
             // Continue app initialization even if services fail

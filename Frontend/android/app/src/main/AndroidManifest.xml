@@ -17,6 +17,7 @@
   <!-- Step tracking permissions (minimal like Pacer) -->
   <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -53,6 +54,12 @@
     <service 
       android:name="com.asterinet.react.bgactions.RNBackgroundActionsTask" 
       android:foregroundServiceType="dataSync"
+      android:exported="false" />
+      
+    <!-- Notifee ForegroundService for persistent notifications -->
+    <service 
+      android:name="app.notifee.core.ForegroundService" 
+      android:foregroundServiceType="shortService"
       android:exported="false" />
   </application>
 </manifest>
