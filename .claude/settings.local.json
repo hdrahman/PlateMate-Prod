@@ -7,7 +7,8 @@
       "Bash(npx expo config:*)",
       "Bash(npx expo install:*)",
       "Bash(npx tsc:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

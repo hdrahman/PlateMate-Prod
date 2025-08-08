@@ -176,17 +176,25 @@ async def get_my_feature_requests(
         result = supabase.table("feature_requests").select("*").eq("firebase_uid", firebase_uid).order("created_at", desc=True).execute()
         
         if result.data:
-            logger.info(f"Retrieved {len(result.data)} feature requests for user {supabase_uid}")
+            logger.info(f"Retrieved {len(result.data)} feature requests for user {firebase_uid}")
             return result.data
         else:
-            logger.info(f"No feature requests found for user {supabase_uid}")
+            logger.info(f"No feature requests found for user {firebase_uid}")
             return []
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting user's feature requests: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Error getting user's feature requests for firebase_uid {firebase_uid}: {str(e)}")
+        # Provide more specific error information
+        error_detail = str(e)
+        if "name" in error_detail and "not defined" in error_detail:
+            error_detail = "Backend variable error - please check server logs"
+        elif "does not exist" in error_detail.lower():
+            error_detail = "Database table or function missing"
+        elif "connection" in error_detail.lower():
+            error_detail = "Database connection error"
+        raise HTTPException(status_code=500, detail=f"Internal server error: {error_detail}")
 
 @router.post("/{request_id}/upvote", response_model=Dict[str, Any])
 async def toggle_feature_upvote(
@@ -208,7 +216,7 @@ async def toggle_feature_upvote(
         }).execute()
         
         if result.data:
-            logger.info(f"Upvote toggled for feature request {request_id} by user {supabase_uid}")
+            logger.info(f"Upvote toggled for feature request {request_id} by user {firebase_uid}")
             # The function returns a JSON object, so we need to extract values properly
             response_data = result.data
             if isinstance(response_data, list) and len(response_data) > 0:
