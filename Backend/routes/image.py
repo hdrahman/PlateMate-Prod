@@ -8,7 +8,7 @@ import traceback  # Added to capture full error logs
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from openai import AsyncOpenAI
 from utils.file_manager import FileManager
 from auth.supabase_auth import get_current_user
@@ -499,6 +499,12 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
 async def upload_multiple_images(
     user_id: int = Form(...), 
     images: List[UploadFile] = File(...),
+    meal_type: Optional[str] = Form(None),
+    food_name: Optional[str] = Form(None),
+    brand_name: Optional[str] = Form(None),
+    quantity: Optional[str] = Form(None),
+    additional_notes: Optional[str] = Form(None),
+    context_label: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
     """Accepts multiple images, saves them to disk, and processes them together with OpenAI. Returns analysis results only - no database storage."""
@@ -510,6 +516,24 @@ async def upload_multiple_images(
         overall_start_time = time.time()
         print(f"📸 Received multiple image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
         print(f"Number of images: {len(images)}")
+        
+        # Log additional context provided by user
+        context_provided = []
+        if meal_type:
+            context_provided.append(f"meal_type='{meal_type}'")
+        if food_name:
+            context_provided.append(f"food_name='{food_name}'")
+        if brand_name:
+            context_provided.append(f"brand_name='{brand_name}'")
+        if quantity:
+            context_provided.append(f"quantity='{quantity}'")
+        if additional_notes:
+            context_provided.append(f"additional_notes='{additional_notes[:50]}...' (truncated for log)")
+        
+        if context_provided:
+            print(f"📝 User provided additional context: {', '.join(context_provided)}")
+        else:
+            print("📝 No additional context provided by user")
         
         # Save all images to disk first
         try:
@@ -553,8 +577,31 @@ async def upload_multiple_images(
         encoding_time = time.time() - encoding_start_time
         print(f"✅ All images encoded in {encoding_time:.2f} seconds")
         
-        # Create content array with all images
-        content = [{"type": "text", "text": "Analyze these food images and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."}]
+        # Create content array with all images  
+        # Build dynamic prompt text based on user context
+        base_prompt = "Analyze these food images and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."
+        
+        # Add user context if available
+        context_additions = []
+        if meal_type:
+            context_additions.append(f"This is a {meal_type.lower()} meal.")
+        if food_name:
+            context_additions.append(f"The user indicates this is '{food_name}'.")
+        if brand_name:
+            context_additions.append(f"The brand/restaurant is '{brand_name}'.")
+        if quantity:
+            context_additions.append(f"The user estimates the quantity as '{quantity}'.")
+        if additional_notes:
+            context_additions.append(f"Additional context from user: '{additional_notes}'.")
+            
+        if context_additions:
+            context_text = " USER CONTEXT: " + " ".join(context_additions)
+            prompt_with_context = base_prompt + context_text + " Use this context to improve the accuracy of your nutritional analysis."
+            print(f"🎯 Enhanced prompt with user context: {context_text[:100]}...")
+        else:
+            prompt_with_context = base_prompt
+        
+        content = [{"type": "text", "text": prompt_with_context}]
         
         # Add all encoded images to the content array
         for image_data in encoded_images:
@@ -578,6 +625,27 @@ async def upload_multiple_images(
             print(f"  - First image data length: {len(encoded_images[0]) if encoded_images else 0} characters")
             print(f"  - Using model: gpt-4o")
             
+            # Build dynamic system message with user context
+            base_system_message = """NUTRITION ANALYSIS EXPERT – ACCURACY-FIRST SYSTEM"""
+            
+            # Add user context section if context is provided
+            if context_additions:
+                user_context_section = f"""
+
+==============================================================================
+USER PROVIDED CONTEXT:
+{chr(10).join([f"• {addition}" for addition in context_additions])}
+
+IMPORTANT: Use this context to guide your food identification and portion estimation.
+- If the user provided a food name, consider it as a strong hint for identification
+- If quantity is specified, use it to calibrate your portion estimates
+- If brand/restaurant is mentioned, adjust for typical portion sizes from that establishment
+- Factor in any additional notes when making nutritional assessments
+=============================================================================="""
+                system_message_with_context = base_system_message + user_context_section
+            else:
+                system_message_with_context = base_system_message
+            
             # Real API call
             api_start_time = time.time()
             response = await client.chat.completions.create(
@@ -585,7 +653,7 @@ async def upload_multiple_images(
                 messages=[
                     {
                         "role": "system",
-                        "content": """NUTRITION ANALYSIS EXPERT – ACCURACY-FIRST SYSTEM
+                        "content": system_message_with_context + """
 
 ==============================================================================
 CRITICAL MISSION: Provide ACCURATE nutritional analysis that matches real-world food labels and portions.
@@ -593,7 +661,6 @@ ACCURACY PRINCIPLE: When in doubt, estimate higher rather than lower - underesti
 ANTI-BIAS DIRECTIVE: The system has historically underestimated by 20-30%. COMPENSATE by being more generous with portions and hidden calories.
 OUTPUT: JSON array only; no explanatory text.
 
-==============================================================================
 STEP 1: ENHANCED VISUAL ANALYSIS WITH BIAS CORRECTION
 
 1. PORTION SIZE BIAS CORRECTION
