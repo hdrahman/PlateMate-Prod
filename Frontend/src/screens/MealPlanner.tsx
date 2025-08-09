@@ -1059,50 +1059,102 @@ export default function MealPlanner() {
             {/* Paywall overlay for non-premium users */}
             {!isCheckingAccess && !hasPremiumAccess && (
                 <View style={styles.paywallOverlay}>
-                    <BlurView intensity={80} style={styles.blurOverlay}>
-                        <View style={styles.paywallContent}>
-                            <LinearGradient
-                                colors={['#5A60EA', '#FF00F5']}
-                                style={styles.paywallGradient}
-                            >
-                                <Ionicons name="restaurant" size={64} color="#FFF" />
-                                <Text style={styles.paywallTitle}>Unlock Meal Planner</Text>
-                                <Text style={styles.paywallSubtitle}>
-                                    Get personalized meal plans, recipe recommendations, and nutrition insights
-                                </Text>
-                                <View style={styles.paywallFeatures}>
-                                    <View style={styles.paywallFeature}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                                        <Text style={styles.paywallFeatureText}>Unlimited recipe access</Text>
-                                    </View>
-                                    <View style={styles.paywallFeature}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                                        <Text style={styles.paywallFeatureText}>Personalized meal plans</Text>
-                                    </View>
-                                    <View style={styles.paywallFeature}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                                        <Text style={styles.paywallFeatureText}>Pantry scanning</Text>
-                                    </View>
-                                    <View style={styles.paywallFeature}>
-                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                                        <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
-                                    </View>
-                                </View>
-                                <TouchableOpacity 
-                                    style={styles.paywallButton}
-                                    onPress={() => navigation.navigate('PremiumSubscription', {
-                                        source: 'meal_planner_overlay',
-                                        feature: 'meal_planning'
-                                    })}
+                    {Platform.OS === 'ios' ? (
+                        <BlurView 
+                            intensity={15} 
+                            tint="dark"
+                            style={styles.blurOverlay}
+                        >
+                            <View style={styles.blurBackdrop} />
+                            <View style={styles.paywallContent}>
+                                <LinearGradient
+                                    colors={['#5A60EA', '#FF00F5']}
+                                    style={styles.paywallGradient}
                                 >
-                                    <Text style={styles.paywallButtonText}>Start Free Trial</Text>
-                                </TouchableOpacity>
-                                <Text style={styles.paywallTrialText}>
-                                    20 days free • Cancel anytime
-                                </Text>
-                            </LinearGradient>
+                                    <Ionicons name="restaurant" size={64} color="#FFF" />
+                                    <Text style={styles.paywallTitle}>Unlock Meal Planner</Text>
+                                    <Text style={styles.paywallSubtitle}>
+                                        Get personalized meal plans, recipe recommendations, and nutrition insights
+                                    </Text>
+                                    <View style={styles.paywallFeatures}>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Unlimited recipe access</Text>
+                                        </View>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Personalized meal plans</Text>
+                                        </View>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Pantry scanning</Text>
+                                        </View>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={styles.paywallButton}
+                                        onPress={() => navigation.navigate('PremiumSubscription', {
+                                            source: 'meal_planner_overlay',
+                                            feature: 'meal_planning'
+                                        })}
+                                    >
+                                        <Text style={styles.paywallButtonText}>Start Free Trial</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.paywallTrialText}>
+                                        20 days free • Cancel anytime
+                                    </Text>
+                                </LinearGradient>
+                            </View>
+                        </BlurView>
+                    ) : (
+                        <View style={[styles.blurOverlay, styles.androidBlurOverlay]}>
+                            <View style={styles.paywallContent}>
+                                <LinearGradient
+                                    colors={['#5A60EA', '#FF00F5']}
+                                    style={styles.paywallGradient}
+                                >
+                                    <Ionicons name="restaurant" size={64} color="#FFF" />
+                                    <Text style={styles.paywallTitle}>Unlock Meal Planner</Text>
+                                    <Text style={styles.paywallSubtitle}>
+                                        Get personalized meal plans, recipe recommendations, and nutrition insights
+                                    </Text>
+                                    <View style={styles.paywallFeatures}>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Unlimited recipe access</Text>
+                                        </View>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Personalized meal plans</Text>
+                                        </View>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Pantry scanning</Text>
+                                        </View>
+                                        <View style={styles.paywallFeature}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={styles.paywallButton}
+                                        onPress={() => navigation.navigate('PremiumSubscription', {
+                                            source: 'meal_planner_overlay',
+                                            feature: 'meal_planning'
+                                        })}
+                                    >
+                                        <Text style={styles.paywallButtonText}>Start Free Trial</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.paywallTrialText}>
+                                        20 days free • Cancel anytime
+                                    </Text>
+                                </LinearGradient>
+                            </View>
                         </View>
-                    </BlurView>
+                    )}
                 </View>
             )}
         </SafeAreaView>
@@ -1451,6 +1503,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+    },
+    blurBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    },
+    androidBlurOverlay: {
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
     },
     paywallContent: {
         width: '100%',
