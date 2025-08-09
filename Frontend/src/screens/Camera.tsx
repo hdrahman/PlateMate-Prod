@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDefaultMealType } from '../utils/mealTypeUtils';
+import SubscriptionManager from '../utils/SubscriptionManager';
 
 // Define navigation types
 type RootStackParamList = {
@@ -122,45 +123,59 @@ export default function CameraScreen() {
             return;
         }
 
-        try {
-            // Add a small delay to ensure camera is fully ready
-            await new Promise(resolve => setTimeout(resolve, 100));
+        // Check if user can upload image (daily limit for free users)
+        await SubscriptionManager.handleImageUpload(
+            navigation,
+            async () => {
+                try {
+                    // Add a small delay to ensure camera is fully ready
+                    await new Promise(resolve => setTimeout(resolve, 100));
 
-            const photo = await cameraRef.current.takePictureAsync({
-                quality: 0.95,
-                base64: false,
-                exif: false,
-            });
+                    const photo = await cameraRef.current.takePictureAsync({
+                        quality: 0.95,
+                        base64: false,
+                        exif: false,
+                    });
 
-            // Navigate to ImageCapture with the photo URI
-            navigation.navigate('ImageCapture', {
-                mealType: getDefaultMealType(),
-                photoUri: photo.uri,
-                sourcePage: 'Camera'
-            });
-        } catch (error) {
-            console.error('Error taking photo:', error);
-        }
+                    // Navigate to ImageCapture with the photo URI
+                    navigation.navigate('ImageCapture', {
+                        mealType: getDefaultMealType(),
+                        photoUri: photo.uri,
+                        sourcePage: 'Camera'
+                    });
+                } catch (error) {
+                    console.error('Error taking photo:', error);
+                }
+            },
+            'camera'
+        );
     };
 
     const openGallery = async () => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 1,
-                allowsEditing: false,
-            });
+        // Check if user can upload image (daily limit for free users)
+        await SubscriptionManager.handleImageUpload(
+            navigation,
+            async () => {
+                try {
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                        quality: 1,
+                        allowsEditing: false,
+                    });
 
-            if (!result.canceled && result.assets && result.assets.length > 0) {
-                navigation.navigate('ImageCapture', {
-                    mealType: getDefaultMealType(),
-                    photoUri: result.assets[0].uri,
-                    sourcePage: 'Camera'
-                });
-            }
-        } catch (error) {
-            console.error('Error picking image:', error);
-        }
+                    if (!result.canceled && result.assets && result.assets.length > 0) {
+                        navigation.navigate('ImageCapture', {
+                            mealType: getDefaultMealType(),
+                            photoUri: result.assets[0].uri,
+                            sourcePage: 'Camera'
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error picking image:', error);
+                }
+            },
+            'gallery'
+        );
     };
 
     const openBarcode = () => {

@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import tokenManager from '../utils/tokenManager';
 import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
 import { getUserProfileBySupabaseUid } from '../utils/database';
+import SubscriptionManager from '../utils/SubscriptionManager';
 
 // We've removed the Apple Authentication module
 console.log('Apple Authentication not available');
@@ -131,6 +132,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
                     // Initialize token manager for authenticated users only
                     await tokenManager.initialize();
+                    
+                    // Initialize subscription manager and auto-start trial if needed
+                    try {
+                        await SubscriptionManager.initialize(authUser.id);
+                        console.log('✅ SubscriptionManager initialized');
+                    } catch (error) {
+                        console.warn('⚠️ SubscriptionManager initialization failed:', error);
+                    }
 
                     // Initialize the new 6-hour PostgreSQL backup sync on app launch
                     postgreSQLSyncService.initializeOnAppLaunch().catch(err => console.warn('Sync init error', err));

@@ -24,6 +24,8 @@ import {
     cancelSubscription
 } from '../utils/database';
 import { SubscriptionDetails, SubscriptionStatus } from '../types/user';
+import SubscriptionService from '../services/SubscriptionService';
+import { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 
 // Define subscription plan type
 interface PlanOption {
@@ -47,6 +49,8 @@ const PremiumSubscription = () => {
     const [isAnnual, setIsAnnual] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionDetails | null>(null);
+    const [revenueCatOfferings, setRevenueCatOfferings] = useState<PurchasesOffering | null>(null);
+    const [isRevenueCatLoading, setIsRevenueCatLoading] = useState(true);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
 
@@ -57,84 +61,78 @@ const PremiumSubscription = () => {
             monthlyPrice: 0,
             annualPrice: 0,
             gradient: ['#333333', '#1A1A1A'],
-            subscriptionType: 'free',
+            subscriptionType: 'expired', // Free users are technically expired
             imageUploads: '1 image upload per day',
             features: [
                 'Unlimited food search',
                 'Barcode scanning support',
-                'Basic meal planning',
-                'Calorie tracking',
-                'Weekly progress reports',
-                'Ad-supported experience'
-            ]
-        },
-        {
-            id: 'basic',
-            title: 'Basic',
-            monthlyPrice: 5.99,
-            annualPrice: 59.88, // 4.99 x 12
-            gradient: ['#5A60EA', '#3940B8'],
-            subscriptionType: 'standard',
-            imageUploads: '3 image uploads per day',
-            features: [
-                'Everything in Free plan',
-                'Advanced meal planning',
-                'Limited AI food analysis',
-                'Personalized nutrition tips',
-                'Ad-free experience',
-                'Email support'
+                'Basic nutrition tracking',
+                'Manual food logging',
+                'Basic meal insights'
             ]
         },
         {
             id: 'premium',
             title: 'Premium',
-            monthlyPrice: 9.99,
-            annualPrice: 83.88, // 6.99 x 12
+            monthlyPrice: 6.99,  // Updated pricing
+            annualPrice: 59.99,  // Updated pricing
             gradient: ['#5A60EA', '#FF00F5'],
-            subscriptionType: isAnnual ? 'premium_annual' : 'premium',
+            subscriptionType: isAnnual ? 'premium_annual' : 'premium_monthly',
             bestValue: true,
             imageUploads: 'Unlimited image uploads',
             features: [
-                'Everything in Basic plan',
-                'Unlimited AI food analysis',
-                'Advanced nutrition insights',
+                'Unlimited AI-powered food analysis',
+                'Advanced meal planning with recipes',
+                'Context-aware AI health coaching',
+                'Unlimited image uploads',
+                'Personalized nutrition insights',
                 'Custom meal recommendations',
-                'Personalized coaching',
-                'Priority support',
-                'Early access to new features'
+                '20-day free trial (30 days with payment method)',
+                'Priority support'
             ]
         }
     ];
 
     useEffect(() => {
-        const loadSubscriptionStatus = async () => {
+        const loadSubscriptionData = async () => {
             try {
                 if (user?.uid) {
-                    const status = await getSubscriptionStatus(user.uid);
-                    setSubscriptionStatus(status);
+                    // Initialize RevenueCat if not already done
+                    await SubscriptionService.initialize(user.uid);
+                    
+                    // Load RevenueCat offerings
+                    setIsRevenueCatLoading(true);
+                    const offerings = await SubscriptionService.getOfferings();
+                    setRevenueCatOfferings(offerings);
+                    
+                    // Get current subscription status from RevenueCat
+                    const customerInfo = await SubscriptionService.getCustomerInfo();
+                    const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
+                    setSubscriptionStatus(revenueCatStatus);
 
-                    // Pre-select current plan if user has one
-                    if (status?.status) {
+                    // Pre-select current plan based on RevenueCat status
+                    if (revenueCatStatus?.status) {
                         let planId;
-                        if (status.status === 'premium' || status.status === 'premium_annual') {
+                        if (['premium_monthly', 'premium_annual', 'free_trial', 'free_trial_extended'].includes(revenueCatStatus.status)) {
                             planId = 'premium';
-                        } else if (status.status === 'standard') {
-                            planId = 'basic';
                         } else {
                             planId = 'free';
                         }
                         setSelectedPlan(planId);
                     } else {
-                        // Default to basic for new users
-                        setSelectedPlan('basic');
+                        // Default to premium for new users (they'll get the trial)
+                        setSelectedPlan('premium');
                     }
+                    
+                    setIsRevenueCatLoading(false);
                 }
             } catch (error) {
-                console.error('Error loading subscription status:', error);
+                console.error('Error loading subscription data:', error);
+                setIsRevenueCatLoading(false);
             }
         };
 
-        loadSubscriptionStatus();
+        loadSubscriptionData();
 
         // Animate entrance
         Animated.parallel([
@@ -163,65 +161,92 @@ const PremiumSubscription = () => {
             return;
         }
 
-        if (selectedPlan === 'free' && subscriptionStatus?.status === 'free') {
-            Alert.alert('Already Subscribed', 'You are already on the Free plan');
+        if (selectedPlan === 'free' && subscriptionStatus?.status === 'expired') {
+            Alert.alert('Already on Free Plan', 'You are already using the free version of PlateMate.');
+            return;
+        }
+
+        // Handle free plan selection
+        if (selectedPlan === 'free') {
+            Alert.alert(
+                'Downgrade Confirmation',
+                'Are you sure you want to downgrade to the free plan? You will lose access to premium features.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                        text: 'Downgrade', 
+                        style: 'destructive',
+                        onPress: () => handleCancelSubscription()
+                    }
+                ]
+            );
             return;
         }
 
         setIsLoading(true);
 
         try {
-            const startDate = new Date().toISOString();
-
-            // Calculate end date based on subscription type
-            let endDate = null;
-            if (selectedPlan !== 'free') {
-                const endDateObj = new Date();
-                if (isAnnual) {
-                    endDateObj.setFullYear(endDateObj.getFullYear() + 1);
-                } else {
-                    endDateObj.setMonth(endDateObj.getMonth() + 1);
-                }
-                endDate = endDateObj.toISOString();
+            // Handle premium subscription with RevenueCat
+            if (!revenueCatOfferings || !revenueCatOfferings.availablePackages) {
+                throw new Error('No subscription packages available. Please try again.');
             }
 
-            // Mock payment process
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Find the appropriate package
+            let packageToPurchase: PurchasesPackage | null = null;
+            
+            if (isAnnual) {
+                packageToPurchase = revenueCatOfferings.availablePackages.find(
+                    pkg => pkg.identifier.includes('annual')
+                ) || revenueCatOfferings.annual;
+            } else {
+                packageToPurchase = revenueCatOfferings.availablePackages.find(
+                    pkg => pkg.identifier.includes('monthly')
+                ) || revenueCatOfferings.monthly;
+            }
 
-            // Determine subscription status based on selected plan
-            const subscriptionType = selectedPlanObj.subscriptionType;
+            // Fallback to any available package
+            if (!packageToPurchase) {
+                packageToPurchase = revenueCatOfferings.availablePackages[0];
+            }
 
-            // Update subscription in database
-            await updateSubscriptionStatus(user?.uid, {
-                status: subscriptionType,
-                startDate,
-                endDate,
-                autoRenew: true,
-                paymentMethod: selectedPlan === 'free' ? 'None' : 'Credit Card',
-            });
+            if (!packageToPurchase) {
+                throw new Error('No subscription package found');
+            }
 
-            // Update local state
-            setSubscriptionStatus({
-                status: subscriptionType,
-                startDate,
-                endDate,
-                autoRenew: true,
-                paymentMethod: selectedPlan === 'free' ? 'None' : 'Credit Card',
-                canceledAt: null,
-                trialEndsAt: null,
-            });
+            console.log('🛒 Attempting to purchase package:', packageToPurchase.identifier);
+            
+            // Purchase through RevenueCat
+            const { customerInfo, productIdentifier } = await SubscriptionService.purchasePackage(packageToPurchase);
+            
+            console.log('✅ Purchase successful:', productIdentifier);
+            
+            // Update local subscription status
+            const updatedStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
+            setSubscriptionStatus(updatedStatus);
 
             // Store subscription info in AsyncStorage for quick access
-            await AsyncStorage.setItem('subscription_plan', selectedPlan);
+            await AsyncStorage.setItem('subscription_plan', 'premium');
 
             Alert.alert(
-                'Subscription Successful',
-                `You are now subscribed to the ${selectedPlanObj.title} plan!`,
+                'Welcome to Premium!',
+                'Your subscription is now active. Enjoy unlimited access to all premium features!',
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error subscribing:', error);
-            Alert.alert('Subscription Error', 'There was an error processing your subscription. Please try again.');
+            
+            let errorMessage = 'There was an error processing your subscription. Please try again.';
+            
+            if (error.message?.includes('user cancelled') || error.code === '1') {
+                // User cancelled the purchase, no need to show error
+                return;
+            } else if (error.message?.includes('network') || error.code === '2') {
+                errorMessage = 'Network error. Please check your connection and try again.';
+            } else if (error.message?.includes('payment') || error.code === '3') {
+                errorMessage = 'Payment method error. Please check your payment information.';
+            }
+            
+            Alert.alert('Subscription Error', errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -314,13 +339,22 @@ const PremiumSubscription = () => {
 
                     <View style={styles.planPricing}>
                         <Text style={styles.planPrice}>{priceText}</Text>
-                        {price > 0 && <Text style={styles.planPeriod}>{period}</Text>}
+                        {price > 0 && period && <Text style={styles.planPeriod}>{period}</Text>}
                     </View>
 
                     {monthlyEquivalent && (
                         <Text style={styles.monthlyEquivalent}>
-                            {monthlyEquivalent} billed annually
+                            {monthlyEquivalent}
                         </Text>
+                    )}
+                    
+                    {plan.id === 'premium' && (
+                        <View style={styles.trialInfo}>
+                            <Ionicons name="time-outline" size={16} color="#4CAF50" />
+                            <Text style={styles.trialText}>
+                                Start with 20 days free • Extend to 30 days
+                            </Text>
+                        </View>
                     )}
 
                     <View style={styles.planHighlight}>
@@ -432,11 +466,15 @@ const PremiumSubscription = () => {
                                     <ActivityIndicator color="#FFF" />
                                 ) : (
                                     <Text style={styles.subscribeButtonText}>
-                                        {isPlanActive(selectedPlan, subscriptionStatus)
-                                            ? 'You are subscribed to this plan'
-                                            : selectedPlan === 'free'
-                                                ? 'Continue with Free Plan'
-                                                : 'Subscribe Now'}
+                                        {isRevenueCatLoading
+                                            ? 'Loading...'
+                                            : isPlanActive(selectedPlan, subscriptionStatus)
+                                                ? 'Current Plan'
+                                                : selectedPlan === 'free'
+                                                    ? 'Continue with Free Plan'
+                                                    : subscriptionStatus?.status === 'free_trial' || subscriptionStatus?.status === 'free_trial_extended'
+                                                        ? 'Manage Subscription'
+                                                        : 'Start Free Trial'}
                                     </Text>
                                 )}
                             </LinearGradient>
@@ -785,7 +823,23 @@ const styles = StyleSheet.create({
         color: '#CCC',
         fontSize: 14,
         lineHeight: 20,
-    }
+    },
+    trialInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        padding: 8,
+        borderRadius: 6,
+        marginTop: 8,
+        marginBottom: 8,
+    },
+    trialText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '500',
+        marginLeft: 6,
+        flex: 1,
+    },
 });
 
 export default PremiumSubscription;

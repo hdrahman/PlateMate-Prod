@@ -1,15 +1,41 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request, Header
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 import json
 import asyncio
+import os
+import hmac
+import hashlib
 from auth.supabase_auth import get_current_user
 from utils.db_connection import get_db_connection
 import logging
 
+# RevenueCat integration
+try:
+    from revenuecat import Client as RevenueCatClient
+    REVENUECAT_AVAILABLE = True
+except ImportError:
+    REVENUECAT_AVAILABLE = False
+    RevenueCatClient = None
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/subscription", tags=["subscription"])
+
+# RevenueCat configuration
+REVENUECAT_API_KEY = os.getenv('REVENUECAT_API_KEY')
+REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
+
+# Initialize RevenueCat client
+rc_client = None
+if REVENUECAT_AVAILABLE and REVENUECAT_API_KEY:
+    try:
+        rc_client = RevenueCatClient(api_key=REVENUECAT_API_KEY)
+        logger.info('RevenueCat client initialized successfully')
+    except Exception as e:
+        logger.error(f'Failed to initialize RevenueCat client: {e}')
+else:
+    logger.warning('RevenueCat not available or API key not configured')
 
 # Pydantic models for request/response
 class SubscriptionDetails(BaseModel):
@@ -45,6 +71,249 @@ class ReceiptValidationRequest(BaseModel):
 
 class SubscriptionCancellationRequest(BaseModel):
     reason: Optional[str] = Field(None, description="Reason for cancellation")
+
+class RevenueCatWebhookEvent(BaseModel):
+    event: Dict[str, Any] = Field(..., description="RevenueCat webhook event data")
+
+# RevenueCat webhook event types
+REVENUECAT_EVENT_TYPES = {
+    'INITIAL_PURCHASE': 'initial_purchase',
+    'NON_RENEWING_PURCHASE': 'non_renewing_purchase',
+    'RENEWAL': 'renewal',
+    'PRODUCT_CHANGE': 'product_change',
+    'CANCELLATION': 'cancellation',
+    'BILLING_ISSUE': 'billing_issue',
+    'SUBSCRIBER_ALIAS': 'subscriber_alias',
+    'SUBSCRIPTION_PAUSED': 'subscription_paused',
+    'TRANSFER': 'transfer',
+    'EXPIRATION': 'expiration',
+    'TRIAL_STARTED': 'trial_started',
+    'TRIAL_CONVERTED': 'trial_converted',
+    'TRIAL_CANCELLED': 'trial_cancelled'
+}
+
+# RevenueCat webhook endpoint
+@router.post("/revenuecat/webhook")
+async def revenuecat_webhook(
+    request: Request,
+    x_revenuecat_signature: Optional[str] = Header(None)
+):
+    """Handle RevenueCat webhook events"""
+    try:
+        # Get raw body for signature verification
+        body = await request.body()
+        
+        # Verify webhook signature if secret is configured
+        if REVENUECAT_WEBHOOK_SECRET and x_revenuecat_signature:
+            if not verify_webhook_signature(body, x_revenuecat_signature, REVENUECAT_WEBHOOK_SECRET):
+                logger.warning("Invalid RevenueCat webhook signature")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse webhook data
+        webhook_data = json.loads(body.decode('utf-8'))
+        event_type = webhook_data.get('event', {}).get('type')
+        app_user_id = webhook_data.get('event', {}).get('app_user_id')
+        
+        logger.info(f"RevenueCat webhook received: {event_type} for user {app_user_id}")
+        
+        # Process the webhook event
+        await process_revenuecat_webhook(webhook_data)
+        
+        return {"status": "success", "message": "Webhook processed"}
+        
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON in RevenueCat webhook")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except Exception as e:
+        logger.error(f"Error processing RevenueCat webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+def verify_webhook_signature(body: bytes, signature: str, secret: str) -> bool:
+    """Verify RevenueCat webhook signature"""
+    try:
+        expected_signature = hmac.new(
+            secret.encode('utf-8'),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(signature, expected_signature)
+    except Exception as e:
+        logger.error(f"Error verifying webhook signature: {e}")
+        return False
+
+async def process_revenuecat_webhook(webhook_data: dict):
+    """Process RevenueCat webhook events"""
+    try:
+        event = webhook_data.get('event', {})
+        event_type = event.get('type')
+        app_user_id = event.get('app_user_id')
+        
+        if not app_user_id:
+            logger.warning("No app_user_id in webhook event")
+            return
+        
+        # Get customer info from the webhook
+        subscriber_attributes = event.get('subscriber_attributes', {})
+        entitlements = event.get('entitlements', {})
+        product_id = event.get('product_id')
+        
+        # Map RevenueCat event to our subscription status
+        subscription_status = map_revenuecat_event_to_status(event_type, entitlements)
+        
+        # Update subscription in database
+        await update_subscription_from_webhook(
+            app_user_id,
+            subscription_status,
+            event,
+            entitlements
+        )
+        
+        logger.info(f"Successfully processed {event_type} for user {app_user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error processing webhook event: {str(e)}")
+        raise
+
+def map_revenuecat_event_to_status(event_type: str, entitlements: dict) -> str:
+    """Map RevenueCat event type to our subscription status"""
+    if event_type in ['INITIAL_PURCHASE', 'RENEWAL']:
+        # Check if it's a trial or paid subscription
+        premium_entitlement = entitlements.get('premium', {})
+        if premium_entitlement.get('is_active', False):
+            # Check if in trial period
+            if premium_entitlement.get('period_type') == 'intro':
+                return 'free_trial'
+            else:
+                # Determine if monthly or annual
+                product_id = premium_entitlement.get('product_identifier', '')
+                if 'annual' in product_id.lower():
+                    return 'premium_annual'
+                else:
+                    return 'premium_monthly'
+    elif event_type == 'TRIAL_STARTED':
+        return 'free_trial'
+    elif event_type == 'TRIAL_CONVERTED':
+        premium_entitlement = entitlements.get('premium', {})
+        product_id = premium_entitlement.get('product_identifier', '')
+        if 'annual' in product_id.lower():
+            return 'premium_annual'
+        else:
+            return 'premium_monthly'
+    elif event_type in ['CANCELLATION', 'EXPIRATION']:
+        return 'expired'
+    elif event_type == 'TRIAL_CANCELLED':
+        return 'expired'
+    
+    return 'free'
+
+async def update_subscription_from_webhook(
+    app_user_id: str,
+    status: str,
+    event: dict,
+    entitlements: dict
+):
+    """Update subscription status from RevenueCat webhook"""
+    try:
+        conn = get_db_connection()
+        
+        # Find user by Firebase UID (app_user_id in RevenueCat)
+        user_query = """
+            SELECT id, firebase_uid FROM users 
+            WHERE firebase_uid = ?
+        """
+        
+        user_result = conn.execute(user_query, (app_user_id,)).fetchone()
+        
+        if not user_result:
+            logger.warning(f"User not found for Firebase UID: {app_user_id}")
+            return
+        
+        user_id = user_result[0]
+        
+        # Get premium entitlement data
+        premium_entitlement = entitlements.get('premium', {})
+        
+        # Prepare subscription data
+        now = datetime.utcnow().isoformat()
+        subscription_data = {
+            'user_id': user_id,
+            'status': status,
+            'start_date': premium_entitlement.get('original_purchase_date'),
+            'end_date': premium_entitlement.get('expires_date'),
+            'auto_renew': premium_entitlement.get('will_renew', False),
+            'subscription_id': premium_entitlement.get('product_identifier'),
+            'original_transaction_id': event.get('transaction_id'),
+            'updated_at': now
+        }
+        
+        # Handle trial dates
+        if status in ['free_trial', 'free_trial_extended']:
+            subscription_data['trial_start_date'] = premium_entitlement.get('original_purchase_date')
+            subscription_data['trial_end_date'] = premium_entitlement.get('expires_date')
+        
+        # Check if subscription exists
+        existing_query = """
+            SELECT id FROM user_subscriptions 
+            WHERE user_id = ?
+        """
+        
+        existing = conn.execute(existing_query, (user_id,)).fetchone()
+        
+        if existing:
+            # Update existing subscription
+            update_query = """
+                UPDATE user_subscriptions 
+                SET status = ?, start_date = ?, end_date = ?, auto_renew = ?,
+                    subscription_id = ?, original_transaction_id = ?,
+                    trial_start_date = ?, trial_end_date = ?, updated_at = ?
+                WHERE user_id = ?
+            """
+            
+            conn.execute(update_query, (
+                subscription_data['status'],
+                subscription_data['start_date'],
+                subscription_data['end_date'],
+                subscription_data['auto_renew'],
+                subscription_data['subscription_id'],
+                subscription_data['original_transaction_id'],
+                subscription_data.get('trial_start_date'),
+                subscription_data.get('trial_end_date'),
+                subscription_data['updated_at'],
+                user_id
+            ))
+        else:
+            # Create new subscription
+            insert_query = """
+                INSERT INTO user_subscriptions (
+                    user_id, status, start_date, end_date, auto_renew,
+                    subscription_id, original_transaction_id, trial_start_date,
+                    trial_end_date, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            conn.execute(insert_query, (
+                subscription_data['user_id'],
+                subscription_data['status'],
+                subscription_data['start_date'],
+                subscription_data['end_date'],
+                subscription_data['auto_renew'],
+                subscription_data['subscription_id'],
+                subscription_data['original_transaction_id'],
+                subscription_data.get('trial_start_date'),
+                subscription_data.get('trial_end_date'),
+                now,
+                subscription_data['updated_at']
+            ))
+        
+        conn.commit()
+        logger.info(f"Updated subscription for user {user_id} to status {status}")
+        
+    except Exception as e:
+        logger.error(f"Error updating subscription from webhook: {str(e)}")
+        raise
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 @router.post("/subscription/start-trial")
 async def start_trial(current_user: dict = Depends(get_current_user)):

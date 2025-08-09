@@ -23,13 +23,20 @@ type EntitlementInfo = {
 };
 
 // Configure your RevenueCat API keys
-const REVENUECAT_API_KEY_ANDROID = 'your_android_api_key_here';
-const REVENUECAT_API_KEY_IOS = 'your_ios_api_key_here';
+// TODO: Replace these with actual RevenueCat API keys from the dashboard
+const REVENUECAT_API_KEY_ANDROID = 'goog_YOUR_GOOGLE_API_KEY_HERE';
+const REVENUECAT_API_KEY_IOS = 'appl_YOUR_APPLE_API_KEY_HERE';
 
 // Product IDs from App Store Connect and Google Play Console
+// Updated pricing: Monthly $6.99, Annual $59.99
 export const PRODUCT_IDS = {
-  MONTHLY: Platform.OS === 'ios' ? 'platemate_premium_monthly' : 'platemate.premium.monthly',
-  ANNUAL: Platform.OS === 'ios' ? 'platemate_premium_annual' : 'platemate.premium.annual',
+  MONTHLY: Platform.OS === 'ios' ? 'platemate_premium_monthly_699' : 'platemate.premium.monthly.699',
+  ANNUAL: Platform.OS === 'ios' ? 'platemate_premium_annual_5999' : 'platemate.premium.annual.5999',
+} as const;
+
+// Entitlement identifier for premium features
+export const ENTITLEMENTS = {
+  PREMIUM: 'premium',
 } as const;
 
 class SubscriptionService {
@@ -49,14 +56,28 @@ class SubscriptionService {
     try {
       const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
       
-      // Configure Purchases SDK
+      // Configure Purchases SDK with enhanced settings
       await Purchases.configure({
         apiKey,
         appUserID: userId,
       });
 
+      // Enable debug logging in development
+      if (__DEV__) {
+        await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      }
+
       this.isInitialized = true;
-      console.log('✅ RevenueCat SDK initialized successfully');
+      console.log('✅ RevenueCat SDK initialized successfully for user:', userId);
+      
+      // Get initial customer info to sync trial status
+      const customerInfo = await this.getCustomerInfo();
+      console.log('💰 Initial customer info:', {
+        activeEntitlements: Object.keys(customerInfo.entitlements.active),
+        originalPurchaseDate: customerInfo.originalPurchaseDate,
+        firstSeen: customerInfo.firstSeen,
+      });
+      
     } catch (error) {
       console.error('❌ Error initializing RevenueCat SDK:', error);
       throw error;
@@ -185,43 +206,61 @@ class SubscriptionService {
   // Convert RevenueCat CustomerInfo to our SubscriptionDetails format
   customerInfoToSubscriptionDetails(customerInfo: CustomerInfo): SubscriptionDetails {
     const entitlements = customerInfo.entitlements.active;
-    const premiumEntitlement = entitlements['premium'] || entitlements['Premium'];
+    const allEntitlements = customerInfo.entitlements.all;
+    const premiumEntitlement = entitlements[ENTITLEMENTS.PREMIUM] || allEntitlements[ENTITLEMENTS.PREMIUM];
 
-    if (!premiumEntitlement) {
-      // No active subscription, check if in trial period
-      const isInTrial = Object.values(customerInfo.entitlements.all).some(
-        (entitlement: EntitlementInfo) => entitlement.isActive && entitlement.willRenew === false
-      );
+    // Check for active premium entitlement first
+    if (premiumEntitlement && premiumEntitlement.isActive) {
+      const productIdentifier = premiumEntitlement.productIdentifier;
+      let status: SubscriptionStatus;
+
+      // Determine if user is in trial period
+      const isInTrial = premiumEntitlement.periodType === 'intro' || 
+                       (premiumEntitlement.expirationDate && new Date(premiumEntitlement.expirationDate) > new Date() && 
+                        !premiumEntitlement.willRenew && premiumEntitlement.unsubscribeDetectedAt === null);
+
+      if (isInTrial) {
+        // User is in trial period - determine which trial phase
+        const trialStartDate = new Date(premiumEntitlement.originalPurchaseDate);
+        const now = new Date();
+        const daysSinceStart = Math.floor((now.getTime() - trialStartDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysSinceStart <= 20) {
+          status = 'free_trial'; // Initial 20-day trial
+        } else {
+          status = 'free_trial_extended'; // Extended 10-day trial
+        }
+      } else {
+        // User has active paid subscription
+        if (productIdentifier.includes('annual')) {
+          status = 'premium_annual';
+        } else {
+          status = 'premium_monthly';
+        }
+      }
 
       return {
-        status: isInTrial ? 'free_trial' : 'expired',
-        startDate: new Date().toISOString(),
-        autoRenew: false,
+        status,
+        startDate: premiumEntitlement.originalPurchaseDate,
+        endDate: premiumEntitlement.expirationDate,
+        trialStartDate: isInTrial ? premiumEntitlement.originalPurchaseDate : undefined,
+        trialEndDate: isInTrial ? premiumEntitlement.expirationDate : undefined,
+        autoRenew: premiumEntitlement.willRenew,
+        subscriptionId: premiumEntitlement.productIdentifier,
+        originalTransactionId: customerInfo.originalPurchaseDate,
+        isInIntroOfferPeriod: isInTrial,
       };
     }
 
-    // Determine subscription status
-    let status: SubscriptionStatus;
-    const productIdentifier = premiumEntitlement.productIdentifier;
-
-    if (premiumEntitlement.isActive) {
-      if (productIdentifier.includes('annual')) {
-        status = 'premium_annual';
-      } else {
-        status = 'premium_monthly';
-      }
-    } else {
-      status = 'expired';
-    }
+    // No active entitlement - user is either new or trial expired
+    const hasExpiredEntitlement = Object.values(allEntitlements).some(
+      (entitlement: EntitlementInfo) => !entitlement.isActive && entitlement.expirationDate
+    );
 
     return {
-      status,
-      startDate: premiumEntitlement.originalPurchaseDate,
-      endDate: premiumEntitlement.expirationDate,
-      autoRenew: premiumEntitlement.willRenew,
-      subscriptionId: premiumEntitlement.productIdentifier,
-      originalTransactionId: customerInfo.originalPurchaseDate,
-      isInIntroOfferPeriod: premiumEntitlement.isActive && premiumEntitlement.unsubscribeDetectedAt === null,
+      status: hasExpiredEntitlement ? 'expired' : 'free_trial', // New users start with free trial
+      startDate: customerInfo.firstSeen || new Date().toISOString(),
+      autoRenew: false,
     };
   }
 
@@ -232,12 +271,173 @@ class SubscriptionService {
 
   // Check if user is in trial period
   isInTrialPeriod(customerInfo: CustomerInfo): boolean {
-    const entitlements = Object.values(customerInfo.entitlements.active);
-    return entitlements.some((entitlement: EntitlementInfo) => 
-      entitlement.isActive && 
-      entitlement.willRenew === false &&
-      entitlement.unsubscribeDetectedAt === null
-    );
+    const premiumEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM] || 
+                              customerInfo.entitlements.all[ENTITLEMENTS.PREMIUM];
+                              
+    if (!premiumEntitlement || !premiumEntitlement.isActive) {
+      return false;
+    }
+
+    // Check if in intro/trial period
+    return premiumEntitlement.periodType === 'intro' || 
+           (!premiumEntitlement.willRenew && premiumEntitlement.unsubscribeDetectedAt === null);
+  }
+
+  // Get trial status with detailed information
+  async getTrialStatus(): Promise<{
+    isInTrial: boolean;
+    trialType: 'initial' | 'extended' | 'none';
+    daysRemaining: number;
+    trialEndDate: string | null;
+    canExtendTrial: boolean;
+    hasUsedExtension: boolean;
+  }> {
+    try {
+      const customerInfo = await this.getCustomerInfo();
+      const premiumEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM] || 
+                                customerInfo.entitlements.all[ENTITLEMENTS.PREMIUM];
+
+      if (!premiumEntitlement || !premiumEntitlement.isActive || premiumEntitlement.willRenew) {
+        return {
+          isInTrial: false,
+          trialType: 'none',
+          daysRemaining: 0,
+          trialEndDate: null,
+          canExtendTrial: false,
+          hasUsedExtension: false,
+        };
+      }
+
+      const trialStartDate = new Date(premiumEntitlement.originalPurchaseDate);
+      const trialEndDate = premiumEntitlement.expirationDate ? new Date(premiumEntitlement.expirationDate) : new Date();
+      const now = new Date();
+      
+      const daysSinceStart = Math.floor((now.getTime() - trialStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysRemaining = Math.max(0, Math.floor((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      let trialType: 'initial' | 'extended' | 'none';
+      let hasUsedExtension = false;
+      
+      if (daysSinceStart <= 20) {
+        trialType = 'initial';
+      } else {
+        trialType = 'extended';
+        hasUsedExtension = true;
+      }
+      
+      const canExtendTrial = trialType === 'initial' && daysRemaining <= 5 && daysRemaining > 0 && !hasUsedExtension;
+
+      return {
+        isInTrial: true,
+        trialType,
+        daysRemaining,
+        trialEndDate: trialEndDate.toISOString(),
+        canExtendTrial,
+        hasUsedExtension,
+      };
+    } catch (error) {
+      console.error('❌ Error getting trial status:', error);
+      return {
+        isInTrial: false,
+        trialType: 'none',
+        daysRemaining: 0,
+        trialEndDate: null,
+        canExtendTrial: false,
+        hasUsedExtension: false,
+      };
+    }
+  }
+
+  // Setup auto-renew to extend trial (user adds payment method)
+  async setupAutoRenewForTrialExtension(): Promise<boolean> {
+    try {
+      console.log('💳 Setting up auto-renew for trial extension...');
+      
+      // Get current offerings to find the products
+      const offerings = await this.getOfferings();
+      if (!offerings || !offerings.availablePackages) {
+        throw new Error('No offerings available');
+      }
+
+      // Find a package (preferably monthly for trial extension)
+      const monthlyPackage = offerings.availablePackages.find(
+        pkg => pkg.storeProduct.identifier === PRODUCT_IDS.MONTHLY
+      );
+      
+      const packageToUse = monthlyPackage || offerings.availablePackages[0];
+      
+      if (!packageToUse) {
+        throw new Error('No subscription package found');
+      }
+
+      // This will prompt the user to set up payment method and extend trial
+      const { customerInfo } = await this.purchasePackage(packageToUse);
+      
+      console.log('✅ Auto-renew setup successful, trial extended');
+      return true;
+    } catch (error) {
+      console.error('❌ Error setting up auto-renew for trial extension:', error);
+      return false;
+    }
+  }
+  // Check if user has premium access (including trial)
+  async hasPremiumAccess(): Promise<boolean> {
+    try {
+      const customerInfo = await this.getCustomerInfo();
+      return this.hasActiveSubscription(customerInfo) || this.isInTrialPeriod(customerInfo);
+    } catch (error) {
+      console.error('❌ Error checking premium access:', error);
+      return false;
+    }
+  }
+
+  // Get user's current subscription tier
+  async getSubscriptionTier(): Promise<'free' | 'trial' | 'premium_monthly' | 'premium_annual'> {
+    try {
+      const customerInfo = await this.getCustomerInfo();
+      const subscriptionDetails = this.customerInfoToSubscriptionDetails(customerInfo);
+      
+      if (subscriptionDetails.status === 'free_trial' || subscriptionDetails.status === 'free_trial_extended') {
+        return 'trial';
+      } else if (subscriptionDetails.status === 'premium_monthly') {
+        return 'premium_monthly';
+      } else if (subscriptionDetails.status === 'premium_annual') {
+        return 'premium_annual';
+      } else {
+        return 'free';
+      }
+    } catch (error) {
+      console.error('❌ Error getting subscription tier:', error);
+      return 'free';
+    }
+  }
+
+  // Start free trial for new users (20 days)
+  async startFreeTrial(): Promise<boolean> {
+    try {
+      console.log('🎆 Starting 20-day free trial for new user...');
+      
+      // For new users, RevenueCat will automatically start the trial when they first interact
+      // We just need to ensure they're properly initialized
+      const customerInfo = await this.getCustomerInfo();
+      
+      // If user doesn't have any entitlements, they'll get the trial on first purchase attempt
+      const hasAnyEntitlements = Object.keys(customerInfo.entitlements.all).length > 0;
+      
+      if (!hasAnyEntitlements) {
+        console.log('🎆 New user detected, trial will start on first purchase interaction');
+        return true;
+      }
+      
+      // Check if already in trial
+      const isInTrial = this.isInTrialPeriod(customerInfo);
+      console.log('📊 Current trial status:', isInTrial);
+      
+      return isInTrial;
+    } catch (error) {
+      console.error('❌ Error starting free trial:', error);
+      return false;
+    }
   }
 }
 

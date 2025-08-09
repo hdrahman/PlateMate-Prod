@@ -57,6 +57,8 @@ import { getTodayExerciseCalories, getUserProfileBySupabaseUid, getUserGoals } f
 import { NutritionGoals, calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { UserProfile } from '../types/user';
 import { useFoodLog } from '../context/FoodLogContext';
+import SubscriptionManager from '../utils/SubscriptionManager';
+import { BlurView } from 'expo-blur';
 
 // Define color constants for consistent theming
 const PRIMARY_BG = '#000000';
@@ -210,6 +212,10 @@ export default function MealPlanner() {
     const { profile: onboardingProfile, isLoading: isOnboardingLoading } = useOnboarding();
     const { nutrientTotals, refreshLogs, isLoading: foodLogLoading,
         startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
+    
+    // Subscription status
+    const [hasPremiumAccess, setHasPremiumAccess] = useState(true); // Start optimistic
+    const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
     // Daily nutrition stats
     const [dailyNutrition, setDailyNutrition] = useState({
@@ -507,8 +513,38 @@ export default function MealPlanner() {
 
     // Load popular healthy recipes on component mount
     useEffect(() => {
+        checkPremiumAccess();
         loadFeaturedRecipes();
     }, []);
+    
+    // Re-check premium access when user changes (e.g., after subscription)
+    useEffect(() => {
+        if (user) {
+            checkPremiumAccess();
+        }
+    }, [user]);
+    
+    // Re-load recipes when premium access changes
+    useEffect(() => {
+        if (!isCheckingAccess) {
+            loadFeaturedRecipes();
+        }
+    }, [hasPremiumAccess, isCheckingAccess]);
+    
+    // Check if user has premium access
+    const checkPremiumAccess = async () => {
+        try {
+            setIsCheckingAccess(true);
+            const hasAccess = await SubscriptionManager.canAccessPremiumFeature();
+            setHasPremiumAccess(hasAccess);
+        } catch (error) {
+            console.error('Error checking premium access:', error);
+            // On error, assume no access to be safe
+            setHasPremiumAccess(false);
+        } finally {
+            setIsCheckingAccess(false);
+        }
+    };
 
     // Start watching for food log changes
     useEffect(() => {
@@ -638,6 +674,13 @@ export default function MealPlanner() {
     const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
+            
+            // For non-premium users, show generic/demo recipes
+            if (!hasPremiumAccess && !isCheckingAccess) {
+                const genericRecipes = getGenericRecipes();
+                setFeaturedRecipes(genericRecipes);
+                return;
+            }
 
             // Clean up expired cache entries first
             await cleanupExpiredCache();
@@ -707,20 +750,102 @@ export default function MealPlanner() {
             }
         } catch (error) {
             console.error('Error loading featured recipes:', error);
-            Alert.alert('Error', 'Failed to load featured recipes. Please try again later.');
+            // For premium users, show error. For free users, show generic recipes
+            if (!hasPremiumAccess) {
+                setFeaturedRecipes(getGenericRecipes());
+            } else {
+                Alert.alert('Error', 'Failed to load featured recipes. Please try again later.');
+            }
         } finally {
             setIsLoading(false);
         }
     };
-
-    // Handle recipe press
-    const handleRecipePress = (recipe: Recipe) => {
-        navigation.navigate('RecipeDetails', { recipeId: recipe.id });
+    
+    // Generic recipes for non-premium users
+    const getGenericRecipes = (): Recipe[] => {
+        return [
+            {
+                id: 999001,
+                title: 'Delicious Healthy Meal',
+                image: 'https://via.placeholder.com/300x200/4CAF50/white?text=Healthy+Recipe',
+                readyInMinutes: 30,
+                servings: 2,
+                healthScore: 85,
+                aggregateLikes: 245,
+                extendedIngredients: [],
+                analyzedInstructions: [],
+                cuisines: ['Healthy'],
+                diets: ['Balanced'],
+                dishTypes: ['Main Course'],
+                summary: 'A nutritious and delicious meal perfect for your health goals.',
+                vegan: false,
+                vegetarian: false,
+                glutenFree: false,
+                dairyFree: false
+            },
+            {
+                id: 999002,
+                title: 'Protein-Rich Dish',
+                image: 'https://via.placeholder.com/300x200/FF9800/white?text=Protein+Rich',
+                readyInMinutes: 25,
+                servings: 4,
+                healthScore: 90,
+                aggregateLikes: 189,
+                extendedIngredients: [],
+                analyzedInstructions: [],
+                cuisines: ['Fitness'],
+                diets: ['High Protein'],
+                dishTypes: ['Main Course'],
+                summary: 'High-protein recipe designed to support your fitness goals.',
+                vegan: false,
+                vegetarian: false,
+                glutenFree: false,
+                dairyFree: false
+            },
+            {
+                id: 999003,
+                title: 'Balanced Nutrition Bowl',
+                image: 'https://via.placeholder.com/300x200/2196F3/white?text=Nutrition+Bowl',
+                readyInMinutes: 20,
+                servings: 1,
+                healthScore: 95,
+                aggregateLikes: 312,
+                extendedIngredients: [],
+                analyzedInstructions: [],
+                cuisines: ['Bowl'],
+                diets: ['Balanced', 'Whole Foods'],
+                dishTypes: ['Bowl'],
+                summary: 'A perfectly balanced nutrition bowl with wholesome ingredients.',
+                vegan: true,
+                vegetarian: true,
+                glutenFree: true,
+                dairyFree: true
+            }
+        ];
     };
 
-    // Handle scanning pantry (placeholder for future feature)
-    const handleScanPantry = () => {
-        Alert.alert('Coming Soon', 'Pantry scanning feature is coming soon!');
+    // Handle recipe press - redirect to subscription for non-premium users
+    const handleRecipePress = async (recipe: Recipe) => {
+        if (!hasPremiumAccess) {
+            navigation.navigate('PremiumSubscription', {
+                source: 'meal_planner',
+                feature: 'recipe_details',
+            });
+        } else {
+            navigation.navigate('RecipeDetails', { recipeId: recipe.id });
+        }
+    };
+
+    // Handle scanning pantry - redirect to subscription for non-premium users
+    const handleScanPantry = async () => {
+        if (!hasPremiumAccess) {
+            navigation.navigate('PremiumSubscription', {
+                source: 'meal_planner',
+                feature: 'pantry_scanning',
+            });
+        } else {
+            Alert.alert('Coming Soon', 'Pantry scanning feature is coming soon!');
+        }
     };
 
     // Error banner component
@@ -747,6 +872,7 @@ export default function MealPlanner() {
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollInner}
+                scrollEnabled={hasPremiumAccess} // Disable scrolling for non-premium users
             >
                 {/* Header Section */}
                 <View style={styles.headerInContent}>
@@ -886,24 +1012,32 @@ export default function MealPlanner() {
                     <View style={styles.nutritionInfoContainer}>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Remaining Calories</Text>
-                            <Text style={styles.nutritionValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.remainingCalories}</Text>
+                            <Text style={styles.nutritionValue}>
+                                {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.remainingCalories}
+                            </Text>
                         </View>
                         <View style={styles.nutritionItem}>
                             <Text style={styles.nutritionLabel}>Meals Left</Text>
-                            <Text style={styles.nutritionValue}>{dailyNutrition.mealsLeft}</Text>
+                            <Text style={styles.nutritionValue}>{!hasPremiumAccess ? '---' : dailyNutrition.mealsLeft}</Text>
                         </View>
                     </View>
                     <View style={styles.macrosContainer}>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.carbs}g</Text>
+                            <Text style={styles.macroValue}>
+                                {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.carbs + 'g'}
+                            </Text>
                             <Text style={styles.macroLabel}>Carbs</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.protein}g</Text>
+                            <Text style={styles.macroValue}>
+                                {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.protein + 'g'}
+                            </Text>
                             <Text style={styles.macroLabel}>Protein</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>{isDailyNutrientsLoading ? '...' : dailyNutrition.fat}g</Text>
+                            <Text style={styles.macroValue}>
+                                {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.fat + 'g'}
+                            </Text>
                             <Text style={styles.macroLabel}>Fat</Text>
                         </View>
                     </View>
@@ -921,6 +1055,56 @@ export default function MealPlanner() {
                     </Text>
                 </View>
             </ScrollView>
+            
+            {/* Paywall overlay for non-premium users */}
+            {!isCheckingAccess && !hasPremiumAccess && (
+                <View style={styles.paywallOverlay}>
+                    <BlurView intensity={80} style={styles.blurOverlay}>
+                        <View style={styles.paywallContent}>
+                            <LinearGradient
+                                colors={['#5A60EA', '#FF00F5']}
+                                style={styles.paywallGradient}
+                            >
+                                <Ionicons name="restaurant" size={64} color="#FFF" />
+                                <Text style={styles.paywallTitle}>Unlock Meal Planner</Text>
+                                <Text style={styles.paywallSubtitle}>
+                                    Get personalized meal plans, recipe recommendations, and nutrition insights
+                                </Text>
+                                <View style={styles.paywallFeatures}>
+                                    <View style={styles.paywallFeature}>
+                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                        <Text style={styles.paywallFeatureText}>Unlimited recipe access</Text>
+                                    </View>
+                                    <View style={styles.paywallFeature}>
+                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                        <Text style={styles.paywallFeatureText}>Personalized meal plans</Text>
+                                    </View>
+                                    <View style={styles.paywallFeature}>
+                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                        <Text style={styles.paywallFeatureText}>Pantry scanning</Text>
+                                    </View>
+                                    <View style={styles.paywallFeature}>
+                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                        <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity 
+                                    style={styles.paywallButton}
+                                    onPress={() => navigation.navigate('PremiumSubscription', {
+                                        source: 'meal_planner_overlay',
+                                        feature: 'meal_planning'
+                                    })}
+                                >
+                                    <Text style={styles.paywallButtonText}>Start Free Trial</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.paywallTrialText}>
+                                    20 days free • Cancel anytime
+                                </Text>
+                            </LinearGradient>
+                        </View>
+                    </BlurView>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
@@ -1256,5 +1440,83 @@ const styles = StyleSheet.create({
         color: SUBDUED,
         textDecorationLine: 'underline',
         opacity: 0.8,
+    },
+    // Paywall styles
+    paywallOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 1000,
+    },
+    blurOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    paywallContent: {
+        width: '100%',
+        maxWidth: 350,
+        borderRadius: 20,
+        overflow: 'hidden',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 10,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+    },
+    paywallGradient: {
+        padding: 32,
+        alignItems: 'center',
+    },
+    paywallTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#FFF',
+        marginTop: 16,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    paywallSubtitle: {
+        fontSize: 16,
+        color: 'rgba(255, 255, 255, 0.9)',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    paywallFeatures: {
+        width: '100%',
+        marginBottom: 24,
+    },
+    paywallFeature: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    paywallFeatureText: {
+        fontSize: 16,
+        color: '#FFF',
+        marginLeft: 12,
+        fontWeight: '500',
+    },
+    paywallButton: {
+        backgroundColor: '#FFF',
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        borderRadius: 25,
+        marginBottom: 12,
+        minWidth: 200,
+        alignItems: 'center',
+    },
+    paywallButtonText: {
+        color: '#5A60EA',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    paywallTrialText: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.8)',
+        textAlign: 'center',
     },
 });

@@ -24,6 +24,7 @@ import {
 } from '../utils/database';
 import { useOnboarding } from '../context/OnboardingContext';
 import WelcomePremiumModal from '../components/WelcomePremiumModal';
+import TrialCountdown from '../components/TrialCountdown';
 
 import {
   View,

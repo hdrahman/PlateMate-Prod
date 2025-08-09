@@ -40,6 +40,7 @@ import {
   getUserStreak,
   getCurrentUserId
 } from '../utils/database';
+import SubscriptionManager from '../utils/SubscriptionManager';
 
 // Get IP and port from the BACKEND_URL
 const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
@@ -148,8 +149,21 @@ export default function Chatbot() {
     return date.toISOString().split('T')[0]; // YYYY-MM-DD format
   };
 
-  // Load user context from local SQLite database
+  // Load user context from local SQLite database (Premium feature)
   const loadUserContext = async () => {
+    // Check if user has premium access before loading context
+    const canAccess = await SubscriptionManager.canAccessPremiumFeature();
+    if (!canAccess) {
+      await SubscriptionManager.handleContextAwareMode(
+        navigation,
+        () => {
+          // If they upgrade, try loading context again
+          loadUserContext();
+        }
+      );
+      return;
+    }
+
     try {
       setIsLoadingContext(true);
       console.log('🔄 Loading user context from local database...');

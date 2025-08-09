@@ -33,6 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { navigateToFoodLog } from '../navigation/RootNavigation';
 import { validateUserContext, createLLMContextPayload, UserContextData, validateFoodName, validateBrandName, validateQuantity, validateNotes, getCharacterLimits, isApproachingLimit } from '../utils/inputValidation';
+import SubscriptionManager from '../utils/SubscriptionManager';
 
 const { width, height } = Dimensions.get('window');
 
@@ -241,65 +242,79 @@ const ImageCapture: React.FC = () => {
     };
 
     const handleTakePhoto = async (index: number) => {
-        try {
-            const result = await launchCameraAsync({
-                mediaTypes: MediaTypeOptions.Images,
-                quality: 1,
-                allowsEditing: false,
-            });
+        // Check if user can upload additional images (daily limit for free users)
+        await SubscriptionManager.handleImageUpload(
+            navigation,
+            async () => {
+                try {
+                    const result = await launchCameraAsync({
+                        mediaTypes: MediaTypeOptions.Images,
+                        quality: 1,
+                        allowsEditing: false,
+                    });
 
-            if (!result.canceled) {
-                // Optimize image while keeping high quality
-                const optimizedUri = await optimizeImage(result.assets[0].uri);
+                    if (!result.canceled) {
+                        // Optimize image while keeping high quality
+                        const optimizedUri = await optimizeImage(result.assets[0].uri);
 
-                const newImages = [...images];
-                newImages[index] = {
-                    ...newImages[index],
-                    uri: optimizedUri,
-                    uploaded: false
-                };
-                setImages(newImages);
-                
-                // If this was a side view image (index 1) and both images now exist, switch to show it
-                if (index === 1 && newImages[0].uri && newImages[1].uri) {
-                    setActiveImageIndex(1); // Switch to show the side view (second image)
+                        const newImages = [...images];
+                        newImages[index] = {
+                            ...newImages[index],
+                            uri: optimizedUri,
+                            uploaded: false
+                        };
+                        setImages(newImages);
+                        
+                        // If this was a side view image (index 1) and both images now exist, switch to show it
+                        if (index === 1 && newImages[0].uri && newImages[1].uri) {
+                            setActiveImageIndex(1); // Switch to show the side view (second image)
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error taking photo:', error);
+                    Alert.alert('Error', 'Failed to take photo');
                 }
-            }
-        } catch (error) {
-            console.error('Error taking photo:', error);
-            Alert.alert('Error', 'Failed to take photo');
-        }
+            },
+            'image_capture_additional'
+        );
     };
 
     const handlePickImage = async (index: number) => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: MediaTypeOptions.Images,
-                quality: 1,
-                allowsEditing: false,
-            });
+        // Check if user can upload additional images (daily limit for free users)
+        await SubscriptionManager.handleImageUpload(
+            navigation,
+            async () => {
+                try {
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: MediaTypeOptions.Images,
+                        quality: 1,
+                        allowsEditing: false,
+                    });
 
-            if (!result.canceled) {
-                // Optimize image while keeping high quality
-                const optimizedUri = await optimizeImage(result.assets[0].uri);
+                    if (!result.canceled) {
+                        // Optimize image while keeping high quality
+                        const optimizedUri = await optimizeImage(result.assets[0].uri);
 
-                const newImages = [...images];
-                newImages[index] = {
-                    ...newImages[index],
-                    uri: optimizedUri,
-                    uploaded: false
-                };
-                setImages(newImages);
-                
-                // If this was a side view image (index 1) and both images now exist, switch to show it
-                if (index === 1 && newImages[0].uri && newImages[1].uri) {
-                    setActiveImageIndex(1); // Switch to show the side view (second image)
+                        const newImages = [...images];
+                        newImages[index] = {
+                            ...newImages[index],
+                            uri: optimizedUri,
+                            uploaded: false
+                        };
+                        setImages(newImages);
+                        
+                        // If this was a side view image (index 1) and both images now exist, switch to show it
+                        if (index === 1 && newImages[0].uri && newImages[1].uri) {
+                            setActiveImageIndex(1); // Switch to show the side view (second image)
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error picking image:', error);
+                    Alert.alert('Error', 'Failed to pick image');
                 }
-            }
-        } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image');
-        }
+            },
+            'image_capture_gallery'
+        );
     };
 
     const uploadImage = async (uri: string): Promise<{ url: string, key: string, data: any }> => {
