@@ -14,6 +14,7 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SubscriptionService from '../services/SubscriptionService';
 import TrialManager from '../services/TrialManager';
+import SubscriptionManager from '../utils/SubscriptionManager';
 import { useAuth } from '../context/AuthContext';
 
 interface TrialCountdownProps {
@@ -53,12 +54,22 @@ export default function TrialCountdown({ visible = true, style, compact = false 
     try {
       setIsLoading(true);
       
-      // Get trial status from RevenueCat
-      const status = await SubscriptionService.getTrialStatus();
+      // Get unified subscription status (includes automatic trials)
+      const subscriptionStatus = await SubscriptionManager.getSubscriptionStatus();
+      
+      // Convert to trial status format for this component
+      const status = {
+        isInTrial: subscriptionStatus.isInTrial,
+        trialType: subscriptionStatus.tier === 'trial' ? 'initial' as const : 'none' as const,
+        daysRemaining: subscriptionStatus.daysRemaining || 0,
+        trialEndDate: null, // We don't need exact date for this component
+        canExtendTrial: subscriptionStatus.canExtendTrial || false,
+      };
+      
       setTrialStatus(status);
       
-      // Show auto-renew prompt if conditions are met
-      if (status.canExtendTrial && status.trialType === 'initial' && status.daysRemaining <= 5) {
+      // Show auto-renew prompt if conditions are met (for automatic trials)
+      if (status.canExtendTrial && status.isInTrial && status.daysRemaining <= 5) {
         // Only show once per session to avoid spam
         const hasShownPrompt = await checkIfPromptShown();
         if (!hasShownPrompt) {
@@ -102,29 +113,33 @@ export default function TrialCountdown({ visible = true, style, compact = false 
     try {
       setIsExtending(true);
       
-      // Use TrialManager to extend trial with payment method
-      await TrialManager.extendTrialWithPaymentMethod(user.uid);
+      // For automatic trials, use our new extension logic
+      const success = await SubscriptionManager.extendAutoTrial(user.uid);
       
-      // Refresh trial status
-      await loadTrialStatus();
-      
-      setShowExtensionModal(false);
-      
-      Alert.alert(
-        'Trial Extended! 🎉',
-        'Your trial has been extended to 30 days total. Enjoy exploring all premium features!',
-        [{ text: 'Great!', style: 'default' }]
-      );
+      if (success) {
+        // Refresh trial status
+        await loadTrialStatus();
+        
+        setShowExtensionModal(false);
+        
+        Alert.alert(
+          'Trial Extended! 🎉',
+          'Your trial has been extended to 30 days total. You now have 10 additional days to explore all premium features!',
+          [{ text: 'Awesome!', style: 'default' }]
+        );
+      } else {
+        throw new Error('Extension failed');
+      }
       
     } catch (error: any) {
       console.error('❌ Error extending trial:', error);
       
       let errorMessage = 'Unable to extend trial. Please try again later.';
       
-      if (error.message?.includes('already granted')) {
+      if (error.message?.includes('already')) {
         errorMessage = 'Your trial has already been extended to the maximum duration.';
-      } else if (error.message?.includes('payment')) {
-        errorMessage = 'Please check your payment method and try again.';
+      } else if (error.message?.includes('not found')) {
+        errorMessage = 'No active trial found to extend.';
       }
       
       Alert.alert('Extension Error', errorMessage);

@@ -26,6 +26,8 @@ import tokenManager from './src/utils/tokenManager';
 import UnifiedStepTracker from './src/services/UnifiedStepTracker';
 import notifee, { EventType } from '@notifee/react-native';
 import PersistentStepTracker from './src/services/PersistentStepTracker';
+// Import Subscription Manager for automatic trials
+import SubscriptionManager from './src/utils/SubscriptionManager';
 
 // Debug utilities (development only) - removed obsolete imports
 if (__DEV__) {

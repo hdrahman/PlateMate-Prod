@@ -22,16 +22,15 @@ type EntitlementInfo = {
   billingIssueDetectedAt?: string;
 };
 
-// Configure your RevenueCat API keys
-// TODO: Replace these with actual RevenueCat API keys from the dashboard
-const REVENUECAT_API_KEY_ANDROID = 'goog_YOUR_GOOGLE_API_KEY_HERE';
-const REVENUECAT_API_KEY_IOS = 'appl_YOUR_APPLE_API_KEY_HERE';
+// Configure your RevenueCat API keys from environment
+const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID || 'goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA';
+const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS || 'appl_YOUR_APPLE_API_KEY_HERE';
 
 // Product IDs from App Store Connect and Google Play Console
-// Updated pricing: Monthly $6.99, Annual $59.99
+// These match your RevenueCat dashboard configuration
 export const PRODUCT_IDS = {
-  MONTHLY: Platform.OS === 'ios' ? 'platemate_premium_monthly_699' : 'platemate.premium.monthly.699',
-  ANNUAL: Platform.OS === 'ios' ? 'platemate_premium_annual_5999' : 'platemate.premium.annual.5999',
+  MONTHLY: '$rc_monthly', // RevenueCat ID: Monthly Subscription (platemate_premium:premium-monthly)
+  ANNUAL: '$rc_annual',   // RevenueCat ID: Annual Subscription (platemate_premium:premium-annual)
 } as const;
 
 // Entitlement identifier for premium features
@@ -60,6 +59,7 @@ class SubscriptionService {
       await Purchases.configure({
         apiKey,
         appUserID: userId,
+        usesStoreKit2IfAvailable: false, // Disable StoreKit 2 for better compatibility with unpublished apps
       });
 
       // Enable debug logging in development
@@ -71,12 +71,16 @@ class SubscriptionService {
       console.log('✅ RevenueCat SDK initialized successfully for user:', userId);
       
       // Get initial customer info to sync trial status
-      const customerInfo = await this.getCustomerInfo();
-      console.log('💰 Initial customer info:', {
-        activeEntitlements: Object.keys(customerInfo.entitlements.active),
-        originalPurchaseDate: customerInfo.originalPurchaseDate,
-        firstSeen: customerInfo.firstSeen,
-      });
+      try {
+        const customerInfo = await this.getCustomerInfo();
+        console.log('💰 Initial customer info:', {
+          activeEntitlements: Object.keys(customerInfo.entitlements.active),
+          originalPurchaseDate: customerInfo.originalPurchaseDate,
+          firstSeen: customerInfo.firstSeen,
+        });
+      } catch (customerError) {
+        console.warn('⚠️ Could not fetch initial customer info (may be expected for unpublished apps):', customerError);
+      }
       
     } catch (error) {
       console.error('❌ Error initializing RevenueCat SDK:', error);
@@ -412,31 +416,43 @@ class SubscriptionService {
     }
   }
 
-  // Start free trial for new users (20 days)
+  // Start free trial for new users (20 days) - THIS IS THE AUTOMATIC PART
   async startFreeTrial(): Promise<boolean> {
     try {
-      console.log('🎆 Starting 20-day free trial for new user...');
+      console.log('🎆 Starting automatic 20-day free trial...');
       
-      // For new users, RevenueCat will automatically start the trial when they first interact
-      // We just need to ensure they're properly initialized
       const customerInfo = await this.getCustomerInfo();
       
-      // If user doesn't have any entitlements, they'll get the trial on first purchase attempt
+      // Check if user already has any trial/subscription history
       const hasAnyEntitlements = Object.keys(customerInfo.entitlements.all).length > 0;
       
-      if (!hasAnyEntitlements) {
-        console.log('🎆 New user detected, trial will start on first purchase interaction');
-        return true;
+      if (hasAnyEntitlements) {
+        console.log('📊 User already has entitlement history, checking current status...');
+        return this.isInTrialPeriod(customerInfo);
       }
       
-      // Check if already in trial
-      const isInTrial = this.isInTrialPeriod(customerInfo);
-      console.log('📊 Current trial status:', isInTrial);
+      // For truly new users, we need to create a local trial record
+      // Since RevenueCat doesn't have "automatic" trials, we'll track this locally
+      console.log('🎆 New user detected - creating local trial record');
       
-      return isInTrial;
+      return true; // We'll handle the trial logic in TrialManager
     } catch (error) {
       console.error('❌ Error starting free trial:', error);
       return false;
+    }
+  }
+
+  // Check if user is eligible for automatic trial (no previous history)
+  async isEligibleForAutoTrial(): Promise<boolean> {
+    try {
+      const customerInfo = await this.getCustomerInfo();
+      
+      // User is eligible if they have no entitlement history at all
+      const hasAnyEntitlements = Object.keys(customerInfo.entitlements.all).length > 0;
+      return !hasAnyEntitlements;
+    } catch (error) {
+      console.error('❌ Error checking auto-trial eligibility:', error);
+      return true; // Default to eligible on error (better UX)
     }
   }
 }

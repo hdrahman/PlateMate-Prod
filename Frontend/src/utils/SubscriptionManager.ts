@@ -23,7 +23,7 @@ class SubscriptionManager {
     return SubscriptionManager.instance;
   }
 
-  // Get current subscription status with caching
+  // Get current subscription status with caching - UPDATED TO CHECK LOCAL AUTO-TRIALS
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
     const now = Date.now();
     
@@ -33,6 +33,15 @@ class SubscriptionManager {
     }
 
     try {
+      // FIRST: Check for local automatic trial
+      const localTrialStatus = await this.checkLocalAutoTrial();
+      if (localTrialStatus) {
+        this.cachedStatus = localTrialStatus;
+        this.lastCacheUpdate = now;
+        return localTrialStatus;
+      }
+
+      // SECOND: Fall back to RevenueCat for paid subscriptions
       const [tier, hasPremiumAccess, trialStatus] = await Promise.all([
         SubscriptionService.getSubscriptionTier(),
         SubscriptionService.hasPremiumAccess(),
@@ -65,6 +74,62 @@ class SubscriptionManager {
     }
   }
 
+  // Check local automatic trial status - THIS ENABLES THE AUTOMATIC TRIAL FEATURES
+  async checkLocalAutoTrial(): Promise<SubscriptionStatus | null> {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage');
+      
+      // Get all auto trial keys (there should only be one per user typically)
+      const keys = await AsyncStorage.getAllKeys();
+      const autoTrialKey = keys.find(key => key.startsWith('auto_trial_'));
+      
+      console.log('🔍 DEBUG: All AsyncStorage keys:', keys);
+      console.log('🔍 DEBUG: Found auto trial key:', autoTrialKey);
+      
+      if (!autoTrialKey) {
+        console.log('❌ DEBUG: No auto trial key found in storage');
+        return null; // No local auto trial found
+      }
+      
+      const trialDataStr = await AsyncStorage.getItem(autoTrialKey);
+      if (!trialDataStr) {
+        console.log('❌ DEBUG: Auto trial key exists but no data');
+        return null;
+      }
+      
+      const trialData = JSON.parse(trialDataStr);
+      console.log('🔍 DEBUG: Trial data found:', trialData);
+      
+      const now = new Date();
+      const endDate = new Date(trialData.endDate);
+      
+      // Check if trial has expired
+      if (now > endDate) {
+        console.log('⏰ Local automatic trial has expired, removing...');
+        await AsyncStorage.removeItem(autoTrialKey);
+        return null;
+      }
+      
+      // Calculate days remaining
+      const msRemaining = endDate.getTime() - now.getTime();
+      const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+      
+      console.log(`🎉 Active automatic trial found! ${daysRemaining} days remaining`);
+      
+      return {
+        tier: 'trial',
+        hasPremiumAccess: true, // THIS IS THE KEY - AUTOMATIC TRIAL GIVES PREMIUM ACCESS
+        isInTrial: true,
+        daysRemaining,
+        canExtendTrial: !trialData.extendedTrialUsed && daysRemaining <= 5,
+      };
+      
+    } catch (error) {
+      console.error('❌ Error checking local auto trial:', error);
+      return null;
+    }
+  }
+
   // Clear cache to force refresh
   clearCache(): void {
     this.cachedStatus = null;
@@ -74,6 +139,15 @@ class SubscriptionManager {
   // Check if user can access premium features
   async canAccessPremiumFeature(): Promise<boolean> {
     const status = await this.getSubscriptionStatus();
+    
+    // DEBUG: Log the subscription status to see what's happening
+    console.log('🔍 DEBUG: Checking premium access:', {
+      tier: status.tier,
+      hasPremiumAccess: status.hasPremiumAccess,
+      isInTrial: status.isInTrial,
+      daysRemaining: status.daysRemaining,
+    });
+    
     return status.hasPremiumAccess;
   }
 
@@ -360,35 +434,81 @@ class SubscriptionManager {
     }
   }
 
-  // Check and auto-trigger trial on app launch
+  // Check and auto-trigger trial on app launch - THE KEY AUTOMATIC FUNCTION
   async checkAndAutoStartTrial(userId: string): Promise<void> {
     try {
+      console.log('🚀 DEBUG: Checking automatic trial eligibility for user:', userId);
+      
+      // First check if trial already exists locally
+      const existingTrialStatus = await this.checkLocalAutoTrial();
+      if (existingTrialStatus) {
+        console.log('✅ DEBUG: User already has active automatic trial:', existingTrialStatus);
+        return;
+      }
+      
       // Always initialize RevenueCat first
       await SubscriptionService.initialize(userId);
       
-      // Get current status
-      const status = await this.getSubscriptionStatus();
+      // Check if user is eligible for automatic trial (completely new user)
+      const isEligible = await SubscriptionService.isEligibleForAutoTrial();
+      console.log('🔍 DEBUG: Is user eligible for auto trial?', isEligible);
       
-      console.log('📋 Current subscription status on launch:', {
-        tier: status.tier,
-        hasPremiumAccess: status.hasPremiumAccess,
-        isInTrial: status.isInTrial,
-        daysRemaining: status.daysRemaining
-      });
-      
-      // For users who are free and not in trial, try to start one
-      if (status.tier === 'free' && !status.isInTrial && !status.hasPremiumAccess) {
-        console.log('🎆 Auto-starting trial for user...');
+      if (isEligible) {
+        console.log('🎆 NEW USER DETECTED - Starting automatic 20-day trial!');
         
-        try {
-          await this.initializeTrialForExistingUser(userId);
-        } catch (error) {
-          console.log('⚠️ Could not auto-start trial (may be expected for users who already had one):', error.message);
-        }
+        // Force start the trial for this new user
+        await this.forceStartAutoTrial(userId);
+      } else {
+        console.log('📊 Existing user, checking current status...');
+        
+        // Get current status for existing users
+        const status = await this.getSubscriptionStatus();
+        console.log('📋 Current subscription status:', {
+          tier: status.tier,
+          hasPremiumAccess: status.hasPremiumAccess,
+          isInTrial: status.isInTrial,
+          daysRemaining: status.daysRemaining
+        });
       }
       
     } catch (error) {
       console.error('❌ Error in auto-trial check:', error);
+    }
+  }
+
+  // Force start automatic trial for new users - NO USER INTERACTION REQUIRED
+  async forceStartAutoTrial(userId: string): Promise<void> {
+    try {
+      console.log('🎆 FORCE STARTING 20-DAY AUTOMATIC TRIAL - NO USER INPUT NEEDED');
+      
+      // Create the trial directly without any RevenueCat purchase flow
+      // This is a local trial that gives premium features for 20 days
+      const now = new Date();
+      const trialEnd = new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000);
+      
+      // Store trial info locally
+      const trialData = {
+        userId: userId,
+        startDate: now.toISOString(),
+        endDate: trialEnd.toISOString(),
+        type: 'automatic_20_day',
+        isActive: true,
+        extendedTrialUsed: false
+      };
+      
+      // Store in AsyncStorage for immediate access
+      const AsyncStorage = require('@react-native-async-storage/async-storage');
+      await AsyncStorage.setItem(`auto_trial_${userId}`, JSON.stringify(trialData));
+      
+      console.log('✅ AUTOMATIC TRIAL STARTED! User gets premium features until:', trialEnd.toISOString());
+      console.log('🎉 Trial will be active for 20 days with NO user interaction required');
+      
+      // Clear any cached status to force refresh
+      this.clearCache();
+      
+    } catch (error) {
+      console.error('❌ Error force starting auto trial:', error);
+      throw error;
     }
   }
 
@@ -446,6 +566,64 @@ class SubscriptionManager {
       }
     } catch (error) {
       console.error('❌ Error initializing subscription for new user:', error);
+    }
+  }
+
+  // Handle automatic trial extension when user adds payment method near end
+  async extendAutoTrial(userId: string): Promise<boolean> {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage');
+      const autoTrialKey = `auto_trial_${userId}`;
+      
+      const trialDataStr = await AsyncStorage.getItem(autoTrialKey);
+      if (!trialDataStr) {
+        throw new Error('No automatic trial found to extend');
+      }
+      
+      const trialData = JSON.parse(trialDataStr);
+      
+      if (trialData.extendedTrialUsed) {
+        throw new Error('Trial extension already used');
+      }
+      
+      // Extend the trial by 10 more days
+      const currentEnd = new Date(trialData.endDate);
+      const newEnd = new Date(currentEnd.getTime() + 10 * 24 * 60 * 60 * 1000);
+      
+      const extendedTrialData = {
+        ...trialData,
+        endDate: newEnd.toISOString(),
+        extendedTrialUsed: true,
+        extensionDate: new Date().toISOString(),
+        type: 'automatic_30_day_extended'
+      };
+      
+      await AsyncStorage.setItem(autoTrialKey, JSON.stringify(extendedTrialData));
+      
+      console.log('✅ Automatic trial extended! New end date:', newEnd.toISOString());
+      
+      // Clear cache to force refresh
+      this.clearCache();
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error extending automatic trial:', error);
+      return false;
+    }
+  }
+
+  // Check if user should be prompted to extend trial (in last 5 days of 20-day trial)
+  async shouldPromptForExtension(userId: string): Promise<boolean> {
+    try {
+      const status = await this.getSubscriptionStatus();
+      
+      return status.isInTrial && 
+             status.canExtendTrial && 
+             status.daysRemaining <= 5 && 
+             status.daysRemaining > 0;
+    } catch (error) {
+      console.error('❌ Error checking extension prompt status:', error);
+      return false;
     }
   }
 }
