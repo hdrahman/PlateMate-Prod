@@ -66,16 +66,12 @@ class StepNotificationService {
           console.log('📝 No existing channel to delete, creating new one');
         }
 
-        // Create the channel with explicit silent settings
+        // Create the channel with minimal settings for foreground service
         await notifee.createChannel({
           id: CHANNEL_ID,
           name: 'Step Tracking',
           description: 'Persistent notifications for step tracking and calorie monitoring',
           importance: AndroidImportance.LOW, // LOW importance for silent foreground services
-          sound: null, // Explicitly no sound for persistent notifications
-          badge: false, // No badge for step tracking
-          vibration: false, // Explicitly disable vibration
-          lights: false, // Disable notification lights
         });
         
         console.log('✅ Created silent step tracking notification channel');
@@ -490,8 +486,6 @@ class StepNotificationService {
           autoCancel: false,
           smallIcon: 'ic_launcher',
           color: '#FF00F5',
-          sound: null, // Explicitly disable sound at notification level
-          vibrationPattern: [], // Empty vibration pattern for silence
           style: {
             type: AndroidStyle.BIGTEXT,
             text: body,
@@ -526,6 +520,12 @@ class StepNotificationService {
     } catch (error) {
       console.error('❌ Error starting foreground service:', error);
       
+      // Stop infinite retry loops by checking error type
+      if (error instanceof Error && error.message.includes('sound')) {
+        console.error('🛑 Sound configuration error - notification service needs reconfiguration');
+        return;
+      }
+      
       // Fallback to regular notification
       try {
         const fallbackNotification = {
@@ -539,8 +539,6 @@ class StepNotificationService {
             autoCancel: false,
             smallIcon: 'ic_launcher',
             color: '#FF00F5',
-            sound: null, // Explicitly disable sound for fallback
-            vibrationPattern: [], // Empty vibration pattern for silence
           },
           ios: {
             categoryId: 'step-tracking',
@@ -568,6 +566,13 @@ class StepNotificationService {
         console.log('🔔 Fallback foreground service started:', { steps });
       } catch (fallbackError) {
         console.error('❌ Even fallback foreground service failed:', fallbackError);
+        
+        // Prevent infinite error loops by disabling notifications temporarily
+        if (fallbackError instanceof Error && fallbackError.message.includes('sound')) {
+          console.error('🛑 Critical notification error - disabling for this session');
+          this.currentNotificationId = 'DISABLED';
+          return;
+        }
       }
     }
   }
@@ -584,6 +589,12 @@ class StepNotificationService {
    * Update the notification with new step count
    */
   public async updateNotification(steps: number): Promise<void> {
+    // Safety check: Don't try to update if we've disabled notifications
+    if (this.currentNotificationId === 'DISABLED') {
+      console.warn('⚠️ Notifications disabled due to previous errors, skipping update');
+      return;
+    }
+    
     // Check if notification is still active, recreate if needed
     const isActive = await this.isNotificationActive();
     if (!isActive) {

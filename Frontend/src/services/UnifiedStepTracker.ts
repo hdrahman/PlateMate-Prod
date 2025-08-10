@@ -61,6 +61,9 @@ class UnifiedStepTracker {
     private notificationUpdateInterval: NodeJS.Timeout | null = null;
     private midnightResetInterval: NodeJS.Timeout | null = null;
     private isNotificationUpdateRunning: boolean = false; // Prevent interval pileups
+    private lastAppResumeRecovery: number = 0; // Debounce app resume recovery
+    private isRecoveryRunning: boolean = false; // Prevent multiple concurrent recoveries
+    private notificationErrorCount: number = 0; // Track notification failures for circuit breaker
     // Notifications are now handled by StepNotificationService
 
     private constructor() {
@@ -385,7 +388,22 @@ class UnifiedStepTracker {
             // App going to background - save state and optimize
             this.saveCurrentState();
         } else if (nextAppState === 'active') {
-            // App becoming active - perform recovery
+            // App becoming active - perform recovery with debouncing
+            const now = Date.now();
+            const timeSinceLastRecovery = now - this.lastAppResumeRecovery;
+            
+            // Prevent recovery spam - minimum 5 seconds between recoveries
+            if (timeSinceLastRecovery < 5000) {
+                console.log(`⚠️ App resume recovery debounced (${timeSinceLastRecovery}ms since last recovery)`);
+                return;
+            }
+            
+            // Prevent concurrent recoveries
+            if (this.isRecoveryRunning) {
+                console.log('⚠️ App resume recovery already running, skipping...');
+                return;
+            }
+            
             this.performAppResumeRecovery();
         }
     }
@@ -405,6 +423,8 @@ class UnifiedStepTracker {
 
     private async performAppResumeRecovery(): Promise<void> {
         try {
+            this.isRecoveryRunning = true;
+            this.lastAppResumeRecovery = Date.now();
             console.log('🔄 Performing app resume recovery...');
 
             const today = new Date().toISOString().split('T')[0];
@@ -490,9 +510,20 @@ class UnifiedStepTracker {
                 console.error('❌ Notification update failed during recovery:', error);
             }
 
+            // 5. Trigger food log refresh by notifying of database change
+            try {
+                const { notifyDatabaseChanged } = await import('../utils/databaseWatcher');
+                await notifyDatabaseChanged();
+                console.log('✅ Food log refresh triggered during recovery');
+            } catch (error) {
+                console.warn('⚠️ Failed to trigger food log refresh during recovery:', error);
+            }
+
             console.log('✅ App resume recovery completed');
         } catch (error) {
             console.error('❌ App resume recovery failed:', error);
+        } finally {
+            this.isRecoveryRunning = false;
         }
     }
 
@@ -695,9 +726,24 @@ class UnifiedStepTracker {
 
     private async updateNotification(): Promise<void> {
         try {
+            // Circuit breaker: Stop trying notifications after too many failures
+            if (this.notificationErrorCount > 10) {
+                console.warn('⚠️ Notification circuit breaker active - skipping update');
+                return;
+            }
+            
             await StepNotificationService.updateNotification(this.state.currentSteps);
+            
+            // Reset error count on success
+            this.notificationErrorCount = 0;
         } catch (error) {
             console.error('❌ Error updating step notification:', error);
+            this.notificationErrorCount++;
+            
+            // If we hit too many errors, log it
+            if (this.notificationErrorCount > 10) {
+                console.error('🛑 Too many notification failures - circuit breaker activated');
+            }
         }
     }
 
