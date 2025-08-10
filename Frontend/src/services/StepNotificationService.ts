@@ -59,14 +59,28 @@ class StepNotificationService {
 
       // Create notification channel for Android
       if (Platform.OS === 'android') {
+        // First, delete any existing channel to ensure settings take effect
+        try {
+          await notifee.deleteChannel(CHANNEL_ID);
+          console.log('🔄 Deleted existing step tracking channel for recreation');
+        } catch (deleteError) {
+          // Channel may not exist, which is fine
+          console.log('📝 No existing channel to delete, creating new one');
+        }
+
+        // Create the channel with explicit silent settings
         await notifee.createChannel({
           id: CHANNEL_ID,
           name: 'Step Tracking',
           description: 'Persistent notifications for step tracking and calorie monitoring',
-          importance: AndroidImportance.DEFAULT, // Default importance for foreground services
-          sound: undefined, // No sound for persistent notifications
+          importance: AndroidImportance.LOW, // LOW importance for silent foreground services
+          sound: null, // Explicitly no sound for persistent notifications
           badge: false, // No badge for step tracking
+          vibration: false, // Explicitly disable vibration
+          lights: false, // Disable notification lights
         });
+        
+        console.log('✅ Created silent step tracking notification channel');
       }
 
       this.isInitialized = true;
@@ -441,11 +455,13 @@ class StepNotificationService {
         body,
         android: {
           channelId: CHANNEL_ID,
-          importance: AndroidImportance.DEFAULT,
+          importance: AndroidImportance.LOW, // Ensure LOW importance at notification level too
           ongoing: true, // Makes notification persistent
           autoCancel: false,
           smallIcon: 'ic_launcher',
           color: '#FF00F5',
+          sound: null, // Explicitly disable sound at notification level
+          vibrationPattern: [], // Empty vibration pattern for silence
           style: {
             type: AndroidStyle.BIGTEXT,
             text: body,
@@ -488,11 +504,13 @@ class StepNotificationService {
           body: 'Step tracking active',
           android: {
             channelId: CHANNEL_ID,
-            importance: AndroidImportance.DEFAULT,
+            importance: AndroidImportance.LOW, // Ensure fallback is also silent
             ongoing: true,
             autoCancel: false,
             smallIcon: 'ic_launcher',
-            color: '#FF00F5'
+            color: '#FF00F5',
+            sound: null, // Explicitly disable sound for fallback
+            vibrationPattern: [], // Empty vibration pattern for silence
           },
           ios: {
             categoryId: 'step-tracking',
