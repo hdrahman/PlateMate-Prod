@@ -43,8 +43,8 @@ const getResponsiveDimensions = () => {
     const availableHeight = height - 200; // Account for header, status bar, and bottom padding
     const sidePadding = Math.max(16, width * 0.05);
     const availableWidth = width - (sidePadding * 2); // Account for side padding
-    const baseImageHeight = Math.min(600, availableWidth * 1.4); // Use available width, not full screen width
-    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.70); // Use even more available height
+    const baseImageHeight = Math.min(500, availableWidth * 0.8); // Reduced from 1.4 to 0.8 for tighter fit
+    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.65); // Reduced from 0.70 to 0.65 to save space
     const sideViewButtonHeight = 80; // Fixed height for side view button
     return { imageHeight: dynamicImageHeight, sidePadding, sideViewButtonHeight };
 };
@@ -267,7 +267,8 @@ const ImageCapture: React.FC = () => {
                         
                         // If this was a side view image (index 1) and both images now exist, switch to show it
                         if (index === 1 && newImages[0].uri && newImages[1].uri) {
-                            setActiveImageIndex(1); // Switch to show the side view (second image)
+                            // Use setTimeout to ensure ScrollView content is updated before navigation
+                            setTimeout(() => scrollToImage(1), 100);
                         }
                     }
                 } catch (error) {
@@ -305,7 +306,8 @@ const ImageCapture: React.FC = () => {
                         
                         // If this was a side view image (index 1) and both images now exist, switch to show it
                         if (index === 1 && newImages[0].uri && newImages[1].uri) {
-                            setActiveImageIndex(1); // Switch to show the side view (second image)
+                            // Use setTimeout to ensure ScrollView content is updated before navigation
+                            setTimeout(() => scrollToImage(1), 100);
                         }
                     }
                 } catch (error) {
@@ -1107,7 +1109,7 @@ const ImageCapture: React.FC = () => {
                         if (sideImage.uri) {
                             if (hasBothImages) {
                                 // If in swipe mode, switch to side image
-                                setActiveImageIndex(1);
+                                scrollToImage(1);
                             }
                         } else {
                             // If no side image, take photo
@@ -1134,7 +1136,7 @@ const ImageCapture: React.FC = () => {
                                         uploaded: false
                                     };
                                     setImages(newImages);
-                                    setActiveImageIndex(0); // Switch back to main image
+                                    scrollToImage(0); // Switch back to main image
                                 }}
                             >
                                 <Ionicons name="close" size={12} color="#fff" />
@@ -1626,22 +1628,22 @@ const styles = StyleSheet.create({
         paddingBottom: 16, // Reduced from 20
     },
     instructionsContainer: {
-        marginBottom: 12, // Reduced from 16 for tighter spacing
+        marginBottom: 8, // Further reduced from 12 to 8 for tighter spacing
         paddingHorizontal: 4,
     },
     instructionsTitle: {
-        fontSize: 24,
+        fontSize: 22, // Reduced from 24 to save space
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: 8,
+        marginBottom: 6, // Reduced from 8 to 6
     },
     instructionsText: {
-        fontSize: 14, // Reduced from 15
+        fontSize: 13, // Further reduced from 14 to save space
         color: '#aaa',
-        lineHeight: 20, // Reduced from 22 for more compact spacing
+        lineHeight: 18, // Reduced from 20 for more compact spacing
     },
     imagesContainer: {
-        marginBottom: 12, // Reduced from 16 for tighter spacing
+        marginBottom: 8, // Further reduced from 12 to 8 for tighter spacing
     },
     imagePlaceholderWrapper: {
         width: '100%',
