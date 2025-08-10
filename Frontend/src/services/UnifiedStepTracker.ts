@@ -103,24 +103,8 @@ class UnifiedStepTracker {
                 console.error('❌ Failed to load previous state:', error);
             }
 
-            // Request permissions
-            try {
-                await this.requestAllPermissions();
-                console.log('✅ Permissions requested');
-            } catch (error) {
-                console.error('❌ Failed to request permissions:', error);
-            }
-
-            // Check if tracking was enabled before
-            try {
-                const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
-                if (wasEnabled === 'true' && this.state.hasPermissions) {
-                    console.log('🔄 Restarting step tracking after app restart');
-                    await this.startTracking();
-                }
-            } catch (error) {
-                console.error('❌ Failed to restart tracking:', error);
-            }
+            // Note: Permission requests moved to startTracking() method
+            // This allows deferred permission requests until after authentication
 
             // Start midnight reset timer
             try {
@@ -139,6 +123,49 @@ class UnifiedStepTracker {
             // Mark as initialized even if there were errors
             this.state.isInitialized = true;
             console.log('✅ UnifiedStepTracker marked as initialized');
+        }
+    }
+
+    private async checkExistingPermissions(): Promise<boolean> {
+        try {
+            console.log('🔍 Checking existing permissions (without requesting)...');
+
+            if (isAndroid) {
+                // Android: Check existing permissions
+                const activityGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION);
+                this.state.hasPermissions = activityGranted;
+                
+                // Check native step counter availability
+                try {
+                    this.state.nativeStepCounterAvailable = await NativeStepCounter.isAvailable();
+                } catch (error) {
+                    console.warn('⚠️ Failed to check native step counter availability:', error);
+                    this.state.nativeStepCounterAvailable = false;
+                }
+                
+                console.log(`📱 Android permissions check: Activity=${activityGranted}, NativeStepCounter=${this.state.nativeStepCounterAvailable}`);
+            } else {
+                // iOS: Check HealthKit availability and initialization status
+                try {
+                    const healthKitAvailable = await HealthKitStepCounter.isAvailable();
+                    if (healthKitAvailable) {
+                        // HealthKit permissions are handled implicitly during initialization
+                        this.state.healthKitInitialized = true;
+                        this.state.hasPermissions = true;
+                    }
+                } catch (error) {
+                    console.warn('⚠️ HealthKit check failed:', error);
+                    this.state.healthKitInitialized = false;
+                    this.state.hasPermissions = false;
+                }
+                
+                console.log(`📱 iOS HealthKit check: Available=${this.state.healthKitInitialized}`);
+            }
+
+            return this.state.hasPermissions;
+        } catch (error) {
+            console.error('❌ Error checking existing permissions:', error);
+            return false;
         }
     }
 
@@ -482,6 +509,24 @@ class UnifiedStepTracker {
             if (!this.appStateSubscription) {
                 console.log('🔧 Performing deferred initialization...');
                 await this.initialize();
+            }
+
+            // Check if tracking was previously enabled and if we have permissions
+            try {
+                const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
+                
+                if (wasEnabled === 'true') {
+                    console.log('🔄 Step tracking was previously enabled, checking permissions...');
+                    
+                    // Check if we already have permissions without requesting them
+                    await this.checkExistingPermissions();
+                    
+                    if (this.state.hasPermissions) {
+                        console.log('✅ Permissions already granted, restarting step tracking');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Failed to check previous tracking state:', error);
             }
 
             if (!this.state.hasPermissions) {

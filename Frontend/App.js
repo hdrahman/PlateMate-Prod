@@ -355,6 +355,36 @@ function AuthenticatedContent() {
     }
   }, [onboardingComplete]);
 
+  // Initialize step tracking after user is authenticated and onboarding is complete
+  React.useEffect(() => {
+    const initializeStepTracking = async () => {
+      if (onboardingComplete && hasCompletedOnboarding) {
+        try {
+          console.log('🚀 Initializing step tracking for authenticated user...');
+          
+          // Check if we're running in Expo Go
+          const isExpoGo = global.isExpoGo === true || global.__expo?.isExpoGo === true;
+          
+          if (!isExpoGo) {
+            // Initialize step tracking - this will now request permissions
+            const success = await UnifiedStepTracker.startTracking();
+            if (success) {
+              console.log('✅ Step tracking initialized successfully for authenticated user');
+            } else {
+              console.log('⚠️ Step tracking initialization failed (user may have denied permissions)');
+            }
+          } else {
+            console.log('⚠️ Skipping step tracking initialization in Expo Go');
+          }
+        } catch (error) {
+          console.error('❌ Error initializing step tracking for authenticated user:', error);
+        }
+      }
+    };
+
+    initializeStepTracking();
+  }, [onboardingComplete, hasCompletedOnboarding]);
+
   // Show loading screen while either auth is preloading OR onboarding context is still loading
   // But once onboarding is completed, don't show loading screen again to prevent flashing
   if ((isPreloading || onboardingLoading) && !hasCompletedOnboarding) {
@@ -532,17 +562,8 @@ export default function App() {
               console.log('ℹ️ No old background services to cleanup:', cleanupError.message);
             }
 
-            // Initialize step tracking without blocking app startup
-            console.log('Initializing unified step tracking...');
-            
-            // Start step tracking immediately but don't wait for permissions
-            // This will start basic tracking and show notification if permissions are already granted
-            UnifiedStepTracker.startTracking().then(() => {
-              console.log('✅ Unified step tracking initialized successfully');
-            }).catch(stepError => {
-              console.error('❌ Error starting step tracking:', stepError);
-              console.log('ℹ️ App will continue with basic step tracking');
-            });
+            // Note: Step tracking initialization moved to AuthenticatedContent
+            // to request permissions only after user authentication
             
             console.log('✅ App initialization complete');
           } catch (error) {

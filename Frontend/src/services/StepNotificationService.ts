@@ -46,18 +46,16 @@ class StepNotificationService {
   }
 
   /**
-   * Initialize the notification service
+   * Initialize the notification service without requesting permissions
+   * This sets up channels and basic infrastructure
    */
   public async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      console.log('🔔 Initializing Step Notification Service...');
+      console.log('🔔 Initializing Step Notification Service (without permissions)...');
 
-      // Request notification permissions
-      await notifee.requestPermission();
-
-      // Create notification channel for Android
+      // Create notification channel for Android (can be done without permissions)
       if (Platform.OS === 'android') {
         // First, delete any existing channel to ensure settings take effect
         try {
@@ -84,9 +82,31 @@ class StepNotificationService {
       }
 
       this.isInitialized = true;
-      console.log('✅ Step Notification Service initialized');
+      console.log('✅ Step Notification Service initialized (permissions will be requested when needed)');
     } catch (error) {
       console.error('❌ Failed to initialize Step Notification Service:', error);
+    }
+  }
+
+  /**
+   * Request notification permissions (called separately after authentication)
+   */
+  public async requestPermissions(): Promise<boolean> {
+    try {
+      console.log('📱 Requesting notification permissions...');
+      const settings = await notifee.requestPermission();
+      const granted = settings.authorizationStatus >= 1; // AuthorizationStatus.AUTHORIZED or higher
+      
+      if (granted) {
+        console.log('✅ Notification permissions granted');
+      } else {
+        console.log('❌ Notification permissions denied');
+      }
+      
+      return granted;
+    } catch (error) {
+      console.error('❌ Error requesting notification permissions:', error);
+      return false;
     }
   }
 
@@ -443,6 +463,16 @@ class StepNotificationService {
   public async startForegroundService(steps: number): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
+    }
+
+    // Request notification permissions if needed
+    try {
+      const hasPermissions = await this.requestPermissions();
+      if (!hasPermissions) {
+        console.warn('⚠️ Notification permissions not granted, foreground service may not work properly');
+      }
+    } catch (permissionError) {
+      console.warn('⚠️ Failed to request notification permissions:', permissionError);
     }
 
     try {
