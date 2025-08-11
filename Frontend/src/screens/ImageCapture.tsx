@@ -43,8 +43,8 @@ const getResponsiveDimensions = () => {
     const availableHeight = height - 200; // Account for header, status bar, and bottom padding
     const sidePadding = Math.max(16, width * 0.05);
     const availableWidth = width - (sidePadding * 2); // Account for side padding
-    const baseImageHeight = Math.min(500, availableWidth * 0.8); // Reduced from 1.4 to 0.8 for tighter fit
-    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.65); // Reduced from 0.70 to 0.65 to save space
+    const baseImageHeight = Math.min(650, availableWidth * 1.2); // Increased height significantly
+    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.8); // Increased from 0.65 to 0.8 for better use of space
     const sideViewButtonHeight = 80; // Fixed height for side view button
     return { imageHeight: dynamicImageHeight, sidePadding, sideViewButtonHeight };
 };
@@ -1799,7 +1799,7 @@ const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: '100%',
-        resizeMode: 'contain', // Changed from 'cover' to 'contain' to prevent cropping
+        resizeMode: 'cover', // Fill the frame completely without empty spaces
     },
     imageContainer: {
         width: '100%',
