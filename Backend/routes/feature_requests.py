@@ -210,10 +210,34 @@ async def toggle_feature_upvote(
         supabase = get_supabase_client(service_key=True)
         
         # Use the toggle_feature_upvote function with firebase_uid
-        result = supabase.rpc("toggle_feature_upvote", {
-            "p_feature_request_id": request_id,
-            "p_firebase_uid": firebase_uid
-        }).execute()
+        try:
+            result = supabase.rpc("toggle_feature_upvote", {
+                "p_feature_request_id": request_id,
+                "p_firebase_uid": firebase_uid
+            }).execute()
+        except Exception as rpc_error:
+            # Handle specific Supabase RPC error where JSON parsing fails but operation succeeds
+            error_str = str(rpc_error)
+            if "JSON could not be generated" in error_str and "details" in error_str:
+                # Extract the JSON from the error details
+                import re
+                import json
+                match = re.search(r"'details': 'b\\'(.+?)\\'", error_str)
+                if match:
+                    try:
+                        json_str = match.group(1).replace('\\', '')
+                        parsed_data = json.loads(json_str)
+                        logger.info(f"Successfully extracted response from RPC error for request {request_id}")
+                        return {
+                            "success": parsed_data.get("success", True),
+                            "message": parsed_data.get("message", "Upvote toggled"),
+                            "upvoted": parsed_data.get("upvoted", False)
+                        }
+                    except (json.JSONDecodeError, AttributeError) as parse_error:
+                        logger.warning(f"Failed to parse JSON from RPC error: {parse_error}")
+            
+            # Re-raise if we couldn't handle it
+            raise rpc_error
         
         if result.data:
             logger.info(f"Upvote toggled for feature request {request_id} by user {firebase_uid}")
