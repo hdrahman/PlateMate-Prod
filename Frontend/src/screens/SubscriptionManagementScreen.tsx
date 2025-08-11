@@ -15,7 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import SubscriptionService, { PRODUCT_IDS } from '../services/SubscriptionService';
-import TrialManager from '../services/TrialManager';
 import TrialStatusCard from '../components/TrialStatusCard';
 import { SubscriptionDetails } from '../types/user';
 
@@ -123,7 +122,11 @@ const SubscriptionManagementScreen: React.FC = () => {
                             try {
                                 // This would normally open a payment method form
                                 // For now, we'll simulate adding a payment method
-                                await TrialManager.extendTrialWithPaymentMethod(user.uid);
+                                // Trial extension now handled by RevenueCat
+                                const success = await SubscriptionService.setupAutoRenewForTrialExtension();
+                                if (!success) {
+                                    throw new Error('Failed to extend trial');
+                                }
 
                                 Alert.alert(
                                     'Trial Extended!',
@@ -172,7 +175,7 @@ const SubscriptionManagementScreen: React.FC = () => {
                                 const { customerInfo } = await SubscriptionService.purchaseProduct(plan.productId);
 
                                 // Clear trial data since user is now subscribed
-                                await TrialManager.clearTrialData(user.uid);
+                                // Trial data clearing handled by RevenueCat
 
                                 // Update local state
                                 setSubscriptionDetails(SubscriptionService.customerInfoToSubscriptionDetails(customerInfo));

@@ -9,6 +9,7 @@ import tokenManager from '../utils/tokenManager';
 import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
 import { getUserProfileBySupabaseUid } from '../utils/database';
 import SubscriptionManager from '../utils/SubscriptionManager';
+import { BACKEND_URL } from '../utils/config';
 
 // We've removed the Apple Authentication module
 console.log('Apple Authentication not available');
@@ -41,6 +42,33 @@ const AuthContext = createContext<AuthContextType>({
     signInAnonymously: async () => { },
     isPreloading: false,
 });
+
+// Helper function to grant promotional trial to new users
+const grantPromotionalTrialToNewUser = async (userId: string) => {
+    try {
+        console.log('🎆 Attempting to grant promotional trial to new user:', userId);
+        
+        const token = await tokenManager.getToken('supabase_auth');
+        const response = await fetch(`${BACKEND_URL}/api/subscription/grant-promotional-trial`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            console.log('✅ Promotional trial granted successfully:', result);
+        } else {
+            console.log('ℹ️ Promotional trial not granted:', result.message || 'Unknown reason');
+        }
+    } catch (error) {
+        console.error('❌ Error granting promotional trial:', error);
+        // Don't throw - this shouldn't block user registration
+    }
+};
 
 // Provider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -133,12 +161,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     // Initialize token manager for authenticated users only
                     await tokenManager.initialize();
                     
-                    // Initialize subscription manager and auto-start trial if needed
+                    // Initialize subscription manager
                     try {
                         await SubscriptionManager.initialize(authUser.id);
                         console.log('✅ SubscriptionManager initialized');
                     } catch (error) {
                         console.warn('⚠️ SubscriptionManager initialization failed:', error);
+                    }
+                    
+                    // Grant promotional trial to new users (20 days free)
+                    // This happens for first-time logins (new signups)
+                    try {
+                        await grantPromotionalTrialToNewUser(authUser.id);
+                    } catch (error) {
+                        console.warn('⚠️ Promotional trial grant failed:', error);
+                        // Don't block user login if trial grant fails
                     }
 
                     // Initialize the new 6-hour PostgreSQL backup sync on app launch

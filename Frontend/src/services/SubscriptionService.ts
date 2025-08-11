@@ -33,14 +33,16 @@ export const PRODUCT_IDS = {
   ANNUAL: '$rc_annual',   // RevenueCat ID: Annual Subscription (platemate_premium:premium-annual)
 } as const;
 
-// Entitlement identifier for premium features
+// Entitlement identifiers for features
 export const ENTITLEMENTS = {
-  PREMIUM: 'premium',
+  PREMIUM: 'premium',           // Full premium access from paid subscription
+  PROMOTIONAL_TRIAL: 'promotional_trial', // 20-day backend-granted trial
 } as const;
 
 class SubscriptionService {
   private static instance: SubscriptionService;
   private isInitialized = false;
+  private currentUserId: string | null = null;
 
   static getInstance(): SubscriptionService {
     if (!SubscriptionService.instance) {
@@ -384,14 +386,71 @@ class SubscriptionService {
       return false;
     }
   }
-  // Check if user has premium access (including trial)
+  // Check if user has premium access (including promotional trial and paid subscription)
   async hasPremiumAccess(): Promise<boolean> {
     try {
       const customerInfo = await this.getCustomerInfo();
-      return this.hasActiveSubscription(customerInfo) || this.isInTrialPeriod(customerInfo);
+      
+      // Check for active premium subscription
+      const hasPremiumSub = this.hasActiveSubscription(customerInfo);
+      
+      // Check for active promotional trial (20-day backend-granted)
+      const hasPromotionalTrial = customerInfo.entitlements.active[ENTITLEMENTS.PROMOTIONAL_TRIAL]?.isActive || false;
+      
+      // Check for store trial (10-day intro trial)
+      const hasStoreTrial = this.isInTrialPeriod(customerInfo);
+      
+      const hasAccess = hasPremiumSub || hasPromotionalTrial || hasStoreTrial;
+      
+      console.log('🔒 Premium Access Check:', {
+        premiumSubscription: hasPremiumSub,
+        promotionalTrial: hasPromotionalTrial,
+        storeTrial: hasStoreTrial,
+        totalAccess: hasAccess
+      });
+      
+      return hasAccess;
     } catch (error) {
       console.error('❌ Error checking premium access:', error);
       return false;
+    }
+  }
+
+  // Get promotional trial status (20-day backend trial)
+  async getPromotionalTrialStatus(): Promise<{
+    isActive: boolean;
+    daysRemaining: number;
+    startDate?: string;
+    endDate?: string;
+  }> {
+    try {
+      const customerInfo = await this.getCustomerInfo();
+      const promoTrial = customerInfo.entitlements.active[ENTITLEMENTS.PROMOTIONAL_TRIAL] || 
+                        customerInfo.entitlements.all[ENTITLEMENTS.PROMOTIONAL_TRIAL];
+      
+      if (!promoTrial) {
+        return { isActive: false, daysRemaining: 0 };
+      }
+      
+      const isActive = promoTrial.isActive;
+      let daysRemaining = 0;
+      
+      if (promoTrial.expirationDate && isActive) {
+        const now = new Date();
+        const expiration = new Date(promoTrial.expirationDate);
+        const msRemaining = expiration.getTime() - now.getTime();
+        daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+      }
+      
+      return {
+        isActive,
+        daysRemaining,
+        startDate: promoTrial.originalPurchaseDate,
+        endDate: promoTrial.expirationDate,
+      };
+    } catch (error) {
+      console.error('❌ Error getting promotional trial status:', error);
+      return { isActive: false, daysRemaining: 0 };
     }
   }
 
@@ -435,7 +494,7 @@ class SubscriptionService {
       // Since RevenueCat doesn't have "automatic" trials, we'll track this locally
       console.log('🎆 New user detected - creating local trial record');
       
-      return true; // We'll handle the trial logic in TrialManager
+      return true; // Trial logic handled by RevenueCat
     } catch (error) {
       console.error('❌ Error starting free trial:', error);
       return false;

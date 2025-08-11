@@ -13,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SubscriptionService from '../services/SubscriptionService';
-import TrialManager from '../services/TrialManager';
 import SubscriptionManager from '../utils/SubscriptionManager';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,10 +28,10 @@ export default function TrialCountdown({ visible = true, style, compact = false 
   
   const [trialStatus, setTrialStatus] = useState<{
     isInTrial: boolean;
-    trialType: 'initial' | 'extended' | 'none';
+    trialType: 'promotional' | 'store' | 'none';
     daysRemaining: number;
     trialEndDate: string | null;
-    canExtendTrial: boolean;
+    canUpgrade: boolean;
   } | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -54,23 +53,46 @@ export default function TrialCountdown({ visible = true, style, compact = false 
     try {
       setIsLoading(true);
       
-      // Get unified subscription status (includes automatic trials)
+      // Get promotional trial status first
+      const promoTrialStatus = await SubscriptionService.getPromotionalTrialStatus();
       const subscriptionStatus = await SubscriptionManager.getSubscriptionStatus();
       
-      // Convert to trial status format for this component
-      const status = {
-        isInTrial: subscriptionStatus.isInTrial,
-        trialType: subscriptionStatus.tier === 'trial' ? 'initial' as const : 'none' as const,
-        daysRemaining: subscriptionStatus.daysRemaining || 0,
-        trialEndDate: null, // We don't need exact date for this component
-        canExtendTrial: subscriptionStatus.canExtendTrial || false,
-      };
+      let status;
+      
+      if (promoTrialStatus.isActive) {
+        // User is in 20-day promotional trial
+        status = {
+          isInTrial: true,
+          trialType: 'promotional' as const,
+          daysRemaining: promoTrialStatus.daysRemaining,
+          trialEndDate: promoTrialStatus.endDate || null,
+          canUpgrade: promoTrialStatus.daysRemaining <= 15, // Show upgrade after 5 days
+        };
+      } else if (subscriptionStatus.isInTrial) {
+        // User is in 10-day store trial
+        status = {
+          isInTrial: true,
+          trialType: 'store' as const,
+          daysRemaining: subscriptionStatus.daysRemaining || 0,
+          trialEndDate: null,
+          canUpgrade: false, // Already subscribed
+        };
+      } else {
+        // No trial active
+        status = {
+          isInTrial: false,
+          trialType: 'none' as const,
+          daysRemaining: 0,
+          trialEndDate: null,
+          canUpgrade: false,
+        };
+      }
       
       setTrialStatus(status);
       
-      // Show auto-renew prompt if conditions are met (for automatic trials)
-      if (status.canExtendTrial && status.isInTrial && status.daysRemaining <= 5) {
-        // Only show once per session to avoid spam
+      // Show upgrade prompts for promotional trial
+      if (status.trialType === 'promotional' && status.canUpgrade && status.daysRemaining <= 15) {
+        // Show upgrade prompt for promotional trial users
         const hasShownPrompt = await checkIfPromptShown();
         if (!hasShownPrompt) {
           setTimeout(() => {
@@ -107,45 +129,12 @@ export default function TrialCountdown({ visible = true, style, compact = false 
     }
   };
 
-  const handleExtendTrial = async () => {
-    if (!user?.uid) return;
-
-    try {
-      setIsExtending(true);
-      
-      // For automatic trials, use our new extension logic
-      const success = await SubscriptionManager.extendAutoTrial(user.uid);
-      
-      if (success) {
-        // Refresh trial status
-        await loadTrialStatus();
-        
-        setShowExtensionModal(false);
-        
-        Alert.alert(
-          'Trial Extended! 🎉',
-          'Your trial has been extended to 30 days total. You now have 10 additional days to explore all premium features!',
-          [{ text: 'Awesome!', style: 'default' }]
-        );
-      } else {
-        throw new Error('Extension failed');
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error extending trial:', error);
-      
-      let errorMessage = 'Unable to extend trial. Please try again later.';
-      
-      if (error.message?.includes('already')) {
-        errorMessage = 'Your trial has already been extended to the maximum duration.';
-      } else if (error.message?.includes('not found')) {
-        errorMessage = 'No active trial found to extend.';
-      }
-      
-      Alert.alert('Extension Error', errorMessage);
-    } finally {
-      setIsExtending(false);
-    }
+  const handleUpgradeToSubscription = () => {
+    // Navigate to subscription screen for promotional trial users
+    setShowExtensionModal(false);
+    
+    // Use the navigation to go to Premium Subscription screen
+    navigation.navigate('PremiumSubscription' as never);
   };
 
   const handleUpgradeNow = () => {
@@ -166,7 +155,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
     return null;
   }
 
-  const { daysRemaining, trialType, canExtendTrial } = trialStatus;
+  const { daysRemaining, trialType, canUpgrade } = trialStatus;
   
   const isUrgent = daysRemaining <= 3;
   const isLastDay = daysRemaining <= 1;
@@ -178,10 +167,12 @@ export default function TrialCountdown({ visible = true, style, compact = false 
   };
 
   const getStatusText = () => {
+    const trialTypeName = trialType === 'promotional' ? 'free access' : 'subscription trial';
+    
     if (isLastDay) {
-      return `Trial expires ${daysRemaining === 0 ? 'today' : 'tomorrow'}`;
+      return `${trialTypeName} expires ${daysRemaining === 0 ? 'today' : 'tomorrow'}`;
     }
-    return `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left in trial`;
+    return `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left in ${trialTypeName}`;
   };
 
   const renderCompactView = () => (
@@ -195,12 +186,12 @@ export default function TrialCountdown({ visible = true, style, compact = false 
           <Text style={[styles.compactText, { color: getStatusColor() }]}>
             {getStatusText()}
           </Text>
-          {canExtendTrial && (
+          {canUpgrade && trialType === 'promotional' && (
             <TouchableOpacity 
-              onPress={() => setShowExtensionModal(true)}
+              onPress={handleUpgradeToSubscription}
               style={styles.extendButton}
             >
-              <Text style={styles.extendButtonText}>Extend</Text>
+              <Text style={styles.extendButtonText}>Upgrade</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -226,27 +217,29 @@ export default function TrialCountdown({ visible = true, style, compact = false 
           <View style={styles.textContainer}>
             <Text style={styles.statusText}>{getStatusText()}</Text>
             <Text style={styles.subtitleText}>
-              {trialType === 'initial' && canExtendTrial
-                ? 'Add payment method to extend to 30 days'
-                : 'Enjoying the premium experience?'
+              {trialType === 'promotional' && canUpgrade
+                ? 'Subscribe now to get 10 more days free!'
+                : trialType === 'promotional'
+                  ? 'Enjoying your free access to premium features?'
+                  : 'How are you liking the premium experience?'
               }
             </Text>
           </View>
           
           <View style={styles.actionContainer}>
-            {canExtendTrial && trialType === 'initial' ? (
+            {trialType === 'promotional' && canUpgrade ? (
               <TouchableOpacity 
-                onPress={() => setShowExtensionModal(true)}
+                onPress={handleUpgradeToSubscription}
                 style={[styles.actionButton, { backgroundColor: getStatusColor() }]}
               >
-                <Text style={styles.actionButtonText}>Extend Trial</Text>
+                <Text style={styles.actionButtonText}>Get 10 More Days</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity 
-                onPress={handleUpgradeNow}
+                onPress={handleUpgradeToSubscription}
                 style={[styles.actionButton, { backgroundColor: getStatusColor() }]}
               >
-                <Text style={styles.actionButtonText}>Upgrade Now</Text>
+                <Text style={styles.actionButtonText}>Subscribe Now</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -276,38 +269,39 @@ export default function TrialCountdown({ visible = true, style, compact = false 
                 <Ionicons name="gift-outline" size={48} color="#FFF" />
                 
                 <Text style={styles.modalTitle}>
-                  Extend Your Trial! 🎉
+                  {trialType === 'promotional' ? 'Get 10 More Days Free! 🎉' : 'Upgrade to Premium! 🎉'}
                 </Text>
                 
                 <Text style={styles.modalText}>
-                  Love what you're seeing? Add a payment method now to extend your trial from 20 to 30 days total.
+                  {trialType === 'promotional' 
+                    ? 'Subscribe now and get an additional 10-day free trial before your first payment!'
+                    : 'Subscribe to continue enjoying all premium features without interruption.'
+                  }
                 </Text>
                 
                 <Text style={styles.modalSubtext}>
-                  You won't be charged until your trial ends. Cancel anytime.
+                  {trialType === 'promotional'
+                    ? 'Auto-renew required to start. Cancel anytime during trial to avoid charges.'
+                    : 'Manage your subscription anytime in your account settings.'
+                  }
                 </Text>
                 
                 <View style={styles.modalActions}>
                   <TouchableOpacity 
-                    onPress={handleExtendTrial}
+                    onPress={handleUpgradeToSubscription}
                     style={styles.primaryModalButton}
-                    disabled={isExtending}
                   >
-                    {isExtending ? (
-                      <ActivityIndicator color="#5A60EA" size="small" />
-                    ) : (
-                      <Text style={styles.primaryModalButtonText}>
-                        Extend to 30 Days
-                      </Text>
-                    )}
+                    <Text style={styles.primaryModalButtonText}>
+                      {trialType === 'promotional' ? 'Get 10 More Days' : 'Subscribe Now'}
+                    </Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
-                    onPress={handleUpgradeNow}
+                    onPress={handleDismissModal}
                     style={styles.secondaryModalButton}
                   >
                     <Text style={styles.secondaryModalButtonText}>
-                      Subscribe Now
+                      Maybe Later
                     </Text>
                   </TouchableOpacity>
                   

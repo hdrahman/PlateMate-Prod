@@ -53,6 +53,15 @@ const PremiumSubscription = () => {
     const [isRevenueCatLoading, setIsRevenueCatLoading] = useState(true);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
+    
+    // Current plan status for prominent display - IMPROVED UX
+    const [currentPlanInfo, setCurrentPlanInfo] = useState<{
+        planName: string;
+        isActive: boolean;
+        statusText: string;
+        statusColor: string;
+        showUpgradePrompt: boolean;
+    } | null>(null);
 
     const plans: PlanOption[] = [
         {
@@ -87,7 +96,7 @@ const PremiumSubscription = () => {
                 'Unlimited image uploads',
                 'Personalized nutrition insights',
                 'Custom meal recommendations',
-                '20-day free trial (30 days with payment method)',
+                '10-day free trial (auto-renew required)',
                 'Priority support'
             ]
         }
@@ -109,6 +118,26 @@ const PremiumSubscription = () => {
                     const customerInfo = await SubscriptionService.getCustomerInfo();
                     const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
                     setSubscriptionStatus(revenueCatStatus);
+                    
+                    // Set current plan info for prominent display
+                    if (revenueCatStatus) {
+                        const planInfo = {
+                            planName: revenueCatStatus.status === 'premium_monthly' ? 'Premium Monthly' :
+                                     revenueCatStatus.status === 'premium_annual' ? 'Premium Annual' :
+                                     revenueCatStatus.status === 'free_trial' ? 'Free Trial' :
+                                     revenueCatStatus.status === 'free_trial_extended' ? 'Extended Trial' : 'Free Plan',
+                            isActive: ['premium_monthly', 'premium_annual', 'free_trial', 'free_trial_extended'].includes(revenueCatStatus.status),
+                            statusText: revenueCatStatus.status === 'premium_monthly' ? 'Renews monthly' :
+                                       revenueCatStatus.status === 'premium_annual' ? 'Renews annually - Save 25%' :
+                                       revenueCatStatus.status === 'free_trial' ? `${revenueCatStatus.trialDaysLeft || 0} days remaining` :
+                                       revenueCatStatus.status === 'free_trial_extended' ? `${revenueCatStatus.trialDaysLeft || 0} days remaining (extended)` :
+                                       'Limited to 1 image upload per day',
+                            statusColor: ['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status) ? '#00aa44' :
+                                        ['free_trial', 'free_trial_extended'].includes(revenueCatStatus.status) ? '#ff8800' : '#ff4444',
+                            showUpgradePrompt: !['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status)
+                        };
+                        setCurrentPlanInfo(planInfo);
+                    }
 
                     // Pre-select current plan based on RevenueCat status
                     if (revenueCatStatus?.status) {
@@ -423,11 +452,38 @@ const PremiumSubscription = () => {
                                 <Ionicons name="star" size={40} color="#FFD700" />
                                 <Text style={styles.heroTitle}>Upgrade Your Experience</Text>
                                 <Text style={styles.heroText}>
-                                    Get more image uploads, AI-powered analysis, and personalized nutrition insights
+                                    Get unlimited features with up to 30 days free - Start with 20 days, then add 10 more with subscription
                                 </Text>
                             </View>
                         </LinearGradient>
                     </View>
+
+                    {/* Current Plan Status Card - IMPROVED UX */}
+                    {currentPlanInfo && (
+                        <View style={styles.currentPlanCard}>
+                            <View style={[styles.currentPlanHeader, { backgroundColor: currentPlanInfo.statusColor + '20' }]}>
+                                <Ionicons 
+                                    name={currentPlanInfo.isActive ? "checkmark-circle" : "information-circle"} 
+                                    size={20} 
+                                    color={currentPlanInfo.statusColor} 
+                                />
+                                <Text style={styles.currentPlanLabel}>
+                                    {currentPlanInfo.isActive ? "Current Plan" : "Plan Status"}
+                                </Text>
+                            </View>
+                            <View style={styles.currentPlanBody}>
+                                <Text style={styles.currentPlanName}>{currentPlanInfo.planName}</Text>
+                                <Text style={[styles.currentPlanStatus, { color: currentPlanInfo.statusColor }]}>
+                                    {currentPlanInfo.statusText}
+                                </Text>
+                                {currentPlanInfo.showUpgradePrompt && (
+                                    <Text style={styles.upgradePrompt}>
+                                        Upgrade for unlimited features
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+                    )}
 
                     <View style={styles.billingToggle}>
                         <Text style={[styles.billingOption, !isAnnual && styles.activeBillingOption]}>Monthly</Text>
@@ -474,7 +530,7 @@ const PremiumSubscription = () => {
                                                     ? 'Continue with Free Plan'
                                                     : subscriptionStatus?.status === 'free_trial' || subscriptionStatus?.status === 'free_trial_extended'
                                                         ? 'Manage Subscription'
-                                                        : 'Start Free Trial'}
+                                                        : 'Start 10-Day Free Trial'}
                                     </Text>
                                 )}
                             </LinearGradient>
@@ -490,6 +546,15 @@ const PremiumSubscription = () => {
                             </TouchableOpacity>
                         )}
                     </View>
+
+                    {/* Store-compliant trial disclaimer */}
+                    {selectedPlan === 'premium' && (
+                        <View style={styles.trialDisclaimerSection}>
+                            <Text style={styles.trialDisclaimerText}>
+                                Start a 10-day free trial (auto-renew required to start). Cancel anytime during the trial to avoid being charged. Access lasts until the trial ends.
+                            </Text>
+                        </View>
+                    )}
 
                     <View style={styles.guaranteeSection}>
                         <Ionicons name="shield-checkmark" size={24} color="#5A60EA" />
@@ -839,6 +904,65 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginLeft: 6,
         flex: 1,
+    },
+    // Current Plan Status Card Styles - IMPROVED UX
+    currentPlanCard: {
+        backgroundColor: '#1A1A1A',
+        borderRadius: 16,
+        marginHorizontal: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#333',
+        overflow: 'hidden',
+    },
+    currentPlanHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    currentPlanLabel: {
+        color: '#CCC',
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    currentPlanBody: {
+        padding: 16,
+    },
+    currentPlanName: {
+        color: '#FFF',
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 6,
+    },
+    currentPlanStatus: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginBottom: 8,
+    },
+    upgradePrompt: {
+        color: '#FF00F5',
+        fontSize: 13,
+        fontStyle: 'italic',
+    },
+    // Store-compliant trial disclaimer styles
+    trialDisclaimerSection: {
+        marginHorizontal: 20,
+        marginBottom: 16,
+        padding: 12,
+        backgroundColor: 'rgba(90, 96, 234, 0.08)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(90, 96, 234, 0.2)',
+    },
+    trialDisclaimerText: {
+        color: '#CCC',
+        fontSize: 12,
+        lineHeight: 16,
+        textAlign: 'center',
+        fontStyle: 'italic',
     },
 });
 

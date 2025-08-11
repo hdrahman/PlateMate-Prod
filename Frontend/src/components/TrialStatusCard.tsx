@@ -12,7 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import SubscriptionService from '../services/SubscriptionService';
-import TrialManager from '../services/TrialManager';
+import SubscriptionManager from '../utils/SubscriptionManager';
 import { SubscriptionDetails } from '../types/user';
 
 interface TrialStatusCardProps {
@@ -41,10 +41,19 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
 
         try {
             setIsLoading(true);
-            const [status, subscription] = await Promise.all([
-                TrialManager.getTrialStatus(user.uid),
+            const [subscriptionStatus, subscription] = await Promise.all([
+                SubscriptionManager.getSubscriptionStatus(),
                 SubscriptionService.getCustomerInfo(),
             ]);
+            
+            // Convert SubscriptionStatus to trial status format
+            const status = {
+                isInTrial: subscriptionStatus.isInTrial,
+                daysRemaining: subscriptionStatus.daysRemaining || 0,
+                isExtended: false, // Extended trial info not needed with RevenueCat
+                canExtend: subscriptionStatus.canExtendTrial || false,
+                endDate: new Date(), // Placeholder, not used in UI
+            };
 
             setTrialStatus(status);
             if (subscription) {

@@ -11,13 +11,15 @@ from auth.supabase_auth import get_current_user
 from utils.db_connection import get_db_connection
 import logging
 
-# RevenueCat integration
+# RevenueCat integration for server-side validation
 try:
     from revenuecat import Client as RevenueCatClient
     REVENUECAT_AVAILABLE = True
+    print('✅ RevenueCat server integration available')
 except ImportError:
     REVENUECAT_AVAILABLE = False
     RevenueCatClient = None
+    print('⚠️ RevenueCat server integration not available - install revenuecat package')
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/subscription", tags=["subscription"])
@@ -26,16 +28,16 @@ router = APIRouter(prefix="/api/subscription", tags=["subscription"])
 REVENUECAT_API_KEY = os.getenv('REVENUECAT_API_KEY')
 REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
 
-# Initialize RevenueCat client
+# Initialize RevenueCat client for secure server-side validation
 rc_client = None
 if REVENUECAT_AVAILABLE and REVENUECAT_API_KEY:
     try:
         rc_client = RevenueCatClient(api_key=REVENUECAT_API_KEY)
-        logger.info('RevenueCat client initialized successfully')
+        logger.info('🔒 RevenueCat server client initialized for secure validation')
     except Exception as e:
-        logger.error(f'Failed to initialize RevenueCat client: {e}')
+        logger.error(f'❌ Failed to initialize RevenueCat client: {e}')
 else:
-    logger.warning('RevenueCat not available or API key not configured')
+    logger.warning('⚠️ RevenueCat server validation not available - configure API key')
 
 # Pydantic models for request/response
 class SubscriptionDetails(BaseModel):
@@ -649,6 +651,72 @@ async def cancel_subscription(
         logger.error(f"Error canceling subscription: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/subscription/validate-premium")
+async def validate_premium_access(current_user: dict = Depends(get_current_user)):
+    """Secure server-side validation of premium access - prevents client tampering"""
+    try:
+        firebase_uid = current_user["uid"]
+        
+        if not rc_client:
+            logger.error("RevenueCat client not available for server-side validation")
+            # For security, deny access if we can't validate properly
+            return {
+                "has_premium_access": False,
+                "error": "Server validation unavailable",
+                "status": "free"
+            }
+        
+        try:
+            # Get subscriber info from RevenueCat server
+            subscriber_info = rc_client.get_subscriber(firebase_uid)
+            
+            # Check for active premium entitlement OR promotional trial
+            entitlements = subscriber_info.get('entitlements', {})
+            premium_entitlement = entitlements.get('premium', {})
+            promotional_trial = entitlements.get('promotional_trial', {})
+            
+            has_premium_subscription = premium_entitlement.get('is_active', False)
+            has_promotional_trial = promotional_trial.get('is_active', False)
+            has_premium_access = has_premium_subscription or has_promotional_trial
+            
+            # Determine subscription tier
+            if has_premium_subscription:
+                product_id = premium_entitlement.get('product_identifier', '')
+                if 'annual' in product_id.lower():
+                    tier = 'premium_annual'
+                elif 'monthly' in product_id.lower():
+                    tier = 'premium_monthly'
+                else:
+                    tier = 'trial'  # Store intro trial
+            elif has_promotional_trial:
+                tier = 'promotional_trial'  # 20-day backend trial
+            else:
+                tier = 'free'
+            
+            logger.info(f"🔒 Server validation for {firebase_uid}: {tier} (premium: {has_premium_access})")
+            
+            return {
+                "has_premium_access": has_premium_access,
+                "tier": tier,
+                "status": "success",
+                "validation_source": "revenuecat_server"
+            }
+            
+        except Exception as rc_error:
+            logger.error(f"RevenueCat server validation error: {rc_error}")
+            # For new users or connection issues, allow limited grace period
+            # but this should be handled carefully in production
+            return {
+                "has_premium_access": False,
+                "tier": "free",
+                "status": "validation_failed",
+                "error": str(rc_error)
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in server-side premium validation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Premium validation failed")
+
 @router.get("/subscription/products")
 async def get_subscription_products():
     """Get available subscription products/plans"""
@@ -700,3 +768,207 @@ async def get_subscription_products():
     except Exception as e:
         logger.error(f"Error getting subscription products: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/subscription/validate-upload-limit")
+async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
+    """Secure server-side enforcement of daily upload limits - prevents client bypass"""
+    try:
+        firebase_uid = current_user["uid"]
+        
+        # First check if user has premium access
+        premium_validation = await validate_premium_access(current_user)
+        
+        if premium_validation.get("has_premium_access", False):
+            return {
+                "upload_allowed": True,
+                "reason": "premium_unlimited",
+                "uploads_today": None,
+                "limit": None
+            }
+        
+        # For free users, check daily limit server-side
+        from datetime import datetime, timezone
+        
+        try:
+            # Use database for rate limiting (more reliable than Redis for this use case)
+            from ..database import get_db_connection
+            
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Check today's uploads for this user
+                cursor.execute("""
+                    SELECT COUNT(*) FROM image_uploads 
+                    WHERE user_id = ? AND DATE(created_at) = ?
+                """, (firebase_uid, today))
+                
+                uploads_today = cursor.fetchone()[0]
+                FREE_USER_DAILY_LIMIT = 1
+                
+                if uploads_today >= FREE_USER_DAILY_LIMIT:
+                    return {
+                        "upload_allowed": False,
+                        "reason": "daily_limit_exceeded",
+                        "uploads_today": uploads_today,
+                        "limit": FREE_USER_DAILY_LIMIT
+                    }
+                
+                return {
+                    "upload_allowed": True,
+                    "reason": "within_free_limit", 
+                    "uploads_today": uploads_today,
+                    "limit": FREE_USER_DAILY_LIMIT
+                }
+            
+        except Exception as db_error:
+            logger.warning(f"Database rate limiting failed: {db_error}")
+            # For database errors, allow upload but log for monitoring
+            return {
+                "upload_allowed": True,
+                "reason": "validation_error_allowed",
+                "uploads_today": None,
+                "limit": 1
+            }
+            
+    except Exception as e:
+        logger.error(f"Error validating upload limit: {str(e)}")
+        raise HTTPException(status_code=500, detail="Upload validation failed")
+
+@router.post("/subscription/grant-promotional-trial")
+async def grant_promotional_trial(current_user: dict = Depends(get_current_user)):
+    """Grant 20-day promotional trial to new users - Backend managed"""
+    try:
+        firebase_uid = current_user["uid"]
+        
+        if not rc_client:
+            logger.error("RevenueCat client not available for trial management")
+            raise HTTPException(status_code=500, detail="Trial service unavailable")
+        
+        try:
+            # Check if user already has any entitlements
+            subscriber_info = rc_client.get_subscriber(firebase_uid)
+            entitlements = subscriber_info.get('entitlements', {})
+            
+            # Check for existing promotional trial
+            if entitlements.get('promotional_trial', {}).get('is_active', False):
+                return {
+                    "success": False,
+                    "message": "User already has active promotional trial",
+                    "trial_granted": False
+                }
+            
+            # Check for existing premium subscription
+            if entitlements.get('premium', {}).get('is_active', False):
+                return {
+                    "success": False,
+                    "message": "User already has premium subscription",
+                    "trial_granted": False
+                }
+            
+        except Exception as check_error:
+            # User might be new, continue with trial grant
+            logger.info(f"New user detected for trial: {firebase_uid}")
+        
+        try:
+            # Grant 20-day promotional trial via RevenueCat API
+            from datetime import datetime, timedelta, timezone
+            
+            trial_end = datetime.now(timezone.utc) + timedelta(days=20)
+            
+            # Call RevenueCat REST API to grant promotional entitlement
+            import requests
+            
+            if not REVENUECAT_API_KEY:
+                raise HTTPException(status_code=500, detail="RevenueCat API key not configured")
+            
+            grant_url = f"https://api.revenuecat.com/v1/subscribers/{firebase_uid}/entitlements/promotional_trial/grant"
+            headers = {
+                "Authorization": f"Bearer {REVENUECAT_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            grant_data = {
+                "duration": "20d"
+            }
+            
+            response = requests.post(grant_url, headers=headers, json=grant_data)
+            
+            if response.status_code not in [200, 201]:
+                logger.error(f"RevenueCat grant failed: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=500, detail="Failed to grant promotional trial")
+            
+            logger.info(f"🎆 Successfully granted 20-day promotional trial to user {firebase_uid}")
+            
+            return {
+                "success": True,
+                "message": "20-day promotional trial granted",
+                "trial_granted": True,
+                "trial_end_date": trial_end.isoformat(),
+                "trial_days": 20
+            }
+            
+        except Exception as grant_error:
+            logger.error(f"Failed to grant promotional trial: {grant_error}")
+            raise HTTPException(status_code=500, detail="Failed to grant trial")
+            
+    except Exception as e:
+        logger.error(f"Error in promotional trial grant: {str(e)}")
+        raise HTTPException(status_code=500, detail="Trial grant failed")
+
+@router.get("/subscription/promotional-trial-status")
+async def get_promotional_trial_status(current_user: dict = Depends(get_current_user)):
+    """Get current promotional trial status for user"""
+    try:
+        firebase_uid = current_user["uid"]
+        
+        if not rc_client:
+            return {
+                "has_trial": False,
+                "is_active": False,
+                "days_remaining": 0
+            }
+        
+        try:
+            subscriber_info = rc_client.get_subscriber(firebase_uid)
+            entitlements = subscriber_info.get('entitlements', {})
+            promo_trial = entitlements.get('promotional_trial', {})
+            
+            is_active = promo_trial.get('is_active', False)
+            days_remaining = 0
+            
+            if is_active and promo_trial.get('expires_date'):
+                from datetime import datetime, timezone
+                
+                expires_date = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
+                now = datetime.now(timezone.utc)
+                
+                if expires_date > now:
+                    delta = expires_date - now
+                    days_remaining = max(0, delta.days)
+                else:
+                    is_active = False
+            
+            return {
+                "has_trial": promo_trial is not None,
+                "is_active": is_active,
+                "days_remaining": days_remaining,
+                "start_date": promo_trial.get('purchase_date'),
+                "end_date": promo_trial.get('expires_date')
+            }
+            
+        except Exception as rc_error:
+            logger.warning(f"RevenueCat promotional trial check failed: {rc_error}")
+            return {
+                "has_trial": False,
+                "is_active": False,
+                "days_remaining": 0
+            }
+            
+    except Exception as e:
+        logger.error(f"Error checking promotional trial status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Trial status check failed")
+
+# SECURITY: All subscription validation now happens server-side
+# Client apps cannot bypass premium limits by manipulating local storage
+# Promotional trials are managed via RevenueCat entitlements (tamper-proof)
