@@ -217,7 +217,7 @@ async def toggle_feature_upvote(
         
         if result.data:
             logger.info(f"Upvote toggled for feature request {request_id} by user {firebase_uid}")
-            # The function returns a JSON string, so we need to handle it properly
+            # The function returns data that may be in various formats (dict, string, bytes, or list)
             response_data = result.data
             if isinstance(response_data, list) and len(response_data) > 0:
                 response_data = response_data[0]
@@ -230,16 +230,26 @@ async def toggle_feature_upvote(
                     "upvoted": response_data.get("upvoted", False)
                 }
             else:
-                # If it's a JSON string, parse it
+                # Handle different response formats (string, bytes, etc.)
                 import json
                 try:
-                    parsed_data = json.loads(response_data) if isinstance(response_data, str) else response_data
+                    # If it's bytes, decode to string first
+                    if isinstance(response_data, bytes):
+                        response_data = response_data.decode('utf-8')
+                    
+                    # If it's a string, parse as JSON
+                    if isinstance(response_data, str):
+                        parsed_data = json.loads(response_data)
+                    else:
+                        parsed_data = response_data
+                    
                     return {
                         "success": parsed_data.get("success", True),
                         "message": parsed_data.get("message", "Upvote toggled"),
                         "upvoted": parsed_data.get("upvoted", False)
                     }
-                except (json.JSONDecodeError, TypeError):
+                except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as e:
+                    logger.warning(f"Failed to parse upvote response: {e}. Raw response: {result.data}")
                     # Fallback if JSON parsing fails
                     return {
                         "success": True,
