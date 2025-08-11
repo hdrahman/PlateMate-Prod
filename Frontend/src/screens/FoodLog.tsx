@@ -45,6 +45,7 @@ import {
 } from '../utils/foodUnitConversion';
 import { formatNutritionalValue } from '../utils/helpers';
 import { shouldShowFirstFoodLogPopup, markFirstFoodLogPopupShown } from '../utils/firstFoodLogTracker';
+import { formatWeight, kgToLbs } from '../utils/unitConversion';
 import FirstFoodLogPopup from '../components/FirstFoodLogPopup';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -2518,16 +2519,26 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                     let displayText = '';
                                     let textColor = '#AAAAAA';
 
-                                    // Show deficit/surplus information
-                                    const deficitText = prediction.dailyDeficit > 0 
-                                        ? `${Math.round(prediction.dailyDeficit)} calorie deficit` 
-                                        : `${Math.abs(Math.round(prediction.dailyDeficit))} calorie surplus`;
+                                    // Check if user prefers imperial units
+                                    const isImperial = !userProfile?.use_metric_system;
+                                    
+                                    // Prepare weight change text with proper units
+                                    const weightChangeAmount = Math.abs(prediction.projectedWeightChangeKg);
+                                    const weightChangeAmountDisplay = isImperial 
+                                        ? kgToLbs(weightChangeAmount).toFixed(1)
+                                        : weightChangeAmount.toFixed(1);
+                                    const weightChangeUnit = isImperial ? 'lbs' : 'kg';
                                     
                                     const weightChangeText = prediction.projectedWeightChangeKg > 0 
-                                        ? `gain ${Math.abs(prediction.projectedWeightChangeKg).toFixed(1)}kg`
-                                        : `lose ${Math.abs(prediction.projectedWeightChangeKg).toFixed(1)}kg`;
+                                        ? `gain ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`
+                                        : `lose ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`;
 
-                                    displayText = `True ${deficitText} (${dailyCaloriesConsumed}/${Math.round(prediction.totalAvailableCalories)} cal from BMR+activity+exercise), you'd ${weightChangeText} in 1 month, weighing ${estimatedWeight.toFixed(1)}kg.`;
+                                    // Format final weight with proper units (rounded to 1 decimal)
+                                    const finalWeightDisplay = isImperial 
+                                        ? `${kgToLbs(estimatedWeight).toFixed(1)}\u00A0lbs`
+                                        : `${estimatedWeight.toFixed(1)}\u00A0kg`;
+
+                                    displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
 
                                     // Simple minimum calorie check - show warning if eating less than 1500 calories
                                     if (dailyCaloriesConsumed < 1500) {
