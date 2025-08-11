@@ -9,9 +9,7 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
-    Dimensions,
-    Animated,
-    Platform
+    Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -19,8 +17,6 @@ import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    getSubscriptionStatus,
-    updateSubscriptionStatus,
     cancelSubscription
 } from '../utils/database';
 import { SubscriptionDetails, SubscriptionStatus } from '../types/user';
@@ -40,17 +36,14 @@ interface PlanOption {
     imageUploads: string;
 }
 
-const { width } = Dimensions.get('window');
 
 const PremiumSubscription = () => {
     const navigation = useNavigation();
     const { user } = useAuth();
     const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-    const [isAnnual, setIsAnnual] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionDetails | null>(null);
     const [revenueCatOfferings, setRevenueCatOfferings] = useState<PurchasesOffering | null>(null);
-    const [isRevenueCatLoading, setIsRevenueCatLoading] = useState(true);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
     
@@ -63,42 +56,41 @@ const PremiumSubscription = () => {
         showUpgradePrompt: boolean;
     } | null>(null);
 
+    // Premium features that apply to both plans
+    const premiumFeatures = [
+        'AI-powered food recognition & analysis',
+        'Unlimited photo uploads',
+        'Smart nutrition tracking',
+        'Personalized meal recommendations',
+        'Advanced macro & calorie insights',
+        'Custom dietary goal setting',
+        'Barcode scanning',
+        'Recipe suggestions',
+        'Health trend analytics',
+        'Priority customer support'
+    ];
+
     const plans: PlanOption[] = [
         {
-            id: 'free',
-            title: 'Free',
-            monthlyPrice: 0,
+            id: 'premium_monthly',
+            title: 'Premium Monthly',
+            monthlyPrice: 6.99,
             annualPrice: 0,
-            gradient: ['#333333', '#1A1A1A'],
-            subscriptionType: 'expired', // Free users are technically expired
-            imageUploads: '1 image upload per day',
-            features: [
-                'Unlimited food search',
-                'Barcode scanning support',
-                'Basic nutrition tracking',
-                'Manual food logging',
-                'Basic meal insights'
-            ]
+            gradient: ['#5A60EA', '#4A90E2'],
+            subscriptionType: 'premium_monthly',
+            imageUploads: 'Monthly billing',
+            features: ['10-day free trial']
         },
         {
-            id: 'premium',
-            title: 'Premium',
-            monthlyPrice: 6.99,  // Updated pricing
-            annualPrice: 59.99,  // Updated pricing
-            gradient: ['#5A60EA', '#FF00F5'],
-            subscriptionType: isAnnual ? 'premium_annual' : 'premium_monthly',
+            id: 'premium_annual',
+            title: 'Premium Annual',
+            monthlyPrice: 0,
+            annualPrice: 59.99,
+            gradient: ['#FF00F5', '#5A60EA'],
+            subscriptionType: 'premium_annual',
             bestValue: true,
-            imageUploads: 'Unlimited image uploads',
-            features: [
-                'Unlimited AI-powered food analysis',
-                'Advanced meal planning with recipes',
-                'Context-aware AI health coaching',
-                'Unlimited image uploads',
-                'Personalized nutrition insights',
-                'Custom meal recommendations',
-                '10-day free trial (auto-renew required)',
-                'Priority support'
-            ]
+            imageUploads: 'Annual billing',
+            features: ['10-day free trial', 'Save 30% vs monthly plan']
         }
     ];
 
@@ -110,7 +102,6 @@ const PremiumSubscription = () => {
                     await SubscriptionService.initialize(user.uid);
                     
                     // Load RevenueCat offerings
-                    setIsRevenueCatLoading(true);
                     const offerings = await SubscriptionService.getOfferings();
                     setRevenueCatOfferings(offerings);
                     
@@ -128,9 +119,9 @@ const PremiumSubscription = () => {
                                      revenueCatStatus.status === 'free_trial_extended' ? 'Extended Trial' : 'Free Plan',
                             isActive: ['premium_monthly', 'premium_annual', 'free_trial', 'free_trial_extended'].includes(revenueCatStatus.status),
                             statusText: revenueCatStatus.status === 'premium_monthly' ? 'Renews monthly' :
-                                       revenueCatStatus.status === 'premium_annual' ? 'Renews annually - Save 25%' :
-                                       revenueCatStatus.status === 'free_trial' ? `${revenueCatStatus.trialDaysLeft || 0} days remaining` :
-                                       revenueCatStatus.status === 'free_trial_extended' ? `${revenueCatStatus.trialDaysLeft || 0} days remaining (extended)` :
+                                       revenueCatStatus.status === 'premium_annual' ? 'Renews annually - Save 30%' :
+                                       revenueCatStatus.status === 'free_trial' ? 'Trial active' :
+                                       revenueCatStatus.status === 'free_trial_extended' ? 'Extended trial active' :
                                        'Limited to 1 image upload per day',
                             statusColor: ['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status) ? '#00aa44' :
                                         ['free_trial', 'free_trial_extended'].includes(revenueCatStatus.status) ? '#ff8800' : '#ff4444',
@@ -141,23 +132,22 @@ const PremiumSubscription = () => {
 
                     // Pre-select current plan based on RevenueCat status
                     if (revenueCatStatus?.status) {
-                        let planId;
-                        if (['premium_monthly', 'premium_annual', 'free_trial', 'free_trial_extended'].includes(revenueCatStatus.status)) {
-                            planId = 'premium';
+                        let planId: string;
+                        if (revenueCatStatus.status === 'premium_monthly') {
+                            planId = 'premium_monthly';
+                        } else if (revenueCatStatus.status === 'premium_annual') {
+                            planId = 'premium_annual';
                         } else {
-                            planId = 'free';
+                            planId = 'premium_monthly'; // Default to monthly for new users
                         }
                         setSelectedPlan(planId);
                     } else {
-                        // Default to premium for new users (they'll get the trial)
-                        setSelectedPlan('premium');
+                        // Default to monthly for new users (they'll get the trial)
+                        setSelectedPlan('premium_monthly');
                     }
-                    
-                    setIsRevenueCatLoading(false);
                 }
             } catch (error) {
                 console.error('Error loading subscription data:', error);
-                setIsRevenueCatLoading(false);
             }
         };
 
@@ -178,39 +168,19 @@ const PremiumSubscription = () => {
         ]).start();
     }, [user]);
 
-    const handleSubscribe = async () => {
-        if (!selectedPlan) {
+    const handleSubscribe = async (planId?: string) => {
+        const planToUse = planId || selectedPlan;
+        if (!planToUse) {
             Alert.alert('Error', 'Please select a subscription plan');
             return;
         }
 
-        const selectedPlanObj = plans.find(p => p.id === selectedPlan);
+        const selectedPlanObj = plans.find(p => p.id === planToUse);
         if (!selectedPlanObj) {
             Alert.alert('Error', 'Invalid plan selected');
             return;
         }
 
-        if (selectedPlan === 'free' && subscriptionStatus?.status === 'expired') {
-            Alert.alert('Already on Free Plan', 'You are already using the free version of PlateMate.');
-            return;
-        }
-
-        // Handle free plan selection
-        if (selectedPlan === 'free') {
-            Alert.alert(
-                'Downgrade Confirmation',
-                'Are you sure you want to downgrade to the free plan? You will lose access to premium features.',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                        text: 'Downgrade', 
-                        style: 'destructive',
-                        onPress: () => handleCancelSubscription()
-                    }
-                ]
-            );
-            return;
-        }
 
         setIsLoading(true);
 
@@ -220,10 +190,10 @@ const PremiumSubscription = () => {
                 throw new Error('No subscription packages available. Please try again.');
             }
 
-            // Find the appropriate package
+            // Find the appropriate package based on selected plan
             let packageToPurchase: PurchasesPackage | null = null;
             
-            if (isAnnual) {
+            if (planToUse === 'premium_annual') {
                 packageToPurchase = revenueCatOfferings.availablePackages.find(
                     pkg => pkg.identifier.includes('annual')
                 ) || revenueCatOfferings.annual;
@@ -282,7 +252,7 @@ const PremiumSubscription = () => {
     };
 
     const handleCancelSubscription = async () => {
-        if (!subscriptionStatus || subscriptionStatus.status === 'free') {
+        if (!subscriptionStatus || subscriptionStatus.status === 'expired') {
             Alert.alert('Error', 'You do not have an active premium subscription to cancel.');
             return;
         }
@@ -324,32 +294,34 @@ const PremiumSubscription = () => {
         );
     };
 
+    const handlePlanPurchase = async (planId: string) => {
+        setSelectedPlan(planId);
+        await handleSubscribe(planId);
+    };
+
     const renderPlanCard = (plan: PlanOption) => {
-        const isSelected = selectedPlan === plan.id;
-        const price = isAnnual ? plan.annualPrice : plan.monthlyPrice;
-        const priceText = price === 0 ? 'Free' : `$${price.toFixed(2)}`;
-        const period = isAnnual ? '/year' : '/month';
+        const price = plan.id === 'premium_annual' ? plan.annualPrice : plan.monthlyPrice;
+        const priceText = `$${price.toFixed(2)}`;
+        const period = plan.id === 'premium_annual' ? '/year' : '/month';
 
         // Calculate monthly equivalent for annual plan
-        const monthlyEquivalent = plan.id !== 'free' && isAnnual
-            ? plan.id === 'basic' ? '$4.99/month' : '$6.99/month'
-            : null;
+        const monthlyEquivalent = plan.id === 'premium_annual' ? '$5.00/month' : null;
 
         // Check if user is currently on this plan
         const isPlanActive =
-            (plan.id === 'free' && subscriptionStatus?.status === 'free') ||
-            (plan.id === 'basic' && subscriptionStatus?.status === 'standard') ||
-            (plan.id === 'premium' && (subscriptionStatus?.status === 'premium' || subscriptionStatus?.status === 'premium_annual'));
+            (plan.id === 'premium_monthly' && subscriptionStatus?.status === 'premium_monthly') ||
+            (plan.id === 'premium_annual' && subscriptionStatus?.status === 'premium_annual');
 
         return (
             <TouchableOpacity
                 key={plan.id}
                 style={[
                     styles.planCard,
-                    isSelected && styles.selectedPlan,
-                    plan.bestValue && styles.bestValueCard
+                    plan.bestValue && styles.bestValueCard,
+                    isPlanActive && styles.planCardActive
                 ]}
-                onPress={() => setSelectedPlan(plan.id)}
+                onPress={() => !isPlanActive && handlePlanPurchase(plan.id)}
+                disabled={isLoading || isPlanActive}
             >
                 <LinearGradient
                     colors={plan.gradient as [string, string]}
@@ -368,7 +340,7 @@ const PremiumSubscription = () => {
 
                     <View style={styles.planPricing}>
                         <Text style={styles.planPrice}>{priceText}</Text>
-                        {price > 0 && period && <Text style={styles.planPeriod}>{period}</Text>}
+                        <Text style={styles.planPeriod}>{period}</Text>
                     </View>
 
                     {monthlyEquivalent && (
@@ -376,41 +348,35 @@ const PremiumSubscription = () => {
                             {monthlyEquivalent}
                         </Text>
                     )}
-                    
-                    {plan.id === 'premium' && (
-                        <View style={styles.trialInfo}>
-                            <Ionicons name="time-outline" size={16} color="#4CAF50" />
-                            <Text style={styles.trialText}>
-                                Start with 20 days free • Extend to 30 days
-                            </Text>
-                        </View>
-                    )}
-
-                    <View style={styles.planHighlight}>
-                        <Ionicons name="image-outline" size={18} color="#FFF" style={styles.featureIcon} />
-                        <Text style={[styles.featureText, styles.highlightText]}>{plan.imageUploads}</Text>
-                    </View>
-
-                    <View style={styles.planDivider} />
 
                     <View style={styles.planFeatures}>
                         {plan.features.map((feature, index) => (
                             <View key={index} style={styles.featureItem}>
-                                <Ionicons name="checkmark-circle" size={18} color="#FFF" style={styles.featureIcon} />
+                                <Ionicons name="checkmark-circle" size={16} color="#FFD700" style={styles.featureIcon} />
                                 <Text style={styles.featureText}>{feature}</Text>
                             </View>
                         ))}
                     </View>
 
-                    {isSelected && (
-                        <View style={styles.selectedIndicator}>
-                            <Ionicons name="checkmark-circle" size={24} color="#FFF" />
-                        </View>
-                    )}
+                    <View style={[
+                        styles.planStatus,
+                        isPlanActive && styles.planStatusActive
+                    ]}>
+                        {isLoading && selectedPlan === plan.id ? (
+                            <ActivityIndicator color="#FFF" size="small" />
+                        ) : (
+                            <Text style={[
+                                styles.planStatusText,
+                                isPlanActive && styles.planStatusTextActive
+                            ]}>
+                                {isPlanActive ? 'Current Plan' : 'Tap to Start Trial'}
+                            </Text>
+                        )}
+                    </View>
 
-                    {isPlanActive && !isSelected && (
+                    {isPlanActive && (
                         <View style={styles.currentPlanIndicator}>
-                            <Text style={styles.currentPlanText}>CURRENT PLAN</Text>
+                            <Text style={styles.currentPlanText}>ACTIVE</Text>
                         </View>
                     )}
                 </LinearGradient>
@@ -449,10 +415,10 @@ const PremiumSubscription = () => {
                             style={styles.heroGradient}
                         >
                             <View style={styles.heroContent}>
-                                <Ionicons name="star" size={40} color="#FFD700" />
-                                <Text style={styles.heroTitle}>Upgrade Your Experience</Text>
+                                <Ionicons name="nutrition" size={40} color="#FFD700" />
+                                <Text style={styles.heroTitle}>Unlock Premium Features</Text>
                                 <Text style={styles.heroText}>
-                                    Get unlimited features with up to 30 days free - Start with 20 days, then add 10 more with subscription
+                                    Experience AI-powered nutrition tracking with a 10-day free trial
                                 </Text>
                             </View>
                         </LinearGradient>
@@ -485,58 +451,31 @@ const PremiumSubscription = () => {
                         </View>
                     )}
 
-                    <View style={styles.billingToggle}>
-                        <Text style={[styles.billingOption, !isAnnual && styles.activeBillingOption]}>Monthly</Text>
-                        <TouchableOpacity
-                            style={styles.toggleSwitch}
-                            onPress={() => setIsAnnual(!isAnnual)}
-                        >
-                            <View style={[styles.toggleBall, isAnnual && styles.toggleBallRight]} />
-                        </TouchableOpacity>
-                        <Text style={[styles.billingOption, isAnnual && styles.activeBillingOption]}>Annual</Text>
-                        <View style={styles.savingsPill}>
-                            <Text style={styles.savingsPillText}>Save up to 30%</Text>
-                        </View>
-                    </View>
-
                     <View style={styles.plansContainer}>
                         {plans.map(plan => renderPlanCard(plan))}
                     </View>
 
-                    <View style={styles.actionContainer}>
-                        <TouchableOpacity
-                            style={[
-                                styles.subscribeButton,
-                                (!selectedPlan || isLoading) && styles.disabledButton
-                            ]}
-                            onPress={handleSubscribe}
-                            disabled={!selectedPlan || isLoading}
-                        >
-                            <LinearGradient
-                                colors={['#5A60EA', '#FF00F5']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.subscribeButtonGradient}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator color="#FFF" />
-                                ) : (
-                                    <Text style={styles.subscribeButtonText}>
-                                        {isRevenueCatLoading
-                                            ? 'Loading...'
-                                            : isPlanActive(selectedPlan, subscriptionStatus)
-                                                ? 'Current Plan'
-                                                : selectedPlan === 'free'
-                                                    ? 'Continue with Free Plan'
-                                                    : subscriptionStatus?.status === 'free_trial' || subscriptionStatus?.status === 'free_trial_extended'
-                                                        ? 'Manage Subscription'
-                                                        : 'Start 10-Day Free Trial'}
-                                    </Text>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
+                    {/* Store-compliant trial disclaimer */}
+                    <View style={styles.trialDisclaimerSection}>
+                        <Text style={styles.trialDisclaimerText}>
+                            Start a 10-day free trial (auto-renew required to start). Cancel anytime during the trial to avoid being charged. Access lasts until the trial ends.
+                        </Text>
+                    </View>
 
-                        {subscriptionStatus && subscriptionStatus.status !== 'free' && (
+                    <View style={styles.featuresSection}>
+                        <Text style={styles.featuresTitle}>Premium Features</Text>
+                        <View style={styles.featuresGrid}>
+                            {premiumFeatures.map((feature, index) => (
+                                <View key={index} style={styles.featureItem}>
+                                    <Ionicons name="checkmark-circle" size={20} color="#5A60EA" style={styles.featureIcon} />
+                                    <Text style={styles.featureText}>{feature}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+
+                    {subscriptionStatus && subscriptionStatus.status !== 'expired' && (
+                        <View style={styles.cancelSection}>
                             <TouchableOpacity
                                 style={styles.cancelButton}
                                 onPress={handleCancelSubscription}
@@ -544,17 +483,9 @@ const PremiumSubscription = () => {
                             >
                                 <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
                             </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {/* Store-compliant trial disclaimer */}
-                    {selectedPlan === 'premium' && (
-                        <View style={styles.trialDisclaimerSection}>
-                            <Text style={styles.trialDisclaimerText}>
-                                Start a 10-day free trial (auto-renew required to start). Cancel anytime during the trial to avoid being charged. Access lasts until the trial ends.
-                            </Text>
                         </View>
                     )}
+
 
                     <View style={styles.guaranteeSection}>
                         <Ionicons name="shield-checkmark" size={24} color="#5A60EA" />
@@ -593,16 +524,6 @@ const PremiumSubscription = () => {
     );
 };
 
-// Helper function to check if the selected plan is the active plan
-const isPlanActive = (selectedPlan: string | null, subscriptionStatus: SubscriptionDetails | null) => {
-    if (!selectedPlan || !subscriptionStatus) return false;
-
-    return (
-        (selectedPlan === 'free' && subscriptionStatus.status === 'free') ||
-        (selectedPlan === 'basic' && subscriptionStatus.status === 'standard') ||
-        (selectedPlan === 'premium' && (subscriptionStatus.status === 'premium' || subscriptionStatus.status === 'premium_annual'))
-    );
-};
 
 const styles = StyleSheet.create({
     container: {
@@ -633,10 +554,10 @@ const styles = StyleSheet.create({
     content: {
         padding: 20,
         paddingBottom: 40,
-        paddingTop: 40,
+        paddingTop: 20,
     },
     heroSection: {
-        marginBottom: 25,
+        marginBottom: 30,
     },
     heroGradient: {
         borderRadius: 16,
@@ -660,72 +581,51 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         opacity: 0.9,
     },
-    billingToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 25,
+    featuresSection: {
+        marginBottom: 30,
+        backgroundColor: '#1A1A1A',
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#333',
     },
-    billingOption: {
-        color: '#AAA',
-        fontSize: 16,
-        marginHorizontal: 10,
-    },
-    activeBillingOption: {
+    featuresTitle: {
         color: '#FFF',
+        fontSize: 22,
         fontWeight: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
     },
-    toggleSwitch: {
-        width: 50,
-        height: 28,
-        backgroundColor: '#333',
-        borderRadius: 14,
-        padding: 3,
-    },
-    toggleBall: {
-        width: 22,
-        height: 22,
-        backgroundColor: '#FFF',
-        borderRadius: 11,
-    },
-    toggleBallRight: {
-        marginLeft: 22,
-    },
-    savingsPill: {
-        backgroundColor: '#5A60EA',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginLeft: 10,
-    },
-    savingsPillText: {
-        color: '#FFF',
-        fontSize: 12,
-        fontWeight: 'bold',
+    featuresGrid: {
+        gap: 12,
     },
     plansContainer: {
-        marginBottom: 25,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 16,
+        marginBottom: 20,
     },
     planCard: {
-        marginBottom: 16,
-        borderRadius: 16,
+        flex: 1,
+        borderRadius: 20,
         overflow: 'hidden',
-        elevation: 3,
-        shadowColor: '#FF00F5',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
     },
     selectedPlan: {
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: '#FF00F5',
+        transform: [{ scale: 1.02 }],
     },
     bestValueCard: {
-        borderColor: '#5A60EA',
+        borderColor: '#FFD700',
         borderWidth: 2,
     },
     planGradient: {
-        padding: 20,
+        padding: 24,
     },
     planHeader: {
         flexDirection: 'row',
@@ -739,13 +639,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     bestValueBadge: {
-        backgroundColor: '#FF00F5',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
+        backgroundColor: '#FFD700',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
     },
     bestValueText: {
-        color: '#FFF',
+        color: '#000',
         fontSize: 12,
         fontWeight: 'bold',
     },
@@ -755,51 +655,63 @@ const styles = StyleSheet.create({
     },
     planPrice: {
         color: '#FFF',
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: 'bold',
     },
     planPeriod: {
         color: '#FFF',
         opacity: 0.8,
-        fontSize: 16,
+        fontSize: 18,
         marginLeft: 4,
     },
     monthlyEquivalent: {
-        color: '#FF00F5',
-        fontSize: 14,
-        marginTop: 4,
-    },
-    planHighlight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 12,
-        marginBottom: 8,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        padding: 10,
-        borderRadius: 8,
-    },
-    highlightText: {
-        fontWeight: 'bold',
-    },
-    planDivider: {
-        height: 1,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        marginVertical: 12,
+        color: '#FFD700',
+        fontSize: 16,
+        fontWeight: '600',
+        marginTop: 8,
     },
     planFeatures: {
         marginTop: 10,
     },
     featureItem: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
+        alignItems: 'flex-start',
+        marginBottom: 10,
     },
     featureIcon: {
-        marginRight: 8,
+        marginRight: 10,
+        marginTop: 2,
     },
     featureText: {
         color: '#FFF',
+        fontSize: 15,
+        flex: 1,
+        lineHeight: 22,
+    },
+    planCardActive: {
+        opacity: 0.7,
+    },
+    planStatus: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+        minHeight: 40,
+    },
+    planStatusActive: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    planStatusText: {
+        color: '#FFF',
         fontSize: 14,
+        fontWeight: '600',
+        letterSpacing: 0.3,
+    },
+    planStatusTextActive: {
+        opacity: 0.7,
     },
     selectedIndicator: {
         position: 'absolute',
@@ -820,26 +732,9 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: 'bold',
     },
-    actionContainer: {
-        marginTop: 10,
-        marginBottom: 25,
-    },
-    subscribeButton: {
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    subscribeButtonGradient: {
-        paddingVertical: 16,
+    cancelSection: {
         alignItems: 'center',
-        justifyContent: 'center',
-    },
-    disabledButton: {
-        opacity: 0.7,
-    },
-    subscribeButtonText: {
-        color: '#FFF',
-        fontSize: 18,
-        fontWeight: 'bold',
+        marginBottom: 20,
     },
     cancelButton: {
         paddingVertical: 16,
@@ -949,20 +844,18 @@ const styles = StyleSheet.create({
     },
     // Store-compliant trial disclaimer styles
     trialDisclaimerSection: {
-        marginHorizontal: 20,
-        marginBottom: 16,
-        padding: 12,
-        backgroundColor: 'rgba(90, 96, 234, 0.08)',
-        borderRadius: 8,
+        marginBottom: 20,
+        padding: 16,
+        backgroundColor: 'rgba(90, 96, 234, 0.05)',
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(90, 96, 234, 0.2)',
+        borderColor: 'rgba(90, 96, 234, 0.15)',
     },
     trialDisclaimerText: {
-        color: '#CCC',
-        fontSize: 12,
-        lineHeight: 16,
+        color: '#AAA',
+        fontSize: 13,
+        lineHeight: 18,
         textAlign: 'center',
-        fontStyle: 'italic',
     },
 });
 
