@@ -34,6 +34,7 @@ import { supabase } from '../utils/supabaseClient';
 import { navigateToFoodLog } from '../navigation/RootNavigation';
 import { validateUserContext, createLLMContextPayload, UserContextData, validateFoodName, validateBrandName, validateQuantity, validateNotes, getCharacterLimits, isApproachingLimit } from '../utils/inputValidation';
 import SubscriptionManager from '../utils/SubscriptionManager';
+import PremiumFeatureCard from '../components/PremiumFeatureCard';
 
 const { width, height } = Dimensions.get('window');
 
@@ -137,6 +138,16 @@ const ImageCapture: React.FC = () => {
     const [analysisStage, setAnalysisStage] = useState<'uploading' | 'analyzing' | 'processing'>('uploading');
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
     const [analysisStartTime, setAnalysisStartTime] = useState(0);
+
+    // State for premium feature card
+    const [showPremiumCard, setShowPremiumCard] = useState(false);
+    const [premiumCardProps, setPremiumCardProps] = useState({
+        title: '',
+        subtitle: '',
+        features: [] as string[],
+        icon: 'camera' as keyof typeof Ionicons.glyphMap,
+        onUpgrade: () => {},
+    });
 
     useEffect(() => {
         (async () => {
@@ -276,7 +287,17 @@ const ImageCapture: React.FC = () => {
                     Alert.alert('Error', 'Failed to take photo');
                 }
             },
-            'image_capture_additional'
+            'image_capture_additional',
+            (alertOptions) => {
+                setPremiumCardProps({
+                    title: alertOptions.title,
+                    subtitle: alertOptions.subtitle,
+                    features: alertOptions.features,
+                    icon: alertOptions.icon,
+                    onUpgrade: alertOptions.onUpgrade || (() => {}),
+                });
+                setShowPremiumCard(true);
+            }
         );
     };
 
@@ -315,7 +336,17 @@ const ImageCapture: React.FC = () => {
                     Alert.alert('Error', 'Failed to pick image');
                 }
             },
-            'image_capture_gallery'
+            'image_capture_gallery',
+            (alertOptions) => {
+                setPremiumCardProps({
+                    title: alertOptions.title,
+                    subtitle: alertOptions.subtitle,
+                    features: alertOptions.features,
+                    icon: alertOptions.icon,
+                    onUpgrade: alertOptions.onUpgrade || (() => {}),
+                });
+                setShowPremiumCard(true);
+            }
         );
     };
 
@@ -1576,6 +1607,20 @@ const ImageCapture: React.FC = () => {
                 onCancel={handleAnalysisCancel}
                 stage={analysisStage}
                 imageUri={images.find(img => img.uri !== '')?.uri}
+            />
+
+            {/* Premium Feature Card */}
+            <PremiumFeatureCard
+                visible={showPremiumCard}
+                onClose={() => setShowPremiumCard(false)}
+                onUpgrade={() => {
+                    setShowPremiumCard(false);
+                    premiumCardProps.onUpgrade();
+                }}
+                title={premiumCardProps.title}
+                subtitle={premiumCardProps.subtitle}
+                features={premiumCardProps.features}
+                icon={premiumCardProps.icon}
             />
 
         </SafeAreaView>

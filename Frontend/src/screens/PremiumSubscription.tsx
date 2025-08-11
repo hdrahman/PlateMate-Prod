@@ -329,33 +329,35 @@ const PremiumSubscription = () => {
                     end={{ x: 1, y: 0 }}
                     style={styles.planGradient}
                 >
-                    <View style={styles.planHeader}>
-                        <Text style={styles.planTitle}>{plan.title}</Text>
-                        {plan.bestValue && (
-                            <View style={styles.bestValueBadge}>
-                                <Text style={styles.bestValueText}>BEST VALUE</Text>
-                            </View>
+                    <View style={styles.planTopContent}>
+                        <View style={styles.planHeader}>
+                            <Text style={styles.planTitle}>{plan.title}</Text>
+                            {plan.bestValue && (
+                                <View style={styles.bestValueBadge}>
+                                    <Text style={styles.bestValueText}>BEST VALUE</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.planPricing}>
+                            <Text style={styles.planPrice}>{priceText}</Text>
+                            <Text style={styles.planPeriod}>{period}</Text>
+                        </View>
+
+                        {monthlyEquivalent && (
+                            <Text style={styles.monthlyEquivalent}>
+                                {monthlyEquivalent}
+                            </Text>
                         )}
-                    </View>
 
-                    <View style={styles.planPricing}>
-                        <Text style={styles.planPrice}>{priceText}</Text>
-                        <Text style={styles.planPeriod}>{period}</Text>
-                    </View>
-
-                    {monthlyEquivalent && (
-                        <Text style={styles.monthlyEquivalent}>
-                            {monthlyEquivalent}
-                        </Text>
-                    )}
-
-                    <View style={styles.planFeatures}>
-                        {plan.features.map((feature, index) => (
-                            <View key={index} style={styles.featureItem}>
-                                <Ionicons name="checkmark-circle" size={16} color="#FFD700" style={styles.featureIcon} />
-                                <Text style={styles.featureText}>{feature}</Text>
-                            </View>
-                        ))}
+                        <View style={styles.planFeatures}>
+                            {plan.features.map((feature, index) => (
+                                <View key={index} style={styles.featureItem}>
+                                    <Ionicons name="checkmark-circle" size={16} color="#FFD700" style={styles.featureIcon} />
+                                    <Text style={styles.featureText}>{feature}</Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
 
                     <View style={[
@@ -607,6 +609,7 @@ const styles = StyleSheet.create({
     },
     planCard: {
         flex: 1,
+        minHeight: 280,
         borderRadius: 20,
         overflow: 'hidden',
         elevation: 4,
@@ -625,28 +628,34 @@ const styles = StyleSheet.create({
         borderWidth: 2,
     },
     planGradient: {
-        padding: 24,
+        flex: 1,
+        padding: 16,
+        justifyContent: 'space-between',
+    },
+    planTopContent: {
+        flex: 1,
     },
     planHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     planTitle: {
         color: '#FFF',
-        fontSize: 20,
+        fontSize: 16,
         fontWeight: 'bold',
+        flex: 1,
     },
     bestValueBadge: {
         backgroundColor: '#FFD700',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     bestValueText: {
         color: '#000',
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: 'bold',
     },
     planPricing: {
@@ -655,51 +664,52 @@ const styles = StyleSheet.create({
     },
     planPrice: {
         color: '#FFF',
-        fontSize: 32,
+        fontSize: 24,
         fontWeight: 'bold',
     },
     planPeriod: {
         color: '#FFF',
         opacity: 0.8,
-        fontSize: 18,
-        marginLeft: 4,
+        fontSize: 14,
+        marginLeft: 2,
     },
     monthlyEquivalent: {
         color: '#FFD700',
-        fontSize: 16,
+        fontSize: 12,
         fontWeight: '600',
-        marginTop: 8,
+        marginTop: 4,
     },
     planFeatures: {
-        marginTop: 10,
+        marginTop: 8,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 10,
+        marginBottom: 6,
     },
     featureIcon: {
-        marginRight: 10,
-        marginTop: 2,
+        marginRight: 6,
+        marginTop: 1,
     },
     featureText: {
         color: '#FFF',
-        fontSize: 15,
+        fontSize: 12,
         flex: 1,
-        lineHeight: 22,
+        lineHeight: 16,
     },
     planCardActive: {
         opacity: 0.7,
     },
     planStatus: {
         backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 16,
-        minHeight: 40,
+        marginTop: 0,
+        minHeight: 36,
+        width: '100%',
     },
     planStatusActive: {
         backgroundColor: 'rgba(255,255,255,0.1)',

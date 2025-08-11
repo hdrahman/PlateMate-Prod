@@ -1104,7 +1104,7 @@ export default function MealPlanner() {
                                         <Text style={styles.paywallButtonText}>Start Free Trial</Text>
                                     </TouchableOpacity>
                                     <Text style={styles.paywallTrialText}>
-                                        20 days free • Cancel anytime
+                                        10 days free • Cancel anytime
                                     </Text>
                                 </LinearGradient>
                             </View>
@@ -1149,7 +1149,7 @@ export default function MealPlanner() {
                                         <Text style={styles.paywallButtonText}>Start Free Trial</Text>
                                     </TouchableOpacity>
                                     <Text style={styles.paywallTrialText}>
-                                        20 days free • Cancel anytime
+                                        10 days free • Cancel anytime
                                     </Text>
                                 </LinearGradient>
                             </View>
@@ -1495,7 +1495,11 @@ const styles = StyleSheet.create({
     },
     // Paywall styles
     paywallOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         zIndex: 1000,
     },
     blurOverlay: {
@@ -1505,7 +1509,11 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     blurBackdrop: {
-        ...StyleSheet.absoluteFillObject,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.4)',
     },
     androidBlurOverlay: {
@@ -1528,6 +1536,7 @@ const styles = StyleSheet.create({
     paywallGradient: {
         padding: 32,
         alignItems: 'center',
+        borderRadius: 20,
     },
     paywallTitle: {
         fontSize: 28,

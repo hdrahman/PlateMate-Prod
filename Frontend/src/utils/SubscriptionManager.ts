@@ -232,10 +232,11 @@ class SubscriptionManager {
     source: string = 'camera',
     showRateLimitAlert?: (alertOptions: {
       title: string;
-      message: string;
+      subtitle: string;
+      features: string[];
+      icon: any;
       onUpgrade?: () => void;
-      limit?: number;
-      timeRemaining?: string;
+      onClose?: () => void;
     }) => void
   ): Promise<void> {
     const uploadStatus = await this.canUploadImage();
@@ -259,25 +260,24 @@ class SubscriptionManager {
         });
       };
 
-      const timeRemaining = this.getTimeUntilReset();
-
       if (showRateLimitAlert) {
-        // Use elegant rate limit alert
+        // Use new card-style alert
         showRateLimitAlert({
           title: 'Daily Upload Limit Reached',
-          message: 'Upgrade to premium for unlimited uploads and AI-powered food analysis!',
+          subtitle: 'You\'ve used your daily image upload. Upgrade to premium for unlimited uploads!',
+          features: [
+            'Unlimited food photo uploads',
+            'Advanced AI food recognition',
+            'Detailed nutrition analysis',
+            'Multiple image uploads per meal'
+          ],
+          icon: 'camera',
           onUpgrade: handleUpgrade,
-          limit: uploadStatus.limit,
-          timeRemaining,
+          onClose: () => {}, // No-op for close
         });
       } else {
-        // Fallback to premium alert for backwards compatibility
-        await this.showPremiumFeatureAlert(navigation, {
-          title: 'Daily Upload Limit Reached',
-          message: `You've used your ${uploadStatus.limit} daily image upload. Upgrade to premium for unlimited uploads and AI-powered food analysis!`,
-          feature: 'unlimited_uploads',
-          source,
-        });
+        // Fallback to navigation
+        handleUpgrade();
       }
     }
   }
@@ -325,18 +325,47 @@ class SubscriptionManager {
     onEnable: () => void,
     showAlert?: (alertOptions: {
       title: string;
-      message: string;
+      subtitle: string;
+      features: string[];
+      icon: any;
       onUpgrade?: () => void;
-      feature?: string;
+      onClose?: () => void;
     }) => void
   ): Promise<void> {
-    await this.checkFeatureAccess(navigation, {
-      feature: 'context_aware_coaching',
-      source: 'ai_coach',
-      title: 'Premium Feature',
-      message: 'Context-aware coaching is a premium feature. Upgrade to get personalized advice based on your nutrition and fitness data!',
-      onAccess: onEnable,
-    }, showAlert);
+    const canAccess = await this.canAccessPremiumFeature();
+    
+    if (canAccess) {
+      onEnable();
+      return;
+    }
+
+    const handleUpgrade = () => {
+      this.navigateToSubscription(navigation, {
+        source: 'ai_coach',
+        feature: 'context_aware_coaching',
+        showTrialOffer: true,
+      });
+    };
+
+    if (showAlert) {
+      // Use new card-style alert
+      showAlert({
+        title: 'Unlock AI Coach Context',
+        subtitle: 'Get personalized advice based on your nutrition and fitness data',
+        features: [
+          'Personalized meal recommendations',
+          'Context-aware coaching tips',
+          'Nutrition goal optimization',
+          'Progress tracking insights'
+        ],
+        icon: 'fitness',
+        onUpgrade: handleUpgrade,
+        onClose: () => {}, // No-op for close
+      });
+    } else {
+      // Fallback to navigation
+      handleUpgrade();
+    }
   }
 
   // Main initialization method - call this on app launch

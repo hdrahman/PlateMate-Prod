@@ -41,6 +41,7 @@ import {
   getCurrentUserId
 } from '../utils/database';
 import SubscriptionManager from '../utils/SubscriptionManager';
+import PremiumFeatureCard from '../components/PremiumFeatureCard';
 
 // Get IP and port from the BACKEND_URL
 const BACKEND_BASE_URL = BACKEND_URL.split('/').slice(0, 3).join('/');
@@ -102,6 +103,14 @@ export default function Chatbot() {
   const [contextData, setContextData] = useState<UserContext | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [isNutritionistMode, setIsNutritionistMode] = useState(false);
+  const [showPremiumCard, setShowPremiumCard] = useState(false);
+  const [premiumCardProps, setPremiumCardProps] = useState({
+    title: '',
+    subtitle: '',
+    features: [] as string[],
+    icon: 'fitness' as keyof typeof Ionicons.glyphMap,
+    onUpgrade: () => {},
+  });
   const scrollViewRef = useRef<ScrollView>(null);
   const dot1Opacity = useRef(new Animated.Value(0.4)).current;
   const dot2Opacity = useRef(new Animated.Value(0.4)).current;
@@ -159,6 +168,16 @@ export default function Chatbot() {
         () => {
           // If they upgrade, try loading context again
           loadUserContext();
+        },
+        (alertOptions) => {
+          setPremiumCardProps({
+            title: alertOptions.title,
+            subtitle: alertOptions.subtitle,
+            features: alertOptions.features,
+            icon: alertOptions.icon,
+            onUpgrade: alertOptions.onUpgrade || (() => {}),
+          });
+          setShowPremiumCard(true);
         }
       );
       return;
@@ -885,6 +904,20 @@ export default function Chatbot() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Premium Feature Card */}
+      <PremiumFeatureCard
+        visible={showPremiumCard}
+        onClose={() => setShowPremiumCard(false)}
+        onUpgrade={() => {
+          setShowPremiumCard(false);
+          premiumCardProps.onUpgrade();
+        }}
+        title={premiumCardProps.title}
+        subtitle={premiumCardProps.subtitle}
+        features={premiumCardProps.features}
+        icon={premiumCardProps.icon}
+      />
     </SafeAreaView>
   );
 }
