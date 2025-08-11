@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCacheStats, clearMealPlannerCache } from "../utils/database";
 import UnifiedStepTracker from "../services/UnifiedStepTracker";
+import PersistentStepTracker from "../services/PersistentStepTracker";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
@@ -57,11 +58,15 @@ const SettingsScreen = () => {
                     Alert.alert('Error', 'Failed to enable step tracking. Please check permissions.');
                 }
             } else {
-                await UnifiedStepTracker.stopTracking();
+                // Stop both step tracking services
+                await Promise.all([
+                    UnifiedStepTracker.stopTracking(),
+                    PersistentStepTracker.stopService()
+                ]);
                 setIsPersistentTrackingEnabled(false);
                 Alert.alert(
                     'Step Tracking Disabled',
-                    'Step counting has been stopped.',
+                    'Step counting has been completely stopped.',
                     [{ text: 'OK' }]
                 );
             }
