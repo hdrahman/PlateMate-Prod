@@ -9,10 +9,10 @@ type DatabaseChangeListener = () => void;
 // Store for all registered listeners
 const listeners: Set<DatabaseChangeListener> = new Set();
 
-// Debouncing and loop prevention
+// Debouncing and loop prevention - increased debounce for better performance
 let isNotifying = false;
 let notificationTimeout: NodeJS.Timeout | null = null;
-const DEBOUNCE_MS = 500; // 500ms debounce
+const DEBOUNCE_MS = 1000; // 1000ms debounce (increased from 500ms for better performance)
 
 /**
  * Notify all registered listeners that the database has changed
@@ -191,8 +191,8 @@ export async function notifyDatabaseChangedManually(): Promise<void> {
 // Last known database state
 let lastLogs: Record<string, any[]> = {};
 
-// Polling interval (in milliseconds)
-const POLLING_INTERVAL = 10000; // 10 seconds, reduced frequency to prevent database locking conflicts
+// Polling interval (in milliseconds) - increased for better performance
+const POLLING_INTERVAL = 30000; // 30 seconds, reduced frequency to prevent database locking conflicts and improve performance
 
 // Track if polling is active
 let pollingInterval: NodeJS.Timeout | null = null;

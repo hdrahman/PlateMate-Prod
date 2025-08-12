@@ -56,6 +56,35 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         db = await SQLite.openDatabaseAsync('platemate.db');
         console.log('✅ Database opened successfully');
 
+        // Configure SQLite performance settings for optimal performance
+        console.log('🔧 Configuring SQLite performance settings...');
+        
+        // Enable WAL (Write-Ahead Logging) mode for better concurrency and performance
+        await db.execAsync('PRAGMA journal_mode = WAL');
+        console.log('✅ WAL mode enabled');
+        
+        // Set cache size to 10000 pages (approximately 40MB) for better performance
+        await db.execAsync('PRAGMA cache_size = 10000');
+        console.log('✅ Cache size set to 10000 pages');
+        
+        // Set synchronous mode to NORMAL for better performance while maintaining data integrity
+        await db.execAsync('PRAGMA synchronous = NORMAL');
+        console.log('✅ Synchronous mode set to NORMAL');
+        
+        // Use memory for temporary storage for faster operations
+        await db.execAsync('PRAGMA temp_store = MEMORY');
+        console.log('✅ Temp store set to MEMORY');
+        
+        // Set busy timeout to 30 seconds to handle database locks gracefully
+        await db.execAsync('PRAGMA busy_timeout = 30000');
+        console.log('✅ Busy timeout set to 30 seconds');
+        
+        // Enable automatic index optimization
+        await db.execAsync('PRAGMA optimize');
+        console.log('✅ Database optimization enabled');
+        
+        console.log('🚀 SQLite performance settings configured successfully');
+
         // Create tables with basic schema
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS food_logs (
@@ -737,17 +766,20 @@ export const getFoodLogsByDate = async (date: string) => {
             console.log(`📊 DEBUG: First food log in database:`, JSON.stringify(allLogs[0]));
         }
 
-        // First check if there are any logs for this date
+        // Normalize date to ensure exact matching (better for index usage)
+        const normalizedDate = date.split('T')[0]; // Extract YYYY-MM-DD part only
+        
+        // First check if there are any logs for this date (using exact date match for better index performance)
         const countResult = await db.getFirstAsync<{ count: number }>(
-            `SELECT COUNT(*) as count FROM food_logs WHERE date LIKE ? AND user_id = ?`,
-            [`${date}%`, firebaseUserId]
+            `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
+            [normalizedDate, firebaseUserId]
         );
-        console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${date}`);
+        console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${normalizedDate}`);
 
-        // Get all logs for this date
+        // Get all logs for this date (optimized query using the new index)
         const result = await db.getAllAsync(
-            `SELECT * FROM food_logs WHERE date LIKE ? AND user_id = ? ORDER BY id DESC`,
-            [`${date}%`, firebaseUserId]
+            `SELECT * FROM food_logs WHERE user_id = ? AND date = ? ORDER BY id DESC`,
+            [firebaseUserId, normalizedDate]
         );
 
         // Log the first record for debugging
@@ -758,8 +790,8 @@ export const getFoodLogsByDate = async (date: string) => {
 
             // Try another query without user_id to check if data exists but with wrong user
             const logsWithoutUser = await db.getAllAsync(
-                `SELECT * FROM food_logs WHERE date LIKE ? LIMIT 5`,
-                [`${date}%`]
+                `SELECT * FROM food_logs WHERE date = ? LIMIT 5`,
+                [normalizedDate]
             );
 
             if (logsWithoutUser && logsWithoutUser.length > 0) {
@@ -2590,42 +2622,45 @@ export const hasActivityForToday = async (firebaseUid: string): Promise<boolean>
             console.log(`No user profile found for ${firebaseUid}, using firebase_uid directly`);
         }
 
+        // Normalize today's date for exact matching (better index performance)
+        const normalizedToday = todayStr.split('T')[0]; // Extract YYYY-MM-DD part only
+
         // If we couldn't get a user ID, use the firebase UID directly
         if (!userId) {
-            // Check for food logs today using firebase_uid directly
+            // Check for food logs today using firebase_uid directly (optimized query)
             const foodLog = await db.getFirstAsync(
-                `SELECT id FROM food_logs WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
-                [firebaseUid]
+                `SELECT id FROM food_logs WHERE user_id = ? AND date = ? LIMIT 1`,
+                [firebaseUid, normalizedToday]
             );
 
             if (foodLog) {
                 return true;
             }
 
-            // Check for exercises today using firebase_uid directly
+            // Check for exercises today using firebase_uid directly (optimized query)
             const exercise = await db.getFirstAsync(
-                `SELECT id FROM exercises WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
-                [firebaseUid]
+                `SELECT id FROM exercises WHERE user_id = ? AND date = ? LIMIT 1`,
+                [firebaseUid, normalizedToday]
             );
 
             if (exercise) {
                 return true;
             }
         } else {
-            // Check for food logs today
+            // Check for food logs today (optimized query using the new index)
             const foodLog = await db.getFirstAsync(
-                `SELECT id FROM food_logs WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
-                [userId]
+                `SELECT id FROM food_logs WHERE user_id = ? AND date = ? LIMIT 1`,
+                [userId, normalizedToday]
             );
 
             if (foodLog) {
                 return true;
             }
 
-            // Check for exercises today
+            // Check for exercises today (optimized query using the new index)
             const exercise = await db.getFirstAsync(
-                `SELECT id FROM exercises WHERE user_id = ? AND date LIKE '${todayStr}%' LIMIT 1`,
-                [userId]
+                `SELECT id FROM exercises WHERE user_id = ? AND date = ? LIMIT 1`,
+                [userId, normalizedToday]
             );
 
             if (exercise) {

@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 14; // Increment to version 14 for water intake table
+const CURRENT_VERSION = 15; // Increment to version 15 for database indexes and performance optimizations
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -391,6 +391,75 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             console.log('✅ Migration to version 14 complete');
                         } catch (error) {
                             console.error('❌ Error creating water_intake table:', error);
+                            throw error;
+                        }
+                    }
+                },
+                // Migration to version 15 - Add database indexes and performance optimizations
+                async () => {
+                    if (currentVersion < 15) {
+                        console.log('Running migration to version 15 - Adding database indexes and performance optimizations...');
+                        
+                        try {
+                            // Create critical indexes for food_logs table
+                            console.log('📊 Creating database indexes for performance optimization...');
+                            
+                            // Composite index for user_id + date queries (most common query pattern)
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_food_logs_user_date 
+                                ON food_logs(user_id, date)
+                            `);
+                            console.log('✅ Created index: idx_food_logs_user_date');
+                            
+                            // Index for user_id + id for recent food lookups
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_food_logs_user_id 
+                                ON food_logs(user_id, id DESC)
+                            `);
+                            console.log('✅ Created index: idx_food_logs_user_id');
+                            
+                            // Index for sync operations
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_food_logs_synced 
+                                ON food_logs(synced, user_id)
+                            `);
+                            console.log('✅ Created index: idx_food_logs_synced');
+                            
+                            // Index for meal_type queries
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_food_logs_meal_type 
+                                ON food_logs(user_id, meal_type, date)
+                            `);
+                            console.log('✅ Created index: idx_food_logs_meal_type');
+                            
+                            // Indexes for other frequently queried tables
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_user_profiles_firebase_uid 
+                                ON user_profiles(firebase_uid)
+                            `);
+                            console.log('✅ Created index: idx_user_profiles_firebase_uid');
+                            
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_exercises_user_date 
+                                ON exercises(user_id, date)
+                            `);
+                            console.log('✅ Created index: idx_exercises_user_date');
+                            
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_water_intake_user_date 
+                                ON water_intake(firebase_uid, date)
+                            `);
+                            console.log('✅ Created index: idx_water_intake_user_date');
+                            
+                            await db.execAsync(`
+                                CREATE INDEX IF NOT EXISTS idx_steps_date 
+                                ON steps(date)
+                            `);
+                            console.log('✅ Created index: idx_steps_date');
+                            
+                            console.log('✅ Migration to version 15 complete - Database indexes created');
+                        } catch (error) {
+                            console.error('❌ Error creating database indexes:', error);
                             throw error;
                         }
                     }
