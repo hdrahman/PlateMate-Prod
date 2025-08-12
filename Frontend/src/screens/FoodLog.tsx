@@ -2540,8 +2540,9 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
 
                                     displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
 
-                                    // Simple minimum calorie check - show warning if eating less than 1500 calories
-                                    if (dailyCaloriesConsumed < 1500) {
+                                    // Gender-based minimum calorie check for safety
+                                    const minCaloriesForGender = userProfile?.gender === 'female' ? 1200 : 1500;
+                                    if (dailyCaloriesConsumed < minCaloriesForGender) {
                                         displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
                                         textColor = '#FF5252';
                                     } else if (prediction.dailyDeficit < -500) {
@@ -2552,11 +2553,6 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                         textColor = '#FFD740';
                                     }
 
-                                    // Check if below 75% of target calories
-                                    if (!prediction.meetsMinimumRequirement && textColor !== '#FF5252') {
-                                        displayText = 'Warning: Eating significantly below your daily requirements may affect your health goals.';
-                                        textColor = '#FF5252';
-                                    }
 
                                     // Single line for all cases
                                     return (
