@@ -48,11 +48,17 @@ const grantPromotionalTrialToNewUser = async (userId: string) => {
     try {
         console.log('🎆 Attempting to grant promotional trial to new user:', userId);
         
-        const token = await tokenManager.getToken('supabase_auth');
+        // Use existing session token instead of forcing refresh
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+            console.log('ℹ️ No active session, skipping promotional trial');
+            return;
+        }
+        
         const response = await fetch(`${BACKEND_URL}/api/subscription/grant-promotional-trial`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${session.access_token}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -172,7 +178,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     // Grant promotional trial to new users (20 days free)
                     // This happens for first-time logins (new signups)
                     try {
-                        await grantPromotionalTrialToNewUser(authUser.id);
+                        grantPromotionalTrialToNewUser(authUser.id);
                     } catch (error) {
                         console.warn('⚠️ Promotional trial grant failed:', error);
                         // Don't block user login if trial grant fails
