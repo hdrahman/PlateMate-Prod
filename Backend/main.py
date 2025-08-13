@@ -99,7 +99,6 @@ async def startup_event():
         auth_status = await get_auth_status()
         if auth_status["jwt_secret_configured"]:
             print("✅ Supabase Auth is configured successfully at startup")
-            print(f"   Supabase URL: {auth_status['supabase_url']}")
         else:
             print("⚠️ Supabase Auth configuration incomplete. Authentication may not work properly.")
             print("   Please ensure SUPABASE_JWT_SECRET or SUPABASE_ANON_KEY environment variables are set.")

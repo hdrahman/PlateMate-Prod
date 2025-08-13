@@ -35,7 +35,6 @@ try:
     else:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         print("✅ OpenAI Async API client initialized successfully")
-        print(f"✅ Using API key starting with: {OPENAI_API_KEY[:10]}...")
 except Exception as e:
     print(f"❌ Failed to initialize OpenAI Async client: {e}")
     client = None

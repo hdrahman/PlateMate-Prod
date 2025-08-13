@@ -80,12 +80,10 @@ class UnifiedStepTracker {
 
     private async initialize(): Promise<void> {
         try {
-            console.log('🚀 Initializing Unified Step Tracker...');
-
+    
             // Set up app state listener
             try {
                 this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
-                console.log('✅ App state listener set up');
             } catch (error) {
                 console.error('❌ Failed to set up app state listener:', error);
             }
@@ -93,7 +91,6 @@ class UnifiedStepTracker {
             // Check date and reset if needed
             try {
                 await this.checkDateAndResetIfNeeded();
-                console.log('✅ Date check completed');
             } catch (error) {
                 console.error('❌ Failed to check date:', error);
             }
@@ -101,7 +98,6 @@ class UnifiedStepTracker {
             // Load previous state
             try {
                 await this.loadPreviousState();
-                console.log('✅ Previous state loaded');
             } catch (error) {
                 console.error('❌ Failed to load previous state:', error);
             }
@@ -112,26 +108,21 @@ class UnifiedStepTracker {
             // Start midnight reset timer
             try {
                 this.startMidnightResetTimer();
-                console.log('✅ Midnight reset timer started');
             } catch (error) {
                 console.error('❌ Failed to start midnight reset timer:', error);
             }
 
-            console.log('✅ Unified Step Tracker initialized');
         } catch (error) {
             console.error('❌ Failed to initialize Unified Step Tracker:', error);
             // Continue initialization to prevent app crash
-            console.log('ℹ️ Continuing with degraded step tracking capabilities');
         } finally {
             // Mark as initialized even if there were errors
             this.state.isInitialized = true;
-            console.log('✅ UnifiedStepTracker marked as initialized');
         }
     }
 
     private async checkExistingPermissions(): Promise<boolean> {
         try {
-            console.log('🔍 Checking existing permissions (without requesting)...');
 
             if (isAndroid) {
                 // Android: Check existing permissions
@@ -146,7 +137,6 @@ class UnifiedStepTracker {
                     this.state.nativeStepCounterAvailable = false;
                 }
                 
-                console.log(`📱 Android permissions check: Activity=${activityGranted}, NativeStepCounter=${this.state.nativeStepCounterAvailable}`);
             } else {
                 // iOS: Check HealthKit availability and initialization status
                 try {
@@ -162,7 +152,6 @@ class UnifiedStepTracker {
                     this.state.hasPermissions = false;
                 }
                 
-                console.log(`📱 iOS HealthKit check: Available=${this.state.healthKitInitialized}`);
             }
 
             return this.state.hasPermissions;
@@ -174,7 +163,6 @@ class UnifiedStepTracker {
 
     private async requestAllPermissions(): Promise<boolean> {
         try {
-            console.log('📱 Requesting step tracking permissions...');
 
             if (isAndroid) {
                 // Android permissions
@@ -190,27 +178,20 @@ class UnifiedStepTracker {
                 
                 // Check native step counter availability
                 try {
-                    console.log('🔍 Checking native step counter availability...');
                     this.state.nativeStepCounterAvailable = await NativeStepCounter.isAvailable();
-                    console.log('✅ Native step counter check completed:', this.state.nativeStepCounterAvailable);
                 } catch (error) {
                     console.error('❌ Failed to check native step counter availability:', error);
                     this.state.nativeStepCounterAvailable = false;
                 }
                 
-                console.log(`📱 Android permissions: Activity=${activityGranted}, NativeStepCounter=${this.state.nativeStepCounterAvailable}`);
             } else {
                 // iOS - Initialize HealthKit
                 try {
-                    console.log('🔍 Checking HealthKit availability...');
                     const healthKitAvailable = await HealthKitStepCounter.isAvailable();
-                    console.log('✅ HealthKit availability check completed:', healthKitAvailable);
                     
                     if (healthKitAvailable) {
-                        console.log('🔄 Initializing HealthKit...');
                         const healthKitInitialized = await HealthKitStepCounter.initialize();
                         this.state.healthKitInitialized = healthKitInitialized;
-                        console.log(`📱 iOS HealthKit initialized: ${healthKitInitialized}`);
                     }
                 } catch (error) {
                     console.error('❌ HealthKit initialization failed:', error);
@@ -282,7 +263,6 @@ class UnifiedStepTracker {
                 try {
                     const NativeStepCounter = (await import('./NativeStepCounter')).default;
                     await NativeStepCounter.resetDailyBaseline();
-                    console.log('✅ Android baseline reset at midnight');
                 } catch (error) {
                     console.error('❌ Failed to reset Android baseline:', error);
                 }

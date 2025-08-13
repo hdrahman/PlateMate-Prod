@@ -310,34 +310,6 @@ const FeatureRequestsScreen = () => {
         </View>
     );
 
-    const renderDebugPanel = () => {
-        if (!error || networkStatus) return null;
-
-        return (
-            <View style={styles.debugPanel}>
-                <Text style={styles.debugTitle}>🔧 Debug Information</Text>
-                <Text style={styles.debugText}>Backend URL: {BACKEND_URL}</Text>
-                <Text style={styles.debugText}>Network Status: {networkStatus ? 'Online' : 'Offline'}</Text>
-                <Text style={styles.debugText}>Error: {error}</Text>
-                <TouchableOpacity
-                    style={styles.debugButton}
-                    onPress={() => {
-                        // Test backend health
-                        fetch(`${BACKEND_URL}/health/routes`)
-                            .then(res => res.json())
-                            .then(data => {
-                                Alert.alert('Backend Status', `Routes available: ${data.total_routes}\nFeature requests: ${data.feature_requests_available ? 'Available' : 'Not Found'}`);
-                            })
-                            .catch(err => {
-                                Alert.alert('Backend Error', `Cannot connect to backend: ${err.message}`);
-                            });
-                    }}
-                >
-                    <Text style={styles.debugButtonText}>Test Backend</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    };
 
     // Render header
     const renderHeader = () => (
@@ -472,7 +444,6 @@ const FeatureRequestsScreen = () => {
                 </View>
             )}
 
-            {renderDebugPanel()}
         </SafeAreaView>
     );
 };
@@ -788,34 +759,6 @@ const styles = StyleSheet.create({
         borderRadius: 32,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    debugPanel: {
-        backgroundColor: '#1E1E1E',
-        padding: 16,
-        borderRadius: 8,
-        margin: 16,
-    },
-    debugTitle: {
-        color: '#FFF',
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    debugText: {
-        color: '#888',
-        fontSize: 14,
-        marginBottom: 8,
-    },
-    debugButton: {
-        backgroundColor: '#9B00FF',
-        padding: 12,
-        borderRadius: 8,
-        alignSelf: 'flex-end',
-    },
-    debugButtonText: {
-        color: '#FFF',
-        fontSize: 14,
-        fontWeight: '600',
     },
 });
 

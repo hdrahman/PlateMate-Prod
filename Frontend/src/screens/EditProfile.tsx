@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     getUserProfileBySupabaseUid,
+    getUserProfileByFirebaseUid,
     getUserGoals,
     getUserStreak,
     initDatabase,
@@ -409,26 +410,122 @@ const EditProfile = () => {
         checkForChanges('sex', value);
     };
 
-    const handleHeightFeetChange = (text: string) => {
+    const handleHeightFeetChange = async (text: string) => {
         setEditedHeightFeet(text);
         checkForChanges('heightFeet', text);
-    };
-
-    const handleHeightInchesChange = (text: string) => {
-        setEditedHeightInches(text);
-        checkForChanges('heightInches', text);
-    };
-
-    const handleHeightCmChange = (value: string) => {
-        if (/^\d*\.?\d*$/.test(value)) {
-            setHeight(`${value} cm`);
-            checkForChanges('height', value);
+        
+        // Trigger immediate BMR recalculation if both feet and inches values are valid
+        if (text && editedHeightInches && !isNaN(parseFloat(text)) && !isNaN(parseFloat(editedHeightInches)) && user) {
+            try {
+                const heightInCm = feetInchesToCm(parseFloat(text), parseFloat(editedHeightInches));
+                
+                // Get current profile for BMR calculation
+                const fullProfile = await getUserProfileByFirebaseUid(user.uid);
+                if (fullProfile && fullProfile.weight && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
+                    // Create updated profile with new height
+                    const profileForBMR = {
+                        ...fullProfile,
+                        height: heightInCm
+                    };
+                    
+                    await calculateAndStoreBMR(profileForBMR, user.uid);
+                    console.log('✅ BMR recalculated after height change');
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to recalculate BMR after height change:', error);
+                // Don't show error to user as this is background calculation
+            }
         }
     };
 
-    const handleWeightChange = (text: string) => {
+    const handleHeightInchesChange = async (text: string) => {
+        setEditedHeightInches(text);
+        checkForChanges('heightInches', text);
+        
+        // Trigger immediate BMR recalculation if both feet and inches values are valid
+        if (text && editedHeightFeet && !isNaN(parseFloat(text)) && !isNaN(parseFloat(editedHeightFeet)) && user) {
+            try {
+                const heightInCm = feetInchesToCm(parseFloat(editedHeightFeet), parseFloat(text));
+                
+                // Get current profile for BMR calculation
+                const fullProfile = await getUserProfileByFirebaseUid(user.uid);
+                if (fullProfile && fullProfile.weight && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
+                    // Create updated profile with new height
+                    const profileForBMR = {
+                        ...fullProfile,
+                        height: heightInCm
+                    };
+                    
+                    await calculateAndStoreBMR(profileForBMR, user.uid);
+                    console.log('✅ BMR recalculated after height change');
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to recalculate BMR after height change:', error);
+                // Don't show error to user as this is background calculation
+            }
+        }
+    };
+
+    const handleHeightCmChange = async (value: string) => {
+        if (/^\d*\.?\d*$/.test(value)) {
+            setHeight(`${value} cm`);
+            checkForChanges('height', value);
+            
+            // Trigger immediate BMR recalculation if height value is valid
+            if (value && !isNaN(parseFloat(value)) && user) {
+                try {
+                    const heightInCm = parseFloat(value);
+                    
+                    // Get current profile for BMR calculation
+                    const fullProfile = await getUserProfileByFirebaseUid(user.uid);
+                    if (fullProfile && fullProfile.weight && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
+                        // Create updated profile with new height
+                        const profileForBMR = {
+                            ...fullProfile,
+                            height: heightInCm
+                        };
+                        
+                        await calculateAndStoreBMR(profileForBMR, user.uid);
+                        console.log('✅ BMR recalculated after height change');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to recalculate BMR after height change:', error);
+                    // Don't show error to user as this is background calculation
+                }
+            }
+        }
+    };
+
+    const handleWeightChange = async (text: string) => {
         setEditedWeight(text);
         checkForChanges('weight', text);
+        
+        // Trigger immediate BMR recalculation if weight value is valid
+        if (text && !isNaN(parseFloat(text)) && user) {
+            try {
+                // Convert weight to kg for calculation
+                let weightInKg = parseFloat(text);
+                if (editedIsImperialUnits) {
+                    weightInKg = lbsToKg(weightInKg);
+                }
+                
+                // Get current profile for BMR calculation
+                const fullProfile = await getUserProfileByFirebaseUid(user.uid);
+                if (fullProfile && fullProfile.height && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
+                    // Create updated profile with new weight
+                    const profileForBMR = {
+                        ...fullProfile,
+                        weight: weightInKg
+                    };
+                    
+                    await calculateAndStoreBMR(profileForBMR, user.uid);
+                    console.log('✅ BMR recalculated after weight change');
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to recalculate BMR after weight change:', error);
+                // Don't show error to user as this is background calculation
+            }
+        }
     };
 
     const handleLocationChange = (location: string) => {
@@ -682,7 +779,7 @@ const EditProfile = () => {
                     {hasUnsavedChanges && (
                         <View style={styles.readOnlyBadge}>
                             <Ionicons name="information-circle" size={16} color={WHITE} />
-                            <Text style={styles.readOnlyBadgeText}>Save changes to update profile</Text>
+                            <Text style={styles.readOnlyBadgeText}>Save changes to update profile and nutrition targets</Text>
                         </View>
                     )}
                 </LinearGradient>

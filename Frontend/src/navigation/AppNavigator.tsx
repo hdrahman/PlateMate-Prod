@@ -15,7 +15,6 @@ import Settings from '../screens/Settings';
 import NotificationsScreen from '../screens/Notifications';
 import DataSharing from '../screens/DataSharing';
 import PrivacyPolicy from '../screens/PrivacyPolicy';
-import DebugOnboarding from '../components/DebugOnboarding';
 import FoodLog from '../screens/FoodLog';
 import FoodDetail from '../screens/FoodDetail';
 import NutritionFactsResult from '../screens/NutritionFactsResult';
@@ -45,7 +44,6 @@ type RootStackParamList = {
     Notifications: undefined;
     DataSharing: undefined;
     PrivacyPolicy: undefined;
-    DebugOnboarding: undefined;
     FoodDetail: { foodId: number };
     NutritionFactsResult: {
         nutritionData: any[];
@@ -132,7 +130,6 @@ const AppNavigator = () => {
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="DataSharing" component={DataSharing} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
-                <Stack.Screen name="DebugOnboarding" component={DebugOnboarding} />
                 <Stack.Screen name="FoodDetail" component={FoodDetail} />
                 <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
                 <Stack.Screen name="Chatbot" component={Chatbot} />

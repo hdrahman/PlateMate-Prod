@@ -51,40 +51,30 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         }
 
         isInitializing = true;
-        console.log('🔄 Initializing database...');
 
         // Open the database
         db = await SQLite.openDatabaseAsync('platemate.db');
-        console.log('✅ Database opened successfully');
 
         // Configure SQLite performance settings for optimal performance
-        console.log('🔧 Configuring SQLite performance settings...');
         
         // Enable WAL (Write-Ahead Logging) mode for better concurrency and performance
         await db.execAsync('PRAGMA journal_mode = WAL');
-        console.log('✅ WAL mode enabled');
         
         // Set cache size to 10000 pages (approximately 40MB) for better performance
         await db.execAsync('PRAGMA cache_size = 10000');
-        console.log('✅ Cache size set to 10000 pages');
         
         // Set synchronous mode to NORMAL for better performance while maintaining data integrity
         await db.execAsync('PRAGMA synchronous = NORMAL');
-        console.log('✅ Synchronous mode set to NORMAL');
         
         // Use memory for temporary storage for faster operations
         await db.execAsync('PRAGMA temp_store = MEMORY');
-        console.log('✅ Temp store set to MEMORY');
         
         // Set busy timeout to 30 seconds to handle database locks gracefully
         await db.execAsync('PRAGMA busy_timeout = 30000');
-        console.log('✅ Busy timeout set to 30 seconds');
         
         // Enable automatic index optimization
         await db.execAsync('PRAGMA optimize');
-        console.log('✅ Database optimization enabled');
         
-        console.log('🚀 SQLite performance settings configured successfully');
 
         // Create tables with basic schema
         await db.execAsync(`
@@ -110,7 +100,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         last_modified TEXT NOT NULL
       )
     `);
-        console.log('✅ food_logs table created successfully');
 
         // Create user_subscriptions table for subscription management (SECURE - separate from profile)
         await db.execAsync(`
@@ -146,7 +135,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
       )
     `);
-        console.log('✅ user_subscriptions table created successfully');
 
         // Create user_profiles table (premium column kept for backward compatibility but subscription logic should use user_subscriptions table)
         await db.execAsync(`
@@ -212,18 +200,14 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         premium INTEGER DEFAULT 0
       )
     `);
-        console.log('✅ user_profiles table created successfully');
 
         // Verify the premium column exists
         try {
             const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
             const premiumColumn = tableInfo.find((col: any) => col.name === 'premium');
             if (premiumColumn) {
-                console.log('✅ Premium column verified in user_profiles table');
             } else {
-                console.log('⚠️ Premium column not found, adding it manually...');
                 await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN premium INTEGER DEFAULT 0`);
-                console.log('✅ Premium column added successfully');
             }
         } catch (error) {
             console.error('❌ Error verifying premium column:', error);
@@ -242,7 +226,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
       )
     `);
-        console.log('✅ user_weights table created successfully');
 
         // Create onboarding_temp table for storing data before user authentication
         await db.execAsync(`
@@ -257,7 +240,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         synced_to_profile INTEGER DEFAULT 0
       )
     `);
-        console.log('✅ onboarding_temp table created successfully');
 
         // Create sync_log table to track last backup sync time and status
         await db.execAsync(`
@@ -267,7 +249,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         sync_status TEXT
       )
     `);
-        console.log('✅ sync_log table created/verified successfully');
 
         // Create nutrition_goals table
         await db.execAsync(`
@@ -298,7 +279,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         UNIQUE(firebase_uid)
       )
     `);
-        console.log('✅ nutrition_goals table created successfully');
 
         // Create cheat_day_settings table
         await db.execAsync(`
@@ -318,7 +298,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
       )
     `);
-        console.log('✅ cheat_day_settings table created successfully');
 
         // Check and add missing columns to nutrition_goals table
         try {
@@ -326,18 +305,14 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
             const dailyCalorieGoalColumn = nutritionGoalsInfo.find((col: any) => col.name === 'daily_calorie_goal');
             
             if (!dailyCalorieGoalColumn) {
-                console.log('🔄 Adding daily_calorie_goal column to nutrition_goals table...');
                 await db.execAsync(`ALTER TABLE nutrition_goals ADD COLUMN daily_calorie_goal INTEGER`);
-                console.log('✅ daily_calorie_goal column added to nutrition_goals table');
             }
         } catch (error) {
             console.error('❌ Error checking/adding daily_calorie_goal column:', error);
         }
 
         // Run database migrations to ensure all columns exist
-        console.log('🔄 Running database migrations...');
         await updateDatabaseSchema(db);
-        console.log('✅ Database migrations completed');
 
         // Create other tables
         await db.execAsync(`
@@ -354,7 +329,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         last_modified TEXT NOT NULL
       )
     `);
-        console.log('✅ exercises table created successfully');
 
         // Create sync_status table
         await db.execAsync(`
@@ -364,7 +338,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         status TEXT DEFAULT 'pending'
       )
     `);
-        console.log('✅ sync_status table created successfully');
 
         // Create steps table for step tracking
         await db.execAsync(`
@@ -378,7 +351,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         last_modified TEXT NOT NULL
       )
     `);
-        console.log('✅ steps table created successfully');
 
         // Create streak_tracking table for streak management
         await db.execAsync(`
@@ -395,7 +367,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
       )
     `);
-        console.log('✅ streak_tracking table created successfully');
 
         // Create API tokens table for secure token management
         await db.execAsync(`
@@ -409,7 +380,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       )
     `);
-        console.log('✅ api_tokens table created successfully');
 
         // Create cache table for daily meal planner features
         await db.execAsync(`
@@ -422,7 +392,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-        console.log('✅ meal_planner_cache table created successfully');
 
         // Create user_steps table for step tracking
         await db.execAsync(`
@@ -441,7 +410,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         UNIQUE(firebase_uid, date)
       )
     `);
-        console.log('✅ user_steps table created successfully');
 
         // Create water_intake table for hydration tracking
         await db.execAsync(`
@@ -458,13 +426,11 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
       )
     `);
-        console.log('✅ water_intake table created successfully');
 
         // Set initialization flags
         global.dbInitialized = true;
         isInitializing = false;
 
-        console.log('✅ Database initialization completed successfully');
         return db;
     } catch (error) {
         isInitializing = false;
@@ -513,13 +479,11 @@ export const getCurrentUserIdAsync = async (): Promise<string> => {
 
 // Forward database change subscription functions to use our databaseWatcher module
 export const subscribeToFoodLogChanges = (callback: () => void | Promise<void>) => {
-    console.log('📊 Adding database change listener');
     return subscribeToDatabaseChanges(callback);
 };
 
 // Unsubscribe from database changes
 export const unsubscribeFromFoodLogChanges = (callback: () => void | Promise<void>) => {
-    console.log('📊 Removing database change listener');
     unsubscribeFromDatabaseChanges(callback);
 };
 
@@ -556,9 +520,7 @@ export const addFoodLog = async (foodData: {
     file_key?: string;
 }) => {
     // Immediately navigate user to FoodLog screen so they can view the entry
-    console.log('🚀 About to navigate to FoodLog...');
     navigateToFoodLog();
-    console.log('✅ navigateToFoodLog() called');
 
     try {
         const db = await getDatabase();
@@ -686,7 +648,6 @@ export const updateFoodLog = async (id: number, updates: any) => {
         const sql = `UPDATE food_logs SET ${setClauses.join(', ')} WHERE id = ?`;
         const result = await db.runAsync(sql, values);
 
-        console.log('✅ Food log updated successfully', result.changes);
 
         // Trigger notification for observers
         try {
@@ -725,7 +686,6 @@ export const deleteFoodLog = async (id: number) => {
 
     try {
         await db.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
-        console.log('✅ Food log deleted successfully');
 
         // Trigger notification for observers
         try {

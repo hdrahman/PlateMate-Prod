@@ -60,7 +60,6 @@ const getAuthHeaders = async () => {
             'Content-Type': 'application/json',
         };
     } catch (error) {
-        console.error('Error getting auth headers:', error);
         throw error;
     }
 };
@@ -81,7 +80,6 @@ const checkBackendHealth = async (): Promise<boolean> => {
         clearTimeout(timeoutId);
         return response.ok;
     } catch (error) {
-        console.error('Backend health check failed:', error);
         return false;
     }
 };
@@ -117,7 +115,6 @@ export const createFeatureRequest = async (request: FeatureRequestCreate): Promi
                     errorMessage = 'Server error: Please try again later';
                 }
             } catch (parseError) {
-                console.error('Error parsing response:', parseError);
                 // Use default error message if response can't be parsed
             }
             
@@ -127,7 +124,6 @@ export const createFeatureRequest = async (request: FeatureRequestCreate): Promi
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error creating feature request:', error);
         
         // Handle network errors
         if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -181,7 +177,6 @@ export const getFeatureRequests = async (
                     errorMessage = errorData.detail || errorMessage;
                 }
             } catch (parseError) {
-                console.error('Error parsing error response:', parseError);
                 // Use default error message
             }
             
@@ -191,7 +186,6 @@ export const getFeatureRequests = async (
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error fetching feature requests:', error);
         
         // Handle network errors
         if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -230,7 +224,6 @@ export const getMyFeatureRequests = async (): Promise<FeatureRequest[]> => {
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error fetching user feature requests:', error);
         throw error;
     }
 };
@@ -255,7 +248,6 @@ export const toggleFeatureUpvote = async (requestId: string): Promise<{ success:
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error toggling upvote:', error);
         throw error;
     }
 };
@@ -284,7 +276,6 @@ export const updateFeatureRequest = async (
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error updating feature request:', error);
         throw error;
     }
 };
@@ -309,7 +300,6 @@ export const deleteFeatureRequest = async (requestId: string): Promise<{ success
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error deleting feature request:', error);
         throw error;
     }
 };
@@ -338,7 +328,6 @@ export const updateFeatureStatus = async (
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('Error updating feature status:', error);
         throw error;
     }
 };
@@ -362,7 +351,6 @@ export const getFeatureRequestStats = async (): Promise<FeatureRequestStats> => 
         const result = await response.json();
         return result.stats;
     } catch (error) {
-        console.error('Error fetching feature request stats:', error);
         throw error;
     }
 };
@@ -399,7 +387,6 @@ export class FeatureRequestsRealtime {
                     table: 'feature_requests'
                 },
                 (payload) => {
-                    console.log('Feature request change:', payload);
                     this.callbacks.onFeatureRequestChange?.(payload);
                 }
             )
@@ -411,7 +398,6 @@ export class FeatureRequestsRealtime {
                     table: 'feature_upvotes'
                 },
                 (payload) => {
-                    console.log('Upvote change:', payload);
                     this.callbacks.onUpvoteChange?.(payload);
                 }
             )
@@ -423,13 +409,10 @@ export class FeatureRequestsRealtime {
                     table: 'feature_status_updates'
                 },
                 (payload) => {
-                    console.log('Status change:', payload);
                     this.callbacks.onStatusChange?.(payload);
                 }
             )
-            .subscribe((status) => {
-                console.log('Feature requests realtime status:', status);
-            });
+            .subscribe();
 
         return this.channel;
     }
@@ -461,7 +444,6 @@ export const isOnline = async () => {
     try {
         return await isBackendAvailable();
     } catch (error) {
-        console.error('Error checking network status:', error);
         return false;
     }
 };
@@ -479,7 +461,7 @@ export const getFeatureRequestsOffline = async (): Promise<FeatureRequest[]> => 
             }
         }
     } catch (error) {
-        console.error('Error reading cached feature requests:', error);
+        // Silent fail for cache read
     }
     
     return [];
@@ -494,6 +476,6 @@ export const cacheFeatureRequests = async (requests: FeatureRequest[]) => {
         };
         await AsyncStorage.setItem('feature_requests_cache', JSON.stringify(cacheData));
     } catch (error) {
-        console.error('Error caching feature requests:', error);
+        // Silent fail for cache write
     }
 }; 

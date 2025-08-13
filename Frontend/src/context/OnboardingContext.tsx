@@ -206,12 +206,6 @@ const OnboardingContext = createContext<OnboardingContextType>({
 const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile => {
     if (!sqliteProfile) return defaultProfile;
 
-    console.log('🔄 Converting SQLite profile to frontend format:', {
-        onboarding_complete: sqliteProfile.onboarding_complete,
-        first_name: sqliteProfile.first_name,
-        email: sqliteProfile.email
-    });
-
     return {
         firstName: sqliteProfile.first_name || '',
         lastName: sqliteProfile.last_name || '',
@@ -386,11 +380,9 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
             try {
                 setIsLoading(true);
-                console.log('🔍 Loading onboarding state...');
 
                 if (user && user.id) {
                     // User is authenticated - try to load from user profile first
-                    console.log(`👤 Loading for authenticated user: ${user.id}`);
                     // Try the fast path – lookup by Supabase UID (stored in firebase_uid column)
                     let sqliteProfile = await getUserProfileBySupabaseUid(user.id);
 
@@ -403,7 +395,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                             const { getUserProfileByEmail, getDatabase } = await import('../utils/database');
                             const profileByEmail = await getUserProfileByEmail(user.email);
                             if (profileByEmail) {
-                                console.log('🔄 Found profile by e-mail – updating firebase_uid to current Supabase UID');
                                 try {
                                     const dbInstance = await getDatabase();
                                     await dbInstance.runAsync(`UPDATE user_profiles SET firebase_uid = ? WHERE email = ?`, [user.id, user.email]);
@@ -419,8 +410,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                     }
 
                     if (sqliteProfile) {
-                        console.log('✅ Found profile in SQLite database');
-                        console.log(`Profile data: onboarding_complete=${sqliteProfile.onboarding_complete}, email=${sqliteProfile.email}`);
 
                         // Convert SQLite profile to frontend format
                         const frontendProfile = convertSQLiteProfileToFrontendFormat(sqliteProfile);
@@ -432,16 +421,13 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                         setProfile(frontendProfile);
                         setCurrentStep(isOnboardingComplete ? totalSteps : 1);
 
-                        console.log(`✅ Onboarding state loaded: complete=${isOnboardingComplete}, step=${isOnboardingComplete ? totalSteps : 1}`);
                     } else {
                         // No local profile – attempt to restore backup from PostgreSQL first
-                        console.log('📋 No existing profile found – attempting PostgreSQL restore');
 
                         try {
                             const { postgreSQLSyncService } = await import('../utils/postgreSQLSyncService');
                             const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
                             if (restoreResult.success) {
-                                console.log('✅ Backup restore succeeded – reloading profile');
                                 sqliteProfile = await getUserProfileBySupabaseUid(user.id);
                             } else {
                                 console.warn('⚠️ Backup restore returned errors:', restoreResult.errors);
@@ -459,25 +445,20 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                             setProfile(frontendProfile);
                             setCurrentStep(isOnboardingComplete ? totalSteps : 1);
 
-                            console.log(`✅ Profile reloaded after restore: complete=${isOnboardingComplete}`);
                         } else {
                             // Try to load and sync temporary data
-                            console.log('📋 Still no profile found, checking temporary data...');
                             const tempData = await loadOnboardingProgressIncremental(tempSessionId);
                             if (tempData) {
-                                console.log('🔄 Found temporary data, syncing to user profile...');
                                 try {
                                     await syncTempOnboardingToUserProfile(tempSessionId, user.id, user.email);
                                     setProfile(tempData.profileData);
                                     setCurrentStep(tempData.currentStep);
-                                    console.log('✅ Temporary data synced to user profile');
                                 } catch (syncError) {
                                     console.error('❌ Error syncing temporary data:', syncError);
                                     setProfile(tempData.profileData);
                                     setCurrentStep(tempData.currentStep);
                                 }
                             } else {
-                                console.log('ℹ️ No existing data found, starting fresh');
                                 setProfile(defaultProfile);
                                 setCurrentStep(1);
                             }
@@ -489,11 +470,9 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                     console.log('👥 Loading for unauthenticated user');
                     const tempData = await loadOnboardingProgressIncremental(tempSessionId);
                     if (tempData) {
-                        console.log('✅ Found temporary onboarding data');
                         setProfile(tempData.profileData);
                         setCurrentStep(tempData.currentStep);
                     } else {
-                        console.log('ℹ️ No temporary data found, starting fresh');
                         setProfile(defaultProfile);
                         setCurrentStep(1);
                     }
@@ -550,7 +529,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                     currentStep,
                     user?.id
                 );
-                console.log('✅ Profile data saved incrementally');
             }
 
             // If user is authenticated and has an existing profile, update it directly
@@ -670,7 +648,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             throw new Error('User email is missing. Please try signing in again.');
         }
 
-        console.log(`✅ User validated: ${currentUser.id}, Email: ${currentUser.email}`);
 
         // Ensure database is ready
         await ensureDatabaseReady();
