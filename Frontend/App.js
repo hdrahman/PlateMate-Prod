@@ -26,6 +26,7 @@ import tokenManager from './src/utils/tokenManager';
 import UnifiedStepTracker from './src/services/UnifiedStepTracker';
 import notifee, { EventType } from '@notifee/react-native';
 import PersistentStepTracker from './src/services/PersistentStepTracker';
+import * as Notifications from 'expo-notifications';
 // Import Subscription Manager for automatic trials
 import SubscriptionManager from './src/utils/SubscriptionManager';
 
@@ -44,7 +45,7 @@ import DeleteAccount from './src/screens/DeleteAccount';
 import ChangePassword from './src/screens/ChangePassword';
 import AboutUs from './src/screens/AboutUs';
 import Settings from './src/screens/Settings';
-import Notifications from './src/screens/Notifications';
+import NotificationsScreen from './src/screens/Notifications';
 import DataSharing from './src/screens/DataSharing';
 import PrivacyPolicy from './src/screens/PrivacyPolicy';
 import CameraScreen from './src/screens/Camera';
@@ -421,7 +422,7 @@ function AuthenticatedContent() {
       <Stack.Screen name="ChangePassword" component={ChangePassword} />
       <Stack.Screen name="AboutUs" component={AboutUs} />
       <Stack.Screen name="Settings" component={Settings} />
-      <Stack.Screen name="Notifications" component={Notifications} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="DataSharing" component={DataSharing} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
       <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
@@ -495,6 +496,21 @@ export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
+    // Set up notification response listener
+    const notificationListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification tapped:', response);
+      
+      // Handle different notification types
+      const data = response.notification.request.content.data;
+      if (data?.action === 'open_app') {
+        // App is already open due to the tap, just navigate to home if needed
+        if (navigationRef.current) {
+          // Navigate to main screen (Home)
+          navigationRef.current.navigate('Main', { screen: 'Home' });
+        }
+      }
+    });
+
     // Initialize basic app components
     const initApp = async () => {
       try {
@@ -583,6 +599,11 @@ export default function App() {
     };
 
     initApp();
+
+    // Cleanup listener on unmount
+    return () => {
+      notificationListener?.remove();
+    };
   }, []);
 
   if (!appIsReady) {

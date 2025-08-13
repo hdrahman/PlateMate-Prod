@@ -167,17 +167,6 @@ class NotificationService {
                 console.warn(`Completed scheduling with errors in: ${errors.join(', ')}`);
             }
 
-            // Schedule a daily refresh of all notifications to maintain correct scheduling patterns
-            const midnight = new Date();
-            midnight.setHours(0, 0, 0, 0);
-            midnight.setDate(midnight.getDate() + 1);
-
-            const secondsUntilMidnight = Math.floor((midnight.getTime() - new Date().getTime()) / 1000);
-
-            setTimeout(() => {
-                this.scheduleAllNotifications();
-            }, secondsUntilMidnight * 1000);
-
         } catch (error) {
             console.error('Error scheduling notifications:', error);
             throw error;
@@ -185,8 +174,10 @@ class NotificationService {
     }
 
     private getNotificationTrigger(hour: number, minute: number, repeats: boolean = true, weekday?: number): Notifications.NotificationTriggerInput {
-        // For Android, use seconds-based trigger because calendar trigger is not supported
+        // Use calendar trigger for both platforms for more reliable scheduling
         if (Platform.OS === 'android') {
+            // For Android, we'll use a hybrid approach: schedule individual notifications for each day
+            // to avoid drift issues with TIME_INTERVAL repeating
             const now = new Date();
             const scheduledTime = new Date();
             scheduledTime.setHours(hour, minute, 0, 0);
@@ -208,22 +199,12 @@ class NotificationService {
             // Calculate seconds from now
             const secondsFromNow = Math.floor((scheduledTime.getTime() - now.getTime()) / 1000);
 
-            // For repeating notifications, we need to be explicit about the repeat interval
-            if (repeats) {
-                // Daily repeating notifications (24 hours = 86400 seconds)
-                return {
-                    type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                    seconds: secondsFromNow,
-                    repeats: true
-                };
-            } else {
-                // One-time notification
-                return {
-                    type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                    seconds: secondsFromNow,
-                    repeats: false
-                };
-            }
+            // Use TIME_INTERVAL but don't repeat - we'll schedule individual notifications
+            return {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: secondsFromNow,
+                repeats: false
+            };
         } else {
             // For iOS, we can use calendar trigger (CalendarTriggerInput)
             return {
@@ -248,25 +229,74 @@ class NotificationService {
 
             if (!this.isInQuietHours(hours, minutes, settings)) {
                 try {
-                    const id = await Notifications.scheduleNotificationAsync({
-                        content: {
-                            title: `${meal.emoji} ${meal.name} Time!`,
-                            body: `Don't forget to log your ${meal.name.toLowerCase()}`,
-                            data: { type: 'meal_reminder', meal: meal.name.toLowerCase() },
-                            sound: true,
-                        },
-                        trigger: this.getNotificationTrigger(hours, minutes),
-                    });
+                    // For iOS, schedule one repeating notification
+                    if (Platform.OS === 'ios') {
+                        const id = await Notifications.scheduleNotificationAsync({
+                            content: {
+                                title: `${meal.emoji} ${meal.name} Time!`,
+                                body: this.getMealReminderMessage(meal.name, settings.generalSettings.savageMode),
+                                data: { 
+                                    type: 'meal_reminder', 
+                                    meal: meal.name.toLowerCase(),
+                                    action: 'open_app'
+                                },
+                                sound: true,
+                            },
+                            trigger: this.getNotificationTrigger(hours, minutes, true),
+                        });
 
-                    await this.saveScheduledNotification({
-                        id,
-                        type: 'meal',
-                        title: `${meal.name} Reminder`,
-                        body: `Time to log your ${meal.name.toLowerCase()}`,
-                        scheduledTime: meal.time,
-                        repeats: true,
-                        enabled: true,
-                    });
+                        await this.saveScheduledNotification({
+                            id,
+                            type: 'meal',
+                            title: `${meal.name} Reminder`,
+                            body: `Time to log your ${meal.name.toLowerCase()}`,
+                            scheduledTime: meal.time,
+                            repeats: true,
+                            enabled: true,
+                        });
+                    } else {
+                        // For Android, schedule notifications for the next 30 days to avoid drift
+                        for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+                            const notificationDate = new Date();
+                            notificationDate.setDate(notificationDate.getDate() + dayOffset);
+                            notificationDate.setHours(hours, minutes, 0, 0);
+
+                            // Skip if this time has already passed today
+                            if (dayOffset === 0 && notificationDate <= new Date()) {
+                                continue;
+                            }
+
+                            const secondsFromNow = Math.floor((notificationDate.getTime() - new Date().getTime()) / 1000);
+
+                            const id = await Notifications.scheduleNotificationAsync({
+                                content: {
+                                    title: `${meal.emoji} ${meal.name} Time!`,
+                                    body: this.getMealReminderMessage(meal.name, settings.generalSettings.savageMode),
+                                    data: { 
+                                        type: 'meal_reminder', 
+                                        meal: meal.name.toLowerCase(),
+                                        action: 'open_app'
+                                    },
+                                    sound: true,
+                                },
+                                trigger: {
+                                    type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                                    seconds: secondsFromNow,
+                                    repeats: false
+                                }
+                            });
+
+                            await this.saveScheduledNotification({
+                                id,
+                                type: 'meal',
+                                title: `${meal.name} Reminder`,
+                                body: `Time to log your ${meal.name.toLowerCase()}`,
+                                scheduledTime: `${meal.time} (Day ${dayOffset})`,
+                                repeats: false,
+                                enabled: true,
+                            });
+                        }
+                    }
                 } catch (error) {
                     console.error(`Error scheduling ${meal.name} reminder:`, error);
                 }
@@ -283,25 +313,74 @@ class NotificationService {
 
                 if (!this.isInQuietHours(hours, minutes, settings)) {
                     try {
-                        const id = await Notifications.scheduleNotificationAsync({
-                            content: {
-                                title: '🍎 Snack Time!',
-                                body: 'Remember to log any snacks you have',
-                                data: { type: 'snack_reminder', time },
-                                sound: true,
-                            },
-                            trigger: this.getNotificationTrigger(hours, minutes),
-                        });
+                        // For iOS, schedule one repeating notification
+                        if (Platform.OS === 'ios') {
+                            const id = await Notifications.scheduleNotificationAsync({
+                                content: {
+                                    title: '🍎 Snack Time!',
+                                    body: this.getMealReminderMessage('Snack', settings.generalSettings.savageMode),
+                                    data: { 
+                                        type: 'snack_reminder', 
+                                        time,
+                                        action: 'open_app'
+                                    },
+                                    sound: true,
+                                },
+                                trigger: this.getNotificationTrigger(hours, minutes, true),
+                            });
 
-                        await this.saveScheduledNotification({
-                            id,
-                            type: 'meal',
-                            title: 'Snack Reminder',
-                            body: 'Log your snacks',
-                            scheduledTime: time,
-                            repeats: true,
-                            enabled: true,
-                        });
+                            await this.saveScheduledNotification({
+                                id,
+                                type: 'meal',
+                                title: 'Snack Reminder',
+                                body: 'Log your snacks',
+                                scheduledTime: time,
+                                repeats: true,
+                                enabled: true,
+                            });
+                        } else {
+                            // For Android, schedule notifications for the next 30 days
+                            for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+                                const notificationDate = new Date();
+                                notificationDate.setDate(notificationDate.getDate() + dayOffset);
+                                notificationDate.setHours(hours, minutes, 0, 0);
+
+                                // Skip if this time has already passed today
+                                if (dayOffset === 0 && notificationDate <= new Date()) {
+                                    continue;
+                                }
+
+                                const secondsFromNow = Math.floor((notificationDate.getTime() - new Date().getTime()) / 1000);
+
+                                const id = await Notifications.scheduleNotificationAsync({
+                                    content: {
+                                        title: '🍎 Snack Time!',
+                                        body: this.getMealReminderMessage('Snack', settings.generalSettings.savageMode),
+                                        data: { 
+                                            type: 'snack_reminder', 
+                                            time,
+                                            action: 'open_app'
+                                        },
+                                        sound: true,
+                                    },
+                                    trigger: {
+                                        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                                        seconds: secondsFromNow,
+                                        repeats: false
+                                    }
+                                });
+
+                                await this.saveScheduledNotification({
+                                    id,
+                                    type: 'meal',
+                                    title: 'Snack Reminder',
+                                    body: 'Log your snacks',
+                                    scheduledTime: `${time} (Day ${dayOffset})`,
+                                    repeats: false,
+                                    enabled: true,
+                                });
+                            }
+                        }
                     } catch (error) {
                         console.error(`Error scheduling snack reminder for ${time}:`, error);
                     }
@@ -472,27 +551,73 @@ class NotificationService {
 
     private async scheduleStatusNotifications(settings: NotificationSettings): Promise<void> {
         if (settings.statusNotifications.dailyProgress) {
-            // Evening progress notification
+            // Helpful evening reminder notification instead of generic progress check
             try {
-                const id = await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: '📊 Daily Progress Update',
-                        body: 'Check out your progress for today!',
-                        data: { type: 'daily_progress' },
-                        sound: true,
-                    },
-                    trigger: this.getNotificationTrigger(19, 0), // 7 PM
-                });
+                // For iOS, schedule one repeating notification
+                if (Platform.OS === 'ios') {
+                    const id = await Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: '🎯 Evening Check-in',
+                            body: this.getEveningReminderMessage(settings.generalSettings.savageMode),
+                            data: { 
+                                type: 'daily_progress',
+                                action: 'open_app'
+                            },
+                            sound: true,
+                        },
+                        trigger: this.getNotificationTrigger(19, 0, true), // 7 PM
+                    });
 
-                await this.saveScheduledNotification({
-                    id,
-                    type: 'status',
-                    title: 'Daily Progress',
-                    body: 'Progress update',
-                    scheduledTime: '19:00',
-                    repeats: true,
-                    enabled: true,
-                });
+                    await this.saveScheduledNotification({
+                        id,
+                        type: 'status',
+                        title: 'Evening Check-in',
+                        body: 'Daily reminder',
+                        scheduledTime: '19:00',
+                        repeats: true,
+                        enabled: true,
+                    });
+                } else {
+                    // For Android, schedule for next 30 days
+                    for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+                        const notificationDate = new Date();
+                        notificationDate.setDate(notificationDate.getDate() + dayOffset);
+                        notificationDate.setHours(19, 0, 0, 0);
+
+                        if (dayOffset === 0 && notificationDate <= new Date()) {
+                            continue;
+                        }
+
+                        const secondsFromNow = Math.floor((notificationDate.getTime() - new Date().getTime()) / 1000);
+
+                        const id = await Notifications.scheduleNotificationAsync({
+                            content: {
+                                title: '🎯 Evening Check-in',
+                                body: this.getEveningReminderMessage(settings.generalSettings.savageMode),
+                                data: { 
+                                    type: 'daily_progress',
+                                    action: 'open_app'
+                                },
+                                sound: true,
+                            },
+                            trigger: {
+                                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                                seconds: secondsFromNow,
+                                repeats: false
+                            }
+                        });
+
+                        await this.saveScheduledNotification({
+                            id,
+                            type: 'status',
+                            title: 'Evening Check-in',
+                            body: 'Daily reminder',
+                            scheduledTime: `19:00 (Day ${dayOffset})`,
+                            repeats: false,
+                            enabled: true,
+                        });
+                    }
+                }
             } catch (error) {
                 console.error('Error scheduling daily progress notification:', error);
             }
@@ -536,6 +661,64 @@ class NotificationService {
             // This would be scheduled when new features are released
             console.log('New feature notifications will be scheduled as needed');
         }
+    }
+
+    // Message generation methods
+    private getMealReminderMessage(mealName: string, savageMode: boolean): string {
+        const normalMessages = [
+            `Don't forget to log your ${mealName.toLowerCase()}`,
+            `Time to track your ${mealName.toLowerCase()}!`,
+            `Ready to log your ${mealName.toLowerCase()}?`,
+        ];
+
+        const savageMessages = [
+            `Stop hiding and log your ${mealName.toLowerCase()}! 🍽️`,
+            `We see you avoiding the food log... 👀`,
+            `Your ${mealName.toLowerCase()} isn't going to log itself! 📱`,
+            `Seriously? Still no ${mealName.toLowerCase()} logged? 🤨`,
+            `The food log is feeling lonely without your ${mealName.toLowerCase()}...`,
+        ];
+
+        const messages = savageMode ? savageMessages : normalMessages;
+        return messages[Math.floor(Math.random() * messages.length)];
+    }
+
+    private getMissedMealMessage(mealName: string, savageMode: boolean): string {
+        const normalMessages = [
+            `Don't forget to log your ${mealName.toLowerCase()} when you get a chance`,
+            `Looks like you missed logging ${mealName.toLowerCase()}`,
+        ];
+
+        const savageMessages = [
+            `Still haven't logged ${mealName.toLowerCase()}? We're disappointed 😤`,
+            `${mealName} happened 2 hours ago and still no log? Come on! 🙄`,
+            `Did you think we'd forget about your missing ${mealName.toLowerCase()}? Think again! 😏`,
+            `Your ${mealName.toLowerCase()} is playing hide and seek with the food log 🙈`,
+        ];
+
+        const messages = savageMode ? savageMessages : normalMessages;
+        return messages[Math.floor(Math.random() * messages.length)];
+    }
+
+    private getEveningReminderMessage(savageMode: boolean): string {
+        const normalMessages = [
+            `Time to review your day and plan tomorrow's meals 📝`,
+            `How did your nutrition goals go today? 🥗`,
+            `Quick check: did you hit your targets today? 🎯`,
+            `Evening reflection: what went well with your eating today? ✨`,
+            `Take a moment to see how your day shaped up 📊`,
+        ];
+
+        const savageMessages = [
+            `Time for a reality check - did you actually stick to your goals today? 🤔`,
+            `Let's see... how many meals did you "forget" to log today? 🙄`,
+            `Evening confession time: what did you eat that you haven't logged? 😏`,
+            `Day's almost over - better late than never to fix that food log! ⏰`,
+            `Plot twist: we know you had more than what's logged 👀`,
+        ];
+
+        const messages = savageMode ? savageMessages : normalMessages;
+        return messages[Math.floor(Math.random() * messages.length)];
     }
 
     // Utility methods

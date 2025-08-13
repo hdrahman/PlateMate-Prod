@@ -786,6 +786,38 @@ export default function NotificationsScreen() {
                             )}
                         </GradientBorderCard>
 
+                        {/* Savage Mode */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="flame" size={24} color={ACCENT_RED} />
+                                <Text style={styles.sectionTitle}>Savage Mode</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Enable Savage Mode</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Get brutally honest, edgy notifications that call you out
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.generalSettings.savageMode}
+                                    onValueChange={(value) => handleToggle('generalSettings.savageMode', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
+                                    thumbColor={settings.generalSettings.savageMode ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            {settings.generalSettings.savageMode && (
+                                <View style={styles.warningContainer}>
+                                    <Ionicons name="warning" size={20} color={ACCENT_ORANGE} />
+                                    <Text style={styles.warningText}>
+                                        Savage Mode delivers blunt, no-nonsense notifications. We'll call you out when you're slacking!
+                                    </Text>
+                                </View>
+                            )}
+                        </GradientBorderCard>
+
                         {/* Reset Button */}
                         <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
                             <Ionicons name="refresh" size={20} color={ACCENT_RED} />
@@ -1147,5 +1179,20 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: WHITE,
         marginBottom: 4,
+    },
+    warningContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 10,
+    },
+    warningText: {
+        fontSize: 14,
+        color: ACCENT_ORANGE,
+        marginLeft: 10,
+        flex: 1,
+        fontStyle: 'italic',
     },
 }); 

@@ -30,6 +30,7 @@ export interface NotificationSettings {
         quietStart: string;
         quietEnd: string;
         enabled: boolean;
+        savageMode: boolean;
     };
 }
 

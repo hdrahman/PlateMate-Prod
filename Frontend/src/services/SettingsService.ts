@@ -42,6 +42,7 @@ class SettingsService {
             quietStart: '22:00',
             quietEnd: '07:00',
             enabled: true,
+            savageMode: false,
         },
     };
 
