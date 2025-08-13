@@ -4,6 +4,7 @@ import * as SQLite from 'expo-sqlite';
 import { updateDatabaseSchema } from './updateDatabase';
 import { supabase } from './supabaseClient';
 import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
+import { formatDateToString } from './dateUtils';
 
 // Import subscription types
 import { SubscriptionStatus, SubscriptionDetails } from '../types/user';
@@ -1249,7 +1250,7 @@ export const addWaterIntake = async (amountMl: number, containerType: string = '
 
     const firebaseUserId = getCurrentUserId();
     const timestamp = getCurrentDate();
-    const date = timestamp.split('T')[0]; // YYYY-MM-DD format
+    const date = formatDateToString(new Date()); // Use consistent local date formatting
 
     try {
         const result = await db.runAsync(
