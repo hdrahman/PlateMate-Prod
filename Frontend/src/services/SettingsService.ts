@@ -31,6 +31,12 @@ class SettingsService {
             goalAchievements: true,
             weeklyProgress: true,
         },
+        behavioralNotifications: {
+            missedMeals: true,
+            unhealthyFoodWarnings: true,
+            streakCelebrations: true,
+            plateauBreaking: false, // Start disabled as it's advanced
+        },
         engagementNotifications: {
             weeklyReports: true,
             reEngagement: false,
@@ -90,9 +96,9 @@ class SettingsService {
                     await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
                 }
 
-                // Handle migration for existing users who don't have permanentNotification property
-                if (!parsed.permanentNotification) {
-                    parsed.permanentNotification = this.defaultNotificationSettings.permanentNotification;
+                // Handle migration for existing users who don't have behavioral notifications
+                if (!parsed.behavioralNotifications) {
+                    parsed.behavioralNotifications = this.defaultNotificationSettings.behavioralNotifications;
                     // Save the migrated settings
                     await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
                 }

@@ -786,6 +786,74 @@ export default function NotificationsScreen() {
                             )}
                         </GradientBorderCard>
 
+                        {/* Behavioral Notifications */}
+                        <GradientBorderCard>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="pulse" size={24} color={ACCENT_PURPLE} />
+                                <Text style={styles.sectionTitle}>Smart Notifications</Text>
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Missed Meal Detection</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Get reminded when you haven't logged meals
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.behavioralNotifications?.missedMeals || false}
+                                    onValueChange={(value) => handleToggle('behavioralNotifications.missedMeals', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                    thumbColor={settings.behavioralNotifications?.missedMeals ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Unhealthy Food Warnings</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Alerts for high sodium, sugar, or processed foods
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.behavioralNotifications?.unhealthyFoodWarnings || false}
+                                    onValueChange={(value) => handleToggle('behavioralNotifications.unhealthyFoodWarnings', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                    thumbColor={settings.behavioralNotifications?.unhealthyFoodWarnings ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Streak Celebrations</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Celebrate your consistency milestones
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.behavioralNotifications?.streakCelebrations || false}
+                                    onValueChange={(value) => handleToggle('behavioralNotifications.streakCelebrations', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                    thumbColor={settings.behavioralNotifications?.streakCelebrations ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <Text style={styles.settingLabel}>Plateau Breaking</Text>
+                                    <Text style={styles.settingDescription}>
+                                        Get motivated when you've been inactive
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={settings.behavioralNotifications?.plateauBreaking || false}
+                                    onValueChange={(value) => handleToggle('behavioralNotifications.plateauBreaking', value)}
+                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                    thumbColor={settings.behavioralNotifications?.plateauBreaking ? '#fff' : '#f4f3f4'}
+                                />
+                            </View>
+                        </GradientBorderCard>
+
                         {/* Savage Mode */}
                         <GradientBorderCard>
                             <View style={styles.sectionHeader}>

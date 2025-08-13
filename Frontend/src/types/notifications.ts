@@ -19,6 +19,12 @@ export interface NotificationSettings {
         goalAchievements: boolean;
         weeklyProgress: boolean;
     };
+    behavioralNotifications: {
+        missedMeals: boolean;
+        unhealthyFoodWarnings: boolean;
+        streakCelebrations: boolean;
+        plateauBreaking: boolean;
+    };
     engagementNotifications: {
         weeklyReports: boolean;
         reEngagement: boolean;
@@ -36,7 +42,7 @@ export interface NotificationSettings {
 
 export interface NotificationSchedule {
     id: string;
-    type: 'meal' | 'water' | 'status' | 'engagement';
+    type: 'meal' | 'water' | 'status' | 'engagement' | 'behavioral' | 'achievement' | 'streak';
     title: string;
     body: string;
     scheduledTime: string;

@@ -9,7 +9,13 @@
       "Bash(npx tsc:*)",
       "Bash(node:*)",
       "Bash(python:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(where sqlite3)",
+      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" platemate_local.db \".tables\")",
+      "Bash(dir:*)",
+      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT name FROM sqlite_master WHERE type=''table'';\")",
+      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT * FROM sqlite_master;\")",
+      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT COUNT(*) FROM sqlite_master WHERE type=''table'' AND name=''water_intake'';\")"
     ],
     "deny": []
   }
