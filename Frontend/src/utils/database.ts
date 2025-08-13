@@ -447,7 +447,12 @@ export const isDatabaseReady = () => {
 // Helper function to get current date in YYYY-MM-DD format
 export const getCurrentDate = () => {
     const now = new Date();
-    return now.toISOString();
+    return formatDateToString(now);
+};
+
+// Helper function to get current timestamp in ISO format for precise timing
+export const getCurrentTimestamp = () => {
+    return new Date().toISOString();
 };
 
 // Helper function to get current user ID (Legacy sync version)
@@ -1209,8 +1214,8 @@ export const addWaterIntake = async (amountMl: number, containerType: string = '
     }
 
     const firebaseUserId = getCurrentUserId();
-    const timestamp = getCurrentDate();
-    const date = formatDateToString(new Date()); // Use consistent local date formatting
+    const timestamp = getCurrentTimestamp();
+    const date = getCurrentDate();
 
     try {
         const result = await db.runAsync(
@@ -4046,7 +4051,7 @@ export const saveOnboardingProgressIncremental = async (
 
     try {
         const profileDataString = JSON.stringify(profileData);
-        const timestamp = getCurrentDate();
+        const timestamp = getCurrentTimestamp();
 
         // Check if temp session already exists
         const existingSession = await db.getFirstAsync(

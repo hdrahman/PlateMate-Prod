@@ -209,7 +209,8 @@ class UnifiedStepTracker {
     }
 
     private async checkDateAndResetIfNeeded(): Promise<void> {
-        const today = new Date().toISOString().split('T')[0];
+        const { formatDateToString } = await import('../utils/dateUtils');
+        const today = formatDateToString(new Date());
         const lastResetDate = await AsyncStorage.getItem(LAST_RESET_DATE_KEY);
 
         if (lastResetDate !== today) {
@@ -251,7 +252,8 @@ class UnifiedStepTracker {
     private async handleMidnightReset(): Promise<void> {
         try {
             console.log('🌅 Performing midnight reset...');
-            const today = new Date().toISOString().split('T')[0];
+            const { formatDateToString } = await import('../utils/dateUtils');
+            const today = formatDateToString(new Date());
 
             // Reset step count and cached data
             this.state.currentSteps = 0;
@@ -288,7 +290,8 @@ class UnifiedStepTracker {
 
     private async loadPreviousState(): Promise<void> {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const { formatDateToString } = await import('../utils/dateUtils');
+            const today = formatDateToString(new Date());
             
             // Try multiple data sources with retry logic
             let dbSteps = 0;
@@ -407,7 +410,8 @@ class UnifiedStepTracker {
             this.lastAppResumeRecovery = Date.now();
             console.log('🔄 Performing app resume recovery...');
 
-            const today = new Date().toISOString().split('T')[0];
+            const { formatDateToString } = await import('../utils/dateUtils');
+            const today = formatDateToString(new Date());
             const currentDisplayedSteps = this.state.currentSteps;
 
             // 1. Force refresh from all available sources
@@ -858,7 +862,8 @@ class UnifiedStepTracker {
 
     private async syncToDatabase(): Promise<void> {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const { formatDateToString } = await import('../utils/dateUtils');
+            const today = formatDateToString(new Date());
 
             await updateTodaySteps(this.state.currentSteps);
 

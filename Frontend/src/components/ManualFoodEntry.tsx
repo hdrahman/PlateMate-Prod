@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -70,13 +70,149 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
     );
 };
 
+// Separate component for health rating slider to isolate animations
+interface HealthRatingSliderProps {
+    healthRating: number;
+    onRatingChange: (rating: number) => void;
+}
+
+const HealthRatingSlider = React.memo(({ healthRating, onRatingChange }: HealthRatingSliderProps) => {
+    const sliderOffset = useSharedValue(0);
+    const indicatorRadius = 8;
+    const sliderWidth = 280 - (indicatorRadius * 2);
+
+    // Initialize slider position based on current rating
+    React.useEffect(() => {
+        const position = ((healthRating - 1) / 9) * sliderWidth;
+        sliderOffset.value = position;
+    }, [healthRating, sliderWidth]);
+
+    // Memoized callback to prevent recreation on every render
+    const updateHealthRating = useCallback((newRating: number) => {
+        onRatingChange(newRating);
+    }, [onRatingChange]);
+
+    // Memoized pan gesture
+    const panGesture = React.useMemo(() => 
+        Gesture.Pan()
+            .onStart(() => {})
+            .onUpdate((event) => {
+                const adjustedX = event.x - indicatorRadius;
+                const currentX = Math.max(0, Math.min(sliderWidth, adjustedX));
+                const percentage = currentX / sliderWidth;
+                const rawRating = 1 + (percentage * 9);
+                const newRating = Math.max(1, Math.min(10, Math.round(rawRating)));
+                
+                sliderOffset.value = currentX;
+                runOnJS(updateHealthRating)(newRating);
+            })
+            .onEnd((event) => {
+                const adjustedX = event.x - indicatorRadius;
+                const currentX = Math.max(0, Math.min(sliderWidth, adjustedX));
+                const percentage = currentX / sliderWidth;
+                const rawRating = 1 + (percentage * 9);
+                const newRating = Math.max(1, Math.min(10, Math.round(rawRating)));
+                const finalPosition = ((newRating - 1) / 9) * sliderWidth;
+                sliderOffset.value = finalPosition;
+            })
+    , [sliderWidth, indicatorRadius, updateHealthRating]);
+
+    // Memoized animated style
+    const sliderIndicatorStyle = useAnimatedStyle(() => ({
+        left: sliderOffset.value + indicatorRadius,
+    }), []);
+
+    // Memoized color calculation
+    const getHealthinessColor = useCallback((rating: number): string => {
+        if (rating <= 4) return '#FF5252';
+        if (rating <= 7) return '#FFD740';
+        return '#4CAF50';
+    }, []);
+
+    // Memoized rating label
+    const getHealthRatingLabel = useCallback((rating: number): string => {
+        if (rating <= 2) return 'Very Poor';
+        if (rating <= 4) return 'Poor';
+        if (rating <= 6) return 'Fair';
+        if (rating <= 7) return 'Good';
+        if (rating <= 8.5) return 'Very Good';
+        return 'Excellent';
+    }, []);
+
+    const healthColor = getHealthinessColor(healthRating);
+    const healthLabel = getHealthRatingLabel(healthRating);
+
+    return (
+        <View style={[styles.healthRatingCard, { backgroundColor: `${healthColor}15` }]}>
+            {/* Rating Display Header */}
+            <View style={styles.healthRatingHeader}>
+                <View style={styles.healthRatingMainDisplay}>
+                    <Text style={[styles.healthRatingScore, { color: healthColor }]}>
+                        {Math.round(healthRating)}
+                    </Text>
+                    <Text style={styles.healthRatingMaxScore}>/10</Text>
+                </View>
+                <View style={styles.healthRatingStatus}>
+                    <View style={[styles.healthRatingIndicator, { backgroundColor: healthColor }]} />
+                    <Text style={[styles.healthRatingStatusText, { color: healthColor }]}>
+                        {healthLabel}
+                    </Text>
+                </View>
+            </View>
+
+            {/* Visual Rating Bar */}
+            <View style={styles.healthRatingBarContainer}>
+                <GestureDetector gesture={panGesture}>
+                    <View style={styles.healthRatingBarBackground}>
+                        <LinearGradient
+                            colors={['#FF5252', '#FFD740', '#4CAF50']}
+                            style={styles.healthRatingBarGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        />
+                        <Animated.View style={[
+                            styles.healthRatingBarIndicator,
+                            sliderIndicatorStyle
+                        ]} />
+                    </View>
+                </GestureDetector>
+                <View style={styles.healthRatingBarLabels}>
+                    <Text style={styles.healthRatingBarLabel}>Poor</Text>
+                    <Text style={styles.healthRatingBarLabel}>Good</Text>
+                    <Text style={styles.healthRatingBarLabel}>Excellent</Text>
+                </View>
+            </View>
+
+            {/* Rating Guidelines */}
+            <View style={styles.healthRatingGuidelines}>
+                <Text style={styles.healthRatingGuidelinesTitle}>Rating Guide</Text>
+                <View style={styles.healthRatingGuidelinesList}>
+                    <View style={styles.healthRatingGuideline}>
+                        <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FF5252' }]} />
+                        <Text style={styles.healthRatingGuidelineText}>1-4: Processed, high sugar/sodium</Text>
+                    </View>
+                    <View style={styles.healthRatingGuideline}>
+                        <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FFD740' }]} />
+                        <Text style={styles.healthRatingGuidelineText}>5-7: Moderate nutrition value</Text>
+                    </View>
+                    <View style={styles.healthRatingGuideline}>
+                        <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#4CAF50' }]} />
+                        <Text style={styles.healthRatingGuidelineText}>8-10: Whole foods, nutrient-dense</Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+});
+
 interface ManualFoodEntryProps {
     visible: boolean;
     onClose: () => void;
     onAddFood: (food: FoodItem, mealType: string, quantity: number) => void;
 }
 
-export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualFoodEntryProps) {
+// Memoize the main component to prevent unnecessary re-renders
+const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood }: ManualFoodEntryProps) => {
     const [foodName, setFoodName] = useState<string>('');
     const [calories, setCalories] = useState<string>('');
     const [proteins, setProteins] = useState<string>('0');
@@ -93,83 +229,20 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
     // AI estimation state
     const [isEstimating, setIsEstimating] = useState<boolean>(false);
 
-    // Health rating state and animation values
+    // Health rating state
     const [healthRating, setHealthRating] = useState<number>(5);
-    const sliderOffset = useSharedValue(0);
-    const indicatorRadius = 8; // Half of indicator width (16/2)
-    const sliderWidth = 280 - (indicatorRadius * 2); // Account for indicator size on both ends
 
-    // Initialize slider position based on current rating
-    React.useEffect(() => {
-        const position = ((healthRating - 1) / 9) * sliderWidth;
-        sliderOffset.value = position;
-    }, [healthRating, sliderWidth]);
+    // Memoized form validation
+    const isFormValid = React.useMemo(() => 
+        foodName.trim() !== '' && calories.trim() !== '' && parseFloat(calories) > 0,
+        [foodName, calories]
+    );
 
-    // Update health rating from gesture
-    const updateHealthRating = (newRating: number) => {
-        setHealthRating(newRating);
-    };
+    // Memoized meal options
+    const mealOptions = React.useMemo(() => ['Breakfast', 'Lunch', 'Dinner', 'Snack'], []);
 
-    // Pan gesture for smooth slider interaction
-    const panGesture = Gesture.Pan()
-        .onStart(() => {
-            // Store the current position when starting the gesture
-        })
-        .onUpdate((event) => {
-            // Use x coordinate but account for indicator radius padding
-            const adjustedX = event.x - indicatorRadius;
-            const currentX = Math.max(0, Math.min(sliderWidth, adjustedX));
-            const percentage = currentX / sliderWidth;
-            const rawRating = 1 + (percentage * 9);
-            const newRating = Math.max(1, Math.min(10, Math.round(rawRating)));
-
-            // Update the visual position immediately
-            sliderOffset.value = currentX;
-
-            // Update the rating state
-            runOnJS(updateHealthRating)(newRating);
-        })
-        .onEnd((event) => {
-            // Snap to the final position based on the final rating
-            const adjustedX = event.x - indicatorRadius;
-            const currentX = Math.max(0, Math.min(sliderWidth, adjustedX));
-            const percentage = currentX / sliderWidth;
-            const rawRating = 1 + (percentage * 9);
-            const newRating = Math.max(1, Math.min(10, Math.round(rawRating)));
-            const finalPosition = ((newRating - 1) / 9) * sliderWidth;
-            sliderOffset.value = finalPosition;
-        });
-
-    // Animated style for the slider indicator
-    const sliderIndicatorStyle = useAnimatedStyle(() => ({
-        left: sliderOffset.value + indicatorRadius,
-    }));
-
-    // Check if form is valid (has food name and calories)
-    const isFormValid = foodName.trim() !== '' && calories.trim() !== '' && parseFloat(calories) > 0;
-
-    // Meal options
-    const mealOptions = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-
-    // Get color based on healthiness rating
-    const getHealthinessColor = (rating: number): string => {
-        if (rating <= 4) return '#FF5252'; // Red for unhealthy (0-4)
-        if (rating <= 7) return '#FFD740'; // Yellow for moderate (5-7)
-        return '#4CAF50'; // Green for healthy (8-10)
-    };
-
-    // Get health rating label
-    const getHealthRatingLabel = (rating: number): string => {
-        if (rating <= 2) return 'Very Poor';
-        if (rating <= 4) return 'Poor';
-        if (rating <= 6) return 'Fair';
-        if (rating <= 7) return 'Good';
-        if (rating <= 8.5) return 'Very Good';
-        return 'Excellent';
-    };
-
-    // Reset form
-    const resetForm = () => {
+    // Memoized reset form function
+    const resetForm = useCallback(() => {
         setFoodName('');
         setCalories('');
         setProteins('0');
@@ -182,10 +255,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         setServingUnit('serving');
         setHealthRating(5);
         setIsEstimating(false);
-    };
+    }, []);
 
-    // Handle AI nutrition estimation
-    const handleAIEstimation = async () => {
+    // Memoized AI estimation handler
+    const handleAIEstimation = useCallback(async () => {
         if (!foodName.trim()) {
             Alert.alert('Error', 'Please enter a food name first');
             return;
@@ -247,10 +320,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
         } finally {
             setIsEstimating(false);
         }
-    };
+    }, [foodName, quantity, servingUnit]);
 
-    // Handle save
-    const handleSave = () => {
+    // Memoized save handler
+    const handleSave = useCallback(() => {
         // Validate required fields
         if (!foodName.trim()) {
             Alert.alert('Error', 'Please enter a food name');
@@ -305,7 +378,12 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
 
         // Reset form for next use
         resetForm();
-    };
+    }, [foodName, calories, proteins, carbs, fats, fiber, sugar, quantity, servingUnit, selectedMeal, healthRating, onAddFood, resetForm]);
+
+    // Memoized health rating change handler
+    const handleHealthRatingChange = useCallback((newRating: number) => {
+        setHealthRating(newRating);
+    }, []);
 
     return (
         <Modal
@@ -518,67 +596,10 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
                         <GradientBorderCard style={styles.section}>
                             <Text style={styles.sectionTitle}>Health Rating</Text>
                             <Text style={styles.healthRatingSubtitle}>How nutritious is this food?</Text>
-
-                            {/* Health Rating Card */}
-                            <View style={[styles.healthRatingCard, { backgroundColor: `${getHealthinessColor(healthRating)}15` }]}>
-                                {/* Rating Display Header */}
-                                <View style={styles.healthRatingHeader}>
-                                    <View style={styles.healthRatingMainDisplay}>
-                                        <Text style={[styles.healthRatingScore, { color: getHealthinessColor(healthRating) }]}>
-                                            {Math.round(healthRating)}
-                                        </Text>
-                                        <Text style={styles.healthRatingMaxScore}>/10</Text>
-                                    </View>
-                                    <View style={styles.healthRatingStatus}>
-                                        <View style={[styles.healthRatingIndicator, { backgroundColor: getHealthinessColor(healthRating) }]} />
-                                        <Text style={[styles.healthRatingStatusText, { color: getHealthinessColor(healthRating) }]}>
-                                            {getHealthRatingLabel(healthRating)}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Visual Rating Bar */}
-                                <View style={styles.healthRatingBarContainer}>
-                                    <GestureDetector gesture={panGesture}>
-                                        <View style={styles.healthRatingBarBackground}>
-                                            <LinearGradient
-                                                colors={['#FF5252', '#FFD740', '#4CAF50']}
-                                                style={styles.healthRatingBarGradient}
-                                                start={{ x: 0, y: 0 }}
-                                                end={{ x: 1, y: 0 }}
-                                            />
-                                            <Animated.View style={[
-                                                styles.healthRatingBarIndicator,
-                                                sliderIndicatorStyle
-                                            ]} />
-                                        </View>
-                                    </GestureDetector>
-                                    <View style={styles.healthRatingBarLabels}>
-                                        <Text style={styles.healthRatingBarLabel}>Poor</Text>
-                                        <Text style={styles.healthRatingBarLabel}>Good</Text>
-                                        <Text style={styles.healthRatingBarLabel}>Excellent</Text>
-                                    </View>
-                                </View>
-
-                                {/* Rating Guidelines */}
-                                <View style={styles.healthRatingGuidelines}>
-                                    <Text style={styles.healthRatingGuidelinesTitle}>Rating Guide</Text>
-                                    <View style={styles.healthRatingGuidelinesList}>
-                                        <View style={styles.healthRatingGuideline}>
-                                            <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FF5252' }]} />
-                                            <Text style={styles.healthRatingGuidelineText}>1-4: Processed, high sugar/sodium</Text>
-                                        </View>
-                                        <View style={styles.healthRatingGuideline}>
-                                            <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FFD740' }]} />
-                                            <Text style={styles.healthRatingGuidelineText}>5-7: Moderate nutrition value</Text>
-                                        </View>
-                                        <View style={styles.healthRatingGuideline}>
-                                            <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#4CAF50' }]} />
-                                            <Text style={styles.healthRatingGuidelineText}>8-10: Whole foods, nutrient-dense</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
+                            <HealthRatingSlider 
+                                healthRating={healthRating}
+                                onRatingChange={handleHealthRatingChange}
+                            />
                         </GradientBorderCard>
 
                         {/* Save Button */}
@@ -607,7 +628,9 @@ export default function ManualFoodEntry({ visible, onClose, onAddFood }: ManualF
             </GestureHandlerRootView>
         </Modal>
     );
-}
+});
+
+export default ManualFoodEntry;
 
 const styles = StyleSheet.create({
     container: {
