@@ -518,8 +518,55 @@ const EditProfile = () => {
                         weight: weightInKg
                     };
                     
+                    console.log('🔄 Recalculating BMR after weight change:', {
+                        oldWeight: fullProfile.weight,
+                        newWeight: weightInKg,
+                        targetWeight: fullProfile.target_weight || 'not set',
+                        height: fullProfile.height,
+                        age: fullProfile.age,
+                        gender: fullProfile.gender
+                    });
+                    
                     await calculateAndStoreBMR(profileForBMR, user.uid);
                     console.log('✅ BMR recalculated after weight change');
+                    
+                    // IMPORTANT: Also update nutrition goals since weight changed
+                    try {
+                        const { calculateNutritionGoals } = await import('../utils/nutritionCalculator');
+                        const { updateUserGoals } = await import('../utils/database');
+                        
+                        // Convert database profile format to frontend format for calculation
+                        const profileForNutrition = {
+                            height: profileForBMR.height,
+                            weight: profileForBMR.weight,
+                            age: profileForBMR.age,
+                            gender: profileForBMR.gender,
+                            activityLevel: profileForBMR.activity_level,
+                            weightGoal: profileForBMR.weight_goal,
+                            targetWeight: profileForBMR.target_weight,
+                            nutrientFocus: profileForBMR.nutrient_focus
+                        };
+                        
+                        const newNutritionGoals = calculateNutritionGoals(profileForNutrition);
+                        console.log('🔄 Updating nutrition goals after weight change:', newNutritionGoals);
+                        
+                        await updateUserGoals(user.uid, {
+                            calorieGoal: newNutritionGoals.calories,
+                            proteinGoal: newNutritionGoals.protein,
+                            carbGoal: newNutritionGoals.carbs,
+                            fatGoal: newNutritionGoals.fat
+                        });
+                        console.log('✅ Nutrition goals updated after weight change');
+                    } catch (nutritionError) {
+                        console.warn('⚠️ Failed to update nutrition goals after weight change:', nutritionError);
+                    }
+                } else {
+                    console.log('⚠️ Cannot recalculate BMR - missing profile fields:', {
+                        height: fullProfile?.height || 'MISSING',
+                        age: fullProfile?.age || 'MISSING',
+                        gender: fullProfile?.gender || 'MISSING',
+                        activityLevel: fullProfile?.activity_level || 'MISSING'
+                    });
                 }
             } catch (error) {
                 console.warn('⚠️ Failed to recalculate BMR after weight change:', error);
@@ -695,6 +742,37 @@ const EditProfile = () => {
                         
                         await calculateAndStoreBMR(profileForBMR, user.uid);
                         console.log('✅ BMR recalculated successfully after profile update');
+                        
+                        // CRITICAL: Also update nutrition goals after profile save
+                        try {
+                            const { calculateNutritionGoals } = await import('../utils/nutritionCalculator');
+                            const { updateUserGoals } = await import('../utils/database');
+                            
+                            // Convert database profile format to frontend format for calculation
+                            const profileForNutrition = {
+                                height: profileForBMR.height,
+                                weight: profileForBMR.weight,
+                                age: profileForBMR.age,
+                                gender: profileForBMR.gender,
+                                activityLevel: profileForBMR.activity_level,
+                                weightGoal: profileForBMR.weight_goal,
+                                targetWeight: profileForBMR.target_weight,
+                                nutrientFocus: profileForBMR.nutrient_focus
+                            };
+                            
+                            const newNutritionGoals = calculateNutritionGoals(profileForNutrition);
+                            console.log('🔄 Updating nutrition goals after profile save:', newNutritionGoals);
+                            
+                            await updateUserGoals(user.uid, {
+                                calorieGoal: newNutritionGoals.calories,
+                                proteinGoal: newNutritionGoals.protein,
+                                carbGoal: newNutritionGoals.carbs,
+                                fatGoal: newNutritionGoals.fat
+                            });
+                            console.log('✅ Nutrition goals updated after profile save');
+                        } catch (nutritionError) {
+                            console.warn('⚠️ Failed to update nutrition goals after profile save:', nutritionError);
+                        }
                     } else {
                         console.log('ℹ️ Cannot recalculate BMR - missing required profile fields');
                     }

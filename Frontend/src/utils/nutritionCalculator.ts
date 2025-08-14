@@ -25,11 +25,30 @@ export interface BMRCalculationResult {
  * Using the Mifflin-St Jeor Equation for BMR and proper weight goal adjustments
  */
 export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | null => {
+    // Validate required fields for BMR calculation
     if (!profile.height || !profile.weight || !profile.age || !profile.gender || !profile.activityLevel) {
+        console.log('❌ Cannot calculate BMR - missing required fields:', {
+            height: profile.height || 'MISSING',
+            weight: profile.weight || 'MISSING (current weight)',
+            targetWeight: profile.targetWeight || 'not set',
+            age: profile.age || 'MISSING',
+            gender: profile.gender || 'MISSING',
+            activityLevel: profile.activityLevel || 'MISSING'
+        });
         return null;
     }
 
-    // Calculate BMR using Mifflin-St Jeor Equation
+    // Log the values being used for BMR calculation for debugging
+    console.log('🧮 BMR Calculation using:', {
+        currentWeight: profile.weight,
+        targetWeight: profile.targetWeight || 'not set',
+        height: profile.height,
+        age: profile.age,
+        gender: profile.gender,
+        activityLevel: profile.activityLevel
+    });
+
+    // Calculate BMR using Mifflin-St Jeor Equation with CURRENT weight
     let bmr = 0;
     if (profile.gender === 'male') {
         bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age + 5;

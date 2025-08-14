@@ -401,61 +401,83 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                         console.log('Running migration to version 15 - Adding database indexes and performance optimizations...');
                         
                         try {
+                            // First, ensure exercises table exists before creating indexes
+                            console.log('📊 Creating exercises table if not exists...');
+                            await db.execAsync(`
+                                CREATE TABLE IF NOT EXISTS exercises (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    user_id INTEGER DEFAULT 1,
+                                    exercise_name TEXT NOT NULL,
+                                    calories_burned INTEGER NOT NULL,
+                                    duration INTEGER NOT NULL,
+                                    date TEXT NOT NULL,
+                                    notes TEXT,
+                                    synced INTEGER DEFAULT 0,
+                                    sync_action TEXT DEFAULT 'create',
+                                    last_modified TEXT NOT NULL
+                                )
+                            `);
+                            console.log('✅ Created exercises table');
+                            
                             // Create critical indexes for food_logs table
                             console.log('📊 Creating database indexes for performance optimization...');
                             
+                            // Helper function to safely create indexes
+                            const createIndexSafely = async (indexSQL: string, indexName: string) => {
+                                try {
+                                    await db.execAsync(indexSQL);
+                                    console.log(`✅ Created index: ${indexName}`);
+                                } catch (error) {
+                                    console.warn(`⚠️ Could not create index ${indexName}:`, error.message);
+                                    // Don't throw - continue with other indexes
+                                }
+                            };
+                            
                             // Composite index for user_id + date queries (most common query pattern)
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_user_date 
                                 ON food_logs(user_id, date)
-                            `);
-                            console.log('✅ Created index: idx_food_logs_user_date');
+                            `, 'idx_food_logs_user_date');
                             
                             // Index for user_id + id for recent food lookups
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_user_id 
                                 ON food_logs(user_id, id DESC)
-                            `);
-                            console.log('✅ Created index: idx_food_logs_user_id');
+                            `, 'idx_food_logs_user_id');
                             
                             // Index for sync operations
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_synced 
                                 ON food_logs(synced, user_id)
-                            `);
-                            console.log('✅ Created index: idx_food_logs_synced');
+                            `, 'idx_food_logs_synced');
                             
                             // Index for meal_type queries
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_meal_type 
                                 ON food_logs(user_id, meal_type, date)
-                            `);
-                            console.log('✅ Created index: idx_food_logs_meal_type');
+                            `, 'idx_food_logs_meal_type');
                             
                             // Indexes for other frequently queried tables
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_user_profiles_firebase_uid 
                                 ON user_profiles(firebase_uid)
-                            `);
-                            console.log('✅ Created index: idx_user_profiles_firebase_uid');
+                            `, 'idx_user_profiles_firebase_uid');
                             
-                            await db.execAsync(`
+                            // Index for exercises table (now safe to create)
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_exercises_user_date 
                                 ON exercises(user_id, date)
-                            `);
-                            console.log('✅ Created index: idx_exercises_user_date');
+                            `, 'idx_exercises_user_date');
                             
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_water_intake_user_date 
                                 ON water_intake(firebase_uid, date)
-                            `);
-                            console.log('✅ Created index: idx_water_intake_user_date');
+                            `, 'idx_water_intake_user_date');
                             
-                            await db.execAsync(`
+                            await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_steps_date 
                                 ON steps(date)
-                            `);
-                            console.log('✅ Created index: idx_steps_date');
+                            `, 'idx_steps_date');
                             
                             console.log('✅ Migration to version 15 complete - Database indexes created');
                         } catch (error) {

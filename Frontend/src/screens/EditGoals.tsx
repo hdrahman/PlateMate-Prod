@@ -498,7 +498,25 @@ export default function EditGoals() {
                     resetGoals = calculateNutritionGoalsFromProfile(profileForCalculation);
 
                     if (!resetGoals) {
-                        throw new Error('Unable to calculate nutrition goals - missing required profile data');
+                        // Check what's actually missing for better error messaging
+                        const missingFields = [];
+                        if (!profileForCalculation.weight) missingFields.push('current weight');
+                        if (!profileForCalculation.height) missingFields.push('height');
+                        if (!profileForCalculation.age) missingFields.push('age');
+                        if (!profileForCalculation.gender) missingFields.push('gender');
+                        if (!profileForCalculation.activity_level) missingFields.push('activity level');
+                        
+                        console.log('❌ Nutrition goals calculation failed. Missing fields:', missingFields);
+                        console.log('📋 Profile data available:', {
+                            currentWeight: profileForCalculation.weight,
+                            targetWeight: profileForCalculation.target_weight,
+                            height: profileForCalculation.height,
+                            age: profileForCalculation.age,
+                            gender: profileForCalculation.gender,
+                            activityLevel: profileForCalculation.activity_level
+                        });
+                        
+                        throw new Error(`Unable to calculate nutrition goals. Missing required fields: ${missingFields.join(', ')}. Note: Target weight is optional.`);
                     }
 
                     console.log('✅ Nutrition goals calculated offline');

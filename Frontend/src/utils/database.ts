@@ -314,21 +314,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         // Run database migrations to ensure all columns exist
         await updateDatabaseSchema(db);
 
-        // Create other tables
-        await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS exercises (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER DEFAULT 1,
-        exercise_name TEXT NOT NULL,
-        calories_burned INTEGER NOT NULL,
-        duration INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        notes TEXT,
-        synced INTEGER DEFAULT 0,
-        sync_action TEXT DEFAULT 'create',
-        last_modified TEXT NOT NULL
-      )
-    `);
+        // Note: exercises table is now created in migration script to ensure proper order
 
         // Create sync_status table
         await db.execAsync(`

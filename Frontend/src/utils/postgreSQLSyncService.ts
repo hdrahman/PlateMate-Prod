@@ -978,6 +978,8 @@ class PostgreSQLSyncService {
 
     private async restoreNutritionGoals(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
+            console.log('🔄 Attempting to restore nutrition goals for user:', firebaseUid);
+            
             const { data: goals, error } = await supabase
                 .from('nutrition_goals')
                 .select('*')
@@ -986,12 +988,20 @@ class PostgreSQLSyncService {
 
             if (error) {
                 if (error.code === 'PGRST116') {
+                    console.log('ℹ️ No nutrition goals found in PostgreSQL for user:', firebaseUid);
                     return; // Goals don't exist
                 }
                 throw error;
             }
 
+            console.log('✅ Found nutrition goals in PostgreSQL:', {
+                targetWeight: goals.target_weight,
+                calorieGoal: goals.daily_calorie_goal,
+                proteinGoal: goals.protein_goal
+            });
+
             const existingGoals = await getUserGoals(firebaseUid);
+            console.log('📋 Existing local goals:', existingGoals ? 'Found' : 'Not found');
 
             if (!existingGoals) {
                 // Create new goals
@@ -1005,12 +1015,16 @@ class PostgreSQLSyncService {
                     activityLevel: goals.activity_level
                 };
 
+                console.log('💾 Creating new local nutrition goals:', goalData);
                 await updateUserGoals(firebaseUid, goalData);
                 stats.nutritionGoalsRestored++;
+                console.log('✅ Nutrition goals restored successfully');
+            } else {
+                console.log('ℹ️ Local nutrition goals already exist, skipping restore');
             }
 
         } catch (error: any) {
-            console.error('Error restoring nutrition goals:', error);
+            console.error('❌ Error restoring nutrition goals:', error);
             errors.push(`Nutrition goals restore error: ${error.message}`);
         }
     }
