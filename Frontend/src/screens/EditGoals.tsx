@@ -340,17 +340,10 @@ export default function EditGoals() {
     }, [formValues.activityLevel, getActivityLevelIndex]);
 
     // Check if caloric-affecting values have changed
+    // NOTE: Target weight is NOT included because it doesn't affect calorie calculations
+    // (target weight is only used for progress tracking display)
     const hasCaloricValuesChanged = () => {
-        const currentTargetWeight = isImperialUnits && formValues.targetWeight
-            ? lbsToKg(formValues.targetWeight)
-            : formValues.targetWeight;
-
-        const originalTargetWeight = isImperialUnits && originalCaloricValues.targetWeight
-            ? originalCaloricValues.targetWeight
-            : originalCaloricValues.targetWeight;
-
         return (
-            currentTargetWeight !== originalTargetWeight ||
             formValues.fitnessGoal !== originalCaloricValues.fitnessGoal ||
             formValues.activityLevel !== originalCaloricValues.activityLevel
         );

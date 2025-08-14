@@ -139,13 +139,31 @@ export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | n
  */
 export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals => {
     if (!profile.height || !profile.weight || !profile.age || !profile.gender || !profile.activityLevel) {
+        console.log('❌ calculateNutritionGoals - Missing required data (target weight is optional):', {
+            height: profile.height || 'MISSING',
+            weight: profile.weight || 'MISSING',
+            targetWeight: profile.targetWeight || 'not set (OK)',
+            age: profile.age || 'MISSING',
+            gender: profile.gender || 'MISSING',
+            activityLevel: profile.activityLevel || 'MISSING'
+        });
         // Return default values if missing required data
         return getDefaultNutritionGoals();
     }
 
+    console.log('✅ calculateNutritionGoals - All required data present (target weight optional):', {
+        height: profile.height,
+        weight: profile.weight,
+        targetWeight: profile.targetWeight || 'not set (this is fine)',
+        age: profile.age,
+        gender: profile.gender,
+        activityLevel: profile.activityLevel
+    });
+
     // Use the new BMR calculation function
     const bmrData = calculateBMRData(profile);
     if (!bmrData) {
+        console.log('❌ calculateNutritionGoals - BMR calculation failed');
         return getDefaultNutritionGoals();
     }
 

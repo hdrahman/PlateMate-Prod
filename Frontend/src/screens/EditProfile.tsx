@@ -632,8 +632,11 @@ const EditProfile = () => {
             // Calculate age from date of birth if available
             const calculatedAge = dateOfBirth && dateOfBirth !== '---' ? calculateAge(dateOfBirth) : null;
 
+            // Get existing profile to preserve important fields like target_weight
+            const existingProfile = await getUserProfileByFirebaseUid(user.uid);
+            
             // Create profile data object based strictly on the fields that exist in user_profiles table
-            // Exclude location first in case it's not supported
+            // IMPORTANT: Preserve target_weight and other fields that shouldn't be cleared
             const baseProfileData = {
                 first_name: firstName,
                 last_name: lastName,
@@ -646,8 +649,18 @@ const EditProfile = () => {
                 email: email,
                 // Include date of birth and calculated age
                 ...(dateOfBirth && dateOfBirth !== '---' ? { date_of_birth: dateOfBirth } : {}),
-                ...(calculatedAge !== null ? { age: calculatedAge } : {})
+                ...(calculatedAge !== null ? { age: calculatedAge } : {}),
+                // CRITICAL: Preserve target_weight from existing profile to prevent it from being cleared
+                ...(existingProfile?.target_weight !== undefined ? { target_weight: existingProfile.target_weight } : {}),
+                // Preserve other important fields that shouldn't be lost during profile update
+                ...(existingProfile?.weight_goal ? { weight_goal: existingProfile.weight_goal } : {}),
+                ...(existingProfile?.activity_level ? { activity_level: existingProfile.activity_level } : {})
             };
+            
+            console.log('💾 Preserving target weight during profile update:', {
+                existingTargetWeight: existingProfile?.target_weight || 'not set',
+                preservedInUpdate: baseProfileData.target_weight || 'not preserved'
+            });
 
             // Save the location value regardless of whether we could save it to the database
             // We'll use it for the UI display
@@ -759,6 +772,13 @@ const EditProfile = () => {
                                 targetWeight: profileForBMR.target_weight,
                                 nutrientFocus: profileForBMR.nutrient_focus
                             };
+                            
+                            console.log('🧮 Profile data for nutrition calculation (target weight preserved):', {
+                                currentWeight: profileForNutrition.weight,
+                                targetWeight: profileForNutrition.targetWeight || 'not set (this is fine)',
+                                height: profileForNutrition.height,
+                                activityLevel: profileForNutrition.activityLevel
+                            });
                             
                             const newNutritionGoals = calculateNutritionGoals(profileForNutrition);
                             console.log('🔄 Updating nutrition goals after profile save:', newNutritionGoals);
