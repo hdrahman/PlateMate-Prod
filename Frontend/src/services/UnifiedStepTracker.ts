@@ -209,18 +209,27 @@ class UnifiedStepTracker {
     }
 
     private async checkDateAndResetIfNeeded(): Promise<void> {
-        const { formatDateToString } = await import('../utils/dateUtils');
-        const today = formatDateToString(new Date());
-        const lastResetDate = await AsyncStorage.getItem(LAST_RESET_DATE_KEY);
+        try {
+            const { formatDateToString } = await import('../utils/dateUtils');
+            const today = formatDateToString(new Date());
+            const lastResetDate = await AsyncStorage.getItem(LAST_RESET_DATE_KEY);
 
-        if (lastResetDate !== today) {
-            console.log('📅 New day detected, resetting step counter');
-            await this.handleMidnightReset();
+            console.log(`📅 Date check - Today: ${today}, Last reset: ${lastResetDate}`);
+
+            if (lastResetDate !== today) {
+                console.log('📅 New day detected, resetting step counter');
+                console.log(`📅 RESET TRIGGER: Date changed from ${lastResetDate} to ${today}`);
+                await this.handleMidnightReset();
+            } else {
+                console.log('📅 Same day confirmed, no reset needed');
+            }
+        } catch (error) {
+            console.error('❌ Error in date check and reset:', error);
         }
     }
 
     /**
-     * Start the midnight reset timer (copied from Home.tsx pattern)
+     * Start the midnight reset timer with improved reliability
      */
     private startMidnightResetTimer(): void {
         // Clear any existing timer
@@ -228,22 +237,40 @@ class UnifiedStepTracker {
             clearInterval(this.midnightResetInterval);
         }
 
-        // Check for midnight every minute
+        // Check for date changes more frequently and reliably
         const checkTimeAndReset = async () => {
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
+            try {
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
 
-            // Check if it's midnight (00:00)
-            if (hours === 0 && minutes === 0) {
-                console.log('🕛 Midnight detected, triggering step reset');
-                await this.handleMidnightReset();
+                // Log every hour for debugging (but only at :00 minutes)
+                if (minutes === 0 && seconds < 30) {
+                    console.log(`⏰ Hourly check - Current time: ${hours}:${String(minutes).padStart(2, '0')}`);
+                }
+
+                // Primary trigger: Check if it's midnight (more generous window)
+                if (hours === 0 && minutes === 0) {
+                    console.log('🕛 MIDNIGHT DETECTED - Triggering step reset');
+                    await this.handleMidnightReset();
+                }
+
+                // Secondary trigger: Always check for date changes regardless of time
+                // This catches cases where the timer missed exactly midnight
+                await this.checkDateAndResetIfNeeded();
+
+            } catch (error) {
+                console.error('❌ Error in midnight reset timer:', error);
             }
         };
 
-        // Check every minute for midnight trigger
-        this.midnightResetInterval = setInterval(checkTimeAndReset, 60000);
-        console.log('⏰ Midnight reset timer started (checks every minute)');
+        // Check every 30 seconds for better reliability
+        this.midnightResetInterval = setInterval(checkTimeAndReset, 30000);
+        console.log('⏰ Improved midnight reset timer started (checks every 30 seconds)');
+        
+        // Also do an immediate check
+        setTimeout(checkTimeAndReset, 1000);
     }
 
     /**
@@ -251,20 +278,29 @@ class UnifiedStepTracker {
      */
     private async handleMidnightReset(): Promise<void> {
         try {
-            console.log('🌅 Performing midnight reset...');
+            const resetStartTime = new Date();
+            console.log('🌅 STARTING MIDNIGHT RESET...');
+            console.log(`🌅 Reset triggered at: ${resetStartTime.toLocaleString()}`);
+            
             const { formatDateToString } = await import('../utils/dateUtils');
             const today = formatDateToString(new Date());
+            const previousSteps = this.state.currentSteps;
+
+            console.log(`🌅 Previous step count: ${previousSteps}`);
+            console.log(`🌅 Setting date to: ${today}`);
 
             // Reset step count and cached data
             this.state.currentSteps = 0;
             await AsyncStorage.setItem(LAST_STEP_COUNT_KEY, '0');
             await AsyncStorage.setItem(LAST_RESET_DATE_KEY, today);
+            console.log('✅ AsyncStorage reset complete');
 
             // Reset sensor baselines
             if (Platform.OS === 'android' && this.state.nativeStepCounterAvailable) {
                 try {
                     const NativeStepCounter = (await import('./NativeStepCounter')).default;
                     await NativeStepCounter.resetDailyBaseline();
+                    console.log('✅ Android baseline reset complete');
                 } catch (error) {
                     console.error('❌ Failed to reset Android baseline:', error);
                 }
@@ -272,19 +308,34 @@ class UnifiedStepTracker {
                 // Reset iOS session baseline
                 this.sessionBaseline = 0;
                 this.isFirstReading = true;
-                console.log('✅ iOS baseline reset at midnight');
+                console.log('✅ iOS baseline reset complete');
             }
 
             // Sync to database
-            await this.syncToDatabase();
+            try {
+                await this.syncToDatabase();
+                console.log('✅ Database sync complete');
+            } catch (error) {
+                console.error('❌ Database sync failed during reset:', error);
+            }
 
             // Notify listeners of reset
-            this.notifyListeners(0);
-            StepEventBus.notifyStepUpdate(0);
+            try {
+                this.notifyListeners(0);
+                StepEventBus.notifyStepUpdate(0);
+                console.log('✅ Listeners notified of reset');
+            } catch (error) {
+                console.error('❌ Failed to notify listeners:', error);
+            }
 
-            console.log('✅ Midnight reset completed successfully');
+            const resetEndTime = new Date();
+            const resetDuration = resetEndTime.getTime() - resetStartTime.getTime();
+            console.log(`🌅 ✅ MIDNIGHT RESET COMPLETED SUCCESSFULLY in ${resetDuration}ms`);
+            console.log(`🌅 Final state: Steps = ${this.state.currentSteps}, Date = ${today}`);
+
         } catch (error) {
-            console.error('❌ Midnight reset failed:', error);
+            console.error('❌ 🚨 MIDNIGHT RESET FAILED:', error);
+            console.error('❌ This is a critical failure - step tracking may be inconsistent');
         }
     }
 
@@ -386,6 +437,13 @@ class UnifiedStepTracker {
                 console.log('⚠️ App resume recovery already running, skipping...');
                 return;
             }
+            
+            // CRITICAL: Check for date change when app resumes
+            // This catches cases where the app was backgrounded overnight
+            console.log('📱 App resumed - checking for date changes...');
+            this.checkDateAndResetIfNeeded().catch(error => {
+                console.error('❌ Date check failed on app resume:', error);
+            });
             
             this.performAppResumeRecovery();
         }
@@ -504,6 +562,15 @@ class UnifiedStepTracker {
             }
 
             console.log('✅ App resume recovery completed');
+            
+            // Additional safety check: Verify date consistency after recovery
+            try {
+                console.log('🔍 Final safety check - verifying date consistency...');
+                await this.checkDateAndResetIfNeeded();
+            } catch (error) {
+                console.error('❌ Final date consistency check failed:', error);
+            }
+            
         } catch (error) {
             console.error('❌ App resume recovery failed:', error);
         } finally {
@@ -855,25 +922,35 @@ class UnifiedStepTracker {
         // Notify listeners with error handling (legacy pattern - keeping for now)
         this.notifyListeners(steps);
 
-        // Log the change with more detail
+        // Log the change with more detail and timestamp
         const changeIndicator = stepIncrease > 0 ? `+${stepIncrease}` : stepIncrease.toString();
-        console.log(`📊 Steps updated: ${previousSteps} → ${steps} (${changeIndicator})`);
+        const timestamp = new Date().toLocaleString();
+        console.log(`📊 Steps updated: ${previousSteps} → ${steps} (${changeIndicator}) at ${timestamp}`);
     }
 
     private async syncToDatabase(): Promise<void> {
         try {
             const { formatDateToString } = await import('../utils/dateUtils');
             const today = formatDateToString(new Date());
+            const syncStartTime = Date.now();
+
+            console.log(`📊 Starting database sync: ${this.state.currentSteps} steps for ${today}`);
 
             await updateTodaySteps(this.state.currentSteps);
+            console.log('📊 ✅ Step count updated in database');
 
             if (this.state.currentSteps > 0) {
                 await syncStepsWithExerciseLog(this.state.currentSteps, today);
+                console.log('📊 ✅ Exercise log synced with steps');
+            } else {
+                console.log('📊 ℹ️ Skipping exercise log sync (0 steps)');
             }
 
-            console.log(`📊 Database synced: ${this.state.currentSteps} steps`);
+            const syncDuration = Date.now() - syncStartTime;
+            console.log(`📊 ✅ Database sync completed in ${syncDuration}ms: ${this.state.currentSteps} steps`);
         } catch (error) {
-            console.error('❌ Database sync failed:', error);
+            console.error('❌ 🚨 Database sync FAILED:', error);
+            console.error('❌ Steps may not be persisted correctly');
         }
     }
 

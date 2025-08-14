@@ -3,14 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import StepEventBus from '../services/StepEventBus';
 import { Pedometer } from 'expo-sensors';
-
-// Helper function to format date as YYYY-MM-DD (matching database.ts)
-const formatDateToString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
+import { formatDateToString } from '../utils/dateUtils';
 
 export interface StepHistoryItem {
     date: string;

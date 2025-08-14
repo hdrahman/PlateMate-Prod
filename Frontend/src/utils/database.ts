@@ -1113,6 +1113,8 @@ export const syncStepsWithExerciseLog = async (stepCount: number, date: string) 
 
     const firebaseUserId = getCurrentUserId();
     const normalizedDate = date.split('T')[0]; // Remove any time component
+    
+    console.log(`🔄 Syncing steps with exercise log: ${stepCount} steps for ${normalizedDate}`);
 
     try {
         // Query for user ID
@@ -1147,7 +1149,7 @@ export const syncStepsWithExerciseLog = async (stepCount: number, date: string) 
                  WHERE id = ?`,
                 [exerciseName, caloriesBurned, duration, notes, now, existingEntry.id]
             );
-            console.log(`✅ Updated automatic step entry: ${stepCount} steps, ${caloriesBurned} calories`);
+            console.log(`✅ Updated automatic step entry: ${stepCount} steps, ${caloriesBurned} calories (was ${existingEntry.calories_burned})`);
         } else {
             // Create new entry
             await db.runAsync(
@@ -1174,9 +1176,11 @@ export const syncStepsWithExerciseLog = async (stepCount: number, date: string) 
         // Emit change notification
         notifyDatabaseChanged();
 
+        console.log(`🔄 ✅ Step-to-exercise sync completed for ${normalizedDate}`);
         return true;
     } catch (error) {
-        console.error('❌ Error syncing steps with exercise log:', error);
+        console.error('❌ 🚨 Error syncing steps with exercise log:', error);
+        console.error('❌ Walking calories may not appear in food log');
         throw error;
     }
 };
@@ -1405,7 +1409,7 @@ export const getStepsHistory = async (days: number = 7) => {
         for (let i = 0; i < days; i++) {
             const date = new Date(today);
             date.setDate(today.getDate() - i);
-            const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const formattedDate = formatDateToString(date);
             dateRange.push(formattedDate);
         }
 
@@ -1437,13 +1441,13 @@ export const getStepsHistory = async (days: number = 7) => {
 
 // Update steps for today
 export const updateTodaySteps = async (count: number) => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const today = formatDateToString(new Date());
     return saveSteps(count, today);
 };
 
 // Get steps for today
 export const getTodaySteps = async (): Promise<number> => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const today = formatDateToString(new Date());
     return await getStepsForDate(today);
 };
 
@@ -2467,12 +2471,12 @@ export const checkAndUpdateStreak = async (firebaseUid: string): Promise<number>
         // Get the current date (YYYY-MM-DD)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = formatDateToString(today);
 
         // Yesterday's date
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = formatDateToString(yesterday);
 
         // Check if user has a streak record
         const streakRecord = await db.getFirstAsync(
@@ -2553,7 +2557,7 @@ export const hasActivityForToday = async (firebaseUid: string): Promise<boolean>
         // Get the current date (YYYY-MM-DD)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = formatDateToString(today);
 
         // Try to get the user's ID from the profile table
         let userId: any = null;
