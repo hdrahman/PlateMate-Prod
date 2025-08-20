@@ -790,37 +790,37 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
         from datetime import datetime, timezone
         
         try:
-            # Use database for rate limiting (more reliable than Redis for this use case)
-            from ..database import get_db_connection
-            
+            # Use database for rate limiting (more reliable than Redis for this use case)            
             today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
             
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Check today's uploads for this user
-                cursor.execute("""
-                    SELECT COUNT(*) FROM image_uploads 
-                    WHERE user_id = ? AND DATE(created_at) = ?
-                """, (firebase_uid, today))
-                
-                uploads_today = cursor.fetchone()[0]
-                FREE_USER_DAILY_LIMIT = 1
-                
-                if uploads_today >= FREE_USER_DAILY_LIMIT:
-                    return {
-                        "upload_allowed": False,
-                        "reason": "daily_limit_exceeded",
-                        "uploads_today": uploads_today,
-                        "limit": FREE_USER_DAILY_LIMIT
-                    }
-                
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Check today's uploads for this user
+            cursor.execute("""
+                SELECT COUNT(*) FROM image_uploads 
+                WHERE user_id = ? AND DATE(created_at) = ?
+            """, (firebase_uid, today))
+            
+            uploads_today = cursor.fetchone()[0]
+            conn.close()
+            
+            FREE_USER_DAILY_LIMIT = 1
+            
+            if uploads_today >= FREE_USER_DAILY_LIMIT:
                 return {
-                    "upload_allowed": True,
-                    "reason": "within_free_limit", 
+                    "upload_allowed": False,
+                    "reason": "daily_limit_exceeded",
                     "uploads_today": uploads_today,
                     "limit": FREE_USER_DAILY_LIMIT
                 }
+            
+            return {
+                "upload_allowed": True,
+                "reason": "within_free_limit", 
+                "uploads_today": uploads_today,
+                "limit": FREE_USER_DAILY_LIMIT
+            }
             
         except Exception as db_error:
             logger.warning(f"Database rate limiting failed: {db_error}")

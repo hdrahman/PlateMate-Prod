@@ -1,4 +1,3 @@
-import openai
 import os
 import base64
 import re
@@ -199,8 +198,29 @@ async def upload_image(
     user_id = current_user['supabase_uid']  # Extract user_id from current_user
     
     try:
+        # Check upload limit for free users
+        from .subscription import validate_upload_limit
+        upload_validation = await validate_upload_limit(current_user)
+        
+        if not upload_validation.get("upload_allowed", False):
+            reason = upload_validation.get("reason", "unknown")
+            uploads_today = upload_validation.get("uploads_today", 0)
+            limit = upload_validation.get("limit", 1)
+            
+            if reason == "daily_limit_exceeded":
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Daily upload limit exceeded. Free users can upload {limit} image per day. You have uploaded {uploads_today} today. Upgrade to Premium for unlimited uploads."
+                )
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Upload not allowed. Please try again later or upgrade to Premium."
+                )
+        
         overall_start_time = time.time()
         print(f"📸 Received image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
+        print(f"✅ Upload limit validation passed: {upload_validation.get('reason', 'unknown')}")
         
         # Save image file to disk first
         try:
@@ -299,6 +319,20 @@ async def upload_image(
             if ai_analysis_path and ai_analysis_path != file_path:
                 FileManager.delete_file(ai_analysis_path)
             
+            # Record successful upload for rate limiting
+            try:
+                from utils.db_connection import get_db_connection
+                conn = get_db_connection()
+                conn.execute(
+                    "INSERT INTO image_uploads (user_id, filename) VALUES (?, ?)",
+                    (user_id, url_path)
+                )
+                conn.commit()
+                conn.close()
+                print(f"✅ Upload recorded for user {user_id}")
+            except Exception as db_error:
+                print(f"⚠️ Failed to record upload: {db_error}")
+            
             return {
                 "message": "✅ Image uploaded and analyzed successfully", 
                 "meal_id": meal_id, 
@@ -345,9 +379,30 @@ async def upload_multiple_images(
     meal_id = None
     
     try:
+        # Check upload limit for free users
+        from .subscription import validate_upload_limit
+        upload_validation = await validate_upload_limit(current_user)
+        
+        if not upload_validation.get("upload_allowed", False):
+            reason = upload_validation.get("reason", "unknown")
+            uploads_today = upload_validation.get("uploads_today", 0)
+            limit = upload_validation.get("limit", 1)
+            
+            if reason == "daily_limit_exceeded":
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Daily upload limit exceeded. Free users can upload {limit} image per day. You have uploaded {uploads_today} today. Upgrade to Premium for unlimited uploads."
+                )
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Upload not allowed. Please try again later or upgrade to Premium."
+                )
+        
         overall_start_time = time.time()
         print(f"📸 Received multiple image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
         print(f"Number of images: {len(images)}")
+        print(f"✅ Upload limit validation passed: {upload_validation.get('reason', 'unknown')}")
         
         # Log additional context provided by user
         context_provided = []
@@ -391,20 +446,20 @@ async def upload_multiple_images(
                 with open(ai_path, 'rb') as f:
                     image_data = encode_image(f)
                 encoded_images.append(image_data)
-                print(f"✅ High-quality image {i+1} encoded successfully")
+                print(f"✅ High-quality image {i + 1} encoded successfully")
             except Exception as e:
-                print(f"❌ Error encoding high-quality image {i+1}: {e}")
+                print(f"❌ Error encoding high-quality image {i + 1}: {e}")
                 # Fallback to original image encoding
                 try:
                     await images[i].seek(0)
                     image_data = encode_image(images[i].file)
                     encoded_images.append(image_data)
-                    print(f"✅ Fallback: Original image {i+1} encoded successfully")
+                    print(f"✅ Fallback: Original image {i + 1} encoded successfully")
                 except Exception as e2:
-                    print(f"❌ Error encoding original image {i+1}: {e2}")
+                    print(f"❌ Error encoding original image {i + 1}: {e2}")
                     # Clean up all saved files on encoding error
                 FileManager.cleanup_files([fp for fp, _ in saved_files])
-                raise HTTPException(status_code=500, detail=f"Error encoding image {i+1}: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Error encoding image {i + 1}: {str(e)}")
         
         encoding_time = time.time() - encoding_start_time
         print(f"✅ All images encoded in {encoding_time:.2f} seconds")
@@ -789,6 +844,21 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
         # Ensure meal_id is set (fallback if something went wrong)
         if meal_id is None:
             meal_id = int(datetime.utcnow().timestamp())
+        
+        # Record successful upload for rate limiting
+        try:
+            from utils.db_connection import get_db_connection
+            conn = get_db_connection()
+            for _, filename in saved_files:
+                conn.execute(
+                    "INSERT INTO image_uploads (user_id, filename) VALUES (?, ?)",
+                    (current_user['supabase_uid'], filename)
+                )
+            conn.commit()
+            conn.close()
+            print(f"✅ {len(saved_files)} uploads recorded for user {current_user['supabase_uid']}")
+        except Exception as db_error:
+            print(f"⚠️ Failed to record uploads: {db_error}")
         
         # Return success response without cleanup (files intentionally kept)
         return {
