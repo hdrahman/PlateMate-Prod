@@ -21,7 +21,8 @@
       "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT COUNT(*) FROM sqlite_master WHERE type=''table'' AND name=''water_intake'';\")",
       "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"INSERT INTO water_intake (firebase_uid, amount_ml, container_type, date, timestamp, last_modified) VALUES (''test-user-123'', 250, ''glass'', ''2025-08-13'', ''2025-08-13T10:30:00.000Z'', datetime(''now''));\")",
       "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"INSERT INTO water_intake (firebase_uid, amount_ml, container_type, date, timestamp, last_modified) VALUES (''test-user-123'', 500, ''bottle'', ''2025-08-13'', ''2025-08-13T14:15:00.000Z'', datetime(''now''));\")",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebSearch"
     ],
     "deny": []
   }
