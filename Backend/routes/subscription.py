@@ -321,7 +321,7 @@ async def update_subscription_from_webhook(
 async def start_trial(current_user: dict = Depends(get_current_user)):
     """Start the initial 20-day free trial for new users"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         # Check if user already has a subscription
         conn = await get_db_connection()
@@ -369,7 +369,7 @@ async def extend_trial(
 ):
     """Extend trial to 30 days when payment method is added"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         conn = await get_db_connection()
         async with conn.transaction():
@@ -443,7 +443,7 @@ async def validate_receipt(
 ):
     """Validate App Store or Play Store receipt"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         # Here you would implement actual receipt validation
         # For iOS: Send to Apple's verifyReceipt endpoint
@@ -503,7 +503,7 @@ async def validate_receipt(
 async def get_subscription_status(current_user: dict = Depends(get_current_user)):
     """Get current subscription status for user"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         conn = await get_db_connection()
         subscription = await conn.fetchrow(
@@ -575,7 +575,7 @@ async def cancel_subscription(
 ):
     """Cancel subscription (user keeps access until end of billing period)"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         conn = await get_db_connection()
         async with conn.transaction():
@@ -655,7 +655,7 @@ async def cancel_subscription(
 async def validate_premium_access(current_user: dict = Depends(get_current_user)):
     """Secure server-side validation of premium access - prevents client tampering"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         if not rc_client:
             logger.error("RevenueCat client not available for server-side validation")
@@ -773,7 +773,7 @@ async def get_subscription_products():
 async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
     """Secure server-side enforcement of daily upload limits - prevents client bypass"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         # First check if user has premium access
         premium_validation = await validate_premium_access(current_user)
@@ -840,7 +840,7 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
 async def grant_promotional_trial(current_user: dict = Depends(get_current_user)):
     """Grant 20-day promotional trial to new users - Backend managed"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         if not rc_client:
             logger.error("RevenueCat client not available for trial management")
@@ -920,7 +920,7 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
 async def get_promotional_trial_status(current_user: dict = Depends(get_current_user)):
     """Get current promotional trial status for user"""
     try:
-        firebase_uid = current_user["uid"]
+        firebase_uid = current_user["supabase_uid"]
         
         if not rc_client:
             return {
