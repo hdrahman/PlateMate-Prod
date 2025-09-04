@@ -304,11 +304,8 @@ STEP 1: SCALE/DEPTH CALIBRATION PROTOCOL
    MIXED PREPARATIONS: Estimate total mass then distribute across components
 
 3. DEPTH PERCEPTION CALIBRATION
-   • Foreground items: May appear 20-30% larger than actual
-   • Background items: May appear 30-40% smaller than actual
-   • Center plate items: Most accurate visual representation
-   • Edge items: Apply depth correction based on position
-
+Be wary of image perception effects. Depending on angle and distance, items may look larger, or smaller than they actually are. 
+Always try to use reference points to do math and determine the reality.
 ==============================================================================
 STEP 2: PROTEIN IDENTIFICATION
 
@@ -317,14 +314,6 @@ VISUAL PROTEIN IDENTIFICATION FRAMEWORK:
 • Color assessment: Raw vs cooked states, marinades, seasonings
 • Shape/cut patterns: Whole pieces, ground, sliced, processed forms
 • Cooking indicators: Grill marks, browning, moisture content
-
-
-SPECIFIC PROTEIN DIFFERENTIATION:
-• CHICKEN vs TURKEY: Texture density (turkey denser), color (turkey darker when cooked)
-• CHICKEN vs TOFU: Fiber patterns (chicken has visible muscle fibers, tofu uniform)
-• FISH SPECIES: Flake patterns, color, fat content visual indicators
-• BEEF vs PORK: Grain structure, fat marbling patterns, color variations
-• PROCESSED vs WHOLE: Uniform texture vs natural variations
 
 Always analyze images to determine Protein used. Look at how the meat is being used, and looked for shape, texture, and other physical indications. You often mistake tofu, fish, turkey, etc and default to chicken.
 
@@ -366,11 +355,6 @@ STEP 7: MATHEMATICAL VALIDATION
 CALCULATION VERIFICATION:
 Total Calories = (Protein g × 4) + (Carbs g × 4) + (Fat g × 9)
 Acceptable variance: ±10% from calculated total
-
-PROPORTION REASONABLENESS:
-• Protein: 15-35% of total calories
-• Carbohydrates: 45-65% of total calories  
-• Fat: 20-35% of total calories
 
 MICRONUTRIENT ESTIMATION:
 • Base on primary ingredients with realistic bioavailability
@@ -420,6 +404,7 @@ CRITICAL ACCURACY PRINCIPLES:
 4. SCALE CALIBRATION: Account for camera perspective and reference objects for accurate portion sizing
 5. VALIDATION: Cross-check estimates against realistic meal calorie ranges and nutritional proportions
 6. Be careful of hidden calories, like oil and sauces. Try to cross references traditionally high oil meals(like stir fry and curries)
+7. Always be methodical and scientific/mathematical. Avoid doing guesswork which would cause incosistent results when rescanning the same meal
 
 REMEMBER: Accurate nutrition analysis requires systematic visual assessment, evidence-based nutritional knowledge, and mathematical validation."""
                         },
