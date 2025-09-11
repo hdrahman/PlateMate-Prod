@@ -1,29 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Bash(keytool:*)",
-      "Bash(ls:*)",
-      "Bash(npx expo config:*)",
-      "Bash(npx expo install:*)",
-      "Bash(npx tsc:*)",
-      "Bash(node:*)",
-      "Bash(python:*)",
-      "mcp__ide__getDiagnostics",
-      "Bash(where sqlite3)",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" platemate_local.db \".tables\")",
-      "Bash(dir:*)",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT name FROM sqlite_master WHERE type=''table'';\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT * FROM sqlite_master;\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT COUNT(*) FROM sqlite_master WHERE type=''table'' AND name=''water_intake'';\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT COUNT(*) FROM sqlite_master WHERE type=''table'' AND name=''water_intake'';\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"CREATE TABLE IF NOT EXISTS water_intake (id INTEGER PRIMARY KEY AUTOINCREMENT, firebase_uid TEXT NOT NULL, amount_ml INTEGER NOT NULL, container_type TEXT DEFAULT ''custom'', date TEXT NOT NULL, timestamp TEXT NOT NULL, synced INTEGER DEFAULT 0, sync_action TEXT DEFAULT ''create'', last_modified TEXT NOT NULL DEFAULT (datetime(''now'')));\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"SELECT COUNT(*) FROM sqlite_master WHERE type=''table'' AND name=''water_intake'';\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"INSERT INTO water_intake (firebase_uid, amount_ml, container_type, date, timestamp, last_modified) VALUES (''test-user-123'', 250, ''glass'', ''2025-08-13'', ''2025-08-13T10:30:00.000Z'', datetime(''now''));\")",
-      "Bash(\"C:\\Users\\Haame\\anaconda3\\Library\\bin\\sqlite3.exe\" \"C:\\Platemate\\PlateMate-Prod\\Backend\\platemate_local.db\" \"INSERT INTO water_intake (firebase_uid, amount_ml, container_type, date, timestamp, last_modified) VALUES (''test-user-123'', 500, ''bottle'', ''2025-08-13'', ''2025-08-13T14:15:00.000Z'', datetime(''now''));\")",
-      "Bash(rm:*)",
-      "WebSearch"
+      "Bash(find:*)"
     ],
-    "deny": []
+    "deny": [],
+    "ask": []
   }
 }
