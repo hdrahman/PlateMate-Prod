@@ -2228,7 +2228,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                             colors={["#0074dd", "#5c00dd", "#dd0095"]}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
-                                            style={{ width: 27, height: 27 }}
+                                            style={{ width: userStreak >= 10 ? 40 : 27, height: 27 }}
                                         />
                                     </MaskedView>
                                     <MaskedView
