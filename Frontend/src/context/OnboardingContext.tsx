@@ -370,7 +370,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         // The real value will be re-evaluated inside `loadOnboardingState()`.
     }, [user?.id]);
 
-    // Load saved onboarding state from SQLite database or temp storage
+    // Fast SQLite-only onboarding state loading (simplified)
     useEffect(() => {
         const loadOnboardingState = async () => {
             if (hasLoadedInitialState || !tempSessionId) {
@@ -382,126 +382,38 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 setIsLoading(true);
 
                 if (user && user.id) {
-                    // User is authenticated - try to load from user profile first
-                    // Try the fast path – lookup by Supabase UID (stored in firebase_uid column)
-                    let sqliteProfile = await getUserProfileBySupabaseUid(user.id);
-
-                    // Fallback: the record may have been created under the old Firebase UID or the
-                    // user may have re-created their account which results in a new Supabase UID.
-                    // In that case we attempt to find the profile by email and, if found, update
-                    // its firebase_uid so future look-ups succeed.
-                    if (!sqliteProfile && user.email) {
-                        try {
-                            const { getUserProfileByEmail, getDatabase } = await import('../utils/database');
-                            const profileByEmail = await getUserProfileByEmail(user.email);
-                            if (profileByEmail) {
-                                try {
-                                    const dbInstance = await getDatabase();
-                                    await dbInstance.runAsync(`UPDATE user_profiles SET firebase_uid = ? WHERE email = ?`, [user.id, user.email]);
-                                    // Reload the profile with the new UID mapping
-                                    sqliteProfile = await getUserProfileBySupabaseUid(user.id);
-                                } catch (uidUpdateErr) {
-                                    console.warn('⚠️ Failed to update firebase_uid', uidUpdateErr);
-                                }
-                            }
-                        } catch (fallbackErr) {
-                            console.warn('⚠️ Fallback email lookup failed:', fallbackErr);
-                        }
-                    }
+                    // Fast SQLite lookup only - no network calls, no retries
+                    console.log('⚡ Fast onboarding: Checking SQLite for user profile...');
+                    const sqliteProfile = await getUserProfileBySupabaseUid(user.id);
 
                     if (sqliteProfile) {
-
-                        // Convert SQLite profile to frontend format
+                        // Profile exists - user has completed onboarding
+                        console.log('✅ Profile found in SQLite - onboarding complete');
                         const frontendProfile = convertSQLiteProfileToFrontendFormat(sqliteProfile);
-
-                        // FIXED: Properly check onboarding completion from the database
                         const isOnboardingComplete = Boolean(sqliteProfile.onboarding_complete);
 
                         setOnboardingComplete(isOnboardingComplete);
                         setProfile(frontendProfile);
                         setCurrentStep(isOnboardingComplete ? totalSteps : 1);
-
                     } else {
-                        // No local profile – attempt to restore backup from PostgreSQL first
-
-                        try {
-                            const { postgreSQLSyncService } = await import('../utils/postgreSQLSyncService');
-                            const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
-                            if (restoreResult.success) {
-                                sqliteProfile = await getUserProfileBySupabaseUid(user.id);
-                            } else {
-                                console.warn('⚠️ Backup restore returned errors:', restoreResult.errors);
-                            }
-                        } catch (restoreErr) {
-                            console.warn('⚠️ Backup restore threw error:', restoreErr);
-                        }
-
-                        // If restore populated the profile, use it; otherwise fall back to temp/onboarding
-                        if (sqliteProfile) {
-                            const frontendProfile = convertSQLiteProfileToFrontendFormat(sqliteProfile);
-                            const isOnboardingComplete = Boolean(sqliteProfile.onboarding_complete);
-
-                            setOnboardingComplete(isOnboardingComplete);
-                            setProfile(frontendProfile);
-                            setCurrentStep(isOnboardingComplete ? totalSteps : 1);
-
-                        } else {
-                            // Try to load and sync temporary data
-                            const tempData = await loadOnboardingProgressIncremental(tempSessionId);
-                            if (tempData) {
-                                try {
-                                    await syncTempOnboardingToUserProfile(tempSessionId, user.id, user.email);
-                                    setProfile(tempData.profileData);
-                                    setCurrentStep(tempData.currentStep);
-                                } catch (syncError) {
-                                    console.error('❌ Error syncing temporary data:', syncError);
-                                    setProfile(tempData.profileData);
-                                    setCurrentStep(tempData.currentStep);
-                                }
-                            } else {
-                                setProfile(defaultProfile);
-                                setCurrentStep(1);
-                            }
-                            setOnboardingComplete(false);
-                        }
-                    }
-                } else {
-                    // User not authenticated - try to load from temp storage
-                    console.log('👥 Loading for unauthenticated user');
-                    const tempData = await loadOnboardingProgressIncremental(tempSessionId);
-                    if (tempData) {
-                        setProfile(tempData.profileData);
-                        setCurrentStep(tempData.currentStep);
-                    } else {
+                        // No profile - user needs onboarding
+                        console.log('⚪ No profile found - onboarding required');
+                        setOnboardingComplete(false);
                         setProfile(defaultProfile);
                         setCurrentStep(1);
                     }
+                } else {
+                    // User not authenticated - start fresh onboarding
+                    console.log('👥 No user - starting fresh onboarding');
                     setOnboardingComplete(false);
+                    setProfile(defaultProfile);
+                    setCurrentStep(1);
                 }
 
                 setHasLoadedInitialState(true);
-
-                // Clean up old temp sessions
-                try {
-                    await cleanupOldTempOnboardingSessions();
-                } catch (cleanupError) {
-                    console.warn('⚠️ Error cleaning up temp sessions:', cleanupError);
-                }
             } catch (error) {
-                console.error('❌ Error loading onboarding state:', error);
-                // Handle invalid/expired Supabase sessions gracefully
-                if (
-                    (error as any)?.code === 'refresh_token_already_used' ||
-                    (error as any)?.name === 'AuthSessionMissingError'
-                ) {
-                    try {
-                        console.log('🔒 Invalid Supabase session detected during onboarding load – forcing logout');
-                        await supabaseAuth.signOut();
-                    } catch (signOutErr) {
-                        console.warn('Error during forced logout:', signOutErr);
-                    }
-                }
-                // Set defaults on error
+                console.warn('⚠️ Error loading onboarding state:', error);
+                // Set defaults on error - no complex error handling needed
                 setOnboardingComplete(false);
                 setCurrentStep(1);
                 setProfile(defaultProfile);
@@ -594,7 +506,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         setCurrentStep(prevStep => Math.max(1, prevStep - 1));
     };
 
-    // Complete the onboarding process
+    // Complete the onboarding process (simplified)
     const completeOnboarding = async () => {
         // Prevent duplicate executions
         if (isLoading || onboardingComplete) {
@@ -605,56 +517,18 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         setIsLoading(true);
         console.log('🚀 Starting onboarding completion...');
 
-        // NEW: Enhanced user validation with retry mechanism
-        let currentUser = user;
-        let retryCount = 0;
-        const maxRetries = 5;
-
-        // Wait for user to be properly authenticated after account creation
-        while ((!currentUser || !currentUser.id) && retryCount < maxRetries) {
-            console.log(`⏳ Waiting for user authentication (attempt ${retryCount + 1}/${maxRetries})...`);
-
-            // Get fresh user from Supabase auth
-            const { data: { user: freshUser } } = await supabase.auth.getUser();
-            if (freshUser) {
-                currentUser = {
-                    id: freshUser.id,
-                    email: freshUser.email,
-                    uid: freshUser.id
-                };
-            }
-
-            if (!currentUser || !currentUser.id) {
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-                retryCount++;
-            } else {
-                break;
-            }
+        // Simple validation - if no user, can't complete onboarding
+        if (!user || !user.id) {
+            console.error('❌ Cannot complete onboarding - no authenticated user');
+            setIsLoading(false);
+            return;
         }
 
-        // Final validation
-        if (!currentUser) {
-            console.error('❌ Cannot complete onboarding: user is null/undefined after retries');
-            throw new Error('User not authenticated. Please try signing in again.');
-        }
-
-        if (!currentUser.id) {
-            console.error('❌ Cannot complete onboarding: user.id is missing after retries');
-            throw new Error('User ID is missing. Please try signing in again.');
-        }
-
-        if (!currentUser.email) {
-            console.error('❌ Cannot complete onboarding: user.email is missing after retries');
-            throw new Error('User email is missing. Please try signing in again.');
-        }
-
-
-        // Ensure database is ready
-        await ensureDatabaseReady();
+        console.log('💾 Saving profile to SQLite database...');
 
         const profileData = {
-            firebase_uid: currentUser.id, // Use the validated currentUser
-            email: currentUser.email,
+            firebase_uid: user.id,
+            email: user.email || profile.email,
             first_name: profile.firstName || '',
             last_name: profile.lastName || '',
             height: profile.height || null,
@@ -708,168 +582,24 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             premium: false,
         };
 
-        console.log('💾 Saving profile to SQLite database...', {
-            firebase_uid: profileData.firebase_uid,
-            email: profileData.email,
-            onboarding_complete: profileData.onboarding_complete,
-            activity_level: profileData.activity_level,
-            fitness_goal: profileData.fitness_goal,
-            weight_goal: profileData.weight_goal
-        });
-
         try {
+            // Simple profile save to SQLite
+            console.log('💾 Saving profile to SQLite database...');
             const profileId = await addUserProfile(profileData);
             console.log('✅ Profile saved successfully with ID:', profileId);
 
-            // NEW: Update Supabase Auth user profile with display name
-            if (profile.firstName || profile.lastName) {
-                console.log('💾 Updating Supabase Auth user profile with display name...');
-                try {
-                    const displayName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim();
-                    if (displayName) {
-                        const { error: updateError } = await supabase.auth.updateUser({
-                            data: {
-                                display_name: displayName,
-                                full_name: displayName,
-                                first_name: profile.firstName,
-                                last_name: profile.lastName
-                            }
-                        });
-
-                        if (updateError) {
-                            console.warn('⚠️ Could not update Supabase Auth display name:', updateError);
-                        } else {
-                            console.log(`✅ Supabase Auth display name updated to: "${displayName}"`);
-                        }
-                    }
-                } catch (authUpdateError) {
-                    console.warn('⚠️ Error updating Supabase Auth profile:', authUpdateError);
-                    // Don't fail onboarding if auth profile update fails
-                }
-            }
-
-            // NEW: Save nutrition goals to the nutrition_goals table if we have the required data
-            if (profile.weightGoal || profile.fitnessGoal || profile.activityLevel || profile.dailyCalorieTarget) {
-                console.log('💾 Saving nutrition goals to nutrition_goals table...');
-
-                const { updateUserGoals } = await import('../utils/database');
-                const goalsToSave = {
-                    targetWeight: profile.targetWeight,
-                    calorieGoal: profile.dailyCalorieTarget,
-                    proteinGoal: profile.nutrientFocus?.protein,
-                    carbGoal: profile.nutrientFocus?.carbs,
-                    fatGoal: profile.nutrientFocus?.fat,
-                    fitnessGoal: profile.fitnessGoal || profile.weightGoal,
-                    activityLevel: profile.activityLevel,
-                };
-
-                await updateUserGoals(currentUser.id, goalsToSave);
-                console.log('✅ Nutrition goals saved successfully');
-            }
-
-            // NEW: Initialize cheat day settings if enabled
-            if (profile.cheatDayEnabled !== undefined || profile.cheatDayFrequency !== undefined || profile.preferredCheatDayOfWeek !== undefined) {
-                console.log('💾 Initializing cheat day settings...');
-
-                const { initializeCheatDaySettings } = await import('../utils/database');
-                try {
-                    await initializeCheatDaySettings(
-                        currentUser.id,
-                        profile.cheatDayFrequency || 7,
-                        profile.preferredCheatDayOfWeek
-                    );
-
-                    // Update cheat day settings with enabled status
-                    const { updateCheatDaySettings } = await import('../utils/database');
-                    await updateCheatDaySettings(currentUser.id, {
-                        enabled: profile.cheatDayEnabled || false,
-                        frequency: profile.cheatDayFrequency || 7,
-                        preferredDayOfWeek: profile.preferredCheatDayOfWeek
-                    });
-
-                    console.log('✅ Cheat day settings initialized successfully');
-                } catch (error) {
-                    console.error('❌ Error initializing cheat day settings:', error);
-                    // Continue with onboarding even if cheat day initialization fails
-                }
-            }
-
-            // Verify profile was saved
-            console.log('🔍 Verifying profile was saved...');
-            const savedProfile = await getUserProfileBySupabaseUid(currentUser.id);
-            if (savedProfile) {
-                console.log('✅ Profile verification successful:', {
-                    id: savedProfile.id,
-                    email: savedProfile.email,
-                    onboarding_complete: savedProfile.onboarding_complete,
-                    activity_level: savedProfile.activity_level,
-                    fitness_goal: savedProfile.fitness_goal
-                });
-            } else {
-                console.error('❌ Profile verification failed - could not retrieve saved profile');
-            }
-
-            // NEW: Calculate and store BMR if we have the required profile data
-            if (savedProfile && savedProfile.height && savedProfile.weight && savedProfile.age && 
-                savedProfile.gender && savedProfile.activity_level) {
-                console.log('🧮 Calculating initial BMR for new user...');
-                
-                try {
-                    const { calculateAndStoreBMR } = await import('../utils/nutritionCalculator');
-                    
-                    // Create a profile object compatible with the BMR calculator
-                    const profileForBMR = {
-                        ...savedProfile,
-                        activityLevel: savedProfile.activity_level,
-                        weightGoal: savedProfile.weight_goal || savedProfile.fitness_goal,
-                        dailyCalorieTarget: savedProfile.daily_calorie_target
-                    };
-                    
-                    const bmrResult = await calculateAndStoreBMR(profileForBMR, currentUser.id);
-                    if (bmrResult) {
-                        console.log('✅ Initial BMR calculated and stored:', {
-                            bmr: bmrResult.bmr,
-                            maintenance: bmrResult.maintenanceCalories,
-                            dailyTarget: bmrResult.dailyTarget
-                        });
-                    } else {
-                        console.log('ℹ️ Could not calculate BMR - missing required data');
-                    }
-                } catch (bmrError) {
-                    console.warn('⚠️ Failed to calculate initial BMR:', bmrError);
-                    // Don't fail onboarding if BMR calculation fails
-                }
-            } else {
-                console.log('ℹ️ Cannot calculate initial BMR - missing required profile fields');
-            }
-
-            // Clean up temporary data
-            if (tempSessionId) {
-                await cleanupOldTempOnboardingSessions();
-            }
-
-            // Mark onboarding as complete in state IMMEDIATELY
-            console.log('🎯 Setting onboarding complete state immediately');
+            // Mark onboarding as complete immediately
             setOnboardingComplete(true);
             setJustCompletedOnboarding(true);
             setCurrentStep(totalSteps);
-
-            // Force a small delay to ensure state propagation
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             console.log('🎉 Onboarding completed successfully!');
 
         } catch (error) {
             console.error('❌ Error saving user profile:', error);
-
-            // More specific error handling
-            if (error.message?.includes('User not authenticated')) {
-                throw new Error('Authentication failed. Please try signing in again.');
-            } else if (error.message?.includes('database')) {
-                throw new Error('Failed to save your profile. Please check your connection and try again.');
-            } else {
-                throw new Error(`Failed to complete onboarding: ${error.message || 'Unknown error'}`);
-            }
+            throw new Error(`Failed to complete onboarding: ${error.message || 'Unknown error'}`);
+        } finally {
+            setIsLoading(false);
         }
     };
 

@@ -27,7 +27,6 @@ interface AuthContextType {
     signInWithGoogle: () => Promise<any>;
     signInWithApple: () => Promise<void>;
     signInAnonymously: () => Promise<void>;
-    isPreloading: boolean;
 }
 
 // Create context with default values
@@ -40,7 +39,6 @@ const AuthContext = createContext<AuthContextType>({
     signInWithGoogle: async () => { },
     signInWithApple: async () => { },
     signInAnonymously: async () => { },
-    isPreloading: false,
 });
 
 // Helper function to grant promotional trial to new users
@@ -80,46 +78,83 @@ const grantPromotionalTrialToNewUser = async (userId: string) => {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isPreloading, setIsPreloading] = useState(false);
 
-    // Check for stored credentials on mount and restore auth state
+    // Fast startup: Check cached user immediately, validate session async
     useEffect(() => {
-        const restoreAuthState = async () => {
+        const fastStartup = async () => {
             try {
-                // Check for existing Supabase session
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    console.log('Found existing Supabase session, restoring auth state');
-                    // Add compatibility layer for Firebase -> Supabase migration
-                    (session.user as any).uid = session.user.id;
-                    setUser(session.user);
-                    // Cache user globally for database functions
-                    global.cachedSupabaseUser = session.user;
-                } else {
-                    console.log('No existing Supabase session found');
-                }
-            } catch (error) {
-                console.error('Error restoring auth state:', error);
-                // Force logout on invalid or expired session so user is redirected to login
-                if (
-                    (error as any)?.code === 'refresh_token_already_used' ||
-                    (error as any)?.name === 'AuthSessionMissingError'
-                ) {
+                // FAST PATH: Check AsyncStorage first (instant)
+                const cachedSession = await AsyncStorage.getItem('supabase.auth.token');
+                if (cachedSession) {
                     try {
-                        console.log('🔒 Invalid Supabase session detected during auth restore – forcing logout');
-                        await supabaseAuth.signOut();
-                        setUser(null);
-                        global.cachedSupabaseUser = null;
-                    } catch (signOutErr) {
-                        console.warn('Error during forced logout:', signOutErr);
+                        const session = JSON.parse(cachedSession);
+                        if (session?.user && session?.access_token) {
+                            console.log('⚡ Fast startup: Found cached session');
+                            // Add compatibility layer for Firebase -> Supabase migration
+                            (session.user as any).uid = session.user.id;
+                            setUser(session.user);
+                            // Cache user globally for database functions
+                            global.cachedSupabaseUser = session.user;
+                            
+                            // App can start immediately, validate session in background
+                            setIsLoading(false);
+                            validateSessionInBackground(session);
+                            return;
+                        }
+                    } catch (parseError) {
+                        console.warn('Invalid cached session, will validate normally');
                     }
                 }
+
+                // FALLBACK: No cache, need to check Supabase (this should be rare)
+                console.log('No cached session, checking Supabase...');
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    console.log('Found existing Supabase session');
+                    (session.user as any).uid = session.user.id;
+                    setUser(session.user);
+                    global.cachedSupabaseUser = session.user;
+                } else {
+                    console.log('No existing session found');
+                }
+            } catch (error) {
+                console.error('Error during fast startup:', error);
+                // Don't force logout during startup - just continue without user
+                setUser(null);
+                global.cachedSupabaseUser = null;
             } finally {
                 setIsLoading(false);
             }
         };
 
-        restoreAuthState();
+        // Background session validation (doesn't block startup)
+        const validateSessionInBackground = async (cachedSession: any) => {
+            try {
+                console.log('🔄 Background: Validating cached session...');
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error || !session) {
+                    console.log('🔒 Background: Session invalid, clearing cache');
+                    await AsyncStorage.removeItem('supabase.auth.token');
+                    setUser(null);
+                    global.cachedSupabaseUser = null;
+                } else {
+                    console.log('✅ Background: Session valid');
+                    // Update cache if session was refreshed
+                    if (session.access_token !== cachedSession.access_token) {
+                        console.log('🔄 Background: Session refreshed, updating cache');
+                        (session.user as any).uid = session.user.id;
+                        setUser(session.user);
+                        global.cachedSupabaseUser = session.user;
+                    }
+                }
+            } catch (backgroundError) {
+                console.warn('Background session validation failed:', backgroundError);
+                // Don't throw - this is background validation
+            }
+        };
+
+        fastStartup();
     }, []);
 
     // Listen for auth state changes
@@ -158,58 +193,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Cache user globally for database functions
             global.cachedSupabaseUser = authUser;
 
-            // If user just logged in, preload data and initialize services
+            // If user just logged in, initialize services in background (non-blocking)
             if (authUser && !previousUserId) {
-                setIsPreloading(true);
-                try {
-                    console.log('✅ User authenticated, initializing services...');
-
-                    // Initialize token manager for authenticated users only
-                    await tokenManager.initialize();
-                    
-                    // Initialize subscription manager
-                    try {
-                        await SubscriptionManager.initialize(authUser.id);
-                        console.log('✅ SubscriptionManager initialized');
-                    } catch (error) {
-                        console.warn('⚠️ SubscriptionManager initialization failed:', error);
-                    }
-                    
-                    // Grant promotional trial to new users (20 days free)
-                    // This happens for first-time logins (new signups)
-                    try {
-                        grantPromotionalTrialToNewUser(authUser.id);
-                    } catch (error) {
-                        console.warn('⚠️ Promotional trial grant failed:', error);
-                        // Don't block user login if trial grant fails
-                    }
-
-                    // Initialize the new 6-hour PostgreSQL backup sync on app launch
-                    postgreSQLSyncService.initializeOnAppLaunch().catch(err => console.warn('Sync init error', err));
-
-                    // Check if local database is empty and restore from PostgreSQL if needed
-                    const localProfile = await getUserProfileBySupabaseUid(authUser.id);
-                    if (!localProfile) {
-                        console.log('🔄 No local profile found, attempting PostgreSQL restore...');
-                        try {
-                            const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
-                            if (restoreResult.success) {
-                                console.log('✅ PostgreSQL restore completed successfully:', restoreResult.stats);
-                            } else {
-                                console.warn('⚠️ PostgreSQL restore completed with errors:', restoreResult.errors);
-                            }
-                        } catch (error) {
-                            console.error('❌ PostgreSQL restore failed:', error);
-                            // Don't block login if restore fails
-                        }
-                    }
-
-                    // Removed preloading API calls - as per user request, the imported recipes are useless
-                } catch (error) {
-                    console.error('Error preloading data after login:', error);
-                } finally {
-                    setIsPreloading(false);
-                }
+                console.log('✅ User authenticated, starting background initialization...');
+                
+                // Background initialization - doesn't block app startup
+                initializeServicesInBackground(authUser.id);
             }
 
             // Update previous user ID for next comparison
@@ -223,6 +212,62 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             subscription.unsubscribe();
         };
     }, []); // Empty dependency array to prevent infinite loop
+
+    // Background service initialization (non-blocking)
+    const initializeServicesInBackground = async (userId: string) => {
+        try {
+            console.log('🔄 Background: Starting service initialization...');
+
+            // Initialize token manager for authenticated users only
+            await tokenManager.initialize();
+            console.log('✅ Background: TokenManager initialized');
+            
+            // Initialize subscription manager
+            try {
+                await SubscriptionManager.initialize(userId);
+                console.log('✅ Background: SubscriptionManager initialized');
+            } catch (error) {
+                console.warn('⚠️ Background: SubscriptionManager initialization failed:', error);
+            }
+            
+            // Grant promotional trial to new users (20 days free)
+            try {
+                await grantPromotionalTrialToNewUser(userId);
+                console.log('✅ Background: Promotional trial processed');
+            } catch (error) {
+                console.warn('⚠️ Background: Promotional trial grant failed:', error);
+            }
+
+            // Initialize PostgreSQL backup sync
+            try {
+                await postgreSQLSyncService.initializeOnAppLaunch();
+                console.log('✅ Background: PostgreSQL sync initialized');
+            } catch (error) {
+                console.warn('⚠️ Background: PostgreSQL sync init failed:', error);
+            }
+
+            // Check if local database is empty and restore from PostgreSQL if needed
+            try {
+                const localProfile = await getUserProfileBySupabaseUid(userId);
+                if (!localProfile) {
+                    console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
+                    const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
+                    if (restoreResult.success) {
+                        console.log('✅ Background: PostgreSQL restore completed successfully:', restoreResult.stats);
+                    } else {
+                        console.warn('⚠️ Background: PostgreSQL restore completed with errors:', restoreResult.errors);
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Background: Profile restore failed:', error);
+            }
+
+            console.log('✅ Background: All services initialized');
+        } catch (error) {
+            console.warn('⚠️ Background: Service initialization failed:', error);
+            // Don't throw - this is background initialization
+        }
+    };
 
     // Sign up with email/password
     const signUp = async (email: string, password: string) => {
@@ -306,7 +351,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 signInWithGoogle,
                 signInWithApple,
                 signInAnonymously,
-                isPreloading,
             }}
         >
             {children}

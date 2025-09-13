@@ -346,7 +346,6 @@ function AuthenticatedApp({ children }) {
 // Component for authenticated user content
 function AuthenticatedContent() {
   const { onboardingComplete, isLoading: onboardingLoading } = useOnboarding();
-  const { isPreloading } = useAuth();
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = React.useState(false);
 
   // Track when onboarding is completed to prevent flashing
@@ -386,9 +385,9 @@ function AuthenticatedContent() {
     initializeStepTracking();
   }, [onboardingComplete, hasCompletedOnboarding]);
 
-  // Show loading screen while either auth is preloading OR onboarding context is still loading
+  // Show loading screen while onboarding context is still loading
   // But once onboarding is completed, don't show loading screen again to prevent flashing
-  if ((isPreloading || onboardingLoading) && !hasCompletedOnboarding) {
+  if (onboardingLoading && !hasCompletedOnboarding) {
     return <LoadingScreen message="Loading your profile..." />;
   }
 
