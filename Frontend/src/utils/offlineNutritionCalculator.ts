@@ -179,9 +179,8 @@ export function calculateOfflineNutritionGoals(
     // 3. Adjust TDEE based on weight goal
     const adjustedTdee = applyWeightGoalAdjustment(tdee, weightGoal);
 
-    // 4. Ensure minimum calories
-    const minCalories = gender === Gender.MALE ? 1500 : 1200;
-    const calories = Math.max(Math.round(adjustedTdee), minCalories);
+    // 4. Round calories without minimum limit
+    const calories = Math.round(adjustedTdee);
 
     // 5. Calculate macronutrients
     const macros = calculateMacros(calories, weightGoal, weightKg);

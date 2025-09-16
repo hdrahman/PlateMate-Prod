@@ -2158,9 +2158,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
         // Positive deficit = weight loss (negative change), negative deficit = weight gain (positive change)
         const projectedWeightChangeKg = -(dailyDeficit * 30) / caloriesPerKg;
 
-        // Use the minimum calories from nutrition calculator
-        const minMaleCalories = 1500;
-        const minFemaleCalories = 1200;
+        // Removed minimum calorie constraints
         const defaultMinCalories = totalAvailableCalories * 0.75; // Default to 75% of available calories if gender unknown
 
         // We'll determine gender-based minimum while rendering, since we have the profile data there
@@ -2540,12 +2538,8 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
 
                                     displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
 
-                                    // Gender-based minimum calorie check for safety
-                                    const minCaloriesForGender = userProfile?.gender === 'female' ? 1200 : 1500;
-                                    if (dailyCaloriesConsumed < minCaloriesForGender) {
-                                        displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
-                                        textColor = '#FF5252';
-                                    } else if (prediction.dailyDeficit < -500) {
+                                    // Removed minimum calorie check
+                                    if (prediction.dailyDeficit < -500) {
                                         // Large surplus - caution
                                         textColor = '#FFD740';
                                     } else if (prediction.dailyDeficit > 1000) {

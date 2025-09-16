@@ -115,9 +115,7 @@ export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | n
     // Calculate daily target with weight goal adjustment
     let dailyTarget = maintenanceCalories + weightGoalAdjustment;
 
-    // Ensure minimum calories for safety
-    const minCalories = profile.gender === 'male' ? 1500 : 1200;
-    dailyTarget = Math.max(dailyTarget, minCalories);
+    // Remove minimum calorie constraint
 
     // If user has set a custom calorie target, use that instead
     if (profile.dailyCalorieTarget && profile.dailyCalorieTarget > 0) {

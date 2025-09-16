@@ -156,9 +156,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             }
         }
 
-        // Ensure minimum calories
-        const minCalories = profile.gender === 'male' ? 1500 : 1200;
-        tdee = Math.max(tdee, minCalories);
+        // Removed minimum calorie constraint
 
         setCalculatedCalories(tdee);
 
