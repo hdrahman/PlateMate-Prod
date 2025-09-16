@@ -3773,8 +3773,8 @@ export const storeApiToken = async (
         if (existingResult.length > 0) {
             // Update existing token
             await db.runAsync(
-                `UPDATE api_tokens 
-         SET token = ?, token_type = ?, expiry_time = ?, updated_at = datetime('now')
+                `UPDATE api_tokens
+         SET token = ?, token_type = ?, expires_at = ?, updated_at = datetime('now')
          WHERE service_name = ?`,
                 [token, tokenType, expiryTime, serviceName]
             );
@@ -3782,7 +3782,7 @@ export const storeApiToken = async (
         } else {
             // Insert new token
             await db.runAsync(
-                `INSERT INTO api_tokens (service_name, token, token_type, expiry_time)
+                `INSERT INTO api_tokens (service_name, token, token_type, expires_at)
          VALUES (?, ?, ?, ?)`,
                 [serviceName, token, tokenType, expiryTime]
             );
@@ -3806,7 +3806,7 @@ export const getApiToken = async (
         const db = await getDatabase();
 
         const result = await db.getAllAsync(
-            `SELECT token, token_type, expiry_time FROM api_tokens WHERE service_name = ?`,
+            `SELECT token, token_type, expires_at FROM api_tokens WHERE service_name = ?`,
             [serviceName]
         );
 
@@ -3815,10 +3815,10 @@ export const getApiToken = async (
             return null;
         }
 
-        const { token, token_type, expiry_time } = result[0];
+        const { token, token_type, expires_at } = result[0];
 
         // Check if token is expired (with 10 second buffer)
-        if (expiry_time < Date.now() + 10000) {
+        if (expires_at < Date.now() + 10000) {
             console.log(`Token for ${serviceName} is expired`);
             return null;
         }
@@ -3864,14 +3864,14 @@ export const getAllApiTokens = async (): Promise<Array<{
         const db = await getDatabase();
 
         const results = await db.getAllAsync(
-            `SELECT service_name, token, token_type, expiry_time FROM api_tokens`
+            `SELECT service_name, token, token_type, expires_at FROM api_tokens`
         );
 
         return results.map(row => ({
             serviceName: row.service_name,
             token: row.token,
             tokenType: row.token_type,
-            expiryTime: row.expiry_time
+            expiryTime: row.expires_at
         }));
     } catch (error) {
         console.error('❌ Error getting all API tokens:', error);

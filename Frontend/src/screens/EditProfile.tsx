@@ -37,7 +37,7 @@ import {
     formatHeight,
     formatWeight
 } from '../utils/unitConversion';
-import { calculateAndStoreBMR } from '../utils/nutritionCalculator';
+import { resetNutritionGoals } from '../utils/resetNutritionGoals';
 import _ from 'lodash'; // Import lodash for deep cloning
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -410,169 +410,26 @@ const EditProfile = () => {
         checkForChanges('sex', value);
     };
 
-    const handleHeightFeetChange = async (text: string) => {
+    const handleHeightFeetChange = (text: string) => {
         setEditedHeightFeet(text);
         checkForChanges('heightFeet', text);
-        
-        // Trigger immediate BMR recalculation if both feet and inches values are valid
-        if (text && editedHeightInches && !isNaN(parseFloat(text)) && !isNaN(parseFloat(editedHeightInches)) && user) {
-            try {
-                const heightInCm = feetInchesToCm(parseFloat(text), parseFloat(editedHeightInches));
-                
-                // Get current profile for BMR calculation
-                const fullProfile = await getUserProfileByFirebaseUid(user.uid);
-                if (fullProfile && fullProfile.weight && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
-                    // Create updated profile with new height
-                    const profileForBMR = {
-                        ...fullProfile,
-                        height: heightInCm
-                    };
-                    
-                    await calculateAndStoreBMR(profileForBMR, user.uid);
-                    console.log('✅ BMR recalculated after height change');
-                }
-            } catch (error) {
-                console.warn('⚠️ Failed to recalculate BMR after height change:', error);
-                // Don't show error to user as this is background calculation
-            }
-        }
     };
 
-    const handleHeightInchesChange = async (text: string) => {
+    const handleHeightInchesChange = (text: string) => {
         setEditedHeightInches(text);
         checkForChanges('heightInches', text);
-        
-        // Trigger immediate BMR recalculation if both feet and inches values are valid
-        if (text && editedHeightFeet && !isNaN(parseFloat(text)) && !isNaN(parseFloat(editedHeightFeet)) && user) {
-            try {
-                const heightInCm = feetInchesToCm(parseFloat(editedHeightFeet), parseFloat(text));
-                
-                // Get current profile for BMR calculation
-                const fullProfile = await getUserProfileByFirebaseUid(user.uid);
-                if (fullProfile && fullProfile.weight && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
-                    // Create updated profile with new height
-                    const profileForBMR = {
-                        ...fullProfile,
-                        height: heightInCm
-                    };
-                    
-                    await calculateAndStoreBMR(profileForBMR, user.uid);
-                    console.log('✅ BMR recalculated after height change');
-                }
-            } catch (error) {
-                console.warn('⚠️ Failed to recalculate BMR after height change:', error);
-                // Don't show error to user as this is background calculation
-            }
-        }
     };
 
-    const handleHeightCmChange = async (value: string) => {
+    const handleHeightCmChange = (value: string) => {
         if (/^\d*\.?\d*$/.test(value)) {
             setHeight(`${value} cm`);
             checkForChanges('height', value);
-            
-            // Trigger immediate BMR recalculation if height value is valid
-            if (value && !isNaN(parseFloat(value)) && user) {
-                try {
-                    const heightInCm = parseFloat(value);
-                    
-                    // Get current profile for BMR calculation
-                    const fullProfile = await getUserProfileByFirebaseUid(user.uid);
-                    if (fullProfile && fullProfile.weight && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
-                        // Create updated profile with new height
-                        const profileForBMR = {
-                            ...fullProfile,
-                            height: heightInCm
-                        };
-                        
-                        await calculateAndStoreBMR(profileForBMR, user.uid);
-                        console.log('✅ BMR recalculated after height change');
-                    }
-                } catch (error) {
-                    console.warn('⚠️ Failed to recalculate BMR after height change:', error);
-                    // Don't show error to user as this is background calculation
-                }
-            }
         }
     };
 
-    const handleWeightChange = async (text: string) => {
+    const handleWeightChange = (text: string) => {
         setEditedWeight(text);
         checkForChanges('weight', text);
-        
-        // Trigger immediate BMR recalculation if weight value is valid
-        if (text && !isNaN(parseFloat(text)) && user) {
-            try {
-                // Convert weight to kg for calculation
-                let weightInKg = parseFloat(text);
-                if (editedIsImperialUnits) {
-                    weightInKg = lbsToKg(weightInKg);
-                }
-                
-                // Get current profile for BMR calculation
-                const fullProfile = await getUserProfileByFirebaseUid(user.uid);
-                if (fullProfile && fullProfile.height && fullProfile.age && fullProfile.gender && fullProfile.activity_level) {
-                    // Create updated profile with new weight
-                    const profileForBMR = {
-                        ...fullProfile,
-                        weight: weightInKg
-                    };
-                    
-                    console.log('🔄 Recalculating BMR after weight change:', {
-                        oldWeight: fullProfile.weight,
-                        newWeight: weightInKg,
-                        targetWeight: fullProfile.target_weight || 'not set',
-                        height: fullProfile.height,
-                        age: fullProfile.age,
-                        gender: fullProfile.gender
-                    });
-                    
-                    await calculateAndStoreBMR(profileForBMR, user.uid);
-                    console.log('✅ BMR recalculated after weight change');
-                    
-                    // IMPORTANT: Also update nutrition goals since weight changed
-                    try {
-                        const { calculateNutritionGoals } = await import('../utils/nutritionCalculator');
-                        const { updateUserGoals } = await import('../utils/database');
-                        
-                        // Convert database profile format to frontend format for calculation
-                        const profileForNutrition = {
-                            height: profileForBMR.height,
-                            weight: profileForBMR.weight,
-                            age: profileForBMR.age,
-                            gender: profileForBMR.gender,
-                            activityLevel: profileForBMR.activity_level,
-                            weightGoal: profileForBMR.weight_goal,
-                            targetWeight: profileForBMR.target_weight,
-                            nutrientFocus: profileForBMR.nutrient_focus
-                        };
-                        
-                        const newNutritionGoals = calculateNutritionGoals(profileForNutrition);
-                        console.log('🔄 Updating nutrition goals after weight change:', newNutritionGoals);
-                        
-                        await updateUserGoals(user.uid, {
-                            calorieGoal: newNutritionGoals.calories,
-                            proteinGoal: newNutritionGoals.protein,
-                            carbGoal: newNutritionGoals.carbs,
-                            fatGoal: newNutritionGoals.fat
-                        });
-                        console.log('✅ Nutrition goals updated after weight change');
-                    } catch (nutritionError) {
-                        console.warn('⚠️ Failed to update nutrition goals after weight change:', nutritionError);
-                    }
-                } else {
-                    console.log('⚠️ Cannot recalculate BMR - missing profile fields:', {
-                        height: fullProfile?.height || 'MISSING',
-                        age: fullProfile?.age || 'MISSING',
-                        gender: fullProfile?.gender || 'MISSING',
-                        activityLevel: fullProfile?.activity_level || 'MISSING'
-                    });
-                }
-            } catch (error) {
-                console.warn('⚠️ Failed to recalculate BMR after weight change:', error);
-                // Don't show error to user as this is background calculation
-            }
-        }
     };
 
     const handleLocationChange = (location: string) => {
@@ -634,7 +491,23 @@ const EditProfile = () => {
 
             // Get existing profile to preserve important fields like target_weight
             const existingProfile = await getUserProfileByFirebaseUid(user.uid);
-            
+
+            // Check if height or weight changed to trigger nutrition goals recalculation
+            const heightChanged = existingProfile?.height !== heightInCm && heightInCm > 0;
+            const weightChanged = existingProfile?.weight !== weightInKg && weightInKg > 0;
+            const shouldResetNutrition = heightChanged || weightChanged;
+
+            if (shouldResetNutrition) {
+                console.log('📊 Height or weight changed, will recalculate nutrition goals after save:', {
+                    heightChanged,
+                    weightChanged,
+                    oldHeight: existingProfile?.height,
+                    newHeight: heightInCm,
+                    oldWeight: existingProfile?.weight,
+                    newWeight: weightInKg
+                });
+            }
+
             // Create profile data object based strictly on the fields that exist in user_profiles table
             // IMPORTANT: Preserve target_weight and other fields that shouldn't be cleared
             const baseProfileData = {
@@ -651,7 +524,7 @@ const EditProfile = () => {
                 ...(dateOfBirth && dateOfBirth !== '---' ? { date_of_birth: dateOfBirth } : {}),
                 ...(calculatedAge !== null ? { age: calculatedAge } : {}),
                 // CRITICAL: Preserve target_weight from existing profile to prevent it from being cleared
-                ...(existingProfile?.target_weight !== undefined ? { target_weight: existingProfile.target_weight } : {}),
+                ...(existingProfile?.target_weight !== undefined && existingProfile?.target_weight !== null ? { target_weight: existingProfile.target_weight } : {}),
                 // Preserve other important fields that shouldn't be lost during profile update
                 ...(existingProfile?.weight_goal ? { weight_goal: existingProfile.weight_goal } : {}),
                 ...(existingProfile?.activity_level ? { activity_level: existingProfile.activity_level } : {})
@@ -721,90 +594,44 @@ const EditProfile = () => {
 
                 setTimeZone(editedTimeZone);
 
-                // Recalculate and store BMR after profile update
-                try {
-                    const updatedProfile = {
-                        ...baseProfileData,
-                        location: locationToDisplay,
-                        // Ensure we have all required fields for BMR calculation
-                        height: heightInCm > 0 ? heightInCm : null,
-                        weight: weightInKg > 0 ? weightInKg : null,
-                        gender: editedSex.toLowerCase(),
-                        // Note: age and activityLevel would need to be set separately if available
-                        // For now, we'll recalculate BMR in the background if possible
-                    };
+                // Trigger nutrition goals reset if height or weight changed
+                if (shouldResetNutrition) {
+                    try {
+                        console.log('🔄 Triggering nutrition goals reset after height/weight change...');
 
-                    // Attempt to recalculate BMR with updated profile data
-                    // This will only work if the profile has all required BMR fields
-                    console.log('🔄 Attempting to recalculate BMR after profile update...');
-                    
-                    // Get the full profile to ensure we have all BMR calculation fields
-                    const fullProfile = await getUserProfileByFirebaseUid(user.uid);
-                    if (fullProfile && fullProfile.height && fullProfile.weight && fullProfile.age && 
-                        fullProfile.gender && fullProfile.activity_level) {
-                        
-                        // Update the profile with new values for BMR calculation
-                        const profileForBMR = {
-                            ...fullProfile,
-                            height: heightInCm > 0 ? heightInCm : fullProfile.height,
-                            weight: weightInKg > 0 ? weightInKg : fullProfile.weight,
-                            gender: editedSex.toLowerCase() || fullProfile.gender,
-                            // Use calculated age from DOB if available, otherwise use current age
-                            age: calculatedAge !== null ? calculatedAge : (age > 0 ? age : fullProfile.age)
-                        };
-                        
-                        await calculateAndStoreBMR(profileForBMR, user.uid);
-                        console.log('✅ BMR recalculated successfully after profile update');
-                        
-                        // CRITICAL: Also update nutrition goals after profile save
-                        try {
-                            const { calculateNutritionGoals } = await import('../utils/nutritionCalculator');
-                            const { updateUserGoals } = await import('../utils/database');
-                            
-                            // Convert database profile format to frontend format for calculation
-                            const profileForNutrition = {
-                                height: profileForBMR.height,
-                                weight: profileForBMR.weight,
-                                age: profileForBMR.age,
-                                gender: profileForBMR.gender,
-                                activityLevel: profileForBMR.activity_level,
-                                weightGoal: profileForBMR.weight_goal,
-                                targetWeight: profileForBMR.target_weight,
-                                nutrientFocus: profileForBMR.nutrient_focus
-                            };
-                            
-                            console.log('🧮 Profile data for nutrition calculation (target weight preserved):', {
-                                currentWeight: profileForNutrition.weight,
-                                targetWeight: profileForNutrition.targetWeight || 'not set (this is fine)',
-                                height: profileForNutrition.height,
-                                activityLevel: profileForNutrition.activityLevel
-                            });
-                            
-                            const newNutritionGoals = calculateNutritionGoals(profileForNutrition);
-                            console.log('🔄 Updating nutrition goals after profile save:', newNutritionGoals);
-                            
-                            await updateUserGoals(user.uid, {
-                                calorieGoal: newNutritionGoals.calories,
-                                proteinGoal: newNutritionGoals.protein,
-                                carbGoal: newNutritionGoals.carbs,
-                                fatGoal: newNutritionGoals.fat
-                            });
-                            console.log('✅ Nutrition goals updated after profile save');
-                        } catch (nutritionError) {
-                            console.warn('⚠️ Failed to update nutrition goals after profile save:', nutritionError);
+                        // Use the reset utility function with current profile data
+                        const resetResult = await resetNutritionGoals(user.uid, {
+                            // No need to pass target weight, activity level, or fitness goal
+                            // as we want to use whatever is currently stored in the profile
+                            isImperialUnits: editedIsImperialUnits
+                        });
+
+                        if (resetResult.success) {
+                            console.log('✅ Nutrition goals reset successfully after height/weight change');
+                            Alert.alert(
+                                'Profile Updated',
+                                'Your profile has been updated and nutrition goals have been recalculated based on your new height and weight.'
+                            );
+                        } else {
+                            console.warn('⚠️ Failed to reset nutrition goals:', resetResult.errorMessage);
+                            Alert.alert(
+                                'Profile Updated',
+                                'Your profile has been updated, but nutrition goals could not be recalculated. You can manually reset them in the Goals screen.'
+                            );
                         }
-                    } else {
-                        console.log('ℹ️ Cannot recalculate BMR - missing required profile fields');
+                    } catch (resetError) {
+                        console.warn('⚠️ Error during nutrition goals reset:', resetError);
+                        Alert.alert(
+                            'Profile Updated',
+                            'Your profile has been updated, but nutrition goals could not be recalculated. You can manually reset them in the Goals screen.'
+                        );
                     }
-                } catch (bmrError) {
-                    console.warn('⚠️ Failed to recalculate BMR after profile update:', bmrError);
-                    // Don't fail the profile update if BMR calculation fails
+                } else {
+                    Alert.alert('Success', 'Profile updated successfully.');
                 }
 
                 // Reset unsaved changes flag after successful save
                 setHasUnsavedChanges(false);
-
-                Alert.alert('Success', 'Profile updated successfully.');
             } else {
                 Alert.alert('Error', 'User not found. Please log in again.');
             }

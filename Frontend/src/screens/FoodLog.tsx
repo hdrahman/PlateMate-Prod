@@ -2166,8 +2166,6 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
         return {
             meetsMinimumRequirement: dailyCaloriesConsumed >= defaultMinCalories, // At least 75% of needed calories
             projectedWeightChangeKg,
-            minMaleCalories,
-            minFemaleCalories,
             totalAvailableCalories,
             dailyDeficit,
             exerciseCalories: totalExerciseCalories,

@@ -83,14 +83,14 @@ class TokenManager {
             const db = await getDatabase();
 
             const results = await db.getAllAsync(
-                `SELECT service_name, token, token_type, expiry_time FROM api_tokens`
+                `SELECT service_name, token, token_type, expires_at FROM api_tokens`
             );
 
             for (const row of results) {
                 const serviceName = (row as any).service_name;
                 const token = (row as any).token;
                 const tokenType = (row as any).token_type;
-                const expiryTime = (row as any).expiry_time;
+                const expiryTime = (row as any).expires_at;
 
                 // Only store if not expired or close to expiry
                 if (expiryTime > Date.now() + TOKEN_REFRESH_THRESHOLD_MS) {
@@ -162,15 +162,15 @@ class TokenManager {
             if (existingResult.length > 0) {
                 // Update existing token
                 await db.runAsync(
-                    `UPDATE api_tokens 
-           SET token = ?, token_type = ?, expiry_time = ?, updated_at = datetime('now')
+                    `UPDATE api_tokens
+           SET token = ?, token_type = ?, expires_at = ?, updated_at = datetime('now')
            WHERE service_name = ?`,
                     [token, tokenType, expiryTime, serviceName]
                 );
             } else {
                 // Insert new token
                 await db.runAsync(
-                    `INSERT INTO api_tokens (service_name, token, token_type, expiry_time)
+                    `INSERT INTO api_tokens (service_name, token, token_type, expires_at)
            VALUES (?, ?, ?, ?)`,
                     [serviceName, token, tokenType, expiryTime]
                 );
