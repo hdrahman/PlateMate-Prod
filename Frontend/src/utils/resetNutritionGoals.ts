@@ -1,4 +1,4 @@
-import { getUserProfileBySupabaseUid, updateUserGoals } from './database';
+import { getUserProfileBySupabaseUid, updateUserGoals, getUserGoals } from './database';
 import { calculateNutritionGoalsFromProfile } from './offlineNutritionCalculator';
 import { lbsToKg } from './unitConversion';
 
@@ -78,6 +78,16 @@ export const resetNutritionGoals = async (
             };
         }
 
+        // Get current goals (including correct fitness goal from nutrition_goals table)
+        const currentGoals = await getUserGoals(userUid);
+        const correctFitnessGoal = currentGoals?.fitnessGoal || userProfile.weight_goal;
+
+        console.log('🎯 Fitness goal comparison:', {
+            fromUserProfile: userProfile.weight_goal,
+            fromNutritionGoals: currentGoals?.fitnessGoal,
+            usingForCalculation: correctFitnessGoal
+        });
+
         console.log('Profile data for calculation:', {
             weight: userProfile.weight,
             height: userProfile.height,
@@ -92,11 +102,11 @@ export const resetNutritionGoals = async (
             targetWeightKg = lbsToKg(options.targetWeight);
         }
 
-        // Use provided values or fall back to profile values
+        // Use provided values or fall back to correct fitness goal
         // Only map fitness goal if one is explicitly provided in options
         const effectiveWeightGoal = options.fitnessGoal
             ? mapFitnessGoalToWeightGoal(options.fitnessGoal)
-            : userProfile.weight_goal; // Preserve original weight_goal if no fitness goal provided
+            : correctFitnessGoal; // Use correct fitness goal from nutrition_goals table
 
         const profileForCalculation = {
             ...userProfile,
@@ -144,7 +154,7 @@ export const resetNutritionGoals = async (
             proteinGoal: resetGoals.protein_goal,
             carbGoal: resetGoals.carb_goal,
             fatGoal: resetGoals.fat_goal,
-            fitnessGoal: userProfile.weight_goal, // Always preserve the original fitness goal
+            // DO NOT pass fitnessGoal - let it remain unchanged in database
             activityLevel: options.activityLevel || userProfile.activity_level,
             // Preserve other goals that weren't reset
             weeklyWorkouts: userProfile.weekly_workouts,
