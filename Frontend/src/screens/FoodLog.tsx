@@ -157,7 +157,7 @@ const DiaryScreen: React.FC = () => {
     const [mealIdFilter, setMealIdFilter] = useState<number | null>(null);
     const [isFilteredView, setIsFilteredView] = useState(false);
     const [showFirstFoodLogPopup, setShowFirstFoodLogPopup] = useState(false);
-    
+
     // Add BMR data state
     const [bmrData, setBmrData] = useState<{
         bmr: number | null;
@@ -2107,10 +2107,10 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
         // Calculate total daily calories available:
         // Raw BMR × Activity Level + Exercise calories logged today
         const totalExerciseCalories = exerciseList.reduce((total, exercise) => total + exercise.calories_burned, 0);
-        
+
         // Get raw BMR and apply activity multiplier to get TRUE maintenance calories
         const rawBMR = bmrData.bmr || 2000; // Fallback if BMR not available
-        
+
         // Get activity level from user profile and apply multiplier
         let activityMultiplier = 1.2; // Sedentary default
         if (userProfile?.activity_level) {
@@ -2129,11 +2129,11 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                     break;
             }
         }
-        
+
         // Calculate TRUE maintenance calories (not adjusted for weight goals)
         const trueMaintenance = Math.round(rawBMR * activityMultiplier);
         const totalAvailableCalories = trueMaintenance + totalExerciseCalories;
-        
+
         console.log('📊 Weight prediction calculation:', {
             dailyCaloriesConsumed,
             rawBMR,
@@ -2517,32 +2517,42 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
 
                                     // Check if user prefers imperial units
                                     const isImperial = !userProfile?.use_metric_system;
-                                    
+
                                     // Prepare weight change text with proper units
                                     const weightChangeAmount = Math.abs(prediction.projectedWeightChangeKg);
-                                    const weightChangeAmountDisplay = isImperial 
+                                    const weightChangeAmountDisplay = isImperial
                                         ? kgToLbs(weightChangeAmount).toFixed(1)
                                         : weightChangeAmount.toFixed(1);
                                     const weightChangeUnit = isImperial ? 'lbs' : 'kg';
-                                    
-                                    const weightChangeText = prediction.projectedWeightChangeKg > 0 
+
+                                    const weightChangeText = prediction.projectedWeightChangeKg > 0
                                         ? `gain ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`
                                         : `lose ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`;
 
                                     // Format final weight with proper units (rounded to 1 decimal)
-                                    const finalWeightDisplay = isImperial 
+                                    const finalWeightDisplay = isImperial
                                         ? `${kgToLbs(estimatedWeight).toFixed(1)}\u00A0lbs`
                                         : `${estimatedWeight.toFixed(1)}\u00A0kg`;
 
-                                    displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
+                                    // Check if user is 1000+ calories below their MAINTENANCE (not goal)
+                                    const maintenanceDeficit = prediction.trueMaintenance - dailyCaloriesConsumed;
 
-                                    // Removed minimum calorie check
-                                    if (prediction.dailyDeficit < -500) {
-                                        // Large surplus - caution
-                                        textColor = '#FFD740';
-                                    } else if (prediction.dailyDeficit > 1000) {
-                                        // Very large deficit - caution
-                                        textColor = '#FFD740';
+                                    if (maintenanceDeficit >= 1000) {
+                                        // User is dangerously under-eating - show warning instead of prediction
+                                        displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
+                                        textColor = '#FF5252'; // Red color for warning
+                                    } else {
+                                        // Normal prediction display
+                                        displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
+
+                                        // Removed minimum calorie check
+                                        if (prediction.dailyDeficit < -500) {
+                                            // Large surplus - caution
+                                            textColor = '#FFD740';
+                                        } else if (prediction.dailyDeficit > 1000) {
+                                            // Very large deficit - caution
+                                            textColor = '#FFD740';
+                                        }
                                     }
 
 
