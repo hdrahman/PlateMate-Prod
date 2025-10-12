@@ -15,16 +15,18 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.platemate.app",
+      "bundleIdentifier": "com.zentraai.platematepro",
+      "buildNumber": "2",
       "infoPlist": {
         "UIBackgroundModes": [
-          "fitness",
-          "fetch",
-          "background-processing"
+          "fetch"
         ],
         "NSMotionUsageDescription": "PlateMate uses motion and fitness data to track your daily steps and help you achieve your fitness goals.",
         "NSHealthShareUsageDescription": "PlateMate uses HealthKit to read your step count data and provide accurate fitness tracking.",
-        "NSHealthUpdateUsageDescription": "PlateMate may write step data to HealthKit to keep your fitness data synchronized."
+        "NSHealthUpdateUsageDescription": "PlateMate may write step data to HealthKit to keep your fitness data synchronized.",
+        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your Camera to take photos and videos.",
+        "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,

@@ -21,7 +21,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { addFoodLog, addMultipleFoodLogs, getCurrentUserId } from '../utils/database';
@@ -123,11 +122,11 @@ const ImageCapture: React.FC = () => {
     // New state for UI improvements
     const [showSideView, setShowSideView] = useState(false);
     const [showOptionalDetails, setShowOptionalDetails] = useState(false);
-    
+
     // State for image navigation
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const scrollViewRef = React.useRef<ScrollView>(null);
-    
+
     // State for input validation
     const [inputErrors, setInputErrors] = useState<{ [key: string]: string[] }>({});
     const [inputWarnings, setInputWarnings] = useState<{ [key: string]: boolean }>({});
@@ -146,7 +145,7 @@ const ImageCapture: React.FC = () => {
         subtitle: '',
         features: [] as string[],
         icon: 'camera' as keyof typeof Ionicons.glyphMap,
-        onUpgrade: () => {},
+        onUpgrade: () => { },
     });
 
     useEffect(() => {
@@ -162,18 +161,18 @@ const ImageCapture: React.FC = () => {
             setShowSideView(true);
         }
     }, [initialPhotoUri]);
-    
+
     // Validation handlers for real-time input validation
     const validateAndSetFoodName = (text: string) => {
         setFoodName(text);
         const result = validateFoodName(text);
         const limits = getCharacterLimits();
-        
+
         setInputErrors(prev => ({
             ...prev,
             foodName: result.errors
         }));
-        
+
         setInputWarnings(prev => ({
             ...prev,
             foodName: isApproachingLimit(text, 'foodName', 0.8)
@@ -183,12 +182,12 @@ const ImageCapture: React.FC = () => {
     const validateAndSetBrandName = (text: string) => {
         setBrandName(text);
         const result = validateBrandName(text);
-        
+
         setInputErrors(prev => ({
             ...prev,
             brandName: result.errors
         }));
-        
+
         setInputWarnings(prev => ({
             ...prev,
             brandName: isApproachingLimit(text, 'brandName', 0.8)
@@ -198,12 +197,12 @@ const ImageCapture: React.FC = () => {
     const validateAndSetQuantity = (text: string) => {
         setQuantity(text);
         const result = validateQuantity(text);
-        
+
         setInputErrors(prev => ({
             ...prev,
             quantity: result.errors
         }));
-        
+
         setInputWarnings(prev => ({
             ...prev,
             quantity: isApproachingLimit(text, 'quantity', 0.8)
@@ -213,12 +212,12 @@ const ImageCapture: React.FC = () => {
     const validateAndSetNotes = (text: string) => {
         setNotes(text);
         const result = validateNotes(text);
-        
+
         setInputErrors(prev => ({
             ...prev,
             notes: result.errors
         }));
-        
+
         setInputWarnings(prev => ({
             ...prev,
             notes: isApproachingLimit(text, 'notes', 0.8)
@@ -227,27 +226,13 @@ const ImageCapture: React.FC = () => {
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
-            console.log('Optimizing image for maximum quality (single compression point)...');
-            // Get image info first to avoid unnecessary resizing
-            const imageInfo = await ImageManipulator.manipulateAsync(uri, []);
-
-            // Only resize if extremely large (>3000px) to prevent memory issues and preserve quality
-            const resizeTransforms = imageInfo.width > 3000 ? [{ resize: { width: 3000 } }] : [];
-
-            const manipResult = await ImageManipulator.manipulateAsync(
-                uri,
-                resizeTransforms, // Only resize if necessary
-                { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG } // Maximum quality (no compression)
-            );
-
-            console.log('Image optimized successfully');
-            console.log(`Original URI: ${uri}`);
-            console.log(`Optimized URI: ${manipResult.uri}`);
-
-            return manipResult.uri;
+            console.log('Using optimized image...');
+            // For now, return the original URI since expo-image-picker already provides compressed images
+            // This can be enhanced later with expo-image or other image processing libraries
+            return uri;
         } catch (error) {
-            console.error('Error optimizing image:', error);
-            // Fall back to original image if optimization fails
+            console.error('Error processing image:', error);
+            // Fall back to original image if processing fails
             return uri;
         }
     };
@@ -275,7 +260,7 @@ const ImageCapture: React.FC = () => {
                             uploaded: false
                         };
                         setImages(newImages);
-                        
+
                         // If this was a side view image (index 1) and both images now exist, switch to show it
                         if (index === 1 && newImages[0].uri && newImages[1].uri) {
                             // Use setTimeout to ensure ScrollView content is updated before navigation
@@ -294,7 +279,7 @@ const ImageCapture: React.FC = () => {
                     subtitle: alertOptions.subtitle,
                     features: alertOptions.features,
                     icon: alertOptions.icon,
-                    onUpgrade: alertOptions.onUpgrade || (() => {}),
+                    onUpgrade: alertOptions.onUpgrade || (() => { }),
                 });
                 setShowPremiumCard(true);
             }
@@ -324,7 +309,7 @@ const ImageCapture: React.FC = () => {
                             uploaded: false
                         };
                         setImages(newImages);
-                        
+
                         // If this was a side view image (index 1) and both images now exist, switch to show it
                         if (index === 1 && newImages[0].uri && newImages[1].uri) {
                             // Use setTimeout to ensure ScrollView content is updated before navigation
@@ -343,7 +328,7 @@ const ImageCapture: React.FC = () => {
                     subtitle: alertOptions.subtitle,
                     features: alertOptions.features,
                     icon: alertOptions.icon,
-                    onUpgrade: alertOptions.onUpgrade || (() => {}),
+                    onUpgrade: alertOptions.onUpgrade || (() => { }),
                 });
                 setShowPremiumCard(true);
             }
@@ -480,7 +465,7 @@ const ImageCapture: React.FC = () => {
 
             // Create structured payload with additional context
             const contextPayload = createLLMContextPayload(sanitizedContext);
-            
+
             const requestBody = {
                 image_urls: fullImageUrls,
                 meal_type: mealType,
@@ -604,7 +589,7 @@ const ImageCapture: React.FC = () => {
             // Create FormData with Android-compatible file handling
             const formData = new FormData();
             formData.append('user_id', '1');
-            
+
             // Add additional context for LLM analysis
             formData.append('meal_type', mealType);
             if (sanitizedContext.foodName) {
@@ -1126,12 +1111,12 @@ const ImageCapture: React.FC = () => {
             </TouchableOpacity>
         );
     };
-    
+
     // Render side view button (matches additional details design exactly)
     const renderSideViewButton = () => {
         const sideImage = images[1];
         const hasBothImages = images[0].uri && images[1].uri;
-        
+
         return (
             <View style={styles.optionalDetailsWrapper}>
                 <TouchableOpacity
@@ -1184,7 +1169,7 @@ const ImageCapture: React.FC = () => {
             </View>
         );
     };
-    
+
     // Handle scroll end to update active index
     const handleScrollEnd = (event: any) => {
         const { contentOffset } = event.nativeEvent;
@@ -1192,7 +1177,7 @@ const ImageCapture: React.FC = () => {
         const pageIndex = Math.round(contentOffset.x / slideWidth);
         setActiveImageIndex(pageIndex);
     };
-    
+
     // Function to scroll to specific image
     const scrollToImage = (index: number) => {
         if (scrollViewRef.current) {
@@ -1201,12 +1186,12 @@ const ImageCapture: React.FC = () => {
         }
         setActiveImageIndex(index);
     };
-    
+
     // Render swipeable images with ScrollView
     const renderSwipeableImages = () => {
         const filledImages = images.filter(img => img.uri !== '');
         const showNavigation = filledImages.length > 1;
-        
+
         return (
             <View style={styles.swipeableContainer}>
                 <ScrollView
@@ -1217,61 +1202,9 @@ const ImageCapture: React.FC = () => {
                     onMomentumScrollEnd={handleScrollEnd}
                     style={[styles.imagePlaceholderWrapper, styles.imageScrollView]}
                 >
-                        {filledImages.length > 0 ? (
-                            filledImages.map((image, index) => (
-                                <View key={index} style={styles.imageSlide}>
-                                    <LinearGradient
-                                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={styles.imagePlaceholderGradient}
-                                        locations={[0, 0.5, 1]}
-                                    >
-                                        <View style={styles.imagePlaceholder}>
-                                            <View style={styles.imageContainer}>
-                                                <Image source={{ uri: image.uri }} style={styles.image} />
-                                                <TouchableOpacity
-                                                    style={styles.removeImageButton}
-                                                    onPress={() => {
-                                                        const imageIndex = images.findIndex(img => img.uri === image.uri);
-                                                        if (imageIndex !== -1) {
-                                                            const newImages = [...images];
-                                                            newImages[imageIndex] = {
-                                                                ...newImages[imageIndex],
-                                                                uri: '',
-                                                                uploaded: false
-                                                            };
-                                                            setImages(newImages);
-                                                            
-                                                            // Reset active image index if needed
-                                                            const updatedFilledImages = newImages.filter(img => img.uri !== '');
-                                                            if (activeImageIndex >= updatedFilledImages.length) {
-                                                                setActiveImageIndex(Math.max(0, updatedFilledImages.length - 1));
-                                                            }
-                                                        }
-                                                    }}
-                                                >
-                                                    <Ionicons name="close" size={16} color="#fff" />
-                                                </TouchableOpacity>
-                                            </View>
-                                            
-                                            {/* Gallery button */}
-                                            <TouchableOpacity
-                                                style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
-                                                onPress={() => {
-                                                    const imageIndex = images.findIndex(img => img.uri === image.uri);
-                                                    handlePickImage(imageIndex);
-                                                }}
-                                            >
-                                                <Ionicons name="images" size={16} color="#fff" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </LinearGradient>
-                                </View>
-                            ))
-                        ) : (
-                            // Show placeholder when no images
-                            <View style={styles.imageSlide}>
+                    {filledImages.length > 0 ? (
+                        filledImages.map((image, index) => (
+                            <View key={index} style={styles.imageSlide}>
                                 <LinearGradient
                                     colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
                                     start={{ x: 0, y: 0 }}
@@ -1280,30 +1213,82 @@ const ImageCapture: React.FC = () => {
                                     locations={[0, 0.5, 1]}
                                 >
                                     <View style={styles.imagePlaceholder}>
-                                        <TouchableOpacity
-                                            style={styles.placeholderContent}
-                                            onPress={() => handleTakePhoto(0)}
-                                        >
-                                            <Ionicons name="camera" size={50} color="#8A2BE2" />
-                                            <Text style={[styles.placeholderText, { color: "#8A2BE2" }]}>
-                                                Tap to capture your meal
-                                            </Text>
-                                            <Text style={styles.requiredText}>Required</Text>
-                                        </TouchableOpacity>
-                                        
+                                        <View style={styles.imageContainer}>
+                                            <Image source={{ uri: image.uri }} style={styles.image} />
+                                            <TouchableOpacity
+                                                style={styles.removeImageButton}
+                                                onPress={() => {
+                                                    const imageIndex = images.findIndex(img => img.uri === image.uri);
+                                                    if (imageIndex !== -1) {
+                                                        const newImages = [...images];
+                                                        newImages[imageIndex] = {
+                                                            ...newImages[imageIndex],
+                                                            uri: '',
+                                                            uploaded: false
+                                                        };
+                                                        setImages(newImages);
+
+                                                        // Reset active image index if needed
+                                                        const updatedFilledImages = newImages.filter(img => img.uri !== '');
+                                                        if (activeImageIndex >= updatedFilledImages.length) {
+                                                            setActiveImageIndex(Math.max(0, updatedFilledImages.length - 1));
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                <Ionicons name="close" size={16} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+
                                         {/* Gallery button */}
                                         <TouchableOpacity
                                             style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
-                                            onPress={() => handlePickImage(0)}
+                                            onPress={() => {
+                                                const imageIndex = images.findIndex(img => img.uri === image.uri);
+                                                handlePickImage(imageIndex);
+                                            }}
                                         >
                                             <Ionicons name="images" size={16} color="#fff" />
                                         </TouchableOpacity>
                                     </View>
                                 </LinearGradient>
                             </View>
-                        )}
+                        ))
+                    ) : (
+                        // Show placeholder when no images
+                        <View style={styles.imageSlide}>
+                            <LinearGradient
+                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.imagePlaceholderGradient}
+                                locations={[0, 0.5, 1]}
+                            >
+                                <View style={styles.imagePlaceholder}>
+                                    <TouchableOpacity
+                                        style={styles.placeholderContent}
+                                        onPress={() => handleTakePhoto(0)}
+                                    >
+                                        <Ionicons name="camera" size={50} color="#8A2BE2" />
+                                        <Text style={[styles.placeholderText, { color: "#8A2BE2" }]}>
+                                            Tap to capture your meal
+                                        </Text>
+                                        <Text style={styles.requiredText}>Required</Text>
+                                    </TouchableOpacity>
+
+                                    {/* Gallery button */}
+                                    <TouchableOpacity
+                                        style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
+                                        onPress={() => handlePickImage(0)}
+                                    >
+                                        <Ionicons name="images" size={16} color="#fff" />
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
+                        </View>
+                    )}
                 </ScrollView>
-                
+
                 {/* Navigation dots */}
                 {showNavigation && (
                     <View style={styles.dotsContainer}>
@@ -1322,8 +1307,8 @@ const ImageCapture: React.FC = () => {
             </View>
         );
     };
-    
-    
+
+
 
 
     const renderOptionalDetailsSection = () => {
@@ -1463,7 +1448,7 @@ const ImageCapture: React.FC = () => {
         setIsAnalyzing(false);
         Alert.alert('Cancelled', 'Image analysis has been cancelled.');
     };
-    
+
 
     return (
         <SafeAreaView style={[styles.container, containerStyle]}>

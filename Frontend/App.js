@@ -2,13 +2,14 @@ import React, { useState, useEffect } from "react";
 import { NavigationContainer, DefaultTheme, useNavigation } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TouchableOpacity, View, Text, StatusBar, Dimensions, ActivityIndicator } from "react-native";
+import { TouchableOpacity, View, Text, StatusBar, Dimensions, ActivityIndicator, Platform } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoadingScreen from './src/components/LoadingScreen';
+import GlobalErrorBoundary from './src/components/GlobalErrorBoundary';
 import { handleTakePhoto } from './src/screens/Camera';
 import { getDatabase } from './src/utils/database';
 import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
@@ -24,15 +25,23 @@ import StepErrorBoundary from './src/components/StepErrorBoundary';
 import tokenManager from './src/utils/tokenManager';
 // Import Unified Step Tracker
 import UnifiedStepTracker from './src/services/UnifiedStepTracker';
-import notifee, { EventType } from '@notifee/react-native';
 import PersistentStepTracker from './src/services/PersistentStepTracker';
 import * as Notifications from 'expo-notifications';
 // Import Subscription Manager for automatic trials
 import SubscriptionManager from './src/utils/SubscriptionManager';
 
-// Debug utilities (development only) - removed obsolete imports
-if (__DEV__) {
-  import('./src/utils/testNativeModule');
+// Conditional import for Android-only notifee module (prevents iOS crash)
+let notifee = null;
+let EventType = null;
+
+if (Platform.OS === 'android') {
+  try {
+    const notifeeModule = require('@notifee/react-native');
+    notifee = notifeeModule.default;
+    EventType = notifeeModule.EventType;
+  } catch (error) {
+    console.warn('⚠️ Notifee not available on this platform:', error);
+  }
 }
 
 import Home from "./src/screens/Home";
@@ -520,37 +529,41 @@ export default function App() {
         // Small delay to ensure database is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Register Notifee foreground service for step tracking
-        try {
-          notifee.registerForegroundService((notification) => {
-            return new Promise(() => {
-              console.log('🚀 Foreground service registered and running');
-              
-              // Handle foreground service events (stop button, etc.)
-              notifee.onForegroundEvent(({ type, detail }) => {
-                if (type === EventType.ACTION_PRESS && detail.pressAction.id === 'stop') {
-                  console.log('🛑 Stop action pressed, stopping step tracking');
-                  // Stop both trackers
-                  Promise.all([
-                    UnifiedStepTracker.stopTracking(),
-                    PersistentStepTracker.stopService()
-                  ]).then(() => {
-                    notifee.stopForegroundService();
-                    console.log('✅ All step tracking stopped from notification');
-                  }).catch(error => {
-                    console.error('❌ Error stopping step tracking:', error);
-                    notifee.stopForegroundService();
-                  });
-                }
-              });
+        // Register Notifee foreground service for step tracking (Android only)
+        if (Platform.OS === 'android' && notifee && EventType) {
+          try {
+            notifee.registerForegroundService((notification) => {
+              return new Promise(() => {
+                console.log('🚀 Foreground service registered and running');
 
-              // Keep the service running - this promise never resolves
-              // The service will continue until explicitly stopped
+                // Handle foreground service events (stop button, etc.)
+                notifee.onForegroundEvent(({ type, detail }) => {
+                  if (type === EventType.ACTION_PRESS && detail.pressAction.id === 'stop') {
+                    console.log('🛑 Stop action pressed, stopping step tracking');
+                    // Stop both trackers
+                    Promise.all([
+                      UnifiedStepTracker.stopTracking(),
+                      PersistentStepTracker.stopService()
+                    ]).then(() => {
+                      notifee.stopForegroundService();
+                      console.log('✅ All step tracking stopped from notification');
+                    }).catch(error => {
+                      console.error('❌ Error stopping step tracking:', error);
+                      notifee.stopForegroundService();
+                    });
+                  }
+                });
+
+                // Keep the service running - this promise never resolves
+                // The service will continue until explicitly stopped
+              });
             });
-          });
-          console.log('✅ Notifee foreground service registered');
-        } catch (error) {
-          console.error('❌ Failed to register foreground service:', error);
+            console.log('✅ Notifee foreground service registered');
+          } catch (error) {
+            console.error('❌ Failed to register foreground service:', error);
+          }
+        } else {
+          console.log('ℹ️ Skipping Notifee registration (iOS or Notifee unavailable)');
         }
 
         // Check if we're running in Expo Go
@@ -610,12 +623,14 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar barStyle="light-content" backgroundColor="black" />
-        <AppNavigator />
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GlobalErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <StatusBar barStyle="light-content" backgroundColor="black" />
+          <AppNavigator />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GlobalErrorBoundary>
   );
 }
 

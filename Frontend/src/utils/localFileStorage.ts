@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 // Create a directory for storing meal images locally on the device
 const MEAL_IMAGES_DIR = `${FileSystem.documentDirectory}meal_images/`;

@@ -1,7 +1,6 @@
 {
     "cli": {
-        "version": ">= 16.13.2",
-        "appVersionSource": "remote"
+        "version": ">= 16.13.2"
     },
     "build": {
         "development": {
@@ -14,11 +13,20 @@
             "android": {
                 "buildType": "apk"
             },
+            "ios": {
+                "simulator": true
+            },
             "node": "18.20.4"
         },
         "production": {
             "android": {
                 "buildType": "apk"
+            },
+            "ios": {
+                "simulator": false,
+                "cache": {
+                    "disabled": true
+                }
             },
             "node": "18.20.4"
         }
