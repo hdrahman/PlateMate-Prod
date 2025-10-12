@@ -98,7 +98,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                     }}
                 >
                     <Image
-                        source={require('../../assets/icon2 - Edited.png')}
+                        source={require('../../assets/icon2-edited.png')}
                         style={{
                             width: logoSize,
                             height: logoSize,

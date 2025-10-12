@@ -2,21 +2,24 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "sdkVersion": "53.0.0",
     "splash": {
-      "image": "./assets/icon2 - Edited.png",
+      "image": "./assets/icon2-edited.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "2",
+      "buildNumber": "4",
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch"

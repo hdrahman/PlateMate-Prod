@@ -302,7 +302,7 @@ const Auth = ({ navigation, route }: any) => {
                             />
                             <View style={styles.logoCircle}>
                                 <Image
-                                    source={require('../../assets/icon2 - Edited.png')}
+                                    source={require('../../assets/icon2-edited.png')}
                                     style={styles.logoImage}
                                     resizeMode="cover"
                                 />
