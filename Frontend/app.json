@@ -2,11 +2,11 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "sdkVersion": "53.0.0",
     "splash": {
       "image": "./assets/icon2-edited.png",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "5",
+      "buildNumber": "7",
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch"
@@ -38,7 +38,7 @@
     },
     "android": {
       "package": "com.platemate.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.BODY_SENSORS",

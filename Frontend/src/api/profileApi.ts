@@ -4,17 +4,32 @@ import { Platform } from 'react-native';
 import { supabase } from '../utils/supabaseClient';
 
 // Get the local IP address from Expo Constants for physical device testing
+// Safe for production builds where Constants.manifest is null
 const getLocalIpAddress = () => {
-    if (Constants.manifest && Constants.manifest.debuggerHost) {
-        return Constants.manifest.debuggerHost.split(':').shift();
+    try {
+        // Try multiple APIs for compatibility with different Expo SDK versions
+        const debuggerHost =
+            (Constants as any).expoConfig?.hostUri ||
+            (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
+            (Constants as any).manifest?.debuggerHost;
+
+        if (debuggerHost && typeof debuggerHost === 'string') {
+            return debuggerHost.split(':')[0];
+        }
+    } catch (error) {
+        console.warn('Could not get debugger host from Constants:', error);
     }
-    return '172.31.90.70'; // Fallback to the updated IP
+
+    // Fallback for development
+    return '172.31.90.70';
 };
 
 // Determine the appropriate API URL based on the platform
-const API_URL = Platform.OS === 'web'
-    ? 'http://172.31.90.70:8000'
-    : `http://${getLocalIpAddress()}:8000`;
+// In production builds, use production URL
+const localIp = getLocalIpAddress();
+const API_URL = __DEV__ && localIp !== '172.31.90.70'
+    ? (Platform.OS === 'web' ? 'http://172.31.90.70:8000' : `http://${localIp}:8000`)
+    : 'https://platemateserver.onrender.com';
 
 // Helper function to get Supabase auth token
 const getIdToken = async (): Promise<string> => {

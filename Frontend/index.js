@@ -1,13 +1,22 @@
 // Firebase has been migrated to Supabase - no initialization needed
 // Supabase client is initialized when imported in components
 
-import { registerRootComponent } from 'expo';
-import App from './App';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+// Wrap everything in try-catch to handle errors before React mounts
+try {
+    // Import statements with error handling
+    const { registerRootComponent } = require('expo');
+    const App = require('./App').default;
+    const { Platform, Alert } = require('react-native');
+    const Constants = require('expo-constants').default;
 
-// Check if we're running in Expo Go
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
+    // Check if we're running in Expo Go - safe check with fallback
+    let isExpoGo = false;
+    try {
+        isExpoGo = Constants?.executionEnvironment === 'storeClient';
+    } catch (error) {
+        console.warn('Could not determine execution environment:', error);
+        isExpoGo = false;
+    }
 
 // Only import notifee on Android and when not in Expo Go
 let notifee;
@@ -51,10 +60,25 @@ if (Platform.OS === 'android' && !isExpoGo) {
     console.log('Running in Expo Go - Notifee functionality will be disabled');
 }
 
-// Make global variable to indicate if we're in Expo Go
-global.isExpoGo = isExpoGo;
+    // Make global variable to indicate if we're in Expo Go
+    global.isExpoGo = isExpoGo;
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(App);
+    // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+    // It also ensures that whether you load the app in Expo Go or in a native build,
+    // the environment is set up appropriately
+    registerRootComponent(App);
+
+    console.log('✅ PlateMate initialized successfully');
+
+} catch (error) {
+    // Critical error handler - this catches errors before React mounts
+    console.error('🚨 CRITICAL ERROR during app initialization:', error);
+    console.error('Error message:', error?.message || 'Unknown error');
+    console.error('Error stack:', error?.stack || 'No stack trace');
+
+    // DO NOT use Alert.alert() here - React Native UI is not ready yet!
+    // Just log the error and let React Native's error handler deal with it
+
+    // Rethrow to ensure the error is visible in crash logs
+    throw error;
+}

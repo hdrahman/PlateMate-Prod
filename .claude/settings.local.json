@@ -3,7 +3,9 @@
     "allow": [
       "Bash(find:*)",
       "Read(//c/Users/Haame/Downloads/**)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npx:*)",
+      "Bash(eas build:*)"
     ],
     "deny": [],
     "ask": []

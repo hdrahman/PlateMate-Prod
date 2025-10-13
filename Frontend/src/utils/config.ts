@@ -4,22 +4,39 @@ import Constants from 'expo-constants';
 
 // Get the local IP address from Expo Constants for physical device testing
 // This helps connect to your development machine when using Expo Go
+// Safe for production builds where Constants.manifest is null
 const getLocalIpAddress = () => {
-    if (Constants.manifest && (Constants.manifest as any).debuggerHost) {
-        return (Constants.manifest as any).debuggerHost.split(':').shift();
+    try {
+        // Try multiple APIs for compatibility with different Expo SDK versions
+        const debuggerHost =
+            (Constants as any).expoConfig?.hostUri ||
+            (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
+            (Constants as any).manifest?.debuggerHost;
+
+        if (debuggerHost && typeof debuggerHost === 'string') {
+            return debuggerHost.split(':')[0];
+        }
+    } catch (error) {
+        console.warn('Could not get debugger host from Constants:', error);
     }
-    return '172.31.90.70'; // Fallback to the updated IP
+
+    // Fallback for development (when not in Expo Go)
+    return '172.31.90.70';
 };
 
 // Determine the appropriate backend URL based on the platform
-// For mobile devices (iOS/Android), use the network IP
+// For mobile devices (iOS/Android), use the network IP in development
 // For web, also use the IP address for consistent connectivity
+// In production builds, this will always use the production URL
+const localIp = getLocalIpAddress();
 const DEV_BACKEND_URL = Platform.OS === 'web'
     ? 'http://172.31.90.70:8000'
-    : `http://${getLocalIpAddress()}:8000`; // Use the dynamically detected IP
+    : `http://${localIp}:8000`;
 
-// Backend URL - dynamically set based on platform
-export const BACKEND_URL = 'https://platemateserver.onrender.com';
+// Backend URL - Use production URL by default, dev URL only in __DEV__ mode
+export const BACKEND_URL = __DEV__ && localIp !== '172.31.90.70'
+    ? DEV_BACKEND_URL
+    : 'https://platemateserver.onrender.com';
 
 // Check if we're in development environment
 export const isDebug = __DEV__;
