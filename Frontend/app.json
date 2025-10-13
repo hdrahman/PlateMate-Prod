@@ -2,7 +2,7 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.6",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch"
