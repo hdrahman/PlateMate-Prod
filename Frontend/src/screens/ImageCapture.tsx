@@ -20,7 +20,7 @@ import { useNavigation, useRoute, StackActions } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { addFoodLog, addMultipleFoodLogs, getCurrentUserId } from '../utils/database';

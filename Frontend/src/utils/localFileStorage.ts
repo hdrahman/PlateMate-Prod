@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Create a directory for storing meal images locally on the device
 const MEAL_IMAGES_DIR = `${FileSystem.documentDirectory}meal_images/`;
