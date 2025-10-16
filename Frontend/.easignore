@@ -1,0 +1,11 @@
+# Gradle cache and lock files
+android/.gradle/
+android/build/
+android/app/build/
+
+# Node modules (already ignored by default but just in case)
+node_modules/
+
+# Other build artifacts
+.expo/
+dist/
