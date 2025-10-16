@@ -10,7 +10,9 @@
       "WebFetch(domain:docs.expo.dev)",
       "Bash(npm view:*)",
       "Bash(npm install)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(ls -lh \"C:\\Platemate\\PlateMate-Prod\\Frontend\\android\\app\\src\\main\\java\\com\\platemate\\app\"\" | grep -E \"Native)",
+      "Bash(Step \")"
     ],
     "deny": [],
     "ask": []
