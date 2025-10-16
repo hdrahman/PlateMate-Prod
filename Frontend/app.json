@@ -2,7 +2,7 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -18,9 +18,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "UIBackgroundModes": [
+          "fetch",
           "fetch"
         ],
         "NSMotionUsageDescription": "PlateMate uses motion and fitness data to track your daily steps and help you achieve your fitness goals.",
@@ -33,6 +34,9 @@
       "entitlements": {
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": []
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -46,8 +50,17 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.BODY_SENSORS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -79,6 +92,9 @@
       "eas": {
         "projectId": "6c1ede6a-d918-4fbc-a5b8-c549ed290ff6"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6c1ede6a-d918-4fbc-a5b8-c549ed290ff6"
     }
   }
 }

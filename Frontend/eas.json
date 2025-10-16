@@ -1,44 +1,47 @@
 {
-    "cli": {
-        "version": ">= 16.13.2"
+  "cli": {
+    "version": ">= 16.13.2"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "node": "18.20.4",
+      "channel": "development"
     },
-    "build": {
-        "development": {
-            "developmentClient": true,
-            "distribution": "internal",
-            "node": "18.20.4"
-        },
-        "preview": {
-            "distribution": "internal",
-            "android": {
-                "buildType": "apk"
-            },
-            "ios": {
-                "simulator": true
-            },
-            "node": "18.20.4"
-        },
-        "production": {
-            "env": {
-                "SUPABASE_URL": "https://noyieuwbhalbmdntoxoj.supabase.co",
-                "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5veWlldXdiaGFsYm1kbnRveG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDIxNDQsImV4cCI6MjA2NjI3ODE0NH0.OwnfpOt6LhXv7sWQoF56I619sLSOS0pKLjGxsDyc7rA",
-                "GOOGLE_WEB_CLIENT_ID": "placeholder-google-client-id",
-                "REVENUECAT_API_KEY_ANDROID": "goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA",
-                "REVENUECAT_API_KEY_IOS": "appl_YOUR_APPLE_API_KEY_PENDING_VERIFICATION"
-            },
-            "android": {
-                "buildType": "apk"
-            },
-            "ios": {
-                "simulator": false,
-                "cache": {
-                    "disabled": true
-                }
-            },
-            "node": "18.20.4"
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "node": "18.20.4",
+      "channel": "preview"
+    },
+    "production": {
+      "env": {
+        "SUPABASE_URL": "https://noyieuwbhalbmdntoxoj.supabase.co",
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5veWlldXdiaGFsYm1kbnRveG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDIxNDQsImV4cCI6MjA2NjI3ODE0NH0.OwnfpOt6LhXv7sWQoF56I619sLSOS0pKLjGxsDyc7rA",
+        "GOOGLE_WEB_CLIENT_ID": "placeholder-google-client-id",
+        "REVENUECAT_API_KEY_ANDROID": "goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA",
+        "REVENUECAT_API_KEY_IOS": "appl_YOUR_APPLE_API_KEY_PENDING_VERIFICATION"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false,
+        "cache": {
+          "disabled": true
         }
-    },
-    "submit": {
-        "production": {}
+      },
+      "node": "18.20.4",
+      "channel": "production"
     }
+  },
+  "submit": {
+    "production": {}
+  }
 }
