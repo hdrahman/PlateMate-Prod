@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
 
-// Import Google Sign In safely
+// Import Google Sign In safely - only available in dev builds, not Expo Go
 let GoogleSignin = null;
 try {
     const GoogleSigninModule = require('@react-native-google-signin/google-signin');
@@ -9,16 +9,23 @@ try {
 
     if (GoogleSignin) {
         console.log('Google Sign-In module loaded, available methods:', Object.keys(GoogleSignin));
-        
+
         // Configure Google Sign In for Supabase with minimal configuration
-        GoogleSignin.configure({
-            webClientId: GOOGLE_WEB_CLIENT_ID,
-            offlineAccess: true,
-        });
-        console.log('Google Sign-In configured for Supabase Auth');
+        // Wrap in try-catch in case native module isn't fully available
+        try {
+            GoogleSignin.configure({
+                webClientId: GOOGLE_WEB_CLIENT_ID,
+                offlineAccess: true,
+            });
+            console.log('Google Sign-In configured for Supabase Auth');
+        } catch (configError) {
+            console.log('Could not configure Google Sign-In (native module not available):', configError);
+            GoogleSignin = null; // Set to null if configuration fails
+        }
     }
 } catch (error) {
     console.log('Google Sign-In not available', error);
+    GoogleSignin = null;
 }
 
 // Auth service for Supabase

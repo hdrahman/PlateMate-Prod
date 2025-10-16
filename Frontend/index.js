@@ -12,7 +12,10 @@ try {
     // Check if we're running in Expo Go - safe check with fallback
     let isExpoGo = false;
     try {
-        isExpoGo = Constants?.executionEnvironment === 'storeClient';
+        isExpoGo = Constants?.executionEnvironment === 'storeClient' || Constants?.appOwnership === 'expo';
+        console.log('Execution environment:', Constants?.executionEnvironment);
+        console.log('App ownership:', Constants?.appOwnership);
+        console.log('Is Expo Go:', isExpoGo);
     } catch (error) {
         console.warn('Could not determine execution environment:', error);
         isExpoGo = false;
@@ -22,7 +25,18 @@ try {
 let notifee;
 let EventType;
 
-if (Platform.OS === 'android' && !isExpoGo) {
+// Check if notifee module exists before trying to import
+let hasNotifee = false;
+try {
+    // This will throw if the module isn't available
+    require.resolve('@notifee/react-native');
+    hasNotifee = true;
+} catch (e) {
+    console.log('Notifee module not available (running in Expo Go)');
+    hasNotifee = false;
+}
+
+if (Platform.OS === 'android' && !isExpoGo && hasNotifee) {
     try {
         // Try to import notifee
         const notifeeModule = require('@notifee/react-native');

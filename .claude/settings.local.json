@@ -5,7 +5,11 @@
       "Read(//c/Users/Haame/Downloads/**)",
       "WebSearch",
       "Bash(npx:*)",
-      "Bash(eas build:*)"
+      "Bash(eas build:*)",
+      "WebFetch(domain:expo.dev)",
+      "WebFetch(domain:docs.expo.dev)",
+      "Bash(npm view:*)",
+      "Bash(npm install)"
     ],
     "deny": [],
     "ask": []

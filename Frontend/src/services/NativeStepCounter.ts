@@ -40,11 +40,13 @@ class NativeStepCounterService {
     console.log('🔧 NativeStepCounterService constructor called');
     console.log('Platform.OS:', Platform.OS);
     console.log('NativeStepCounter module exists:', !!NativeStepCounter);
-    
-    if (Platform.OS === 'android' && NativeStepCounter) {
+
+    // Only create NativeEventEmitter on Android AND when the module actually exists
+    // This prevents crashes in Expo Go or on iOS
+    if (Platform.OS === 'android' && NativeStepCounter && typeof NativeStepCounter === 'object') {
       try {
         console.log('🔧 Creating NativeEventEmitter...');
-        this.eventEmitter = new NativeEventEmitter(NativeStepCounter);
+        this.eventEmitter = new NativeEventEmitter(NativeStepCounter as any);
         console.log('✅ NativeEventEmitter created successfully');
       } catch (error) {
         console.error('❌ Failed to create NativeEventEmitter:', error);
@@ -52,6 +54,7 @@ class NativeStepCounterService {
       }
     } else {
       console.log('ℹ️ NativeEventEmitter not created - not Android or module missing');
+      this.eventEmitter = null;
     }
   }
 

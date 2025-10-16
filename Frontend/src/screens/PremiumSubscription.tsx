@@ -21,7 +21,10 @@ import {
 } from '../utils/database';
 import { SubscriptionDetails, SubscriptionStatus } from '../types/user';
 import SubscriptionService from '../services/SubscriptionService';
-import { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
+
+// Define types locally to avoid importing from react-native-purchases
+type PurchasesOffering = any;
+type PurchasesPackage = any;
 
 // Define subscription plan type
 interface PlanOption {

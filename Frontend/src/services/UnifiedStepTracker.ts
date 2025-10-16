@@ -3,9 +3,26 @@ import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateTodaySteps, getStepsForDate, syncStepsWithExerciseLog } from '../utils/database';
 import StepNotificationService from './StepNotificationService';
-import HealthKitStepCounter from './HealthKitStepCounter';
 import NativeStepCounter from './NativeStepCounter';
 import StepEventBus from './StepEventBus';
+
+// Conditionally import HealthKitStepCounter only on iOS to prevent crashes
+let HealthKitStepCounter: any = null;
+if (Platform.OS === 'ios') {
+    try {
+        HealthKitStepCounter = require('./HealthKitStepCounter').default;
+        console.log('✅ HealthKitStepCounter loaded successfully');
+    } catch (error) {
+        console.warn('⚠️ HealthKitStepCounter not available:', error);
+        // Create a mock implementation to prevent crashes
+        HealthKitStepCounter = {
+            isAvailable: async () => false,
+            initialize: async () => false,
+            getTodaySteps: async () => 0,
+            requestPermissions: async () => false,
+        };
+    }
+}
 
 // Conditional imports
 let notifee: any = null;
@@ -140,18 +157,24 @@ class UnifiedStepTracker {
             } else {
                 // iOS: Check HealthKit availability and initialization status
                 try {
-                    const healthKitAvailable = await HealthKitStepCounter.isAvailable();
-                    if (healthKitAvailable) {
-                        // HealthKit permissions are handled implicitly during initialization
-                        this.state.healthKitInitialized = true;
-                        this.state.hasPermissions = true;
+                    if (HealthKitStepCounter) {
+                        const healthKitAvailable = await HealthKitStepCounter.isAvailable();
+                        if (healthKitAvailable) {
+                            // HealthKit permissions are handled implicitly during initialization
+                            this.state.healthKitInitialized = true;
+                            this.state.hasPermissions = true;
+                        }
+                    } else {
+                        console.warn('⚠️ HealthKit module not loaded');
+                        this.state.healthKitInitialized = false;
+                        this.state.hasPermissions = false;
                     }
                 } catch (error) {
                     console.warn('⚠️ HealthKit check failed:', error);
                     this.state.healthKitInitialized = false;
                     this.state.hasPermissions = false;
                 }
-                
+
             }
 
             return this.state.hasPermissions;
@@ -187,17 +210,22 @@ class UnifiedStepTracker {
             } else {
                 // iOS - Initialize HealthKit
                 try {
-                    const healthKitAvailable = await HealthKitStepCounter.isAvailable();
-                    
-                    if (healthKitAvailable) {
-                        const healthKitInitialized = await HealthKitStepCounter.initialize();
-                        this.state.healthKitInitialized = healthKitInitialized;
+                    if (HealthKitStepCounter) {
+                        const healthKitAvailable = await HealthKitStepCounter.isAvailable();
+
+                        if (healthKitAvailable) {
+                            const healthKitInitialized = await HealthKitStepCounter.initialize();
+                            this.state.healthKitInitialized = healthKitInitialized;
+                        }
+                    } else {
+                        console.warn('⚠️ HealthKit module not loaded, skipping initialization');
+                        this.state.healthKitInitialized = false;
                     }
                 } catch (error) {
                     console.error('❌ HealthKit initialization failed:', error);
                     this.state.healthKitInitialized = false;
                 }
-                
+
                 this.state.hasPermissions = true;
             }
 
@@ -744,7 +772,7 @@ class UnifiedStepTracker {
                 return;
             } else {
                 // iOS: Use HealthKit if available, fallback to Expo Pedometer
-                if (this.state.healthKitInitialized) {
+                if (this.state.healthKitInitialized && HealthKitStepCounter) {
                     try {
                         console.log('🍎 iOS: Syncing from HealthKit...');
                         const steps = await HealthKitStepCounter.getTodaySteps();

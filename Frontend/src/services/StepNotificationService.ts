@@ -1,8 +1,26 @@
-import notifee, { AndroidImportance, AndroidStyle } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserGoals, getCurrentUserIdAsync, getCurrentUserId, getTodayExerciseCalories } from '../utils/database';
 import SettingsService from './SettingsService';
+
+// Conditional import for notifee - only available in dev builds, not Expo Go
+let notifee: any = null;
+let AndroidImportance: any = null;
+let AndroidStyle: any = null;
+
+const isExpoGo = global.isExpoGo === true;
+
+if (Platform.OS === 'android' && !isExpoGo) {
+  try {
+    const notifeeModule = require('@notifee/react-native');
+    notifee = notifeeModule.default;
+    AndroidImportance = notifeeModule.AndroidImportance;
+    AndroidStyle = notifeeModule.AndroidStyle;
+    console.log('✅ Notifee loaded in StepNotificationService');
+  } catch (error) {
+    console.warn('⚠️ Notifee not available in StepNotificationService (Expo Go mode):', error);
+  }
+}
 
 // Helper function to format date as YYYY-MM-DD (matching database.ts)
 const formatDateToString = (date: Date): string => {
@@ -55,6 +73,13 @@ class StepNotificationService {
     try {
       console.log('🔔 Initializing Step Notification Service (without permissions)...');
 
+      // Check if notifee is available
+      if (!notifee) {
+        console.log('⚠️ Notifee not available (running in Expo Go) - skipping notification initialization');
+        this.isInitialized = true;
+        return;
+      }
+
       // Create notification channel for Android (can be done without permissions)
       if (Platform.OS === 'android') {
         // First, delete any existing channel to ensure settings take effect
@@ -73,7 +98,7 @@ class StepNotificationService {
           description: 'Persistent notifications for step tracking and calorie monitoring',
           importance: AndroidImportance.LOW, // LOW importance for silent foreground services
         });
-        
+
         console.log('✅ Created silent step tracking notification channel');
       }
 
@@ -89,16 +114,21 @@ class StepNotificationService {
    */
   public async requestPermissions(): Promise<boolean> {
     try {
+      if (!notifee) {
+        console.log('⚠️ Notifee not available - skipping permission request');
+        return false;
+      }
+
       console.log('📱 Requesting notification permissions...');
       const settings = await notifee.requestPermission();
       const granted = settings.authorizationStatus >= 1; // AuthorizationStatus.AUTHORIZED or higher
-      
+
       if (granted) {
         console.log('✅ Notification permissions granted');
       } else {
         console.log('❌ Notification permissions denied');
       }
-      
+
       return granted;
     } catch (error) {
       console.error('❌ Error requesting notification permissions:', error);
@@ -457,6 +487,11 @@ class StepNotificationService {
    * Start the foreground service with step tracking notification
    */
   public async startForegroundService(steps: number): Promise<void> {
+    if (!notifee) {
+      console.log('⚠️ Notifee not available - skipping foreground service');
+      return;
+    }
+
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -607,19 +642,24 @@ class StepNotificationService {
    * Stop the foreground service and hide notification
    */
   public async stopForegroundService(): Promise<void> {
+    if (!notifee) {
+      console.log('⚠️ Notifee not available - nothing to stop');
+      return;
+    }
+
     try {
       if (this.currentNotificationId) {
         // Stop foreground service and cancel notification
         await notifee.stopForegroundService();
         await notifee.cancelNotification(this.currentNotificationId);
         console.log('🛑 Foreground service stopped');
-        
+
         this.currentNotificationId = null;
         console.log('✅ Step tracking service stopped');
       }
     } catch (error) {
       console.error('❌ Error stopping foreground service:', error);
-      
+
       // Fallback to regular notification cancellation
       try {
         if (this.currentNotificationId) {
@@ -644,6 +684,10 @@ class StepNotificationService {
    * Check if notification is currently displayed
    */
   public async isNotificationActive(): Promise<boolean> {
+    if (!notifee) {
+      return false;
+    }
+
     try {
       const notifications = await notifee.getDisplayedNotifications();
       return notifications.some(n => n.id === NOTIFICATION_ID);

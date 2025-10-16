@@ -1,10 +1,29 @@
-import BackgroundService from 'react-native-background-actions';
 import { Platform } from 'react-native';
 import { Pedometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { updateTodaySteps } from '../utils/database';
 import NativeStepCounter from './NativeStepCounter';
 import StepNotificationService from './StepNotificationService';
+
+// Conditional import for react-native-background-actions - only available in dev builds, not Expo Go
+let BackgroundService: any = null;
+
+// Detect if we're running in Expo Go BEFORE trying to require native modules
+const isExpoGo = Constants?.executionEnvironment === 'storeClient' ||
+                 Constants?.appOwnership === 'expo';
+
+if (!isExpoGo) {
+  try {
+    BackgroundService = require('react-native-background-actions').default;
+    console.log('✅ react-native-background-actions loaded');
+  } catch (error) {
+    console.log('⚠️ react-native-background-actions not available (Expo Go mode)');
+    BackgroundService = null;
+  }
+} else {
+  console.log('Expo Go detected - background actions disabled');
+}
 
 // Keys for AsyncStorage
 const PERSISTENT_STEP_SERVICE_KEY = 'PERSISTENT_STEP_SERVICE_ENABLED';
@@ -52,11 +71,16 @@ class PersistentStepTracker {
      * The background task that runs continuously
      */
     private backgroundStepTask = async (taskDataArguments: any) => {
+        if (!BackgroundService) {
+            console.log('⚠️ BackgroundService not available, skipping background task');
+            return;
+        }
+
         try {
             const { delay = this.syncInterval } = taskDataArguments || {};
-            
+
             console.log('🔄 Starting persistent step tracking background service');
-            
+
             // Background task should run indefinitely
             let isRunning = true;
             while (isRunning) {
@@ -237,6 +261,11 @@ class PersistentStepTracker {
      * Update the persistent notification with current step count
      */
     private async updateNotification(steps: number): Promise<void> {
+        if (!BackgroundService) {
+            console.log('⚠️ BackgroundService not available, skipping notification update');
+            return;
+        }
+
         try {
             // Only update if the service is actually running
             if (!this.isServiceRunning || !BackgroundService.isRunning()) {
@@ -247,7 +276,7 @@ class PersistentStepTracker {
             // Update both the background service notification AND the foreground service notification
             const todayDate = new Date().toLocaleDateString();
             const formattedSteps = steps.toLocaleString();
-            
+
             // Update background service notification
             await BackgroundService.updateNotification({
                 taskName: 'PlateMate Step Tracker',
@@ -284,6 +313,11 @@ class PersistentStepTracker {
      * Start the persistent step tracking service
      */
     public async startPersistentTracking(): Promise<void> {
+        if (!BackgroundService) {
+            console.log('⚠️ BackgroundService not available (Expo Go) - cannot start persistent tracking');
+            return;
+        }
+
         try {
             if (this.isServiceRunning) {
                 console.log('ℹ️ Persistent step tracking already running');
@@ -413,6 +447,11 @@ class PersistentStepTracker {
      * Stop the persistent step tracking service
      */
     public async stopPersistentTracking(): Promise<void> {
+        if (!BackgroundService) {
+            console.log('⚠️ BackgroundService not available - nothing to stop');
+            return;
+        }
+
         try {
             if (!this.isServiceRunning) {
                 console.log('ℹ️ Persistent step tracking not running');
@@ -462,14 +501,18 @@ class PersistentStepTracker {
      * Check if the persistent service is running
      */
     public isPersistentTrackingRunning(): boolean {
+        if (!BackgroundService) {
+            return false;
+        }
+
         const actuallyRunning = this.isServiceRunning && BackgroundService.isRunning();
-        
+
         // If we think it's running but it's actually not, update our state
         if (this.isServiceRunning && !BackgroundService.isRunning()) {
             console.warn('⚠️ Persistent service state mismatch detected, correcting...');
             this.isServiceRunning = false;
         }
-        
+
         return actuallyRunning;
     }
 
@@ -569,6 +612,11 @@ class PersistentStepTracker {
      * Set up event listeners for iOS expiration handling
      */
     public setupEventListeners(): void {
+        if (!BackgroundService) {
+            console.log('⚠️ BackgroundService not available - skipping event listeners');
+            return;
+        }
+
         if (Platform.OS === 'ios') {
             BackgroundService.on('expiration', () => {
                 console.log('⏰ iOS background time is expiring, performing final sync...');
@@ -624,10 +672,15 @@ class PersistentStepTracker {
      * Start heartbeat to keep service alive
      */
     private startHeartbeat(): void {
+        if (!BackgroundService) {
+            console.log('⚠️ BackgroundService not available - skipping heartbeat');
+            return;
+        }
+
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
         }
-        
+
         this.heartbeatInterval = setInterval(() => {
             try {
                 if (BackgroundService.isRunning()) {
@@ -641,7 +694,7 @@ class PersistentStepTracker {
             } catch (error) {
                 console.error('❌ Heartbeat error:', error);
                 this.consecutiveErrors++;
-                
+
                 if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
                     console.error('❌ Too many consecutive errors, stopping service');
                     this.stopPersistentTracking();

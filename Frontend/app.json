@@ -2,12 +2,11 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.8",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
-    "sdkVersion": "53.0.0",
+    "sdkVersion": "54.0.0",
     "splash": {
       "image": "./assets/icon2-edited.png",
       "resizeMode": "contain",
@@ -19,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "8",
+      "buildNumber": "10",
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch"
@@ -71,13 +70,15 @@
       "expo-background-fetch",
       "expo-task-manager",
       "./notifee.plugin.js",
-      "expo-font"
+      "expo-font",
+      "react-native-health",
+      "expo-asset"
     ],
+    "owner": "haamed",
     "extra": {
       "eas": {
         "projectId": "6c1ede6a-d918-4fbc-a5b8-c549ed290ff6"
       }
-    },
-    "owner": "haamed"
+    }
   }
 }

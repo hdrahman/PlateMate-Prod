@@ -1,14 +1,37 @@
 import { Platform } from 'react-native';
 import { SubscriptionDetails, SubscriptionStatus } from '../types/user';
+import Constants from 'expo-constants';
 
-// Import RevenueCat SDK
-import Purchases, { 
-  CustomerInfo, 
-  PurchasesOffering, 
-  PurchasesPackage, 
-  PurchasesStoreProduct,
-  INTRO_ELIGIBILITY_STATUS 
-} from 'react-native-purchases';
+// Conditional import for RevenueCat SDK - only available in dev builds, not Expo Go
+let Purchases: any = null;
+let CustomerInfo: any = null;
+let PurchasesOffering: any = null;
+let PurchasesPackage: any = null;
+let PurchasesStoreProduct: any = null;
+let INTRO_ELIGIBILITY_STATUS: any = null;
+
+// Detect if we're running in Expo Go BEFORE trying to require native modules
+const isExpoGo = Constants?.executionEnvironment === 'storeClient' ||
+                 Constants?.appOwnership === 'expo';
+
+// Only try to load RevenueCat if NOT in Expo Go
+if (!isExpoGo) {
+  try {
+    const PurchasesModule = require('react-native-purchases');
+    Purchases = PurchasesModule.default;
+    CustomerInfo = PurchasesModule.CustomerInfo;
+    PurchasesOffering = PurchasesModule.PurchasesOffering;
+    PurchasesPackage = PurchasesModule.PurchasesPackage;
+    PurchasesStoreProduct = PurchasesModule.PurchasesStoreProduct;
+    INTRO_ELIGIBILITY_STATUS = PurchasesModule.INTRO_ELIGIBILITY_STATUS;
+    console.log('✅ RevenueCat SDK loaded successfully');
+  } catch (error) {
+    console.log('⚠️ RevenueCat failed to load:', error);
+    Purchases = null;
+  }
+} else {
+  console.log('Expo Go app detected. Using RevenueCat in Preview API Mode.');
+}
 
 // Define EntitlementInfo type locally (it's part of CustomerInfo but not exported separately)
 type EntitlementInfo = {
@@ -54,9 +77,15 @@ class SubscriptionService {
   async initialize(userId: string): Promise<void> {
     if (this.isInitialized) return;
 
+    if (!Purchases) {
+      console.log('⚠️ RevenueCat not available - skipping initialization');
+      this.isInitialized = true;
+      return;
+    }
+
     try {
       const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
-      
+
       // Configure Purchases SDK with enhanced settings
       await Purchases.configure({
         apiKey,
@@ -71,7 +100,7 @@ class SubscriptionService {
 
       this.isInitialized = true;
       console.log('✅ RevenueCat SDK initialized successfully for user:', userId);
-      
+
       // Get initial customer info to sync trial status
       try {
         const customerInfo = await this.getCustomerInfo();
@@ -83,7 +112,7 @@ class SubscriptionService {
       } catch (customerError) {
         console.warn('⚠️ Could not fetch initial customer info (may be expected for unpublished apps):', customerError);
       }
-      
+
     } catch (error) {
       console.error('❌ Error initializing RevenueCat SDK:', error);
       throw error;
@@ -91,6 +120,8 @@ class SubscriptionService {
   }
 
   async getOfferings(): Promise<PurchasesOffering | null> {
+    if (!Purchases) return null;
+
     try {
       const offerings = await Purchases.getOfferings();
       return offerings.current;
@@ -101,6 +132,8 @@ class SubscriptionService {
   }
 
   async getProducts(): Promise<PurchasesStoreProduct[]> {
+    if (!Purchases) return [];
+
     try {
       const products = await Purchases.getProducts([
         PRODUCT_IDS.MONTHLY,
@@ -159,6 +192,10 @@ class SubscriptionService {
   }
 
   async getCustomerInfo(): Promise<CustomerInfo> {
+    if (!Purchases) {
+      throw new Error('RevenueCat not available');
+    }
+
     try {
       const customerInfo = await Purchases.getCustomerInfo();
       return customerInfo;
