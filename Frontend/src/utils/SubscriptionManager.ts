@@ -372,13 +372,12 @@ class SubscriptionManager {
   async initialize(userId: string): Promise<void> {
     try {
       console.log('🚀 Initializing SubscriptionManager for user:', userId);
-      
+
       // Clear any stale cache
       this.clearCache();
-      
-      // Check and auto-start trial if needed
-      await this.checkAndAutoStartTrial(userId);
-      
+
+      console.log('✅ SubscriptionManager initialized successfully');
+
     } catch (error) {
       console.error('❌ Error initializing SubscriptionManager:', error);
     }

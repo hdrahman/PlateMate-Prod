@@ -9,7 +9,8 @@
       "WebFetch(domain:expo.dev)",
       "WebFetch(domain:docs.expo.dev)",
       "Bash(npm view:*)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

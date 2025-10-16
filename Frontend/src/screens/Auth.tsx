@@ -94,7 +94,8 @@ const Auth = ({ navigation, route }: any) => {
     const [isAppleAuthAvailable, setIsAppleAuthAvailable] = useState(false);
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
-    const { signIn, signUp, signInWithGoogle, signInWithApple, user } = useAuth();
+    const [showSignedInState, setShowSignedInState] = useState(false);
+    const { signIn, signUp, signInWithGoogle, signInWithApple, signOut, user } = useAuth();
 
     // Animation refs
     const logoScale = useRef(new Animated.Value(0.9)).current;
@@ -165,7 +166,34 @@ const Auth = ({ navigation, route }: any) => {
         }
     }, [user, returnTo, skipIntroSteps, navigation]);
 
+    // Detect if user is already signed in but stuck on Auth screen
+    useEffect(() => {
+        // If user exists but we're still on Auth screen after a delay, show signed-in state
+        if (user) {
+            const timer = setTimeout(() => {
+                setShowSignedInState(true);
+            }, 2000); // Wait 2 seconds to allow normal navigation to complete
+            return () => clearTimeout(timer);
+        } else {
+            setShowSignedInState(false);
+        }
+    }, [user]);
+
     const handleAuth = async () => {
+        // If user is already signed in, sign them out
+        if (showSignedInState) {
+            setIsLoading(true);
+            try {
+                await signOut();
+                setShowSignedInState(false);
+            } catch (error) {
+                console.error('Error signing out:', error);
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
+
         if (!email || !password) {
             Alert.alert('Error', 'Email and password are required');
             return;
@@ -249,8 +277,9 @@ const Auth = ({ navigation, route }: any) => {
         }
     };
 
-    // Show loading screen if user is authenticated (prevents flash during navigation)
-    if (user) {
+    // Show loading screen if user is authenticated and navigation is expected
+    // Don't show loading if we're in the stuck state (showSignedInState = true)
+    if (user && !showSignedInState) {
         return <LoadingScreen message="Signing you in..." />;
     }
 
@@ -335,77 +364,83 @@ const Auth = ({ navigation, route }: any) => {
                             <View style={styles.card}>
                                 <View style={styles.cardContent}>
                                     <Text style={styles.formTitle}>
-                                        {isLogin ? 'Welcome Back' : 'Create Account'}
+                                        {showSignedInState ? 'Already Signed In' : (isLogin ? 'Welcome Back' : 'Create Account')}
                                     </Text>
                                     <Text style={styles.formSubtitle}>
-                                        {isLogin
-                                            ? 'Sign in to continue your journey'
-                                            : 'Join thousands transforming their health'}
+                                        {showSignedInState
+                                            ? 'You are currently signed in. Sign out to switch accounts or try onboarding again.'
+                                            : (isLogin
+                                                ? 'Sign in to continue your journey'
+                                                : 'Join thousands transforming their health')}
                                     </Text>
 
-                                    {/* Email Input */}
-                                    <View style={styles.inputContainer}>
-                                        <Ionicons name="mail-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Email address"
-                                            placeholderTextColor="#777"
-                                            value={email}
-                                            onChangeText={setEmail}
-                                            keyboardType="email-address"
-                                            autoCapitalize="none"
-                                            autoCorrect={false}
-                                        />
-                                    </View>
-
-                                    {/* Password Input */}
-                                    <View style={styles.inputContainer}>
-                                        <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Password"
-                                            placeholderTextColor="#777"
-                                            value={password}
-                                            onChangeText={setPassword}
-                                            secureTextEntry={!passwordVisible}
-                                            autoCorrect={false}
-                                        />
-                                        <TouchableOpacity
-                                            onPress={() => setPasswordVisible(!passwordVisible)}
-                                            style={styles.eyeIcon}
-                                        >
-                                            <Ionicons
-                                                name={passwordVisible ? "eye-outline" : "eye-off-outline"}
-                                                size={20}
-                                                color="#777"
-                                            />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* Confirm Password Input (Sign Up only) */}
-                                    {!isLogin && (
-                                        <View style={styles.inputContainer}>
-                                            <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
-                                            <TextInput
-                                                style={styles.input}
-                                                placeholder="Confirm password"
-                                                placeholderTextColor="#777"
-                                                value={confirmPassword}
-                                                onChangeText={setConfirmPassword}
-                                                secureTextEntry={!confirmPasswordVisible}
-                                                autoCorrect={false}
-                                            />
-                                            <TouchableOpacity
-                                                onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
-                                                style={styles.eyeIcon}
-                                            >
-                                                <Ionicons
-                                                    name={confirmPasswordVisible ? "eye-outline" : "eye-off-outline"}
-                                                    size={20}
-                                                    color="#777"
+                                    {!showSignedInState && (
+                                        <>
+                                            {/* Email Input */}
+                                            <View style={styles.inputContainer}>
+                                                <Ionicons name="mail-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
+                                                <TextInput
+                                                    style={styles.input}
+                                                    placeholder="Email address"
+                                                    placeholderTextColor="#777"
+                                                    value={email}
+                                                    onChangeText={setEmail}
+                                                    keyboardType="email-address"
+                                                    autoCapitalize="none"
+                                                    autoCorrect={false}
                                                 />
-                                            </TouchableOpacity>
-                                        </View>
+                                            </View>
+
+                                            {/* Password Input */}
+                                            <View style={styles.inputContainer}>
+                                                <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
+                                                <TextInput
+                                                    style={styles.input}
+                                                    placeholder="Password"
+                                                    placeholderTextColor="#777"
+                                                    value={password}
+                                                    onChangeText={setPassword}
+                                                    secureTextEntry={!passwordVisible}
+                                                    autoCorrect={false}
+                                                />
+                                                <TouchableOpacity
+                                                    onPress={() => setPasswordVisible(!passwordVisible)}
+                                                    style={styles.eyeIcon}
+                                                >
+                                                    <Ionicons
+                                                        name={passwordVisible ? "eye-outline" : "eye-off-outline"}
+                                                        size={20}
+                                                        color="#777"
+                                                    />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {/* Confirm Password Input (Sign Up only) */}
+                                            {!isLogin && (
+                                                <View style={styles.inputContainer}>
+                                                    <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        placeholder="Confirm password"
+                                                        placeholderTextColor="#777"
+                                                        value={confirmPassword}
+                                                        onChangeText={setConfirmPassword}
+                                                        secureTextEntry={!confirmPasswordVisible}
+                                                        autoCorrect={false}
+                                                    />
+                                                    <TouchableOpacity
+                                                        onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                                                        style={styles.eyeIcon}
+                                                    >
+                                                        <Ionicons
+                                                            name={confirmPasswordVisible ? "eye-outline" : "eye-off-outline"}
+                                                            size={20}
+                                                            color="#777"
+                                                        />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            )}
+                                        </>
                                     )}
 
                                     {/* Main Auth Button */}
@@ -416,7 +451,7 @@ const Auth = ({ navigation, route }: any) => {
                                         activeOpacity={0.8}
                                     >
                                         <LinearGradient
-                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                            colors={showSignedInState ? ["#dd0095", "#9B00FF", "#dd0095"] : ["#0074dd", "#5c00dd", "#dd0095"]}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
                                             style={styles.authButtonGradient}
@@ -426,51 +461,55 @@ const Auth = ({ navigation, route }: any) => {
                                                 <ActivityIndicator color="#ffffff" size="small" />
                                             ) : (
                                                 <Text style={styles.authButtonText}>
-                                                    {isLogin ? 'Sign In' : 'Create Account'}
+                                                    {showSignedInState ? 'Sign Out' : (isLogin ? 'Sign In' : 'Create Account')}
                                                 </Text>
                                             )}
                                         </View>
                                     </TouchableOpacity>
 
-                                    {/* Toggle Auth Mode */}
-                                    <TouchableOpacity onPress={toggleAuthMode} style={styles.toggleContainer}>
-                                        <Text style={styles.toggleAuthText}>
-                                            {isLogin ? "Don't have an account? " : "Already have an account? "}
-                                            <Text style={styles.toggleAuthHighlight}>
-                                                {isLogin ? "Sign up" : "Sign in"}
+                                    {/* Toggle Auth Mode - only show if not in signed-in state */}
+                                    {!showSignedInState && (
+                                        <TouchableOpacity onPress={toggleAuthMode} style={styles.toggleContainer}>
+                                            <Text style={styles.toggleAuthText}>
+                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                                <Text style={styles.toggleAuthHighlight}>
+                                                    {isLogin ? "Sign up" : "Sign in"}
+                                                </Text>
                                             </Text>
-                                        </Text>
-                                    </TouchableOpacity>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             </View>
                         </View>
                     </Animated.View>
 
-                    {/* Social Login Section */}
-                    <Animated.View
-                        style={[
-                            styles.socialContainer,
-                            { opacity: socialButtonsOpacity }
-                        ]}
-                    >
-                        <View style={styles.dividerContainer}>
-                            <View style={styles.divider} />
-                            <Text style={styles.orText}>or continue with</Text>
-                            <View style={styles.divider} />
-                        </View>
-
-                        <TouchableOpacity
-                            style={styles.socialButton}
-                            onPress={handleGoogleSignIn}
-                            disabled={isLoading}
-                            activeOpacity={0.8}
+                    {/* Social Login Section - only show if not in signed-in state */}
+                    {!showSignedInState && (
+                        <Animated.View
+                            style={[
+                                styles.socialContainer,
+                                { opacity: socialButtonsOpacity }
+                            ]}
                         >
-                            <View style={styles.socialButtonContent}>
-                                <Ionicons name="logo-google" size={20} color="#FFF" style={styles.socialIcon} />
-                                <Text style={styles.socialButtonText}>Continue with Google</Text>
+                            <View style={styles.dividerContainer}>
+                                <View style={styles.divider} />
+                                <Text style={styles.orText}>or continue with</Text>
+                                <View style={styles.divider} />
                             </View>
-                        </TouchableOpacity>
-                    </Animated.View>
+
+                            <TouchableOpacity
+                                style={styles.socialButton}
+                                onPress={handleGoogleSignIn}
+                                disabled={isLoading}
+                                activeOpacity={0.8}
+                            >
+                                <View style={styles.socialButtonContent}>
+                                    <Ionicons name="logo-google" size={20} color="#FFF" style={styles.socialIcon} />
+                                    <Text style={styles.socialButtonText}>Continue with Google</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    )}
                 </ScrollView>
             </KeyboardAvoidingView>
         </View>
