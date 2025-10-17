@@ -5,7 +5,7 @@ import SubscriptionService from '../services/SubscriptionService';
 // All local trial logic and AsyncStorage manipulation has been removed for security
 
 export interface SubscriptionStatus {
-  tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual';
+  tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
   hasPremiumAccess: boolean;
   isInTrial: boolean;
   daysRemaining?: number;

@@ -528,8 +528,39 @@ class SubscriptionService {
   }
 
   // Get user's current subscription tier
-  async getSubscriptionTier(): Promise<'free' | 'trial' | 'premium_monthly' | 'premium_annual'> {
+  async getSubscriptionTier(): Promise<'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime'> {
     try {
+      // PRIORITY 1: Check backend for VIP status first
+      try {
+        const { BACKEND_URL } = require('../utils/config');
+        const tokenManager = require('../utils/tokenManager').default;
+        const { ServiceTokenType } = require('../utils/tokenManager');
+
+        const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
+
+        const response = await fetch(`${BACKEND_URL}/api/subscription/validate-premium`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // If VIP, return VIP tier
+          if (data.tier === 'vip_lifetime') {
+            console.log('👑 VIP tier detected from backend');
+            return 'vip_lifetime';
+          }
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Backend VIP tier check failed, falling back to RevenueCat:', backendError);
+        // Continue to RevenueCat check if backend fails
+      }
+
+      // PRIORITY 2: Check RevenueCat for paid subscriptions or trials
       const customerInfo = await this.getCustomerInfo();
       const subscriptionDetails = this.customerInfoToSubscriptionDetails(customerInfo);
 

@@ -101,6 +101,48 @@ const PremiumSubscription = () => {
         const loadSubscriptionData = async () => {
             try {
                 if (user?.uid) {
+                    // PRIORITY 1: Check if user is VIP via backend
+                    try {
+                        const { BACKEND_URL } = require('../utils/config');
+                        const tokenManager = require('../utils/tokenManager').default;
+                        const { ServiceTokenType } = require('../utils/tokenManager');
+
+                        const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
+
+                        const response = await fetch(`${BACKEND_URL}/api/subscription/validate-premium`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                            },
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+
+                            // If VIP, set special VIP status and skip RevenueCat
+                            if (data.tier === 'vip_lifetime') {
+                                console.log('👑 VIP user detected, displaying VIP status');
+                                
+                                const vipPlanInfo = {
+                                    planName: 'VIP Lifetime Access',
+                                    isActive: true,
+                                    statusText: `VIP Member • ${data.vip_reason || 'Lifetime Access'}`,
+                                    statusColor: '#FFD700', // Gold color for VIP
+                                    showUpgradePrompt: false
+                                };
+                                setCurrentPlanInfo(vipPlanInfo);
+                                
+                                // Don't load RevenueCat for VIPs, they don't need it
+                                return;
+                            }
+                        }
+                    } catch (backendError) {
+                        console.warn('⚠️ Backend VIP check failed, continuing with RevenueCat:', backendError);
+                        // Continue to RevenueCat check if backend fails
+                    }
+
+                    // PRIORITY 2: For non-VIP users, load RevenueCat data
                     // Initialize RevenueCat if not already done
                     await SubscriptionService.initialize(user.uid);
                     
@@ -434,12 +476,12 @@ const PremiumSubscription = () => {
                         <View style={styles.currentPlanCard}>
                             <View style={[styles.currentPlanHeader, { backgroundColor: currentPlanInfo.statusColor + '20' }]}>
                                 <Ionicons 
-                                    name={currentPlanInfo.isActive ? "checkmark-circle" : "information-circle"} 
+                                    name={currentPlanInfo.planName.includes('VIP') ? "shield-checkmark" : currentPlanInfo.isActive ? "checkmark-circle" : "information-circle"} 
                                     size={20} 
                                     color={currentPlanInfo.statusColor} 
                                 />
                                 <Text style={styles.currentPlanLabel}>
-                                    {currentPlanInfo.isActive ? "Current Plan" : "Plan Status"}
+                                    {currentPlanInfo.planName.includes('VIP') ? "VIP Status" : currentPlanInfo.isActive ? "Current Plan" : "Plan Status"}
                                 </Text>
                             </View>
                             <View style={styles.currentPlanBody}>
@@ -452,20 +494,30 @@ const PremiumSubscription = () => {
                                         Upgrade for unlimited features
                                     </Text>
                                 )}
+                                {currentPlanInfo.planName.includes('VIP') && (
+                                    <Text style={styles.vipMessage}>
+                                        ✨ You have full access to all premium features with no subscription required!
+                                    </Text>
+                                )}
                             </View>
                         </View>
                     )}
 
-                    <View style={styles.plansContainer}>
-                        {plans.map(plan => renderPlanCard(plan))}
-                    </View>
+                    {/* Only show subscription plans for non-VIP users */}
+                    {(!currentPlanInfo || !currentPlanInfo.planName.includes('VIP')) && (
+                        <>
+                            <View style={styles.plansContainer}>
+                                {plans.map(plan => renderPlanCard(plan))}
+                            </View>
 
-                    {/* Store-compliant trial disclaimer */}
-                    <View style={styles.trialDisclaimerSection}>
-                        <Text style={styles.trialDisclaimerText}>
-                            New users get 20 days free automatically. Start a subscription to unlock an additional 10 days (30 days total). Cancel anytime during the trial period. No charges until trial ends.
-                        </Text>
-                    </View>
+                            {/* Store-compliant trial disclaimer */}
+                            <View style={styles.trialDisclaimerSection}>
+                                <Text style={styles.trialDisclaimerText}>
+                                    New users get 20 days free automatically. Start a subscription to unlock an additional 10 days (30 days total). Cancel anytime during the trial period. No charges until trial ends.
+                                </Text>
+                            </View>
+                        </>
+                    )}
 
                     <View style={styles.featuresSection}>
                         <Text style={styles.featuresTitle}>Premium Features</Text>
@@ -853,6 +905,13 @@ const styles = StyleSheet.create({
     upgradePrompt: {
         color: '#FF00F5',
         fontSize: 13,
+        fontStyle: 'italic',
+    },
+    vipMessage: {
+        color: '#FFD700',
+        fontSize: 14,
+        fontWeight: '600',
+        marginTop: 8,
         fontStyle: 'italic',
     },
     // Store-compliant trial disclaimer styles
