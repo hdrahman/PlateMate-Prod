@@ -28,7 +28,6 @@ router = APIRouter(prefix="/api/subscription", tags=["subscription"])
 REVENUECAT_API_KEY = os.getenv('REVENUECAT_API_KEY')
 REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
 
-# VIP User Management - Helper function
 async def check_vip_status(firebase_uid: str) -> dict:
     """
     Check if user is a VIP (gets free lifetime premium access)
@@ -38,23 +37,20 @@ async def check_vip_status(firebase_uid: str) -> dict:
         dict with keys: is_vip (bool), reason (str), granted_at (str)
     """
     try:
-        conn = await get_db_connection()
+        # Supabase client is synchronous, but we run in async context
+        supabase = get_db_connection()
         
-        vip_query = """
-            SELECT firebase_uid, email, reason, granted_by, granted_at, is_active
-            FROM vip_users
-            WHERE firebase_uid = $1 AND is_active = true
-        """
+        # Query vip_users table using Supabase client
+        response = supabase.table('vip_users').select('*').eq('firebase_uid', firebase_uid).eq('is_active', True).execute()
         
-        vip_record = await conn.fetchrow(vip_query, firebase_uid)
-        
-        if vip_record:
+        if response.data and len(response.data) > 0:
+            vip_record = response.data[0]
             logger.info(f"👑 VIP user detected: {firebase_uid} (reason: {vip_record['reason']})")
             return {
                 'is_vip': True,
                 'reason': vip_record['reason'],
-                'granted_at': vip_record['granted_at'].isoformat() if vip_record['granted_at'] else None,
-                'granted_by': vip_record['granted_by']
+                'granted_at': vip_record['granted_at'] if 'granted_at' in vip_record else None,
+                'granted_by': vip_record['granted_by'] if 'granted_by' in vip_record else None
             }
         
         return {'is_vip': False}
