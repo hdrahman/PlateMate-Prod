@@ -1130,6 +1130,14 @@ async def get_promotional_trial_status(current_user: dict = Depends(get_current_
                 "is_active": False,
                 "days_remaining": 0
             }
+    
+    except Exception as e:
+        logger.error(f"Error in promotional trial status endpoint: {str(e)}")
+        return {
+            "has_trial": False,
+            "is_active": False,
+            "days_remaining": 0
+        }
 
 
 @router.post("/admin/invalidate-vip-cache")
