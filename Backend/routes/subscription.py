@@ -37,8 +37,8 @@ async def check_vip_status(firebase_uid: str) -> dict:
         dict with keys: is_vip (bool), reason (str), granted_at (str)
     """
     try:
-        # Supabase client is synchronous, but we run in async context
-        supabase = get_db_connection()
+        # Get Supabase client (async wrapper around sync client)
+        supabase = await get_db_connection()
         
         # Query vip_users table using Supabase client
         response = supabase.table('vip_users').select('*').eq('firebase_uid', firebase_uid).eq('is_active', True).execute()
