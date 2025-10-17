@@ -40,13 +40,14 @@ async def check_vip_status(firebase_uid: str) -> dict:
         # Get Supabase client (async wrapper around sync client)
         supabase = await get_db_connection()
         
+        logger.info(f"🔍 Querying VIP table for firebase_uid: {firebase_uid}")
+        
         # Query vip_users table using Supabase client
         response = supabase.table('vip_users').select('*').eq('firebase_uid', firebase_uid).eq('is_active', True).execute()
         
         # Debug logging
-        logger.info(f"🔍 VIP check for {firebase_uid}: Found {len(response.data) if response.data else 0} records")
-        if response.data:
-            logger.info(f"🔍 VIP data: {response.data}")
+        logger.info(f"🔍 VIP query response - Count: {response.count if hasattr(response, 'count') else 'N/A'}, Data length: {len(response.data) if response.data else 0}")
+        logger.info(f"🔍 VIP raw data: {response.data}")
         
         if response.data and len(response.data) > 0:
             vip_record = response.data[0]
@@ -57,6 +58,10 @@ async def check_vip_status(firebase_uid: str) -> dict:
                 'granted_at': vip_record['granted_at'] if 'granted_at' in vip_record else None,
                 'granted_by': vip_record['granted_by'] if 'granted_by' in vip_record else None
             }
+        
+        # Also try querying ALL VIP records to see what's there
+        all_vips = supabase.table('vip_users').select('firebase_uid, email, is_active').execute()
+        logger.info(f"🔍 ALL VIP records in table: {all_vips.data}")
         
         logger.info(f"❌ No VIP record found for {firebase_uid}")
         return {'is_vip': False}
