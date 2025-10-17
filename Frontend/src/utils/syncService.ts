@@ -218,6 +218,10 @@ export interface SyncStats {
     nutritionGoalsUploaded: number;
     subscriptionsUploaded: number;
     cheatDaySettingsUploaded: number;
+    dailyGoalsUploaded: number;
+    waterIntakeUploaded: number;
+    userSettingsUploaded: number;
+    favoritesUploaded: number;
     totalErrors: number;
     lastSyncTime: string;
 }
@@ -236,6 +240,10 @@ export interface RestoreStats {
     nutritionGoalsRestored: number;
     subscriptionsRestored: number;
     cheatDaySettingsRestored: number;
+    dailyGoalsRestored: number;
+    waterIntakeRestored: number;
+    userSettingsRestored: number;
+    favoritesRestored: number;
     totalErrors: number;
 }
 
@@ -349,6 +357,10 @@ class PostgreSQLSyncService {
             nutritionGoalsUploaded: 0,
             subscriptionsUploaded: 0,
             cheatDaySettingsUploaded: 0,
+            dailyGoalsUploaded: 0,
+            waterIntakeUploaded: 0,
+            userSettingsUploaded: 0,
+            favoritesUploaded: 0,
             totalErrors: 0,
             lastSyncTime: new Date().toISOString()
         };
@@ -381,6 +393,18 @@ class PostgreSQLSyncService {
 
             // 7. Sync Cheat Day Settings
             await this.syncCheatDaySettings(currentUser.id, stats, errors);
+
+            // 8. Sync Daily Goals
+            await this.syncDailyGoals(currentUser.id, stats, errors);
+
+            // 9. Sync Water Intake
+            await this.syncWaterIntake(currentUser.id, stats, errors);
+
+            // 10. Sync User Settings
+            await this.syncUserSettings(currentUser.id, stats, errors);
+
+            // 11. Sync Favorites
+            await this.syncFavorites(currentUser.id, stats, errors);
 
             this.lastSyncTime = new Date();
             stats.totalErrors = errors.length;
@@ -832,6 +856,188 @@ class PostgreSQLSyncService {
         }
     }
 
+    private async syncDailyGoals(firebaseUid: string, stats: SyncStats, errors: string[]) {
+        try {
+            // Get daily goals from AsyncStorage (StreakService stores them there)
+            const goalsJson = await AsyncStorage.getItem('daily_goals');
+            if (!goalsJson) return;
+
+            const goals = JSON.parse(goalsJson);
+            if (goals.length === 0) return;
+
+            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
+            if (!postgresUserId) {
+                errors.push('Cannot sync daily goals: User not found in PostgreSQL');
+                return;
+            }
+
+            for (const goal of goals) {
+                try {
+                    const goalData = {
+                        firebase_uid: firebaseUid,
+                        goal_type: goal.type,
+                        target: goal.target,
+                        current_value: goal.current,
+                        achieved: goal.achieved,
+                        date: goal.date
+                    };
+
+                    const { error } = await supabase
+                        .from('daily_goals')
+                        .upsert(goalData, { onConflict: 'firebase_uid,goal_type,date' });
+
+                    if (error) throw error;
+
+                    stats.dailyGoalsUploaded++;
+                } catch (error) {
+                    console.error(`Error syncing daily goal ${goal.type}:`, error);
+                    errors.push(`Daily goal ${goal.type} sync error: ${error.message}`);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error syncing daily goals:', error);
+            errors.push(`Daily goals sync error: ${error.message}`);
+        }
+    }
+
+    private async syncWaterIntake(firebaseUid: string, stats: SyncStats, errors: string[]) {
+        try {
+            // Get unsynced water intake from database
+            // Note: This requires adding getUnsyncedWaterIntake function to database.ts
+            const { getWaterIntakeHistory } = await import('./database');
+            const waterIntake = await getWaterIntakeHistory(30); // Last 30 days
+
+            if (waterIntake.length === 0) return;
+
+            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
+            if (!postgresUserId) {
+                errors.push('Cannot sync water intake: User not found in PostgreSQL');
+                return;
+            }
+
+            for (const entry of waterIntake) {
+                try {
+                    const waterData = {
+                        firebase_uid: firebaseUid,
+                        amount_ml: entry.total,
+                        date: entry.date,
+                        container_type: 'custom'
+                    };
+
+                    const { error } = await supabase
+                        .from('water_intake')
+                        .insert(waterData);
+
+                    if (error && error.code !== '23505') throw error; // Ignore duplicate errors
+
+                    stats.waterIntakeUploaded++;
+                } catch (error) {
+                    console.error(`Error syncing water intake for ${entry.date}:`, error);
+                    errors.push(`Water intake sync error: ${error.message}`);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error syncing water intake:', error);
+            errors.push(`Water intake sync error: ${error.message}`);
+        }
+    }
+
+    private async syncUserSettings(firebaseUid: string, stats: SyncStats, errors: string[]) {
+        try {
+            // Get settings from AsyncStorage (SettingsService stores them there)
+            const [notificationSettings, dataSharingSettings, privacySettings] = await Promise.all([
+                AsyncStorage.getItem('notification_settings'),
+                AsyncStorage.getItem('data_sharing_settings'),
+                AsyncStorage.getItem('privacy_settings')
+            ]);
+
+            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
+            if (!postgresUserId) {
+                errors.push('Cannot sync user settings: User not found in PostgreSQL');
+                return;
+            }
+
+            const settingsData = {
+                firebase_uid: firebaseUid,
+                notification_settings: notificationSettings ? JSON.parse(notificationSettings) : {},
+                data_sharing_settings: dataSharingSettings ? JSON.parse(dataSharingSettings) : {},
+                privacy_settings: privacySettings ? JSON.parse(privacySettings) : {},
+                updated_at: new Date().toISOString()
+            };
+
+            const { data: existingSettings } = await supabase
+                .from('user_settings')
+                .select('id')
+                .eq('firebase_uid', firebaseUid)
+                .single();
+
+            if (existingSettings) {
+                const { error } = await supabase
+                    .from('user_settings')
+                    .update(settingsData)
+                    .eq('firebase_uid', firebaseUid);
+
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('user_settings')
+                    .insert(settingsData);
+
+                if (error) throw error;
+            }
+
+            stats.userSettingsUploaded++;
+
+        } catch (error) {
+            console.error('Error syncing user settings:', error);
+            errors.push(`User settings sync error: ${error.message}`);
+        }
+    }
+
+    private async syncFavorites(firebaseUid: string, stats: SyncStats, errors: string[]) {
+        try {
+            // Get favorites from AsyncStorage (FavoritesContext stores them there)
+            const favoritesJson = await AsyncStorage.getItem('favorites');
+            if (!favoritesJson) return;
+
+            const favorites = JSON.parse(favoritesJson);
+            if (favorites.length === 0) return;
+
+            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
+            if (!postgresUserId) {
+                errors.push('Cannot sync favorites: User not found in PostgreSQL');
+                return;
+            }
+
+            for (const favorite of favorites) {
+                try {
+                    const favoriteData = {
+                        firebase_uid: firebaseUid,
+                        recipe_id: favorite.id,
+                        recipe_data: favorite
+                    };
+
+                    const { error } = await supabase
+                        .from('user_favorites')
+                        .upsert(favoriteData, { onConflict: 'firebase_uid,recipe_id' });
+
+                    if (error) throw error;
+
+                    stats.favoritesUploaded++;
+                } catch (error) {
+                    console.error(`Error syncing favorite ${favorite.id}:`, error);
+                    errors.push(`Favorite ${favorite.id} sync error: ${error.message}`);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error syncing favorites:', error);
+            errors.push(`Favorites sync error: ${error.message}`);
+        }
+    }
+
     // Restore data from PostgreSQL to SQLite (when local storage is empty)
     async restoreFromPostgreSQL(): Promise<RestoreResult> {
         const errors: string[] = [];
@@ -843,6 +1049,10 @@ class PostgreSQLSyncService {
             nutritionGoalsRestored: 0,
             subscriptionsRestored: 0,
             cheatDaySettingsRestored: 0,
+            dailyGoalsRestored: 0,
+            waterIntakeRestored: 0,
+            userSettingsRestored: 0,
+            favoritesRestored: 0,
             totalErrors: 0
         };
 
@@ -881,6 +1091,18 @@ class PostgreSQLSyncService {
 
             // 7. Restore Cheat Day Settings
             await this.restoreCheatDaySettings(currentUser.id, postgresUserId, stats, errors);
+
+            // 8. Restore Daily Goals
+            await this.restoreDailyGoals(currentUser.id, postgresUserId, stats, errors);
+
+            // 9. Restore Water Intake
+            await this.restoreWaterIntake(currentUser.id, postgresUserId, stats, errors);
+
+            // 10. Restore User Settings
+            await this.restoreUserSettings(currentUser.id, postgresUserId, stats, errors);
+
+            // 11. Restore Favorites
+            await this.restoreFavorites(currentUser.id, postgresUserId, stats, errors);
 
             stats.totalErrors = errors.length;
 
@@ -1214,6 +1436,124 @@ class PostgreSQLSyncService {
         } catch (error) {
             console.error('Error restoring cheat day settings:', error);
             errors.push(`Cheat day settings restore error: ${error.message}`);
+        }
+    }
+
+    private async restoreDailyGoals(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
+        try {
+            const { data: goals, error } = await supabase
+                .from('daily_goals')
+                .select('*')
+                .eq('firebase_uid', firebaseUid)
+                .order('date', { ascending: false })
+                .limit(30); // Last 30 days
+
+            if (error) throw error;
+            if (!goals || goals.length === 0) return;
+
+            // Store daily goals back to AsyncStorage
+            const goalsData = goals.map(g => ({
+                type: g.goal_type,
+                target: g.target,
+                current: g.current_value,
+                achieved: g.achieved,
+                date: g.date
+            }));
+
+            await AsyncStorage.setItem('daily_goals', JSON.stringify(goalsData));
+            stats.dailyGoalsRestored++;
+
+        } catch (error) {
+            console.error('Error restoring daily goals:', error);
+            errors.push(`Daily goals restore error: ${error.message}`);
+        }
+    }
+
+    private async restoreWaterIntake(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
+        try {
+            const { data: waterIntake, error } = await supabase
+                .from('water_intake')
+                .select('*')
+                .eq('firebase_uid', firebaseUid)
+                .order('date', { ascending: false })
+                .limit(100); // Last 100 entries
+
+            if (error) throw error;
+            if (!waterIntake || waterIntake.length === 0) return;
+
+            // Import database functions
+            const { addWaterIntake } = await import('./database');
+
+            for (const entry of waterIntake) {
+                try {
+                    await addWaterIntake(entry.amount_ml, entry.container_type || 'custom');
+                    stats.waterIntakeRestored++;
+                } catch (error) {
+                    console.error(`Error restoring water intake entry:`, error);
+                    errors.push(`Water intake restore error: ${error.message}`);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error restoring water intake:', error);
+            errors.push(`Water intake restore error: ${error.message}`);
+        }
+    }
+
+    private async restoreUserSettings(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
+        try {
+            const { data: settings, error } = await supabase
+                .from('user_settings')
+                .select('*')
+                .eq('firebase_uid', firebaseUid)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    return; // Settings don't exist
+                }
+                throw error;
+            }
+
+            // Restore settings to AsyncStorage
+            if (settings.notification_settings && Object.keys(settings.notification_settings).length > 0) {
+                await AsyncStorage.setItem('notification_settings', JSON.stringify(settings.notification_settings));
+            }
+
+            if (settings.data_sharing_settings && Object.keys(settings.data_sharing_settings).length > 0) {
+                await AsyncStorage.setItem('data_sharing_settings', JSON.stringify(settings.data_sharing_settings));
+            }
+
+            if (settings.privacy_settings && Object.keys(settings.privacy_settings).length > 0) {
+                await AsyncStorage.setItem('privacy_settings', JSON.stringify(settings.privacy_settings));
+            }
+
+            stats.userSettingsRestored++;
+
+        } catch (error) {
+            console.error('Error restoring user settings:', error);
+            errors.push(`User settings restore error: ${error.message}`);
+        }
+    }
+
+    private async restoreFavorites(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
+        try {
+            const { data: favorites, error } = await supabase
+                .from('user_favorites')
+                .select('*')
+                .eq('firebase_uid', firebaseUid);
+
+            if (error) throw error;
+            if (!favorites || favorites.length === 0) return;
+
+            // Restore favorites to AsyncStorage
+            const favoritesData = favorites.map(f => f.recipe_data);
+            await AsyncStorage.setItem('favorites', JSON.stringify(favoritesData));
+            stats.favoritesRestored++;
+
+        } catch (error) {
+            console.error('Error restoring favorites:', error);
+            errors.push(`Favorites restore error: ${error.message}`);
         }
     }
 

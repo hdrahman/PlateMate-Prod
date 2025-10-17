@@ -82,7 +82,7 @@ const PremiumSubscription = () => {
             gradient: ['#5A60EA', '#4A90E2'],
             subscriptionType: 'premium_monthly',
             imageUploads: 'Monthly billing',
-            features: ['10-day free trial']
+            features: ['Up to 30 days free trial']
         },
         {
             id: 'premium_annual',
@@ -93,7 +93,7 @@ const PremiumSubscription = () => {
             subscriptionType: 'premium_annual',
             bestValue: true,
             imageUploads: 'Annual billing',
-            features: ['10-day free trial', 'Save 30% vs monthly plan']
+            features: ['Up to 30 days free trial', 'Save 30% vs monthly plan']
         }
     ];
 
@@ -423,7 +423,7 @@ const PremiumSubscription = () => {
                                 <Ionicons name="nutrition" size={40} color="#FFD700" />
                                 <Text style={styles.heroTitle}>Unlock Premium Features</Text>
                                 <Text style={styles.heroText}>
-                                    Experience AI-powered nutrition tracking with a 10-day free trial
+                                    Experience AI-powered nutrition tracking with up to 30 days free trial
                                 </Text>
                             </View>
                         </LinearGradient>
@@ -463,7 +463,7 @@ const PremiumSubscription = () => {
                     {/* Store-compliant trial disclaimer */}
                     <View style={styles.trialDisclaimerSection}>
                         <Text style={styles.trialDisclaimerText}>
-                            Start a 10-day free trial (auto-renew required to start). Cancel anytime during the trial to avoid being charged. Access lasts until the trial ends.
+                            New users get 20 days free automatically. Start a subscription to unlock an additional 10 days (30 days total). Cancel anytime during the trial period. No charges until trial ends.
                         </Text>
                     </View>
 

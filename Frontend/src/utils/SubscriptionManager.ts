@@ -91,23 +91,52 @@ class SubscriptionManager {
     }
   }
 
-  // Check image upload permissions - SECURE: No local storage manipulation possible
+  // Check image upload permissions - SECURE: Server-side validation via backend API
   async canUploadImage(): Promise<{ allowed: boolean; uploadsToday?: number; limit?: number }> {
     const status = await this.getSubscriptionStatus();
-    
+
     // Premium users (including trial) have unlimited uploads - validated by RevenueCat
     if (status.hasPremiumAccess) {
       return { allowed: true };
     }
 
-    // Free users have 1 upload per day - this should be validated server-side for security
-    // For now, we'll allow the upload and let backend handle the actual limit enforcement
-    console.log('⚠️ Free user attempting upload - backend will enforce limits');
-    return {
-      allowed: true, // Let backend handle the actual enforcement
-      uploadsToday: undefined, // Remove local tracking
-      limit: 1,
-    };
+    // Free users: Check server-side upload limit enforcement
+    try {
+      const { BACKEND_URL } = require('./config');
+      const tokenManager = require('./tokenManager').default;
+      const { ServiceTokenType } = require('./tokenManager');
+
+      // Get auth token
+      const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
+
+      // Call backend to validate upload limit
+      const response = await fetch(`${BACKEND_URL}/api/subscription/validate-upload-limit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('❌ Upload limit validation failed:', response.status);
+        // On error, be conservative and deny upload
+        return { allowed: false, uploadsToday: undefined, limit: 1 };
+      }
+
+      const data = await response.json();
+      console.log('✅ Upload limit validation:', data);
+
+      return {
+        allowed: data.upload_allowed || false,
+        uploadsToday: data.uploads_today,
+        limit: data.limit || 1
+      };
+    } catch (error) {
+      console.error('❌ Error validating upload limit:', error);
+      // On error, be conservative and deny upload for free users
+      return { allowed: false, uploadsToday: undefined, limit: 1 };
+    }
   }
 
   // Image upload tracking removed - handled server-side for security

@@ -59,7 +59,8 @@ export const PRODUCT_IDS = {
 // Entitlement identifiers for features
 export const ENTITLEMENTS = {
   PREMIUM: 'premium',           // Full premium access from paid subscription
-  PROMOTIONAL_TRIAL: 'promotional_trial', // 20-day backend-granted trial
+  PROMOTIONAL_TRIAL: 'promotional_trial', // 20-day backend-granted trial (automatic for new users)
+  EXTENDED_TRIAL: 'extended_trial', // Additional 10-day trial when user starts subscription trial
 } as const;
 
 class SubscriptionService {
@@ -90,7 +91,7 @@ class SubscriptionService {
       await Purchases.configure({
         apiKey,
         appUserID: userId,
-        usesStoreKit2IfAvailable: false, // Disable StoreKit 2 for better compatibility with unpublished apps
+        usesStoreKit2IfAvailable: true, // Enable StoreKit 2 for production - better transaction handling, family sharing
       });
 
       // Enable debug logging in development
@@ -423,29 +424,33 @@ class SubscriptionService {
       return false;
     }
   }
-  // Check if user has premium access (including promotional trial and paid subscription)
+  // Check if user has premium access (including promotional trial, extended trial, and paid subscription)
   async hasPremiumAccess(): Promise<boolean> {
     try {
       const customerInfo = await this.getCustomerInfo();
-      
+
       // Check for active premium subscription
       const hasPremiumSub = this.hasActiveSubscription(customerInfo);
-      
-      // Check for active promotional trial (20-day backend-granted)
+
+      // Check for active promotional trial (20-day backend-granted, automatic for new users)
       const hasPromotionalTrial = customerInfo.entitlements.active[ENTITLEMENTS.PROMOTIONAL_TRIAL]?.isActive || false;
-      
-      // Check for store trial (10-day intro trial)
+
+      // Check for active extended trial (additional 10-day when user starts subscription trial)
+      const hasExtendedTrial = customerInfo.entitlements.active[ENTITLEMENTS.EXTENDED_TRIAL]?.isActive || false;
+
+      // Check for store trial (in-app purchase trial period)
       const hasStoreTrial = this.isInTrialPeriod(customerInfo);
-      
-      const hasAccess = hasPremiumSub || hasPromotionalTrial || hasStoreTrial;
-      
+
+      const hasAccess = hasPremiumSub || hasPromotionalTrial || hasExtendedTrial || hasStoreTrial;
+
       console.log('🔒 Premium Access Check:', {
         premiumSubscription: hasPremiumSub,
         promotionalTrial: hasPromotionalTrial,
+        extendedTrial: hasExtendedTrial,
         storeTrial: hasStoreTrial,
         totalAccess: hasAccess
       });
-      
+
       return hasAccess;
     } catch (error) {
       console.error('❌ Error checking premium access:', error);
