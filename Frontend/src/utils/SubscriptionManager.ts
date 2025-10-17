@@ -18,7 +18,7 @@ class SubscriptionManager {
   private cachedStatus: SubscriptionStatus | null = null;
   private lastCacheUpdate: number = 0;
   private cacheValidityMs = 5 * 60 * 1000; // Increased to 5 minutes to reduce backend calls
-  
+
   // Track pending requests to prevent duplicates
   private pendingRequest: Promise<SubscriptionStatus> | null = null;
 
@@ -32,7 +32,7 @@ class SubscriptionManager {
   // Get current subscription status from RevenueCat only - SECURE IMPLEMENTATION
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
     const now = Date.now();
-    
+
     // Return cached status if still valid
     if (this.cachedStatus && (now - this.lastCacheUpdate) < this.cacheValidityMs) {
       console.log('📦 Returning cached subscription status');
@@ -61,7 +61,7 @@ class SubscriptionManager {
   // Separate method for actual fetching logic
   private async fetchSubscriptionStatus(): Promise<SubscriptionStatus> {
     const now = Date.now();
-    
+
     try {
       // ONLY source: RevenueCat - tamper-proof subscription status
       const [tier, hasPremiumAccess, trialStatus] = await Promise.all([
@@ -83,7 +83,7 @@ class SubscriptionManager {
       return this.cachedStatus;
     } catch (error) {
       console.error('❌ Error getting subscription status from RevenueCat:', error);
-      
+
       // Return safe default for free user
       const fallbackStatus: SubscriptionStatus = {
         tier: 'free',
@@ -92,7 +92,7 @@ class SubscriptionManager {
         daysRemaining: 0,
         canExtendTrial: false,
       };
-      
+
       return fallbackStatus;
     }
   }
@@ -109,9 +109,9 @@ class SubscriptionManager {
     try {
       // Direct RevenueCat check - tamper-proof
       const hasPremiumAccess = await SubscriptionService.hasPremiumAccess();
-      
+
       console.log('🔒 SECURE: Premium access check via RevenueCat:', hasPremiumAccess);
-      
+
       return hasPremiumAccess;
     } catch (error) {
       console.error('❌ Error checking premium access from RevenueCat:', error);
@@ -180,9 +180,9 @@ class SubscriptionManager {
     showTrialOffer?: boolean;
   }): void {
     const { source = 'unknown', feature = 'premium feature', showTrialOffer = true } = options || {};
-    
+
     console.log(`🚀 Navigating to subscription screen from ${source} for ${feature}`);
-    
+
     navigation.navigate('PremiumSubscription', {
       source,
       feature,
@@ -192,7 +192,7 @@ class SubscriptionManager {
 
   // Show premium feature alert and navigate to subscription
   async showPremiumFeatureAlert(
-    navigation: NavigationProp<any>, 
+    navigation: NavigationProp<any>,
     options: {
       title: string;
       message: string;
@@ -207,7 +207,7 @@ class SubscriptionManager {
     }) => void
   ): Promise<void> {
     const { title, message, feature, source } = options;
-    
+
     const handleUpgrade = () => {
       this.navigateToSubscription(navigation, {
         source,
@@ -263,9 +263,9 @@ class SubscriptionManager {
     }) => void
   ): Promise<boolean> {
     const { feature, source, title, message, onAccess } = options;
-    
+
     const canAccess = await this.canAccessPremiumFeature();
-    
+
     if (canAccess) {
       // User has premium access, execute the feature
       onAccess?.();
@@ -297,11 +297,11 @@ class SubscriptionManager {
     }) => void
   ): Promise<void> {
     const uploadStatus = await this.canUploadImage();
-    
+
     if (uploadStatus.allowed) {
       // User can upload, proceed
       onUpload();
-      
+
       // Record the upload if they're a free user
       const status = await this.getSubscriptionStatus();
       if (!status.hasPremiumAccess) {
@@ -330,7 +330,7 @@ class SubscriptionManager {
           ],
           icon: 'camera',
           onUpgrade: handleUpgrade,
-          onClose: () => {}, // No-op for close
+          onClose: () => { }, // No-op for close
         });
       } else {
         // Fallback to navigation
@@ -345,10 +345,10 @@ class SubscriptionManager {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
-    
+
     const msUntilReset = tomorrow.getTime() - now.getTime();
     const hoursUntilReset = Math.ceil(msUntilReset / (1000 * 60 * 60));
-    
+
     if (hoursUntilReset === 1) {
       return '1 hour';
     } else {
@@ -390,7 +390,7 @@ class SubscriptionManager {
     }) => void
   ): Promise<void> {
     const canAccess = await this.canAccessPremiumFeature();
-    
+
     if (canAccess) {
       onEnable();
       return;
@@ -417,7 +417,7 @@ class SubscriptionManager {
         ],
         icon: 'fitness',
         onUpgrade: handleUpgrade,
-        onClose: () => {}, // No-op for close
+        onClose: () => { }, // No-op for close
       });
     } else {
       // Fallback to navigation
