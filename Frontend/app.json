@@ -2,7 +2,7 @@
   "expo": {
     "name": "PlateMate",
     "slug": "PlateMate",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "orientation": "default",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",

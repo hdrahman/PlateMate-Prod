@@ -1,8 +1,12 @@
 # Gradle cache and lock files
 android/.gradle/
+android/.kotlin/
 android/build/
 android/app/build/
 android/app/.cxx/
+android/local.properties
+android/*.hprof
+android/*.iml
 
 # Node modules (already ignored by default but just in case)
 node_modules/
@@ -11,6 +15,7 @@ node_modules/
 .expo/
 dist/
 build/
+.metro-health-check*
 
 # Documentation files (not needed for builds)
 *.md
@@ -31,6 +36,7 @@ jest.config.js
 # IDE and editor files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -62,3 +68,11 @@ yarn-error.log*
 .nvmrc
 .npmrc
 patches/
+plugins/
+scripts/
+
+# Build configuration files (processed before upload)
+babel.config.js
+metro.config.js
+tsconfig.json
+expo.json

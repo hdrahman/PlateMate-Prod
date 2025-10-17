@@ -126,9 +126,11 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const isTablet = Platform.isPad || width >= 768;
   const scaleFactor = isTablet
-    ? Math.min(width / BASE_WIDTH, 2.7) // Allow up to 2.7x scaling for iPad
+    ? Math.min(width / BASE_WIDTH, 1.4) // Reduced from 2.7x to 1.4x for better iPad proportions
     : Math.min(width / BASE_WIDTH, 1.5); // Slightly more flexible for large phones
-  const CIRCLE_SIZE = Math.min(width * 0.50 * scaleFactor, width * 0.85); // Cap at 85% of screen width
+  const CIRCLE_SIZE = isTablet
+    ? Math.min(width * 0.38, 350) // For tablets: 38% of width, max 350px
+    : Math.min(width * 0.50 * scaleFactor, width * 0.85); // For phones: existing logic
   const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2);
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 
@@ -2589,7 +2591,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    height: 250 // Increased height to accommodate the larger SVG size
+    minHeight: 250 // Changed to minHeight to allow dynamic sizing
   },
   loadingContainer: {
     flex: 1,
