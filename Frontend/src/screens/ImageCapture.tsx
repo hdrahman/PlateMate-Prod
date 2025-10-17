@@ -163,66 +163,85 @@ const ImageCapture: React.FC = () => {
     }, [initialPhotoUri]);
 
     // Validation handlers for real-time input validation
-    const validateAndSetFoodName = (text: string) => {
+    // Using React.startTransition to batch state updates and prevent keyboard flickering
+    const validateAndSetFoodName = React.useCallback((text: string) => {
         setFoodName(text);
-        const result = validateFoodName(text);
-        const limits = getCharacterLimits();
 
-        setInputErrors(prev => ({
-            ...prev,
-            foodName: result.errors
-        }));
+        // Use startTransition to mark validation updates as non-urgent
+        // This batches them with other updates and prevents re-renders during typing
+        React.startTransition(() => {
+            const result = validateFoodName(text);
+            const isApproaching = isApproachingLimit(text, 'foodName', 0.8);
 
-        setInputWarnings(prev => ({
-            ...prev,
-            foodName: isApproachingLimit(text, 'foodName', 0.8)
-        }));
-    };
+            // Batch error and warning updates together
+            setInputErrors(prev => ({
+                ...prev,
+                foodName: result.errors
+            }));
 
-    const validateAndSetBrandName = (text: string) => {
+            setInputWarnings(prev => ({
+                ...prev,
+                foodName: isApproaching
+            }));
+        });
+    }, []);
+
+    const validateAndSetBrandName = React.useCallback((text: string) => {
         setBrandName(text);
-        const result = validateBrandName(text);
 
-        setInputErrors(prev => ({
-            ...prev,
-            brandName: result.errors
-        }));
+        React.startTransition(() => {
+            const result = validateBrandName(text);
+            const isApproaching = isApproachingLimit(text, 'brandName', 0.8);
 
-        setInputWarnings(prev => ({
-            ...prev,
-            brandName: isApproachingLimit(text, 'brandName', 0.8)
-        }));
-    };
+            setInputErrors(prev => ({
+                ...prev,
+                brandName: result.errors
+            }));
 
-    const validateAndSetQuantity = (text: string) => {
+            setInputWarnings(prev => ({
+                ...prev,
+                brandName: isApproaching
+            }));
+        });
+    }, []);
+
+    const validateAndSetQuantity = React.useCallback((text: string) => {
         setQuantity(text);
-        const result = validateQuantity(text);
 
-        setInputErrors(prev => ({
-            ...prev,
-            quantity: result.errors
-        }));
+        React.startTransition(() => {
+            const result = validateQuantity(text);
+            const isApproaching = isApproachingLimit(text, 'quantity', 0.8);
 
-        setInputWarnings(prev => ({
-            ...prev,
-            quantity: isApproachingLimit(text, 'quantity', 0.8)
-        }));
-    };
+            setInputErrors(prev => ({
+                ...prev,
+                quantity: result.errors
+            }));
 
-    const validateAndSetNotes = (text: string) => {
+            setInputWarnings(prev => ({
+                ...prev,
+                quantity: isApproaching
+            }));
+        });
+    }, []);
+
+    const validateAndSetNotes = React.useCallback((text: string) => {
         setNotes(text);
-        const result = validateNotes(text);
 
-        setInputErrors(prev => ({
-            ...prev,
-            notes: result.errors
-        }));
+        React.startTransition(() => {
+            const result = validateNotes(text);
+            const isApproaching = isApproachingLimit(text, 'notes', 0.8);
 
-        setInputWarnings(prev => ({
-            ...prev,
-            notes: isApproachingLimit(text, 'notes', 0.8)
-        }));
-    };
+            setInputErrors(prev => ({
+                ...prev,
+                notes: result.errors
+            }));
+
+            setInputWarnings(prev => ({
+                ...prev,
+                notes: isApproaching
+            }));
+        });
+    }, []);
 
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
@@ -1537,7 +1556,12 @@ const ImageCapture: React.FC = () => {
                 locations={[0, 0.5, 1]}
             />
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.content}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+            >
                 <View style={styles.instructionsContainer}>
                     <Text style={styles.instructionsTitle}>Capture Your Meal</Text>
                     <Text style={styles.instructionsText}>

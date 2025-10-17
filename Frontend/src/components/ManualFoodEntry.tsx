@@ -405,7 +405,11 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood }: ManualFoodE
                         <View style={{ width: 28 }} />
                     </View>
 
-                    <ScrollView style={styles.content}>
+                    <ScrollView
+                        style={styles.content}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
+                    >
                         {/* Meal Type Selector - Moved to top */}
                         <GradientBorderCard style={styles.section}>
                             <Text style={styles.sectionTitle}>Add to Meal</Text>

@@ -2,6 +2,7 @@
 android/.gradle/
 android/build/
 android/app/build/
+android/app/.cxx/
 
 # Node modules (already ignored by default but just in case)
 node_modules/
@@ -9,3 +10,55 @@ node_modules/
 # Other build artifacts
 .expo/
 dist/
+build/
+
+# Documentation files (not needed for builds)
+*.md
+docs/
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.test.jsx
+**/*.spec.ts
+**/*.spec.tsx
+**/*.spec.js
+**/*.spec.jsx
+jest.config.js
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Environment files (already in eas.json)
+.env.example
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc development files
+.nvmrc
+.npmrc
+patches/
