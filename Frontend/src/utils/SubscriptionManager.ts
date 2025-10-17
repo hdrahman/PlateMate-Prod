@@ -1,8 +1,10 @@
 import { NavigationProp } from '@react-navigation/native';
+import { AppState, AppStateStatus } from 'react-native';
 import SubscriptionService from '../services/SubscriptionService';
 
 // SECURITY: This SubscriptionManager now only uses RevenueCat as source of truth
 // All local trial logic and AsyncStorage manipulation has been removed for security
+// Uses 24-hour cache with event-driven invalidation for optimal UX
 
 export interface SubscriptionStatus {
   tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
@@ -17,7 +19,8 @@ class SubscriptionManager {
   private static instance: SubscriptionManager;
   private cachedStatus: SubscriptionStatus | null = null;
   private lastCacheUpdate: number = 0;
-  private cacheValidityMs = 5 * 60 * 1000; // Increased to 5 minutes to reduce backend calls
+  private cacheValidityMs = 24 * 60 * 60 * 1000; // 24 hours - event-driven invalidation handles changes
+  private appStateListener: any = null;
 
   // Track pending requests to prevent duplicates
   private pendingRequest: Promise<SubscriptionStatus> | null = null;
@@ -25,8 +28,33 @@ class SubscriptionManager {
   static getInstance(): SubscriptionManager {
     if (!SubscriptionManager.instance) {
       SubscriptionManager.instance = new SubscriptionManager();
+      SubscriptionManager.instance.setupAppStateListener();
     }
     return SubscriptionManager.instance;
+  }
+
+  // Set up app state listener for smart cache refresh on app foreground
+  private setupAppStateListener(): void {
+    if (this.appStateListener) return;
+
+    this.appStateListener = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        // App came to foreground - check if cache is stale (older than 1 hour)
+        const now = Date.now();
+        const cacheAge = now - this.lastCacheUpdate;
+        const oneHour = 60 * 60 * 1000;
+
+        if (this.cachedStatus && cacheAge > oneHour) {
+          console.log('🔄 App foregrounded with stale cache (>1h), refreshing...');
+          // Clear cache to force refresh on next call
+          this.clearCache();
+        } else if (this.cachedStatus) {
+          console.log('✅ App foregrounded, cache still fresh');
+        }
+      }
+    });
+
+    console.log('✅ App state listener set up for smart cache refresh');
   }
 
   // Get current subscription status from RevenueCat only - SECURE IMPLEMENTATION
@@ -104,17 +132,17 @@ class SubscriptionManager {
     this.lastCacheUpdate = 0;
   }
 
-  // Check if user can access premium features - SECURE: Only RevenueCat source
+  // Check if user can access premium features - SECURE with caching
   async canAccessPremiumFeature(): Promise<boolean> {
     try {
-      // Direct RevenueCat check - tamper-proof
-      const hasPremiumAccess = await SubscriptionService.hasPremiumAccess();
+      // Use cached subscription status if available (5-minute cache)
+      const status = await this.getSubscriptionStatus();
 
-      console.log('🔒 SECURE: Premium access check via RevenueCat:', hasPremiumAccess);
+      console.log('🔒 SECURE: Premium access check from cache:', status.hasPremiumAccess);
 
-      return hasPremiumAccess;
+      return status.hasPremiumAccess;
     } catch (error) {
-      console.error('❌ Error checking premium access from RevenueCat:', error);
+      console.error('❌ Error checking premium access:', error);
       return false; // Fail securely - deny access on error
     }
   }

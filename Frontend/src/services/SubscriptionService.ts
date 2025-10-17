@@ -68,11 +68,43 @@ class SubscriptionService {
   private isInitialized = false;
   private currentUserId: string | null = null;
 
+  // In-memory cache for VIP/premium status - secure, no AsyncStorage manipulation
+  // Long cache (24h) with event-driven invalidation for immediate updates
+  private premiumStatusCache: {
+    hasPremiumAccess: boolean | null;
+    tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime' | null;
+    lastUpdate: number;
+    cacheTTL: number;
+  } = {
+      hasPremiumAccess: null,
+      tier: null,
+      lastUpdate: 0,
+      cacheTTL: 24 * 60 * 60 * 1000, // 24 hours - event-driven invalidation handles changes
+    };
+
+  // Track if RevenueCat listener is set up
+  private revenueCatListenerAdded = false;
+
   static getInstance(): SubscriptionService {
     if (!SubscriptionService.instance) {
       SubscriptionService.instance = new SubscriptionService();
     }
     return SubscriptionService.instance;
+  }
+
+  // Clear cache when needed (e.g., user logout, subscription change)
+  clearCache(): void {
+    this.premiumStatusCache.hasPremiumAccess = null;
+    this.premiumStatusCache.tier = null;
+    this.premiumStatusCache.lastUpdate = 0;
+    console.log('🗑️ Premium status cache cleared');
+  }
+
+  // Check if cache is still valid
+  private isCacheValid(): boolean {
+    const now = Date.now();
+    const cacheAge = now - this.premiumStatusCache.lastUpdate;
+    return cacheAge < this.premiumStatusCache.cacheTTL;
   }
 
   async initialize(userId: string): Promise<void> {
@@ -102,6 +134,9 @@ class SubscriptionService {
       this.isInitialized = true;
       console.log('✅ RevenueCat SDK initialized successfully for user:', userId);
 
+      // Set up real-time subscription change listener (for immediate cache invalidation)
+      this.setupRevenueCatListener();
+
       // Get initial customer info to sync trial status
       try {
         const customerInfo = await this.getCustomerInfo();
@@ -117,6 +152,35 @@ class SubscriptionService {
     } catch (error) {
       console.error('❌ Error initializing RevenueCat SDK:', error);
       throw error;
+    }
+  }
+
+  // Set up RevenueCat listener for real-time subscription changes
+  private setupRevenueCatListener(): void {
+    if (!Purchases || this.revenueCatListenerAdded) return;
+
+    try {
+      // Add listener for customer info updates (fires when subscription status changes)
+      Purchases.addCustomerInfoUpdateListener((customerInfo) => {
+        console.log('💫 RevenueCat: Subscription status changed, invalidating cache');
+        console.log('📊 New entitlements:', Object.keys(customerInfo.entitlements.active));
+
+        // Clear cache immediately to fetch fresh status
+        this.clearCache();
+
+        // Also clear SubscriptionManager cache
+        try {
+          const SubscriptionManager = require('../utils/SubscriptionManager').default;
+          SubscriptionManager.clearCache();
+        } catch (error) {
+          console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
+        }
+      });
+
+      this.revenueCatListenerAdded = true;
+      console.log('✅ RevenueCat real-time listener set up');
+    } catch (error) {
+      console.error('❌ Error setting up RevenueCat listener:', error);
     }
   }
 
@@ -154,6 +218,19 @@ class SubscriptionService {
     try {
       const { customerInfo, productIdentifier } = await Purchases.purchasePackage(packageToPurchase);
       console.log('✅ Purchase successful:', productIdentifier);
+
+      // Clear cache immediately to reflect new subscription status
+      console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
+      this.clearCache();
+
+      // Also clear SubscriptionManager cache
+      try {
+        const SubscriptionManager = require('../utils/SubscriptionManager').default;
+        SubscriptionManager.clearCache();
+      } catch (error) {
+        console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
+      }
+
       return { customerInfo, productIdentifier };
     } catch (error) {
       console.error('❌ Purchase failed:', error);
@@ -174,6 +251,19 @@ class SubscriptionService {
 
       const { customerInfo, productIdentifier: purchasedProductId } = await Purchases.purchaseStoreProduct(products[0]);
       console.log('✅ Purchase successful:', purchasedProductId);
+
+      // Clear cache immediately to reflect new subscription status
+      console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
+      this.clearCache();
+
+      // Also clear SubscriptionManager cache
+      try {
+        const SubscriptionManager = require('../utils/SubscriptionManager').default;
+        SubscriptionManager.clearCache();
+      } catch (error) {
+        console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
+      }
+
       return { customerInfo, productIdentifier: purchasedProductId };
     } catch (error) {
       console.error('❌ Purchase failed:', error);
@@ -185,6 +275,19 @@ class SubscriptionService {
     try {
       const customerInfo = await Purchases.restorePurchases();
       console.log('✅ Purchases restored successfully');
+
+      // Clear cache to reflect restored purchases immediately
+      console.log('🔄 Purchases restored - invalidating cache for immediate refresh');
+      this.clearCache();
+
+      // Also clear SubscriptionManager cache
+      try {
+        const SubscriptionManager = require('../utils/SubscriptionManager').default;
+        SubscriptionManager.clearCache();
+      } catch (error) {
+        console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
+      }
+
       return customerInfo;
     } catch (error) {
       console.error('❌ Error restoring purchases:', error);
@@ -427,6 +530,14 @@ class SubscriptionService {
   // Check if user has premium access (including VIP, promotional trial, extended trial, and paid subscription)
   async hasPremiumAccess(): Promise<boolean> {
     try {
+      // Check cache first to avoid unnecessary backend calls
+      if (this.isCacheValid() && this.premiumStatusCache.hasPremiumAccess !== null) {
+        console.log('📦 Using cached premium access status:', this.premiumStatusCache.hasPremiumAccess);
+        return this.premiumStatusCache.hasPremiumAccess;
+      }
+
+      console.log('🔄 Cache miss or expired, fetching premium access status...');
+
       // PRIORITY 1: Check backend for VIP status (server-side validation)
       try {
         const { BACKEND_URL } = require('../utils/config');
@@ -446,9 +557,11 @@ class SubscriptionService {
         if (response.ok) {
           const data = await response.json();
 
-          // If VIP or has premium access via backend validation, return true
+          // If VIP or has premium access via backend validation, cache and return true
           if (data.has_premium_access) {
             console.log('👑 VIP/Premium Access granted via backend:', data);
+            this.premiumStatusCache.hasPremiumAccess = true;
+            this.premiumStatusCache.lastUpdate = Date.now();
             return true;
           }
         }
@@ -481,6 +594,10 @@ class SubscriptionService {
         storeTrial: hasStoreTrial,
         totalAccess: hasAccess
       });
+
+      // Cache the result
+      this.premiumStatusCache.hasPremiumAccess = hasAccess;
+      this.premiumStatusCache.lastUpdate = Date.now();
 
       return hasAccess;
     } catch (error) {
@@ -530,6 +647,14 @@ class SubscriptionService {
   // Get user's current subscription tier
   async getSubscriptionTier(): Promise<'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime'> {
     try {
+      // Check cache first to avoid unnecessary backend calls
+      if (this.isCacheValid() && this.premiumStatusCache.tier !== null) {
+        console.log('📦 Using cached tier:', this.premiumStatusCache.tier);
+        return this.premiumStatusCache.tier;
+      }
+
+      console.log('🔄 Cache miss or expired, fetching subscription tier...');
+
       // PRIORITY 1: Check backend for VIP status first
       try {
         const { BACKEND_URL } = require('../utils/config');
@@ -549,9 +674,11 @@ class SubscriptionService {
         if (response.ok) {
           const data = await response.json();
 
-          // If VIP, return VIP tier
+          // If VIP, cache and return VIP tier
           if (data.tier === 'vip_lifetime') {
             console.log('👑 VIP tier detected from backend');
+            this.premiumStatusCache.tier = 'vip_lifetime';
+            this.premiumStatusCache.lastUpdate = Date.now();
             return 'vip_lifetime';
           }
         }
@@ -564,15 +691,23 @@ class SubscriptionService {
       const customerInfo = await this.getCustomerInfo();
       const subscriptionDetails = this.customerInfoToSubscriptionDetails(customerInfo);
 
+      let tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
+
       if (subscriptionDetails.status === 'free_trial' || subscriptionDetails.status === 'free_trial_extended') {
-        return 'trial';
+        tier = 'trial';
       } else if (subscriptionDetails.status === 'premium_monthly') {
-        return 'premium_monthly';
+        tier = 'premium_monthly';
       } else if (subscriptionDetails.status === 'premium_annual') {
-        return 'premium_annual';
+        tier = 'premium_annual';
       } else {
-        return 'free';
+        tier = 'free';
       }
+
+      // Cache the result
+      this.premiumStatusCache.tier = tier;
+      this.premiumStatusCache.lastUpdate = Date.now();
+
+      return tier;
     } catch (error) {
       console.error('❌ Error getting subscription tier:', error);
       return 'free';
