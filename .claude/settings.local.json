@@ -1,18 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Read(//c/Users/Haame/Downloads/**)",
-      "WebSearch",
-      "Bash(npx:*)",
-      "Bash(eas build:*)",
-      "WebFetch(domain:expo.dev)",
-      "WebFetch(domain:docs.expo.dev)",
-      "Bash(npm view:*)",
-      "Bash(npm install)",
-      "Bash(git log:*)",
-      "Bash(ls -lh \"C:\\Platemate\\PlateMate-Prod\\Frontend\\android\\app\\src\\main\\java\\com\\platemate\\app\"\" | grep -E \"Native)",
-      "Bash(Step \")"
+      "Bash(while read file)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

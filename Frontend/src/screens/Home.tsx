@@ -39,7 +39,9 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
-  Alert
+  Alert,
+  useWindowDimensions,
+  Platform
 } from 'react-native';
 import Svg, {
   Circle,
@@ -53,15 +55,11 @@ import * as d3Scale from 'd3-scale';
 import * as d3Shape from 'd3-shape';
 import { ThemeContext } from '../ThemeContext';
 
-const { width } = Dimensions.get('window');
+// Constants that don't depend on screen size
 const BASE_WIDTH = 375; // base width for scaling
-const scaleFactor = Math.min(width / BASE_WIDTH, 1);
-const CIRCLE_SIZE = width * 0.50 * scaleFactor; // scales proportionally
 const STROKE_WIDTH = 20;
 const OUTLINE_WIDTH = 2; // Width of the purple outline
 const SVG_PADDING = OUTLINE_WIDTH * 3; // Extra padding for the SVG
-const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2); // Total SVG size including padding
-
 const MACRO_RING_SIZE = 60;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -123,6 +121,16 @@ export default function Home() {
   const { user } = useAuth();
   const { onboardingComplete, justCompletedOnboarding, markWelcomeModalShown } = useOnboarding();
   const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
+
+  // Responsive dimensions for iPad support
+  const { width } = useWindowDimensions();
+  const isTablet = Platform.isPad || width >= 768;
+  const scaleFactor = isTablet
+    ? Math.min(width / BASE_WIDTH, 2.7) // Allow up to 2.7x scaling for iPad
+    : Math.min(width / BASE_WIDTH, 1.5); // Slightly more flexible for large phones
+  const CIRCLE_SIZE = Math.min(width * 0.50 * scaleFactor, width * 0.85); // Cap at 85% of screen width
+  const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2);
+  const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 
   // Date change detection for midnight rollover
   useEffect(() => {
@@ -715,7 +723,6 @@ export default function Home() {
   const adjustedGoal = dailyCalorieGoal + exerciseCalories;
 
   // Calculate values for the main ring based on adjusted goal.
-  const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
   const circumference = 2 * Math.PI * radius;
   const adjustedPercentCons = adjustedGoal > 0 ? (consumedCalories / adjustedGoal) * 100 : 0;
   // Don't allow progress to exceed 100% of the circle circumference
@@ -1318,7 +1325,13 @@ export default function Home() {
           </TouchableOpacity>
           <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
             <View style={styles.ringContainer}>
-              <View style={styles.ringGlow} />
+              <View style={[styles.ringGlow, {
+                width: CIRCLE_SIZE - STROKE_WIDTH * 2,
+                height: CIRCLE_SIZE - STROKE_WIDTH * 2,
+                borderRadius: CIRCLE_SIZE,
+                top: STROKE_WIDTH + SVG_PADDING,
+                left: STROKE_WIDTH + SVG_PADDING
+              }]} />
               <Svg width={SVG_SIZE} height={SVG_SIZE}>
                 <Defs>
                   <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -1434,11 +1447,18 @@ export default function Home() {
                   transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
                 />
               </Svg>
-              <View style={styles.centerTextContainer}>
-                <Text style={styles.remainingValue}>
+              <View style={[styles.centerTextContainer, {
+                width: SVG_SIZE,
+                height: SVG_SIZE
+              }]}>
+                <Text style={[styles.remainingValue, {
+                  fontSize: Math.min(30 * scaleFactor, 60) // Scale font, max 60px
+                }]}>
                   {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
                 </Text>
-                <Text style={styles.remainingLabel}>
+                <Text style={[styles.remainingLabel, {
+                  fontSize: Math.min(14 * scaleFactor, 24) // Scale font, max 24px
+                }]}>
                   {remainingCals < 0 ? 'OVER' : 'REMAINING'}
                 </Text>
               </View>
@@ -1573,6 +1593,9 @@ export default function Home() {
  *  WEIGHT GRAPH COMPONENT
  ************************************/
 function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWeight }: { data: { date: string; weight: number }[]; onAddPress: () => void; weightLoading: boolean; showTodayWeight: boolean; todayWeight: number | null }) {
+  // Get responsive dimensions
+  const { width } = useWindowDimensions();
+
   // Dimensions for the chart - use more of the available width
   const GRAPH_WIDTH = 0.98 * width;
   const GRAPH_HEIGHT = 250; // Increased height to 250 from 220
@@ -1862,6 +1885,9 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
  *  STEPS GRAPH COMPONENT (Second Card)
  ************************************/
 function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
+  // Get responsive dimensions
+  const { width } = useWindowDimensions();
+
   const GRAPH_WIDTH = 0.98 * width;
   const GRAPH_HEIGHT = 230; // Increased height to 230 from 200
   const MARGIN_RIGHT = 60; // Increased right margin from 45 to 60
@@ -2372,18 +2398,11 @@ const styles = StyleSheet.create({
   },
   ringGlow: {
     position: 'absolute',
-    width: CIRCLE_SIZE - STROKE_WIDTH * 2,
-    height: CIRCLE_SIZE - STROKE_WIDTH * 2,
-    borderRadius: CIRCLE_SIZE,
     backgroundColor: 'transparent',
     opacity: 0,
-    top: STROKE_WIDTH + SVG_PADDING,
-    left: STROKE_WIDTH + SVG_PADDING
   },
   centerTextContainer: {
     position: 'absolute',
-    width: SVG_SIZE,
-    height: SVG_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
     left: 0,
