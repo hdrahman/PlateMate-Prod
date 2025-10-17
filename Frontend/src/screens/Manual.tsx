@@ -613,6 +613,7 @@ export default function Manual() {
                 visible={showManualEntry}
                 onClose={() => setShowManualEntry(false)}
                 onAddFood={(food, mealType, quantity) => handleAddFood(food, mealType || selectedMealCategory, quantity)}
+                defaultMealType={selectedMealCategory}
             />
 
             {/* Loading Overlay */}

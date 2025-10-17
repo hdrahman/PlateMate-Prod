@@ -209,16 +209,17 @@ interface ManualFoodEntryProps {
     visible: boolean;
     onClose: () => void;
     onAddFood: (food: FoodItem, mealType: string, quantity: number) => void;
+    defaultMealType?: string;
 }
 
 // Memoize the main component to prevent unnecessary re-renders
-const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood }: ManualFoodEntryProps) => {
+const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealType }: ManualFoodEntryProps) => {
     const [foodName, setFoodName] = useState<string>('');
     const [calories, setCalories] = useState<string>('');
     const [proteins, setProteins] = useState<string>('0');
     const [carbs, setCarbs] = useState<string>('0');
     const [fats, setFats] = useState<string>('0');
-    const [selectedMeal, setSelectedMeal] = useState<string>('Breakfast');
+    const [selectedMeal, setSelectedMeal] = useState<string>(defaultMealType || 'Breakfast');
     const [quantity, setQuantity] = useState<string>('1');
     const [servingUnit, setServingUnit] = useState<string>('serving');
 
@@ -231,6 +232,13 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood }: ManualFoodE
 
     // Health rating state
     const [healthRating, setHealthRating] = useState<number>(5);
+
+    // Update selected meal when defaultMealType changes
+    React.useEffect(() => {
+        if (defaultMealType) {
+            setSelectedMeal(defaultMealType);
+        }
+    }, [defaultMealType]);
 
     // Memoized form validation
     const isFormValid = React.useMemo(() => 
