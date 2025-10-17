@@ -109,7 +109,7 @@ export default function Chatbot() {
     subtitle: '',
     features: [] as string[],
     icon: 'fitness' as keyof typeof Ionicons.glyphMap,
-    onUpgrade: () => {},
+    onUpgrade: () => { },
   });
   const scrollViewRef = useRef<ScrollView>(null);
   const dot1Opacity = useRef(new Animated.Value(0.4)).current;
@@ -175,7 +175,7 @@ export default function Chatbot() {
             subtitle: alertOptions.subtitle,
             features: alertOptions.features,
             icon: alertOptions.icon,
-            onUpgrade: alertOptions.onUpgrade || (() => {}),
+            onUpgrade: alertOptions.onUpgrade || (() => { }),
           });
           setShowPremiumCard(true);
         }
@@ -266,15 +266,7 @@ export default function Chatbot() {
   const clearContext = () => {
     setContextActive(false);
     setContextData(null);
-
-    const clearMessage: Message = {
-      id: "context-cleared-" + Date.now(),
-      text: "🔄 I've cleared your activity data. I'm back to general coaching mode. You can re-enable context anytime!",
-      sender: "bot",
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, clearMessage]);
+    // No message needed - context is silently cleared
   };
 
   // Smart context suggestion based on user input
@@ -904,7 +896,7 @@ export default function Chatbot() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      
+
       {/* Premium Feature Card */}
       <PremiumFeatureCard
         visible={showPremiumCard}
