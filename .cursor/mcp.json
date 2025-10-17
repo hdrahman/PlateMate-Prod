@@ -2,6 +2,10 @@
   "mcpServers": {
     "revenuecat": {
       "url": "http://localhost:55265/revenuecat-sse?origin=cHJvamtleV8wLjQ0NTk1MDI1Njk="
+    },
+    "render": {
+      "url": "https://mcp.render.com/mcp",
+      "apiKey": "rnd_ywQXC3Qw2EVY3LYeTXh5YQHPZRgL"
     }
   }
 }

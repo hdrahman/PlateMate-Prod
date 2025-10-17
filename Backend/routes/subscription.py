@@ -1251,18 +1251,6 @@ async def clear_all_vip_cache(
             status_code=500,
             detail=f"Failed to clear caches: {str(e)}"
         )
-            
-        except Exception as rc_error:
-            logger.warning(f"RevenueCat promotional trial check failed: {rc_error}")
-            return {
-                "has_trial": False,
-                "is_active": False,
-                "days_remaining": 0
-            }
-            
-    except Exception as e:
-        logger.error(f"Error checking promotional trial status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Trial status check failed")
 
 # SECURITY: All subscription validation now happens server-side
 # Client apps cannot bypass premium limits by manipulating local storage
