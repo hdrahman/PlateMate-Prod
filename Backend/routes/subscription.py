@@ -43,6 +43,11 @@ async def check_vip_status(firebase_uid: str) -> dict:
         # Query vip_users table using Supabase client
         response = supabase.table('vip_users').select('*').eq('firebase_uid', firebase_uid).eq('is_active', True).execute()
         
+        # Debug logging
+        logger.info(f"🔍 VIP check for {firebase_uid}: Found {len(response.data) if response.data else 0} records")
+        if response.data:
+            logger.info(f"🔍 VIP data: {response.data}")
+        
         if response.data and len(response.data) > 0:
             vip_record = response.data[0]
             logger.info(f"👑 VIP user detected: {firebase_uid} (reason: {vip_record['reason']})")
@@ -53,6 +58,7 @@ async def check_vip_status(firebase_uid: str) -> dict:
                 'granted_by': vip_record['granted_by'] if 'granted_by' in vip_record else None
             }
         
+        logger.info(f"❌ No VIP record found for {firebase_uid}")
         return {'is_vip': False}
         
     except Exception as e:
