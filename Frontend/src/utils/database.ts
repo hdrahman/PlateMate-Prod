@@ -510,21 +510,12 @@ export const addFoodLog = async (foodData: {
     image_url: string;
     file_key?: string;
 }) => {
-    // Immediately navigate user to FoodLog screen so they can view the entry
-    navigateToFoodLog();
-
     try {
         const db = await getDatabase();
-        // Use async version to ensure we get a valid authenticated user ID when available
-        let userId: string;
-        try {
-            userId = await getCurrentUserIdAsync();
-        } catch (idErr) {
-            console.warn('⚠️ Falling back to cached/anonymous user id due to error fetching async user id:', idErr);
-            userId = getCurrentUserId();
-        }
+        // Use cached user ID to avoid network calls and maintain offline-first behavior
+        const userId = getCurrentUserId();
 
-        if (!userId) {
+        if (!userId || userId === 'anonymous') {
             throw new Error('No authenticated user found');
         }
 
@@ -582,6 +573,10 @@ export const addFoodLog = async (foodData: {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
         }
+
+        // Navigate to FoodLog screen AFTER database operations complete
+        // This prevents race conditions and ensures the entry is visible immediately
+        navigateToFoodLog();
 
         return result.lastInsertRowId;
     } catch (error) {
@@ -700,59 +695,21 @@ export const getFoodLogsByDate = async (date: string) => {
         throw new Error('Database not initialized');
     }
 
-    // Ensure we fetch a reliable user id asynchronously
-    let firebaseUserId: string;
-    try {
-        firebaseUserId = await getCurrentUserIdAsync();
-    } catch (idErr) {
-        console.warn('⚠️ Falling back to cached/anonymous user id due to error fetching async user id:', idErr);
-        firebaseUserId = getCurrentUserId();
-    }
+    // Use cached user ID to avoid network calls and maintain offline-first behavior
+    const firebaseUserId = getCurrentUserId();
     console.log(`🔍 Looking for food logs with date=${date} and user_id=${firebaseUserId}`);
 
     try {
-        // Debug query: Get ALL food logs regardless of date or user to see what's in the database
-        const allLogs = await db.getAllAsync(`SELECT * FROM food_logs LIMIT 10`);
-        console.log(`📊 DEBUG: Found ${allLogs.length} total food logs in database`);
-        if (allLogs.length > 0) {
-            console.log(`📊 DEBUG: First food log in database:`, JSON.stringify(allLogs[0]));
-        }
-
         // Normalize date to ensure exact matching (better for index usage)
         const normalizedDate = date.split('T')[0]; // Extract YYYY-MM-DD part only
 
-        // First check if there are any logs for this date (using exact date match for better index performance)
-        const countResult = await db.getFirstAsync<{ count: number }>(
-            `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
-            [normalizedDate, firebaseUserId]
-        );
-        console.log(`🔢 Found ${countResult?.count || 0} food logs for date: ${normalizedDate}`);
-
-        // Get all logs for this date (optimized query using the new index)
+        // Get all logs for this date (optimized query using the index)
         const result = await db.getAllAsync(
             `SELECT * FROM food_logs WHERE user_id = ? AND date = ? ORDER BY id DESC`,
             [firebaseUserId, normalizedDate]
         );
 
-        // Log the first record for debugging
-        if (result && result.length > 0) {
-            console.log(`📝 First food log: ${JSON.stringify(result[0])}`);
-        } else {
-            console.log(`📋 No food logs found for date: ${date}`);
-
-            // Try another query without user_id to check if data exists but with wrong user
-            const logsWithoutUser = await db.getAllAsync(
-                `SELECT * FROM food_logs WHERE date = ? LIMIT 5`,
-                [normalizedDate]
-            );
-
-            if (logsWithoutUser && logsWithoutUser.length > 0) {
-                console.log(`📊 DEBUG: Found ${logsWithoutUser.length} logs for date without user filter`);
-                console.log(`📊 DEBUG: First entry:`, JSON.stringify(logsWithoutUser[0]));
-            } else {
-                console.log(`📊 DEBUG: No logs found for date ${date} even without user filter`);
-            }
-        }
+        console.log(`� Found ${result.length} food logs for date: ${normalizedDate}`);
 
         return result;
     } catch (error) {
