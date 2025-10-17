@@ -45,14 +45,14 @@ const AuthContext = createContext<AuthContextType>({
 const grantPromotionalTrialToNewUser = async (userId: string) => {
     try {
         console.log('🎆 Attempting to grant promotional trial to new user:', userId);
-        
+
         // Use existing session token instead of forcing refresh
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
             console.log('ℹ️ No active session, skipping promotional trial');
             return;
         }
-        
+
         const response = await fetch(`${BACKEND_URL}/api/subscription/grant-promotional-trial`, {
             method: 'POST',
             headers: {
@@ -60,9 +60,9 @@ const grantPromotionalTrialToNewUser = async (userId: string) => {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok && result.success) {
             console.log('✅ Promotional trial granted successfully:', result);
         } else {
@@ -95,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             setUser(session.user);
                             // Cache user globally for database functions
                             global.cachedSupabaseUser = session.user;
-                            
+
                             // App can start immediately, validate session in background
                             setIsLoading(false);
                             validateSessionInBackground(session);
@@ -132,7 +132,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             try {
                 console.log('🔄 Background: Validating cached session...');
                 const { data: { session }, error } = await supabase.auth.getSession();
-                
+
                 if (error || !session) {
                     console.log('🔒 Background: Session invalid, clearing cache');
                     await AsyncStorage.removeItem('supabase.auth.token');
@@ -196,7 +196,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // If user just logged in, initialize services in background (non-blocking)
             if (authUser && !previousUserId) {
                 console.log('✅ User authenticated, starting background initialization...');
-                
+
                 // Background initialization - doesn't block app startup
                 initializeServicesInBackground(authUser.id);
             }
@@ -221,7 +221,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Initialize token manager for authenticated users only
             await tokenManager.initialize();
             console.log('✅ Background: TokenManager initialized');
-            
+
             // Initialize subscription manager
             try {
                 await SubscriptionManager.initialize(userId);
@@ -229,7 +229,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } catch (error) {
                 console.warn('⚠️ Background: SubscriptionManager initialization failed:', error);
             }
-            
+
             // Grant promotional trial to new users (20 days free)
             try {
                 await grantPromotionalTrialToNewUser(userId);
@@ -334,6 +334,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // Clear cached user
             global.cachedSupabaseUser = null;
+
+            // Clear subscription cache on logout
+            try {
+                const SubscriptionService = require('../services/SubscriptionService').default;
+                const SubscriptionManager = require('../utils/SubscriptionManager').default;
+                SubscriptionService.clearCache();
+                SubscriptionManager.clearCache();
+                console.log('✅ Subscription cache cleared on logout');
+            } catch (error) {
+                console.warn('⚠️ Could not clear subscription cache on logout:', error);
+            }
         } catch (error: any) {
             Alert.alert('Sign Out Error', error.message);
             throw error;
