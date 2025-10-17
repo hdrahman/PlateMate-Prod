@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
+import json
 
 from auth.supabase_auth import get_current_user
+from services.redis_connection import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +160,7 @@ async def get_random_recipes(
     current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
-    Get random recipes
+    Get random recipes with Redis caching
     
     Args:
         number: Number of random recipes to return
@@ -175,6 +177,18 @@ async def get_random_recipes(
         user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Random recipes request from user {user_id}: count={recipe_count}")
         
+        # Check Redis cache first
+        redis = await get_redis()
+        cache_key = f"random_recipes:{recipe_count}"
+        
+        cached_recipes = await redis.get(cache_key)
+        if cached_recipes:
+            logger.info(f"🎯 Returning {recipe_count} cached random recipes")
+            return {"recipes": json.loads(cached_recipes)}
+        
+        # Cache miss - fetch from FatSecret API
+        logger.info(f"💾 Cache miss - fetching {recipe_count} random recipes from FatSecret API")
+        
         fatsecret_service = get_fatsecret_service()
         if not fatsecret_service:
             raise HTTPException(status_code=503, detail="FatSecret service is not available")
@@ -184,7 +198,10 @@ async def get_random_recipes(
         
         results = fatsecret_service.get_random_recipes(recipe_count)
         
-        logger.info(f"Found {len(results)} random recipes")
+        # Cache for 1 hour (recipes don't change frequently)
+        await redis.set(cache_key, json.dumps(results), ex=3600)
+        logger.info(f"💾 Cached {len(results)} random recipes (TTL: 1 hour)")
+        
         return {"recipes": results}
         
     except Exception as e:
@@ -197,7 +214,7 @@ async def get_recipes_by_meal_type(
     current_user: dict = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:
     """
-    Get recipes filtered by meal type
+    Get recipes filtered by meal type with Redis caching
     
     Args:
         request: MealTypeRecipesRequest containing meal type and count
@@ -210,6 +227,24 @@ async def get_recipes_by_meal_type(
         user_id = current_user.get('supabase_uid', 'unknown')
         logger.info(f"Meal type recipes request from user {user_id}: {request.meal_type}")
         
+        if not request.meal_type or len(request.meal_type.strip()) < 1:
+            raise HTTPException(status_code=400, detail="Meal type is required")
+        
+        meal_type = request.meal_type.strip().lower()
+        recipe_count = request.count or 3
+        
+        # Check Redis cache
+        redis = await get_redis()
+        cache_key = f"meal_type_recipes:{meal_type}:{recipe_count}"
+        
+        cached_recipes = await redis.get(cache_key)
+        if cached_recipes:
+            logger.info(f"🎯 Returning {recipe_count} cached recipes for meal type: {meal_type}")
+            return json.loads(cached_recipes)
+        
+        # Cache miss - fetch from FatSecret API
+        logger.info(f"💾 Cache miss - fetching recipes for meal type: {meal_type}")
+        
         fatsecret_service = get_fatsecret_service()
         if not fatsecret_service:
             raise HTTPException(status_code=503, detail="FatSecret service is not available")
@@ -217,15 +252,12 @@ async def get_recipes_by_meal_type(
         if not fatsecret_service.is_configured:
             raise HTTPException(status_code=503, detail="FatSecret service is not configured")
         
-        if not request.meal_type or len(request.meal_type.strip()) < 1:
-            raise HTTPException(status_code=400, detail="Meal type is required")
+        results = fatsecret_service.get_recipes_by_meal_type(meal_type, recipe_count)
         
-        results = fatsecret_service.get_recipes_by_meal_type(
-            request.meal_type.strip(),
-            request.count or 3
-        )
+        # Cache for 2 hours (meal type recipes don't change)
+        await redis.set(cache_key, json.dumps(results), ex=7200)
+        logger.info(f"💾 Cached {len(results)} recipes for meal type: {meal_type} (TTL: 2 hours)")
         
-        logger.info(f"Found {len(results)} recipes for meal type: {request.meal_type}")
         return results
         
     except HTTPException:

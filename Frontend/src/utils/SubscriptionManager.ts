@@ -17,7 +17,10 @@ class SubscriptionManager {
   private static instance: SubscriptionManager;
   private cachedStatus: SubscriptionStatus | null = null;
   private lastCacheUpdate: number = 0;
-  private cacheValidityMs = 2 * 60 * 1000; // 2 minutes - shorter cache for more up-to-date status
+  private cacheValidityMs = 5 * 60 * 1000; // Increased to 5 minutes to reduce backend calls
+  
+  // Track pending requests to prevent duplicates
+  private pendingRequest: Promise<SubscriptionStatus> | null = null;
 
   static getInstance(): SubscriptionManager {
     if (!SubscriptionManager.instance) {
@@ -32,9 +35,33 @@ class SubscriptionManager {
     
     // Return cached status if still valid
     if (this.cachedStatus && (now - this.lastCacheUpdate) < this.cacheValidityMs) {
+      console.log('📦 Returning cached subscription status');
       return this.cachedStatus;
     }
 
+    // If a request is already in flight, wait for it instead of making a new one
+    if (this.pendingRequest) {
+      console.log('⏳ Subscription request already in progress, waiting for result...');
+      return this.pendingRequest;
+    }
+
+    // Make the request and track it to prevent duplicates
+    console.log('🔄 Fetching fresh subscription status from backend/RevenueCat');
+    this.pendingRequest = this.fetchSubscriptionStatus();
+
+    try {
+      const status = await this.pendingRequest;
+      return status;
+    } finally {
+      // Clear pending request when done (success or failure)
+      this.pendingRequest = null;
+    }
+  }
+
+  // Separate method for actual fetching logic
+  private async fetchSubscriptionStatus(): Promise<SubscriptionStatus> {
+    const now = Date.now();
+    
     try {
       // ONLY source: RevenueCat - tamper-proof subscription status
       const [tier, hasPremiumAccess, trialStatus] = await Promise.all([
@@ -52,6 +79,7 @@ class SubscriptionManager {
       };
 
       this.lastCacheUpdate = now;
+      console.log('✅ Subscription status updated and cached');
       return this.cachedStatus;
     } catch (error) {
       console.error('❌ Error getting subscription status from RevenueCat:', error);

@@ -9,6 +9,7 @@ import hmac
 import hashlib
 from auth.supabase_auth import get_current_user
 from utils.db_connection import get_db_connection
+from services.redis_connection import get_redis
 import logging
 
 # RevenueCat integration for server-side validation
@@ -33,11 +34,23 @@ async def check_vip_status(firebase_uid: str) -> dict:
     Check if user is a VIP (gets free lifetime premium access)
     VIPs are managed via Supabase dashboard - insert into vip_users table
     
+    Uses Redis caching with 5-minute TTL to minimize database queries
+    
     Returns:
         dict with keys: is_vip (bool), reason (str), granted_at (str)
     """
     try:
-        # Get Supabase client (async wrapper around sync client)
+        # Step 1: Check Redis cache first
+        redis = await get_redis()
+        cache_key = f"vip_status:{firebase_uid}"
+        
+        cached_status = await redis.get(cache_key)
+        if cached_status:
+            logger.info(f"🎯 VIP status retrieved from cache for {firebase_uid}")
+            return json.loads(cached_status)
+        
+        # Step 2: Cache miss - query Supabase
+        logger.info(f"💾 Cache miss - querying VIP table for {firebase_uid}")
         supabase = await get_db_connection()
         
         logger.info(f"🔍 Querying VIP table for firebase_uid: {firebase_uid}")
@@ -49,26 +62,30 @@ async def check_vip_status(firebase_uid: str) -> dict:
         logger.info(f"🔍 VIP query response - Count: {response.count if hasattr(response, 'count') else 'N/A'}, Data length: {len(response.data) if response.data else 0}")
         logger.info(f"🔍 VIP raw data: {response.data}")
         
+        # Step 3: Process result
+        vip_result = {'is_vip': False}
+        
         if response.data and len(response.data) > 0:
             vip_record = response.data[0]
             logger.info(f"👑 VIP user detected: {firebase_uid} (reason: {vip_record['reason']})")
-            return {
+            vip_result = {
                 'is_vip': True,
                 'reason': vip_record['reason'],
                 'granted_at': vip_record['granted_at'] if 'granted_at' in vip_record else None,
                 'granted_by': vip_record['granted_by'] if 'granted_by' in vip_record else None
             }
+        else:
+            logger.info(f"❌ No VIP record found for {firebase_uid}")
         
-        # Also try querying ALL VIP records to see what's there
-        all_vips = supabase.table('vip_users').select('firebase_uid, email, is_active').execute()
-        logger.info(f"🔍 ALL VIP records in table: {all_vips.data}")
+        # Step 4: Cache the result (5 minute TTL)
+        await redis.set(cache_key, json.dumps(vip_result), ex=300)
+        logger.info(f"💾 VIP status cached for {firebase_uid} (TTL: 5 minutes)")
         
-        logger.info(f"❌ No VIP record found for {firebase_uid}")
-        return {'is_vip': False}
+        return vip_result
         
     except Exception as e:
         logger.error(f"Error checking VIP status for {firebase_uid}: {str(e)}")
-        # On error, default to non-VIP (fail safely)
+        # Fail safely - return non-VIP on error
         return {'is_vip': False}
 
 # Initialize RevenueCat client for secure server-side validation
@@ -1105,6 +1122,127 @@ async def get_promotional_trial_status(current_user: dict = Depends(get_current_
                 "start_date": promo_trial.get('purchase_date'),
                 "end_date": promo_trial.get('expires_date')
             }
+            
+        except Exception as e:
+            logger.error(f"Error checking promotional trial status: {str(e)}")
+            return {
+                "has_trial": False,
+                "is_active": False,
+                "days_remaining": 0
+            }
+
+
+@router.post("/admin/invalidate-vip-cache")
+async def invalidate_vip_cache(
+    firebase_uid: str,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """
+    Invalidate VIP cache for a specific user (Admin only)
+    
+    Use this endpoint after manually updating VIP status in Supabase dashboard
+    to ensure changes take effect immediately.
+    
+    Headers:
+        x-admin-key: Admin API key for authentication
+    
+    Body:
+        firebase_uid: User's Firebase UID to invalidate cache for
+    """
+    # Verify admin key
+    admin_key = os.getenv("ADMIN_API_KEY", "default_admin_key_change_in_production")
+    
+    if not x_admin_key or x_admin_key != admin_key:
+        logger.warning(f"Unauthorized cache invalidation attempt")
+        raise HTTPException(
+            status_code=403, 
+            detail="Unauthorized - Invalid admin key"
+        )
+    
+    try:
+        redis = await get_redis()
+        cache_key = f"vip_status:{firebase_uid}"
+        
+        # Delete the cache entry
+        deleted = await redis.delete(cache_key)
+        
+        if deleted:
+            logger.info(f"🗑️ VIP cache invalidated for {firebase_uid}")
+            return {
+                "status": "success",
+                "message": f"Cache cleared for user {firebase_uid}",
+                "cache_key": cache_key
+            }
+        else:
+            logger.info(f"⚠️ No cache entry found for {firebase_uid}")
+            return {
+                "status": "success",
+                "message": f"No cache entry found for user {firebase_uid} (may already be cleared)",
+                "cache_key": cache_key
+            }
+            
+    except Exception as e:
+        logger.error(f"Error invalidating VIP cache: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to invalidate cache: {str(e)}"
+        )
+
+
+@router.post("/admin/clear-all-vip-cache")
+async def clear_all_vip_cache(
+    x_admin_key: Optional[str] = Header(None)
+):
+    """
+    Clear ALL VIP caches (Admin only)
+    
+    Use this with caution - will force database queries for all users
+    on their next request. Use after bulk VIP status updates.
+    
+    Headers:
+        x-admin-key: Admin API key for authentication
+    """
+    # Verify admin key
+    admin_key = os.getenv("ADMIN_API_KEY", "default_admin_key_change_in_production")
+    
+    if not x_admin_key or x_admin_key != admin_key:
+        logger.warning(f"Unauthorized cache clear attempt")
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized - Invalid admin key"
+        )
+    
+    try:
+        redis = await get_redis()
+        
+        # Find all VIP cache keys using pattern matching
+        pattern = "vip_status:*"
+        cursor = 0
+        deleted_count = 0
+        
+        # Scan for all matching keys
+        while True:
+            cursor, keys = await redis.scan(cursor, match=pattern, count=100)
+            if keys:
+                deleted_count += await redis.delete(*keys)
+            
+            if cursor == 0:
+                break
+        
+        logger.info(f"🗑️ Cleared {deleted_count} VIP cache entries")
+        
+        return {
+            "status": "success",
+            "message": f"Cleared {deleted_count} VIP cache entries",
+            "pattern": pattern
+        }
+        
+    except Exception as e:
+        logger.error(f"Error clearing all VIP caches: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear caches: {str(e)}"
+        )
             
         except Exception as rc_error:
             logger.warning(f"RevenueCat promotional trial check failed: {rc_error}")
