@@ -49,7 +49,7 @@ const PremiumSubscription = () => {
     const [revenueCatOfferings, setRevenueCatOfferings] = useState<PurchasesOffering | null>(null);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
-    
+
     // Current plan status for prominent display - IMPROVED UX
     const [currentPlanInfo, setCurrentPlanInfo] = useState<{
         planName: string;
@@ -123,7 +123,7 @@ const PremiumSubscription = () => {
                             // If VIP, set special VIP status and skip RevenueCat
                             if (data.tier === 'vip_lifetime') {
                                 console.log('👑 VIP user detected, displaying VIP status');
-                                
+
                                 const vipPlanInfo = {
                                     planName: 'VIP Lifetime Access',
                                     isActive: true,
@@ -132,7 +132,7 @@ const PremiumSubscription = () => {
                                     showUpgradePrompt: false
                                 };
                                 setCurrentPlanInfo(vipPlanInfo);
-                                
+
                                 // Don't load RevenueCat for VIPs, they don't need it
                                 return;
                             }
@@ -145,31 +145,31 @@ const PremiumSubscription = () => {
                     // PRIORITY 2: For non-VIP users, load RevenueCat data
                     // Initialize RevenueCat if not already done
                     await SubscriptionService.initialize(user.uid);
-                    
+
                     // Load RevenueCat offerings
                     const offerings = await SubscriptionService.getOfferings();
                     setRevenueCatOfferings(offerings);
-                    
+
                     // Get current subscription status from RevenueCat
                     const customerInfo = await SubscriptionService.getCustomerInfo();
                     const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
                     setSubscriptionStatus(revenueCatStatus);
-                    
+
                     // Set current plan info for prominent display
                     if (revenueCatStatus) {
                         const planInfo = {
                             planName: revenueCatStatus.status === 'premium_monthly' ? 'Premium Monthly' :
-                                     revenueCatStatus.status === 'premium_annual' ? 'Premium Annual' :
-                                     revenueCatStatus.status === 'free_trial' ? 'Free Trial' :
-                                     revenueCatStatus.status === 'free_trial_extended' ? 'Extended Trial' : 'Free Plan',
+                                revenueCatStatus.status === 'premium_annual' ? 'Premium Annual' :
+                                    revenueCatStatus.status === 'free_trial' ? 'Free Trial' :
+                                        revenueCatStatus.status === 'free_trial_extended' ? 'Extended Trial' : 'Free Plan',
                             isActive: ['premium_monthly', 'premium_annual', 'free_trial', 'free_trial_extended'].includes(revenueCatStatus.status),
                             statusText: revenueCatStatus.status === 'premium_monthly' ? 'Renews monthly' :
-                                       revenueCatStatus.status === 'premium_annual' ? 'Renews annually - Save 30%' :
-                                       revenueCatStatus.status === 'free_trial' ? 'Trial active' :
-                                       revenueCatStatus.status === 'free_trial_extended' ? 'Extended trial active' :
-                                       'Limited to 1 image upload per day',
+                                revenueCatStatus.status === 'premium_annual' ? 'Renews annually - Save 30%' :
+                                    revenueCatStatus.status === 'free_trial' ? 'Trial active' :
+                                        revenueCatStatus.status === 'free_trial_extended' ? 'Extended trial active' :
+                                            'Limited to 1 image upload per day',
                             statusColor: ['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status) ? '#00aa44' :
-                                        ['free_trial', 'free_trial_extended'].includes(revenueCatStatus.status) ? '#ff8800' : '#ff4444',
+                                ['free_trial', 'free_trial_extended'].includes(revenueCatStatus.status) ? '#ff8800' : '#ff4444',
                             showUpgradePrompt: !['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status)
                         };
                         setCurrentPlanInfo(planInfo);
@@ -237,7 +237,7 @@ const PremiumSubscription = () => {
 
             // Find the appropriate package based on selected plan
             let packageToPurchase: PurchasesPackage | null = null;
-            
+
             if (planToUse === 'premium_annual') {
                 packageToPurchase = revenueCatOfferings.availablePackages.find(
                     pkg => pkg.identifier.includes('annual')
@@ -258,12 +258,12 @@ const PremiumSubscription = () => {
             }
 
             console.log('🛒 Attempting to purchase package:', packageToPurchase.identifier);
-            
+
             // Purchase through RevenueCat
             const { customerInfo, productIdentifier } = await SubscriptionService.purchasePackage(packageToPurchase);
-            
+
             console.log('✅ Purchase successful:', productIdentifier);
-            
+
             // Update local subscription status
             const updatedStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
             setSubscriptionStatus(updatedStatus);
@@ -278,9 +278,9 @@ const PremiumSubscription = () => {
             );
         } catch (error: any) {
             console.error('Error subscribing:', error);
-            
+
             let errorMessage = 'There was an error processing your subscription. Please try again.';
-            
+
             if (error.message?.includes('user cancelled') || error.code === '1') {
                 // User cancelled the purchase, no need to show error
                 return;
@@ -289,7 +289,7 @@ const PremiumSubscription = () => {
             } else if (error.message?.includes('payment') || error.code === '3') {
                 errorMessage = 'Payment method error. Please check your payment information.';
             }
-            
+
             Alert.alert('Subscription Error', errorMessage);
         } finally {
             setIsLoading(false);
@@ -475,10 +475,10 @@ const PremiumSubscription = () => {
                     {currentPlanInfo && (
                         <View style={styles.currentPlanCard}>
                             <View style={[styles.currentPlanHeader, { backgroundColor: currentPlanInfo.statusColor + '20' }]}>
-                                <Ionicons 
-                                    name={currentPlanInfo.planName.includes('VIP') ? "shield-checkmark" : currentPlanInfo.isActive ? "checkmark-circle" : "information-circle"} 
-                                    size={20} 
-                                    color={currentPlanInfo.statusColor} 
+                                <Ionicons
+                                    name={currentPlanInfo.planName.includes('VIP') ? "shield-checkmark" : currentPlanInfo.isActive ? "checkmark-circle" : "information-circle"}
+                                    size={20}
+                                    color={currentPlanInfo.statusColor}
                                 />
                                 <Text style={styles.currentPlanLabel}>
                                     {currentPlanInfo.planName.includes('VIP') ? "VIP Status" : currentPlanInfo.isActive ? "Current Plan" : "Plan Status"}
