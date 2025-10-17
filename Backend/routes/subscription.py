@@ -353,7 +353,7 @@ async def update_subscription_from_webhook(
         if 'conn' in locals():
             conn.close()
 
-@router.post("/subscription/start-trial")
+@router.post("/start-trial")
 async def start_trial(current_user: dict = Depends(get_current_user)):
     """Start the initial 20-day free trial for new users"""
     try:
@@ -398,7 +398,7 @@ async def start_trial(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error starting trial: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/subscription/extend-trial")
+@router.post("/extend-trial")
 async def extend_trial(
     request: TrialExtensionRequest,
     current_user: dict = Depends(get_current_user)
@@ -472,7 +472,7 @@ async def extend_trial(
         logger.error(f"Error extending trial: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/subscription/validate-receipt")
+@router.post("/validate-receipt")
 async def validate_receipt(
     request: ReceiptValidationRequest,
     current_user: dict = Depends(get_current_user)
@@ -535,7 +535,7 @@ async def validate_receipt(
         logger.error(f"Error validating receipt: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/subscription/status")
+@router.get("/status")
 async def get_subscription_status(current_user: dict = Depends(get_current_user)):
     """Get current subscription status for user"""
     try:
@@ -604,7 +604,7 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
         logger.error(f"Error getting subscription status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/subscription/cancel")
+@router.post("/cancel")
 async def cancel_subscription(
     request: SubscriptionCancellationRequest,
     current_user: dict = Depends(get_current_user)
@@ -687,7 +687,7 @@ async def cancel_subscription(
         logger.error(f"Error canceling subscription: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/subscription/validate-premium")
+@router.post("/validate-premium")
 async def validate_premium_access(current_user: dict = Depends(get_current_user)):
     """Secure server-side validation of premium access - prevents client tampering"""
     try:
@@ -768,7 +768,7 @@ async def validate_premium_access(current_user: dict = Depends(get_current_user)
         logger.error(f"Error in server-side premium validation: {str(e)}")
         raise HTTPException(status_code=500, detail="Premium validation failed")
 
-@router.get("/subscription/products")
+@router.get("/products")
 async def get_subscription_products():
     """Get available subscription products/plans"""
     try:
@@ -820,7 +820,7 @@ async def get_subscription_products():
         logger.error(f"Error getting subscription products: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/subscription/validate-upload-limit")
+@router.post("/validate-upload-limit")
 async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
     """Secure server-side enforcement of daily upload limits - prevents client bypass"""
     try:
@@ -900,7 +900,7 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error validating upload limit: {str(e)}")
         raise HTTPException(status_code=500, detail="Upload validation failed")
 
-@router.post("/subscription/grant-promotional-trial")
+@router.post("/grant-promotional-trial")
 async def grant_promotional_trial(current_user: dict = Depends(get_current_user)):
     """Grant 20-day promotional trial to new users - Backend managed (automatic for new accounts)"""
     try:
@@ -980,7 +980,7 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
         logger.error(f"Error in promotional trial grant: {str(e)}")
         raise HTTPException(status_code=500, detail="Trial grant failed")
 
-@router.post("/subscription/grant-extended-trial")
+@router.post("/grant-extended-trial")
 async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
     """Grant additional 10-day extended trial when user starts a subscription (after 20-day promo trial)"""
     try:
@@ -1058,7 +1058,7 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error in extended trial grant: {str(e)}")
         raise HTTPException(status_code=500, detail="Extended trial grant failed")
 
-@router.get("/subscription/promotional-trial-status")
+@router.get("/promotional-trial-status")
 async def get_promotional_trial_status(current_user: dict = Depends(get_current_user)):
     """Get current promotional trial status for user"""
     try:

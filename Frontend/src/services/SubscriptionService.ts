@@ -424,9 +424,40 @@ class SubscriptionService {
       return false;
     }
   }
-  // Check if user has premium access (including promotional trial, extended trial, and paid subscription)
+  // Check if user has premium access (including VIP, promotional trial, extended trial, and paid subscription)
   async hasPremiumAccess(): Promise<boolean> {
     try {
+      // PRIORITY 1: Check backend for VIP status (server-side validation)
+      try {
+        const { BACKEND_URL } = require('../utils/config');
+        const tokenManager = require('../utils/tokenManager').default;
+        const { ServiceTokenType } = require('../utils/tokenManager');
+
+        const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
+        
+        const response = await fetch(`${BACKEND_URL}/api/subscription/validate-premium`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // If VIP or has premium access via backend validation, return true
+          if (data.has_premium_access) {
+            console.log('👑 VIP/Premium Access granted via backend:', data);
+            return true;
+          }
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Backend VIP check failed, falling back to RevenueCat:', backendError);
+        // Continue to RevenueCat check if backend fails
+      }
+
+      // PRIORITY 2: Check RevenueCat for paid subscriptions and trials
       const customerInfo = await this.getCustomerInfo();
 
       // Check for active premium subscription
