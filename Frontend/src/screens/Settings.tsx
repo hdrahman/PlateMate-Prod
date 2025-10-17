@@ -1,11 +1,11 @@
 import React, { useContext, useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, StatusBar } from "react-native";
+import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, StatusBar, Modal, TextInput } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getCacheStats, clearMealPlannerCache } from "../utils/database";
+import { getMealGalleryStats, clearOldestMealImages } from "../utils/database";
 import UnifiedStepTracker from "../services/UnifiedStepTracker";
 import PersistentStepTracker from "../services/PersistentStepTracker";
 
@@ -13,21 +13,23 @@ const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
     const { signOut } = useAuth();
-    const [cacheStats, setCacheStats] = useState<{ total: number, active: number, expired: number }>({ total: 0, active: 0, expired: 0 });
+    const [mealGalleryStats, setMealGalleryStats] = useState<{ totalMeals: number, storageUsedMB: number }>({ totalMeals: 0, storageUsedMB: 0 });
     const [isPersistentTrackingEnabled, setIsPersistentTrackingEnabled] = useState(false);
     const [isLoadingStepSettings, setIsLoadingStepSettings] = useState(false);
+    const [showClearMealModal, setShowClearMealModal] = useState(false);
+    const [clearMealCount, setClearMealCount] = useState("");
 
     useEffect(() => {
-        loadCacheStats();
+        loadMealGalleryStats();
         loadStepTrackingSettings();
     }, []);
 
-    const loadCacheStats = async () => {
+    const loadMealGalleryStats = async () => {
         try {
-            const stats = await getCacheStats();
-            setCacheStats(stats);
+            const stats = await getMealGalleryStats();
+            setMealGalleryStats(stats);
         } catch (error) {
-            console.error('Error loading cache stats:', error);
+            console.error('Error loading meal gallery stats:', error);
         }
     };
 
@@ -78,22 +80,49 @@ const SettingsScreen = () => {
         }
     };
 
-    const handleClearCache = async () => {
+    const handleClearMealCache = () => {
+        // Open modal for user to input how many meals to clear
+        setClearMealCount("");
+        setShowClearMealModal(true);
+    };
+
+    const handleConfirmClearMeals = () => {
+        const count = parseInt(clearMealCount);
+
+        // Validate input
+        if (isNaN(count) || count <= 0) {
+            Alert.alert('Invalid Input', 'Please enter a valid number greater than 0.');
+            return;
+        }
+
+        // Determine actual count to delete (cap at total available)
+        const actualCount = Math.min(count, mealGalleryStats.totalMeals);
+
+        if (actualCount === 0) {
+            Alert.alert('No Meals', 'There are no meals with images to clear.');
+            setShowClearMealModal(false);
+            return;
+        }
+
+        // Close the input modal
+        setShowClearMealModal(false);
+
+        // Show confirmation dialog
         Alert.alert(
-            'Clear Meal Planner Cache',
-            'This will clear all cached recipes and force fresh data to be loaded. Are you sure?',
+            'Confirm Deletion',
+            `This will permanently delete ${actualCount} meal${actualCount !== 1 ? 's' : ''} and their image${actualCount !== 1 ? 's' : ''} from local storage. Once cleared, they cannot be recovered.\n\nAre you sure you want to continue?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Clear',
+                    text: 'Delete',
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await clearMealPlannerCache();
-                            await loadCacheStats();
-                            Alert.alert('Success', 'Meal planner cache cleared successfully');
+                            const deletedCount = await clearOldestMealImages(actualCount);
+                            await loadMealGalleryStats();
+                            Alert.alert('Success', `${deletedCount} meal${deletedCount !== 1 ? 's' : ''} cleared successfully.`);
                         } catch (error) {
-                            Alert.alert('Error', 'Failed to clear cache. Please try again.');
+                            Alert.alert('Error', 'Failed to clear meals. Please try again.');
                         }
                     }
                 }
@@ -276,24 +305,24 @@ const SettingsScreen = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Cache Management</Text>
+                    <Text style={styles.sectionTitle}>Meal Gallery Management</Text>
                     <View style={styles.card}>
                         <View style={styles.item}>
                             <View style={[styles.iconBubble, { backgroundColor: '#32CD3230' }]}>
-                                <Ionicons name="server-outline" size={20} color="#32CD32" />
+                                <Ionicons name="images-outline" size={20} color="#32CD32" />
                             </View>
                             <View style={styles.cacheStatsContainer}>
-                                <Text style={styles.itemText}>Cache Statistics</Text>
+                                <Text style={styles.itemText}>Gallery Statistics</Text>
                                 <Text style={styles.cacheStatsText}>
-                                    Active: {cacheStats.active} | Expired: {cacheStats.expired} | Total: {cacheStats.total}
+                                    Meals Saved: {mealGalleryStats.totalMeals} | Storage: {mealGalleryStats.storageUsedMB.toFixed(2)} MB
                                 </Text>
                             </View>
                         </View>
-                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={handleClearCache}>
+                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={handleClearMealCache}>
                             <View style={[styles.iconBubble, { backgroundColor: '#FF453A30' }]}>
                                 <Ionicons name="trash-outline" size={20} color="#FF453A" />
                             </View>
-                            <Text style={styles.itemText}>Clear Recipe Cache</Text>
+                            <Text style={styles.itemText}>Clear Meal Cache</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
                     </View>
@@ -316,6 +345,67 @@ const SettingsScreen = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Clear Meal Cache Modal */}
+            <Modal
+                visible={showClearMealModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowClearMealModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Clear Meal Cache</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowClearMealModal(false)}
+                                style={styles.modalCloseButton}
+                            >
+                                <Ionicons name="close" size={24} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalDescription}>
+                                Enter the number of meals you want to clear. The oldest meals will be deleted first.
+                            </Text>
+                            <Text style={styles.modalWarning}>
+                                ⚠️ Meals are stored locally with images. Once cleared, they cannot be recovered.
+                            </Text>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.inputLabel}>
+                                    Number of meals (max: {mealGalleryStats.totalMeals})
+                                </Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={clearMealCount}
+                                    onChangeText={setClearMealCount}
+                                    keyboardType="numeric"
+                                    placeholder="Enter number"
+                                    placeholderTextColor="#777"
+                                    maxLength={6}
+                                />
+                            </View>
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.cancelButton]}
+                                    onPress={() => setShowClearMealModal(false)}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.clearButton]}
+                                    onPress={handleConfirmClearMeals}
+                                >
+                                    <Text style={styles.clearButtonText}>Clear Meals</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -472,6 +562,100 @@ const styles = StyleSheet.create({
         color: '#777',
         marginTop: 2,
         lineHeight: 16,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContainer: {
+        width: '85%',
+        backgroundColor: '#1E1E1E',
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: '#2A2A2A',
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#FFF',
+    },
+    modalCloseButton: {
+        padding: 4,
+    },
+    modalContent: {
+        padding: 20,
+    },
+    modalDescription: {
+        fontSize: 14,
+        color: '#CCC',
+        marginBottom: 12,
+        lineHeight: 20,
+    },
+    modalWarning: {
+        fontSize: 13,
+        color: '#FF9500',
+        backgroundColor: '#FF950020',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 20,
+        lineHeight: 18,
+    },
+    inputContainer: {
+        marginBottom: 24,
+    },
+    inputLabel: {
+        fontSize: 14,
+        color: '#AAA',
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#2A2A2A',
+        borderWidth: 1,
+        borderColor: '#444',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        color: '#FFF',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#2A2A2A',
+        borderWidth: 1,
+        borderColor: '#444',
+    },
+    clearButton: {
+        backgroundColor: '#FF453A',
+    },
+    cancelButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    clearButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 

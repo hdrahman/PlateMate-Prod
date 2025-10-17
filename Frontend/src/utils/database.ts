@@ -56,25 +56,25 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         db = await SQLite.openDatabaseAsync('platemate.db');
 
         // Configure SQLite performance settings for optimal performance
-        
+
         // Enable WAL (Write-Ahead Logging) mode for better concurrency and performance
         await db.execAsync('PRAGMA journal_mode = WAL');
-        
+
         // Set cache size to 10000 pages (approximately 40MB) for better performance
         await db.execAsync('PRAGMA cache_size = 10000');
-        
+
         // Set synchronous mode to NORMAL for better performance while maintaining data integrity
         await db.execAsync('PRAGMA synchronous = NORMAL');
-        
+
         // Use memory for temporary storage for faster operations
         await db.execAsync('PRAGMA temp_store = MEMORY');
-        
+
         // Set busy timeout to 30 seconds to handle database locks gracefully
         await db.execAsync('PRAGMA busy_timeout = 30000');
-        
+
         // Enable automatic index optimization
         await db.execAsync('PRAGMA optimize');
-        
+
 
         // Create tables with basic schema
         await db.execAsync(`
@@ -303,7 +303,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         try {
             const nutritionGoalsInfo = await db.getAllAsync("PRAGMA table_info(nutrition_goals)");
             const dailyCalorieGoalColumn = nutritionGoalsInfo.find((col: any) => col.name === 'daily_calorie_goal');
-            
+
             if (!dailyCalorieGoalColumn) {
                 await db.execAsync(`ALTER TABLE nutrition_goals ADD COLUMN daily_calorie_goal INTEGER`);
             }
@@ -720,7 +720,7 @@ export const getFoodLogsByDate = async (date: string) => {
 
         // Normalize date to ensure exact matching (better for index usage)
         const normalizedDate = date.split('T')[0]; // Extract YYYY-MM-DD part only
-        
+
         // First check if there are any logs for this date (using exact date match for better index performance)
         const countResult = await db.getFirstAsync<{ count: number }>(
             `SELECT COUNT(*) as count FROM food_logs WHERE date = ? AND user_id = ?`,
@@ -1113,7 +1113,7 @@ export const syncStepsWithExerciseLog = async (stepCount: number, date: string) 
 
     const firebaseUserId = getCurrentUserId();
     const normalizedDate = date.split('T')[0]; // Remove any time component
-    
+
     console.log(`🔄 Syncing steps with exercise log: ${stepCount} steps for ${normalizedDate}`);
 
     try {
@@ -1215,10 +1215,10 @@ export const addWaterIntake = async (amountMl: number, containerType: string = '
         );
 
         console.log(`✅ Water intake added: ${amountMl}ml (${containerType})`);
-        
+
         // Trigger database change notification
         await notifyDatabaseChanged('addWaterIntake');
-        
+
         return result;
     } catch (error) {
         console.error('❌ Error adding water intake:', error);
@@ -1292,10 +1292,10 @@ export const deleteWaterIntake = async (id: number) => {
         }
 
         await db.runAsync('DELETE FROM water_intake WHERE id = ?', [id]);
-        
+
         // Trigger database change notification
         await notifyDatabaseChanged('deleteWaterIntake');
-        
+
         console.log(`✅ Water intake deleted: ${id}`);
         return true;
     } catch (error) {
@@ -4343,11 +4343,11 @@ export const getCachedFeaturedRecipes = async (): Promise<any[] | null> => {
 
         if (result) {
             const { cache_data, cache_date, expires_at } = result as any;
-            
+
             // Check if cache is still valid (not expired)
             const today = new Date();
             const expiryDate = new Date(expires_at);
-            
+
             if (today < expiryDate) {
                 const cachedRecipes = JSON.parse(cache_data);
                 console.log('✅ Using cached featured recipes from', cache_date);
@@ -4409,11 +4409,11 @@ export const getCachedRecipeCategory = async (categoryId: string): Promise<any[]
 
         if (result) {
             const { cache_data, cache_date, expires_at } = result as any;
-            
+
             // Check if cache is still valid (not expired)
             const today = new Date();
             const expiryDate = new Date(expires_at);
-            
+
             if (today < expiryDate) {
                 const cachedRecipes = JSON.parse(cache_data);
                 console.log(`✅ Using cached recipe category ${categoryId} from`, cache_date);
@@ -4457,9 +4457,9 @@ export const cleanupExpiredCache = async (): Promise<void> => {
 export const clearMealPlannerCache = async (): Promise<void> => {
     try {
         const db = await getDatabase();
-        
+
         const result = await db.runAsync('DELETE FROM meal_planner_cache');
-        
+
         console.log('🗑️ Cleared all meal planner cache:', result.changes, 'entries removed');
     } catch (error) {
         console.error('❌ Error clearing meal planner cache:', error);
@@ -4473,21 +4473,21 @@ export const getCacheStats = async (): Promise<{ total: number, active: number, 
     try {
         const db = await getDatabase();
         const today = new Date().toISOString().split('T')[0];
-        
+
         const totalResult = await db.getFirstAsync(`
             SELECT COUNT(*) as count FROM meal_planner_cache
         `);
-        
+
         const activeResult = await db.getFirstAsync(`
             SELECT COUNT(*) as count FROM meal_planner_cache 
             WHERE expires_at >= ?
         `, [today]);
-        
+
         const expiredResult = await db.getFirstAsync(`
             SELECT COUNT(*) as count FROM meal_planner_cache 
             WHERE expires_at < ?
         `, [today]);
-        
+
         return {
             total: (totalResult as any)?.count || 0,
             active: (activeResult as any)?.count || 0,
@@ -4496,6 +4496,109 @@ export const getCacheStats = async (): Promise<{ total: number, active: number, 
     } catch (error) {
         console.error('❌ Error getting cache stats:', error);
         return { total: 0, active: 0, expired: 0 };
+    }
+};
+
+/**
+ * Get meal gallery statistics (count of meals with images and storage used)
+ */
+export const getMealGalleryStats = async (): Promise<{
+    totalMeals: number;
+    storageUsedMB: number;
+}> => {
+    try {
+        // Get all meal images
+        const mealImages = await getAllMealImages();
+
+        // Get storage info from local file storage
+        const { getLocalStorageInfo } = await import('./localFileStorage');
+        const storageInfo = await getLocalStorageInfo();
+
+        return {
+            totalMeals: mealImages.length,
+            storageUsedMB: storageInfo.totalSizeMB
+        };
+    } catch (error) {
+        console.error('❌ Error getting meal gallery stats:', error);
+        return { totalMeals: 0, storageUsedMB: 0 };
+    }
+};
+
+/**
+ * Clear oldest meal images (meals with photos)
+ * @param count Number of oldest meals to clear
+ * @returns Number of meals actually cleared
+ */
+export const clearOldestMealImages = async (count: number): Promise<number> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to clear meal images before database initialization');
+        throw new Error('Database not initialized');
+    }
+
+    const firebaseUserId = getCurrentUserId();
+    console.log(`🗑️ Clearing ${count} oldest meal images for user_id=${firebaseUserId}`);
+
+    try {
+        // Get the oldest N meals with images
+        const oldestMeals = await db.getAllAsync(
+            `SELECT id, image_url, meal_id
+             FROM food_logs
+             WHERE user_id = ?
+             AND image_url IS NOT NULL
+             AND image_url != ''
+             AND image_url != 'https://via.placeholder.com/150'
+             AND image_url != 'default.jpg'
+             AND image_url != 'image0.jpg'
+             AND image_url LIKE '%meal_images%'
+             ORDER BY date ASC, id ASC
+             LIMIT ?`,
+            [firebaseUserId, count]
+        );
+
+        if (oldestMeals.length === 0) {
+            console.log('ℹ️ No meals with images to clear');
+            return 0;
+        }
+
+        console.log(`📋 Found ${oldestMeals.length} meals to clear`);
+
+        // Collect unique image paths and meal IDs
+        const imagePaths = new Set<string>();
+        const mealIds = new Set<number>();
+
+        oldestMeals.forEach((meal: any) => {
+            if (meal.image_url) {
+                imagePaths.add(meal.image_url);
+            }
+            if (meal.meal_id) {
+                mealIds.add(meal.meal_id);
+            }
+        });
+
+        // Delete local image files
+        const { deleteMultipleLocalImages } = await import('./localFileStorage');
+        const deletedImageCount = await deleteMultipleLocalImages(Array.from(imagePaths));
+        console.log(`🗑️ Deleted ${deletedImageCount} local image files`);
+
+        // Delete the food log entries using parameterized query
+        const mealIdArray = Array.from(mealIds);
+        const placeholders = mealIdArray.map(() => '?').join(',');
+        const result = await db.runAsync(
+            `DELETE FROM food_logs
+             WHERE meal_id IN (${placeholders})
+             AND user_id = ?`,
+            [...mealIdArray, firebaseUserId]
+        );
+
+        console.log(`✅ Cleared ${result.changes} food log entries`);
+
+        // Notify any listeners that the database has changed
+        notifyDatabaseChanged();
+
+        return oldestMeals.length;
+    } catch (error) {
+        console.error('❌ Error clearing oldest meal images:', error);
+        throw error;
     }
 };
 
@@ -4511,9 +4614,9 @@ export const getCacheStats = async (): Promise<{ total: number, active: number, 
  * @param dailyTarget Final daily calorie target (including weight goal adjustments)
  */
 export const updateUserBMR = async (
-    firebaseUid: string, 
-    bmr: number, 
-    maintenanceCalories: number, 
+    firebaseUid: string,
+    bmr: number,
+    maintenanceCalories: number,
     dailyTarget: number
 ): Promise<void> => {
     if (!db || !global.dbInitialized) {
@@ -4603,16 +4706,16 @@ export const ensureBMRColumnExists = async (): Promise<void> => {
 
     try {
         const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
-        
+
         const bmrColumn = tableInfo.find((col: any) => col.name === 'bmr');
         const maintenanceColumn = tableInfo.find((col: any) => col.name === 'maintenance_calories');
-        
+
         if (!bmrColumn) {
             console.log('🔄 Adding BMR column to user_profiles table...');
             await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN bmr REAL`);
             console.log('✅ BMR column added successfully');
         }
-        
+
         if (!maintenanceColumn) {
             console.log('🔄 Adding maintenance_calories column to user_profiles table...');
             await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN maintenance_calories REAL`);

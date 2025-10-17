@@ -9,7 +9,8 @@
       "Bash(findstr:*)",
       "mcp__supabase__get_advisors",
       "mcp__supabase__list_tables",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(ls -la \"C:\\Platemate\\PlateMate-Prod\\Frontend\"\" | grep -E \"^d \")"
     ],
     "deny": [],
     "ask": []

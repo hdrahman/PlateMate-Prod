@@ -28,6 +28,42 @@ router = APIRouter(prefix="/api/subscription", tags=["subscription"])
 REVENUECAT_API_KEY = os.getenv('REVENUECAT_API_KEY')
 REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
 
+# VIP User Management - Helper function
+async def check_vip_status(firebase_uid: str) -> dict:
+    """
+    Check if user is a VIP (gets free lifetime premium access)
+    VIPs are managed via Supabase dashboard - insert into vip_users table
+    
+    Returns:
+        dict with keys: is_vip (bool), reason (str), granted_at (str)
+    """
+    try:
+        conn = await get_db_connection()
+        
+        vip_query = """
+            SELECT firebase_uid, email, reason, granted_by, granted_at, is_active
+            FROM vip_users
+            WHERE firebase_uid = $1 AND is_active = true
+        """
+        
+        vip_record = await conn.fetchrow(vip_query, firebase_uid)
+        
+        if vip_record:
+            logger.info(f"👑 VIP user detected: {firebase_uid} (reason: {vip_record['reason']})")
+            return {
+                'is_vip': True,
+                'reason': vip_record['reason'],
+                'granted_at': vip_record['granted_at'].isoformat() if vip_record['granted_at'] else None,
+                'granted_by': vip_record['granted_by']
+            }
+        
+        return {'is_vip': False}
+        
+    except Exception as e:
+        logger.error(f"Error checking VIP status for {firebase_uid}: {str(e)}")
+        # On error, default to non-VIP (fail safely)
+        return {'is_vip': False}
+
 # Initialize RevenueCat client for secure server-side validation
 rc_client = None
 if REVENUECAT_AVAILABLE and REVENUECAT_API_KEY:
@@ -657,6 +693,21 @@ async def validate_premium_access(current_user: dict = Depends(get_current_user)
     try:
         firebase_uid = current_user["supabase_uid"]
         
+        # PRIORITY 1: Check if user is VIP (free lifetime premium)
+        vip_status = await check_vip_status(firebase_uid)
+        
+        if vip_status['is_vip']:
+            logger.info(f"👑 VIP access granted to {firebase_uid} - Reason: {vip_status['reason']}")
+            return {
+                "has_premium_access": True,
+                "tier": "vip_lifetime",
+                "status": "success",
+                "validation_source": "vip_whitelist",
+                "vip_reason": vip_status['reason'],
+                "granted_at": vip_status.get('granted_at')
+            }
+        
+        # PRIORITY 2: Check RevenueCat for paid subscriptions or trials
         if not rc_client:
             logger.error("RevenueCat client not available for server-side validation")
             # For security, deny access if we can't validate properly
@@ -775,7 +826,20 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
     try:
         firebase_uid = current_user["supabase_uid"]
         
-        # First check if user has premium access
+        # PRIORITY 1: Check if user is VIP (unlimited uploads)
+        vip_status = await check_vip_status(firebase_uid)
+        
+        if vip_status['is_vip']:
+            logger.info(f"👑 VIP unlimited uploads granted to {firebase_uid}")
+            return {
+                "upload_allowed": True,
+                "reason": "vip_unlimited",
+                "uploads_today": None,
+                "limit": None,
+                "is_vip": True
+            }
+        
+        # PRIORITY 2: Check if user has premium access via RevenueCat
         premium_validation = await validate_premium_access(current_user)
         
         if premium_validation.get("has_premium_access", False):
