@@ -355,6 +355,7 @@ function AuthenticatedApp({ children }) {
 // Component for authenticated user content
 function AuthenticatedContent() {
   const { onboardingComplete, isLoading: onboardingLoading } = useOnboarding();
+  const { isRestoringData } = useAuth();
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = React.useState(false);
 
   // Track when onboarding is completed to prevent flashing
@@ -393,6 +394,11 @@ function AuthenticatedContent() {
 
     initializeStepTracking();
   }, [onboardingComplete, hasCompletedOnboarding]);
+
+  // Show loading screen while restoring data from cloud
+  if (isRestoringData) {
+    return <LoadingScreen message="Restoring your data from cloud..." />;
+  }
 
   // Show loading screen while onboarding context is still loading
   // But once onboarding is completed, don't show loading screen again to prevent flashing

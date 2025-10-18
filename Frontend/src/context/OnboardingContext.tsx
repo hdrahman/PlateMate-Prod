@@ -3,7 +3,6 @@ import { useAuth } from './AuthContext';
 import { createUser, getUserProfile, updateUserProfile, convertProfileToBackendFormat } from '../api/userApi';
 import { supabase } from '../utils/supabaseClient';
 import { syncUserProfile } from '../utils/profileSyncService';
-import { logAuthState } from '../utils/authDebugger';
 import {
     getUserProfileBySupabaseUid,
     addUserProfile,
@@ -370,11 +369,21 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         // The real value will be re-evaluated inside `loadOnboardingState()`.
     }, [user?.id]);
 
+    // Get isRestoringData from AuthContext
+    const { isRestoringData } = useAuth();
+
     // Fast SQLite-only onboarding state loading (simplified)
     useEffect(() => {
         const loadOnboardingState = async () => {
             if (hasLoadedInitialState || !tempSessionId) {
                 setIsLoading(false);
+                return;
+            }
+
+            // Wait for data restoration to complete before checking profile
+            if (isRestoringData) {
+                console.log('⏳ Waiting for data restoration to complete...');
+                setIsLoading(true);
                 return;
             }
 
@@ -424,7 +433,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         };
 
         loadOnboardingState();
-    }, [user, hasLoadedInitialState, tempSessionId]);
+    }, [user, hasLoadedInitialState, tempSessionId, isRestoringData]);
 
     // Update profile data and save incrementally
     const updateProfile = async (data: Partial<UserProfile>) => {

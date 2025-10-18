@@ -21,6 +21,7 @@ type UserType = any & { uid?: string }; // Supabase user with Firebase compatibi
 interface AuthContextType {
     user: UserType | null;
     isLoading: boolean;
+    isRestoringData: boolean;
     signUp: (email: string, password: string) => Promise<void>;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
@@ -33,6 +34,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
     user: null,
     isLoading: true,
+    isRestoringData: false,
     signUp: async () => { },
     signIn: async () => { },
     signOut: async () => { },
@@ -78,6 +80,7 @@ const grantPromotionalTrialToNewUser = async (userId: string) => {
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UserType | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRestoringData, setIsRestoringData] = useState(false);
 
     // Fast startup: Check cached user immediately, validate session async
     useEffect(() => {
@@ -218,6 +221,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             console.log('🔄 Background: Starting service initialization...');
 
+            // Check if local database is empty and restore from PostgreSQL if needed
+            // This MUST happen first before the app checks onboarding status
+            let profileRestored = false;
+            try {
+                const localProfile = await getUserProfileBySupabaseUid(userId);
+                if (!localProfile) {
+                    console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
+                    setIsRestoringData(true); // Show loading screen while restoring
+                    
+                    const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
+                    if (restoreResult.success) {
+                        console.log('✅ Background: PostgreSQL restore completed successfully:', restoreResult.stats);
+                        profileRestored = true;
+                    } else {
+                        console.warn('⚠️ Background: PostgreSQL restore completed with errors:', restoreResult.errors);
+                    }
+                    
+                    setIsRestoringData(false); // Hide loading screen
+                }
+            } catch (error) {
+                console.warn('⚠️ Background: Profile restore failed:', error);
+                setIsRestoringData(false);
+            }
+
             // Initialize token manager for authenticated users only
             await tokenManager.initialize();
             console.log('✅ Background: TokenManager initialized');
@@ -246,25 +273,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.warn('⚠️ Background: PostgreSQL sync init failed:', error);
             }
 
-            // Check if local database is empty and restore from PostgreSQL if needed
-            try {
-                const localProfile = await getUserProfileBySupabaseUid(userId);
-                if (!localProfile) {
-                    console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
-                    const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
-                    if (restoreResult.success) {
-                        console.log('✅ Background: PostgreSQL restore completed successfully:', restoreResult.stats);
-                    } else {
-                        console.warn('⚠️ Background: PostgreSQL restore completed with errors:', restoreResult.errors);
-                    }
-                }
-            } catch (error) {
-                console.warn('⚠️ Background: Profile restore failed:', error);
-            }
-
             console.log('✅ Background: All services initialized');
         } catch (error) {
             console.warn('⚠️ Background: Service initialization failed:', error);
+            setIsRestoringData(false);
             // Don't throw - this is background initialization
         }
     };
@@ -356,6 +368,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             value={{
                 user,
                 isLoading,
+                isRestoringData,
                 signUp,
                 signIn,
                 signOut,
