@@ -229,7 +229,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (!localProfile) {
                     console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
                     setIsRestoringData(true); // Show loading screen while restoring
-                    
+
                     const restoreResult = await postgreSQLSyncService.restoreFromPostgreSQL();
                     if (restoreResult.success) {
                         console.log('✅ Background: PostgreSQL restore completed successfully:', restoreResult.stats);
@@ -237,7 +237,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     } else {
                         console.warn('⚠️ Background: PostgreSQL restore completed with errors:', restoreResult.errors);
                     }
-                    
+
                     setIsRestoringData(false); // Hide loading screen
                 }
             } catch (error) {

@@ -371,10 +371,10 @@ function AuthenticatedContent() {
       if (onboardingComplete && hasCompletedOnboarding) {
         try {
           console.log('🚀 Initializing step tracking for authenticated user...');
-          
+
           // Check if we're running in Expo Go
           const isExpoGo = global.isExpoGo === true || global.__expo?.isExpoGo === true;
-          
+
           if (!isExpoGo) {
             // Initialize step tracking - this will now request permissions
             const success = await UnifiedStepTracker.startTracking();
@@ -513,7 +513,7 @@ export default function App() {
     // Set up notification response listener
     const notificationListener = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('Notification tapped:', response);
-      
+
       // Handle different notification types
       const data = response.notification.request.content.data;
       if (data?.action === 'open_app') {
@@ -577,7 +577,7 @@ export default function App() {
 
         if (isExpoGo) {
           console.log('Running in Expo Go - Some features like permanent notifications will be disabled');
-          
+
           // Skip native services initialization in Expo Go to prevent hanging
           console.log('Skipping native services initialization in Expo Go');
         } else {
@@ -598,7 +598,7 @@ export default function App() {
 
             // Note: Step tracking initialization moved to AuthenticatedContent
             // to request permissions only after user authentication
-            
+
             console.log('✅ App initialization complete');
           } catch (error) {
             console.error('Failed to initialize enhanced services:', error);
