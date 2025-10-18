@@ -10,6 +10,10 @@ from auth.supabase_auth import get_current_user
 import time
 import openai
 
+# Import HTTP client manager and AI limiter
+from services.http_client_manager import get_http_client
+from services.ai_limiter import get_ai_limiter
+
 # Load environment variables
 load_dotenv()
 
@@ -149,10 +153,14 @@ async def analyze_food(
         
         logger.info(f"Sending request to OpenAI with {len(valid_urls)} images in a single message")
         
-        # Make the real API request to OpenAI using httpx.AsyncClient
-        async with httpx.AsyncClient() as client:
+        # Get persistent HTTP client and AI limiter
+        client = await get_http_client("openai")
+        limiter = await get_ai_limiter()
+        
+        # Use AI limiter to prevent resource exhaustion
+        async with limiter.limit("OpenAI GPT-4o food analysis"):
             response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+                "/chat/completions",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {openai.api_key}"
@@ -251,10 +259,14 @@ async def analyze_meal(
         if not openai.api_key:
             raise HTTPException(status_code=500, detail="OpenAI API key not configured")
         
-        # Make the API request to OpenAI
-        async with httpx.AsyncClient() as client:
+        # Get persistent HTTP client and AI limiter
+        client = await get_http_client("openai")
+        limiter = await get_ai_limiter()
+        
+        # Use AI limiter to prevent resource exhaustion
+        async with limiter.limit("OpenAI GPT-4o meal analysis"):
             response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+                "/chat/completions",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {openai.api_key}"

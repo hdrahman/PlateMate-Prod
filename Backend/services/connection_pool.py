@@ -197,12 +197,34 @@ async def request_with_retry(
                 logger.error(f"Request to {url} failed after {retry_count} retries: {str(e)}")
                 raise last_exception
 
+async def cleanup_response_cache():
+    """Clean up expired entries from response cache"""
+    current_time = time.time()
+    expired_keys = []
+    
+    for key, expiry in response_cache["expiry"].items():
+        if expiry < current_time:
+            expired_keys.append(key)
+    
+    # Remove expired entries
+    for key in expired_keys:
+        del response_cache["data"][key]
+        del response_cache["expiry"][key]
+    
+    if expired_keys:
+        logger.info(f"Cleaned up {len(expired_keys)} expired cache entries")
+
 # Cleanup task
 async def run_connection_pool_maintenance():
-    """Background task to clean up idle connections"""
+    """Background task to clean up idle connections and cache"""
     while True:
-        await asyncio.sleep(POOL_TIMEOUT // 2)
+        await asyncio.sleep(POOL_TIMEOUT // 2)  # Run every 30 seconds
+        
+        # Clean up idle connections
         await close_idle_connections()
+        
+        # Clean up expired cache entries
+        await cleanup_response_cache()
 
 # Start the maintenance task
 maintenance_task = None
@@ -213,7 +235,7 @@ def start_connection_pool():
     if maintenance_task is None:
         loop = asyncio.get_event_loop()
         maintenance_task = loop.create_task(run_connection_pool_maintenance())
-        logger.info("Connection pool maintenance started")
+        logger.info("✅ Connection pool maintenance started (cleanup every 30s)")
 
 def stop_connection_pool():
     """Stop the connection pool maintenance task"""
@@ -221,4 +243,4 @@ def stop_connection_pool():
     if maintenance_task:
         maintenance_task.cancel()
         maintenance_task = None
-        logger.info("Connection pool maintenance stopped") 
+        logger.info("🔄 Connection pool maintenance stopped") 

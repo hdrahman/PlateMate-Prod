@@ -38,6 +38,10 @@ from routes.subscription import router as subscription_router
 # Add the import for connection pool
 from services.connection_pool import start_connection_pool, stop_connection_pool
 
+# HTTP client manager and AI limiter imports
+from services.http_client_manager import http_client_manager
+from services.ai_limiter import ai_limiter
+
 # Rate limiting imports
 from services.redis_connection import redis_manager, get_redis
 from services.rate_limiter import init_rate_limiter
@@ -47,18 +51,30 @@ app = FastAPI()
 
 # Custom middleware to handle timeouts for AI-related endpoints
 class TimeoutMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # AI endpoints that might require longer timeouts
-        timeout_paths = [
+    def __init__(self, app):
+        super().__init__(app)
+        # Paths that should be excluded from timeout handling
+        self.excluded_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json", "/static"]
+        # AI endpoints that need longer timeouts
+        self.timeout_paths = [
             "/deepseek/nutrition-analysis", 
             "/deepseek/chat",
             "/deepseek/chat-with-context",
             "/gpt/analyze-image",
-            "/gpt/analyze-meal"
+            "/gpt/analyze-meal",
+            "/images/upload-image",
+            "/images/upload-multiple-images"
         ]
+    
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        
+        # Skip timeout handling for excluded paths (fast path)
+        if any(path.startswith(excluded) for excluded in self.excluded_paths):
+            return await call_next(request)
         
         # Set longer timeout (70s) for specific AI endpoints
-        if any(path in request.url.path for path in timeout_paths):
+        if any(path in path for path in self.timeout_paths):
             # Extended timeout for AI processing endpoints
             try:
                 # Create a task for the request processing
@@ -122,6 +138,14 @@ async def startup_event():
     except Exception as e:
         print(f"❌ Error checking FatSecret credentials: {e}")
     
+    # Initialize HTTP Client Manager
+    try:
+        await http_client_manager.initialize()
+        print("✅ HTTP client manager initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize HTTP client manager: {e}")
+        print("⚠️ The application will continue but may have performance issues")
+    
     # Initialize Rate Limiting System
     try:
         rate_limiting_enabled = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
@@ -141,23 +165,30 @@ async def startup_event():
     
     # Initialize connection pool
     start_connection_pool()
-    print("Connection pool initialized")
+    print("✅ Connection pool initialized with automatic cleanup")
 
 # Stop the connection pool when the app shuts down
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Shutting down PlateMate API server...")
     
+    # Clean up HTTP client manager
+    try:
+        await http_client_manager.close_all()
+        print("✅ HTTP client manager shut down")
+    except Exception as e:
+        print(f"⚠️ Error shutting down HTTP client manager: {e}")
+    
     # Clean up rate limiting system
     try:
         await redis_manager.close_redis()
-        print("🔄 Rate limiting system shut down")
+        print("✅ Rate limiting system shut down")
     except Exception as e:
         print(f"⚠️ Error shutting down rate limiting: {e}")
     
     # stop_connection_pool is a synchronous function – don't await it
     stop_connection_pool()
-    print("Connection pool stopped")
+    print("✅ Connection pool stopped")
 
 # Custom Exception Handler to Log Full Errors
 @app.exception_handler(Exception)
@@ -266,3 +297,44 @@ async def auth_debug_check(current_user: dict = Depends(get_current_user)):
         "user": current_user,
         "timestamp": time.time()
     }
+
+# Add performance monitoring endpoint
+@app.get("/health/performance")
+async def performance_check():
+    """Check performance optimization status"""
+    try:
+        # Get AI limiter stats
+        limiter_stats = await ai_limiter.get_stats()
+        
+        # Get HTTP client manager status
+        http_client_status = {
+            "initialized": http_client_manager.is_initialized(),
+            "clients_available": len(http_client_manager._clients) if http_client_manager.is_initialized() else 0
+        }
+        
+        # Get connection pool stats
+        from services.connection_pool import http_clients, response_cache
+        pool_stats = {
+            "active_connections": len(http_clients),
+            "cached_responses": len(response_cache["data"])
+        }
+        
+        return {
+            "status": "ok",
+            "timestamp": time.time(),
+            "ai_limiter": limiter_stats,
+            "http_clients": http_client_status,
+            "connection_pool": pool_stats,
+            "optimizations": {
+                "persistent_http_clients": http_client_status["initialized"],
+                "ai_concurrency_limiting": True,
+                "automatic_cache_cleanup": True,
+                "optimized_middleware": True
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": time.time()
+        }

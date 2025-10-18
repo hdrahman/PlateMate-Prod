@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 from auth.supabase_auth import get_current_user
 import time
 
+# Import HTTP client manager and AI limiter
+from services.http_client_manager import get_http_client
+from services.ai_limiter import get_ai_limiter
+
 # Load environment variables
 load_dotenv()
 
@@ -161,10 +165,14 @@ Let me give you personalized insights and recommendations to help you reach your
             {"role": "user", "content": context_message}
         ]
         
-        # Call DeepSeek API securely from backend
-        async with httpx.AsyncClient() as client:
+        # Get persistent HTTP client and AI limiter
+        client = await get_http_client("deepseek")
+        limiter = await get_ai_limiter()
+        
+        # Use AI limiter to prevent resource exhaustion
+        async with limiter.limit("DeepSeek nutrition analysis"):
             response = await client.post(
-                DEEPSEEK_API_URL,
+                "/chat/completions",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
@@ -214,10 +222,14 @@ async def chat_with_coach(
     try:
         logger.info(f"Chat request from user {current_user['supabase_uid']}")
         
-        # Call DeepSeek API securely from backend
-        async with httpx.AsyncClient() as client:
+        # Get persistent HTTP client and AI limiter
+        client = await get_http_client("deepseek")
+        limiter = await get_ai_limiter()
+        
+        # Use AI limiter to prevent resource exhaustion
+        async with limiter.limit("DeepSeek chat"):
             response = await client.post(
-                DEEPSEEK_API_URL,
+                "/chat/completions",
                 headers={
                     "Content-Type": "application/json", 
                     "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
@@ -284,10 +296,14 @@ async def chat_with_context(
         # Add user messages
         messages.extend([msg.dict() for msg in request.messages])
         
-        # Call DeepSeek API
-        async with httpx.AsyncClient() as client:
+        # Get persistent HTTP client and AI limiter
+        client = await get_http_client("deepseek")
+        limiter = await get_ai_limiter()
+        
+        # Use AI limiter to prevent resource exhaustion
+        async with limiter.limit("DeepSeek chat with context"):
             response = await client.post(
-                DEEPSEEK_API_URL,
+                "/chat/completions",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
