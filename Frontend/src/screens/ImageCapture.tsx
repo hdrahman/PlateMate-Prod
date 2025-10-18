@@ -23,6 +23,7 @@ import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addFoodLog, addMultipleFoodLogs, getCurrentUserId } from '../utils/database';
 import { BACKEND_URL } from '../utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -93,6 +94,7 @@ type NutritionData = {
 const ImageCapture: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
+    const insets = useSafeAreaInsets();
     const { mealType: initialMealType, photoUri: initialPhotoUri, foodData } = route.params as { mealType: string; photoUri?: string; foodData?: any };
 
     const [mealType, setMealType] = useState(initialMealType);
@@ -1473,7 +1475,7 @@ const ImageCapture: React.FC = () => {
         <SafeAreaView style={[styles.container, containerStyle]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
@@ -1646,7 +1648,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: sidePadding,
-        paddingVertical: 12,
+        paddingBottom: 12,
         backgroundColor: '#000',
         zIndex: 10,
     },

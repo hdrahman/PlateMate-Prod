@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     cancelSubscription
@@ -43,6 +44,7 @@ interface PlanOption {
 const PremiumSubscription = () => {
     const navigation = useNavigation();
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
     const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionDetails | null>(null);
@@ -435,7 +437,7 @@ const PremiumSubscription = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
@@ -588,7 +590,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#000000',
     },
     header: {
-        paddingTop: 10,
         paddingBottom: 15,
         paddingHorizontal: 16,
         borderBottomWidth: 1,
