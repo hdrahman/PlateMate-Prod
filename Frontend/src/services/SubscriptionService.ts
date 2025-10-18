@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SubscriptionDetails, SubscriptionStatus } from '../types/user';
 import Constants from 'expo-constants';
+import { EventEmitter } from 'events';
+import { supabase } from '../utils/supabaseClient';
 
 // Conditional import for RevenueCat SDK - only available in dev builds, not Expo Go
 let Purchases: any = null;
@@ -68,7 +71,10 @@ class SubscriptionService {
   private isInitialized = false;
   private currentUserId: string | null = null;
 
-  // In-memory cache for VIP/premium status - secure, no AsyncStorage manipulation
+  // Event emitter for subscription changes
+  private eventEmitter = new EventEmitter();
+
+  // Persistent cache for VIP/premium status with AsyncStorage
   // Long cache (24h) with event-driven invalidation for immediate updates
   private premiumStatusCache: {
     hasPremiumAccess: boolean | null;
@@ -82,8 +88,14 @@ class SubscriptionService {
       cacheTTL: 24 * 60 * 60 * 1000, // 24 hours - event-driven invalidation handles changes
     };
 
+  // AsyncStorage key for persistent cache
+  private readonly CACHE_STORAGE_KEY = '@platemate_subscription_cache';
+
   // Track if RevenueCat listener is set up
   private revenueCatListenerAdded = false;
+
+  // Track Supabase Realtime subscription for VIP changes
+  private vipRealtimeSubscription: any = null;
 
   static getInstance(): SubscriptionService {
     if (!SubscriptionService.instance) {
@@ -92,12 +104,96 @@ class SubscriptionService {
     return SubscriptionService.instance;
   }
 
+  // Add subscription change listener
+  addSubscriptionChangeListener(listener: () => void): void {
+    this.eventEmitter.on('subscriptionChanged', listener);
+    console.log('✅ Subscription change listener added');
+  }
+
+  // Remove subscription change listener
+  removeSubscriptionChangeListener(listener: () => void): void {
+    this.eventEmitter.off('subscriptionChanged', listener);
+    console.log('🗑️ Subscription change listener removed');
+  }
+
+  // Emit subscription change event
+  private emitSubscriptionChange(): void {
+    console.log('📢 Emitting subscription change event to all listeners');
+    this.eventEmitter.emit('subscriptionChanged');
+  }
+
   // Clear cache when needed (e.g., user logout, subscription change)
   clearCache(): void {
     this.premiumStatusCache.hasPremiumAccess = null;
     this.premiumStatusCache.tier = null;
     this.premiumStatusCache.lastUpdate = 0;
-    console.log('🗑️ Premium status cache cleared');
+    console.log('🗑️ Premium status cache cleared from memory');
+
+    // Also clear AsyncStorage cache
+    AsyncStorage.removeItem(this.CACHE_STORAGE_KEY)
+      .then(() => console.log('🗑️ Premium status cache cleared from storage'))
+      .catch(error => console.warn('⚠️ Failed to clear storage cache:', error));
+
+    // Emit subscription change event
+    this.emitSubscriptionChange();
+  }
+
+  // Load cache from AsyncStorage (persistent across app restarts)
+  private async loadCacheFromStorage(): Promise<boolean> {
+    try {
+      const cachedData = await AsyncStorage.getItem(this.CACHE_STORAGE_KEY);
+      if (!cachedData) {
+        console.log('📦 No persistent cache found');
+        return false;
+      }
+
+      const parsed = JSON.parse(cachedData);
+
+      // Validate cache structure and freshness
+      if (parsed.lastUpdate && parsed.hasPremiumAccess !== undefined && parsed.tier) {
+        const cacheAge = Date.now() - parsed.lastUpdate;
+
+        if (cacheAge < this.premiumStatusCache.cacheTTL) {
+          // Cache is still valid
+          this.premiumStatusCache.hasPremiumAccess = parsed.hasPremiumAccess;
+          this.premiumStatusCache.tier = parsed.tier;
+          this.premiumStatusCache.lastUpdate = parsed.lastUpdate;
+
+          console.log('✅ Loaded valid cache from storage:', {
+            tier: parsed.tier,
+            hasPremiumAccess: parsed.hasPremiumAccess,
+            ageHours: (cacheAge / (1000 * 60 * 60)).toFixed(1)
+          });
+
+          return true;
+        } else {
+          console.log('⏰ Persistent cache expired, will refetch');
+          // Clear expired cache
+          await AsyncStorage.removeItem(this.CACHE_STORAGE_KEY);
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.warn('⚠️ Failed to load cache from storage:', error);
+      return false;
+    }
+  }
+
+  // Save cache to AsyncStorage (persistent across app restarts)
+  private async saveCacheToStorage(): Promise<void> {
+    try {
+      const cacheData = {
+        hasPremiumAccess: this.premiumStatusCache.hasPremiumAccess,
+        tier: this.premiumStatusCache.tier,
+        lastUpdate: this.premiumStatusCache.lastUpdate,
+      };
+
+      await AsyncStorage.setItem(this.CACHE_STORAGE_KEY, JSON.stringify(cacheData));
+      console.log('💾 Saved cache to storage (24h TTL)');
+    } catch (error) {
+      console.warn('⚠️ Failed to save cache to storage:', error);
+    }
   }
 
   // Check if cache is still valid
@@ -110,9 +206,16 @@ class SubscriptionService {
   async initialize(userId: string): Promise<void> {
     if (this.isInitialized) return;
 
+    // Store current user ID for VIP listener
+    this.currentUserId = userId;
+
     if (!Purchases) {
       console.log('⚠️ RevenueCat not available - skipping initialization');
       this.isInitialized = true;
+
+      // Still set up Supabase Realtime listener for VIP changes
+      this.setupSupabaseVIPListener(userId);
+
       return;
     }
 
@@ -136,6 +239,9 @@ class SubscriptionService {
 
       // Set up real-time subscription change listener (for immediate cache invalidation)
       this.setupRevenueCatListener();
+
+      // Set up Supabase Realtime listener for VIP status changes
+      this.setupSupabaseVIPListener(userId);
 
       // Get initial customer info to sync trial status
       try {
@@ -181,6 +287,54 @@ class SubscriptionService {
       console.log('✅ RevenueCat real-time listener set up');
     } catch (error) {
       console.error('❌ Error setting up RevenueCat listener:', error);
+    }
+  }
+
+  // Set up Supabase Realtime listener for VIP status changes
+  private setupSupabaseVIPListener(userId: string): void {
+    try {
+      // Clean up existing subscription if any
+      if (this.vipRealtimeSubscription) {
+        this.vipRealtimeSubscription.unsubscribe();
+      }
+
+      // Subscribe to changes in vip_users table for this specific user
+      this.vipRealtimeSubscription = supabase
+        .channel('vip_users_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen for INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'vip_users',
+            filter: `firebase_uid=eq.${userId}`
+          },
+          (payload) => {
+            console.log('🔔 Supabase Realtime: VIP status changed for user:', userId);
+            console.log('📊 Change details:', payload);
+
+            // Clear cache immediately to reflect VIP status change
+            this.clearCache();
+
+            // Also clear SubscriptionManager cache
+            try {
+              const SubscriptionManager = require('../utils/SubscriptionManager').default;
+              SubscriptionManager.clearCache();
+            } catch (error) {
+              console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Supabase Realtime: Listening for VIP status changes');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Supabase Realtime: Error subscribing to VIP changes');
+          }
+        });
+
+    } catch (error) {
+      console.error('❌ Error setting up Supabase VIP listener:', error);
     }
   }
 
@@ -311,9 +465,20 @@ class SubscriptionService {
 
   async logout(): Promise<void> {
     try {
-      await Purchases.logOut();
+      if (Purchases) {
+        await Purchases.logOut();
+      }
+
+      // Clean up Supabase Realtime subscription
+      if (this.vipRealtimeSubscription) {
+        this.vipRealtimeSubscription.unsubscribe();
+        this.vipRealtimeSubscription = null;
+        console.log('✅ Supabase VIP listener unsubscribed');
+      }
+
       this.isInitialized = false;
-      console.log('✅ User logged out from RevenueCat');
+      this.currentUserId = null;
+      console.log('✅ User logged out from RevenueCat and Supabase listeners cleaned up');
     } catch (error) {
       console.error('❌ Error logging out:', error);
       throw error;
@@ -530,13 +695,19 @@ class SubscriptionService {
   // Check if user has premium access (including VIP, promotional trial, extended trial, and paid subscription)
   async hasPremiumAccess(): Promise<boolean> {
     try {
-      // Check cache first to avoid unnecessary backend calls
+      // STEP 1: Check in-memory cache first (fastest)
       if (this.isCacheValid() && this.premiumStatusCache.hasPremiumAccess !== null) {
-        console.log('📦 Using cached premium access status:', this.premiumStatusCache.hasPremiumAccess);
+        console.log('⚡ Using in-memory cached premium access status:', this.premiumStatusCache.hasPremiumAccess);
         return this.premiumStatusCache.hasPremiumAccess;
       }
 
-      console.log('🔄 Cache miss or expired, fetching premium access status...');
+      // STEP 2: Try loading from AsyncStorage (persistent cache)
+      if (await this.loadCacheFromStorage()) {
+        console.log('📦 Using persistent cached premium access status:', this.premiumStatusCache.hasPremiumAccess);
+        return this.premiumStatusCache.hasPremiumAccess!;
+      }
+
+      console.log('🔄 No valid cache found, fetching premium access status from server...');
 
       // PRIORITY 1: Check backend for VIP status (server-side validation)
       try {
@@ -561,7 +732,12 @@ class SubscriptionService {
           if (data.has_premium_access) {
             console.log('👑 VIP/Premium Access granted via backend:', data);
             this.premiumStatusCache.hasPremiumAccess = true;
+            this.premiumStatusCache.tier = data.tier || 'vip_lifetime';
             this.premiumStatusCache.lastUpdate = Date.now();
+
+            // Save to persistent storage
+            await this.saveCacheToStorage();
+
             return true;
           }
         }
@@ -595,9 +771,12 @@ class SubscriptionService {
         totalAccess: hasAccess
       });
 
-      // Cache the result
+      // Cache the result (in-memory and persistent storage)
       this.premiumStatusCache.hasPremiumAccess = hasAccess;
       this.premiumStatusCache.lastUpdate = Date.now();
+
+      // Save to AsyncStorage for persistence
+      await this.saveCacheToStorage();
 
       return hasAccess;
     } catch (error) {
@@ -647,13 +826,19 @@ class SubscriptionService {
   // Get user's current subscription tier
   async getSubscriptionTier(): Promise<'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime'> {
     try {
-      // Check cache first to avoid unnecessary backend calls
+      // STEP 1: Check in-memory cache first (fastest)
       if (this.isCacheValid() && this.premiumStatusCache.tier !== null) {
-        console.log('📦 Using cached tier:', this.premiumStatusCache.tier);
+        console.log('⚡ Using in-memory cached tier:', this.premiumStatusCache.tier);
         return this.premiumStatusCache.tier;
       }
 
-      console.log('🔄 Cache miss or expired, fetching subscription tier...');
+      // STEP 2: Try loading from AsyncStorage (persistent cache)
+      if (await this.loadCacheFromStorage()) {
+        console.log('📦 Using persistent cached tier:', this.premiumStatusCache.tier);
+        return this.premiumStatusCache.tier!;
+      }
+
+      console.log('🔄 No valid cache found, fetching subscription tier from server...');
 
       // PRIORITY 1: Check backend for VIP status first
       try {
@@ -678,7 +863,12 @@ class SubscriptionService {
           if (data.tier === 'vip_lifetime') {
             console.log('👑 VIP tier detected from backend');
             this.premiumStatusCache.tier = 'vip_lifetime';
+            this.premiumStatusCache.hasPremiumAccess = true;
             this.premiumStatusCache.lastUpdate = Date.now();
+
+            // Save to persistent storage
+            await this.saveCacheToStorage();
+
             return 'vip_lifetime';
           }
         }
@@ -703,9 +893,12 @@ class SubscriptionService {
         tier = 'free';
       }
 
-      // Cache the result
+      // Cache the result (in-memory and persistent storage)
       this.premiumStatusCache.tier = tier;
       this.premiumStatusCache.lastUpdate = Date.now();
+
+      // Save to AsyncStorage for persistence
+      await this.saveCacheToStorage();
 
       return tier;
     } catch (error) {

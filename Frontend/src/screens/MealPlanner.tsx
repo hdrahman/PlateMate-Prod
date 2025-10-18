@@ -58,6 +58,7 @@ import { NutritionGoals, calculateNutritionGoals, getDefaultNutritionGoals } fro
 import { UserProfile } from '../types/user';
 import { useFoodLog } from '../context/FoodLogContext';
 import SubscriptionManager from '../utils/SubscriptionManager';
+import SubscriptionService from '../services/SubscriptionService';
 import { BlurView } from 'expo-blur';
 
 // Define color constants for consistent theming
@@ -523,7 +524,23 @@ export default function MealPlanner() {
             checkPremiumAccess();
         }
     }, [user]);
-    
+
+    // Listen for subscription changes and re-check premium access
+    useEffect(() => {
+        const handleSubscriptionChange = () => {
+            console.log('📢 MealPlanner: Subscription status changed, re-checking premium access');
+            checkPremiumAccess();
+        };
+
+        // Add listener for subscription changes
+        SubscriptionService.addSubscriptionChangeListener(handleSubscriptionChange);
+
+        // Cleanup listener on unmount
+        return () => {
+            SubscriptionService.removeSubscriptionChangeListener(handleSubscriptionChange);
+        };
+    }, []);
+
     // Re-load recipes when premium access changes
     useEffect(() => {
         if (!isCheckingAccess) {

@@ -41,6 +41,7 @@ import {
   getCurrentUserId
 } from '../utils/database';
 import SubscriptionManager from '../utils/SubscriptionManager';
+import SubscriptionService from '../services/SubscriptionService';
 import PremiumFeatureCard from '../components/PremiumFeatureCard';
 
 // Get IP and port from the BACKEND_URL
@@ -323,6 +324,30 @@ export default function Chatbot() {
       handleNutritionAnalysis(params.nutritionData, params.nutritionAnalysisPrompt);
     }
   }, [route.params]);
+
+  // Listen for subscription changes and update UI accordingly
+  useEffect(() => {
+    const handleSubscriptionChange = () => {
+      console.log('📢 Chatbot: Subscription status changed');
+
+      // Hide premium card if it's currently showing
+      if (showPremiumCard) {
+        setShowPremiumCard(false);
+        console.log('✅ Chatbot: Premium card hidden after subscription change');
+      }
+
+      // If user had premium denied but now has access, they can try enabling context again
+      // The next time they click "Enable", it will check fresh subscription status
+    };
+
+    // Add listener for subscription changes
+    SubscriptionService.addSubscriptionChangeListener(handleSubscriptionChange);
+
+    // Cleanup listener on unmount
+    return () => {
+      SubscriptionService.removeSubscriptionChangeListener(handleSubscriptionChange);
+    };
+  }, [showPremiumCard]);
 
   const handleNutritionAnalysis = async (nutritionData: any, customPrompt?: string) => {
     try {

@@ -1,10 +1,10 @@
 import { NavigationProp } from '@react-navigation/native';
-import { AppState, AppStateStatus } from 'react-native';
 import SubscriptionService from '../services/SubscriptionService';
 
-// SECURITY: This SubscriptionManager now only uses RevenueCat as source of truth
-// All local trial logic and AsyncStorage manipulation has been removed for security
-// Uses 24-hour cache with event-driven invalidation for optimal UX
+// Business logic layer for subscription management
+// Delegates all data fetching to SubscriptionService (single source of truth)
+// Handles navigation, alerts, and feature access gates
+// SECURITY: Server-side validation enforced on actual feature usage
 
 export interface SubscriptionStatus {
   tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
@@ -17,130 +17,55 @@ export interface SubscriptionStatus {
 
 class SubscriptionManager {
   private static instance: SubscriptionManager;
-  private cachedStatus: SubscriptionStatus | null = null;
-  private lastCacheUpdate: number = 0;
-  private cacheValidityMs = 24 * 60 * 60 * 1000; // 24 hours - event-driven invalidation handles changes
-  private appStateListener: any = null;
-
-  // Track pending requests to prevent duplicates
-  private pendingRequest: Promise<SubscriptionStatus> | null = null;
 
   static getInstance(): SubscriptionManager {
     if (!SubscriptionManager.instance) {
       SubscriptionManager.instance = new SubscriptionManager();
-      SubscriptionManager.instance.setupAppStateListener();
     }
     return SubscriptionManager.instance;
   }
 
-  // Set up app state listener for smart cache refresh on app foreground
-  private setupAppStateListener(): void {
-    if (this.appStateListener) return;
 
-    this.appStateListener = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        // App came to foreground - check if cache is stale (older than 1 hour)
-        const now = Date.now();
-        const cacheAge = now - this.lastCacheUpdate;
-        const oneHour = 60 * 60 * 1000;
-
-        if (this.cachedStatus && cacheAge > oneHour) {
-          console.log('🔄 App foregrounded with stale cache (>1h), refreshing...');
-          // Clear cache to force refresh on next call
-          this.clearCache();
-        } else if (this.cachedStatus) {
-          console.log('✅ App foregrounded, cache still fresh');
-        }
-      }
-    });
-
-    console.log('✅ App state listener set up for smart cache refresh');
-  }
-
-  // Get current subscription status from RevenueCat only - SECURE IMPLEMENTATION
+  // Get current subscription status - delegates to SubscriptionService (single source of truth)
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
-    const now = Date.now();
-
-    // Return cached status if still valid
-    if (this.cachedStatus && (now - this.lastCacheUpdate) < this.cacheValidityMs) {
-      console.log('📦 Returning cached subscription status');
-      return this.cachedStatus;
-    }
-
-    // If a request is already in flight, wait for it instead of making a new one
-    if (this.pendingRequest) {
-      console.log('⏳ Subscription request already in progress, waiting for result...');
-      return this.pendingRequest;
-    }
-
-    // Make the request and track it to prevent duplicates
-    console.log('🔄 Fetching fresh subscription status from backend/RevenueCat');
-    this.pendingRequest = this.fetchSubscriptionStatus();
-
     try {
-      const status = await this.pendingRequest;
-      return status;
-    } finally {
-      // Clear pending request when done (success or failure)
-      this.pendingRequest = null;
-    }
-  }
-
-  // Separate method for actual fetching logic
-  private async fetchSubscriptionStatus(): Promise<SubscriptionStatus> {
-    const now = Date.now();
-
-    try {
-      // ONLY source: RevenueCat - tamper-proof subscription status
+      // Delegate to SubscriptionService - it handles all caching
       const [tier, hasPremiumAccess, trialStatus] = await Promise.all([
         SubscriptionService.getSubscriptionTier(),
         SubscriptionService.hasPremiumAccess(),
         SubscriptionService.getTrialStatus()
       ]);
 
-      this.cachedStatus = {
+      return {
         tier,
         hasPremiumAccess,
         isInTrial: trialStatus.isInTrial,
         daysRemaining: trialStatus.daysRemaining,
         canExtendTrial: trialStatus.canExtendTrial,
       };
-
-      this.lastCacheUpdate = now;
-      console.log('✅ Subscription status updated and cached');
-      return this.cachedStatus;
     } catch (error) {
-      console.error('❌ Error getting subscription status from RevenueCat:', error);
+      console.error('❌ Error getting subscription status:', error);
 
       // Return safe default for free user
-      const fallbackStatus: SubscriptionStatus = {
+      return {
         tier: 'free',
         hasPremiumAccess: false,
         isInTrial: false,
         daysRemaining: 0,
         canExtendTrial: false,
       };
-
-      return fallbackStatus;
     }
   }
 
-
-  // Clear cache to force refresh
-  clearCache(): void {
-    this.cachedStatus = null;
-    this.lastCacheUpdate = 0;
-  }
-
-  // Check if user can access premium features - SECURE with caching
+  // Check if user can access premium features - delegates to SubscriptionService
   async canAccessPremiumFeature(): Promise<boolean> {
     try {
-      // Use cached subscription status if available (5-minute cache)
-      const status = await this.getSubscriptionStatus();
+      // Delegate directly to SubscriptionService - it handles all caching
+      const hasPremiumAccess = await SubscriptionService.hasPremiumAccess();
 
-      console.log('🔒 SECURE: Premium access check from cache:', status.hasPremiumAccess);
+      console.log('🔒 SECURE: Premium access check:', hasPremiumAccess);
 
-      return status.hasPremiumAccess;
+      return hasPremiumAccess;
     } catch (error) {
       console.error('❌ Error checking premium access:', error);
       return false; // Fail securely - deny access on error
@@ -458,8 +383,9 @@ class SubscriptionManager {
     try {
       console.log('🚀 Initializing SubscriptionManager for user:', userId);
 
-      // Clear any stale cache
-      this.clearCache();
+      // Set up subscription change listener from SubscriptionService
+      // This allows us to react to subscription changes (e.g., show notifications)
+      this.setupSubscriptionChangeListener();
 
       console.log('✅ SubscriptionManager initialized successfully');
 
@@ -468,8 +394,15 @@ class SubscriptionManager {
     }
   }
 
-
-
+  // Set up listener for subscription changes from SubscriptionService
+  private setupSubscriptionChangeListener(): void {
+    // Listen for subscription changes from SubscriptionService
+    SubscriptionService.addSubscriptionChangeListener(() => {
+      console.log('📢 SubscriptionManager: Received subscription change event from SubscriptionService');
+      // No cache to clear - we always delegate to SubscriptionService
+      // This listener is kept for future use (e.g., showing notifications to users)
+    });
+  }
 
 
 

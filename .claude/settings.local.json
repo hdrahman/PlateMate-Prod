@@ -1,16 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(while read file)",
-      "Bash(do echo \"=== $file ===\")",
-      "Bash(done)",
-      "Bash(npx tsc:*)",
-      "Bash(dir:*)",
-      "Bash(findstr:*)",
-      "mcp__supabase__get_advisors",
-      "mcp__supabase__list_tables",
-      "mcp__supabase__apply_migration",
-      "Bash(ls -la \"C:\\Platemate\\PlateMate-Prod\\Frontend\"\" | grep -E \"^d \")"
+      "mcp__revenuecat__mcp_RC_get_project",
+      "mcp__supabase__search_docs",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

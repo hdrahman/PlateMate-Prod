@@ -33,9 +33,9 @@ async def check_vip_status(firebase_uid: str) -> dict:
     """
     Check if user is a VIP (gets free lifetime premium access)
     VIPs are managed via Supabase dashboard - insert into vip_users table
-    
-    Uses Redis caching with 5-minute TTL to minimize database queries
-    
+
+    Uses Redis caching with 24-hour TTL to minimize database queries (matches frontend cache)
+
     Returns:
         dict with keys: is_vip (bool), reason (str), granted_at (str)
     """
@@ -77,9 +77,10 @@ async def check_vip_status(firebase_uid: str) -> dict:
         else:
             logger.info(f"❌ No VIP record found for {firebase_uid}")
         
-        # Step 4: Cache the result (5 minute TTL)
-        await redis.set(cache_key, json.dumps(vip_result), ex=300)
-        logger.info(f"💾 VIP status cached for {firebase_uid} (TTL: 5 minutes)")
+        # Step 4: Cache the result (24 hour TTL - matches frontend cache)
+        cache_ttl_seconds = 24 * 60 * 60  # 24 hours
+        await redis.set(cache_key, json.dumps(vip_result), ex=cache_ttl_seconds)
+        logger.info(f"💾 VIP status cached for {firebase_uid} (TTL: 24 hours)")
         
         return vip_result
         
@@ -369,7 +370,17 @@ async def update_subscription_from_webhook(
         
         conn.commit()
         logger.info(f"Updated subscription for user {user_id} to status {status}")
-        
+
+        # CACHE INVALIDATION: Clear VIP cache to ensure immediate updates
+        # This ensures frontend immediately sees subscription changes via event-driven system
+        try:
+            redis = await get_redis()
+            cache_key = f"vip_status:{app_user_id}"
+            await redis.delete(cache_key)
+            logger.info(f"🗑️ Webhook: VIP cache invalidated for {app_user_id} after subscription change")
+        except Exception as cache_error:
+            logger.warning(f"⚠️ Failed to invalidate cache in webhook (non-critical): {cache_error}")
+
     except Exception as e:
         logger.error(f"Error updating subscription from webhook: {str(e)}")
         raise
