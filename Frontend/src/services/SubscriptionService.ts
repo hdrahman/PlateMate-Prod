@@ -273,14 +273,6 @@ class SubscriptionService {
 
         // Clear cache immediately to fetch fresh status
         this.clearCache();
-
-        // Also clear SubscriptionManager cache
-        try {
-          const SubscriptionManager = require('../utils/SubscriptionManager').default;
-          SubscriptionManager.clearCache();
-        } catch (error) {
-          console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
-        }
       });
 
       this.revenueCatListenerAdded = true;
@@ -315,14 +307,6 @@ class SubscriptionService {
 
             // Clear cache immediately to reflect VIP status change
             this.clearCache();
-
-            // Also clear SubscriptionManager cache
-            try {
-              const SubscriptionManager = require('../utils/SubscriptionManager').default;
-              SubscriptionManager.clearCache();
-            } catch (error) {
-              console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
-            }
           }
         )
         .subscribe((status) => {
@@ -377,14 +361,6 @@ class SubscriptionService {
       console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
       this.clearCache();
 
-      // Also clear SubscriptionManager cache
-      try {
-        const SubscriptionManager = require('../utils/SubscriptionManager').default;
-        SubscriptionManager.clearCache();
-      } catch (error) {
-        console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
-      }
-
       return { customerInfo, productIdentifier };
     } catch (error) {
       console.error('❌ Purchase failed:', error);
@@ -410,14 +386,6 @@ class SubscriptionService {
       console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
       this.clearCache();
 
-      // Also clear SubscriptionManager cache
-      try {
-        const SubscriptionManager = require('../utils/SubscriptionManager').default;
-        SubscriptionManager.clearCache();
-      } catch (error) {
-        console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
-      }
-
       return { customerInfo, productIdentifier: purchasedProductId };
     } catch (error) {
       console.error('❌ Purchase failed:', error);
@@ -433,14 +401,6 @@ class SubscriptionService {
       // Clear cache to reflect restored purchases immediately
       console.log('🔄 Purchases restored - invalidating cache for immediate refresh');
       this.clearCache();
-
-      // Also clear SubscriptionManager cache
-      try {
-        const SubscriptionManager = require('../utils/SubscriptionManager').default;
-        SubscriptionManager.clearCache();
-      } catch (error) {
-        console.warn('⚠️ Could not clear SubscriptionManager cache:', error);
-      }
 
       return customerInfo;
     } catch (error) {
