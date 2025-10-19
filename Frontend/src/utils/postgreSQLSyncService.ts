@@ -1073,10 +1073,14 @@ class PostgreSQLSyncService {
 
     private async restoreFoodLogs(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
+            // Get local user profile to get the correct local user_id
+            const localProfile = await getUserProfileByFirebaseUid(firebaseUid);
+            const localUserId = localProfile?.id || 1; // Fallback to 1 if profile not found
+
             const { data: rawFoodLogs, error } = await supabase
                 .from('food_logs')
                 .select('*')
-                .eq('user_id', postgresUserId)
+                .eq('user_id', firebaseUid)
                 .order('date', { ascending: false })
                 .limit(100);
 
@@ -1089,7 +1093,7 @@ class PostgreSQLSyncService {
                 try {
                     const foodLogData = {
                         meal_id: foodLog.meal_id,
-                        user_id: 1, // Local SQLite user ID
+                        user_id: localUserId, // Use actual local SQLite user ID
                         food_name: foodLog.food_name,
                         brand_name: foodLog.brand_name,
                         meal_type: foodLog.meal_type,

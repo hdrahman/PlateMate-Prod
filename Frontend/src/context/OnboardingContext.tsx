@@ -15,6 +15,7 @@ import {
     ensureDatabaseReady
 } from '../utils/database';
 import supabaseAuth from '../utils/supabaseAuth';
+import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
 
 interface OnboardingContextType {
     // Basic onboarding state
@@ -408,6 +409,11 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             try {
                 setIsLoading(true);
 
+                // Periodic cleanup of old temp sessions (non-blocking)
+                cleanupOldTempOnboardingSessions().catch(err =>
+                    console.warn('⚠️ Failed to cleanup old temp sessions:', err)
+                );
+
                 if (user && user.id) {
                     // Fast SQLite lookup only - no network calls, no retries
                     console.log('⚡ Fast onboarding: Checking SQLite for user profile...');
@@ -615,10 +621,43 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             const profileId = await addUserProfile(profileData);
             console.log('✅ Profile saved successfully with ID:', profileId);
 
+            // CRITICAL: Immediately backup to Supabase after onboarding completion
+            // This ensures data is backed up even if user uninstalls or loses device
+            console.log('☁️ Starting immediate backup to Supabase...');
+            try {
+                // Attempt immediate sync with timeout
+                const syncPromise = postgreSQLSyncService.syncToPostgreSQL();
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Sync timeout')), 30000) // 30 second timeout
+                );
+
+                const syncResult = await Promise.race([syncPromise, timeoutPromise]);
+
+                if (syncResult.success) {
+                    console.log('✅ Immediate backup to Supabase completed successfully:', syncResult.stats);
+                } else {
+                    console.warn('⚠️ Immediate backup completed with errors:', syncResult.errors);
+                    // Don't throw - continue with onboarding even if backup had issues
+                }
+            } catch (backupError) {
+                // Log the error but don't block onboarding completion
+                console.error('⚠️ Immediate backup failed (will retry later):', backupError);
+                // The regular sync service will retry later
+            }
+
             // Mark onboarding as complete immediately
             setOnboardingComplete(true);
             setJustCompletedOnboarding(true);
             setCurrentStep(totalSteps);
+
+            // Clean up temp onboarding sessions after successful completion
+            try {
+                await cleanupOldTempOnboardingSessions();
+                console.log('🧹 Cleaned up old temp onboarding sessions');
+            } catch (cleanupError) {
+                console.warn('⚠️ Failed to cleanup temp sessions:', cleanupError);
+                // Don't throw - this is just cleanup
+            }
 
             console.log('🎉 Onboarding completed successfully!');
 
