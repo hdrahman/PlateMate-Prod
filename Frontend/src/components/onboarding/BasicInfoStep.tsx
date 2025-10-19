@@ -85,6 +85,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             minLength: boolean;
             hasUppercase: boolean;
             hasLowercase: boolean;
+            hasNumber: boolean;
             hasSpecialChar: boolean;
         }
     } => {
@@ -92,6 +93,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             minLength: password.length >= 8,
             hasUppercase: /[A-Z]/.test(password),
             hasLowercase: /[a-z]/.test(password),
+            hasNumber: /[0-9]/.test(password),
             hasSpecialChar: /[^A-Za-z0-9]/.test(password),
         };
 
@@ -99,6 +101,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
         if (!checks.minLength) errors.push('At least 8 characters');
         if (!checks.hasUppercase) errors.push('One uppercase letter');
         if (!checks.hasLowercase) errors.push('One lowercase letter');
+        if (!checks.hasNumber) errors.push('One number');
         if (!checks.hasSpecialChar) errors.push('One special character');
 
         return {
@@ -249,6 +252,10 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                             <PasswordRequirement
                                 text="One lowercase letter"
                                 met={validatePassword(password).checks.hasLowercase}
+                            />
+                            <PasswordRequirement
+                                text="One number"
+                                met={validatePassword(password).checks.hasNumber}
                             />
                             <PasswordRequirement
                                 text="One special character (!@#$%^&*)"
