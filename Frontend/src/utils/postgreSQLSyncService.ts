@@ -36,6 +36,7 @@ export interface SyncStats {
     nutritionGoalsUploaded: number;
     subscriptionsUploaded: number;
     cheatDaySettingsUploaded: number;
+    userSettingsUploaded: number;
     totalErrors: number;
     lastSyncTime: string;
 }
@@ -54,6 +55,7 @@ export interface RestoreStats {
     nutritionGoalsRestored: number;
     subscriptionsRestored: number;
     cheatDaySettingsRestored: number;
+    userSettingsRestored: number;
     totalErrors: number;
 }
 
@@ -291,6 +293,7 @@ class PostgreSQLSyncService {
                     nutritionGoalsUploaded: 0,
                     subscriptionsUploaded: 0,
                     cheatDaySettingsUploaded: 0,
+                    userSettingsUploaded: 0,
                     totalErrors: 1,
                     lastSyncTime: new Date().toISOString()
                 },
@@ -308,6 +311,7 @@ class PostgreSQLSyncService {
             nutritionGoalsUploaded: 0,
             subscriptionsUploaded: 0,
             cheatDaySettingsUploaded: 0,
+            userSettingsUploaded: 0,
             totalErrors: 0,
             lastSyncTime: new Date().toISOString()
         };
@@ -340,6 +344,9 @@ class PostgreSQLSyncService {
 
             // 7. Sync Cheat Day Settings
             await this.syncCheatDaySettings(currentUser.id, stats, errors);
+
+            // 8. Sync User Settings
+            await this.syncUserSettings(currentUser.id, stats, errors);
 
             this.lastSyncTime = new Date();
             stats.totalErrors = errors.length;
@@ -494,7 +501,7 @@ class PostgreSQLSyncService {
             for (const foodLog of unsyncedFoodLogs) {
                 try {
                     const foodLogData = {
-                        user_id: postgresUserId,
+                        user_id: firebaseUid,
                         meal_id: Number(foodLog.meal_id),
                         food_name: String(foodLog.food_name),
                         brand_name: foodLog.brand_name ? String(foodLog.brand_name) : null,
@@ -559,7 +566,7 @@ class PostgreSQLSyncService {
             for (const weight of unsyncedWeights) {
                 try {
                     const weightData = {
-                        user_id: postgresUserId,
+                        firebase_uid: firebaseUid,
                         weight: Number(weight.weight),
                         recorded_at: String(weight.recorded_at)
                     };
@@ -809,6 +816,37 @@ class PostgreSQLSyncService {
         }
     }
 
+    private async syncUserSettings(firebaseUid: string, stats: SyncStats, errors: string[]) {
+        try {
+            // User settings are not stored in SQLite locally, but we need to ensure they exist in Supabase
+            // Check if user_settings exists in Supabase
+            const { data: existingSettings } = await supabase
+                .from('user_settings')
+                .select('id')
+                .eq('firebase_uid', firebaseUid)
+                .single();
+
+            if (!existingSettings) {
+                // Create default user settings if they don't exist
+                const { error } = await supabase
+                    .from('user_settings')
+                    .insert({
+                        firebase_uid: firebaseUid,
+                        notification_settings: {},
+                        data_sharing_settings: {},
+                        privacy_settings: {},
+                        ui_preferences: {}
+                    });
+
+                if (error) throw error;
+                stats.userSettingsUploaded++;
+            }
+        } catch (error: any) {
+            console.error('Error syncing user settings:', error);
+            errors.push(`User settings sync error: ${error.message}`);
+        }
+    }
+
     // Restore data from PostgreSQL to SQLite (Backup)
     async restoreFromPostgreSQL(): Promise<RestoreResult> {
         const errors: string[] = [];
@@ -820,6 +858,7 @@ class PostgreSQLSyncService {
             nutritionGoalsRestored: 0,
             subscriptionsRestored: 0,
             cheatDaySettingsRestored: 0,
+            userSettingsRestored: 0,
             totalErrors: 0
         };
 
@@ -859,6 +898,9 @@ class PostgreSQLSyncService {
 
             // 7. Restore Cheat Day Settings
             await this.restoreCheatDaySettings(currentUser.id, postgresUserId, stats, errors);
+
+            // 8. Restore User Settings
+            await this.restoreUserSettings(currentUser.id, postgresUserId, stats, errors);
 
             stats.totalErrors = errors.length;
 
@@ -979,7 +1021,7 @@ class PostgreSQLSyncService {
     private async restoreNutritionGoals(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
             console.log('🔄 Attempting to restore nutrition goals for user:', firebaseUid);
-            
+
             const { data: goals, error } = await supabase
                 .from('nutrition_goals')
                 .select('*')
@@ -1208,6 +1250,43 @@ class PostgreSQLSyncService {
         } catch (error: any) {
             console.error('Error restoring cheat day settings:', error);
             errors.push(`Cheat day settings restore error: ${error.message}`);
+        }
+    }
+
+    private async restoreUserSettings(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
+        try {
+            const { data: settings, error } = await supabase
+                .from('user_settings')
+                .select('*')
+                .eq('firebase_uid', firebaseUid)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    // Settings don't exist in Supabase, create default ones
+                    const { error: insertError } = await supabase
+                        .from('user_settings')
+                        .insert({
+                            firebase_uid: firebaseUid,
+                            notification_settings: {},
+                            data_sharing_settings: {},
+                            privacy_settings: {},
+                            ui_preferences: {}
+                        });
+
+                    if (insertError) throw insertError;
+                    stats.userSettingsRestored++;
+                    return;
+                }
+                throw error;
+            }
+
+            // User settings exist, they're now available
+            stats.userSettingsRestored++;
+
+        } catch (error: any) {
+            console.error('Error restoring user settings:', error);
+            errors.push(`User settings restore error: ${error.message}`);
         }
     }
 

@@ -4178,11 +4178,19 @@ const convertFrontendProfileToSQLiteFormatHelper = (frontendProfile: any, fireba
         activity_level: frontendProfile.activityLevel,
         target_weight: frontendProfile.targetWeight,
         starting_weight: frontendProfile.startingWeight,
-        dietary_restrictions: JSON.stringify(frontendProfile.dietaryRestrictions || []),
-        food_allergies: JSON.stringify(frontendProfile.foodAllergies || []),
-        cuisine_preferences: JSON.stringify(frontendProfile.cuisinePreferences || []),
+        dietary_restrictions: Array.isArray(frontendProfile.dietaryRestrictions)
+            ? frontendProfile.dietaryRestrictions.join(',')
+            : (frontendProfile.dietaryRestrictions || ''),
+        food_allergies: Array.isArray(frontendProfile.foodAllergies)
+            ? frontendProfile.foodAllergies.join(',')
+            : (frontendProfile.foodAllergies || ''),
+        cuisine_preferences: Array.isArray(frontendProfile.cuisinePreferences)
+            ? frontendProfile.cuisinePreferences.join(',')
+            : (frontendProfile.cuisinePreferences || ''),
         spice_tolerance: frontendProfile.spiceTolerance,
-        health_conditions: JSON.stringify(frontendProfile.healthConditions || []),
+        health_conditions: Array.isArray(frontendProfile.healthConditions)
+            ? frontendProfile.healthConditions.join(',')
+            : (frontendProfile.healthConditions || ''),
         fitness_goal: frontendProfile.fitnessGoal,
         weight_goal: frontendProfile.weightGoal,
         daily_calorie_target: frontendProfile.dailyCalorieTarget,
@@ -4211,7 +4219,9 @@ const convertFrontendProfileToSQLiteFormatHelper = (frontendProfile: any, fireba
         sleep_quality: frontendProfile.sleepQuality || '',
         stress_level: frontendProfile.stressLevel || '',
         eating_pattern: frontendProfile.eatingPattern || '',
-        motivations: JSON.stringify(frontendProfile.motivations || []),
+        motivations: Array.isArray(frontendProfile.motivations)
+            ? frontendProfile.motivations.join(',')
+            : (frontendProfile.motivations || ''),
         why_motivation: frontendProfile.whyMotivation || '',
         projected_completion_date: frontendProfile.projectedCompletionDate || '',
         estimated_metabolic_age: frontendProfile.estimatedMetabolicAge || 0,

@@ -201,6 +201,28 @@ const OnboardingContext = createContext<OnboardingContextType>({
     markWelcomeModalShown: () => { },
 });
 
+// Helper to safely parse array fields that might be JSON or comma-separated strings
+const safeParseArrayField = (value: any): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string') return [];
+
+    // Empty string
+    if (value.trim() === '') return [];
+
+    // JSON array format: ["item1", "item2"]
+    if (value.startsWith('[')) {
+        try {
+            return JSON.parse(value);
+        } catch {
+            return [];
+        }
+    }
+
+    // Comma-separated format: "item1,item2"
+    return value.split(',').map(s => s.trim()).filter(s => s !== '');
+};
+
 // Helper to convert SQLite profile to frontend format
 const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile => {
     if (!sqliteProfile) return defaultProfile;
@@ -218,18 +240,14 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         gender: sqliteProfile.gender,
         activityLevel: sqliteProfile.activity_level,
         unitPreference: sqliteProfile.unit_preference || 'metric',
-        dietaryRestrictions: sqliteProfile.dietary_restrictions ?
-            (typeof sqliteProfile.dietary_restrictions === 'string' ? JSON.parse(sqliteProfile.dietary_restrictions) : sqliteProfile.dietary_restrictions) : [],
-        foodAllergies: sqliteProfile.food_allergies ?
-            (typeof sqliteProfile.food_allergies === 'string' ? JSON.parse(sqliteProfile.food_allergies) : sqliteProfile.food_allergies) : [],
-        cuisinePreferences: sqliteProfile.cuisine_preferences ?
-            (typeof sqliteProfile.cuisine_preferences === 'string' ? JSON.parse(sqliteProfile.cuisine_preferences) : sqliteProfile.cuisine_preferences) : [],
+        dietaryRestrictions: safeParseArrayField(sqliteProfile.dietary_restrictions),
+        foodAllergies: safeParseArrayField(sqliteProfile.food_allergies),
+        cuisinePreferences: safeParseArrayField(sqliteProfile.cuisine_preferences),
         spiceTolerance: sqliteProfile.spice_tolerance,
         weightGoal: sqliteProfile.weight_goal,
         targetWeight: sqliteProfile.target_weight,
         startingWeight: sqliteProfile.starting_weight,
-        healthConditions: sqliteProfile.health_conditions ?
-            (typeof sqliteProfile.health_conditions === 'string' ? JSON.parse(sqliteProfile.health_conditions) : sqliteProfile.health_conditions) : [],
+        healthConditions: safeParseArrayField(sqliteProfile.health_conditions),
         fitnessGoal: sqliteProfile.fitness_goal,
         dailyCalorieTarget: sqliteProfile.daily_calorie_target,
         nutrientFocus: sqliteProfile.nutrient_focus ?
@@ -237,9 +255,7 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         sleepQuality: sqliteProfile.sleep_quality,
         stressLevel: sqliteProfile.stress_level,
         eatingPattern: sqliteProfile.eating_pattern,
-        motivations: sqliteProfile.motivations ?
-            (typeof sqliteProfile.motivations === 'string' ? sqliteProfile.motivations.split(',') :
-                (Array.isArray(sqliteProfile.motivations) ? sqliteProfile.motivations : [sqliteProfile.motivations])) : [],
+        motivations: safeParseArrayField(sqliteProfile.motivations),
         whyMotivation: sqliteProfile.why_motivation,
         stepGoal: sqliteProfile.step_goal,
         waterGoal: sqliteProfile.water_goal,
@@ -301,7 +317,9 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         sleep_quality: frontendProfile.sleepQuality,
         stress_level: frontendProfile.stressLevel,
         eating_pattern: frontendProfile.eatingPattern,
-        motivations: frontendProfile.motivations ? JSON.stringify(frontendProfile.motivations) : null,
+        motivations: Array.isArray(frontendProfile.motivations)
+            ? frontendProfile.motivations.join(',')
+            : (frontendProfile.motivations || null),
         why_motivation: frontendProfile.whyMotivation,
         step_goal: frontendProfile.stepGoal,
         water_goal: frontendProfile.waterGoal,
