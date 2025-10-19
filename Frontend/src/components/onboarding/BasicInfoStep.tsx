@@ -20,6 +20,20 @@ interface BasicInfoStepProps {
     onNext: () => void;
 }
 
+// Password requirement indicator component
+const PasswordRequirement: React.FC<{ text: string; met: boolean }> = ({ text, met }) => (
+    <View style={styles.requirementRow}>
+        <Ionicons
+            name={met ? "checkmark-circle" : "close-circle"}
+            size={16}
+            color={met ? "#4ade80" : "#888"}
+        />
+        <Text style={[styles.requirementText, met && styles.requirementMet]}>
+            {text}
+        </Text>
+    </View>
+);
+
 const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, onNext }) => {
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [email, setEmail] = useState('');
@@ -27,6 +41,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
     const [age, setAge] = useState(profile.age?.toString() || '');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [passwordTouched, setPasswordTouched] = useState(false);
 
     // Only prefill email from Supabase if profile.email is empty
     useEffect(() => {
@@ -63,6 +78,36 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
         return emailRegex.test(email);
     };
 
+    const validatePassword = (password: string): {
+        isValid: boolean;
+        errors: string[];
+        checks: {
+            minLength: boolean;
+            hasUppercase: boolean;
+            hasLowercase: boolean;
+            hasSpecialChar: boolean;
+        }
+    } => {
+        const checks = {
+            minLength: password.length >= 8,
+            hasUppercase: /[A-Z]/.test(password),
+            hasLowercase: /[a-z]/.test(password),
+            hasSpecialChar: /[^A-Za-z0-9]/.test(password),
+        };
+
+        const errors: string[] = [];
+        if (!checks.minLength) errors.push('At least 8 characters');
+        if (!checks.hasUppercase) errors.push('One uppercase letter');
+        if (!checks.hasLowercase) errors.push('One lowercase letter');
+        if (!checks.hasSpecialChar) errors.push('One special character');
+
+        return {
+            isValid: Object.values(checks).every(check => check),
+            errors,
+            checks
+        };
+    };
+
     const validateAge = (ageStr: string): boolean => {
         const ageNum = parseInt(ageStr);
         return !isNaN(ageNum) && ageNum >= 13 && ageNum <= 120;
@@ -79,8 +124,12 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
             return;
         }
 
-        if (!password || password.length < 6) {
-            Alert.alert('Invalid Password', 'Password must be at least 6 characters long');
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            Alert.alert(
+                'Invalid Password',
+                `Your password must have:\n${passwordValidation.errors.map(e => `• ${e}`).join('\n')}`
+            );
             return;
         }
 
@@ -168,10 +217,11 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                     <View style={styles.inputContainer}>
                         <TextInput
                             style={[styles.input, styles.passwordInput]}
-                            placeholder="Enter your password (min. 6 characters)"
+                            placeholder="Enter your password"
                             placeholderTextColor="#666"
                             value={password}
                             onChangeText={setPassword}
+                            onFocus={() => setPasswordTouched(true)}
                             secureTextEntry={!showPassword}
                             autoCapitalize="none"
                         />
@@ -186,7 +236,26 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                             />
                         </TouchableOpacity>
                     </View>
-                    <Text style={styles.hint}>This will be used to create your account when you subscribe</Text>
+                    {passwordTouched && (
+                        <View style={styles.passwordRequirements}>
+                            <PasswordRequirement
+                                text="At least 8 characters"
+                                met={validatePassword(password).checks.minLength}
+                            />
+                            <PasswordRequirement
+                                text="One uppercase letter"
+                                met={validatePassword(password).checks.hasUppercase}
+                            />
+                            <PasswordRequirement
+                                text="One lowercase letter"
+                                met={validatePassword(password).checks.hasLowercase}
+                            />
+                            <PasswordRequirement
+                                text="One special character (!@#$%^&*)"
+                                met={validatePassword(password).checks.hasSpecialChar}
+                            />
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -331,6 +400,27 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: 16,
         top: 16,
+    },
+    passwordRequirements: {
+        marginTop: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    requirementRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    requirementText: {
+        color: '#888',
+        fontSize: 13,
+        marginLeft: 8,
+    },
+    requirementMet: {
+        color: '#4ade80',
     },
 });
 
