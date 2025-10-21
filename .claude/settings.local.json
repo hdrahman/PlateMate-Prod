@@ -13,7 +13,8 @@
       "Bash(if exist build rd /s /q build)",
       "Bash(if exist appbuild rd /s /q appbuild)",
       "Bash(if exist ..node_modulesreact-native-workletsandroidbuild rd /s /q ..node_modulesreact-native-workletsandroidbuild)",
-      "Bash(./gradlew clean)"
+      "Bash(./gradlew clean)",
+      "Bash(npm run validate:*)"
     ],
     "deny": [],
     "ask": []

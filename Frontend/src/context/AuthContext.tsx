@@ -243,108 +243,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
                         setIsRestoringData(true); // Show loading screen while restoring
 
-                    // Retry configuration
-                    const MAX_RETRIES = 10;
-                    const BASE_DELAY_MS = 2000; // Start with 2 seconds
-                    const MAX_DELAY_MS = 30000; // Cap at 30 seconds
-                    let retryCount = 0;
+                        // Function to ping server to wake it up (for Render free tier)
+                        const wakeUpServer = async (): Promise<boolean> => {
+                            try {
+                                console.log('📡 Pinging server to wake it up...');
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-                    // Function to ping server to wake it up (for Render free tier)
-                    const wakeUpServer = async (): Promise<boolean> => {
-                        try {
-                            console.log('📡 Pinging server to wake it up...');
-                            const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                                const response = await fetch(`${BACKEND_URL}/health`, {
+                                    method: 'GET',
+                                    signal: controller.signal,
+                                });
 
-                            const response = await fetch(`${BACKEND_URL}/health`, {
-                                method: 'GET',
-                                signal: controller.signal,
-                            });
-
-                            clearTimeout(timeoutId);
-                            console.log(`✅ Server responded with status: ${response.status}`);
-                            return response.ok;
-                        } catch (error) {
-                            console.log('⚠️ Server ping failed (may be waking up):', error.message);
-                            return false;
-                        }
-                    };
-
-                    // Helper function to add timeout to restore operation
-                    const restoreWithTimeout = async (timeoutMs: number = 60000) => {
-                        return Promise.race([
-                            postgreSQLSyncService.restoreFromPostgreSQL(),
-                            new Promise<any>((_, reject) =>
-                                setTimeout(() => reject(new Error('Restore operation timed out')), timeoutMs)
-                            )
-                        ]);
-                    };
-
-                    // Retry loop with exponential backoff
-                    while (retryCount < MAX_RETRIES) {
-                        try {
-                            console.log(`🔄 Restore attempt ${retryCount + 1}/${MAX_RETRIES}...`);
-
-                            // On first attempt, ping the server to wake it up
-                            if (retryCount === 0) {
-                                await wakeUpServer();
-                                // Wait a bit for server to fully wake up
-                                await new Promise(resolve => setTimeout(resolve, 3000));
+                                clearTimeout(timeoutId);
+                                console.log(`✅ Server responded with status: ${response.status}`);
+                                return response.ok;
+                            } catch (error) {
+                                console.log('⚠️ Server ping failed (may be waking up):', error.message);
+                                return false;
                             }
+                        };
 
-                            // Use longer timeout for first attempt (server might be waking up)
-                            const timeout = retryCount === 0 ? 90000 : 60000;
-                            const restoreResult = await restoreWithTimeout(timeout);
+                        // Helper function to add 15-minute timeout to restore operation
+                        const restoreWithTimeout = async (timeoutMs: number = 900000) => {
+                            return Promise.race([
+                                postgreSQLSyncService.restoreFromPostgreSQL(),
+                                new Promise<any>((_, reject) =>
+                                    setTimeout(() => reject(new Error('Restore operation timed out after 15 minutes')), timeoutMs)
+                                )
+                            ]);
+                        };
+
+                        try {
+                            console.log('🔄 Starting PostgreSQL restore with 15-minute timeout...');
+
+                            // Ping the server to wake it up (important for Render free tier)
+                            await wakeUpServer();
+                            // Wait a bit for server to fully wake up
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+
+                            // Single restore attempt with 15-minute timeout
+                            const restoreResult = await restoreWithTimeout(900000);
 
                             if (restoreResult.success) {
                                 console.log('✅ Background: PostgreSQL restore completed successfully:', restoreResult.stats);
                                 profileRestored = true;
-                                break; // Success! Exit retry loop
                             } else {
-                                console.warn(`⚠️ Background: PostgreSQL restore attempt ${retryCount + 1} completed with errors:`, restoreResult.errors);
-
-                                // Check if errors indicate network/server issues (retry) or data issues (don't retry)
-                                const hasNetworkError = restoreResult.errors.some(err =>
-                                    err.includes('network') ||
-                                    err.includes('timeout') ||
-                                    err.includes('timed out') ||
-                                    err.includes('fetch') ||
-                                    err.includes('ECONNREFUSED') ||
-                                    err.includes('connection') ||
-                                    err.includes('ETIMEDOUT')
-                                );
-
-                                if (!hasNetworkError && retryCount > 0) {
-                                    // If it's not a network error and we've tried at least once, stop retrying
-                                    console.log('ℹ️ Non-network error detected, stopping retries');
-                                    break;
-                                }
+                                console.warn('⚠️ Background: PostgreSQL restore completed with errors:', restoreResult.errors);
                             }
                         } catch (error) {
-                            console.warn(`⚠️ Background: Restore attempt ${retryCount + 1} failed:`, error);
-
-                            // Check if it's a timeout error - these should always retry
-                            const isTimeoutError = error.message?.includes('timed out') || error.message?.includes('timeout');
-                            if (!isTimeoutError && error.message?.includes('User not found') && retryCount > 0) {
-                                // If user truly doesn't exist in Supabase, stop retrying
-                                console.log('ℹ️ User not found in Supabase, stopping retries');
-                                break;
-                            }
+                            console.error('❌ Background: PostgreSQL restore failed:', error);
                         }
-
-                        retryCount++;
-
-                        if (retryCount < MAX_RETRIES) {
-                            // Calculate exponential backoff delay
-                            const delay = Math.min(BASE_DELAY_MS * Math.pow(2, retryCount - 1), MAX_DELAY_MS);
-                            console.log(`⏳ Waiting ${delay / 1000} seconds before retry...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                        }
-                    }
-
-                    if (!profileRestored && retryCount >= MAX_RETRIES) {
-                        console.error('❌ Background: Failed to restore profile after maximum retries');
-                    }
 
                         setIsRestoringData(false); // Hide loading screen
                     }
