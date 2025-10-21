@@ -7,7 +7,13 @@
       "mcp__supabase__list_tables",
       "mcp__supabase__get_advisors",
       "mcp__supabase__execute_sql",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(npm pkg get version)",
+      "WebSearch",
+      "Bash(if exist build rd /s /q build)",
+      "Bash(if exist appbuild rd /s /q appbuild)",
+      "Bash(if exist ..node_modulesreact-native-workletsandroidbuild rd /s /q ..node_modulesreact-native-workletsandroidbuild)",
+      "Bash(./gradlew clean)"
     ],
     "deny": [],
     "ask": []

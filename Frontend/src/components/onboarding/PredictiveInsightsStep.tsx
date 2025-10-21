@@ -580,16 +580,17 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
     const { signUp } = useAuth();
     const { completeOnboarding } = useOnboarding();
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState('');
 
     const handleSubmit = async () => {
         // Automatically create account and start 15-day premium trial
         if (profile.email && profile.password) {
             setIsLoading(true);
             try {
-                console.log('Creating account with collected profile data:', profile.email);
+                console.log('🚀 Starting account creation with collected profile data:', profile.email);
 
-                // First update the profile with calculated metrics
-                await updateProfile({
+                // Prepare calculated data to pass directly (avoids React state race condition)
+                const calculatedData = {
                     dailyCalorieTarget: dailyCalories,
                     projectedCompletionDate: targetDate,
                     estimatedDurationWeeks: estimatedWeeks,
@@ -597,94 +598,110 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
                         protein: macros.protein,
                         carbs: macros.carbs,
                         fat: macros.fat,
-                    }
-                });
+                    },
+                    premium: true,
+                    trialEndDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 days from now
+                };
+
+                console.log('📊 Calculated metrics prepared:', calculatedData);
 
                 // Create the account using collected info
-                await signUp(profile.email, profile.password);
+                setLoadingMessage('Creating your account...');
+                console.log('👤 Creating user account...');
+                const displayName = `${profile.firstName} ${profile.lastName || ''}`.trim();
+                const newUser = await signUp(profile.email, profile.password, displayName);
+                console.log('✅ Account created successfully!');
+                console.log('🆔 New user UID:', newUser?.id);
+                console.log('📧 New user email:', newUser?.email);
 
-                console.log('Account created successfully');
+                // No need to wait - we have the user object directly!
+                setLoadingMessage('Saving your profile...');
+                console.log('💾 Calling completeOnboarding with user and calculated data...');
+                console.log('📋 User object being passed:', { id: newUser?.id, email: newUser?.email });
 
-                // Calculate trial end date (15 days from now)
-                const trialEndDate = new Date();
-                trialEndDate.setDate(trialEndDate.getDate() + 15);
+                // Pass user directly to avoid context race condition
+                await completeOnboarding(calculatedData, newUser);
+                console.log('✅ Onboarding completed successfully with UID:', newUser?.id);
 
-                // Auto-start 15-day premium trial
-                await updateProfile({
-                    premium: true,
-                    trialEndDate: trialEndDate.toISOString(),
-                });
+                setLoadingMessage('Finalizing setup...');
+                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UI
 
-                console.log('✅ 15-day premium trial activated:', {
-                    premium: true,
-                    trialEndDate: trialEndDate.toISOString()
-                });
-
-                // Wait for auth state to fully propagate
-                console.log('⏳ Waiting for auth state to propagate...');
-                await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-
-                // Retry mechanism for completing onboarding
-                let retryCount = 0;
-                const maxRetries = 3;
-
-                while (retryCount < maxRetries) {
-                    try {
-                        await completeOnboarding();
-                        console.log('✅ Onboarding completed successfully');
-                        break;
-                    } catch (error) {
-                        retryCount++;
-                        console.log(`⚠️ Onboarding completion attempt ${retryCount} failed:`, error);
-
-                        if (retryCount < maxRetries) {
-                            console.log(`🔄 Retrying in ${retryCount} seconds...`);
-                            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
-                        } else {
-                            throw error;
-                        }
-                    }
-                }
-
+                console.log('🎊 Onboarding flow completed successfully!');
                 onComplete();
             } catch (error) {
-                console.error('Account creation error:', error);
-                Alert.alert('Error', 'Failed to create account. Please try again.');
+                console.error('❌ Account creation/onboarding error:', error);
+                console.error('📋 Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    profileEmail: profile.email,
+                    hasPassword: !!profile.password
+                });
+
+                // Show user-friendly error message
+                let errorMessage = 'Failed to create account. ';
+                if (error.message?.includes('Missing required')) {
+                    errorMessage = 'Please complete all required profile information before continuing.';
+                } else if (error.message?.includes('already exists') || error.message?.includes('already registered')) {
+                    errorMessage = 'An account with this email already exists. Please sign in instead.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                } else {
+                    errorMessage += 'Please try again or contact support if the problem persists.';
+                }
+
+                Alert.alert('Error', errorMessage);
             } finally {
                 setIsLoading(false);
             }
         } else {
+            console.error('❌ Missing account information:', {
+                hasEmail: !!profile.email,
+                hasPassword: !!profile.password
+            });
             Alert.alert('Error', 'Missing account information. Please go back and complete your profile.');
         }
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-            {/* Header handled at screen level – removed duplicate back/progress bar */}
+        <View style={{ flex: 1 }}>
+            <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+                {/* Header handled at screen level – removed duplicate back/progress bar */}
 
-            {renderHeroCard()}
-            {renderTimelineCard()}
-            {renderNutritionCard()}
-            {renderMetricsCard()}
-            {renderCompletionCard()}
+                {renderHeroCard()}
+                {renderTimelineCard()}
+                {renderNutritionCard()}
+                {renderMetricsCard()}
+                {renderCompletionCard()}
 
-            <Animated.View style={{ opacity: fadeAnim }}>
-                <TouchableOpacity
-                    style={[styles.nextButton, isLoading && styles.nextButtonDisabled]}
-                    onPress={handleSubmit}
-                    disabled={isLoading}
-                >
-                    {isLoading ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                        <>
-                            <Text style={styles.nextButtonText}>Start My Journey</Text>
-                            <Ionicons name="arrow-forward" size={20} color="#fff" />
-                        </>
-                    )}
-                </TouchableOpacity>
-            </Animated.View>
-        </ScrollView>
+                <Animated.View style={{ opacity: fadeAnim }}>
+                    <TouchableOpacity
+                        style={[styles.nextButton, isLoading && styles.nextButtonDisabled]}
+                        onPress={handleSubmit}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Text style={styles.nextButtonText}>Start My Journey</Text>
+                                <Ionicons name="arrow-forward" size={20} color="#fff" />
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </Animated.View>
+            </ScrollView>
+
+            {/* Loading Overlay */}
+            {isLoading && loadingMessage && (
+                <View style={styles.loadingOverlay}>
+                    <View style={styles.loadingCard}>
+                        <ActivityIndicator size="large" color="#9D4EDD" />
+                        <Text style={styles.loadingMessage}>{loadingMessage}</Text>
+                        <Text style={styles.loadingSubtext}>This may take a few seconds...</Text>
+                    </View>
+                </View>
+            )}
+        </View>
     );
 };
 
@@ -1036,6 +1053,39 @@ const styles = StyleSheet.create({
     },
     nextButtonDisabled: {
         opacity: 0.6,
+    },
+    loadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    loadingCard: {
+        backgroundColor: '#2a2a3e',
+        borderRadius: 20,
+        padding: 32,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#9D4EDD',
+        minWidth: 280,
+    },
+    loadingMessage: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '600',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    loadingSubtext: {
+        color: '#B8B8CC',
+        fontSize: 14,
+        marginTop: 8,
+        textAlign: 'center',
     },
 });
 

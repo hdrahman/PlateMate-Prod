@@ -200,8 +200,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (authUser && !previousUserId) {
                 console.log('✅ User authenticated, starting background initialization...');
 
+                // Detect if this is a brand new signup (user created within last 10 seconds)
+                const userCreatedAt = new Date(authUser.created_at);
+                const now = new Date();
+                const accountAgeSeconds = (now.getTime() - userCreatedAt.getTime()) / 1000;
+                const isNewSignup = event === 'SIGNED_IN' && accountAgeSeconds < 10;
+
+                console.log(`📊 Account age: ${accountAgeSeconds.toFixed(1)} seconds, isNewSignup: ${isNewSignup}`);
+
                 // Background initialization - doesn't block app startup
-                initializeServicesInBackground(authUser.id);
+                initializeServicesInBackground(authUser.id, isNewSignup);
             }
 
             // Update previous user ID for next comparison
@@ -217,7 +225,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, []); // Empty dependency array to prevent infinite loop
 
     // Background service initialization (non-blocking)
-    const initializeServicesInBackground = async (userId: string) => {
+    const initializeServicesInBackground = async (userId: string, isNewSignup: boolean = false) => {
         try {
             console.log('🔄 Background: Starting service initialization...');
 
@@ -227,8 +235,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             try {
                 const localProfile = await getUserProfileBySupabaseUid(userId);
                 if (!localProfile) {
-                    console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
-                    setIsRestoringData(true); // Show loading screen while restoring
+                    // Skip restore for brand new signups - they haven't saved data yet!
+                    if (isNewSignup) {
+                        console.log('🆕 Brand new signup detected - skipping restore (no data exists yet)');
+                        profileRestored = false;
+                    } else {
+                        console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
+                        setIsRestoringData(true); // Show loading screen while restoring
 
                     // Retry configuration
                     const MAX_RETRIES = 10;
@@ -333,7 +346,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         console.error('❌ Background: Failed to restore profile after maximum retries');
                     }
 
-                    setIsRestoringData(false); // Hide loading screen
+                        setIsRestoringData(false); // Hide loading screen
+                    }
                 }
             } catch (error) {
                 console.warn('⚠️ Background: Profile restore failed:', error);
@@ -377,9 +391,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     // Sign up with email/password
-    const signUp = async (email: string, password: string) => {
+    const signUp = async (email: string, password: string, displayName?: string) => {
         try {
-            await supabaseAuth.signUp(email, password);
+            const user = await supabaseAuth.signUp(email, password, displayName);
+            console.log('✅ AuthContext: User created with UID:', user?.id);
+            return user;  // Return the user object so caller can use the UID immediately
         } catch (error: any) {
             Alert.alert('Sign Up Error', error.message);
             throw error;

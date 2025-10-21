@@ -32,7 +32,7 @@ interface OnboardingContextType {
     updateProfile: (data: Partial<UserProfile>) => Promise<void>;
     goToNextStep: () => void;
     goToPreviousStep: () => void;
-    completeOnboarding: () => Promise<void>;
+    completeOnboarding: (additionalData?: Partial<UserProfile>, userObj?: any) => Promise<void>;
     resetOnboarding: () => Promise<void>;
     saveOnboardingProgress: () => Promise<void>;
     setCurrentStep: (step: number) => void;
@@ -429,11 +429,40 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                         setProfile(frontendProfile);
                         setCurrentStep(isOnboardingComplete ? totalSteps : 1);
                     } else {
-                        // No profile - user needs onboarding
-                        console.log('⚪ No profile found - onboarding required');
+                        // No profile in SQLite - check if onboarding is in progress
+                        console.log('⚪ No profile found in SQLite - checking onboarding status');
+
+                        // CRITICAL: Don't wipe profile state if user is actively going through onboarding!
+                        // This happens when user creates account mid-onboarding - auth state changes,
+                        // this useEffect runs, but completeOnboarding() hasn't been called yet.
+                        const hasOnboardingData =
+                            currentStep > 1 ||           // User is past first step
+                            profile.firstName ||          // Has entered name
+                            profile.weight ||             // Has entered weight
+                            profile.targetWeight ||       // Has entered target weight
+                            profile.email ||              // Has entered email
+                            profile.age;                  // Has entered age
+
+                        if (!hasOnboardingData) {
+                            // Truly fresh start - no onboarding data exists
+                            console.log('🆕 Fresh start - using default profile');
+                            setProfile(defaultProfile);
+                            setCurrentStep(1);
+                        } else {
+                            // Onboarding in progress - preserve the data!
+                            console.log('🔄 Onboarding in progress - PRESERVING profile data');
+                            console.log('📋 Current profile data:', {
+                                firstName: profile.firstName,
+                                email: profile.email,
+                                weight: profile.weight,
+                                targetWeight: profile.targetWeight,
+                                age: profile.age,
+                                currentStep
+                            });
+                            // Don't modify profile state - keep user's entered data!
+                        }
+
                         setOnboardingComplete(false);
-                        setProfile(defaultProfile);
-                        setCurrentStep(1);
                     }
                 } else {
                     // User not authenticated - start fresh onboarding
@@ -540,7 +569,9 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     };
 
     // Complete the onboarding process (simplified)
-    const completeOnboarding = async () => {
+    // additionalData allows passing calculated metrics directly to avoid React state race conditions
+    // userObj allows passing user directly to avoid context race conditions
+    const completeOnboarding = async (additionalData?: Partial<UserProfile>, userObj?: any) => {
         // Prevent duplicate executions
         if (isLoading || onboardingComplete) {
             console.log('⚠️ Onboarding completion already in progress or completed, skipping');
@@ -548,122 +579,240 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
         }
 
         setIsLoading(true);
-        console.log('🚀 Starting onboarding completion...');
 
-        // Simple validation - if no user, can't complete onboarding
-        if (!user || !user.id) {
-            console.error('❌ Cannot complete onboarding - no authenticated user');
+        // Use passed user OR fall back to context user
+        const authUser = userObj || user;
+
+        // CRITICAL: Merge additional data with current profile to avoid React state race condition
+        // additionalData contains freshly calculated metrics that may not be in state yet
+        const finalProfile = { ...profile, ...additionalData };
+
+        console.log('🚀 Starting onboarding completion...');
+        console.log('📋 Final merged profile data:', {
+            firstName: finalProfile.firstName,
+            email: finalProfile.email,
+            age: finalProfile.age,
+            weight: finalProfile.weight,
+            targetWeight: finalProfile.targetWeight,
+            dailyCalorieTarget: finalProfile.dailyCalorieTarget,
+            projectedCompletionDate: finalProfile.projectedCompletionDate,
+            estimatedDurationWeeks: finalProfile.estimatedDurationWeeks,
+            nutrientFocus: finalProfile.nutrientFocus
+        });
+
+        // Validation - must have user object with ID
+        if (!authUser || !authUser.id) {
+            console.error('❌ Cannot complete onboarding - no user object provided');
+            console.error('📋 authUser:', authUser);
+            console.error('📋 context user:', user);
             setIsLoading(false);
-            return;
+            throw new Error('Cannot complete onboarding - no user object provided');
         }
 
-        console.log('💾 Saving profile to SQLite database...');
+        console.log('✅ Using user ID:', authUser.id);
+        console.log('📧 User email:', authUser.email);
+        console.log('💾 Preparing to save profile to SQLite database...');
 
         const profileData = {
-            firebase_uid: user.id,
-            email: user.email || profile.email,
-            first_name: profile.firstName || '',
-            last_name: profile.lastName || '',
-            height: profile.height || null,
-            weight: profile.weight || null,
-            age: profile.age || null,
-            gender: profile.gender || null,
-            activity_level: profile.activityLevel || null,
-            weight_goal: profile.weightGoal || null,
-            target_weight: profile.targetWeight || null,
-            dietary_restrictions: Array.isArray(profile.dietaryRestrictions) ? profile.dietaryRestrictions : [],
-            food_allergies: Array.isArray(profile.foodAllergies) ? profile.foodAllergies : [],
-            cuisine_preferences: Array.isArray(profile.cuisinePreferences) ? profile.cuisinePreferences : [],
-            spice_tolerance: profile.spiceTolerance || null,
-            health_conditions: Array.isArray(profile.healthConditions) ? profile.healthConditions : [],
-            fitness_goal: profile.fitnessGoal || null,
-            daily_calorie_target: profile.dailyCalorieTarget || null,
-            nutrient_focus: profile.nutrientFocus || null,
-            future_self_message_uri: profile.futureSelfMessageUri || null,
-            unit_preference: profile.unitPreference || 'metric',
-            push_notifications_enabled: profile.pushNotificationsEnabled !== false,
-            email_notifications_enabled: profile.emailNotificationsEnabled !== false,
-            sms_notifications_enabled: profile.smsNotificationsEnabled || false,
-            marketing_emails_enabled: profile.marketingEmailsEnabled !== false,
-            preferred_language: profile.preferredLanguage || 'en',
-            timezone: profile.timezone || 'UTC',
-            dark_mode: profile.darkMode || false,
-            sync_data_offline: profile.syncDataOffline !== false,
+            firebase_uid: authUser.id,  // Use passed user's ID (fresh from signUp)
+            email: authUser.email || finalProfile.email,
+            first_name: finalProfile.firstName || '',
+            last_name: finalProfile.lastName || '',
+            height: finalProfile.height || null,
+            weight: finalProfile.weight || null,
+            age: finalProfile.age || null,
+            gender: finalProfile.gender || null,
+            activity_level: finalProfile.activityLevel || null,
+            weight_goal: finalProfile.weightGoal || null,
+            target_weight: finalProfile.targetWeight || null,
+            dietary_restrictions: Array.isArray(finalProfile.dietaryRestrictions) ? finalProfile.dietaryRestrictions : [],
+            food_allergies: Array.isArray(finalProfile.foodAllergies) ? finalProfile.foodAllergies : [],
+            cuisine_preferences: Array.isArray(finalProfile.cuisinePreferences) ? finalProfile.cuisinePreferences : [],
+            spice_tolerance: finalProfile.spiceTolerance || null,
+            health_conditions: Array.isArray(finalProfile.healthConditions) ? finalProfile.healthConditions : [],
+            fitness_goal: finalProfile.fitnessGoal || null,
+            daily_calorie_target: finalProfile.dailyCalorieTarget || null,
+            nutrient_focus: finalProfile.nutrientFocus || null,
+            future_self_message_uri: finalProfile.futureSelfMessageUri || null,
+            unit_preference: finalProfile.unitPreference || 'metric',
+            push_notifications_enabled: finalProfile.pushNotificationsEnabled !== false,
+            email_notifications_enabled: finalProfile.emailNotificationsEnabled !== false,
+            sms_notifications_enabled: finalProfile.smsNotificationsEnabled || false,
+            marketing_emails_enabled: finalProfile.marketingEmailsEnabled !== false,
+            preferred_language: finalProfile.preferredLanguage || 'en',
+            timezone: finalProfile.timezone || 'UTC',
+            dark_mode: finalProfile.darkMode || false,
+            sync_data_offline: finalProfile.syncDataOffline !== false,
             onboarding_complete: true, // Mark as complete
             synced: 0,
-            protein_goal: profile.nutrientFocus?.protein || 0,
-            carb_goal: profile.nutrientFocus?.carbs || 0,
-            fat_goal: profile.nutrientFocus?.fat || 0,
-            weekly_workouts: profile.workoutFrequency || 0,
-            step_goal: profile.stepGoal || 0,
-            water_goal: profile.waterGoal || 0,
-            sleep_goal: profile.sleepGoal || 0,
-            workout_frequency: profile.workoutFrequency || 0,
-            sleep_quality: profile.sleepQuality || '',
-            stress_level: profile.stressLevel || '',
-            eating_pattern: profile.eatingPattern || '',
-            motivations: profile.motivations ? (Array.isArray(profile.motivations) ? profile.motivations.join(',') : profile.motivations) : '',
-            why_motivation: profile.whyMotivation || '',
-            projected_completion_date: profile.projectedCompletionDate || '',
-            estimated_metabolic_age: profile.estimatedMetabolicAge || 0,
-            estimated_duration_weeks: profile.estimatedDurationWeeks || 0,
-            future_self_message: profile.futureSelfMessage || '',
-            future_self_message_type: profile.futureSelfMessageType || '',
-            future_self_message_created_at: profile.futureSelfMessageCreatedAt || '',
-            diet_type: profile.dietType || '',
-            use_metric_system: profile.useMetricSystem !== false ? 1 : 0,
+            protein_goal: finalProfile.nutrientFocus?.protein || 0,
+            carb_goal: finalProfile.nutrientFocus?.carbs || 0,
+            fat_goal: finalProfile.nutrientFocus?.fat || 0,
+            weekly_workouts: finalProfile.workoutFrequency || 0,
+            step_goal: finalProfile.stepGoal || 0,
+            water_goal: finalProfile.waterGoal || 0,
+            sleep_goal: finalProfile.sleepGoal || 0,
+            workout_frequency: finalProfile.workoutFrequency || 0,
+            sleep_quality: finalProfile.sleepQuality || '',
+            stress_level: finalProfile.stressLevel || '',
+            eating_pattern: finalProfile.eatingPattern || '',
+            motivations: finalProfile.motivations ? (Array.isArray(finalProfile.motivations) ? finalProfile.motivations.join(',') : finalProfile.motivations) : '',
+            why_motivation: finalProfile.whyMotivation || '',
+            projected_completion_date: finalProfile.projectedCompletionDate || '',
+            estimated_metabolic_age: finalProfile.estimatedMetabolicAge || 0,
+            estimated_duration_weeks: finalProfile.estimatedDurationWeeks || 0,
+            future_self_message: finalProfile.futureSelfMessage || '',
+            future_self_message_type: finalProfile.futureSelfMessageType || '',
+            future_self_message_created_at: finalProfile.futureSelfMessageCreatedAt || '',
+            diet_type: finalProfile.dietType || '',
+            use_metric_system: finalProfile.useMetricSystem !== false ? 1 : 0,
             premium: false,
         };
 
         try {
             // Simple profile save to SQLite
-            console.log('💾 Saving profile to SQLite database...');
+            console.log('💾 Attempting to save profile to SQLite...');
+            console.log('📊 Profile data being saved:', {
+                firebase_uid: profileData.firebase_uid,
+                email: profileData.email,
+                firstName: profileData.first_name,
+                age: profileData.age,
+                weight: profileData.weight,
+                targetWeight: profileData.target_weight,
+                dailyCalorieTarget: profileData.daily_calorie_target,
+                proteinGoal: profileData.protein_goal,
+                carbGoal: profileData.carb_goal,
+                fatGoal: profileData.fat_goal,
+                projectedCompletionDate: profileData.projected_completion_date,
+                estimatedDurationWeeks: profileData.estimated_duration_weeks,
+                onboardingComplete: profileData.onboarding_complete,
+                synced: profileData.synced
+            });
+            console.log('📊 Profile data size:', JSON.stringify(profileData).length, 'bytes');
+
             const profileId = await addUserProfile(profileData);
-            console.log('✅ Profile saved successfully with ID:', profileId);
+
+            console.log('✅ Profile saved successfully to SQLite!');
+            console.log('🆔 Profile ID:', profileId);
+            console.log('👤 User ID:', profileData.firebase_uid);
+            console.log('📧 Email:', profileData.email);
+            console.log('🎯 Goals: Calories=' + profileData.daily_calorie_target + ', Protein=' + profileData.protein_goal + 'g, Carbs=' + profileData.carb_goal + 'g, Fat=' + profileData.fat_goal + 'g');
 
             // CRITICAL: Immediately backup to Supabase after onboarding completion
             // This ensures data is backed up even if user uninstalls or loses device
+            // IMPORTANT: This is non-blocking - if it fails, background sync will retry
             console.log('☁️ Starting immediate backup to Supabase...');
             try {
-                // Attempt immediate sync with timeout
+                // Check if session is ready before attempting sync
+                console.log('🔐 Verifying Supabase session is ready...');
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (sessionError || !session) {
+                    console.warn('⚠️ Session not ready, waiting 3 seconds for auth to propagate...');
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+
+                    // Try once more
+                    const { data: { session: retrySession } } = await supabase.auth.getSession();
+                    if (!retrySession) {
+                        throw new Error('Session not available after retry - background sync will handle backup');
+                    }
+                    console.log('✅ Session ready after retry');
+                } else {
+                    console.log('✅ Session ready');
+                }
+
+                // Attempt sync with timeout
+                // Note: Render free tier can sleep for 15+ minutes, but we don't want to block onboarding
+                // The background sync service will continue retrying even after onboarding completes
+                console.log('📤 Attempting immediate sync to Supabase...');
                 const syncPromise = postgreSQLSyncService.syncToPostgreSQL();
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Sync timeout')), 30000) // 30 second timeout
+                const timeoutPromise = new Promise<any>((_, reject) =>
+                    setTimeout(() => reject(new Error('Sync timeout - will continue in background')), 90000) // 90 second timeout
                 );
 
                 const syncResult = await Promise.race([syncPromise, timeoutPromise]);
 
                 if (syncResult.success) {
-                    console.log('✅ Immediate backup to Supabase completed successfully:', syncResult.stats);
+                    console.log('✅ Immediate backup to Supabase completed successfully!');
+                    console.log('📊 Sync stats:', syncResult.stats);
                 } else {
-                    console.warn('⚠️ Immediate backup completed with errors:', syncResult.errors);
+                    console.warn('⚠️ Immediate backup completed with errors (background sync will retry)');
+                    console.warn('📋 Errors:', syncResult.errors);
                     // Don't throw - continue with onboarding even if backup had issues
                 }
             } catch (backupError) {
-                // Log the error but don't block onboarding completion
-                console.error('⚠️ Immediate backup failed (will retry later):', backupError);
-                // The regular sync service will retry later
+                // Log the error but DON'T block onboarding completion
+                // The profile is already saved to SQLite (synced=0), so background sync will retry
+                console.error('⚠️ Immediate backup failed - will retry in background');
+                console.error('📋 Error details:', backupError.message || backupError);
+                console.log('💾 Note: Profile is saved locally with synced=0, background sync will handle cloud backup');
+                // The background sync service will continue retrying automatically
             }
 
             // Mark onboarding as complete immediately
+            console.log('🏁 Marking onboarding as complete...');
             setOnboardingComplete(true);
             setJustCompletedOnboarding(true);
             setCurrentStep(totalSteps);
+            console.log('✅ Onboarding state updated: complete=true, step=' + totalSteps);
 
             // Clean up temp onboarding sessions after successful completion
             try {
+                console.log('🧹 Cleaning up temporary onboarding sessions...');
                 await cleanupOldTempOnboardingSessions();
-                console.log('🧹 Cleaned up old temp onboarding sessions');
+                console.log('✅ Cleanup completed');
             } catch (cleanupError) {
                 console.warn('⚠️ Failed to cleanup temp sessions:', cleanupError);
                 // Don't throw - this is just cleanup
             }
 
-            console.log('🎉 Onboarding completed successfully!');
+            console.log('🎉🎉🎉 ONBOARDING COMPLETED SUCCESSFULLY! 🎉🎉🎉');
+            console.log('═══════════════════════════════════════════════════');
+            console.log('📱 Local SQLite Profile: ✅ SAVED');
+            console.log('☁️ Supabase Cloud Backup: ⏳ IN PROGRESS (background)');
+            console.log('👤 User:', profileData.firebase_uid);
+            console.log('📧 Email:', profileData.email);
+            console.log('🎯 Daily Calories:', profileData.daily_calorie_target);
+            console.log('💪 Macros: P=' + profileData.protein_goal + 'g, C=' + profileData.carb_goal + 'g, F=' + profileData.fat_goal + 'g');
+            console.log('📅 Target Date:', profileData.projected_completion_date);
+            console.log('⏱️  Duration:', profileData.estimated_duration_weeks + ' weeks');
+            console.log('✅ Onboarding Complete:', profileData.onboarding_complete);
+            console.log('═══════════════════════════════════════════════════');
 
         } catch (error) {
-            console.error('❌ Error saving user profile:', error);
-            throw new Error(`Failed to complete onboarding: ${error.message || 'Unknown error'}`);
+            console.error('❌❌❌ ONBOARDING COMPLETION FAILED ❌❌❌');
+            console.error('═══════════════════════════════════════════════════');
+            console.error('Error type:', error.name);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            console.error('═══════════════════════════════════════════════════');
+            console.error('📋 Profile state at time of error:', {
+                firstName: profile.firstName,
+                email: profile.email,
+                age: profile.age,
+                weight: profile.weight,
+                targetWeight: profile.targetWeight,
+                dailyCalorieTarget: profile.dailyCalorieTarget,
+                projectedCompletionDate: profile.projectedCompletionDate,
+                estimatedDurationWeeks: profile.estimatedDurationWeeks,
+                nutrientFocus: profile.nutrientFocus
+            });
+            console.error('👤 User state:', user ? { id: user.id, email: user.email } : 'No user');
+            console.error('═══════════════════════════════════════════════════');
+
+            // Provide user-friendly error message
+            let userMessage = 'Failed to complete onboarding. ';
+            if (error.message?.includes('Missing required')) {
+                userMessage += 'Some profile information is missing. Please go back and complete all steps.';
+            } else if (error.message?.includes('not authenticated')) {
+                userMessage += 'Please create an account or sign in to continue.';
+            } else if (error.message?.includes('Database not initialized')) {
+                userMessage += 'App initialization error. Please restart the app and try again.';
+            } else {
+                userMessage += error.message || 'An unexpected error occurred. Please try again.';
+            }
+
+            throw new Error(userMessage);
         } finally {
             setIsLoading(false);
         }
