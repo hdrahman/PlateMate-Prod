@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Request, Header
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import asyncio
 import os
@@ -798,8 +798,7 @@ async def validate_premium_access(current_user: dict = Depends(get_current_user)
         entitlements = subscriber_info.get('subscriber', {}).get('entitlements', {})
 
         # Check each entitlement type
-        from datetime import datetime
-        now = datetime.now(datetime.timezone.utc)
+        now = datetime.now(timezone.utc)
 
         has_premium_access = False
         tier = 'free'
@@ -999,9 +998,8 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             # Check for existing promotional trial
             promo_trial = entitlements.get('promotional_trial', {})
             if promo_trial.get('expires_date'):
-                from datetime import datetime
                 expires = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
-                if expires > datetime.now(datetime.timezone.utc):
+                if expires > datetime.now(timezone.utc):
                     logger.warning(f"User {firebase_uid} already has active promotional trial")
                     return {
                         "success": False,
@@ -1012,9 +1010,8 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             # Check for existing premium subscription
             premium = entitlements.get('premium', {})
             if premium.get('expires_date'):
-                from datetime import datetime
                 expires = datetime.fromisoformat(premium['expires_date'].replace('Z', '+00:00'))
-                if expires > datetime.now(datetime.timezone.utc):
+                if expires > datetime.now(timezone.utc):
                     logger.warning(f"User {firebase_uid} already has active premium subscription")
                     return {
                         "success": False,
@@ -1029,9 +1026,7 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             logger.info(f"New user detected: {firebase_uid} - proceeding with trial grant")
 
         # Step 2: Grant 20-day promotional trial via RevenueCat API
-        from datetime import datetime, timedelta
-
-        trial_end = datetime.now(datetime.timezone.utc) + timedelta(days=20)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=20)
 
         # Use RevenueCat's promotional entitlement grant API
         # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
@@ -1083,9 +1078,8 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
         # Check for existing extended trial
         extended_trial = entitlements.get('extended_trial', {})
         if extended_trial.get('expires_date'):
-            from datetime import datetime
             expires = datetime.fromisoformat(extended_trial['expires_date'].replace('Z', '+00:00'))
-            if expires > datetime.now(datetime.timezone.utc):
+            if expires > datetime.now(timezone.utc):
                 logger.warning(f"User {firebase_uid} already has active extended trial")
                 return {
                     "success": False,
@@ -1104,9 +1098,7 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
             }
 
         # Step 2: Grant 10-day extended trial via RevenueCat API
-        from datetime import datetime, timedelta
-
-        trial_end = datetime.now(datetime.timezone.utc) + timedelta(days=10)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=10)
 
         # Use RevenueCat's promotional entitlement grant API
         grant_data = {
@@ -1166,10 +1158,8 @@ async def get_promotional_trial_status(current_user: dict = Depends(get_current_
     days_remaining = 0
 
     if promo_trial.get('expires_date'):
-        from datetime import datetime
-
         expires_date = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
-        now = datetime.now(datetime.timezone.utc)
+        now = datetime.now(timezone.utc)
 
         if expires_date > now:
             delta = expires_date - now
