@@ -15,7 +15,9 @@
       "Bash(if exist ..node_modulesreact-native-workletsandroidbuild rd /s /q ..node_modulesreact-native-workletsandroidbuild)",
       "Bash(./gradlew clean)",
       "Bash(npm run validate:*)",
-      "Read(//c/Users/Haame/**)"
+      "Read(//c/Users/Haame/**)",
+      "WebFetch(domain:docs.revenuecat.com)",
+      "WebFetch(domain:www.revenuecat.com)"
     ],
     "deny": [],
     "ask": []

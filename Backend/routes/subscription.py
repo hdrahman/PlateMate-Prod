@@ -12,15 +12,8 @@ from utils.db_connection import get_db_connection
 from services.redis_connection import get_redis
 import logging
 
-# RevenueCat integration for server-side validation
-try:
-    from revenuecat import Client as RevenueCatClient
-    REVENUECAT_AVAILABLE = True
-    print('✅ RevenueCat server integration available')
-except ImportError:
-    REVENUECAT_AVAILABLE = False
-    RevenueCatClient = None
-    print('⚠️ RevenueCat server integration not available - install revenuecat package')
+# RevenueCat integration using direct REST API calls (no SDK needed)
+# We use httpx (already in requirements.txt) for all RevenueCat API calls
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/subscription", tags=["subscription"])
@@ -28,6 +21,15 @@ router = APIRouter(prefix="/api/subscription", tags=["subscription"])
 # RevenueCat configuration
 REVENUECAT_API_KEY = os.getenv('REVENUECAT_API_KEY')
 REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
+
+# FAIL LOUDLY if RevenueCat API key is not configured
+# This is core functionality - we don't want silent failures
+if not REVENUECAT_API_KEY:
+    logger.error('❌ CRITICAL: REVENUECAT_API_KEY environment variable not set!')
+    logger.error('❌ Promotional trial grants will FAIL until this is configured')
+    # Don't raise here to allow server to start, but log prominently
+else:
+    logger.info('✅ RevenueCat API key configured successfully')
 
 async def check_vip_status(firebase_uid: str) -> dict:
     """
@@ -89,16 +91,49 @@ async def check_vip_status(firebase_uid: str) -> dict:
         # Fail safely - return non-VIP on error
         return {'is_vip': False}
 
-# Initialize RevenueCat client for secure server-side validation
-rc_client = None
-if REVENUECAT_AVAILABLE and REVENUECAT_API_KEY:
+# Helper function for RevenueCat API calls using httpx
+async def call_revenuecat_api(method: str, endpoint: str, data: Optional[dict] = None) -> dict:
+    """
+    Make direct REST API calls to RevenueCat.
+    FAILS IMMEDIATELY if API key is not configured or request fails.
+    NO FALLBACKS - this is core functionality.
+    """
+    if not REVENUECAT_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="RevenueCat API key not configured - promotional trials unavailable"
+        )
+
+    url = f"https://api.revenuecat.com/v1{endpoint}"
+    headers = {
+        "Authorization": f"Bearer {REVENUECAT_API_KEY}",
+        "Content-Type": "application/json",
+        "X-Platform": "backend"
+    }
+
     try:
-        rc_client = RevenueCatClient(api_key=REVENUECAT_API_KEY)
-        logger.info('🔒 RevenueCat server client initialized for secure validation')
-    except Exception as e:
-        logger.error(f'❌ Failed to initialize RevenueCat client: {e}')
-else:
-    logger.warning('⚠️ RevenueCat server validation not available - configure API key')
+        # Use httpx for async HTTP calls
+        import httpx
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            if method.upper() == "GET":
+                response = await client.get(url, headers=headers)
+            elif method.upper() == "POST":
+                response = await client.post(url, headers=headers, json=data or {})
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+
+            # FAIL LOUDLY on non-2xx responses
+            if response.status_code not in [200, 201]:
+                error_msg = f"RevenueCat API failed: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise HTTPException(status_code=500, detail=error_msg)
+
+            return response.json()
+
+    except httpx.HTTPError as e:
+        error_msg = f"RevenueCat API request failed: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # Pydantic models for request/response
 class SubscriptionDetails(BaseModel):
@@ -743,61 +778,70 @@ async def validate_premium_access(current_user: dict = Depends(get_current_user)
             }
         
         # PRIORITY 2: Check RevenueCat for paid subscriptions or trials
-        if not rc_client:
-            logger.error("RevenueCat client not available for server-side validation")
-            # For security, deny access if we can't validate properly
-            return {
-                "has_premium_access": False,
-                "error": "Server validation unavailable",
-                "status": "free"
-            }
-        
+        # FAIL LOUDLY if RevenueCat is unavailable - this is core functionality
         try:
-            # Get subscriber info from RevenueCat server
-            subscriber_info = rc_client.get_subscriber(firebase_uid)
-            
-            # Check for active premium entitlement OR promotional trial
-            entitlements = subscriber_info.get('entitlements', {})
-            premium_entitlement = entitlements.get('premium', {})
-            promotional_trial = entitlements.get('promotional_trial', {})
-            
-            has_premium_subscription = premium_entitlement.get('is_active', False)
-            has_promotional_trial = promotional_trial.get('is_active', False)
-            has_premium_access = has_premium_subscription or has_promotional_trial
-            
-            # Determine subscription tier
-            if has_premium_subscription:
-                product_id = premium_entitlement.get('product_identifier', '')
+            subscriber_info = await call_revenuecat_api("GET", f"/subscribers/{firebase_uid}")
+        except HTTPException as e:
+            # If user doesn't exist in RevenueCat yet (404), they're a free user
+            if "404" in str(e.detail):
+                logger.info(f"User {firebase_uid} not found in RevenueCat - treating as free user")
+                return {
+                    "has_premium_access": False,
+                    "tier": "free",
+                    "status": "success",
+                    "validation_source": "revenuecat_server"
+                }
+            # For any other error, re-raise to fail loudly
+            raise
+
+        # Check for active premium entitlement OR promotional trial
+        entitlements = subscriber_info.get('subscriber', {}).get('entitlements', {})
+
+        # Check each entitlement type
+        from datetime import datetime
+        now = datetime.now(datetime.timezone.utc)
+
+        has_premium_access = False
+        tier = 'free'
+
+        # Check promotional trial
+        promo_trial = entitlements.get('promotional_trial', {})
+        if promo_trial.get('expires_date'):
+            expires = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
+            if expires > now:
+                has_premium_access = True
+                tier = 'promotional_trial'
+
+        # Check extended trial (overrides promotional)
+        extended_trial = entitlements.get('extended_trial', {})
+        if extended_trial.get('expires_date'):
+            expires = datetime.fromisoformat(extended_trial['expires_date'].replace('Z', '+00:00'))
+            if expires > now:
+                has_premium_access = True
+                tier = 'extended_trial'
+
+        # Check premium subscription (highest priority)
+        premium = entitlements.get('premium', {})
+        if premium.get('expires_date'):
+            expires = datetime.fromisoformat(premium['expires_date'].replace('Z', '+00:00'))
+            if expires > now:
+                has_premium_access = True
+                product_id = premium.get('product_identifier', '')
                 if 'annual' in product_id.lower():
                     tier = 'premium_annual'
                 elif 'monthly' in product_id.lower():
                     tier = 'premium_monthly'
                 else:
-                    tier = 'trial'  # Store intro trial
-            elif has_promotional_trial:
-                tier = 'promotional_trial'  # 20-day backend trial
-            else:
-                tier = 'free'
-            
-            logger.info(f"🔒 Server validation for {firebase_uid}: {tier} (premium: {has_premium_access})")
-            
-            return {
-                "has_premium_access": has_premium_access,
-                "tier": tier,
-                "status": "success",
-                "validation_source": "revenuecat_server"
-            }
-            
-        except Exception as rc_error:
-            logger.error(f"RevenueCat server validation error: {rc_error}")
-            # For new users or connection issues, allow limited grace period
-            # but this should be handled carefully in production
-            return {
-                "has_premium_access": False,
-                "tier": "free",
-                "status": "validation_failed",
-                "error": str(rc_error)
-            }
+                    tier = 'premium'
+
+        logger.info(f"🔒 Server validation for {firebase_uid}: {tier} (premium: {has_premium_access})")
+
+        return {
+            "has_premium_access": has_premium_access,
+            "tier": tier,
+            "status": "success",
+            "validation_source": "revenuecat_server"
+        }
             
     except Exception as e:
         logger.error(f"Error in server-side premium validation: {str(e)}")
@@ -937,218 +981,190 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
 
 @router.post("/grant-promotional-trial")
 async def grant_promotional_trial(current_user: dict = Depends(get_current_user)):
-    """Grant 20-day promotional trial to new users - Backend managed (automatic for new accounts)"""
+    """
+    Grant 20-day promotional trial to new users - Backend managed (automatic for new accounts)
+    FAILS IMMEDIATELY if RevenueCat API is unavailable or returns an error.
+    NO FALLBACKS - this is core subscription functionality.
+    """
+    firebase_uid = current_user["supabase_uid"]
+
+    logger.info(f"🎆 Attempting to grant 20-day promotional trial to user: {firebase_uid}")
+
+    # Step 1: Check if user already has entitlements
     try:
-        firebase_uid = current_user["supabase_uid"]
+        subscriber_info = await call_revenuecat_api("GET", f"/subscribers/{firebase_uid}")
+        entitlements = subscriber_info.get('subscriber', {}).get('entitlements', {})
 
-        if not rc_client:
-            logger.error("RevenueCat client not available for trial management")
-            raise HTTPException(status_code=500, detail="Trial service unavailable")
-
-        try:
-            # Check if user already has any entitlements
-            subscriber_info = rc_client.get_subscriber(firebase_uid)
-            entitlements = subscriber_info.get('entitlements', {})
-
-            # Check for existing promotional trial
-            if entitlements.get('promotional_trial', {}).get('is_active', False):
+        # Check for existing promotional trial
+        promo_trial = entitlements.get('promotional_trial', {})
+        if promo_trial.get('expires_date'):
+            from datetime import datetime
+            expires = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
+            if expires > datetime.now(datetime.timezone.utc):
+                logger.warning(f"User {firebase_uid} already has active promotional trial")
                 return {
                     "success": False,
                     "message": "User already has active 20-day promotional trial",
                     "trial_granted": False
                 }
 
-            # Check for existing premium subscription
-            if entitlements.get('premium', {}).get('is_active', False):
+        # Check for existing premium subscription
+        premium = entitlements.get('premium', {})
+        if premium.get('expires_date'):
+            from datetime import datetime
+            expires = datetime.fromisoformat(premium['expires_date'].replace('Z', '+00:00'))
+            if expires > datetime.now(datetime.timezone.utc):
+                logger.warning(f"User {firebase_uid} already has active premium subscription")
                 return {
                     "success": False,
                     "message": "User already has premium subscription",
                     "trial_granted": False
                 }
 
-        except Exception as check_error:
-            # User might be new, continue with trial grant
-            logger.info(f"New user detected for 20-day promotional trial: {firebase_uid}")
+    except HTTPException as e:
+        # If user doesn't exist yet in RevenueCat, that's fine - continue with grant
+        if "404" not in str(e.detail):
+            raise  # Re-raise other HTTP errors
+        logger.info(f"New user detected: {firebase_uid} - proceeding with trial grant")
 
-        try:
-            # Grant 20-day promotional trial via RevenueCat API
-            from datetime import datetime, timedelta, timezone
+    # Step 2: Grant 20-day promotional trial via RevenueCat API
+    from datetime import datetime, timedelta
 
-            trial_end = datetime.now(timezone.utc) + timedelta(days=20)
+    trial_end = datetime.now(datetime.timezone.utc) + timedelta(days=20)
 
-            # Call RevenueCat REST API to grant promotional entitlement
-            import requests
+    # Use RevenueCat's promotional entitlement grant API
+    # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
+    grant_data = {
+        "duration": "P20D"  # ISO 8601 duration format: 20 days
+    }
 
-            if not REVENUECAT_API_KEY:
-                raise HTTPException(status_code=500, detail="RevenueCat API key not configured")
+    result = await call_revenuecat_api(
+        "POST",
+        f"/subscribers/{firebase_uid}/entitlements/promotional_trial/promotional",
+        grant_data
+    )
 
-            grant_url = f"https://api.revenuecat.com/v1/subscribers/{firebase_uid}/entitlements/promotional_trial/grant"
-            headers = {
-                "Authorization": f"Bearer {REVENUECAT_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            grant_data = {
-                "duration": "20d"
-            }
+    logger.info(f"✅ Successfully granted 20-day promotional trial to user {firebase_uid}")
 
-            response = requests.post(grant_url, headers=headers, json=grant_data)
-
-            if response.status_code not in [200, 201]:
-                logger.error(f"RevenueCat grant failed: {response.status_code} - {response.text}")
-                raise HTTPException(status_code=500, detail="Failed to grant promotional trial")
-
-            logger.info(f"🎆 Successfully granted 20-day promotional trial to user {firebase_uid}")
-
-            return {
-                "success": True,
-                "message": "20-day promotional trial granted automatically for new user",
-                "trial_granted": True,
-                "trial_end_date": trial_end.isoformat(),
-                "trial_days": 20
-            }
-
-        except Exception as grant_error:
-            logger.error(f"Failed to grant promotional trial: {grant_error}")
-            raise HTTPException(status_code=500, detail="Failed to grant trial")
-
-    except Exception as e:
-        logger.error(f"Error in promotional trial grant: {str(e)}")
-        raise HTTPException(status_code=500, detail="Trial grant failed")
+    return {
+        "success": True,
+        "message": "20-day promotional trial granted automatically for new user",
+        "trial_granted": True,
+        "trial_end_date": trial_end.isoformat(),
+        "trial_days": 20,
+        "revenuecat_response": result
+    }
 
 @router.post("/grant-extended-trial")
 async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
-    """Grant additional 10-day extended trial when user starts a subscription (after 20-day promo trial)"""
-    try:
-        firebase_uid = current_user["supabase_uid"]
+    """
+    Grant additional 10-day extended trial when user starts a subscription (after 20-day promo trial)
+    FAILS IMMEDIATELY if RevenueCat API is unavailable or returns an error.
+    NO FALLBACKS - this is core subscription functionality.
+    """
+    firebase_uid = current_user["supabase_uid"]
 
-        if not rc_client:
-            logger.error("RevenueCat client not available for trial management")
-            raise HTTPException(status_code=500, detail="Trial service unavailable")
+    logger.info(f"✨ Attempting to grant 10-day extended trial to user: {firebase_uid}")
 
-        try:
-            # Check if user already has extended trial
-            subscriber_info = rc_client.get_subscriber(firebase_uid)
-            entitlements = subscriber_info.get('entitlements', {})
+    # Step 1: Check if user already has extended trial
+    subscriber_info = await call_revenuecat_api("GET", f"/subscribers/{firebase_uid}")
+    entitlements = subscriber_info.get('subscriber', {}).get('entitlements', {})
 
-            # Check for existing extended trial
-            if entitlements.get('extended_trial', {}).get('is_active', False):
-                return {
-                    "success": False,
-                    "message": "User already has active 10-day extended trial",
-                    "trial_granted": False
-                }
-
-            # Verify user has or had the 20-day promotional trial
-            promo_trial = entitlements.get('promotional_trial', {})
-            if not promo_trial:
-                return {
-                    "success": False,
-                    "message": "User must complete 20-day promotional trial first",
-                    "trial_granted": False
-                }
-
-        except Exception as check_error:
-            logger.warning(f"Could not check existing entitlements: {check_error}")
-
-        try:
-            # Grant 10-day extended trial via RevenueCat API
-            from datetime import datetime, timedelta, timezone
-            import requests
-
-            trial_end = datetime.now(timezone.utc) + timedelta(days=10)
-
-            if not REVENUECAT_API_KEY:
-                raise HTTPException(status_code=500, detail="RevenueCat API key not configured")
-
-            grant_url = f"https://api.revenuecat.com/v1/subscribers/{firebase_uid}/entitlements/extended_trial/grant"
-            headers = {
-                "Authorization": f"Bearer {REVENUECAT_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            grant_data = {
-                "duration": "10d"
-            }
-
-            response = requests.post(grant_url, headers=headers, json=grant_data)
-
-            if response.status_code not in [200, 201]:
-                logger.error(f"RevenueCat extended trial grant failed: {response.status_code} - {response.text}")
-                raise HTTPException(status_code=500, detail="Failed to grant extended trial")
-
-            logger.info(f"✨ Successfully granted 10-day extended trial to user {firebase_uid}")
-
+    # Check for existing extended trial
+    extended_trial = entitlements.get('extended_trial', {})
+    if extended_trial.get('expires_date'):
+        from datetime import datetime
+        expires = datetime.fromisoformat(extended_trial['expires_date'].replace('Z', '+00:00'))
+        if expires > datetime.now(datetime.timezone.utc):
+            logger.warning(f"User {firebase_uid} already has active extended trial")
             return {
-                "success": True,
-                "message": "10-day extended trial granted (30 days total with promo trial)",
-                "trial_granted": True,
-                "trial_end_date": trial_end.isoformat(),
-                "trial_days": 10
+                "success": False,
+                "message": "User already has active 10-day extended trial",
+                "trial_granted": False
             }
 
-        except Exception as grant_error:
-            logger.error(f"Failed to grant extended trial: {grant_error}")
-            raise HTTPException(status_code=500, detail="Failed to grant extended trial")
+    # Verify user has or had the 20-day promotional trial
+    promo_trial = entitlements.get('promotional_trial', {})
+    if not promo_trial:
+        logger.warning(f"User {firebase_uid} does not have promotional trial - cannot grant extended trial")
+        return {
+            "success": False,
+            "message": "User must have used 20-day promotional trial first",
+            "trial_granted": False
+        }
 
-    except Exception as e:
-        logger.error(f"Error in extended trial grant: {str(e)}")
-        raise HTTPException(status_code=500, detail="Extended trial grant failed")
+    # Step 2: Grant 10-day extended trial via RevenueCat API
+    from datetime import datetime, timedelta
+
+    trial_end = datetime.now(datetime.timezone.utc) + timedelta(days=10)
+
+    # Use RevenueCat's promotional entitlement grant API
+    grant_data = {
+        "duration": "P10D"  # ISO 8601 duration format: 10 days
+    }
+
+    result = await call_revenuecat_api(
+        "POST",
+        f"/subscribers/{firebase_uid}/entitlements/extended_trial/promotional",
+        grant_data
+    )
+
+    logger.info(f"✅ Successfully granted 10-day extended trial to user {firebase_uid}")
+
+    return {
+        "success": True,
+        "message": "10-day extended trial granted (30 days total with promo trial)",
+        "trial_granted": True,
+        "trial_end_date": trial_end.isoformat(),
+        "trial_days": 10,
+        "revenuecat_response": result
+    }
 
 @router.get("/promotional-trial-status")
 async def get_promotional_trial_status(current_user: dict = Depends(get_current_user)):
-    """Get current promotional trial status for user"""
+    """
+    Get current promotional trial status for user.
+    FAILS LOUDLY if RevenueCat API is unavailable.
+    """
+    firebase_uid = current_user["supabase_uid"]
+
     try:
-        firebase_uid = current_user["supabase_uid"]
-        
-        if not rc_client:
+        subscriber_info = await call_revenuecat_api("GET", f"/subscribers/{firebase_uid}")
+    except HTTPException as e:
+        # If user doesn't exist in RevenueCat yet (404), they have no trial
+        if "404" in str(e.detail):
             return {
                 "has_trial": False,
                 "is_active": False,
                 "days_remaining": 0
             }
-        
-        try:
-            subscriber_info = rc_client.get_subscriber(firebase_uid)
-            entitlements = subscriber_info.get('entitlements', {})
-            promo_trial = entitlements.get('promotional_trial', {})
-            
-            is_active = promo_trial.get('is_active', False)
-            days_remaining = 0
-            
-            if is_active and promo_trial.get('expires_date'):
-                from datetime import datetime, timezone
-                
-                expires_date = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
-                now = datetime.now(timezone.utc)
-                
-                if expires_date > now:
-                    delta = expires_date - now
-                    days_remaining = max(0, delta.days)
-                else:
-                    is_active = False
-            
-            return {
-                "has_trial": promo_trial is not None,
-                "is_active": is_active,
-                "days_remaining": days_remaining,
-                "start_date": promo_trial.get('purchase_date'),
-                "end_date": promo_trial.get('expires_date')
-            }
-            
-        except Exception as e:
-            logger.error(f"Error checking promotional trial status: {str(e)}")
-            return {
-                "has_trial": False,
-                "is_active": False,
-                "days_remaining": 0
-            }
-    
-    except Exception as e:
-        logger.error(f"Error in promotional trial status endpoint: {str(e)}")
-        return {
-            "has_trial": False,
-            "is_active": False,
-            "days_remaining": 0
-        }
+        # For any other error, re-raise to fail loudly
+        raise
+
+    entitlements = subscriber_info.get('subscriber', {}).get('entitlements', {})
+    promo_trial = entitlements.get('promotional_trial', {})
+
+    is_active = False
+    days_remaining = 0
+
+    if promo_trial.get('expires_date'):
+        from datetime import datetime
+
+        expires_date = datetime.fromisoformat(promo_trial['expires_date'].replace('Z', '+00:00'))
+        now = datetime.now(datetime.timezone.utc)
+
+        if expires_date > now:
+            delta = expires_date - now
+            days_remaining = max(0, delta.days)
+            is_active = True
+
+    return {
+        "has_trial": bool(promo_trial),
+        "is_active": is_active,
+        "days_remaining": days_remaining,
+        "start_date": promo_trial.get('purchase_date'),
+        "end_date": promo_trial.get('expires_date')
+    }
 
 
 @router.post("/admin/invalidate-vip-cache")

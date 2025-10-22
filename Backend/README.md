@@ -53,6 +53,42 @@ The backend includes tools to help troubleshoot authentication issues:
      python test_firebase_auth.py --token "your-firebase-token"
      ```
 
+## RevenueCat Configuration
+
+PlateMate uses RevenueCat for subscription management and promotional trials. **This is required core functionality.**
+
+### Environment Variables
+
+Add these to your `.env` file or Render environment variables:
+
+```bash
+# RevenueCat Secret API Key (from RevenueCat Dashboard → API Keys)
+REVENUECAT_API_KEY=your_secret_api_key_here
+
+# Optional: RevenueCat Webhook Secret for validating webhook signatures
+REVENUECAT_WEBHOOK_SECRET=your_webhook_secret_here
+```
+
+### Getting Your RevenueCat API Key
+
+1. Go to [RevenueCat Dashboard](https://app.revenuecat.com/)
+2. Navigate to **Settings** → **API Keys**
+3. Copy your **Secret API Key** (starts with `sk_`)
+4. Add it to your environment variables as `REVENUECAT_API_KEY`
+
+### Important Notes
+
+- **NO FALLBACKS**: If the RevenueCat API key is not configured, promotional trial grants will FAIL immediately
+- This ensures you know right away if subscription functionality is broken
+- The server will start without the key but will log critical errors prominently
+- All RevenueCat-related endpoints will return 500 errors until the key is configured
+
+### Promotional Trial System
+
+- **20-day trial**: Automatically granted to new users via `/api/subscription/grant-promotional-trial`
+- **+10-day extension**: Granted when users subscribe via `/api/subscription/grant-extended-trial`
+- **Total**: 30 days free before billing starts
+
 ## API Documentation
 
 Once the server is running, you can access the API documentation at:
@@ -73,4 +109,22 @@ This error indicates the Firebase Admin SDK failed to initialize. Check:
 If users are seeing each other's data:
 1. Ensure Firebase Admin SDK is properly initialized
 2. Check that user authentication is working by testing a token
-3. Verify that routes are properly protected with authentication middleware 
+3. Verify that routes are properly protected with authentication middleware
+
+### RevenueCat API Errors
+
+**Error: "RevenueCat API key not configured"**
+- Solution: Add `REVENUECAT_API_KEY` to your environment variables
+- Get your key from RevenueCat Dashboard → Settings → API Keys
+
+**Error: "RevenueCat API failed: 401"**
+- Solution: Your API key is invalid or expired
+- Regenerate a new secret API key in the RevenueCat dashboard
+
+**Error: "RevenueCat API failed: 404"**
+- This is normal for new users who don't exist in RevenueCat yet
+- The system will automatically create them when granting trials
+
+**Startup Warning: "❌ CRITICAL: REVENUECAT_API_KEY environment variable not set!"**
+- This is intentional - the server still starts but promotional trials will fail
+- Configure the API key immediately to restore subscription functionality

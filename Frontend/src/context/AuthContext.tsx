@@ -44,35 +44,34 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 // Helper function to grant promotional trial to new users
+// FAILS LOUDLY if backend is unavailable - this is core subscription functionality
 const grantPromotionalTrialToNewUser = async (userId: string) => {
-    try {
-        console.log('🎆 Attempting to grant promotional trial to new user:', userId);
+    console.log('🎆 Attempting to grant promotional trial to new user:', userId);
 
-        // Use existing session token instead of forcing refresh
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-            console.log('ℹ️ No active session, skipping promotional trial');
-            return;
+    // Use existing session token instead of forcing refresh
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+        const error = new Error('No active session - cannot grant promotional trial');
+        console.error('❌', error.message);
+        throw error;
+    }
+
+    const response = await fetch(`${BACKEND_URL}/api/subscription/grant-promotional-trial`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
         }
+    });
 
-        const response = await fetch(`${BACKEND_URL}/api/subscription/grant-promotional-trial`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+    const result = await response.json();
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            console.log('✅ Promotional trial granted successfully:', result);
-        } else {
-            console.log('ℹ️ Promotional trial not granted:', result.message || 'Unknown reason');
-        }
-    } catch (error) {
-        console.error('❌ Error granting promotional trial:', error);
-        // Don't throw - this shouldn't block user registration
+    if (response.ok && result.success) {
+        console.log('✅ Promotional trial granted successfully:', result);
+    } else {
+        const errorMsg = result.message || result.detail || 'Unknown error from backend';
+        console.error('❌ Failed to grant promotional trial:', errorMsg);
+        throw new Error(`Promotional trial grant failed: ${errorMsg}`);
     }
 };
 
