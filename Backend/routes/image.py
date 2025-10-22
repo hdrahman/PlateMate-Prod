@@ -969,21 +969,25 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
         # Ensure meal_id is set (fallback if something went wrong)
         if meal_id is None:
             meal_id = int(datetime.utcnow().timestamp())
-        
-        # Record successful upload for rate limiting
-        try:
-            from utils.db_connection import get_db_connection
-            conn = get_db_connection()
-            for _, filename in saved_files:
-                conn.execute(
-                    "INSERT INTO image_uploads (user_id, filename) VALUES (?, ?)",
-                    (current_user['supabase_uid'], filename)
-                )
-            conn.commit()
-            conn.close()
-            print(f"✅ {len(saved_files)} uploads recorded for user {current_user['supabase_uid']}")
-        except Exception as db_error:
-            print(f"⚠️ Failed to record uploads: {db_error}")
+
+        # Database upload tracking disabled - would be too expensive to store all images
+        # Rate limiting is now handled by the /api/subscription/validate-upload-limit endpoint
+        # which checks VIP status and premium subscriptions via RevenueCat
+
+        # # Record successful upload for rate limiting (DISABLED)
+        # try:
+        #     from utils.db_connection import get_db_connection
+        #     conn = await get_db_connection()
+        #     for _, filename in saved_files:
+        #         await conn.execute(
+        #             "INSERT INTO image_uploads (user_id, filename) VALUES (?, ?)",
+        #             (current_user['supabase_uid'], filename)
+        #         )
+        #     await conn.commit()
+        #     await conn.close()
+        #     print(f"✅ {len(saved_files)} uploads recorded for user {current_user['supabase_uid']}")
+        # except Exception as db_error:
+        #     print(f"⚠️ Failed to record uploads: {db_error}")
         
         # Return success response without cleanup (files intentionally kept)
         return {
