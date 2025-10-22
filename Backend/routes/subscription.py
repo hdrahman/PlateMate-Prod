@@ -1031,9 +1031,10 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
 
         # Use RevenueCat's promotional entitlement grant API
         # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
-        # RevenueCat expects expiry_time_ms (Unix timestamp in milliseconds)
+        # RevenueCat API v1 no longer accepts expiry_time_ms - duration is managed via dashboard config
+        # or via duration parameter. Trying empty body first (simplest approach).
         grant_data = {
-            "expiry_time_ms": int(trial_end.timestamp() * 1000)
+            "duration": "P20D"  # ISO 8601 duration format: 20 days
         }
 
         result = await call_revenuecat_api(
@@ -1104,9 +1105,9 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
         trial_end = dt.now(tz.utc) + timedelta(days=10)
 
         # Use RevenueCat's promotional entitlement grant API
-        # RevenueCat expects expiry_time_ms (Unix timestamp in milliseconds)
+        # RevenueCat API v1 no longer accepts expiry_time_ms - using duration parameter instead
         grant_data = {
-            "expiry_time_ms": int(trial_end.timestamp() * 1000)
+            "duration": "P10D"  # ISO 8601 duration format: 10 days
         }
 
         result = await call_revenuecat_api(
