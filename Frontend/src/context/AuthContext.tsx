@@ -208,6 +208,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
                 console.log(`📊 Account age: ${accountAgeSeconds.toFixed(1)} seconds, isNewSignup: ${isNewSignup}`);
 
+                // CRITICAL: Set isRestoringData flag BEFORE background init starts
+                // This prevents OnboardingContext from checking profile too early
+                if (!isNewSignup) {
+                    // For existing users, we might need to restore from cloud
+                    setIsRestoringData(true);
+                    console.log('🔄 Setting restore flag for existing user login');
+                }
+
                 // Background initialization - doesn't block app startup
                 initializeServicesInBackground(authUser.id, isNewSignup);
             }
@@ -239,9 +247,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (isNewSignup) {
                         console.log('🆕 Brand new signup detected - skipping restore (no data exists yet)');
                         profileRestored = false;
+                        // Clear the restore flag immediately for new signups
+                        setIsRestoringData(false);
                     } else {
                         console.log('🔄 Background: No local profile found, attempting PostgreSQL restore...');
-                        setIsRestoringData(true); // Show loading screen while restoring
+                        // Flag already set in auth state change handler, no need to set again
 
                         // Function to ping server to wake it up (for Render free tier)
                         const wakeUpServer = async (): Promise<boolean> => {
@@ -288,6 +298,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             if (restoreResult.success) {
                                 console.log('✅ Background: PostgreSQL restore completed successfully:', restoreResult.stats);
                                 profileRestored = true;
+
+                                // CRITICAL: Wait for SQLite commit to complete before clearing isRestoringData flag
+                                // This prevents race condition where OnboardingContext checks SQLite before profile is written
+                                console.log('🔄 Verifying profile exists in SQLite...');
+                                let profileVerified = false;
+                                const maxVerifyAttempts = 5;
+                                for (let attempt = 0; attempt < maxVerifyAttempts; attempt++) {
+                                    const verifiedProfile = await getUserProfileBySupabaseUid(userId);
+                                    if (verifiedProfile) {
+                                        console.log('✅ Profile verified in SQLite');
+                                        profileVerified = true;
+                                        break;
+                                    }
+                                    console.log(`⏳ Profile not yet in SQLite, waiting... (attempt ${attempt + 1}/${maxVerifyAttempts})`);
+                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                }
+
+                                if (!profileVerified) {
+                                    console.warn('⚠️ Profile verification timed out, but restoration reported success');
+                                }
                             } else {
                                 console.warn('⚠️ Background: PostgreSQL restore completed with errors:', restoreResult.errors);
                             }
@@ -297,6 +327,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
                         setIsRestoringData(false); // Hide loading screen
                     }
+                } else {
+                    // Profile already exists locally - no restore needed
+                    console.log('✅ Background: Profile already exists locally, skipping restore');
+                    setIsRestoringData(false);
                 }
             } catch (error) {
                 console.warn('⚠️ Background: Profile restore failed:', error);
