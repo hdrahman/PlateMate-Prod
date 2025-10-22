@@ -1026,12 +1026,14 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             logger.info(f"New user detected: {firebase_uid} - proceeding with trial grant")
 
         # Step 2: Grant 20-day promotional trial via RevenueCat API
-        trial_end = datetime.now(timezone.utc) + timedelta(days=20)
+        from datetime import datetime as dt, timezone as tz
+        trial_end = dt.now(tz.utc) + timedelta(days=20)
 
         # Use RevenueCat's promotional entitlement grant API
         # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
+        # RevenueCat expects expiry_time_ms (Unix timestamp in milliseconds)
         grant_data = {
-            "duration": "P20D"  # ISO 8601 duration format: 20 days
+            "expiry_time_ms": int(trial_end.timestamp() * 1000)
         }
 
         result = await call_revenuecat_api(
@@ -1098,11 +1100,13 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
             }
 
         # Step 2: Grant 10-day extended trial via RevenueCat API
-        trial_end = datetime.now(timezone.utc) + timedelta(days=10)
+        from datetime import datetime as dt, timezone as tz
+        trial_end = dt.now(tz.utc) + timedelta(days=10)
 
         # Use RevenueCat's promotional entitlement grant API
+        # RevenueCat expects expiry_time_ms (Unix timestamp in milliseconds)
         grant_data = {
-            "duration": "P10D"  # ISO 8601 duration format: 10 days
+            "expiry_time_ms": int(trial_end.timestamp() * 1000)
         }
 
         result = await call_revenuecat_api(
