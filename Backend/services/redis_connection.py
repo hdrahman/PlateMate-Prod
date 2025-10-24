@@ -54,4 +54,12 @@ async def get_redis() -> Redis:
     """Get Redis client instance"""
     if redis_manager.redis is None:
         await redis_manager.init_redis()
+    return redis_manager.redis
+
+
+def get_redis_client() -> Optional[Redis]:
+    """
+    Get Redis client synchronously (for use in non-async contexts).
+    Returns None if Redis hasn't been initialized yet.
+    """
     return redis_manager.redis 

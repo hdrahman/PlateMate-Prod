@@ -4,9 +4,12 @@ from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 from functools import lru_cache
+import hashlib
+import json
+import time
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -18,6 +21,10 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "https://noyieuwbhalbmdntoxoj.supabase.
 # Initialize security scheme
 security = HTTPBearer()
 
+# JWT cache configuration
+JWT_CACHE_TTL = 300  # 5 minutes - balance between security and performance
+_redis_client = None
+
 @lru_cache()
 def get_supabase_jwt_secret():
     """Get Supabase JWT secret from environment or fetch from Supabase"""
@@ -28,14 +35,93 @@ def get_supabase_jwt_secret():
     # In production, use the proper JWT secret from Supabase dashboard
     return os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5veWlldXdiaGFsYm1kbnRveG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDIxNDQsImV4cCI6MjA2NjI3ODE0NH0.OwnfpOt6LhXv7sWQoF56I619sLSOS0pKLjGxsDyc7rA")
 
+
+def get_redis_client():
+    """Get or create Redis client for JWT caching"""
+    global _redis_client
+    if _redis_client is None:
+        try:
+            from services.redis_connection import get_redis_client as get_redis
+            _redis_client = get_redis()
+            if _redis_client:
+                logger.info("✅ Redis client initialized for JWT caching")
+            else:
+                logger.warning("⚠️ Redis not yet initialized, JWT caching will be enabled after startup")
+                _redis_client = False  # Sentinel to retry later
+        except Exception as e:
+            logger.warning(f"⚠️ Redis not available for JWT caching: {e}")
+            _redis_client = False  # Sentinel value to avoid repeated attempts
+    return _redis_client if _redis_client else None
+
+
+def generate_token_cache_key(token: str) -> str:
+    """Generate a consistent cache key from token"""
+    # Use SHA256 hash of token for privacy and consistent key length
+    return f"jwt:cache:{hashlib.sha256(token.encode()).hexdigest()}"
+
+
+async def get_cached_jwt(token: str) -> Optional[Dict[str, Any]]:
+    """Retrieve cached JWT payload from Redis"""
+    redis_client = get_redis_client()
+    if not redis_client:
+        return None
+    
+    try:
+        cache_key = generate_token_cache_key(token)
+        cached_data = await redis_client.get(cache_key)
+        
+        if cached_data:
+            payload = json.loads(cached_data)
+            logger.debug(f"✅ JWT cache HIT for user: {payload.get('sub')}")
+            return payload
+        
+        logger.debug("❌ JWT cache MISS")
+        return None
+    except Exception as e:
+        logger.warning(f"Error reading JWT cache: {e}")
+        return None
+
+
+async def cache_jwt(token: str, payload: Dict[str, Any], ttl: int = JWT_CACHE_TTL):
+    """Cache decoded JWT payload in Redis"""
+    redis_client = get_redis_client()
+    if not redis_client:
+        return
+    
+    try:
+        cache_key = generate_token_cache_key(token)
+        
+        # Calculate actual TTL based on token expiry
+        exp_timestamp = payload.get('exp')
+        if exp_timestamp:
+            time_until_expiry = exp_timestamp - int(time.time())
+            # Use the shorter of: default TTL or time until token expiry
+            ttl = min(ttl, max(0, time_until_expiry))
+        
+        if ttl > 0:
+            await redis_client.setex(
+                cache_key,
+                ttl,
+                json.dumps(payload)
+            )
+            logger.debug(f"💾 Cached JWT for user: {payload.get('sub')} (TTL: {ttl}s)")
+    except Exception as e:
+        logger.warning(f"Error caching JWT: {e}")
+
 async def verify_supabase_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """
-    Verify Supabase JWT token and return decoded payload
+    Verify Supabase JWT token and return decoded payload.
+    Uses Redis cache to avoid repeated JWT decoding overhead.
     """
     try:
         token = credentials.credentials
         
-        # Decode the JWT token
+        # Try to get from cache first
+        cached_payload = await get_cached_jwt(token)
+        if cached_payload:
+            return cached_payload
+        
+        # Cache miss - decode and validate token
         secret = get_supabase_jwt_secret()
         
         # Decode without verification first to check the algorithm
@@ -55,6 +141,9 @@ async def verify_supabase_token(credentials: HTTPAuthorizationCredentials = Depe
                 }
             )
             
+            # Cache the validated payload
+            await cache_jwt(token, payload)
+            
             logger.info(f"Successfully verified Supabase token for user: {payload.get('sub')}")
             return payload
             
@@ -71,6 +160,8 @@ async def verify_supabase_token(credentials: HTTPAuthorizationCredentials = Depe
                 detail="Invalid token"
             )
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error verifying Supabase token: {str(e)}")
         raise HTTPException(
@@ -123,9 +214,59 @@ async def get_auth_status():
     """
     Health check endpoint to verify auth configuration
     """
+    redis_available = get_redis_client() is not None
     return {
         "auth_provider": "supabase",
         "supabase_url": SUPABASE_URL,
         "jwt_secret_configured": bool(get_supabase_jwt_secret()),
+        "jwt_cache_enabled": redis_available,
+        "jwt_cache_ttl": JWT_CACHE_TTL if redis_available else None,
         "status": "ready"
-    } 
+    }
+
+
+async def invalidate_jwt_cache(token: str) -> bool:
+    """
+    Manually invalidate a cached JWT token.
+    Useful for logout or when token needs immediate revocation.
+    """
+    redis_client = get_redis_client()
+    if not redis_client:
+        return False
+    
+    try:
+        cache_key = generate_token_cache_key(token)
+        result = await redis_client.delete(cache_key)
+        logger.info(f"🗑️ JWT cache invalidated: {bool(result)}")
+        return bool(result)
+    except Exception as e:
+        logger.warning(f"Error invalidating JWT cache: {e}")
+        return False
+
+
+async def get_jwt_cache_stats() -> Dict[str, Any]:
+    """
+    Get statistics about JWT cache usage (for monitoring/debugging)
+    """
+    redis_client = get_redis_client()
+    if not redis_client:
+        return {
+            "enabled": False,
+            "reason": "Redis not available"
+        }
+    
+    try:
+        # Count JWT cache keys
+        keys = await redis_client.keys("jwt:cache:*")
+        return {
+            "enabled": True,
+            "cached_tokens": len(keys) if keys else 0,
+            "ttl": JWT_CACHE_TTL,
+            "redis_connected": True
+        }
+    except Exception as e:
+        return {
+            "enabled": True,
+            "error": str(e),
+            "redis_connected": False
+        } 

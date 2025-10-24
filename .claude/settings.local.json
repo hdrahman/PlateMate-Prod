@@ -20,7 +20,9 @@
       "WebFetch(domain:www.revenuecat.com)",
       "Bash(python -m py_compile:*)",
       "Bash(python:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "mcp__render__list_services",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
