@@ -32,68 +32,78 @@ logger.info(f"FatSecret API credentials loaded: CLIENT_ID present: {bool(FATSECR
 # FatSecret API endpoints
 FATSECRET_API_URL = "https://platform.fatsecret.com/rest/server.api"
 
-# Cache for OAuth token
+# Cache for OAuth token - protected with asyncio.Lock
 oauth_token = None
 token_expiry = 0
+_token_lock = asyncio.Lock()  # Protect token refresh from race conditions
 
 async def get_oauth_token() -> str:
     """
-    Get an OAuth token for the FatSecret API
+    Get an OAuth token for the FatSecret API (thread-safe with asyncio.Lock)
     
     Returns:
         OAuth token as string
     """
     global oauth_token, token_expiry
     
-    # Check if we have a valid cached token
-    current_time = asyncio.get_event_loop().time()
+    # Fast path: Check if we have a valid cached token (no lock needed for read)
+    current_time = time.time()  # Use time.time() instead of event loop time
     if oauth_token and token_expiry > current_time + 60:  # 60 second buffer
         return oauth_token
     
-    logger.info(f"Getting new FatSecret OAuth token")
-    
-    try:
-        # Check if credentials are available
-        if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
-            logger.error("FatSecret API credentials are not configured properly")
-            raise ValueError("FatSecret API credentials are missing")
+    # Slow path: Need to refresh token - acquire lock to prevent duplicate refreshes
+    async with _token_lock:
+        # Double-check after acquiring lock (another coroutine may have refreshed it)
+        current_time = time.time()
+        if oauth_token and token_expiry > current_time + 60:
+            logger.info("Token was refreshed by another request, using cached token")
+            return oauth_token
+        
+        logger.info(f"Getting new FatSecret OAuth token")
+        
+        try:
+            # Check if credentials are available
+            if not FATSECRET_CLIENT_ID or not FATSECRET_CLIENT_SECRET:
+                logger.error("FatSecret API credentials are not configured properly")
+                raise ValueError("FatSecret API credentials are missing")
+                
+            # Prepare Basic Auth header
+            credentials = f"{FATSECRET_CLIENT_ID}:{FATSECRET_CLIENT_SECRET}"
+            encoded_credentials = base64.b64encode(credentials.encode()).decode()
             
-        # Prepare Basic Auth header
-        credentials = f"{FATSECRET_CLIENT_ID}:{FATSECRET_CLIENT_SECRET}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
-        
-        # Get a client from the connection pool
-        client = await get_http_client(
-            "fatsecret_auth", 
-            headers={
-                "Authorization": f"Basic {encoded_credentials}",
-                "Content-Type": "application/x-www-form-urlencoded"
-            }
-        )
-        
-        # Request a new token - use hardcoded URL to avoid variable issues
-        logger.info("Making token request to https://oauth.fatsecret.com/connect/token")
-        response = await request_with_retry(
-            "POST",
-            "https://oauth.fatsecret.com/connect/token",
-            client,
-            data={
-                "grant_type": "client_credentials",
-                "scope": "basic premier barcode"
-            }
-        )
-        
-        data = response.json()
-        oauth_token = data.get("access_token")
-        
-        # Calculate expiry time (subtract 5 minutes for safety)
-        expires_in = data.get("expires_in", 86400)  # Default to 24 hours
-        token_expiry = current_time + expires_in - 300
-        
-        return oauth_token
-    except Exception as e:
-        logger.error(f"Error getting FatSecret OAuth token: {str(e)}")
-        raise
+            # Get a client from the connection pool
+            client = await get_http_client(
+                "fatsecret_auth", 
+                headers={
+                    "Authorization": f"Basic {encoded_credentials}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+            )
+            
+            # Request a new token - use hardcoded URL to avoid variable issues
+            logger.info("Making token request to https://oauth.fatsecret.com/connect/token")
+            response = await request_with_retry(
+                "POST",
+                "https://oauth.fatsecret.com/connect/token",
+                client,
+                data={
+                    "grant_type": "client_credentials",
+                    "scope": "basic premier barcode"
+                }
+            )
+            
+            data = response.json()
+            oauth_token = data.get("access_token")
+            
+            # Calculate expiry time (subtract 5 minutes for safety)
+            expires_in = data.get("expires_in", 86400)  # Default to 24 hours
+            token_expiry = current_time + expires_in - 300
+            
+            logger.info(f"✅ FatSecret token refreshed, expires in {expires_in}s")
+            return oauth_token
+        except Exception as e:
+            logger.error(f"Error getting FatSecret OAuth token: {str(e)}")
+            raise
 
 @cache_response(ttl_seconds=300)  # Cache for 5 minutes
 async def search_food(query: str, max_results: int = 50) -> List[Dict[str, Any]]:

@@ -3,13 +3,13 @@ import base64
 import re
 import json
 import time
-import traceback  # Added to capture full error logs
+import traceback
+import asyncio
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
 from datetime import datetime
 from typing import List, Optional
 from openai import AsyncOpenAI
-from utils.file_manager import FileManager
 from auth.supabase_auth import get_current_user
 
 # Toggle between mock and real API
@@ -41,11 +41,16 @@ except Exception as e:
 router = APIRouter()
 
 
-def encode_image(image_file):
-    """Encodes image file to base64"""
+async def encode_image(image_file):
+    """
+    Encodes image file to base64 (moved to thread pool to prevent blocking)
+    """
     try:
         start_time = time.time()
-        image_data = image_file.read()
+        
+        # Read image data in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        image_data = await loop.run_in_executor(None, image_file.read)
         
         # Validate image data
         if len(image_data) == 0:
@@ -54,7 +59,11 @@ def encode_image(image_file):
         if len(image_data) > 20 * 1024 * 1024:  # 20MB limit
             print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB)")
         
-        encoded_string = base64.b64encode(image_data).decode('utf-8')
+        # Base64 encoding is CPU-intensive, run in thread pool
+        encoded_string = await loop.run_in_executor(
+            None, 
+            lambda: base64.b64encode(image_data).decode('utf-8')
+        )
         
         # Validate base64 encoding
         if not encoded_string or len(encoded_string) < 100:
@@ -193,9 +202,12 @@ async def upload_image(
     image: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Accepts a single image, saves it to disk, and processes it with OpenAI. Returns analysis results only - no database storage."""
-    file_path = None
-    user_id = current_user['supabase_uid']  # Extract user_id from current_user
+    """
+    Processes image in-memory and sends to OpenAI for analysis. 
+    NO disk storage - images are processed and discarded immediately.
+    Frontend handles all persistent storage in SQLite.
+    """
+    user_id = current_user['supabase_uid']
     
     try:
         # Check upload limit for free users
@@ -219,50 +231,21 @@ async def upload_image(
                 )
         
         overall_start_time = time.time()
-        print(f"📸 Received image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
+        print(f"📸 Processing image upload from user {user_id}")
         print(f"✅ Upload limit validation passed: {upload_validation.get('reason', 'unknown')}")
         
-        # Save image file to disk first
+        # Encode image directly from upload (in-memory, no disk I/O)
         try:
-            file_path, url_path = FileManager.save_image_file(image, user_id)
-            print(f"✅ Image saved to: {file_path}")
-            print(f"✅ Image URL: {url_path}")
-            
-            # Create high-quality version for OpenAI analysis (no web optimization needed)
-            ai_analysis_path = FileManager.prepare_image_for_ai_analysis(file_path)
-            
+            await image.seek(0)
+            image_data = await encode_image(image.file)
+            print("✅ Image encoded for OpenAI analysis (in-memory, no disk storage)")
         except Exception as e:
-            print(f"❌ Error saving image file: {e}")
-            raise HTTPException(status_code=500, detail=f"Error saving image: {str(e)}")
-
-        # Encode the high-quality image for OpenAI analysis
-        try:
-            # Use the high-quality version for OpenAI
-            with open(ai_analysis_path, 'rb') as f:
-                image_data = encode_image(f)
-            print("✅ High-quality image encoded for OpenAI analysis")
-        except Exception as e:
-            print(f"❌ Error encoding high-quality image: {e}")
-            # Fallback to original image encoding
-            try:
-                await image.seek(0)
-                image_data = encode_image(image.file)
-                print("✅ Fallback: Original image encoded for OpenAI analysis")
-            except Exception as e2:
-                print(f"❌ Error encoding original image: {e2}")
-                # Clean up saved files on encoding error
-                if file_path:
-                    FileManager.delete_file(file_path)
-                if ai_analysis_path and ai_analysis_path != file_path:
-                    FileManager.delete_file(ai_analysis_path)
-                raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e2)}")
+            print(f"❌ Error encoding image: {e}")
+            raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
 
         # Check if OpenAI client is available
         if client is None:
             print("❌ OpenAI client not available - API key not configured properly")
-            # Clean up saved file and return error
-            if file_path:
-                FileManager.delete_file(file_path)
             raise HTTPException(status_code=500, detail="OpenAI API not configured properly. Please check OPENAI_API_KEY environment variable.")
 
         try:
@@ -432,57 +415,39 @@ REMEMBER: Accurate nutrition analysis requires systematic visual assessment, evi
             # Generate a meal_id for grouping (frontend can use this)
             meal_id = int(datetime.utcnow().timestamp())
             
-            # Add image URL to each food item
+            # Add meal_id to each food item (no image_url - frontend already has it)
             for food in parsed_foods:
-                food["image_url"] = url_path
                 food["meal_id"] = meal_id
                 
             overall_time = time.time() - overall_start_time
             print(f"✅ Total processing time: {overall_time:.2f} seconds")
             
-            # Clean up AI analysis file after successful processing
-            if ai_analysis_path and ai_analysis_path != file_path:
-                FileManager.delete_file(ai_analysis_path)
-            
-            # Record successful upload for rate limiting
+            # Record successful upload for rate limiting (track count only, no image storage)
             try:
                 from utils.db_connection import get_db_connection
-                conn = get_db_connection()
-                conn.execute(
-                    "INSERT INTO image_uploads (user_id, filename) VALUES (?, ?)",
-                    (user_id, url_path)
-                )
-                conn.commit()
-                conn.close()
+                supabase = await get_db_connection()
+                supabase.table("image_uploads").insert({
+                    "user_id": user_id,
+                    "created_at": datetime.utcnow().isoformat()
+                }).execute()
                 print(f"✅ Upload recorded for user {user_id}")
             except Exception as db_error:
                 print(f"⚠️ Failed to record upload: {db_error}")
             
             return {
-                "message": "✅ Image uploaded and analyzed successfully", 
+                "message": "✅ Image analyzed successfully", 
                 "meal_id": meal_id, 
                 "nutrition_data": parsed_foods,
-                "image_url": url_path,
-                "note": "Data returned for frontend to save locally - backend is stateless"
+                "note": "Data returned for frontend to save locally - backend is stateless (no image storage)"
             }
 
         except Exception as e:
             print(f"❌ OpenAI analysis failed: {e}")
-            # Clean up saved files on analysis error
-            if file_path:
-                FileManager.delete_file(file_path)
-            if ai_analysis_path and ai_analysis_path != file_path:
-                FileManager.delete_file(ai_analysis_path)
             raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {str(e)}")
 
     except Exception as e:
         error_trace = traceback.format_exc()
         print(f"❌ FINAL ERROR TRACEBACK:\n{error_trace}")
-        # Clean up saved files on any error
-        if file_path:
-            FileManager.delete_file(file_path)
-        if 'ai_analysis_path' in locals() and ai_analysis_path and ai_analysis_path != file_path:
-            FileManager.delete_file(ai_analysis_path)
         raise HTTPException(status_code=500, detail=f"Final Error: {str(e)}")
 
 
@@ -498,10 +463,11 @@ async def upload_multiple_images(
     context_label: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Accepts multiple images, saves them to disk, and processes them together with OpenAI. Returns analysis results only - no database storage."""
-    saved_files = []
-    nutrition_data = []
-    meal_id = None
+    """
+    Processes multiple images in-memory and sends to OpenAI for analysis.
+    NO disk storage - images are processed and discarded immediately.
+    Frontend handles all persistent storage in SQLite.
+    """
     
     try:
         # Check upload limit for free users
@@ -525,8 +491,7 @@ async def upload_multiple_images(
                 )
         
         overall_start_time = time.time()
-        print(f"📸 Received multiple image upload from user {user_id} (authenticated: {current_user['supabase_uid']})")
-        print(f"Number of images: {len(images)}")
+        print(f"📸 Processing {len(images)} images from user {user_id}")
         print(f"✅ Upload limit validation passed: {upload_validation.get('reason', 'unknown')}")
         
         # Log additional context provided by user
@@ -547,49 +512,22 @@ async def upload_multiple_images(
         else:
             print("📝 No additional context provided by user")
         
-        # Save all images to disk first
-        try:
-            saved_files = FileManager.save_multiple_images(images, user_id)
-            print(f"✅ Saved {len(saved_files)} images to disk")
-            
-            # Optimize all saved images for web delivery and create AI analysis versions
-            ai_analysis_paths = []
-            for file_path, _ in saved_files:
-                # Create high-quality version for OpenAI analysis (no web optimization needed)
-                ai_path = FileManager.prepare_image_for_ai_analysis(file_path)
-                ai_analysis_paths.append(ai_path)
-                
-        except Exception as e:
-            print(f"❌ Error saving image files: {e}")
-            raise HTTPException(status_code=500, detail=f"Error saving images: {str(e)}")
-        
-        # Encode all high-quality images for OpenAI analysis
+        # Encode all images directly from uploads (in-memory, no disk I/O)
         encoding_start_time = time.time()
         encoded_images = []
-        for i, ai_path in enumerate(ai_analysis_paths):
+        for i, image in enumerate(images):
             try:
-                with open(ai_path, 'rb') as f:
-                    image_data = encode_image(f)
+                await image.seek(0)
+                image_data = await encode_image(image.file)
                 encoded_images.append(image_data)
-                print(f"✅ High-quality image {i + 1} encoded successfully")
+                print(f"✅ Image {i + 1}/{len(images)} encoded (in-memory, no disk storage)")
             except Exception as e:
-                print(f"❌ Error encoding high-quality image {i + 1}: {e}")
-                # Fallback to original image encoding
-                try:
-                    await images[i].seek(0)
-                    image_data = encode_image(images[i].file)
-                    encoded_images.append(image_data)
-                    print(f"✅ Fallback: Original image {i + 1} encoded successfully")
-                except Exception as e2:
-                    print(f"❌ Error encoding original image {i + 1}: {e2}")
-                    # Clean up all saved files on encoding error
-                FileManager.cleanup_files([fp for fp, _ in saved_files])
+                print(f"❌ Error encoding image {i + 1}: {e}")
                 raise HTTPException(status_code=500, detail=f"Error encoding image {i + 1}: {str(e)}")
         
         encoding_time = time.time() - encoding_start_time
         print(f"✅ All images encoded in {encoding_time:.2f} seconds")
         
-        # Create content array with all images  
         # Build dynamic prompt text based on user context
         base_prompt = "Analyze these food images and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."
         
@@ -625,8 +563,6 @@ async def upload_multiple_images(
         # Check if OpenAI client is available
         if client is None:
             print("❌ OpenAI client not available - API key not configured properly")
-            # Clean up saved files and return error
-            FileManager.cleanup_files([fp for fp, _ in saved_files])
             raise HTTPException(status_code=500, detail="OpenAI API not configured properly. Please check OPENAI_API_KEY environment variable.")
 
         try:
@@ -873,8 +809,6 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                     print("  - Image file corrupted during upload")
                     print("  - Base64 encoding issue")
                     
-                    # Clean up saved files and return specific error
-                    FileManager.cleanup_files([fp for fp, _ in saved_files])
                     raise HTTPException(
                         status_code=400, 
                         detail="OpenAI could not analyze this image. This usually happens when: 1) The image is too blurry or dark, 2) No food is clearly visible, 3) The image contains people or text. Please try taking a clearer photo focused on the food."
@@ -912,12 +846,8 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                 # Generate a meal_id for grouping (frontend can use this)
                 meal_id = int(datetime.utcnow().timestamp())
                 
-                # Add image URL and meal_id to each food item
-                for i, food in enumerate(nutrition_data):
-                    # Use the corresponding saved file for each food item
-                    if i < len(saved_files):
-                        _, filename = saved_files[i]
-                        food["image_url"] = filename
+                # Add meal_id to each food item (no image URLs - frontend has them)
+                for food in nutrition_data:
                     food["meal_id"] = meal_id
                 
             except json.JSONDecodeError as e:
@@ -941,26 +871,18 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                 
                 if is_refusal:
                     print("🚨 This appears to be a refusal, not a JSON parsing error")
-                    # Clean up saved files and return specific error
-                    FileManager.cleanup_files([fp for fp, _ in saved_files])
                     raise HTTPException(
                         status_code=400, 
                         detail="OpenAI could not analyze this image. This usually happens when: 1) The image is too blurry or dark, 2) No food is clearly visible, 3) The image contains people or text. Please try taking a clearer photo focused on the food."
                     )
                 
-                # Clean up saved files and return parsing error
-                FileManager.cleanup_files([fp for fp, _ in saved_files])
                 raise HTTPException(status_code=500, detail=f"Error parsing nutrition data from OpenAI. Response was not valid JSON: {str(e)}")
             except Exception as e:
                 print(f"❌ Error processing OpenAI response: {e}")
-                # Clean up saved files and return error
-                FileManager.cleanup_files([fp for fp, _ in saved_files])
                 raise HTTPException(status_code=500, detail=f"Error processing response: {str(e)}")
             
         except Exception as e:
             print(f"❌ Error with OpenAI API call: {e}")
-            # Clean up saved files and return error
-            FileManager.cleanup_files([fp for fp, _ in saved_files])
             raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
         
         overall_time = time.time() - overall_start_time
@@ -970,61 +892,33 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
         if meal_id is None:
             meal_id = int(datetime.utcnow().timestamp())
 
-        # Database upload tracking disabled - would be too expensive to store all images
-        # Rate limiting is now handled by the /api/subscription/validate-upload-limit endpoint
-        # which checks VIP status and premium subscriptions via RevenueCat
-
-        # # Record successful upload for rate limiting (DISABLED)
-        # try:
-        #     from utils.db_connection import get_db_connection
-        #     conn = await get_db_connection()
-        #     for _, filename in saved_files:
-        #         await conn.execute(
-        #             "INSERT INTO image_uploads (user_id, filename) VALUES (?, ?)",
-        #             (current_user['supabase_uid'], filename)
-        #         )
-        #     await conn.commit()
-        #     await conn.close()
-        #     print(f"✅ {len(saved_files)} uploads recorded for user {current_user['supabase_uid']}")
-        # except Exception as db_error:
-        #     print(f"⚠️ Failed to record uploads: {db_error}")
+        # Record successful upload for rate limiting (track count only, no image storage)
+        try:
+            from utils.db_connection import get_db_connection
+            supabase = await get_db_connection()
+            supabase.table("image_uploads").insert({
+                "user_id": current_user['supabase_uid'],
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+            print(f"✅ Upload recorded for user {current_user['supabase_uid']}")
+        except Exception as db_error:
+            print(f"⚠️ Failed to record upload: {db_error}")
         
-        # Return success response without cleanup (files intentionally kept)
+        # Return success response
         return {
             "success": True,
             "message": f"Successfully analyzed {len(images)} images",
             "meal_id": meal_id,
-            "files": [filename for _, filename in saved_files],
             "nutrition_data": nutrition_data,
             "processing_time": {
                 "total": round(overall_time, 2),
                 "encoding": round(encoding_time, 2),
                 "api": round(api_time, 2)
-            }
+            },
+            "note": "Images processed in-memory only - no server-side storage"
         }
         
     except Exception as e:
         print(f"❌ Unexpected error in multiple image upload: {e}")
-        # Clean up any saved files on unexpected error
-        if saved_files:
-            FileManager.cleanup_files([fp for fp, _ in saved_files])
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-
-@router.get("/storage-stats")
-async def get_storage_stats():
-    """Get storage statistics for uploaded images."""
-    return FileManager.get_storage_stats()
-
-
-@router.post("/cleanup-old-files")
-async def cleanup_old_files(days_old: int = 30):
-    """Clean up old uploaded files."""
-    return FileManager.cleanup_old_files(days_old)
-
-
-@router.delete("/delete-file/{file_path:path}")
-async def delete_specific_file(file_path: str):
-    """Delete a specific file."""
-    return FileManager.delete_file(file_path)
 

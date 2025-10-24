@@ -8,6 +8,8 @@ from fastapi import UploadFile, HTTPException
 import uuid
 from PIL import Image
 import io
+import aiofiles
+import asyncio
 
 # Configuration
 UPLOAD_DIR = Path("uploads")
@@ -63,9 +65,9 @@ class FileManager:
         return f"user_{user_id}_{timestamp}_{unique_id}{ext}"
     
     @staticmethod
-    def save_image_file(file: UploadFile, user_id: int) -> Tuple[str, str]:
+    async def save_image_file(file: UploadFile, user_id: int) -> Tuple[str, str]:
         """
-        Save uploaded image file to disk
+        Save uploaded image file to disk (async version)
         Returns: (file_path, url_path)
         """
         try:
@@ -73,9 +75,9 @@ class FileManager:
             FileManager.validate_image_file(file)
             
             # Check file size
-            file.file.seek(0, 2)  # Seek to end
-            file_size = file.file.tell()
-            file.file.seek(0)  # Reset to beginning
+            await file.seek(0, 2)  # Seek to end
+            file_size = await file.tell()
+            await file.seek(0)  # Reset to beginning
             
             if file_size > MAX_FILE_SIZE:
                 raise HTTPException(
@@ -87,9 +89,15 @@ class FileManager:
             filename = FileManager.generate_unique_filename(user_id, file.filename)
             file_path = IMAGES_DIR / filename
             
-            # Save file to disk
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            # Save file to disk asynchronously
+            async with aiofiles.open(file_path, "wb") as buffer:
+                # Read in chunks to avoid loading entire file into memory
+                chunk_size = 64 * 1024  # 64KB chunks
+                while True:
+                    chunk = await file.read(chunk_size)
+                    if not chunk:
+                        break
+                    await buffer.write(chunk)
             
             # Generate URL path
             url_path = f"/static/images/{filename}"
@@ -102,9 +110,9 @@ class FileManager:
             raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}")
     
     @staticmethod
-    def save_multiple_images(files: List[UploadFile], user_id: int) -> List[Tuple[str, str]]:
+    async def save_multiple_images(files: List[UploadFile], user_id: int) -> List[Tuple[str, str]]:
         """
-        Save multiple image files
+        Save multiple image files (async version)
         Returns: List of (file_path, url_path) tuples
         """
         saved_files = []
@@ -112,11 +120,11 @@ class FileManager:
         try:
             for i, file in enumerate(files):
                 try:
-                    file_path, url_path = FileManager.save_image_file(file, user_id)
+                    file_path, url_path = await FileManager.save_image_file(file, user_id)
                     saved_files.append((file_path, url_path))
                 except Exception as e:
                     # If any file fails, clean up already saved files
-                    FileManager.cleanup_files([fp for fp, _ in saved_files])
+                    await FileManager.cleanup_files_async([fp for fp, _ in saved_files])
                     raise HTTPException(
                         status_code=400,
                         detail=f"Failed to save image {i+1}: {str(e)}"
@@ -126,7 +134,7 @@ class FileManager:
             
         except Exception as e:
             # Clean up any files that were saved before the error
-            FileManager.cleanup_files([fp for fp, _ in saved_files])
+            await FileManager.cleanup_files_async([fp for fp, _ in saved_files])
             raise e
     
     @staticmethod
@@ -178,6 +186,13 @@ class FileManager:
         for file_path in file_paths:
             if FileManager.delete_file(file_path):
                 deleted_count += 1
+        return deleted_count
+    
+    @staticmethod
+    async def cleanup_files_async(file_paths: List[str]) -> int:
+        """Async version: Clean up multiple files in thread pool"""
+        loop = asyncio.get_event_loop()
+        deleted_count = await loop.run_in_executor(None, FileManager.cleanup_files, file_paths)
         return deleted_count
     
     @staticmethod

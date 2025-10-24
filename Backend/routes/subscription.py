@@ -310,23 +310,21 @@ async def update_subscription_from_webhook(
     event: dict,
     entitlements: dict
 ):
-    """Update subscription status from RevenueCat webhook"""
+    """
+    Update subscription status from RevenueCat webhook - using Supabase client
+    with optimistic locking to prevent race conditions
+    """
     try:
-        conn = get_db_connection()
-        
+        supabase = await get_db_connection()
+
         # Find user by Firebase UID (app_user_id in RevenueCat)
-        user_query = """
-            SELECT id, firebase_uid FROM users 
-            WHERE firebase_uid = ?
-        """
+        user_result = supabase.table("users").select("id, firebase_uid").eq("firebase_uid", app_user_id).execute()
         
-        user_result = conn.execute(user_query, (app_user_id,)).fetchone()
-        
-        if not user_result:
+        if not user_result.data:
             logger.warning(f"User not found for Firebase UID: {app_user_id}")
             return
         
-        user_id = user_result[0]
+        user_id = user_result.data[0]["id"]
         
         # Get premium entitlement data
         premium_entitlement = entitlements.get('premium', {})
@@ -349,61 +347,60 @@ async def update_subscription_from_webhook(
             subscription_data['trial_start_date'] = premium_entitlement.get('original_purchase_date')
             subscription_data['trial_end_date'] = premium_entitlement.get('expires_date')
         
-        # Check if subscription exists
-        existing_query = """
-            SELECT id FROM user_subscriptions 
-            WHERE user_id = ?
-        """
+        # OPTIMISTIC LOCKING: Check if subscription exists and get current version
+        existing_result = supabase.table("user_subscriptions").select("id, version").eq("user_id", user_id).execute()
         
-        existing = conn.execute(existing_query, (user_id,)).fetchone()
-        
-        if existing:
-            # Update existing subscription
-            update_query = """
-                UPDATE user_subscriptions 
-                SET status = ?, start_date = ?, end_date = ?, auto_renew = ?,
-                    subscription_id = ?, original_transaction_id = ?,
-                    trial_start_date = ?, trial_end_date = ?, updated_at = ?
-                WHERE user_id = ?
-            """
+        if existing_result.data:
+            # Update existing subscription with version check for optimistic locking
+            existing_sub = existing_result.data[0]
+            current_version = existing_sub.get("version", 1)
             
-            conn.execute(update_query, (
-                subscription_data['status'],
-                subscription_data['start_date'],
-                subscription_data['end_date'],
-                subscription_data['auto_renew'],
-                subscription_data['subscription_id'],
-                subscription_data['original_transaction_id'],
-                subscription_data.get('trial_start_date'),
-                subscription_data.get('trial_end_date'),
-                subscription_data['updated_at'],
-                user_id
-            ))
+            update_data = {
+                'status': subscription_data['status'],
+                'start_date': subscription_data['start_date'],
+                'end_date': subscription_data['end_date'],
+                'auto_renew': subscription_data['auto_renew'],
+                'subscription_id': subscription_data['subscription_id'],
+                'original_transaction_id': subscription_data['original_transaction_id'],
+                'trial_start_date': subscription_data.get('trial_start_date'),
+                'trial_end_date': subscription_data.get('trial_end_date'),
+                'updated_at': subscription_data['updated_at'],
+                'version': current_version + 1  # Increment version
+            }
+            
+            # Update with version check - this prevents race conditions
+            result = supabase.table("user_subscriptions").update(update_data).eq("user_id", user_id).eq("version", current_version).execute()
+            
+            if not result.data:
+                # Version mismatch - another update happened concurrently
+                logger.warning(f"⚠️ Optimistic lock failure for user {user_id} - concurrent update detected, retrying...")
+                # Retry once with fresh version
+                await asyncio.sleep(0.1)  # Brief delay before retry
+                retry_result = supabase.table("user_subscriptions").select("id, version").eq("user_id", user_id).execute()
+                if retry_result.data:
+                    new_version = retry_result.data[0].get("version", 1)
+                    update_data['version'] = new_version + 1
+                    supabase.table("user_subscriptions").update(update_data).eq("user_id", user_id).eq("version", new_version).execute()
+                    logger.info(f"✅ Retry successful for user {user_id}")
         else:
-            # Create new subscription
-            insert_query = """
-                INSERT INTO user_subscriptions (
-                    user_id, status, start_date, end_date, auto_renew,
-                    subscription_id, original_transaction_id, trial_start_date,
-                    trial_end_date, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
+            # Create new subscription with initial version
+            insert_data = {
+                'user_id': subscription_data['user_id'],
+                'status': subscription_data['status'],
+                'start_date': subscription_data['start_date'],
+                'end_date': subscription_data['end_date'],
+                'auto_renew': subscription_data['auto_renew'],
+                'subscription_id': subscription_data['subscription_id'],
+                'original_transaction_id': subscription_data['original_transaction_id'],
+                'trial_start_date': subscription_data.get('trial_start_date'),
+                'trial_end_date': subscription_data.get('trial_end_date'),
+                'created_at': now,
+                'updated_at': subscription_data['updated_at'],
+                'version': 1  # Initial version
+            }
             
-            conn.execute(insert_query, (
-                subscription_data['user_id'],
-                subscription_data['status'],
-                subscription_data['start_date'],
-                subscription_data['end_date'],
-                subscription_data['auto_renew'],
-                subscription_data['subscription_id'],
-                subscription_data['original_transaction_id'],
-                subscription_data.get('trial_start_date'),
-                subscription_data.get('trial_end_date'),
-                now,
-                subscription_data['updated_at']
-            ))
+            supabase.table("user_subscriptions").insert(insert_data).execute()
         
-        conn.commit()
         logger.info(f"Updated subscription for user {user_id} to status {status}")
 
         # CACHE INVALIDATION: Clear VIP cache to ensure immediate updates
@@ -419,9 +416,6 @@ async def update_subscription_from_webhook(
     except Exception as e:
         logger.error(f"Error updating subscription from webhook: {str(e)}")
         raise
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 @router.post("/start-trial")
 async def start_trial(current_user: dict = Depends(get_current_user)):
@@ -935,17 +929,12 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
             # Use database for rate limiting (more reliable than Redis for this use case)            
             today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
             
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
+            supabase = await get_db_connection()
+
             # Check today's uploads for this user
-            cursor.execute("""
-                SELECT COUNT(*) FROM image_uploads 
-                WHERE user_id = ? AND DATE(created_at) = ?
-            """, (firebase_uid, today))
+            result = supabase.table("image_uploads").select("id", count="exact").eq("user_id", firebase_uid).gte("created_at", f"{today}T00:00:00").execute()
             
-            uploads_today = cursor.fetchone()[0]
-            conn.close()
+            uploads_today = result.count or 0
             
             FREE_USER_DAILY_LIMIT = 1
             
