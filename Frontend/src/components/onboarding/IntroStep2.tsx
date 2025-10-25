@@ -8,6 +8,7 @@ import {
     Dimensions,
     StatusBar,
     Animated,
+    ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
 
 interface IntroStep2Props {
     onNext: () => void;
@@ -73,149 +75,163 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={[styles.signInButton, { top: 0 }]}
+                style={[styles.signInButton, { top: spacing(2) }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >
                 <Text style={styles.signInText}>Sign In</Text>
             </TouchableOpacity>
 
-            <Animated.View
-                style={[
-                    styles.content,
-                    { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+            {/* Scrollable Content */}
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: spacing(10),
+                        paddingBottom: scale(70)
+                    }
                 ]}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={styles.tag}>FITNESS TRANSFORMATION</Text>
-                    <Text style={styles.title}>
-                        <Text style={styles.titleAccent}>Achieve</Text> Your Dream
-                    </Text>
-                    <Text style={styles.title}>Physique</Text>
-                </View>
+                <Animated.View
+                    style={[
+                        styles.content,
+                        { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+                    ]}
+                >
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <Text style={styles.tag}>FITNESS TRANSFORMATION</Text>
+                        <Text style={styles.title}>
+                            <Text style={styles.titleAccent}>Achieve</Text> Your Dream
+                        </Text>
+                        <Text style={styles.title}>Physique</Text>
+                    </View>
 
-                {/* Image Container with Overlays */}
-                <View style={styles.imageContainer}>
-                    <Image
-                        source={require('../../../assets/AthleticMale.png')}
-                        style={styles.fullScreenImage}
-                        resizeMode="cover"
-                    />
-
-                    {/* Dark overlay for better text readability */}
-                    <View style={styles.imageOverlay} />
-
-                    {/* Bottom gradient mask */}
-                    <View style={styles.bottomGradientMask}>
-                        <LinearGradient
-                            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
-                            locations={[0, 0.3, 0.7, 1]}
-                            style={styles.gradientOverlay}
+                    {/* Image Container with Overlays */}
+                    <View style={styles.imageContainer}>
+                        <Image
+                            source={require('../../../assets/AthleticMale.png')}
+                            style={styles.fullScreenImage}
+                            resizeMode="cover"
                         />
-                    </View>
 
-                    {/* Dynamic Stats Positioning */}
-                    {/* Top Left - Fitness Goal */}
-                    <View style={styles.topLeftStat}>
-                        <View style={styles.statCard}>
-                            <View style={styles.statHeader}>
-                                <MaterialCommunityIcons name="dumbbell" size={18} color="#0074dd" />
-                                <View style={styles.trendArrow}>
-                                    <MaterialCommunityIcons name="trending-up" size={12} color="#00dd74" />
+                        {/* Dark overlay for better text readability */}
+                        <View style={styles.imageOverlay} />
+
+                        {/* Bottom gradient mask */}
+                        <View style={styles.bottomGradientMask}>
+                            <LinearGradient
+                                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+                                locations={[0, 0.3, 0.7, 1]}
+                                style={styles.gradientOverlay}
+                            />
+                        </View>
+
+                        {/* Dynamic Stats Positioning */}
+                        {/* Top Left - Fitness Goal */}
+                        <View style={styles.topLeftStat}>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="dumbbell" size={18} color="#0074dd" />
+                                    <View style={styles.trendArrow}>
+                                        <MaterialCommunityIcons name="trending-up" size={12} color="#00dd74" />
+                                    </View>
+                                </View>
+                                <Text style={styles.statValue}>85%</Text>
+                                <Text style={styles.statLabel}>Fitness Goal</Text>
+                                <View style={styles.miniProgressBar}>
+                                    <View style={[styles.miniProgress, { width: '85%' }]} />
                                 </View>
                             </View>
-                            <Text style={styles.statValue}>85%</Text>
-                            <Text style={styles.statLabel}>Fitness Goal</Text>
-                            <View style={styles.miniProgressBar}>
-                                <View style={[styles.miniProgress, { width: '85%' }]} />
+                        </View>
+
+                        {/* Top Right - Muscle Mass */}
+                        <View style={styles.topRightStat}>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="dumbbell" size={18} color="#dd0095" />
+                                    <Text style={styles.percentageBadge}>+8 lbs</Text>
+                                </View>
+                                <Text style={styles.statValue}>152g</Text>
+                                <Text style={styles.statLabel}>Muscle Mass</Text>
+                                <View style={styles.macroBar}>
+                                    <View style={styles.macroSegment} />
+                                    <View style={[styles.macroSegment, { backgroundColor: '#dd0095' }]} />
+                                    <View style={styles.macroSegment} />
+                                </View>
                             </View>
                         </View>
-                    </View>
 
-                    {/* Top Right - Muscle Mass */}
-                    <View style={styles.topRightStat}>
-                        <View style={styles.statCard}>
-                            <View style={styles.statHeader}>
-                                <MaterialCommunityIcons name="dumbbell" size={18} color="#dd0095" />
-                                <Text style={styles.percentageBadge}>+8 lbs</Text>
-                            </View>
-                            <Text style={styles.statValue}>152g</Text>
-                            <Text style={styles.statLabel}>Muscle Mass</Text>
-                            <View style={styles.macroBar}>
-                                <View style={styles.macroSegment} />
-                                <View style={[styles.macroSegment, { backgroundColor: '#dd0095' }]} />
-                                <View style={styles.macroSegment} />
+                        {/* Bottom Right - Current Weight */}
+                        <View style={styles.bottomRightStat}>
+                            <View style={styles.statCard}>
+                                <View style={styles.statHeader}>
+                                    <MaterialCommunityIcons name="weight" size={18} color="#00dd74" />
+                                    <Text style={styles.changeIndicator}>-15 lbs</Text>
+                                </View>
+                                <Text style={styles.statValue}>178</Text>
+                                <Text style={styles.statLabel}>Current Weight</Text>
+                                <View style={styles.sparklineContainer}>
+                                    <View style={styles.sparkline}>
+                                        {[1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4].map((height, index) => (
+                                            <View
+                                                key={index}
+                                                style={[styles.sparkBar, { height: height * 15 + 3 }]}
+                                            />
+                                        ))}
+                                    </View>
+                                </View>
                             </View>
                         </View>
-                    </View>
 
-                    {/* Bottom Right - Current Weight */}
-                    <View style={styles.bottomRightStat}>
-                        <View style={styles.statCard}>
-                            <View style={styles.statHeader}>
-                                <MaterialCommunityIcons name="weight" size={18} color="#00dd74" />
-                                <Text style={styles.changeIndicator}>-15 lbs</Text>
+                        {/* Bottom Progress Overlay */}
+                        <View style={styles.bottomOverlay}>
+                            <View style={styles.subtitleContainer}>
+                                <Text style={styles.subtitle}>
+                                    Track workouts, build muscle, and achieve your dream physique with personalized guidance.
+                                </Text>
                             </View>
-                            <Text style={styles.statValue}>178</Text>
-                            <Text style={styles.statLabel}>Current Weight</Text>
-                            <View style={styles.sparklineContainer}>
-                                <View style={styles.sparkline}>
-                                    {[1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4].map((height, index) => (
-                                        <View
-                                            key={index}
-                                            style={[styles.sparkBar, { height: height * 15 + 3 }]}
+
+                            <View style={styles.quickProgress}>
+                                <View style={styles.progressHeader}>
+                                    <MaterialCommunityIcons name="chart-line" size={14} color="#5c00dd" />
+                                    <Text style={styles.progressTitle}>Transformation Progress</Text>
+                                </View>
+                                <View style={styles.progressBar}>
+                                    <Animated.View style={[styles.progressFill, { width: progressInterpolated }]}>
+                                        <LinearGradient
+                                            colors={['#0074dd', '#5c00dd', '#dd0095']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.progressGradient}
                                         />
-                                    ))}
+                                    </Animated.View>
                                 </View>
+                                <Text style={styles.progressValue}>85% Fitness Achievement</Text>
                             </View>
                         </View>
                     </View>
+                </Animated.View>
+            </ScrollView>
 
-                    {/* Bottom Progress Overlay */}
-                    <View style={styles.bottomOverlay}>
-                        <View style={styles.subtitleContainer}>
-                            <Text style={styles.subtitle}>
-                                Track workouts, build muscle, and achieve your dream physique with personalized guidance.
-                            </Text>
-                        </View>
-
-                        <View style={styles.quickProgress}>
-                            <View style={styles.progressHeader}>
-                                <MaterialCommunityIcons name="chart-line" size={14} color="#5c00dd" />
-                                <Text style={styles.progressTitle}>Transformation Progress</Text>
-                            </View>
-                            <View style={styles.progressBar}>
-                                <Animated.View style={[styles.progressFill, { width: progressInterpolated }]}>
-                                    <LinearGradient
-                                        colors={['#0074dd', '#5c00dd', '#dd0095']}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={styles.progressGradient}
-                                    />
-                                </Animated.View>
-                            </View>
-                            <Text style={styles.progressValue}>85% Fitness Achievement</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* CTA */}
-                <View style={styles.cta}>
-                    <TouchableOpacity style={styles.button} onPress={onNext}>
-                        <LinearGradient
-                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.buttonGradient}
-                        >
-                            <MaterialCommunityIcons name="dumbbell" size={18} color="#fff" />
-                            <Text style={styles.buttonText}>Transform Now</Text>
-                            <Ionicons name="arrow-forward" size={16} color="#fff" />
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
+            {/* Fixed Button at Bottom */}
+            <View style={[styles.fixedButtonContainer, { bottom: Math.max(insets.bottom, spacing(3)) + spacing(25) }]}>
+                <TouchableOpacity style={styles.button} onPress={onNext}>
+                    <LinearGradient
+                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.buttonGradient}
+                    >
+                        <MaterialCommunityIcons name="dumbbell" size={18} color="#fff" />
+                        <Text style={styles.buttonText}>Transform Now</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#fff" />
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -231,17 +247,22 @@ const styles = StyleSheet.create({
         width: width,
         height: height,
     },
-    content: {
+    scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
         paddingHorizontal: spacing(6),
+    },
+    content: {
+        paddingHorizontal: 0,
         paddingTop: 0,
-        paddingBottom: spacing(10),
-        justifyContent: 'flex-start',
-        marginTop: 0,
+        paddingBottom: 0,
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing(2),
+        marginBottom: spacing(1),
+        marginTop: 0,
     },
     tag: {
         fontSize: fontSize('xs'),
@@ -249,7 +270,7 @@ const styles = StyleSheet.create({
         color: '#0074dd',
         letterSpacing: 1.5,
         textTransform: 'uppercase',
-        marginBottom: spacing(3),
+        marginBottom: spacing(1.5),
     },
     title: {
         fontSize: fontSize('3xl'),
@@ -265,7 +286,7 @@ const styles = StyleSheet.create({
         height: hp(60),
         position: 'relative',
         marginHorizontal: -spacing(6),
-        marginBottom: spacing(12),
+        marginBottom: spacing(3),
         borderRadius: borderRadius('lg'),
         overflow: 'hidden',
     },
@@ -477,16 +498,21 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         textAlign: 'center',
     },
-
+    fixedButtonContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        paddingHorizontal: spacing(6),
+        zIndex: 100,
+    },
     cta: {
         alignItems: 'center',
         marginTop: spacing(6),
     },
     button: {
         width: '100%',
-        height: scale(60),
-        borderRadius: scale(30),
-        marginHorizontal: spacing(5),
+        height: scale(56),
+        borderRadius: scale(28),
         overflow: 'hidden',
         elevation: 8,
         shadowColor: '#5c00dd',

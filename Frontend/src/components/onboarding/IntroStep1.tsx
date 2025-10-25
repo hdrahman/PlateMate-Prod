@@ -8,6 +8,7 @@ import {
     Dimensions,
     StatusBar,
     Animated,
+    ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../utils/responsive';
 
 const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700; // iPhone SE, iPhone 8, etc.
 
 interface IntroStep1Props {
     onNext: () => void;
@@ -99,172 +101,186 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={[styles.signInButton, { top: 0 }]}
+                style={[styles.signInButton, { top: spacing(2) }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >
                 <Text style={styles.signInText}>Sign In</Text>
             </TouchableOpacity>
 
-            <Animated.View
-                style={[
-                    styles.content,
-                    { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+            {/* Scrollable Content */}
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: spacing(10),
+                        paddingBottom: scale(70)
+                    }
                 ]}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <Text style={styles.tag}>SMART FOOD RECOGNITION</Text>
-                    <Text style={styles.title}>Instant AI-Powered</Text>
-                    <Text style={styles.titleAccent}>Nutrition Analysis</Text>
-                    <Text style={styles.subtitle}>
-                        Simply snap a photo and get complete nutritional insights in seconds.
-                    </Text>
-                </View>
+                <Animated.View
+                    style={[
+                        styles.content,
+                        { opacity: fadeIn, transform: [{ translateY: slideUp }] }
+                    ]}
+                >
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <Text style={styles.tag}>SMART FOOD RECOGNITION</Text>
+                        <Text style={styles.title}>Instant AI-Powered</Text>
+                        <Text style={styles.titleAccent}>Nutrition Analysis</Text>
+                        <Text style={styles.subtitle}>
+                            Simply snap a photo and get complete nutritional insights in seconds.
+                        </Text>
+                    </View>
 
-                {/* Food Scanner with Floating Nutrition Tags */}
-                <View style={styles.scannerSection}>
-                    <View style={styles.scannerFrame}>
-                        <LinearGradient
-                            colors={['rgba(147,51,234,0.15)', 'rgba(168,85,247,0.1)', 'rgba(196,181,253,0.05)']}
-                            style={styles.frameGradient}
-                        >
-                            <Image
-                                source={require('../../../assets/food.png')}
-                                style={styles.foodImage}
-                                resizeMode="contain"
-                            />
-
-                            {/* Scanning overlay */}
-                            <Animated.View
-                                style={[
-                                    styles.scanLine,
-                                    { transform: [{ translateY: scanY }] }
-                                ]}
+                    {/* Food Scanner with Floating Nutrition Tags */}
+                    <View style={styles.scannerSection}>
+                        <View style={styles.scannerFrame}>
+                            <LinearGradient
+                                colors={['rgba(147,51,234,0.15)', 'rgba(168,85,247,0.1)', 'rgba(196,181,253,0.05)']}
+                                style={styles.frameGradient}
                             >
-                                <LinearGradient
-                                    colors={['transparent', '#9333ea', 'transparent']}
-                                    style={styles.scanGradient}
+                                <Image
+                                    source={require('../../../assets/food.png')}
+                                    style={styles.foodImage}
+                                    resizeMode="contain"
                                 />
-                            </Animated.View>
 
-                            {/* Corner indicators */}
-                            <View style={styles.corners}>
-                                <View style={[styles.corner, styles.topLeft]} />
-                                <View style={[styles.corner, styles.topRight]} />
-                                <View style={[styles.corner, styles.bottomLeft]} />
-                                <View style={[styles.corner, styles.bottomRight]} />
-                            </View>
-
-                            {/* Floating Nutrition Tags */}
-                            {/* Top Left - Calories */}
-                            <View style={styles.nutritionTag1}>
-                                <View style={styles.nutritionTagContent}>
-                                    <MaterialCommunityIcons name="fire" size={10} color="#dd4400" />
-                                    <Text style={styles.nutritionValue}>342</Text>
-                                    <Text style={styles.nutritionLabel}>Cal</Text>
-                                </View>
-                            </View>
-
-                            {/* Top Right - Protein */}
-                            <View style={styles.nutritionTag2}>
-                                <View style={styles.nutritionTagContent}>
-                                    <MaterialCommunityIcons name="dumbbell" size={10} color="#00dd74" />
-                                    <Text style={styles.nutritionValue}>28g</Text>
-                                    <Text style={styles.nutritionLabel}>Protein</Text>
-                                </View>
-                            </View>
-
-                            {/* Bottom Left - Fat */}
-                            <View style={styles.nutritionTag3}>
-                                <View style={styles.nutritionTagContent}>
-                                    <MaterialCommunityIcons name="circle" size={10} color="#FFD700" />
-                                    <Text style={styles.nutritionValue}>12g</Text>
-                                    <Text style={styles.nutritionLabel}>Fat</Text>
-                                </View>
-                            </View>
-
-                            {/* Bottom Right - Carbs */}
-                            <View style={styles.nutritionTag4}>
-                                <View style={styles.nutritionTagContent}>
-                                    <MaterialCommunityIcons name="circle" size={10} color="#5c00dd" />
-                                    <Text style={styles.nutritionValue}>45g</Text>
-                                    <Text style={styles.nutritionLabel}>Carbs</Text>
-                                </View>
-                            </View>
-
-                            {/* Analysis overlay */}
-                            <View style={styles.analysisOverlay}>
+                                {/* Scanning overlay */}
                                 <Animated.View
-                                    style={[styles.analysisLabel, { opacity: particleOpacity }]}
+                                    style={[
+                                        styles.scanLine,
+                                        { transform: [{ translateY: scanY }] }
+                                    ]}
                                 >
-                                    <MaterialCommunityIcons name="brain" size={12} color="#0074dd" />
-                                    <Text style={styles.analysisText}>AI Analyzing...</Text>
-                                </Animated.View>
-                            </View>
-                        </LinearGradient>
-                    </View>
-                </View>
-
-                {/* Features */}
-                <View style={styles.featuresSection}>
-                    <View style={styles.featuresGrid}>
-                        {[
-                            { icon: 'food-apple', title: 'Instant Nutrition', subtitle: 'Facts' },
-                            { icon: 'camera', title: 'Smart Photo', subtitle: 'Recognition' },
-                        ].map((feature, index) => (
-                            <View key={index} style={styles.featureCard}>
-                                <View style={[styles.featureIcon, {
-                                    backgroundColor: index % 2 === 0 ? '#0074dd15' : '#dd009515'
-                                }]}>
-                                    <MaterialCommunityIcons
-                                        name={feature.icon as any}
-                                        size={14}
-                                        color={index % 2 === 0 ? '#0074dd' : '#dd0095'}
+                                    <LinearGradient
+                                        colors={['transparent', '#9333ea', 'transparent']}
+                                        style={styles.scanGradient}
                                     />
-                                </View>
-                                <Text style={styles.featureTitle}>{feature.title}</Text>
-                                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
+                                </Animated.View>
 
-                {/* Stats */}
-                <View style={styles.statsSection}>
-                    <View style={styles.statsRow}>
-                        {[
-                            { value: '99.2%', label: 'Accuracy', color: '#0074dd', icon: 'target' },
-                            { value: '<3s', label: 'Analysis', color: '#dd0095', icon: 'speedometer' },
-                            { value: '10K+', label: 'Foods', color: '#5c00dd', icon: 'database' },
-                        ].map((stat, index) => (
-                            <View key={index} style={styles.statCard}>
-                                <View style={[styles.statIcon, { backgroundColor: stat.color + '15' }]}>
-                                    <MaterialCommunityIcons name={stat.icon as any} size={12} color={stat.color} />
+                                {/* Corner indicators */}
+                                <View style={styles.corners}>
+                                    <View style={[styles.corner, styles.topLeft]} />
+                                    <View style={[styles.corner, styles.topRight]} />
+                                    <View style={[styles.corner, styles.bottomLeft]} />
+                                    <View style={[styles.corner, styles.bottomRight]} />
                                 </View>
-                                <Text style={styles.statValue}>{stat.value}</Text>
-                                <Text style={styles.statLabel}>{stat.label}</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
 
-                {/* CTA */}
-                <View style={styles.cta}>
-                    <TouchableOpacity style={styles.button} onPress={onNext}>
-                        <LinearGradient
-                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.buttonGradient}
-                        >
-                            <MaterialCommunityIcons name="camera" size={16} color="#fff" />
-                            <Text style={styles.buttonText}>Start Scanning</Text>
-                            <Ionicons name="arrow-forward" size={14} color="#fff" />
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
+                                {/* Floating Nutrition Tags */}
+                                {/* Top Left - Calories */}
+                                <View style={styles.nutritionTag1}>
+                                    <View style={styles.nutritionTagContent}>
+                                        <MaterialCommunityIcons name="fire" size={10} color="#dd4400" />
+                                        <Text style={styles.nutritionValue}>342</Text>
+                                        <Text style={styles.nutritionLabel}>Cal</Text>
+                                    </View>
+                                </View>
+
+                                {/* Top Right - Protein */}
+                                <View style={styles.nutritionTag2}>
+                                    <View style={styles.nutritionTagContent}>
+                                        <MaterialCommunityIcons name="dumbbell" size={10} color="#00dd74" />
+                                        <Text style={styles.nutritionValue}>28g</Text>
+                                        <Text style={styles.nutritionLabel}>Protein</Text>
+                                    </View>
+                                </View>
+
+                                {/* Bottom Left - Fat */}
+                                <View style={styles.nutritionTag3}>
+                                    <View style={styles.nutritionTagContent}>
+                                        <MaterialCommunityIcons name="circle" size={10} color="#FFD700" />
+                                        <Text style={styles.nutritionValue}>12g</Text>
+                                        <Text style={styles.nutritionLabel}>Fat</Text>
+                                    </View>
+                                </View>
+
+                                {/* Bottom Right - Carbs */}
+                                <View style={styles.nutritionTag4}>
+                                    <View style={styles.nutritionTagContent}>
+                                        <MaterialCommunityIcons name="circle" size={10} color="#5c00dd" />
+                                        <Text style={styles.nutritionValue}>45g</Text>
+                                        <Text style={styles.nutritionLabel}>Carbs</Text>
+                                    </View>
+                                </View>
+
+                                {/* Analysis overlay */}
+                                <View style={styles.analysisOverlay}>
+                                    <Animated.View
+                                        style={[styles.analysisLabel, { opacity: particleOpacity }]}
+                                    >
+                                        <MaterialCommunityIcons name="brain" size={12} color="#0074dd" />
+                                        <Text style={styles.analysisText}>AI Analyzing...</Text>
+                                    </Animated.View>
+                                </View>
+                            </LinearGradient>
+                        </View>
+                    </View>
+
+                    {/* Features */}
+                    <View style={styles.featuresSection}>
+                        <View style={styles.featuresGrid}>
+                            {[
+                                { icon: 'food-apple', title: 'Instant Nutrition', subtitle: 'Facts' },
+                                { icon: 'camera', title: 'Smart Photo', subtitle: 'Recognition' },
+                            ].map((feature, index) => (
+                                <View key={index} style={styles.featureCard}>
+                                    <View style={[styles.featureIcon, {
+                                        backgroundColor: index % 2 === 0 ? '#0074dd15' : '#dd009515'
+                                    }]}>
+                                        <MaterialCommunityIcons
+                                            name={feature.icon as any}
+                                            size={14}
+                                            color={index % 2 === 0 ? '#0074dd' : '#dd0095'}
+                                        />
+                                    </View>
+                                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Stats */}
+                    <View style={styles.statsSection}>
+                        <View style={styles.statsRow}>
+                            {[
+                                { value: '99.2%', label: 'Accuracy', color: '#0074dd', icon: 'target' },
+                                { value: '<3s', label: 'Analysis', color: '#dd0095', icon: 'speedometer' },
+                                { value: '10K+', label: 'Foods', color: '#5c00dd', icon: 'database' },
+                            ].map((stat, index) => (
+                                <View key={index} style={styles.statCard}>
+                                    <View style={[styles.statIcon, { backgroundColor: stat.color + '15' }]}>
+                                        <MaterialCommunityIcons name={stat.icon as any} size={12} color={stat.color} />
+                                    </View>
+                                    <Text style={styles.statValue}>{stat.value}</Text>
+                                    <Text style={styles.statLabel}>{stat.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                </Animated.View>
+            </ScrollView>
+
+            {/* Fixed Button at Bottom */}
+            <View style={[styles.fixedButtonContainer, { bottom: Math.max(insets.bottom, spacing(3)) + spacing(25) }]}>
+                <TouchableOpacity style={styles.button} onPress={onNext}>
+                    <LinearGradient
+                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.buttonGradient}
+                    >
+                        <MaterialCommunityIcons name="camera" size={16} color="#fff" />
+                        <Text style={styles.buttonText}>Start Scanning</Text>
+                        <Ionicons name="arrow-forward" size={14} color="#fff" />
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -280,17 +296,22 @@ const styles = StyleSheet.create({
         width: width,
         height: height,
     },
-    content: {
+    scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
         paddingHorizontal: spacing(5),
+    },
+    content: {
+        paddingHorizontal: 0,
         paddingTop: 0,
-        paddingBottom: spacing(10),
-        justifyContent: 'flex-start',
-        marginTop: 0,
+        paddingBottom: 0,
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing(4),
+        marginBottom: spacing(1.5),
+        marginTop: 0,
     },
     tag: {
         fontSize: fontSize('xs'),
@@ -298,21 +319,21 @@ const styles = StyleSheet.create({
         color: '#dd0095',
         letterSpacing: 1.5,
         textTransform: 'uppercase',
-        marginBottom: spacing(3),
+        marginBottom: spacing(1.5),
     },
     title: {
         fontSize: fontSize('3xl'),
         fontWeight: '900',
         color: '#fff',
         textAlign: 'center',
-        marginBottom: spacing(1),
+        marginBottom: spacing(0.5),
     },
     titleAccent: {
         fontSize: fontSize('3xl'),
         fontWeight: '900',
         color: '#0074dd',
         textAlign: 'center',
-        marginBottom: spacing(4),
+        marginBottom: spacing(1.5),
     },
     subtitle: {
         fontSize: fontSize('md'),
@@ -323,10 +344,10 @@ const styles = StyleSheet.create({
     },
     scannerSection: {
         alignItems: 'center',
-        marginBottom: spacing(7),
+        marginBottom: spacing(2.5),
         marginHorizontal: spacing(5),
         paddingVertical: 0,
-        marginTop: spacing(1),
+        marginTop: 0,
     },
     scannerFrame: {
         width: wp(95),
@@ -476,7 +497,7 @@ const styles = StyleSheet.create({
         marginLeft: spacing(1),
     },
     featuresSection: {
-        marginBottom: spacing(7),
+        marginBottom: spacing(2.5),
     },
     featuresGrid: {
         flexDirection: 'row',
@@ -516,7 +537,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     statsSection: {
-        marginBottom: spacing(3),
+        marginBottom: spacing(1),
     },
     statsRow: {
         flexDirection: 'row',
@@ -547,15 +568,21 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         textAlign: 'center',
     },
+    fixedButtonContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        paddingHorizontal: spacing(5),
+        zIndex: 100,
+    },
     cta: {
         alignItems: 'center',
         marginTop: spacing(6),
     },
     button: {
         width: '100%',
-        height: scale(60),
-        borderRadius: scale(30),
-        marginHorizontal: spacing(5),
+        height: scale(56),
+        borderRadius: scale(28),
         overflow: 'hidden',
         elevation: 8,
         shadowColor: '#9333ea',
