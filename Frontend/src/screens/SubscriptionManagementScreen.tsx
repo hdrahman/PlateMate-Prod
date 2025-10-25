@@ -381,6 +381,27 @@ const SubscriptionManagementScreen: React.FC = () => {
                     </View>
                 </View>
 
+                {/* Legal links */}
+                <View style={styles.legalLinksContainer}>
+                    <Text style={styles.legalLinksText}>
+                        By subscribing, you agree to our{' '}
+                        <Text
+                            style={styles.legalLink}
+                            onPress={() => navigation.navigate('LegalTerms' as never)}
+                        >
+                            Terms of Use
+                        </Text>
+                        {' '}and{' '}
+                        <Text
+                            style={styles.legalLink}
+                            onPress={() => navigation.navigate('PrivacyPolicy' as never)}
+                        >
+                            Privacy Policy
+                        </Text>
+                        .
+                    </Text>
+                </View>
+
                 <View style={styles.bottomSpacing} />
             </ScrollView>
 
@@ -607,6 +628,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#ccc',
         lineHeight: 20,
+    },
+    // Legal links styles
+    legalLinksContainer: {
+        marginTop: 24,
+        marginBottom: 16,
+        paddingHorizontal: 16,
+    },
+    legalLinksText: {
+        color: '#888',
+        fontSize: 12,
+        lineHeight: 18,
+        textAlign: 'center',
+    },
+    legalLink: {
+        color: '#0074dd',
+        textDecorationLine: 'underline',
+        fontWeight: '600',
     },
     bottomSpacing: {
         height: 40,

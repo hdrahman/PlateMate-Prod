@@ -38,7 +38,7 @@
         "NSMotionUsageDescription": "PlateMate uses motion and fitness data to track your daily steps and help you achieve your fitness goals.",
         "NSHealthShareUsageDescription": "PlateMate uses HealthKit to read your step count data and provide accurate fitness tracking.",
         "NSHealthUpdateUsageDescription": "PlateMate may write step data to HealthKit to keep your fitness data synchronized.",
-        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your Camera to take photos and videos.",
+        "NSCameraUsageDescription": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
         "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -80,13 +80,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera"
+          "cameraPermission": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually."
         }
       ],
       [
         "react-native-vision-camera",
         {
-          "cameraPermissionText": "$(PRODUCT_NAME) needs access to your Camera to take photos and videos.",
+          "cameraPermissionText": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
           "enableMicrophonePermission": false
         }
       ],

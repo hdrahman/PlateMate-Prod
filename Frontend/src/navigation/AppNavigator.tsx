@@ -15,6 +15,8 @@ import Settings from '../screens/Settings';
 import NotificationsScreen from '../screens/Notifications';
 import DataSharing from '../screens/DataSharing';
 import PrivacyPolicy from '../screens/PrivacyPolicy';
+import LegalTerms from '../screens/LegalTerms';
+import AboutCalculations from '../screens/AboutCalculations';
 import FoodLog from '../screens/FoodLog';
 import FoodDetail from '../screens/FoodDetail';
 import NutritionFactsResult from '../screens/NutritionFactsResult';
@@ -44,6 +46,8 @@ type RootStackParamList = {
     Notifications: undefined;
     DataSharing: undefined;
     PrivacyPolicy: undefined;
+    LegalTerms: undefined;
+    AboutCalculations: undefined;
     FoodDetail: { foodId: number };
     NutritionFactsResult: {
         nutritionData: any[];
@@ -130,6 +134,8 @@ const AppNavigator = () => {
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="DataSharing" component={DataSharing} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+                <Stack.Screen name="LegalTerms" component={LegalTerms} />
+                <Stack.Screen name="AboutCalculations" component={AboutCalculations} />
                 <Stack.Screen name="FoodDetail" component={FoodDetail} />
                 <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
                 <Stack.Screen name="Chatbot" component={Chatbot} />

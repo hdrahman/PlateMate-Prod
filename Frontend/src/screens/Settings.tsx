@@ -294,11 +294,25 @@ const SettingsScreen = () => {
                             <Text style={styles.itemText}>Data Sharing</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("PrivacyPolicy")}>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PrivacyPolicy")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#C0C0C030' }]}>
                                 <Ionicons name="document-text-outline" size={20} color="#C0C0C0" />
                             </View>
                             <Text style={styles.itemText}>Privacy Policy</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("LegalTerms")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#E8A87C30' }]}>
+                                <Ionicons name="document-outline" size={20} color="#E8A87C" />
+                            </View>
+                            <Text style={styles.itemText}>Legal</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("AboutCalculations")}>
+                            <View style={[styles.iconBubble, { backgroundColor: '#FFB30030' }]}>
+                                <Ionicons name="calculator-outline" size={20} color="#FFB300" />
+                            </View>
+                            <Text style={styles.itemText}>About Our Calculations</Text>
                             <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
                         </TouchableOpacity>
                     </View>

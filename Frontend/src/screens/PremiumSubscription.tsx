@@ -518,6 +518,27 @@ const PremiumSubscription = () => {
                                     New users get 20 days free automatically. Start a subscription to unlock an additional 10 days (30 days total). Cancel anytime during the trial period. No charges until trial ends.
                                 </Text>
                             </View>
+
+                            {/* Legal links */}
+                            <View style={styles.legalLinksContainer}>
+                                <Text style={styles.legalLinksText}>
+                                    By subscribing, you agree to our{' '}
+                                    <Text
+                                        style={styles.legalLink}
+                                        onPress={() => navigation.navigate('LegalTerms' as never)}
+                                    >
+                                        Terms of Use
+                                    </Text>
+                                    {' '}and{' '}
+                                    <Text
+                                        style={styles.legalLink}
+                                        onPress={() => navigation.navigate('PrivacyPolicy' as never)}
+                                    >
+                                        Privacy Policy
+                                    </Text>
+                                    .
+                                </Text>
+                            </View>
                         </>
                     )}
 
@@ -929,6 +950,23 @@ const styles = StyleSheet.create({
         fontSize: 13,
         lineHeight: 18,
         textAlign: 'center',
+    },
+    // Legal links styles
+    legalLinksContainer: {
+        marginTop: 12,
+        marginBottom: 20,
+        paddingHorizontal: 16,
+    },
+    legalLinksText: {
+        color: '#888',
+        fontSize: 12,
+        lineHeight: 18,
+        textAlign: 'center',
+    },
+    legalLink: {
+        color: '#5A60EA',
+        textDecorationLine: 'underline',
+        fontWeight: '600',
     },
 });
 

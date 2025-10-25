@@ -57,6 +57,8 @@ import Settings from './src/screens/Settings';
 import NotificationsScreen from './src/screens/Notifications';
 import DataSharing from './src/screens/DataSharing';
 import PrivacyPolicy from './src/screens/PrivacyPolicy';
+import LegalTerms from './src/screens/LegalTerms';
+import AboutCalculations from './src/screens/AboutCalculations';
 import CameraScreen from './src/screens/Camera';
 import ImageCaptureScreen from './src/screens/ImageCapture';
 import NutritionFactsResult from './src/screens/NutritionFactsResult';
@@ -439,6 +441,8 @@ function AuthenticatedContent() {
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="DataSharing" component={DataSharing} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+      <Stack.Screen name="LegalTerms" component={LegalTerms} />
+      <Stack.Screen name="AboutCalculations" component={AboutCalculations} />
       <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
       <Stack.Screen name="Analytics" component={Analytics} />
       <Stack.Screen name="FeatureRequests" component={FeatureRequests} />
