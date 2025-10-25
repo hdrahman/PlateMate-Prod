@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../utils/responsive';
 
 import IntroStep1 from './IntroStep1';
 import IntroStep2 from './IntroStep2';
@@ -108,7 +109,7 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
 
                     const dotWidth = scrollX.interpolate({
                         inputRange,
-                        outputRange: [8, 16, 8],
+                        outputRange: [size(8), size(16), size(8)],
                         extrapolate: 'clamp',
                     });
 
@@ -143,103 +144,103 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        height: 40,
+        height: scale(40),
         position: 'absolute',
-        bottom: 20,
+        bottom: spacing(5),
         width: '100%',
     },
     dot: {
-        height: 8,
-        borderRadius: 4,
+        height: size(8),
+        borderRadius: size(4),
         backgroundColor: '#fff',
-        marginHorizontal: 4,
+        marginHorizontal: spacing(1),
     },
     header: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: spacing(10),
     },
     welcomeText: {
-        fontSize: 24,
+        fontSize: fontSize('3xl'),
         color: '#fff',
-        marginBottom: 8,
+        marginBottom: spacing(2),
     },
     appName: {
-        fontSize: 42,
+        fontSize: fontSize('4xl'),
         fontWeight: '700',
         color: '#fff',
         letterSpacing: -1,
     },
     tagline: {
-        fontSize: 16,
+        fontSize: fontSize('lg'),
         color: '#aaa',
-        marginTop: 8,
+        marginTop: spacing(2),
     },
     imageContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 20,
+        marginVertical: spacing(5),
     },
     image: {
-        width: width * 0.5,
-        height: width * 0.5,
+        width: wp(50),
+        height: wp(50),
     },
     featuresContainer: {
-        marginBottom: 40,
+        marginBottom: spacing(10),
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 24,
-        paddingHorizontal: 20,
+        marginBottom: spacing(6),
+        paddingHorizontal: spacing(5),
     },
     featureIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: size(50),
+        height: size(50),
+        borderRadius: size(25),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 16,
+        marginRight: spacing(4),
     },
     featureContent: {
         flex: 1,
     },
     featureTitle: {
-        fontSize: 18,
+        fontSize: fontSize('xl'),
         fontWeight: '600',
         color: '#fff',
-        marginBottom: 4,
+        marginBottom: spacing(1),
     },
     featureDescription: {
-        fontSize: 14,
+        fontSize: fontSize('md'),
         color: '#aaa',
-        lineHeight: 20,
+        lineHeight: scale(20),
     },
     getStartedContainer: {
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: spacing(5),
     },
     getStartedText: {
-        fontSize: 16,
+        fontSize: fontSize('lg'),
         color: '#fff',
         textAlign: 'center',
-        marginBottom: 24,
+        marginBottom: spacing(6),
     },
     button: {
         width: '100%',
-        borderRadius: 12,
+        borderRadius: borderRadius('lg'),
         overflow: 'hidden',
     },
     buttonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 16,
+        paddingVertical: spacing(4),
     },
     buttonText: {
         color: '#fff',
-        fontSize: 18,
+        fontSize: fontSize('xl'),
         fontWeight: '600',
-        marginRight: 8,
+        marginRight: spacing(2),
     },
 });
 
