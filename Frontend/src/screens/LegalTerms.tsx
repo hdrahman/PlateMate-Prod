@@ -106,9 +106,9 @@ export default function LegalTerms() {
                     <View style={styles.medicalDisclaimerContent}>
                         <Text style={styles.medicalDisclaimerTitle}>Medical Disclaimer</Text>
                         <Text style={styles.medicalDisclaimerText}>
-                            PlateMate is a nutrition tracking and informational tool, not a medical device or diagnostic tool. 
-                            It does not provide medical advice, diagnosis, or treatment. Always consult with a qualified 
-                            healthcare professional, registered dietitian, or physician before making changes to your diet, 
+                            PlateMate is a nutrition tracking and informational tool, not a medical device or diagnostic tool.
+                            It does not provide medical advice, diagnosis, or treatment. Always consult with a qualified
+                            healthcare professional, registered dietitian, or physician before making changes to your diet,
                             starting any weight management program, or if you have any medical conditions or concerns.
                         </Text>
                     </View>
