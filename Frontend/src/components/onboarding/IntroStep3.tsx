@@ -488,17 +488,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         letterSpacing: 0.5,
     },
-    dots: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing(1.5),
-    },
-    dot: {
-        width: size(6),
-        height: size(6),
-        borderRadius: size(3),
-        backgroundColor: 'rgba(255,255,255,0.3)',
-    },
     activeDot: {
         backgroundColor: '#dd0095',
     },

@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         height: scale(40),
         position: 'absolute',
-        bottom: spacing(5),
+        bottom: spacing(23),
         width: '100%',
     },
     dot: {
