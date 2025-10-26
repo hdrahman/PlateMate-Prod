@@ -2558,10 +2558,18 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
 
                                     // Single line for all cases
                                     return (
-                                        <View style={{ marginTop: 8 }}>
+                                        <View style={{ marginTop: 8, alignItems: 'center' }}>
                                             <Text style={{ color: textColor, fontSize: 12, textAlign: 'center' }}>
                                                 {displayText}
                                             </Text>
+                                            <TouchableOpacity
+                                                onPress={() => (navigation as any).navigate('AboutCalculations')}
+                                                style={{ marginTop: 4 }}
+                                            >
+                                                <Text style={{ color: '#AA00FF', fontSize: 11, textDecorationLine: 'underline' }}>
+                                                    Learn about our calculations
+                                                </Text>
+                                            </TouchableOpacity>
                                         </View>
                                     );
                                 })()}
