@@ -774,7 +774,8 @@ REMEMBER: It's better to slightly overestimate than significantly underestimate.
                         "content": content
                     }
                 ],
-                max_tokens=4000
+                max_tokens=4000,
+                temperature=0.1  # Low temperature for consistent, deterministic vision analysis
             )
             
             api_time = time.time() - api_start_time
