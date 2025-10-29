@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Ionicons } from '@expo/vector-icons';
@@ -114,6 +114,110 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
     </View>
   );
 };
+
+// Memoized WeightModal component to prevent unnecessary re-renders
+interface WeightModalProps {
+  visible: boolean;
+  newWeight: string;
+  onChangeText: (text: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}
+
+const WeightModal = React.memo<WeightModalProps>(({
+  visible,
+  newWeight,
+  onChangeText,
+  onCancel,
+  onSave
+}) => {
+  const inputRef = useRef<TextInput>(null);
+
+  // Focus input when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      // Small delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  // Extract styles to avoid inline object creation
+  const inputContainerStyle = useMemo(() => ({
+    width: '100%',
+    position: 'relative' as const,
+    marginBottom: 20,
+  }), []);
+
+  const inputDynamicStyle = useMemo(() => ({
+    borderColor: newWeight ? 'rgba(155, 0, 255, 0.6)' : '#555',
+    paddingRight: 40,
+  }), [newWeight]);
+
+  const unitLabelStyle = useMemo(() => ({
+    position: 'absolute' as const,
+    right: 15,
+    top: 15,
+    color: 'rgba(170, 170, 170, 0.8)',
+    fontSize: 16,
+    fontWeight: '400' as const,
+  }), []);
+
+  const cancelButtonStyle = useMemo(() => ({
+    backgroundColor: 'rgba(60, 60, 60, 0.8)',
+    borderWidth: 1,
+    borderColor: '#555',
+  }), []);
+
+  const saveButtonStyle = useMemo(() => ({
+    backgroundColor: 'rgba(55, 0, 110, 0.6)',
+    borderWidth: 1,
+    borderColor: '#9B00FF',
+  }), []);
+
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onCancel}
+    >
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Update Weight</Text>
+          <View style={inputContainerStyle}>
+            <TextInput
+              ref={inputRef}
+              style={[styles.weightInput, inputDynamicStyle]}
+              value={newWeight}
+              onChangeText={onChangeText}
+              placeholder="Enter weight in kg"
+              keyboardType="numeric"
+              placeholderTextColor="rgba(150, 150, 150, 0.6)"
+            />
+            <Text style={unitLabelStyle}>kg</Text>
+          </View>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, cancelButtonStyle]}
+              onPress={onCancel}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, saveButtonStyle]}
+              onPress={onSave}
+            >
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
 
 export default function Home() {
   const navigation = useNavigation();
@@ -634,8 +738,8 @@ export default function Home() {
     }
   }, [profileLoading, weightLoading, currentWeight, startingWeight, weightHistory]);
 
-  // Update the handleAddWeight function
-  const handleAddWeight = async () => {
+  // Update the handleAddWeight function - wrapped with useCallback for stability
+  const handleAddWeight = useCallback(async () => {
     if (!user || !newWeight) return;
 
     try {
@@ -712,7 +816,21 @@ export default function Home() {
       console.error('Error adding weight entry:', error);
       Alert.alert('Error', 'Failed to add weight entry. Please try again.');
     }
-  };
+  }, [user, newWeight, startingWeight, weightHistory]);
+
+  // Memoized callbacks for WeightModal to prevent unnecessary re-renders
+  const handleWeightChange = useCallback((text: string) => {
+    setNewWeight(text);
+  }, []);
+
+  const handleModalCancel = useCallback(() => {
+    setWeightModalVisible(false);
+    setNewWeight('');
+  }, []);
+
+  const handleModalSave = useCallback(() => {
+    handleAddWeight();
+  }, [handleAddWeight]);
 
   // Handler: updates activeIndex when user scrolls horizontally
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -870,75 +988,6 @@ export default function Home() {
     );
   };
 
-  // Add a modal for entering new weight
-  const renderWeightModal = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={weightModalVisible}
-      onRequestClose={() => setWeightModalVisible(false)}
-    >
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <Text style={styles.modalTitle}>Update Weight</Text>
-          <View style={{
-            width: '100%',
-            position: 'relative',
-            marginBottom: 20,
-          }}>
-            <TextInput
-              style={[styles.weightInput, {
-                borderColor: newWeight ? 'rgba(155, 0, 255, 0.6)' : '#555', // More subtle highlight
-                paddingRight: 40, // Make room for the unit label
-              }]}
-              value={newWeight}
-              onChangeText={setNewWeight}
-              placeholder="Enter weight in kg"
-              keyboardType="numeric"
-              placeholderTextColor="rgba(150, 150, 150, 0.6)"
-              autoFocus={true}
-            />
-            <Text style={{
-              position: 'absolute',
-              right: 15,
-              top: 15,
-              color: 'rgba(170, 170, 170, 0.8)',
-              fontSize: 16,
-              fontWeight: '400',
-            }}>
-              kg
-            </Text>
-          </View>
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, {
-                backgroundColor: 'rgba(60, 60, 60, 0.8)',
-                borderWidth: 1,
-                borderColor: '#555',
-              }]}
-              onPress={() => {
-                setWeightModalVisible(false);
-                setNewWeight('');
-              }}
-            >
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, {
-                backgroundColor: 'rgba(55, 0, 110, 0.6)',
-                borderWidth: 1,
-                borderColor: '#9B00FF',
-              }]}
-              onPress={handleAddWeight}
-            >
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
   // Add function to clear weight history
   const handleClearWeightHistory = async () => {
     Alert.alert(
@@ -1093,24 +1142,21 @@ export default function Home() {
     // Run once when the component mounts to ensure today's weight is recorded
     recordTodayWeight();
 
-    // Set up a timer to check at midnight only
-    const checkTimeAndRecordWeight = () => {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
+    // Calculate milliseconds until next midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setHours(24, 0, 0, 0); // Set to midnight tonight/tomorrow
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
 
-      // Check if it's midnight (00:00) - reset the daily recording flag
-      if (hours === 0 && minutes === 0) {
-        setHasRecordedToday(false);
-        recordTodayWeight();
-      }
-    };
+    // Set up a single timeout until midnight (more efficient than polling every minute)
+    const timeoutId = setTimeout(() => {
+      console.log('Midnight reached - resetting daily weight recording flag');
+      setHasRecordedToday(false);
+      // The effect will re-run due to hasRecordedToday changing, which will call recordTodayWeight
+    }, msUntilMidnight);
 
-    // Check every minute for midnight trigger
-    const interval = setInterval(checkTimeAndRecordWeight, 60000);
-
-    // Clear interval on unmount
-    return () => clearInterval(interval);
+    // Clear timeout on unmount
+    return () => clearTimeout(timeoutId);
   }, [user, currentWeight, hasRecordedToday, startingWeight]); // Removed weightHistory from dependencies
 
   useEffect(() => {
@@ -1453,11 +1499,22 @@ export default function Home() {
                 width: SVG_SIZE,
                 height: SVG_SIZE
               }]}>
-                <Text style={[styles.remainingValue, {
-                  fontSize: Math.min(30 * scaleFactor, 60) // Scale font, max 60px
-                }]}>
-                  {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                  <Text style={[styles.remainingValue, {
+                    fontSize: Math.min(30 * scaleFactor, 60) // Scale font, max 60px
+                  }]}>
+                    {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
+                  </Text>
+                  <Text style={{
+                    color: '#FFF',
+                    fontSize: Math.min(16 * scaleFactor, 28),
+                    fontWeight: '500',
+                    opacity: 0.7,
+                    marginLeft: 4
+                  }}>
+                    kcal
+                  </Text>
+                </View>
                 <Text style={[styles.remainingLabel, {
                   fontSize: Math.min(14 * scaleFactor, 24) // Scale font, max 24px
                 }]}>
@@ -1472,14 +1529,44 @@ export default function Home() {
                   <View key={item.label} style={styles.statRowVertical}>
                     <IconComponent name={item.icon as any} size={20} color={item.color} />
                     <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={[styles.statLabel, { color: item.color }]}>{item.label}</Text>
-                      <Text style={styles.statValue}>
-                        {item.label === 'Steps' && stepsLoading ? (
-                          <ActivityIndicator size="small" color="#E040FB" />
-                        ) : (
-                          item.value
-                        )}
+                      <Text
+                        style={[styles.statLabel, { color: item.color }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
+                        {item.label}
                       </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <Text style={styles.statValue}>
+                          {item.label === 'Steps' && stepsLoading ? (
+                            <ActivityIndicator size="small" color="#E040FB" />
+                          ) : (
+                            item.value
+                          )}
+                        </Text>
+                        {item.label !== 'Steps' && item.value !== '---' && item.value !== '-' && (
+                          <Text style={{
+                            color: '#FFF',
+                            fontSize: 10,
+                            fontWeight: '500',
+                            opacity: 0.7,
+                            marginLeft: 2
+                          }}>
+                            kcal
+                          </Text>
+                        )}
+                        {item.label === 'Steps' && item.value !== '---' && item.value !== '-' && !stepsLoading && (
+                          <Text style={{
+                            color: '#FFF',
+                            fontSize: 10,
+                            fontWeight: '500',
+                            opacity: 0.7,
+                            marginLeft: 2
+                          }}>
+                            steps
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   </View>
                 );
@@ -1579,7 +1666,13 @@ export default function Home() {
           <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
       </ScrollView>
-      {renderWeightModal()}
+      <WeightModal
+        visible={weightModalVisible}
+        newWeight={newWeight}
+        onChangeText={handleWeightChange}
+        onCancel={handleModalCancel}
+        onSave={handleModalSave}
+      />
       <WelcomePremiumModal
         visible={showWelcomeModal}
         onClose={() => {

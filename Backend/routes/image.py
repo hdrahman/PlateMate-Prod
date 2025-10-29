@@ -41,9 +41,39 @@ except Exception as e:
 router = APIRouter()
 
 
+def detect_image_format(image_data: bytes) -> str:
+    """
+    Detect image format from magic bytes (file signature) and return MIME type.
+    Supports formats accepted by OpenAI: PNG, JPEG, GIF, WEBP
+    """
+    if len(image_data) < 12:
+        raise ValueError("Image data too small to detect format")
+    
+    # Check magic bytes for different image formats
+    # PNG: 89 50 4E 47 0D 0A 1A 0A
+    if image_data[:8] == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A':
+        return "image/png"
+    
+    # JPEG: FF D8 FF
+    elif image_data[:3] == b'\xFF\xD8\xFF':
+        return "image/jpeg"
+    
+    # GIF: 47 49 46 38 (GIF8)
+    elif image_data[:4] == b'\x47\x49\x46\x38':
+        return "image/gif"
+    
+    # WEBP: RIFF at start and WEBP at offset 8
+    elif image_data[:4] == b'\x52\x49\x46\x46' and image_data[8:12] == b'\x57\x45\x42\x50':
+        return "image/webp"
+    
+    else:
+        raise ValueError(f"Unsupported image format. OpenAI supports: PNG, JPEG, GIF, WEBP. First bytes: {image_data[:12].hex()}")
+
+
 async def encode_image(image_file):
     """
-    Encodes image file to base64 (moved to thread pool to prevent blocking)
+    Encodes image file to base64 and detects the image format.
+    Returns tuple of (base64_string, mime_type)
     """
     try:
         start_time = time.time()
@@ -59,6 +89,10 @@ async def encode_image(image_file):
         if len(image_data) > 20 * 1024 * 1024:  # 20MB limit
             print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB)")
         
+        # Detect image format before encoding
+        mime_type = detect_image_format(image_data)
+        print(f"🎨 Detected image format: {mime_type}")
+        
         # Base64 encoding is CPU-intensive, run in thread pool
         encoded_string = await loop.run_in_executor(
             None, 
@@ -72,7 +106,7 @@ async def encode_image(image_file):
         print(f"✅ Image encoding took {time.time() - start_time:.2f} seconds")
         print(f"📊 Original size: {len(image_data)} bytes, Base64 size: {len(encoded_string)} characters")
         
-        return encoded_string
+        return encoded_string, mime_type
     except Exception as e:
         print(f"❌ Error encoding image: {e}")
         raise HTTPException(status_code=500, detail=f"Error encoding image: {str(e)}")
@@ -235,9 +269,11 @@ async def upload_image(
         print(f"✅ Upload limit validation passed: {upload_validation.get('reason', 'unknown')}")
         
         # Encode image directly from upload (in-memory, no disk I/O)
+        image_base64 = None
+        image_mime_type = None
         try:
             await image.seek(0)
-            image_data = await encode_image(image.file)
+            image_base64, image_mime_type = await encode_image(image.file)
             print("✅ Image encoded for OpenAI analysis (in-memory, no disk storage)")
         except Exception as e:
             print(f"❌ Error encoding image: {e}")
@@ -250,12 +286,12 @@ async def upload_image(
 
         try:
             # Define analyze_food_image function inline
-            async def analyze_food_image(image_data):
+            async def analyze_food_image(image_data, mime_type):
                 """Analyzes a food image using OpenAI's GPT-4o model."""
                 api_start_time = time.time()
                 content = [
                     {"type": "text", "text": "Analyze this food image and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_data}"}}
                 ]
                 
                 print(f"📤 Sending request to OpenAI API")
@@ -406,7 +442,7 @@ REMEMBER: Accurate nutrition analysis requires systematic visual assessment, evi
                 return response.choices[0].message.content.strip()
 
             # Analyze the image
-            gpt_response = await analyze_food_image(image_data)
+            gpt_response = await analyze_food_image(image_base64, image_mime_type)
             print(f"📝 GPT-4 Vision Response: {gpt_response}")
             
             # Parse the response
@@ -514,12 +550,12 @@ async def upload_multiple_images(
         
         # Encode all images directly from uploads (in-memory, no disk I/O)
         encoding_start_time = time.time()
-        encoded_images = []
+        encoded_images = []  # Will store tuples of (base64_string, mime_type)
         for i, image in enumerate(images):
             try:
                 await image.seek(0)
-                image_data = await encode_image(image.file)
-                encoded_images.append(image_data)
+                image_base64, image_mime_type = await encode_image(image.file)
+                encoded_images.append((image_base64, image_mime_type))
                 print(f"✅ Image {i + 1}/{len(images)} encoded (in-memory, no disk storage)")
             except Exception as e:
                 print(f"❌ Error encoding image {i + 1}: {e}")
@@ -553,11 +589,11 @@ async def upload_multiple_images(
         
         content = [{"type": "text", "text": prompt_with_context}]
         
-        # Add all encoded images to the content array
-        for image_data in encoded_images:
+        # Add all encoded images to the content array with their detected MIME types
+        for image_base64, image_mime_type in encoded_images:
             content.append({
                 "type": "image_url", 
-                "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
+                "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}
             })
         
         # Check if OpenAI client is available

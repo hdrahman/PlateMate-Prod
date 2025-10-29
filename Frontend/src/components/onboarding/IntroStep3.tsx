@@ -9,6 +9,7 @@ import {
     StatusBar,
     Animated,
     ScrollView,
+    useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,8 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../utils/responsive';
 
-const { width, height } = Dimensions.get('window');
-const isSmallScreen = height < 700;
+// Module-level dimensions for StyleSheet (styles are created once at module load)
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface IntroStep3Props {
     onNext: () => void;
@@ -26,6 +27,8 @@ interface IntroStep3Props {
 const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const { width, height } = useWindowDimensions(); // Use hook for dynamic calculations
+    const isSmallScreen = height < 700; // Calculate inside component
     const fadeIn = useRef(new Animated.Value(0)).current;
     const slideUp = useRef(new Animated.Value(20)).current;
     const progressWidth = useRef(new Animated.Value(0)).current;
@@ -71,7 +74,7 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
 
     return (
         <View style={styles.container}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <StatusBar backgroundColor="transparent" barStyle="light-content" />
             <LinearGradient
                 colors={['#000000', '#0a0a1c', '#1a1a35']}
                 style={styles.background}
@@ -92,7 +95,7 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: spacing(10),
+                        paddingTop: Math.max(insets.top, spacing(10)),
                         paddingBottom: scale(70)
                     }
                 ]}
@@ -253,14 +256,14 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
 
 const styles = StyleSheet.create({
     container: {
-        width: width,
-        height: height,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
         backgroundColor: 'rgba(15,15,30,1)',
     },
     background: {
         position: 'absolute',
-        width: width,
-        height: height,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
     },
     scrollView: {
         flex: 1,

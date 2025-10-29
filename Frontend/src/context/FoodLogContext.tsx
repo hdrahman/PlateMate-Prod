@@ -86,7 +86,7 @@ interface FoodLogContextType {
     getLogsByDate: (date: Date) => Promise<FoodLogEntry[]>;
     startWatchingFoodLogs: () => void;
     stopWatchingFoodLogs: () => void;
-    lastUpdated: number; // Timestamp of last update
+    lastUpdated: number; // Timestamp of last update (stored as ref, does NOT trigger re-renders)
     forceSingleRefresh: () => Promise<void>;
 }
 
@@ -172,15 +172,16 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [hasError, setHasError] = useState<boolean>(false);
     const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
-    const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
     const [errorCount, setErrorCount] = useState<number>(0);
     const [isWatching, setIsWatching] = useState<boolean>(false);
     const REFRESH_COOLDOWN = 500; // 500ms cooldown between manual refreshes
 
-    // Use ref to track the current date being displayed
+    // Use refs to track internal state without triggering re-renders
     const currentDateRef = useRef<Date>(new Date());
     const isInitialLoadRef = useRef<boolean>(true);
     const unsubscribeRef = useRef<(() => void) | null>(null);
+    const lastUpdatedRef = useRef<number>(Date.now()); // Changed from state to ref to prevent broadcasting
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Reset error state
     const resetErrorState = useCallback(() => {
@@ -220,10 +221,19 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         return totals;
     };
 
-    // Callback for when database changes are detected
+    // Callback for when database changes are detected (debounced to prevent excessive refreshes)
     const handleDatabaseChange = useCallback(async () => {
-        console.log('Database change detected, refreshing data');
-        await refreshLogs(currentDateRef.current);
+        // Clear any pending debounce timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Set a new debounce timer (300ms delay)
+        debounceTimerRef.current = setTimeout(async () => {
+            console.log('Database change detected, refreshing data');
+            await refreshLogs(currentDateRef.current);
+            debounceTimerRef.current = null;
+        }, 300);
     }, []);
 
     // Refresh logs for a specific date or today
@@ -266,8 +276,8 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
                 // Always update the general foodLogs state
                 setFoodLogs(logs);
 
-                // Update timestamp when data is refreshed
-                setLastUpdated(Date.now());
+                // Update timestamp when data is refreshed (using ref to avoid re-renders)
+                lastUpdatedRef.current = Date.now();
 
                 // After first successful load, mark as no longer initial
                 if (isInitialLoadRef.current) {
@@ -317,9 +327,14 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         initialLoad();
 
-        // Clean up any subscriptions when unmounting
+        // Clean up any subscriptions and timers when unmounting
         return () => {
             stopWatchingFoodLogs();
+            // Clean up debounce timer
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
         };
     }, []);
 
@@ -341,7 +356,7 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
             }
 
             setFoodLogs(logs);
-            setLastUpdated(Date.now());
+            lastUpdatedRef.current = Date.now(); // Using ref to avoid re-renders
 
             // Reset error state on successful refresh
             resetErrorState();
@@ -438,8 +453,8 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
                 });
             }
 
-            // Update timestamp immediately for responsive UI
-            setLastUpdated(Date.now());
+            // Update timestamp immediately for responsive UI (using ref to avoid re-renders)
+            lastUpdatedRef.current = Date.now();
 
             // Now wait for the actual database operation to complete
             const id = await idPromise;
@@ -471,24 +486,38 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     };
 
+    // Memoize context value to prevent unnecessary re-renders
+    const contextValue = React.useMemo(() => ({
+        foodLogs,
+        todayLogs,
+        nutrientTotals,
+        isLoading,
+        hasError,
+        addFoodLog,
+        refreshLogs,
+        getTotalsByDate,
+        getLogsByDate,
+        startWatchingFoodLogs,
+        stopWatchingFoodLogs,
+        lastUpdated: lastUpdatedRef.current, // Using ref value to avoid triggering re-renders
+        forceSingleRefresh
+    }), [
+        foodLogs,
+        todayLogs,
+        nutrientTotals,
+        isLoading,
+        hasError,
+        addFoodLog,
+        refreshLogs,
+        getTotalsByDate,
+        getLogsByDate,
+        startWatchingFoodLogs,
+        stopWatchingFoodLogs,
+        forceSingleRefresh
+    ]);
+
     return (
-        <FoodLogContext.Provider
-            value={{
-                foodLogs,
-                todayLogs,
-                nutrientTotals,
-                isLoading,
-                hasError,
-                addFoodLog,
-                refreshLogs,
-                getTotalsByDate,
-                getLogsByDate,
-                startWatchingFoodLogs,
-                stopWatchingFoodLogs,
-                lastUpdated,
-                forceSingleRefresh
-            }}
-        >
+        <FoodLogContext.Provider value={contextValue}>
             {children}
         </FoodLogContext.Provider>
     );

@@ -317,22 +317,23 @@ async def update_subscription_from_webhook(
     try:
         supabase = await get_db_connection()
 
-        # Find user by Firebase UID (app_user_id in RevenueCat)
-        user_result = supabase.table("users").select("id, firebase_uid").eq("firebase_uid", app_user_id).execute()
-        
+        # app_user_id from RevenueCat IS the firebase_uid
+        # No need to lookup users table - we already have the firebase_uid
+
+        # Verify user exists
+        user_result = supabase.table("users").select("firebase_uid").eq("firebase_uid", app_user_id).execute()
+
         if not user_result.data:
             logger.warning(f"User not found for Firebase UID: {app_user_id}")
             return
-        
-        user_id = user_result.data[0]["id"]
-        
+
         # Get premium entitlement data
         premium_entitlement = entitlements.get('premium', {})
-        
+
         # Prepare subscription data
         now = datetime.utcnow().isoformat()
         subscription_data = {
-            'user_id': user_id,
+            'firebase_uid': app_user_id,
             'status': status,
             'start_date': premium_entitlement.get('original_purchase_date'),
             'end_date': premium_entitlement.get('expires_date'),
@@ -348,13 +349,13 @@ async def update_subscription_from_webhook(
             subscription_data['trial_end_date'] = premium_entitlement.get('expires_date')
         
         # OPTIMISTIC LOCKING: Check if subscription exists and get current version
-        existing_result = supabase.table("user_subscriptions").select("id, version").eq("user_id", user_id).execute()
-        
+        existing_result = supabase.table("user_subscriptions").select("id, version").eq("firebase_uid", app_user_id).execute()
+
         if existing_result.data:
             # Update existing subscription with version check for optimistic locking
             existing_sub = existing_result.data[0]
             current_version = existing_sub.get("version", 1)
-            
+
             update_data = {
                 'status': subscription_data['status'],
                 'start_date': subscription_data['start_date'],
@@ -367,25 +368,25 @@ async def update_subscription_from_webhook(
                 'updated_at': subscription_data['updated_at'],
                 'version': current_version + 1  # Increment version
             }
-            
+
             # Update with version check - this prevents race conditions
-            result = supabase.table("user_subscriptions").update(update_data).eq("user_id", user_id).eq("version", current_version).execute()
-            
+            result = supabase.table("user_subscriptions").update(update_data).eq("firebase_uid", app_user_id).eq("version", current_version).execute()
+
             if not result.data:
                 # Version mismatch - another update happened concurrently
-                logger.warning(f"⚠️ Optimistic lock failure for user {user_id} - concurrent update detected, retrying...")
+                logger.warning(f"⚠️ Optimistic lock failure for user {app_user_id} - concurrent update detected, retrying...")
                 # Retry once with fresh version
                 await asyncio.sleep(0.1)  # Brief delay before retry
-                retry_result = supabase.table("user_subscriptions").select("id, version").eq("user_id", user_id).execute()
+                retry_result = supabase.table("user_subscriptions").select("id, version").eq("firebase_uid", app_user_id).execute()
                 if retry_result.data:
                     new_version = retry_result.data[0].get("version", 1)
                     update_data['version'] = new_version + 1
-                    supabase.table("user_subscriptions").update(update_data).eq("user_id", user_id).eq("version", new_version).execute()
-                    logger.info(f"✅ Retry successful for user {user_id}")
+                    supabase.table("user_subscriptions").update(update_data).eq("firebase_uid", app_user_id).eq("version", new_version).execute()
+                    logger.info(f"✅ Retry successful for user {app_user_id}")
         else:
             # Create new subscription with initial version
             insert_data = {
-                'user_id': subscription_data['user_id'],
+                'firebase_uid': subscription_data['firebase_uid'],
                 'status': subscription_data['status'],
                 'start_date': subscription_data['start_date'],
                 'end_date': subscription_data['end_date'],
@@ -398,10 +399,10 @@ async def update_subscription_from_webhook(
                 'updated_at': subscription_data['updated_at'],
                 'version': 1  # Initial version
             }
-            
+
             supabase.table("user_subscriptions").insert(insert_data).execute()
-        
-        logger.info(f"Updated subscription for user {user_id} to status {status}")
+
+        logger.info(f"Updated subscription for user {app_user_id} to status {status}")
 
         # CACHE INVALIDATION: Clear VIP cache to ensure immediate updates
         # This ensures frontend immediately sees subscription changes via event-driven system
@@ -1015,15 +1016,11 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             logger.info(f"New user detected: {firebase_uid} - proceeding with trial grant")
 
         # Step 2: Grant 20-day promotional trial via RevenueCat API
-        from datetime import datetime as dt, timezone as tz
-        trial_end = dt.now(tz.utc) + timedelta(days=20)
-
         # Use RevenueCat's promotional entitlement grant API
         # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
-        # RevenueCat API v1 no longer accepts expiry_time_ms - duration is managed via dashboard config
-        # or via duration parameter. Trying empty body first (simplest approach).
+        # RevenueCat API requires duration in ISO 8601 format (e.g., P20D for 20 days)
         grant_data = {
-            "duration": "P20D"  # ISO 8601 duration format: 20 days
+            "duration": "P20D"  # Period of 20 Days in ISO 8601 format
         }
 
         result = await call_revenuecat_api(
@@ -1033,6 +1030,10 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
         )
 
         logger.info(f"✅ Successfully granted 20-day promotional trial to user {firebase_uid}")
+
+        # Calculate trial end date for response (for informational purposes)
+        from datetime import datetime as dt, timezone as tz
+        trial_end = dt.now(tz.utc) + timedelta(days=20)
 
         return {
             "success": True,
@@ -1090,13 +1091,10 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
             }
 
         # Step 2: Grant 10-day extended trial via RevenueCat API
-        from datetime import datetime as dt, timezone as tz
-        trial_end = dt.now(tz.utc) + timedelta(days=10)
-
         # Use RevenueCat's promotional entitlement grant API
-        # RevenueCat API v1 no longer accepts expiry_time_ms - using duration parameter instead
+        # RevenueCat API requires duration in ISO 8601 format (e.g., P10D for 10 days)
         grant_data = {
-            "duration": "P10D"  # ISO 8601 duration format: 10 days
+            "duration": "P10D"  # Period of 10 Days in ISO 8601 format
         }
 
         result = await call_revenuecat_api(
@@ -1106,6 +1104,10 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
         )
 
         logger.info(f"✅ Successfully granted 10-day extended trial to user {firebase_uid}")
+
+        # Calculate trial end date for response (for informational purposes)
+        from datetime import datetime as dt, timezone as tz
+        trial_end = dt.now(tz.utc) + timedelta(days=10)
 
         return {
             "success": True,
