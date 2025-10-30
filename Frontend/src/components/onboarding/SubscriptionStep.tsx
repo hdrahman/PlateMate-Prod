@@ -259,9 +259,25 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                     </View>
                 </View>
 
-                <Text style={styles.termsText}>
-                    By continuing, you agree to our Terms of Service and Privacy Policy.
-                </Text>
+                <View style={styles.termsContainer}>
+                    <Text style={styles.termsText}>
+                        By continuing, you agree to our{' '}
+                        <Text
+                            style={styles.termsLink}
+                            onPress={() => (navigation as any).navigate('LegalTerms')}
+                        >
+                            Terms of Service
+                        </Text>
+                        {' '}and{' '}
+                        <Text
+                            style={styles.termsLink}
+                            onPress={() => (navigation as any).navigate('PrivacyPolicy')}
+                        >
+                            Privacy Policy
+                        </Text>
+                        .
+                    </Text>
+                </View>
             </ScrollView>
 
             {/* Trial Notification Popup */}
@@ -429,11 +445,20 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 16,
     },
+    termsContainer: {
+        width: '100%',
+        marginBottom: 16,
+        paddingHorizontal: 20,
+    },
     termsText: {
         color: '#777',
         fontSize: 12,
         textAlign: 'center',
-        marginBottom: 16,
+        lineHeight: 18,
+    },
+    termsLink: {
+        color: '#0074dd',
+        textDecorationLine: 'underline',
     },
     paymentMethodsContainer: {
         alignItems: 'center',

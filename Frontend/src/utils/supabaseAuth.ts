@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
+import { Platform } from 'react-native';
 
 // Import Google Sign In safely - only available in dev builds, not Expo Go
 let GoogleSignin = null;
@@ -26,6 +27,18 @@ try {
 } catch (error) {
     console.log('Google Sign-In not available', error);
     GoogleSignin = null;
+}
+
+// Import Apple Authentication safely - only available on iOS
+let AppleAuthentication = null;
+try {
+    if (Platform.OS === 'ios') {
+        AppleAuthentication = require('expo-apple-authentication');
+        console.log('Apple Authentication module loaded');
+    }
+} catch (error) {
+    console.log('Apple Authentication not available', error);
+    AppleAuthentication = null;
 }
 
 // Auth service for Supabase
@@ -72,7 +85,7 @@ export const supabaseAuth = {
     signInWithGoogle: async () => {
         try {
             console.log('🟡 Starting Google Sign-In flow...');
-            
+
             if (!GoogleSignin) {
                 throw new Error('Google Sign-In not available');
             }
@@ -80,16 +93,16 @@ export const supabaseAuth = {
             // Get Google ID token
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
-            
+
             console.log('🟡 Google Sign-In successful, getting ID token...');
             const { idToken } = await GoogleSignin.getTokens();
-            
+
             if (!idToken) {
                 throw new Error('No ID token received from Google');
             }
 
             console.log('🟡 Signing in to Supabase with Google ID token...');
-            
+
             // Sign in to Supabase with the Google ID token
             const { data, error } = await supabase.auth.signInWithIdToken({
                 provider: 'google',
@@ -120,7 +133,7 @@ export const supabaseAuth = {
                     console.log('Google sign out error (non-critical):', googleError);
                 }
             }
-            
+
             // Sign out from Supabase
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
@@ -189,29 +202,99 @@ export const supabaseAuth = {
         throw new Error('Anonymous sign-in not supported with Supabase');
     },
 
-    // Sign in with Apple (placeholder for compatibility)
+    // Sign in with Apple
     signInWithApple: async () => {
-        throw new Error('Apple sign-in not implemented');
+        try {
+            console.log('🍎 Starting Apple Sign-In flow...');
+
+            if (!AppleAuthentication) {
+                throw new Error('Apple Authentication not available on this platform');
+            }
+
+            // Check if Apple Authentication is available on this device
+            const isAvailable = await AppleAuthentication.isAvailableAsync();
+            if (!isAvailable) {
+                throw new Error('Apple Authentication is not available on this device');
+            }
+
+            console.log('🍎 Apple Authentication is available, prompting user...');
+
+            // Request Apple ID credential
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+
+            console.log('🍎 Apple credential received, signing in to Supabase...');
+
+            // Sign in to Supabase with Apple ID token
+            const { data, error } = await supabase.auth.signInWithIdToken({
+                provider: 'apple',
+                token: credential.identityToken!,
+                nonce: credential.nonce,
+            });
+
+            if (error) {
+                console.error('🔴 Supabase Apple sign-in error:', error);
+                throw error;
+            }
+
+            console.log('✅ Successfully signed in with Apple');
+
+            // Update user profile with Apple name if available
+            if (credential.fullName && (credential.fullName.givenName || credential.fullName.familyName)) {
+                try {
+                    const firstName = credential.fullName.givenName || '';
+                    const lastName = credential.fullName.familyName || '';
+                    const fullName = `${firstName} ${lastName}`.trim();
+
+                    if (fullName) {
+                        await supabase.auth.updateUser({
+                            data: {
+                                full_name: fullName,
+                                display_name: fullName,
+                                first_name: firstName,
+                                last_name: lastName,
+                            }
+                        });
+                        console.log('✅ Updated user profile with Apple name');
+                    }
+                } catch (profileError) {
+                    console.warn('⚠️ Could not update profile with Apple name:', profileError);
+                }
+            }
+
+            return data;
+        } catch (error: any) {
+            if (error.code === 'ERR_REQUEST_CANCELED') {
+                console.log('🍎 User canceled Apple Sign-In');
+                throw new Error('Sign in canceled');
+            }
+            console.error('🔴 Error signing in with Apple:', error);
+            throw error;
+        }
     },
 
     // Update user profile
     updateUserProfile: async (firstName?: string, lastName?: string, additionalData?: any) => {
         try {
             const updates: any = {};
-            
+
             if (firstName !== undefined) {
                 updates.first_name = firstName;
             }
-            
+
             if (lastName !== undefined) {
                 updates.last_name = lastName;
             }
-            
+
             if (firstName && lastName) {
                 updates.full_name = `${firstName} ${lastName}`;
                 updates.display_name = `${firstName} ${lastName}`;
             }
-            
+
             if (additionalData) {
                 Object.assign(updates, additionalData);
             }

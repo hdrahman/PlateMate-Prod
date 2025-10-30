@@ -44,7 +44,10 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": []
+        "com.apple.developer.healthkit.access": [],
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       },
       "runtimeVersion": {
         "policy": "appVersion"
@@ -96,7 +99,8 @@
       "./notifee.plugin.js",
       "expo-font",
       "react-native-health",
-      "expo-asset"
+      "expo-asset",
+      "expo-apple-authentication"
     ],
     "owner": "haamed",
     "extra": {

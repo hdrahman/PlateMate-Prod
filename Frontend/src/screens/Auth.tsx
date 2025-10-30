@@ -27,8 +27,14 @@ import '../types/expo-apple-authentication.d.ts';
 
 // Safe import AppleAuthentication module
 let AppleAuthentication: any = null;
-// We've removed the Apple Authentication module, so this will always be null
-console.log('Apple Authentication not available');
+try {
+    if (Platform.OS === 'ios') {
+        AppleAuthentication = require('expo-apple-authentication');
+        console.log('Apple Authentication module loaded');
+    }
+} catch (error) {
+    console.log('Apple Authentication not available', error);
+}
 
 const { width, height } = Dimensions.get('window');
 
@@ -108,9 +114,24 @@ const Auth = ({ navigation, route }: any) => {
     const returnTo = route?.params?.returnTo;
     const skipIntroSteps = route?.params?.skipIntroSteps;
 
-    // We've removed Apple Authentication, so it's not available
+    // Check if Apple Authentication is available (iOS only)
     useEffect(() => {
-        setIsAppleAuthAvailable(false);
+        const checkAppleAuth = async () => {
+            if (AppleAuthentication && Platform.OS === 'ios') {
+                try {
+                    const isAvailable = await AppleAuthentication.isAvailableAsync();
+                    setIsAppleAuthAvailable(isAvailable);
+                    console.log('Apple Authentication available:', isAvailable);
+                } catch (error) {
+                    console.log('Error checking Apple Authentication availability:', error);
+                    setIsAppleAuthAvailable(false);
+                }
+            } else {
+                setIsAppleAuthAvailable(false);
+            }
+        };
+
+        checkAppleAuth();
     }, []);
 
     // Initial animations
@@ -508,6 +529,21 @@ const Auth = ({ navigation, route }: any) => {
                                     <Text style={styles.socialButtonText}>Continue with Google</Text>
                                 </View>
                             </TouchableOpacity>
+
+                            {/* Apple Sign-In (iOS only) */}
+                            {isAppleAuthAvailable && (
+                                <TouchableOpacity
+                                    style={[styles.socialButton, styles.appleButton]}
+                                    onPress={handleAppleSignIn}
+                                    disabled={isLoading}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.socialButtonContent}>
+                                        <Ionicons name="logo-apple" size={22} color="#FFF" style={styles.socialIcon} />
+                                        <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
                         </Animated.View>
                     )}
                 </ScrollView>
@@ -762,6 +798,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
+    },
+    appleButton: {
+        backgroundColor: '#000',
+        borderColor: '#444',
     },
     socialButtonContent: {
         flexDirection: 'row',
