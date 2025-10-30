@@ -1475,7 +1475,7 @@ const ImageCapture: React.FC = () => {
         <SafeAreaView style={[styles.container, containerStyle]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 12 : insets.top + 12 }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}

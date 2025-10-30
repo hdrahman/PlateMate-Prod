@@ -10,6 +10,7 @@ import {
     Animated,
     ScrollView,
     useWindowDimensions,
+    Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -91,7 +92,7 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Math.max(insets.top, spacing(10)),
+                        paddingTop: Platform.OS === 'ios' ? 0 : Math.max(insets.top, spacing(10)),
                         paddingBottom: scale(70)
                     }
                 ]}

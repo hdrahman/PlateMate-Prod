@@ -9,7 +9,8 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
-    Animated
+    Animated,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -437,7 +438,7 @@ const PremiumSubscription = () => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
 
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : insets.top + 10 }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}

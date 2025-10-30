@@ -182,7 +182,7 @@ const Onboarding = () => {
                 colors={(currentStep === 6 || currentStep === 11) ? ['#000000', '#000000'] : ['#000000', '#121212']}
                 style={styles.background}
             />
-            <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 20 : Math.max(insets.top, 20) }]}>
                 {currentStep > 1 && currentStep <= 8 && (
                     <View style={styles.progressContainer}>
                         {Array.from({ length: TOTAL_ONBOARDING_STEPS }).map((_, index) => (

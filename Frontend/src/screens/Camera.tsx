@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Animated } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Animated, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -260,7 +260,7 @@ export default function CameraScreen() {
                         onMountError={(error) => console.error('Camera mount error:', error)}
                     >
                         {/* Overlay elements positioned inside the camera */}
-                        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                        <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 8 : insets.top + 8 }]}>
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                                 <Ionicons name="arrow-back" size={28} color="#FFF" />
                             </TouchableOpacity>
