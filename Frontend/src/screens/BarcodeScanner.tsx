@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, StatusBar, ActivityIndicator, Alert, TextInput, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, BarcodeScanningResult, useCameraPermissions } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -13,6 +13,7 @@ import { barcodeService } from '../services/BarcodeService';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import tokenManager from '../utils/tokenManager';
+import THEME from '../styles/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -68,6 +69,7 @@ export default function BarcodeScannerScreen() {
 
     const cameraRef = useRef<CameraView>(null);
     const navigation = useNavigation<NavigationProp>();
+    const insets = useSafeAreaInsets();
 
     // Define renderControlBar function before component logic
     const renderControlBar = () => (
@@ -233,11 +235,13 @@ export default function BarcodeScannerScreen() {
     };
 
     const handleCapturePhoto = () => {
-        navigation.navigate('Camera');
+        // Replace instead of navigate to prevent stack buildup
+        navigation.replace('Camera');
     };
 
     const openFoodLog = () => {
-        navigation.navigate('Manual');
+        // Replace instead of navigate to prevent stack buildup
+        navigation.replace('Manual');
     };
 
     // If user denies camera permission
@@ -343,7 +347,7 @@ export default function BarcodeScannerScreen() {
             )}
 
             {/* Simple Header - matching camera screen */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + THEME.spacing.md }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="#FFF" />
                 </TouchableOpacity>
@@ -403,8 +407,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 16,
-        paddingTop: 16,
+        paddingHorizontal: THEME.spacing.md,
+        paddingBottom: THEME.spacing.md,
         backgroundColor: 'transparent',
         position: 'absolute',
         top: 0,
@@ -413,16 +417,16 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     backButton: {
-        padding: 8,
+        padding: THEME.spacing.sm,
     },
     flashButton: {
-        padding: 8,
+        padding: THEME.spacing.sm,
     },
     headerTitle: {
         textAlign: 'center',
-        fontSize: 18,
+        fontSize: THEME.typography.fontSize.lg,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: THEME.text.primary,
     },
 
     // Camera Styles

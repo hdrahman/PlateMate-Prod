@@ -35,6 +35,7 @@ import { navigateToFoodLog } from '../navigation/RootNavigation';
 import { validateUserContext, createLLMContextPayload, UserContextData, validateFoodName, validateBrandName, validateQuantity, validateNotes, getCharacterLimits, isApproachingLimit } from '../utils/inputValidation';
 import SubscriptionManager from '../utils/SubscriptionManager';
 import PremiumFeatureCard from '../components/PremiumFeatureCard';
+import THEME from '../styles/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -1475,7 +1476,7 @@ const ImageCapture: React.FC = () => {
         <SafeAreaView style={[styles.container, containerStyle]}>
             <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+            <View style={[styles.header, { paddingTop: insets.top + THEME.spacing.md }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
@@ -1648,12 +1649,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: sidePadding,
-        paddingBottom: 12,
-        backgroundColor: '#000',
+        paddingBottom: THEME.spacing.md,
+        backgroundColor: THEME.background.primary,
         zIndex: 10,
     },
     backButton: {
-        padding: 4,
+        padding: THEME.spacing.xs,
         width: 28,
     },
     titleContainer: {

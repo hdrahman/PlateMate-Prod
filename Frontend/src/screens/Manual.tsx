@@ -32,6 +32,7 @@ import axios from 'axios';
 import { BACKEND_URL } from '../utils/config';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
+import THEME from '../styles/theme';
 
 // Define navigation type
 type RootStackParamList = {
@@ -398,11 +399,13 @@ export default function Manual() {
     };
 
     const openCamera = () => {
-        navigation.navigate('Camera');
+        // Replace instead of navigate to prevent stack buildup
+        navigation.replace('Camera');
     };
 
     const openBarcodeScanner = () => {
-        navigation.navigate('BarcodeScanner');
+        // Replace instead of navigate to prevent stack buildup
+        navigation.replace('BarcodeScanner');
     };
 
     const openManualEntry = () => {
@@ -446,7 +449,7 @@ export default function Manual() {
             <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
 
             {/* Header with back button and title */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + THEME.spacing.md }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
@@ -635,10 +638,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: THEME.spacing.md,
+        paddingBottom: THEME.spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+        borderBottomColor: THEME.border.light,
     },
     backButton: {
         width: 40,
@@ -649,9 +652,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: THEME.typography.fontSize.lg,
         fontWeight: 'bold',
-        color: WHITE,
+        color: THEME.text.primary,
     },
     // Upload Options (replaced Categories)
     uploadOptionsContainer: {

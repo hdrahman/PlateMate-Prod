@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDefaultMealType } from '../utils/mealTypeUtils';
 import SubscriptionManager from '../utils/SubscriptionManager';
+import THEME from '../styles/theme';
 
 // Define navigation types
 type RootStackParamList = {
@@ -179,12 +180,13 @@ export default function CameraScreen() {
     };
 
     const openBarcode = () => {
-        // Navigate to the barcode scanner screen
-        navigation.navigate('BarcodeScanner');
+        // Replace instead of navigate to prevent stack buildup
+        navigation.replace('BarcodeScanner');
     };
 
     const openFoodLog = () => {
-        navigation.navigate('Manual');
+        // Replace instead of navigate to prevent stack buildup
+        navigation.replace('Manual');
     };
 
     const toggleFlashMode = () => {
@@ -260,7 +262,7 @@ export default function CameraScreen() {
                         onMountError={(error) => console.error('Camera mount error:', error)}
                     >
                         {/* Overlay elements positioned inside the camera */}
-                        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                        <View style={[styles.header, { paddingTop: insets.top + THEME.spacing.md }]}>
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                                 <Ionicons name="arrow-back" size={28} color="#FFF" />
                             </TouchableOpacity>
@@ -344,7 +346,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 16,
+        paddingHorizontal: THEME.spacing.md,
+        paddingBottom: THEME.spacing.md,
         backgroundColor: 'transparent',
         position: 'absolute',
         top: 0,
@@ -353,16 +356,16 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     backButton: {
-        padding: 8,
+        padding: THEME.spacing.sm,
     },
     flashButton: {
-        padding: 8,
+        padding: THEME.spacing.sm,
     },
     headerTitle: {
         textAlign: 'center',
-        fontSize: 18,
+        fontSize: THEME.typography.fontSize.lg,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: THEME.text.primary,
     },
     message: {
         color: '#FFFFFF',
