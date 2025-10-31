@@ -104,102 +104,106 @@ const PremiumSubscription = () => {
         const loadSubscriptionData = async () => {
             try {
                 if (user?.uid) {
-                    // PRIORITY 1: Check if user is VIP via backend
-                    try {
-                        const { BACKEND_URL } = require('../utils/config');
-                        const tokenManager = require('../utils/tokenManager').default;
-                        const { ServiceTokenType } = require('../utils/tokenManager');
+                    // FAST PATH: Use cached subscription data (instant display, no loading)
+                    // SubscriptionService cache is already populated during app launch in AuthContext
+                    console.log('⚡ Fast load: Using cached subscription data');
 
-                        const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
+                    // Get subscription tier from cache (VIP, premium, trial, or free)
+                    const tier = await SubscriptionService.getSubscriptionTier();
+                    console.log('📊 Subscription tier:', tier);
 
-                        const response = await fetch(`${BACKEND_URL}/api/subscription/validate-premium`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json',
-                            },
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-
-                            // If VIP, set special VIP status and skip RevenueCat
-                            if (data.tier === 'vip_lifetime') {
-                                console.log('👑 VIP user detected, displaying VIP status');
-
-                                const vipPlanInfo = {
-                                    planName: 'VIP Lifetime Access',
-                                    isActive: true,
-                                    statusText: `VIP Member • ${data.vip_reason || 'Lifetime Access'}`,
-                                    statusColor: '#FFD700', // Gold color for VIP
-                                    showUpgradePrompt: false
-                                };
-                                setCurrentPlanInfo(vipPlanInfo);
-
-                                // Don't load RevenueCat for VIPs, they don't need it
-                                return;
-                            }
-                        }
-                    } catch (backendError) {
-                        console.warn('⚠️ Backend VIP check failed, continuing with RevenueCat:', backendError);
-                        // Continue to RevenueCat check if backend fails
-                    }
-
-                    // PRIORITY 2: For non-VIP users, load RevenueCat data
-                    // Initialize RevenueCat if not already done
-                    await SubscriptionService.initialize(user.uid);
-
-                    // Load RevenueCat offerings
-                    const offerings = await SubscriptionService.getOfferings();
-                    setRevenueCatOfferings(offerings);
-
-                    // Get current subscription status from RevenueCat
-                    const customerInfo = await SubscriptionService.getCustomerInfo();
-                    const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
-                    setSubscriptionStatus(revenueCatStatus);
-
-                    // Set current plan info for prominent display
-                    if (revenueCatStatus) {
-                        const planInfo = {
-                            planName: revenueCatStatus.status === 'premium_monthly' ? 'Premium Monthly' :
-                                revenueCatStatus.status === 'premium_annual' ? 'Premium Annual' :
-                                    revenueCatStatus.status === 'free_trial' ? 'Free Trial' :
-                                        revenueCatStatus.status === 'free_trial_extended' ? 'Extended Trial' : 'Free Plan',
-                            isActive: ['premium_monthly', 'premium_annual', 'free_trial', 'free_trial_extended'].includes(revenueCatStatus.status),
-                            statusText: revenueCatStatus.status === 'premium_monthly' ? 'Renews monthly' :
-                                revenueCatStatus.status === 'premium_annual' ? 'Renews annually - Save 30%' :
-                                    revenueCatStatus.status === 'free_trial' ? 'Trial active' :
-                                        revenueCatStatus.status === 'free_trial_extended' ? 'Extended trial active' :
-                                            'Limited to 1 image upload per day',
-                            statusColor: ['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status) ? '#00aa44' :
-                                ['free_trial', 'free_trial_extended'].includes(revenueCatStatus.status) ? '#ff8800' : '#ff4444',
-                            showUpgradePrompt: !['premium_monthly', 'premium_annual'].includes(revenueCatStatus.status)
+                    // Set current plan info based on cached tier
+                    if (tier === 'vip_lifetime') {
+                        // VIP user - show special status
+                        console.log('👑 VIP user detected from cache');
+                        const vipPlanInfo = {
+                            planName: 'VIP Lifetime Access',
+                            isActive: true,
+                            statusText: 'VIP Member • Lifetime Access',
+                            statusColor: '#FFD700', // Gold color for VIP
+                            showUpgradePrompt: false
                         };
-                        setCurrentPlanInfo(planInfo);
+                        setCurrentPlanInfo(vipPlanInfo);
+                        // Don't need to load offerings for VIPs
+                        return;
                     }
 
-                    // Pre-select current plan based on RevenueCat status
-                    if (revenueCatStatus?.status) {
-                        let planId: string;
-                        if (revenueCatStatus.status === 'premium_monthly') {
-                            planId = 'premium_monthly';
-                        } else if (revenueCatStatus.status === 'premium_annual') {
-                            planId = 'premium_annual';
-                        } else {
-                            planId = 'premium_monthly'; // Default to monthly for new users
-                        }
-                        setSelectedPlan(planId);
-                    } else {
-                        // Default to monthly for new users (they'll get the trial)
+                    // For non-VIP users, get detailed subscription info from cache
+                    const hasPremiumAccess = await SubscriptionService.hasPremiumAccess();
+
+                    // Map tier to plan info for display
+                    const planInfo = {
+                        planName: tier === 'premium_monthly' ? 'Premium Monthly' :
+                            tier === 'premium_annual' ? 'Premium Annual' :
+                                tier === 'trial' ? 'Free Trial' : 'Free Plan',
+                        isActive: ['premium_monthly', 'premium_annual', 'trial'].includes(tier),
+                        statusText: tier === 'premium_monthly' ? 'Renews monthly' :
+                            tier === 'premium_annual' ? 'Renews annually - Save 30%' :
+                                tier === 'trial' ? 'Trial active' :
+                                    'Limited to 1 image upload per day',
+                        statusColor: ['premium_monthly', 'premium_annual'].includes(tier) ? '#00aa44' :
+                            tier === 'trial' ? '#ff8800' : '#ff4444',
+                        showUpgradePrompt: !['premium_monthly', 'premium_annual'].includes(tier)
+                    };
+                    setCurrentPlanInfo(planInfo);
+
+                    // Pre-select current plan
+                    if (tier === 'premium_monthly') {
                         setSelectedPlan('premium_monthly');
+                    } else if (tier === 'premium_annual') {
+                        setSelectedPlan('premium_annual');
+                    } else {
+                        setSelectedPlan('premium_monthly'); // Default to monthly
+                    }
+
+                    // Load RevenueCat offerings ONLY if needed for purchase flow (non-blocking)
+                    // This happens in background and doesn't affect initial display
+                    if (tier !== 'vip_lifetime') {
+                        loadOfferingsInBackground();
                     }
                 }
             } catch (error) {
                 console.error('Error loading subscription data:', error);
+                // On error, show safe default (free tier)
+                setCurrentPlanInfo({
+                    planName: 'Free Plan',
+                    isActive: false,
+                    statusText: 'Limited to 1 image upload per day',
+                    statusColor: '#ff4444',
+                    showUpgradePrompt: true
+                });
+                setSelectedPlan('premium_monthly');
+            }
+        };
+
+        // Background loading of RevenueCat offerings (doesn't block UI)
+        const loadOfferingsInBackground = async () => {
+            try {
+                console.log('🔄 Background: Loading RevenueCat offerings');
+                // SubscriptionService is already initialized in AuthContext, so we can just get offerings
+                const offerings = await SubscriptionService.getOfferings();
+                setRevenueCatOfferings(offerings);
+
+                // Also get detailed customer info for purchase history
+                const customerInfo = await SubscriptionService.getCustomerInfo();
+                const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
+                setSubscriptionStatus(revenueCatStatus);
+                console.log('✅ Background: RevenueCat data loaded');
+            } catch (error) {
+                console.warn('⚠️ Background: Failed to load RevenueCat offerings:', error);
+                // Non-critical error - user can still see their status from cache
             }
         };
 
         loadSubscriptionData();
+
+        // Set up subscription change listener for real-time updates
+        const handleSubscriptionChange = () => {
+            console.log('📢 Subscription changed, reloading data');
+            loadSubscriptionData();
+        };
+
+        SubscriptionService.addSubscriptionChangeListener(handleSubscriptionChange);
 
         // Animate entrance
         Animated.parallel([
@@ -214,6 +218,11 @@ const PremiumSubscription = () => {
                 useNativeDriver: true
             })
         ]).start();
+
+        // Cleanup listener on unmount
+        return () => {
+            SubscriptionService.removeSubscriptionChangeListener(handleSubscriptionChange);
+        };
     }, [user]);
 
     const handleSubscribe = async (planId?: string) => {

@@ -37,8 +37,7 @@ import { supabase } from '../utils/supabaseClient';
 type RootStackParamList = {
     FoodLog: { refresh?: number };
     Manual: { mealType?: string; sourcePage?: string };
-    Camera: undefined;
-    BarcodeScanner: undefined;
+    Scanner: { mode?: 'camera' | 'barcode' };
     ImageCapture: { mealType: string; photoUri?: string; sourcePage?: string };
     FoodDetail: { foodId: number };
 };
@@ -398,11 +397,11 @@ export default function Manual() {
     };
 
     const openCamera = () => {
-        navigation.navigate('Camera');
+        navigation.navigate('Scanner', { mode: 'camera' });
     };
 
     const openBarcodeScanner = () => {
-        navigation.navigate('BarcodeScanner');
+        navigation.navigate('Scanner', { mode: 'barcode' });
     };
 
     const openManualEntry = () => {

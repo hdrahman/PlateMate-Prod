@@ -10,7 +10,6 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoadingScreen from './src/components/LoadingScreen';
 import GlobalErrorBoundary from './src/components/GlobalErrorBoundary';
-import { handleTakePhoto } from './src/screens/Camera';
 import { getDatabase } from './src/utils/database';
 import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
 import { StepProvider } from './src/context/StepContext';
@@ -59,11 +58,10 @@ import DataSharing from './src/screens/DataSharing';
 import PrivacyPolicy from './src/screens/PrivacyPolicy';
 import LegalTerms from './src/screens/LegalTerms';
 import AboutCalculations from './src/screens/AboutCalculations';
-import CameraScreen from './src/screens/Camera';
+import ScannerScreen from './src/screens/Scanner';
 import ImageCaptureScreen from './src/screens/ImageCapture';
 import NutritionFactsResult from './src/screens/NutritionFactsResult';
 import Nutrients from './src/screens/Nutrients';
-import BarcodeScannerScreen from './src/screens/BarcodeScanner';
 import BarcodeResults from './src/screens/BarcodeResults';
 import ScannedProduct from './src/screens/ScannedProduct';
 import Manual from './src/screens/Manual';
@@ -140,7 +138,7 @@ function CustomTabBarButton({ children }) {
           borderWidth: 0.7,          // reduced from 1 to 0.5
           borderColor: '#FF00F520', // semi-transparent pink border
         }}
-        onPress={() => navigation.navigate('Camera')}
+        onPress={() => navigation.navigate('Scanner', { mode: 'camera' })}
       >
         {children}
       </TouchableOpacity>
@@ -287,8 +285,8 @@ function MainTabs() {
       />
 
       <Tab.Screen
-        name="Camera"
-        component={CameraScreen}
+        name="Scanner"
+        component={ScannerScreen}
         options={{
           headerShown: false,
           tabBarStyle: { display: 'none' }, // Hide the tab bar
@@ -417,11 +415,10 @@ function AuthenticatedContent() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={MainTabs} />
-      <Stack.Screen name="Camera" component={CameraScreen} />
+      <Stack.Screen name="Scanner" component={ScannerScreen} />
       <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
       <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
       <Stack.Screen name="Nutrients" component={Nutrients} />
-      <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
       <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
       <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
       <Stack.Screen name="Manual" component={Manual} />

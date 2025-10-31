@@ -66,8 +66,7 @@ type RootStackParamList = {
         foodName?: string;
         localImagePaths?: string[];
     };
-    Camera: undefined;
-    BarcodeScanner: undefined;
+    Scanner: { mode?: 'camera' | 'barcode' };
     // Add other screens as needed
 };
 

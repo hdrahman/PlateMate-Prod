@@ -58,7 +58,7 @@ const COLORS = {
 // Navigation types
 type RootStackParamList = {
     FoodLog: { refresh?: number };
-    BarcodeScanner: undefined;
+    Scanner: { mode?: 'camera' | 'barcode' };
     ScannedProduct: { foodData: any; mealType?: string };
     Manual: undefined;
 };

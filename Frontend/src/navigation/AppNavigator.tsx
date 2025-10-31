@@ -22,8 +22,7 @@ import FoodDetail from '../screens/FoodDetail';
 import NutritionFactsResult from '../screens/NutritionFactsResult';
 import Chatbot from '../screens/Chatbot';
 import ImageCapture from '../screens/ImageCapture';
-import Camera from '../screens/Camera';
-import BarcodeScanner from '../screens/BarcodeScanner';
+import Scanner from '../screens/Scanner';
 import Manual from '../screens/Manual';
 import MealGallery from '../screens/MealGallery';
 import Home from '../screens/Home';
@@ -61,8 +60,7 @@ type RootStackParamList = {
     };
     Chatbot: undefined;
     ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
-    Camera: undefined;
-    BarcodeScanner: undefined;
+    Scanner: { mode?: 'camera' | 'barcode' };
     Manual: { mealType: string; sourcePage?: string };
     MealGallery: undefined;
     FutureSelfRecordingSimple: undefined;
@@ -140,8 +138,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
                 <Stack.Screen name="Chatbot" component={Chatbot} />
                 <Stack.Screen name="ImageCapture" component={ImageCapture} />
-                <Stack.Screen name="Camera" component={Camera} />
-                <Stack.Screen name="BarcodeScanner" component={BarcodeScanner} />
+                <Stack.Screen name="Scanner" component={Scanner} />
                 <Stack.Screen name="Manual" component={Manual} />
                 <Stack.Screen name="MealGallery" component={MealGallery} />
                 <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />

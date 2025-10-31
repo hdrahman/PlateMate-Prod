@@ -40,7 +40,7 @@ const { width, height } = Dimensions.get('window');
 type RootStackParamList = {
     FoodLog: { refresh?: number };
     BarcodeResults: { foodData: any; mealType?: string };
-    BarcodeScanner: undefined;
+    Scanner: { mode?: 'camera' | 'barcode' };
     Manual: undefined;
 };
 
