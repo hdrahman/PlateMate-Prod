@@ -2460,7 +2460,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontStyle: 'italic', // added italic
     fontWeight: 'bold',   // added bold
-    fontFamily: 'Georgia', // new font for extra flair
   },
   cheatDayBarBackground: {
     marginTop: 8,
@@ -2510,7 +2509,6 @@ const styles = StyleSheet.create({
     textShadowColor: '#9B00FF', // added soft purple shadow
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 4,
-    fontFamily: 'Georgia', // adding a custom font
   },
   remainingLabel: {
     color: '#FFF',
@@ -2556,7 +2554,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textTransform: 'uppercase',
     marginBottom: 4,
-    fontFamily: 'Georgia', // updated font for macro label
   },
   macroRingCenter: {
     position: 'absolute',
@@ -2596,7 +2593,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     fontWeight: 'bold',
-    fontFamily: 'Courier New',
     textAlign: 'center',
     flex: 1,
   },
@@ -2612,7 +2608,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',      // added italic
     fontWeight: 'bold',       // added bold
     textDecorationLine: 'underline', // added underline
-    fontFamily: 'Courier New', // new font style
   },
   /* Pagination Dots */
   dotsContainer: {

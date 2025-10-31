@@ -925,4 +925,3 @@ IMPORTANT REMINDERS:
     except Exception as e:
         print(f"❌ Unexpected error in multiple image upload: {e}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
