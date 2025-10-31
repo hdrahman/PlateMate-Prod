@@ -149,7 +149,7 @@ export default function ScannerScreen() {
                 clearTimeout(timer);
                 setIsCameraReady(false);
             };
-        }, [mode])
+        }, [])
     );
 
     // Handle mode changes
@@ -476,7 +476,7 @@ export default function ScannerScreen() {
 
                         {/* Mode-specific overlays */}
                         {mode === 'camera' && (
-                            <View style={styles.cameraOverlay}>
+                            <View style={styles.cameraOverlay} pointerEvents="box-none">
                                 {/* Animated Camera frame with corners */}
                                 <Animated.View
                                     style={[
@@ -504,7 +504,7 @@ export default function ScannerScreen() {
                         )}
 
                         {mode === 'barcode' && !loading && (
-                            <View style={styles.barcodeOverlay}>
+                            <View style={styles.barcodeOverlay} pointerEvents="box-none">
                                 {/* Barcode scanning frame */}
                                 <View style={styles.scanningFrame}>
                                     <View style={styles.scanLineContainer}>
