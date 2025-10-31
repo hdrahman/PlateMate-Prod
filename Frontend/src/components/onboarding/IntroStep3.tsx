@@ -96,7 +96,7 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? 0 : Math.max(insets.top, spacing(10)),
+                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(2) : Math.max(insets.top, spacing(10)),
                         paddingBottom: scale(70)
                     }
                 ]}
@@ -237,7 +237,7 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
             </ScrollView>
 
             {/* Fixed Button at Bottom */}
-            <View style={[styles.fixedButtonContainer, { bottom: Math.max(insets.bottom, spacing(3)) + spacing(25) }]}>
+            <View style={[styles.fixedButtonContainer, { bottom: spacing(8) }]}>
                 <TouchableOpacity style={styles.button} onPress={handleBeginJourney}>
                     <LinearGradient
                         colors={["#0074dd", "#5c00dd", "#dd0095"]}

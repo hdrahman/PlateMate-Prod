@@ -118,7 +118,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? 0 : Math.max(insets.top, spacing(10)),
+                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(2) : Math.max(insets.top, spacing(10)),
                         paddingBottom: scale(70)
                     }
                 ]}
