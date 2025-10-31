@@ -45,15 +45,15 @@ const getResponsiveDimensions = () => {
     const headerSpace = Platform.OS === 'ios' ? 130 : 120;
     const bottomSpace = Platform.OS === 'ios' ? 90 : 80;
     const availableHeight = height - headerSpace - bottomSpace;
-    
+
     const sidePadding = Math.max(16, width * 0.05);
     const availableWidth = width - (sidePadding * 2);
-    
+
     // For iOS, use more of the available height to fill the screen
     const maxImageHeightRatio = Platform.OS === 'ios' ? 0.72 : 0.60;
     const dynamicImageHeight = Math.min(availableWidth * 1.1, availableHeight * maxImageHeightRatio);
     const sideViewButtonHeight = Platform.OS === 'ios' ? 60 : 70;
-    
+
     return { imageHeight: dynamicImageHeight, sidePadding, sideViewButtonHeight };
 };
 
