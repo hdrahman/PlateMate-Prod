@@ -40,13 +40,20 @@ const { width, height } = Dimensions.get('window');
 
 // Define responsive dimensions
 const getResponsiveDimensions = () => {
-    // Calculate available screen space for better layout
-    const availableHeight = height - 200; // Account for header, status bar, and bottom padding
+    // Calculate available screen space for better layout on iOS
+    // Account for header (~100px), status bar, safe areas, and bottom button (~70px)
+    const headerSpace = Platform.OS === 'ios' ? 130 : 120;
+    const bottomSpace = Platform.OS === 'ios' ? 90 : 80;
+    const availableHeight = height - headerSpace - bottomSpace;
+    
     const sidePadding = Math.max(16, width * 0.05);
-    const availableWidth = width - (sidePadding * 2); // Account for side padding
-    const baseImageHeight = Math.min(650, availableWidth * 1.2); // Increased height significantly
-    const dynamicImageHeight = Math.min(baseImageHeight, availableHeight * 0.8); // Increased from 0.65 to 0.8 for better use of space
-    const sideViewButtonHeight = 80; // Fixed height for side view button
+    const availableWidth = width - (sidePadding * 2);
+    
+    // For iOS, use more of the available height to fill the screen
+    const maxImageHeightRatio = Platform.OS === 'ios' ? 0.72 : 0.60;
+    const dynamicImageHeight = Math.min(availableWidth * 1.1, availableHeight * maxImageHeightRatio);
+    const sideViewButtonHeight = Platform.OS === 'ios' ? 60 : 70;
+    
     return { imageHeight: dynamicImageHeight, sidePadding, sideViewButtonHeight };
 };
 
@@ -1557,12 +1564,7 @@ const ImageCapture: React.FC = () => {
                 locations={[0, 0.5, 1]}
             />
 
-            <ScrollView
-                style={styles.content}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-            >
+            <View style={styles.content}>
                 <View style={styles.instructionsContainer}>
                     <Text style={styles.instructionsTitle}>Capture Your Meal</Text>
                     <Text style={styles.instructionsText}>
@@ -1609,7 +1611,7 @@ const ImageCapture: React.FC = () => {
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </ScrollView>
+            </View>
 
             {/* Analysis Modal */}
             <AnalysisModal
@@ -1679,26 +1681,26 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: sidePadding,
-        paddingTop: 8, // Reduced from 10
-        paddingBottom: 16, // Reduced from 20
+        paddingTop: Platform.OS === 'ios' ? 4 : 8,
+        paddingBottom: Platform.OS === 'ios' ? 8 : 16,
     },
     instructionsContainer: {
-        marginBottom: 8, // Further reduced from 12 to 8 for tighter spacing
+        marginBottom: Platform.OS === 'ios' ? 6 : 8,
         paddingHorizontal: 4,
     },
     instructionsTitle: {
-        fontSize: 22, // Reduced from 24 to save space
+        fontSize: Platform.OS === 'ios' ? 20 : 22,
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: 6, // Reduced from 8 to 6
+        marginBottom: Platform.OS === 'ios' ? 4 : 6,
     },
     instructionsText: {
-        fontSize: 13, // Further reduced from 14 to save space
+        fontSize: Platform.OS === 'ios' ? 12 : 13,
         color: '#aaa',
-        lineHeight: 18, // Reduced from 20 for more compact spacing
+        lineHeight: Platform.OS === 'ios' ? 16 : 18,
     },
     imagesContainer: {
-        marginBottom: 8, // Further reduced from 12 to 8 for tighter spacing
+        marginBottom: Platform.OS === 'ios' ? 6 : 8,
     },
     imagePlaceholderWrapper: {
         width: '100%',
@@ -1714,10 +1716,10 @@ const styles = StyleSheet.create({
         height: imageHeight, // Use same height as primary image
     },
     addSideViewButton: {
-        marginBottom: 12, // Reduced from 16 for tighter spacing
+        marginBottom: Platform.OS === 'ios' ? 6 : 12,
         borderRadius: 12,
         overflow: 'hidden',
-        height: 70, // Reduced from 80 to save space
+        height: sideViewButtonHeight,
     },
     addSideViewGradient: {
         flex: 1,
@@ -1726,31 +1728,31 @@ const styles = StyleSheet.create({
     addSideViewContent: {
         backgroundColor: '#1a1a1a',
         borderRadius: 10,
-        paddingVertical: 16,
+        paddingVertical: Platform.OS === 'ios' ? 12 : 16,
         paddingHorizontal: 20,
         alignItems: 'center',
         justifyContent: 'center',
         flex: 1,
     },
     addSideViewText: {
-        fontSize: 16,
+        fontSize: Platform.OS === 'ios' ? 14 : 16,
         color: '#fff',
         fontWeight: '600',
-        marginTop: 8,
+        marginTop: Platform.OS === 'ios' ? 6 : 8,
     },
     addSideViewSubtext: {
-        fontSize: 13,
+        fontSize: Platform.OS === 'ios' ? 11 : 13,
         color: '#aaa',
         marginTop: 4,
     },
     swipeableContainer: {
-        marginBottom: 6, // Reduced spacing
+        marginBottom: Platform.OS === 'ios' ? 4 : 6,
     },
     dotsContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 12,
+        marginTop: Platform.OS === 'ios' ? 8 : 12,
         paddingHorizontal: 16,
     },
     dot: {
@@ -1885,7 +1887,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#4a4a4a',
     },
     optionalDetailsWrapper: {
-        marginBottom: 12, // Keep normal spacing for sections
+        marginBottom: Platform.OS === 'ios' ? 6 : 12,
         borderRadius: 12,
         backgroundColor: '#1a1a1a',
         overflow: 'hidden',
@@ -1895,7 +1897,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingVertical: Platform.OS === 'ios' ? 8 : 12,
         backgroundColor: '#1a1a1a',
     },
     sectionHeaderContent: {
@@ -1904,65 +1906,65 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     sectionHeaderTitle: {
-        fontSize: 18,
+        fontSize: Platform.OS === 'ios' ? 16 : 18,
         fontWeight: '600',
         color: '#fff',
         marginLeft: 12,
     },
     sectionHeaderSubtitle: {
-        fontSize: 14,
+        fontSize: Platform.OS === 'ios' ? 12 : 14,
         color: '#8A2BE2',
         marginLeft: 8,
         fontWeight: '500',
     },
     optionalDetailsContent: {
         paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingBottom: Platform.OS === 'ios' ? 12 : 20,
         backgroundColor: '#1a1a1a',
     },
     inputGroup: {
-        marginBottom: 20,
+        marginBottom: Platform.OS === 'ios' ? 12 : 20,
     },
     inputLabel: {
-        fontSize: 14,
+        fontSize: Platform.OS === 'ios' ? 13 : 14,
         color: '#fff',
-        marginBottom: 8,
+        marginBottom: Platform.OS === 'ios' ? 6 : 8,
         fontWeight: '500',
     },
     modernInput: {
         backgroundColor: '#2a2a2a',
         borderRadius: 8,
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: Platform.OS === 'ios' ? 10 : 12,
         color: '#fff',
-        fontSize: 16,
+        fontSize: Platform.OS === 'ios' ? 15 : 16,
         borderWidth: 1,
         borderColor: '#333',
     },
     textAreaInput: {
-        height: 80,
+        height: Platform.OS === 'ios' ? 60 : 80,
         textAlignVertical: 'top',
-        paddingTop: 12,
+        paddingTop: Platform.OS === 'ios' ? 10 : 12,
     },
     submitSection: {
-        marginTop: 8,
+        marginTop: Platform.OS === 'ios' ? 4 : 8,
         alignItems: 'center',
     },
     submitButton: {
         width: '100%',
         borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: 12,
+        marginBottom: Platform.OS === 'ios' ? 4 : 12,
     },
     submitGradient: {
-        paddingVertical: 16,
+        paddingVertical: Platform.OS === 'ios' ? 12 : 16,
         paddingHorizontal: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 56,
+        minHeight: Platform.OS === 'ios' ? 48 : 56,
     },
     submitText: {
-        fontSize: 18,
+        fontSize: Platform.OS === 'ios' ? 16 : 18,
         fontWeight: 'bold',
         color: '#fff',
     },
