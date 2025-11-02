@@ -78,13 +78,20 @@ async def encode_image(image_file):
     try:
         start_time = time.time()
         
+        # CRITICAL: Reset file pointer before reading
+        # Without this, subsequent reads return empty data after the first read
+        await asyncio.get_event_loop().run_in_executor(None, image_file.seek, 0)
+        
         # Read image data in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
         image_data = await loop.run_in_executor(None, image_file.read)
         
         # Validate image data
         if len(image_data) == 0:
-            raise ValueError("Image file is empty")
+            raise ValueError("Image file is empty - this may indicate a file pointer issue or corrupted upload")
+        
+        if len(image_data) < 100:
+            raise ValueError(f"Image data too small ({len(image_data)} bytes) - likely corrupted or not a valid image")
         
         if len(image_data) > 20 * 1024 * 1024:  # 20MB limit
             print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB)")
@@ -616,7 +623,8 @@ async def upload_multiple_images(
             print(f"🔍 Debug info:")
             print(f"  - Number of images: {len(encoded_images)}")
             print(f"  - Content array length: {len(content)}")
-            print(f"  - First image data length: {len(encoded_images[0]) if encoded_images else 0} characters")
+            print(f"  - First image base64 length: {len(encoded_images[0][0]) if encoded_images else 0} characters")
+            print(f"  - First image MIME type: {encoded_images[0][1] if encoded_images else 'N/A'}")
             print(f"  - Using model: gpt-4o")
             
             # Build dynamic system message with user context
@@ -776,7 +784,7 @@ IMPORTANT REMINDERS:
                     }
                 ],
                 max_tokens=4000,
-                temperature=0.1  # Low temperature for consistent, deterministic vision analysis
+                temperature=0  # Low temperature for consistent, deterministic vision analysis
             )
             
             api_time = time.time() - api_start_time
@@ -804,12 +812,16 @@ IMPORTANT REMINDERS:
                 if is_refusal:
                     print("❌ OpenAI refused to analyze image")
                     print(f"📝 Full response: {response_content}")
+                    print(f"🔍 Response metadata:")
+                    print(f"  - Model used: {response.model}")
+                    print(f"  - Finish reason: {response.choices[0].finish_reason if response.choices else 'N/A'}")
+                    print(f"  - Image data was: {len(encoded_images[0][0])} characters")
                     print("🔍 Possible causes:")
                     print("  - Image quality too poor")
                     print("  - Image doesn't clearly show food")
                     print("  - Image contains text/people that triggered safety filters")
                     print("  - Image file corrupted during upload")
-                    print("  - Base64 encoding issue")
+                    print("  - Base64 encoding issue (check if image data is empty)")
                     
                     raise HTTPException(
                         status_code=400, 
