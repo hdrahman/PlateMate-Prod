@@ -300,7 +300,7 @@ async def upload_image(
                     {"type": "text", "text": "Analyze this food image and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."},
                     {"type": "image_url", "image_url": {
                         "url": f"data:{mime_type};base64,{image_data}",
-                        "detail": "high"
+                        "detail": "auto"  # Let OpenAI decide - avoids over-processing logos/text that trigger moderation
                     }}
                 ]
                 
@@ -609,7 +609,7 @@ async def upload_multiple_images(
                 "type": "image_url", 
                 "image_url": {
                     "url": f"data:{image_mime_type};base64,{image_base64}",
-                    "detail": "high"
+                    "detail": "auto"  # Let OpenAI decide - avoids over-processing logos/text that trigger moderation
                 }
             })
         
@@ -638,14 +638,39 @@ USER PROVIDED CONTEXT:
 Use this context to guide identification and portion estimation. If the user provided a food name, quantity, or brand, factor that into your analysis.
 """
             
-            # Real API call
+            # Real API call with retry logic for reliability
             api_start_time = time.time()
-            response = await client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"""You are a professional nutritionist and food analysis expert. Analyze food images with scientific precision and mathematical accuracy.
+            
+            # Retry configuration
+            max_retries = 3
+            retry_delay = 1.0  # Start with 1 second
+            models_to_try = ["gpt-4o", "gpt-5-2025-08-07"]  # Fallback to GPT-5 if needed
+            
+            response = None
+            last_error = None
+            successful_model = None
+            
+            for model_idx, model in enumerate(models_to_try):
+                retries_for_this_model = max_retries if model_idx == 0 else 2  # Retry fallback model too
+                
+                for attempt in range(retries_for_this_model):
+                    try:
+                        if attempt > 0:
+                            print(f"🔄 Retry attempt {attempt + 1}/{retries_for_this_model} with {model} after {retry_delay}s delay...")
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                        
+                        if model_idx > 0 and attempt == 0:
+                            print(f"🔀 Falling back to {model} model...")
+                        
+                        response = await client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": f"""You are a professional nutritionist and food analysis expert. Analyze food images with scientific precision and mathematical accuracy.
+
+IMPORTANT CONTEXT: This is a nutrition tracking app analyzing user meal photos. Background items (water bottles, sauce containers, utensils, table surfaces) are normal context for food photography. Focus ONLY on identifying and analyzing the food items on the plate.
 
 SAFETY GUARDRAILS:
 • Analyze FOOD ONLY. If people/faces/bodies are present, ignore them completely.
@@ -777,58 +802,83 @@ IMPORTANT REMINDERS:
 • Be objective; use standardized nutritional data and realistic oil/sauce additions.
 • Enforce the calories ≈ 4/4/9 macro check internally.
 • Output ONLY the JSON array—no other text."""
-                    },
-                    {
-                        "role": "user",
-                        "content": content
-                    }
-                ],
-                max_tokens=4000,
-                temperature=0  # Low temperature for consistent, deterministic vision analysis
-            )
+                                },
+                                {
+                                    "role": "user",
+                                    "content": content
+                                }
+                            ],
+                            max_tokens=4000,
+                            temperature=0  # Zero temperature for maximum determinism
+                        )
+                        
+                        # Check if response is valid (not a refusal)
+                        response_content = response.choices[0].message.content
+                        
+                        # Check for refusal indicators
+                        refusal_indicators = [
+                            "I'm sorry, I can't assist",
+                            "I cannot identify", 
+                            "I'm not able to",
+                            "I can't analyze",
+                            "unable to identify",
+                            "cannot analyze",
+                            "not able to provide"
+                        ]
+                        
+                        response_lower = response_content.lower()
+                        is_refusal = any(indicator.lower() in response_lower for indicator in refusal_indicators)
+                        
+                        if is_refusal:
+                            # This is a refusal, not a success - raise to trigger retry
+                            raise ValueError(f"OpenAI content policy refusal: {response_content[:100]}")
+                        
+                        # Success! Break out of retry loop
+                        successful_model = model
+                        print(f"✅ Successfully analyzed with {model} on attempt {attempt + 1}")
+                        break
+                        
+                    except ValueError as e:
+                        # Content policy refusal - can retry
+                        last_error = e
+                        print(f"⚠️ Attempt {attempt + 1} with {model} failed: {str(e)[:100]}")
+                        if attempt < retries_for_this_model - 1:
+                            continue  # Retry this model
+                        else:
+                            print(f"❌ All retries exhausted for {model}")
+                            break  # Try next model
+                    
+                    except Exception as e:
+                        # API error - can retry
+                        last_error = e
+                        print(f"⚠️ API error on attempt {attempt + 1} with {model}: {str(e)[:100]}")
+                        if attempt < retries_for_this_model - 1:
+                            continue  # Retry this model
+                        else:
+                            print(f"❌ All retries exhausted for {model}")
+                            break  # Try next model
+                
+                # If we got a successful response, break out of model loop
+                if response and successful_model:
+                    break
+            
+            # If all retries and fallbacks failed, raise error
+            if not response or not successful_model:
+                error_msg = f"Failed to analyze image after trying all models and retries. Last error: {str(last_error)}"
+                print(f"❌ {error_msg}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Unable to analyze image after multiple attempts. This may be due to OpenAI service issues. Please try again in a moment."
+                )
             
             api_time = time.time() - api_start_time
-            print(f"✅ OpenAI analysis completed in {api_time:.2f} seconds")
+            print(f"✅ OpenAI analysis completed in {api_time:.2f} seconds using {successful_model}")
             
             # Process the response
             try:
-                response_content = response.choices[0].message.content
                 print(f"📥 OpenAI response: {response_content[:500]}...")
                 
-                # Check if OpenAI refused to analyze the image due to content policy
-                refusal_indicators = [
-                    "I'm sorry, I can't assist",
-                    "I cannot identify", 
-                    "I'm not able to",
-                    "I can't analyze",
-                    "unable to identify",
-                    "cannot analyze",
-                    "not able to provide"
-                ]
-                
-                response_lower = response_content.lower()
-                is_refusal = any(indicator.lower() in response_lower for indicator in refusal_indicators)
-                
-                if is_refusal:
-                    print("❌ OpenAI refused to analyze image")
-                    print(f"📝 Full response: {response_content}")
-                    print(f"🔍 Response metadata:")
-                    print(f"  - Model used: {response.model}")
-                    print(f"  - Finish reason: {response.choices[0].finish_reason if response.choices else 'N/A'}")
-                    print(f"  - Image data was: {len(encoded_images[0][0])} characters")
-                    print("🔍 Possible causes:")
-                    print("  - Image quality too poor")
-                    print("  - Image doesn't clearly show food")
-                    print("  - Image contains text/people that triggered safety filters")
-                    print("  - Image file corrupted during upload")
-                    print("  - Base64 encoding issue (check if image data is empty)")
-                    
-                    raise HTTPException(
-                        status_code=400, 
-                        detail="OpenAI could not analyze this image. This usually happens when: 1) The image is too blurry or dark, 2) No food is clearly visible, 3) The image contains people or text. Please try taking a clearer photo focused on the food."
-                    )
-                
-                # Parse JSON response
+                # Parse JSON response (refusal check already done in retry loop)
                 try:
                     # Try to extract JSON from code block first
                     json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_content)
