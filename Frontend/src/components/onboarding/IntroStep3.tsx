@@ -83,7 +83,9 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={[styles.signInButton, { top: spacing(2) }]}
+                style={[styles.signInButton, {
+                    top: Platform.OS === 'ios' ? insets.top + spacing(-50) : spacing(2)
+                }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >
@@ -96,8 +98,8 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(2) : Math.max(insets.top, spacing(10)),
-                        paddingBottom: scale(70)
+                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(-700) : Math.max(insets.top, spacing(10)),
+                        paddingBottom: Platform.OS === 'ios' ? spacing(15) : spacing(16)
                     }
                 ]}
                 showsVerticalScrollIndicator={false}
@@ -237,7 +239,11 @@ const IntroStep3: React.FC<IntroStep3Props> = ({ onNext }) => {
             </ScrollView>
 
             {/* Fixed Button at Bottom */}
-            <View style={[styles.fixedButtonContainer, { bottom: spacing(8) }]}>
+            <View style={[styles.fixedButtonContainer, {
+                bottom: Platform.OS === 'ios'
+                    ? Math.max(insets.bottom + spacing(2), spacing(4))
+                    : spacing(30)
+            }]}>
                 <TouchableOpacity style={styles.button} onPress={handleBeginJourney}>
                     <LinearGradient
                         colors={["#0074dd", "#5c00dd", "#dd0095"]}
@@ -280,7 +286,7 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing(1.5),
+        marginBottom: spacing(1),
         marginTop: 0,
     },
     tag: {
@@ -316,14 +322,14 @@ const styles = StyleSheet.create({
     },
     heroSection: {
         alignItems: 'center',
-        marginBottom: spacing(1.5),
+        marginBottom: spacing(1),
     },
     dashboardRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing(5),
-        marginBottom: spacing(4),
+        marginBottom: spacing(2),
     },
     leftContent: {
         flexDirection: 'column',
@@ -339,13 +345,13 @@ const styles = StyleSheet.create({
     },
     statCard: {
         backgroundColor: 'rgba(255,255,255,0.05)',
-        padding: spacing(3),
+        padding: spacing(2.5),
         borderRadius: borderRadius('md'),
         borderWidth: scale(1),
         borderColor: 'rgba(255,255,255,0.15)',
-        marginBottom: spacing(4),
+        marginBottom: spacing(3),
         width: '100%',
-        minHeight: scale(70),
+        minHeight: scale(65),
     },
     statHeader: {
         flexDirection: 'row',
@@ -372,8 +378,8 @@ const styles = StyleSheet.create({
     },
     dashboardContainer: {
         width: wp(42),
-        height: hp(41),
-        marginBottom: spacing(4),
+        height: hp(38),
+        marginBottom: spacing(2),
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -383,11 +389,11 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.1)',
         overflow: 'hidden',
         width: wp(42),
-        height: hp(41),
+        height: hp(38),
     },
     dashboardImage: {
         width: wp(42),
-        height: hp(41),
+        height: hp(38),
     },
     liveIndicator: {
         position: 'absolute',

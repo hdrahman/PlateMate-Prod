@@ -105,7 +105,9 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={[styles.signInButton, { top: spacing(2) }]}
+                style={[styles.signInButton, {
+                    top: Platform.OS === 'ios' ? insets.top + spacing(-50) : spacing(2)
+                }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >
@@ -118,8 +120,8 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(2) : Math.max(insets.top, spacing(10)),
-                        paddingBottom: scale(70)
+                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(-700) : Math.max(insets.top, spacing(10)),
+                        paddingBottom: Platform.OS === 'ios' ? spacing(15) : spacing(16)
                     }
                 ]}
                 showsVerticalScrollIndicator={false}
@@ -271,7 +273,11 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
             </ScrollView>
 
             {/* Fixed Button at Bottom */}
-            <View style={[styles.fixedButtonContainer, { bottom: Math.max(insets.bottom, spacing(3)) + spacing(25) }]}>
+            <View style={[styles.fixedButtonContainer, {
+                bottom: Platform.OS === 'ios'
+                    ? Math.max(insets.bottom + spacing(2), spacing(4))
+                    : spacing(30)
+            }]}>
                 <TouchableOpacity style={styles.button} onPress={onNext}>
                     <LinearGradient
                         colors={["#0074dd", "#5c00dd", "#dd0095"]}
@@ -314,7 +320,7 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing(1.5),
+        marginBottom: spacing(1),
         marginTop: 0,
     },
     tag: {
@@ -348,7 +354,7 @@ const styles = StyleSheet.create({
     },
     scannerSection: {
         alignItems: 'center',
-        marginBottom: spacing(2.5),
+        marginBottom: spacing(2),
         marginHorizontal: spacing(5),
         paddingVertical: 0,
         marginTop: 0,
@@ -501,7 +507,7 @@ const styles = StyleSheet.create({
         marginLeft: spacing(1),
     },
     featuresSection: {
-        marginBottom: spacing(2.5),
+        marginBottom: spacing(2),
     },
     featuresGrid: {
         flexDirection: 'row',

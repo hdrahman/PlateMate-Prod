@@ -79,7 +79,9 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
 
             {/* Sign In Button */}
             <TouchableOpacity
-                style={[styles.signInButton, { top: spacing(2) }]}
+                style={[styles.signInButton, {
+                    top: Platform.OS === 'ios' ? insets.top + spacing(-50) : spacing(2)
+                }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
             >
@@ -92,8 +94,8 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(2) : Math.max(insets.top, spacing(10)),
-                        paddingBottom: scale(70)
+                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(-700) : Math.max(insets.top, spacing(10)),
+                        paddingBottom: Platform.OS === 'ios' ? spacing(15) : spacing(16)
                     }
                 ]}
                 showsVerticalScrollIndicator={false}
@@ -222,7 +224,11 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
             </ScrollView>
 
             {/* Fixed Button at Bottom */}
-            <View style={[styles.fixedButtonContainer, { bottom: Math.max(insets.bottom, spacing(3)) + spacing(25) }]}>
+            <View style={[styles.fixedButtonContainer, {
+                bottom: Platform.OS === 'ios'
+                    ? Math.max(insets.bottom + spacing(2), spacing(30))
+                    : spacing(30)
+            }]}>
                 <TouchableOpacity style={styles.button} onPress={onNext}>
                     <LinearGradient
                         colors={["#0074dd", "#5c00dd", "#dd0095"]}
@@ -265,7 +271,7 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing(1),
+        marginBottom: spacing(0.5),
         marginTop: 0,
     },
     tag: {
@@ -287,10 +293,10 @@ const styles = StyleSheet.create({
         color: '#dd0095',
     },
     imageContainer: {
-        height: hp(60),
+        height: hp(58),
         position: 'relative',
         marginHorizontal: -spacing(6),
-        marginBottom: spacing(3),
+        marginBottom: spacing(2),
         borderRadius: borderRadius('lg'),
         overflow: 'hidden',
     },
