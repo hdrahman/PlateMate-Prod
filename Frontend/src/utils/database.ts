@@ -250,66 +250,8 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       )
     `);
 
-        // Create nutrition_goals table
-        await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS nutrition_goals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        firebase_uid TEXT NOT NULL,
-        target_weight REAL,
-        calorie_goal INTEGER,
-        protein_goal INTEGER,
-        carb_goal INTEGER,
-        fat_goal INTEGER,
-        fitness_goal TEXT,
-        weight_goal TEXT,
-        activity_level TEXT,
-        weekly_workouts INTEGER,
-        step_goal INTEGER,
-        water_goal INTEGER,
-        sleep_goal INTEGER,
-        cheat_day_enabled INTEGER DEFAULT 0,
-        cheat_day_frequency INTEGER DEFAULT 7,
-        preferred_cheat_day_of_week INTEGER,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        synced INTEGER DEFAULT 0,
-        sync_action TEXT DEFAULT 'create',
-        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid),
-        UNIQUE(firebase_uid)
-      )
-    `);
-
-        // Create cheat_day_settings table
-        await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS cheat_day_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        firebase_uid TEXT UNIQUE NOT NULL,
-        cheat_day_frequency INTEGER DEFAULT 7,
-        last_cheat_day TEXT,
-        next_cheat_day TEXT,
-        enabled INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now')),
-        synced INTEGER DEFAULT 0,
-        sync_action TEXT DEFAULT 'create',
-        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
-        preferred_day_of_week INTEGER,
-        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
-      )
-    `);
-
-        // Check and add missing columns to nutrition_goals table
-        try {
-            const nutritionGoalsInfo = await db.getAllAsync("PRAGMA table_info(nutrition_goals)");
-            const dailyCalorieGoalColumn = nutritionGoalsInfo.find((col: any) => col.name === 'daily_calorie_goal');
-
-            if (!dailyCalorieGoalColumn) {
-                await db.execAsync(`ALTER TABLE nutrition_goals ADD COLUMN daily_calorie_goal INTEGER`);
-            }
-        } catch (error) {
-            console.error('❌ Error checking/adding daily_calorie_goal column:', error);
-        }
+        // NOTE: nutrition_goals table removed in migration v16 - data consolidated into user_profiles
+        // NOTE: cheat_day_settings table removed in migration v16 - data consolidated into user_profiles
 
         // Run database migrations to ensure all columns exist
         await updateDatabaseSchema(db);
@@ -325,34 +267,8 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       )
     `);
 
-        // Create steps table for step tracking
-        await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS steps (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER DEFAULT 1,
-        count INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        synced INTEGER DEFAULT 0,
-        sync_action TEXT DEFAULT 'create',
-        last_modified TEXT NOT NULL
-      )
-    `);
-
-        // Create streak_tracking table for streak management
-        await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS streak_tracking (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        firebase_uid TEXT UNIQUE NOT NULL,
-        current_streak INTEGER DEFAULT 0,
-        longest_streak INTEGER DEFAULT 0,
-        last_activity_date TEXT,
-        streak_start_date TEXT,
-        synced INTEGER DEFAULT 0,
-        sync_action TEXT DEFAULT 'create',
-        last_modified TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
-      )
-    `);
+        // NOTE: steps table removed in migration v16 - use user_steps table instead
+        // NOTE: streak_tracking table removed in migration v16 - never used (StreakService uses AsyncStorage)
 
         // Create API tokens table for secure token management
         await db.execAsync(`
@@ -2174,7 +2090,7 @@ export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | nul
     try {
         console.log(`🔍 Fetching goals for user: ${firebaseUid}`);
 
-        // Get the user profile which contains nutrition/fitness goals
+        // Get the user profile which contains all goals (nutrition, fitness, cheat day)
         const profile = await getUserProfileByFirebaseUid(firebaseUid);
 
         if (!profile) {
@@ -2182,31 +2098,22 @@ export const getUserGoals = async (firebaseUid: string): Promise<UserGoals | nul
             return null;
         }
 
-        // Get nutrition goals from the nutrition_goals table
-        const nutritionGoals = await db.getFirstAsync(
-            `SELECT * FROM nutrition_goals WHERE firebase_uid = ?`,
-            [firebaseUid]
-        ) as any;
-
-        // Get cheat day settings
-        const cheatDaySettings = await getCheatDaySettings(firebaseUid);
-
-        // Extract goals from both sources
+        // All data is now in user_profiles table (consolidated from nutrition_goals and cheat_day_settings)
         return {
             targetWeight: profile.target_weight,
-            calorieGoal: nutritionGoals?.daily_calorie_goal || profile.daily_calorie_target,
-            proteinGoal: nutritionGoals?.protein_goal || profile.protein_goal,
-            carbGoal: nutritionGoals?.carb_goal || profile.carb_goal,
-            fatGoal: nutritionGoals?.fat_goal || profile.fat_goal,
-            fitnessGoal: nutritionGoals?.weight_goal, // Get from nutrition_goals table
-            activityLevel: nutritionGoals?.activity_level || profile.activity_level,
+            calorieGoal: profile.daily_calorie_target,
+            proteinGoal: profile.protein_goal,
+            carbGoal: profile.carb_goal,
+            fatGoal: profile.fat_goal,
+            fitnessGoal: profile.weight_goal || profile.fitness_goal,
+            activityLevel: profile.activity_level,
             weeklyWorkouts: profile.weekly_workouts,
             stepGoal: profile.step_goal,
             waterGoal: profile.water_goal,
             sleepGoal: profile.sleep_goal,
-            cheatDayEnabled: cheatDaySettings?.enabled,
-            cheatDayFrequency: cheatDaySettings?.frequency,
-            preferredCheatDayOfWeek: cheatDaySettings?.preferredDayOfWeek
+            cheatDayEnabled: profile.cheat_day_enabled,
+            cheatDayFrequency: profile.cheat_day_frequency,
+            preferredCheatDayOfWeek: profile.preferred_cheat_day_of_week
         };
     } catch (error) {
         console.error('❌ Error fetching user goals:', error);
@@ -2224,123 +2131,71 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
     try {
         console.log(`🔄 Updating goals for user: ${firebaseUid}`);
 
-        // Format the goals for the user profile update
-        const profileUpdates = {
-            target_weight: goals.targetWeight,
-            daily_calorie_target: goals.calorieGoal,
-            protein_goal: goals.proteinGoal,
-            carb_goal: goals.carbGoal,
-            fat_goal: goals.fatGoal,
-            // weight_goal is now stored in nutrition_goals table, not user profile
-            activity_level: goals.activityLevel,
-            weekly_workouts: goals.weeklyWorkouts,
-            step_goal: goals.stepGoal,
-            water_goal: goals.waterGoal,
-            sleep_goal: goals.sleepGoal,
+        // Map fitnessGoal to weight_goal constraint values
+        const mapFitnessGoalToWeightGoal = (fitnessGoal?: string): string | null => {
+            if (!fitnessGoal) return null;
+
+            // Direct mapping for new format values
+            const validWeightGoals = ['lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5'];
+            if (validWeightGoals.includes(fitnessGoal)) {
+                return fitnessGoal;
+            }
+
+            // Legacy mapping for old values
+            switch (fitnessGoal) {
+                case 'lose':
+                case 'lose_moderate':
+                case 'fat_loss':
+                    return 'lose_0_5';
+                case 'lose_light':
+                    return 'lose_0_25';
+                case 'lose_heavy':
+                case 'lose_extreme':
+                    return 'lose_0_75';
+                case 'lose_aggressive':
+                    return 'lose_1';
+                case 'gain':
+                case 'gain_moderate':
+                case 'muscle_gain':
+                    return 'gain_0_5';
+                case 'gain_light':
+                    return 'gain_0_25';
+                case 'maintain':
+                case 'balanced':
+                default:
+                    return 'maintain';
+            }
+        };
+
+        // All goals are now stored in user_profiles table (consolidated from nutrition_goals and cheat_day_settings)
+        const profileUpdates: Record<string, any> = {
             // Mark as unsynced so it will be sent to the backend
             synced: 0,
             sync_action: 'update',
             last_modified: new Date().toISOString()
         };
 
-        // Update the user profile
-        await updateUserProfile(firebaseUid, profileUpdates);
-
-        // Update or create nutrition goals if fitness goal, activity level, or nutrition goals are provided
-        if (goals.fitnessGoal || goals.activityLevel || goals.calorieGoal || goals.proteinGoal || goals.carbGoal || goals.fatGoal) {
-            const timestamp = new Date().toISOString();
-
-            // Map fitnessGoal to weight_goal constraint values
-            const mapFitnessGoalToWeightGoal = (fitnessGoal?: string): string | null => {
-                if (!fitnessGoal) return null;
-
-                // Direct mapping for new format values
-                const validWeightGoals = ['lose_1', 'lose_0_75', 'lose_0_5', 'lose_0_25', 'maintain', 'gain_0_25', 'gain_0_5'];
-                if (validWeightGoals.includes(fitnessGoal)) {
-                    return fitnessGoal;
-                }
-
-                // Legacy mapping for old values
-                switch (fitnessGoal) {
-                    case 'lose':
-                    case 'lose_moderate':
-                    case 'fat_loss':
-                        return 'lose_0_5';
-                    case 'lose_light':
-                        return 'lose_0_25';
-                    case 'lose_heavy':
-                    case 'lose_extreme':
-                        return 'lose_0_75';
-                    case 'lose_aggressive':
-                        return 'lose_1';
-                    case 'gain':
-                    case 'gain_moderate':
-                    case 'muscle_gain':
-                        return 'gain_0_5';
-                    case 'gain_light':
-                        return 'gain_0_25';
-                    case 'maintain':
-                    case 'balanced':
-                    default:
-                        return 'maintain';
-                }
-            };
-
+        // Add fields only if they are provided
+        if (goals.targetWeight !== undefined) profileUpdates.target_weight = goals.targetWeight;
+        if (goals.calorieGoal !== undefined) profileUpdates.daily_calorie_target = goals.calorieGoal;
+        if (goals.proteinGoal !== undefined) profileUpdates.protein_goal = goals.proteinGoal;
+        if (goals.carbGoal !== undefined) profileUpdates.carb_goal = goals.carbGoal;
+        if (goals.fatGoal !== undefined) profileUpdates.fat_goal = goals.fatGoal;
+        if (goals.fitnessGoal !== undefined) {
             const mappedWeightGoal = mapFitnessGoalToWeightGoal(goals.fitnessGoal);
-
-            // Check if nutrition goals record exists
-            const existingNutritionGoals = await db.getFirstAsync(
-                `SELECT id FROM nutrition_goals WHERE firebase_uid = ?`,
-                [firebaseUid]
-            );
-
-            if (existingNutritionGoals) {
-                // Update existing record
-                await db.runAsync(
-                    `UPDATE nutrition_goals SET 
-                     target_weight = COALESCE(?, target_weight),
-                     daily_calorie_goal = COALESCE(?, daily_calorie_goal),
-                     protein_goal = COALESCE(?, protein_goal),
-                     carb_goal = COALESCE(?, carb_goal),
-                     fat_goal = COALESCE(?, fat_goal),
-                     weight_goal = COALESCE(?, weight_goal),
-                     activity_level = COALESCE(?, activity_level),
-                     synced = 0,
-                     sync_action = 'update',
-                     last_modified = ?
-                     WHERE firebase_uid = ?`,
-                    [
-                        goals.targetWeight,
-                        goals.calorieGoal,
-                        goals.proteinGoal,
-                        goals.carbGoal,
-                        goals.fatGoal,
-                        mappedWeightGoal,
-                        goals.activityLevel,
-                        timestamp,
-                        firebaseUid
-                    ]
-                );
-            } else {
-                // Create new record
-                await db.runAsync(
-                    `INSERT INTO nutrition_goals 
-                     (firebase_uid, target_weight, daily_calorie_goal, protein_goal, carb_goal, fat_goal, weight_goal, activity_level, synced, sync_action, last_modified)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'create', ?)`,
-                    [
-                        firebaseUid,
-                        goals.targetWeight,
-                        goals.calorieGoal,
-                        goals.proteinGoal,
-                        goals.carbGoal,
-                        goals.fatGoal,
-                        mappedWeightGoal,
-                        goals.activityLevel,
-                        timestamp
-                    ]
-                );
-            }
+            if (mappedWeightGoal) profileUpdates.weight_goal = mappedWeightGoal;
         }
+        if (goals.activityLevel !== undefined) profileUpdates.activity_level = goals.activityLevel;
+        if (goals.weeklyWorkouts !== undefined) profileUpdates.weekly_workouts = goals.weeklyWorkouts;
+        if (goals.stepGoal !== undefined) profileUpdates.step_goal = goals.stepGoal;
+        if (goals.waterGoal !== undefined) profileUpdates.water_goal = goals.waterGoal;
+        if (goals.sleepGoal !== undefined) profileUpdates.sleep_goal = goals.sleepGoal;
+        if (goals.cheatDayEnabled !== undefined) profileUpdates.cheat_day_enabled = goals.cheatDayEnabled ? 1 : 0;
+        if (goals.cheatDayFrequency !== undefined) profileUpdates.cheat_day_frequency = goals.cheatDayFrequency;
+        if (goals.preferredCheatDayOfWeek !== undefined) profileUpdates.preferred_cheat_day_of_week = goals.preferredCheatDayOfWeek;
+
+        // Update the user profile with all goals
+        await updateUserProfile(firebaseUid, profileUpdates);
 
         // Notify listeners of the change
         notifyDatabaseChanged();

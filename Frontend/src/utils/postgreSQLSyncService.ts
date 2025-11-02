@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import supabaseAuth from './supabaseAuth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     getUserProfileByFirebaseUid,
     getUnsyncedFoodLogs,
@@ -324,7 +325,7 @@ class PostgreSQLSyncService {
 
             console.log('🔄 Starting PostgreSQL sync...');
 
-            // 1. Sync User Profile
+            // 1. Sync User Profile (includes goals and cheat day settings)
             await this.syncUserProfile(currentUser.id, stats, errors);
 
             // 2. Sync Food Logs
@@ -333,19 +334,10 @@ class PostgreSQLSyncService {
             // 3. Sync Weight Entries
             await this.syncWeightEntries(currentUser.id, stats, errors);
 
-            // 4. Sync User Streaks
-            await this.syncUserStreaks(currentUser.id, stats, errors);
-
-            // 5. Sync Nutrition Goals
-            await this.syncNutritionGoals(currentUser.id, stats, errors);
-
-            // 6. Sync Subscriptions
+            // 4. Sync Subscriptions
             await this.syncSubscriptions(currentUser.id, stats, errors);
 
-            // 7. Sync Cheat Day Settings
-            await this.syncCheatDaySettings(currentUser.id, stats, errors);
-
-            // 8. Sync User Settings
+            // 5. Sync User Settings (includes AsyncStorage: streaks, daily goals, notifications, privacy)
             await this.syncUserSettings(currentUser.id, stats, errors);
 
             this.lastSyncTime = new Date();
@@ -445,6 +437,12 @@ class PostgreSQLSyncService {
                 marketing_emails_enabled: Boolean(userProfile.marketing_emails_enabled),
                 sync_data_offline: Boolean(userProfile.sync_data_offline),
                 onboarding_complete: Boolean(userProfile.onboarding_complete),
+                // Cheat day settings (migrated from cheat_day_settings table)
+                cheat_day_enabled: userProfile.cheat_day_enabled ? Boolean(userProfile.cheat_day_enabled) : false,
+                cheat_day_frequency: userProfile.cheat_day_frequency || 7,
+                last_cheat_day: userProfile.last_cheat_day,
+                next_cheat_day: userProfile.next_cheat_day,
+                preferred_cheat_day_of_week: userProfile.preferred_cheat_day_of_week,
                 updated_at: new Date().toISOString()
             };
 
@@ -818,7 +816,39 @@ class PostgreSQLSyncService {
 
     private async syncUserSettings(firebaseUid: string, stats: SyncStats, errors: string[]) {
         try {
-            // User settings are not stored in SQLite locally, but we need to ensure they exist in Supabase
+            console.log('📋 Syncing user settings from AsyncStorage to Supabase...');
+
+            // Read all settings from AsyncStorage
+            const [
+                streaksData,
+                dailyGoalsData,
+                notificationSettings,
+                dataSharingSettings,
+                privacySettings
+            ] = await Promise.all([
+                AsyncStorage.getItem('user_streaks'),
+                AsyncStorage.getItem('daily_goals'),
+                AsyncStorage.getItem('notification_settings'),
+                AsyncStorage.getItem('data_sharing_settings'),
+                AsyncStorage.getItem('privacy_settings')
+            ]);
+
+            // Parse the data
+            const parsedStreaks = streaksData ? JSON.parse(streaksData) : null;
+            const parsedGoals = dailyGoalsData ? JSON.parse(dailyGoalsData) : null;
+            const parsedNotifications = notificationSettings ? JSON.parse(notificationSettings) : {};
+            const parsedDataSharing = dataSharingSettings ? JSON.parse(dataSharingSettings) : {};
+            const parsedPrivacy = privacySettings ? JSON.parse(privacySettings) : {};
+
+            // Build ui_preferences object with streaks and daily goals
+            const uiPreferences: any = {};
+            if (parsedStreaks) {
+                uiPreferences.streaks = parsedStreaks;
+            }
+            if (parsedGoals) {
+                uiPreferences.daily_goals = parsedGoals;
+            }
+
             // Check if user_settings exists in Supabase
             const { data: existingSettings } = await supabase
                 .from('user_settings')
@@ -826,21 +856,35 @@ class PostgreSQLSyncService {
                 .eq('firebase_uid', firebaseUid)
                 .single();
 
-            if (!existingSettings) {
-                // Create default user settings if they don't exist
+            const settingsData = {
+                firebase_uid: firebaseUid,
+                notification_settings: parsedNotifications,
+                data_sharing_settings: parsedDataSharing,
+                privacy_settings: parsedPrivacy,
+                ui_preferences: uiPreferences,
+                updated_at: new Date().toISOString()
+            };
+
+            if (existingSettings) {
+                // Update existing settings
                 const { error } = await supabase
                     .from('user_settings')
-                    .insert({
-                        firebase_uid: firebaseUid,
-                        notification_settings: {},
-                        data_sharing_settings: {},
-                        privacy_settings: {},
-                        ui_preferences: {}
-                    });
+                    .update(settingsData)
+                    .eq('firebase_uid', firebaseUid);
 
                 if (error) throw error;
-                stats.userSettingsUploaded++;
+                console.log('✅ Updated user settings in Supabase');
+            } else {
+                // Create new user settings
+                const { error } = await supabase
+                    .from('user_settings')
+                    .insert(settingsData);
+
+                if (error) throw error;
+                console.log('✅ Created user settings in Supabase');
             }
+
+            stats.userSettingsUploaded++;
         } catch (error: any) {
             console.error('Error syncing user settings:', error);
             errors.push(`User settings sync error: ${error.message}`);
@@ -878,28 +922,19 @@ class PostgreSQLSyncService {
                 return { success: true, stats, errors };
             }
 
-            // 1. Restore User Profile
+            // 1. Restore User Profile (includes goals and cheat day settings)
             await this.restoreUserProfile(currentUser.id, postgresUserId, stats, errors);
 
-            // 2. Restore Nutrition Goals
-            await this.restoreNutritionGoals(currentUser.id, postgresUserId, stats, errors);
-
-            // 3. Restore Food Logs
+            // 2. Restore Food Logs
             await this.restoreFoodLogs(currentUser.id, postgresUserId, stats, errors);
 
-            // 4. Restore Weight Entries
+            // 3. Restore Weight Entries
             await this.restoreWeightEntries(currentUser.id, postgresUserId, stats, errors);
 
-            // 5. Restore User Streaks
-            await this.restoreUserStreaks(currentUser.id, postgresUserId, stats, errors);
-
-            // 6. Restore Subscriptions
+            // 4. Restore Subscriptions
             await this.restoreSubscriptions(currentUser.id, postgresUserId, stats, errors);
 
-            // 7. Restore Cheat Day Settings
-            await this.restoreCheatDaySettings(currentUser.id, postgresUserId, stats, errors);
-
-            // 8. Restore User Settings
+            // 5. Restore User Settings (includes AsyncStorage: streaks, daily goals, notifications, privacy)
             await this.restoreUserSettings(currentUser.id, postgresUserId, stats, errors);
 
             stats.totalErrors = errors.length;
@@ -998,6 +1033,12 @@ class PostgreSQLSyncService {
                     marketing_emails_enabled: user.marketing_emails_enabled ? 1 : 0,
                     sync_data_offline: user.sync_data_offline ? 1 : 0,
                     onboarding_complete: user.onboarding_complete ? 1 : 0,
+                    // Cheat day settings (migrated from cheat_day_settings table)
+                    cheat_day_enabled: user.cheat_day_enabled ? 1 : 0,
+                    cheat_day_frequency: user.cheat_day_frequency || 7,
+                    last_cheat_day: user.last_cheat_day,
+                    next_cheat_day: user.next_cheat_day,
+                    preferred_cheat_day_of_week: user.preferred_cheat_day_of_week,
                     last_modified: new Date().toISOString()
                 };
 
@@ -1259,6 +1300,8 @@ class PostgreSQLSyncService {
 
     private async restoreUserSettings(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
+            console.log('📋 Restoring user settings from Supabase to AsyncStorage...');
+
             const { data: settings, error } = await supabase
                 .from('user_settings')
                 .select('*')
@@ -1267,26 +1310,58 @@ class PostgreSQLSyncService {
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // Settings don't exist in Supabase, create default ones
-                    const { error: insertError } = await supabase
-                        .from('user_settings')
-                        .insert({
-                            firebase_uid: firebaseUid,
-                            notification_settings: {},
-                            data_sharing_settings: {},
-                            privacy_settings: {},
-                            ui_preferences: {}
-                        });
-
-                    if (insertError) throw insertError;
-                    stats.userSettingsRestored++;
+                    console.log('ℹ️ No user settings found in Supabase - skipping restore');
                     return;
                 }
                 throw error;
             }
 
-            // User settings exist, they're now available
+            // Restore settings to AsyncStorage
+            const restorePromises = [];
+
+            // Restore notification settings
+            if (settings.notification_settings && Object.keys(settings.notification_settings).length > 0) {
+                restorePromises.push(
+                    AsyncStorage.setItem('notification_settings', JSON.stringify(settings.notification_settings))
+                );
+                console.log('✅ Restoring notification settings');
+            }
+
+            // Restore data sharing settings
+            if (settings.data_sharing_settings && Object.keys(settings.data_sharing_settings).length > 0) {
+                restorePromises.push(
+                    AsyncStorage.setItem('data_sharing_settings', JSON.stringify(settings.data_sharing_settings))
+                );
+                console.log('✅ Restoring data sharing settings');
+            }
+
+            // Restore privacy settings
+            if (settings.privacy_settings && Object.keys(settings.privacy_settings).length > 0) {
+                restorePromises.push(
+                    AsyncStorage.setItem('privacy_settings', JSON.stringify(settings.privacy_settings))
+                );
+                console.log('✅ Restoring privacy settings');
+            }
+
+            // Restore streaks from ui_preferences
+            if (settings.ui_preferences?.streaks) {
+                restorePromises.push(
+                    AsyncStorage.setItem('user_streaks', JSON.stringify(settings.ui_preferences.streaks))
+                );
+                console.log('✅ Restoring streak data');
+            }
+
+            // Restore daily goals from ui_preferences
+            if (settings.ui_preferences?.daily_goals) {
+                restorePromises.push(
+                    AsyncStorage.setItem('daily_goals', JSON.stringify(settings.ui_preferences.daily_goals))
+                );
+                console.log('✅ Restoring daily goals data');
+            }
+
+            await Promise.all(restorePromises);
             stats.userSettingsRestored++;
+            console.log('✅ User settings restored from Supabase');
 
         } catch (error: any) {
             console.error('Error restoring user settings:', error);

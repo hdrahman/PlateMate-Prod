@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 15; // Increment to version 15 for database indexes and performance optimizations
+const CURRENT_VERSION = 16; // Increment to version 16 for database consolidation (merge nutrition_goals and cheat_day_settings into user_profiles)
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -482,6 +482,161 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             console.log('✅ Migration to version 15 complete - Database indexes created');
                         } catch (error) {
                             console.error('❌ Error creating database indexes:', error);
+                            throw error;
+                        }
+                    }
+                },
+                // Migration to version 16 - Consolidate nutrition_goals and cheat_day_settings into user_profiles
+                async () => {
+                    if (currentVersion < 16) {
+                        console.log('Running migration to version 16 - Consolidating database tables...');
+
+                        try {
+                            // Step 1: Add cheat day columns to user_profiles if they don't exist
+                            console.log('📋 Adding cheat day columns to user_profiles...');
+                            const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+                            const existingColumns = tableInfo.map((col: any) => col.name);
+
+                            const cheatDayColumns = [
+                                { name: 'cheat_day_enabled', definition: 'INTEGER DEFAULT 0' },
+                                { name: 'cheat_day_frequency', definition: 'INTEGER DEFAULT 7' },
+                                { name: 'last_cheat_day', definition: 'TEXT' },
+                                { name: 'next_cheat_day', definition: 'TEXT' },
+                                { name: 'preferred_cheat_day_of_week', definition: 'INTEGER' }
+                            ];
+
+                            for (const col of cheatDayColumns) {
+                                if (!existingColumns.includes(col.name)) {
+                                    try {
+                                        await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN ${col.name} ${col.definition}`);
+                                        console.log(`✅ Added column ${col.name} to user_profiles`);
+                                    } catch (error) {
+                                        console.error(`❌ Error adding ${col.name}:`, error);
+                                    }
+                                }
+                            }
+
+                            // Step 2: Migrate data from nutrition_goals to user_profiles (if nutrition_goals data exists)
+                            console.log('📋 Migrating nutrition_goals data to user_profiles...');
+                            try {
+                                // Check if nutrition_goals table exists and has data
+                                const nutritionGoalsData = await db.getAllAsync(
+                                    `SELECT * FROM nutrition_goals`
+                                ).catch(() => []);
+
+                                if (nutritionGoalsData && nutritionGoalsData.length > 0) {
+                                    console.log(`Found ${nutritionGoalsData.length} nutrition goal records to migrate`);
+
+                                    for (const goal of nutritionGoalsData) {
+                                        // Update user_profiles with nutrition_goals data (only if profile exists)
+                                        await db.runAsync(
+                                            `UPDATE user_profiles
+                                             SET target_weight = COALESCE(?, target_weight),
+                                                 daily_calorie_target = COALESCE(?, daily_calorie_target),
+                                                 protein_goal = COALESCE(?, protein_goal),
+                                                 carb_goal = COALESCE(?, carb_goal),
+                                                 fat_goal = COALESCE(?, fat_goal),
+                                                 fitness_goal = COALESCE(?, fitness_goal),
+                                                 weight_goal = COALESCE(?, weight_goal),
+                                                 activity_level = COALESCE(?, activity_level),
+                                                 step_goal = COALESCE(?, step_goal),
+                                                 water_goal = COALESCE(?, water_goal),
+                                                 sleep_goal = COALESCE(?, sleep_goal),
+                                                 weekly_workouts = COALESCE(?, weekly_workouts),
+                                                 cheat_day_enabled = COALESCE(?, cheat_day_enabled),
+                                                 cheat_day_frequency = COALESCE(?, cheat_day_frequency),
+                                                 preferred_cheat_day_of_week = COALESCE(?, preferred_cheat_day_of_week)
+                                             WHERE firebase_uid = ?`,
+                                            [
+                                                goal.target_weight,
+                                                goal.calorie_goal || goal.daily_calorie_goal,
+                                                goal.protein_goal,
+                                                goal.carb_goal,
+                                                goal.fat_goal,
+                                                goal.fitness_goal,
+                                                goal.weight_goal,
+                                                goal.activity_level,
+                                                goal.step_goal,
+                                                goal.water_goal,
+                                                goal.sleep_goal,
+                                                goal.weekly_workouts,
+                                                goal.cheat_day_enabled,
+                                                goal.cheat_day_frequency,
+                                                goal.preferred_cheat_day_of_week,
+                                                goal.firebase_uid
+                                            ]
+                                        );
+                                    }
+                                    console.log('✅ Migrated nutrition_goals data to user_profiles');
+                                } else {
+                                    console.log('ℹ️ No nutrition_goals data to migrate');
+                                }
+                            } catch (error) {
+                                console.warn('⚠️ Could not migrate nutrition_goals (table may not exist):', error.message);
+                            }
+
+                            // Step 3: Migrate data from cheat_day_settings to user_profiles
+                            console.log('📋 Migrating cheat_day_settings data to user_profiles...');
+                            try {
+                                const cheatDayData = await db.getAllAsync(
+                                    `SELECT * FROM cheat_day_settings`
+                                ).catch(() => []);
+
+                                if (cheatDayData && cheatDayData.length > 0) {
+                                    console.log(`Found ${cheatDayData.length} cheat day settings to migrate`);
+
+                                    for (const setting of cheatDayData) {
+                                        // Update user_profiles with cheat_day_settings data
+                                        await db.runAsync(
+                                            `UPDATE user_profiles
+                                             SET cheat_day_enabled = COALESCE(?, cheat_day_enabled),
+                                                 cheat_day_frequency = COALESCE(?, cheat_day_frequency),
+                                                 last_cheat_day = COALESCE(?, last_cheat_day),
+                                                 next_cheat_day = COALESCE(?, next_cheat_day),
+                                                 preferred_cheat_day_of_week = COALESCE(?, preferred_cheat_day_of_week)
+                                             WHERE firebase_uid = ?`,
+                                            [
+                                                setting.enabled,
+                                                setting.cheat_day_frequency,
+                                                setting.last_cheat_day,
+                                                setting.next_cheat_day,
+                                                setting.preferred_day_of_week,
+                                                setting.firebase_uid
+                                            ]
+                                        );
+                                    }
+                                    console.log('✅ Migrated cheat_day_settings data to user_profiles');
+                                } else {
+                                    console.log('ℹ️ No cheat_day_settings data to migrate');
+                                }
+                            } catch (error) {
+                                console.warn('⚠️ Could not migrate cheat_day_settings (table may not exist):', error.message);
+                            }
+
+                            // Step 4: Drop unused tables
+                            console.log('📋 Dropping unused tables...');
+                            const tablesToDrop = [
+                                'nutrition_goals',
+                                'cheat_day_settings',
+                                'user_streaks',      // Created but never used (StreakService uses AsyncStorage)
+                                'streak_tracking',   // Duplicate of user_streaks
+                                'steps'             // Duplicate of user_steps
+                            ];
+
+                            for (const tableName of tablesToDrop) {
+                                try {
+                                    await db.execAsync(`DROP TABLE IF EXISTS ${tableName}`);
+                                    console.log(`✅ Dropped table: ${tableName}`);
+                                } catch (error) {
+                                    console.warn(`⚠️ Could not drop table ${tableName}:`, error.message);
+                                }
+                            }
+
+                            console.log('✅ Migration to version 16 complete - Database consolidated');
+                            console.log('📊 Summary: Merged nutrition_goals and cheat_day_settings into user_profiles');
+                            console.log('📊 Removed 5 unused tables for cleaner schema');
+                        } catch (error) {
+                            console.error('❌ Error in database consolidation migration:', error);
                             throw error;
                         }
                     }

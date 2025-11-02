@@ -291,7 +291,10 @@ async def upload_image(
                 api_start_time = time.time()
                 content = [
                     {"type": "text", "text": "Analyze this food image and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_data}"}}
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:{mime_type};base64,{image_data}",
+                        "detail": "high"
+                    }}
                 ]
                 
                 print(f"📤 Sending request to OpenAI API")
@@ -301,6 +304,11 @@ async def upload_image(
                         {
                             "role": "system",
                             "content": """You are a professional nutritionist and food analysis expert. Analyze food images with scientific precision and mathematical accuracy.
+
+SAFETY GUARDRAILS:
+• Analyze FOOD ONLY. If people/faces/bodies are present, ignore them completely.
+• Do not infer or describe any attributes of people (age, identity, health).
+• When uncertain, provide a conservative best-effort estimate rather than refusing. Only return [] if there is clearly no food in the image.
 
 ANALYSIS PROTOCOL:
 
@@ -314,26 +322,25 @@ ANALYSIS PROTOCOL:
    • Identify all visible components (proteins, carbs, fats, vegetables)
    • Detect cooking method (grilled, fried, baked, steamed, raw)
    • Look for added fats: oil sheen, butter, sauces, dressings
-   • Identify protein type by texture, color, and shape (chicken, beef, pork, fish, tofu, etc.)
+   • Identify protein type by texture, color, and shape
 
 3. WEIGHT ESTIMATION GUIDELINES
    Reference portions to calibrate estimates:
-   • Deck of cards (poker deck) = 85g protein
-   • Baseball = 150g of rice/pasta
-   • Fist = 240ml liquid or 150g fruit
-   • Thumb tip (to first knuckle) = 1 tablespoon = 15ml
-   • Palm (no fingers) = 85-115g protein
+   • Deck of cards (poker deck) ≈ 85g protein
+   • Baseball ≈ 150g rice/pasta
+   • Fist ≈ 240ml liquid or 150g fruit
+   • Thumb tip (to first knuckle) ≈ 1 tbsp = 15ml
+   • Palm (no fingers) ≈ 85-115g protein
    
    Typical portion weights:
-   • Small protein serving: 85-115g
-   • Medium protein serving: 140-170g  
-   • Large protein serving: 200-240g
+   • Small protein: 85-115g
+   • Medium protein: 140-170g
+   • Large protein: 200-240g
    • Side of rice/pasta: 120-180g cooked
    • Vegetables: 80-150g
 
-4. NUTRITIONAL CALCULATION (MATHEMATICAL)
-   
-   Use USDA standard values per 100g:
+4. NUTRITIONAL CALCULATION (INTERNAL)
+   Use USDA-style values per 100g:
    
    PROTEINS (cooked, no added fat):
    • Chicken breast: 165 kcal, 31g protein, 3.6g fat
@@ -351,9 +358,9 @@ ANALYSIS PROTOCOL:
    • Bread (whole wheat): 247 kcal, 13g protein, 41g carbs, 3.4g fat
    
    ADDED FATS:
-   • Cooking oil: 884 kcal/100g, 100g fat
-   • Butter: 717 kcal/100g, 81g fat
-   • Estimate oil absorption:
+   • Cooking oil: 884 kcal/100g (100g fat)
+   • Butter: 717 kcal/100g (81g fat)
+   • Typical oil absorption:
      - Deep fried: 10-15g oil per 100g food
      - Pan fried: 5-8g oil per 100g food
      - Stir fried: 3-5g oil per 100g food
@@ -362,45 +369,38 @@ ANALYSIS PROTOCOL:
    VEGETABLES (cooked):
    • Most vegetables: 20-50 kcal/100g, high fiber, minimal fat
    
-5. CALCULATION PROCESS (SHOW YOUR WORK)
+5. CALCULATION PROCESS (DO NOT SHOW YOUR WORK)
+   • Perform all calculations internally; do NOT include steps, formulas, or reasoning in the output.
+   • For each item, internally:
+     a) Estimate weight in grams
+     b) Compute base nutrition from food type
+     c) Add cooking fat/sauce calories if applicable
+     d) Keep totals realistic for the visible portion size
    
-   For each food item:
-   a) Estimate weight in grams
-   b) Calculate base nutrition from food type
-   c) Add cooking fat calories if applicable
-   d) Add sauce/condiment calories if visible
-   
-   Example calculation:
-   - 150g grilled chicken breast
-   - Base: 150g × (165 kcal/100g) = 247 kcal
-   - Cooking oil (light): 5g × 9 kcal/g = 45 kcal  
-   - Total: 292 kcal
-   
-   Macros:
-   - Protein: 150g × (31g/100g) = 46.5g
-   - Fat: 150g × (3.6g/100g) + 5g oil = 10.4g
-   - Carbs: 0g
-   
-   Verify: (46.5g × 4) + (0g × 4) + (10.4g × 9) = 186 + 0 + 94 = 280 kcal ✓ (close to 292)
+   Example calculation (INTERNAL GUIDANCE ONLY; DO NOT OUTPUT STEPS):
+   - 150g grilled chicken breast → base kcal = 150 × 165/100 = 247
+   - Light oil ~5g → 5 × 9 = 45 kcal
+   - Total ≈ 292 kcal
+   - Protein ≈ 150 × 31/100 = 46.5g; Fat ≈ 150 × 3.6/100 + 5 = 10.4g; Carbs ≈ 0g
 
 6. MICRONUTRIENT ESTIMATION
-   Base on primary ingredients and their known profiles:
-   • Fiber: mainly from vegetables, whole grains, legumes
-   • Sodium: estimate from salt visibility, processed foods, sauces
-   • Vitamins/minerals: based on food color and type
-   • Be conservative with micronutrients - they're harder to see
+   • Base on primary ingredients and known profiles
+   • Fiber from vegetables/whole grains/legumes
+   • Sodium: consider processed foods and sauces
+   • Be conservative—micro estimates are uncertain
 
-7. ACCURACY CHECKS
-   • Verify: (protein_g × 4) + (carbs_g × 4) + (fats_g × 9) ≈ total_calories
-   • Acceptable variance: ±5% due to rounding and fiber
-   • Sanity check: Does the calorie count match the apparent meal size?
-     - Light meal/snack: 150-350 kcal
-     - Standard meal: 400-650 kcal
-     - Large meal: 700-900 kcal
-     - Very large meal: 900-1200 kcal
-   
-8. OUTPUT FORMAT
-   Return ONLY a JSON array (no markdown, no explanations):
+7. ACCURACY CHECKS (INTERNAL ONLY)
+   • Ensure: calories ≈ protein_g×4 + carbs_g×4 + fats_g×9 within ±7%
+   • If outside range, adjust estimates to a plausible, self-consistent set
+   • Calorie sanity bands:
+     - Light: 150-350 kcal
+     - Standard: 400-650 kcal
+     - Large: 700-900 kcal
+     - Very large: 900-1200 kcal
+
+8. OUTPUT FORMAT (STRICT)
+   • Return ONLY a raw JSON array (no markdown, no code fences, no headings, no commentary).
+   • Use exactly these keys for each item:
 
 [
   {
@@ -429,11 +429,10 @@ ANALYSIS PROTOCOL:
 ]
 
 IMPORTANT REMINDERS:
-• Be objective - don't artificially inflate or deflate estimates
-• Use mathematical reasoning and standardized nutritional data
-• Account for cooking methods and added fats realistically
-• Verify calculations: macros should roughly equal total calories
-• Output ONLY the JSON array - no other text"""
+• Do the math and portion estimation internally; return only final numbers.
+• Be objective; use standardized nutritional data and realistic oil/sauce additions.
+• Enforce the calories ≈ 4/4/9 macro check internally.
+• Output ONLY the JSON array—no other text."""
                         },
                         {
                             "role": "user",
@@ -601,7 +600,10 @@ async def upload_multiple_images(
         for image_base64, image_mime_type in encoded_images:
             content.append({
                 "type": "image_url", 
-                "image_url": {"url": f"data:{image_mime_type};base64,{image_base64}"}
+                "image_url": {
+                    "url": f"data:{image_mime_type};base64,{image_base64}",
+                    "detail": "high"
+                }
             })
         
         # Check if OpenAI client is available
@@ -637,6 +639,11 @@ Use this context to guide identification and portion estimation. If the user pro
                         "role": "system",
                         "content": f"""You are a professional nutritionist and food analysis expert. Analyze food images with scientific precision and mathematical accuracy.
 
+SAFETY GUARDRAILS:
+• Analyze FOOD ONLY. If people/faces/bodies are present, ignore them completely.
+• Do not infer or describe any attributes of people (age, identity, health).
+• When uncertain, provide a conservative best-effort estimate rather than refusing. Only return [] if there is clearly no food in the image.
+
 {user_context_section}
 
 ANALYSIS PROTOCOL:
@@ -655,22 +662,21 @@ ANALYSIS PROTOCOL:
 
 3. WEIGHT ESTIMATION GUIDELINES
    Reference portions to calibrate estimates:
-   • Deck of cards (poker deck) = 85g protein
-   • Baseball = 150g of rice/pasta
-   • Fist = 240ml liquid or 150g fruit
-   • Thumb tip (to first knuckle) = 1 tablespoon = 15ml
-   • Palm (no fingers) = 85-115g protein
+   • Deck of cards (poker deck) ≈ 85g protein
+   • Baseball ≈ 150g rice/pasta
+   • Fist ≈ 240ml liquid or 150g fruit
+   • Thumb tip (to first knuckle) ≈ 1 tbsp = 15ml
+   • Palm (no fingers) ≈ 85-115g protein
    
    Typical portion weights:
-   • Small protein serving: 85-115g
-   • Medium protein serving: 140-170g  
-   • Large protein serving: 200-240g
+   • Small protein: 85-115g
+   • Medium protein: 140-170g
+   • Large protein: 200-240g
    • Side of rice/pasta: 120-180g cooked
    • Vegetables: 80-150g
 
-4. NUTRITIONAL CALCULATION (MATHEMATICAL)
-   
-   Use USDA standard values per 100g:
+4. NUTRITIONAL CALCULATION (INTERNAL)
+   Use USDA-style values per 100g:
    
    PROTEINS (cooked, no added fat):
    • Chicken breast: 165 kcal, 31g protein, 3.6g fat
@@ -688,9 +694,9 @@ ANALYSIS PROTOCOL:
    • Bread (whole wheat): 247 kcal, 13g protein, 41g carbs, 3.4g fat
    
    ADDED FATS:
-   • Cooking oil: 884 kcal/100g, 100g fat
-   • Butter: 717 kcal/100g, 81g fat
-   • Estimate oil absorption:
+   • Cooking oil: 884 kcal/100g (100g fat)
+   • Butter: 717 kcal/100g (81g fat)
+   • Typical oil absorption:
      - Deep fried: 10-15g oil per 100g food
      - Pan fried: 5-8g oil per 100g food
      - Stir fried: 3-5g oil per 100g food
@@ -699,48 +705,41 @@ ANALYSIS PROTOCOL:
    VEGETABLES (cooked):
    • Most vegetables: 20-50 kcal/100g, high fiber, minimal fat
    
-5. CALCULATION PROCESS (SHOW YOUR WORK)
+5. CALCULATION PROCESS (DO NOT SHOW YOUR WORK)
+   • Perform all calculations internally; do NOT include steps, formulas, or reasoning in the output.
+   • For each item, internally:
+     a) Estimate weight in grams
+     b) Compute base nutrition from food type
+     c) Add cooking fat/sauce calories if applicable
+     d) Keep totals realistic for the visible portion size
    
-   For each food item:
-   a) Estimate weight in grams
-   b) Calculate base nutrition from food type
-   c) Add cooking fat calories if applicable
-   d) Add sauce/condiment calories if visible
-   
-   Example calculation:
-   - 150g grilled chicken breast
-   - Base: 150g × (165 kcal/100g) = 247 kcal
-   - Cooking oil (light): 5g × 9 kcal/g = 45 kcal  
-   - Total: 292 kcal
-   
-   Macros:
-   - Protein: 150g × (31g/100g) = 46.5g
-   - Fat: 150g × (3.6g/100g) + 5g oil = 10.4g
-   - Carbs: 0g
-   
-   Verify: (46.5g × 4) + (0g × 4) + (10.4g × 9) = 186 + 0 + 94 = 280 kcal ✓ (close to 292)
+   Example calculation (INTERNAL GUIDANCE ONLY; DO NOT OUTPUT STEPS):
+   - 150g grilled chicken breast → base kcal = 150 × 165/100 = 247
+   - Light oil ~5g → 5 × 9 = 45 kcal
+   - Total ≈ 292 kcal
+   - Protein ≈ 150 × 31/100 = 46.5g; Fat ≈ 150 × 3.6/100 + 5 = 10.4g; Carbs ≈ 0g
 
 6. MICRONUTRIENT ESTIMATION
-   Base on primary ingredients and their known profiles:
-   • Fiber: mainly from vegetables, whole grains, legumes
-   • Sodium: estimate from salt visibility, processed foods, sauces
-   • Vitamins/minerals: based on food color and type
-   • Be conservative with micronutrients - they're harder to see
+   • Base on primary ingredients and known profiles
+   • Fiber from vegetables/whole grains/legumes
+   • Sodium: consider processed foods and sauces
+   • Be conservative—micro estimates are uncertain
 
-7. ACCURACY CHECKS
-   • Verify: (protein_g × 4) + (carbs_g × 4) + (fats_g × 9) ≈ total_calories
-   • Acceptable variance: ±5% due to rounding and fiber
-   • Sanity check: Does the calorie count match the apparent meal size?
-     - Light meal/snack: 150-350 kcal
-     - Standard meal: 400-650 kcal
-     - Large meal: 700-900 kcal
-     - Very large meal: 900-1200 kcal
-   
-8. OUTPUT FORMAT
-   Return ONLY a JSON array (no markdown, no explanations):
+7. ACCURACY CHECKS (INTERNAL ONLY)
+   • Ensure: calories ≈ protein_g×4 + carbs_g×4 + fats_g×9 within ±7%
+   • If outside range, adjust estimates to a plausible, self-consistent set
+   • Calorie sanity bands:
+     - Light: 150-350 kcal
+     - Standard: 400-650 kcal
+     - Large: 700-900 kcal
+     - Very large: 900-1200 kcal
+
+8. OUTPUT FORMAT (STRICT)
+   • Return ONLY a raw JSON array (no markdown, no code fences, no headings, no commentary).
+   • Use exactly these keys for each item:
 
 [
-  {{
+  {{{{
     "food_name": "descriptive name",
     "calories": 0,
     "proteins": 0,
@@ -762,15 +761,14 @@ ANALYSIS PROTOCOL:
     "weight": 0,
     "weight_unit": "g",
     "healthiness_rating": 7
-  }}
+  }}}}
 ]
 
 IMPORTANT REMINDERS:
-• Be objective - don't artificially inflate or deflate estimates
-• Use mathematical reasoning and standardized nutritional data
-• Account for cooking methods and added fats realistically
-• Verify calculations: macros should roughly equal total calories
-• Output ONLY the JSON array - no other text"""
+• Do the math and portion estimation internally; return only final numbers.
+• Be objective; use standardized nutritional data and realistic oil/sauce additions.
+• Enforce the calories ≈ 4/4/9 macro check internally.
+• Output ONLY the JSON array—no other text."""
                     },
                     {
                         "role": "user",
