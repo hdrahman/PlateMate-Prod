@@ -77,17 +77,6 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                 style={styles.background}
             />
 
-            {/* Sign In Button */}
-            <TouchableOpacity
-                style={[styles.signInButton, {
-                    top: Platform.OS === 'ios' ? insets.top + spacing(-17) : spacing(2)
-                }]}
-                onPress={handleSignIn}
-                activeOpacity={0.7}
-            >
-                <Text style={styles.signInText}>Sign In</Text>
-            </TouchableOpacity>
-
             {/* Scrollable Content */}
             <ScrollView
                 style={styles.scrollView}
@@ -222,6 +211,17 @@ const IntroStep2: React.FC<IntroStep2Props> = ({ onNext }) => {
                     </View>
                 </Animated.View>
             </ScrollView>
+
+            {/* Sign In Button */}
+            <TouchableOpacity
+                style={[styles.signInButton, {
+                    top: Platform.OS === 'ios' ? insets.top + spacing(-17) : spacing(2)
+                }]}
+                onPress={handleSignIn}
+                activeOpacity={0.7}
+            >
+                <Text style={styles.signInText}>Sign In</Text>
+            </TouchableOpacity>
 
             {/* Fixed Button at Bottom */}
             <View style={[styles.fixedButtonContainer, {
