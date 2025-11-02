@@ -275,7 +275,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
             {/* Fixed Button at Bottom */}
             <View style={[styles.fixedButtonContainer, {
                 bottom: Platform.OS === 'ios'
-                    ? Math.max(insets.bottom + spacing(2), spacing(4))
+                    ? Math.max(insets.bottom + spacing(35), spacing(4))
                     : spacing(30)
             }]}>
                 <TouchableOpacity style={styles.button} onPress={onNext}>
