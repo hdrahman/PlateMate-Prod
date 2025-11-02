@@ -106,7 +106,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
             {/* Sign In Button */}
             <TouchableOpacity
                 style={[styles.signInButton, {
-                    top: Platform.OS === 'ios' ? insets.top + spacing(-50) : spacing(2)
+                    top: Platform.OS === 'ios' ? insets.top + spacing(-17) : spacing(2)
                 }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
