@@ -7,6 +7,7 @@ import asyncio
 import os
 import hmac
 import hashlib
+import uuid
 from auth.supabase_auth import get_current_user
 from utils.db_connection import get_db_connection
 from services.redis_connection import get_redis
@@ -92,7 +93,7 @@ async def check_vip_status(firebase_uid: str) -> dict:
         return {'is_vip': False}
 
 # Helper function for RevenueCat API calls using httpx
-async def call_revenuecat_api(method: str, endpoint: str, data: Optional[dict] = None) -> dict:
+async def call_revenuecat_api(method: str, endpoint: str, data: Optional[dict] = None, extra_headers: Optional[dict] = None) -> dict:
     """
     Make direct REST API calls to RevenueCat.
     FAILS IMMEDIATELY if API key is not configured or request fails.
@@ -110,6 +111,10 @@ async def call_revenuecat_api(method: str, endpoint: str, data: Optional[dict] =
         "Content-Type": "application/json",
         "X-Platform": "backend"
     }
+
+    # Add any extra headers (e.g., X-Idempotency-Key)
+    if extra_headers:
+        headers.update(extra_headers)
 
     try:
         # Use httpx for async HTTP calls
@@ -1018,22 +1023,27 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
         # Step 2: Grant 20-day promotional trial via RevenueCat API
         # Use RevenueCat's promotional entitlement grant API
         # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
-        # RevenueCat API requires duration in ISO 8601 format (e.g., P20D for 20 days)
+        # Calculate end time in milliseconds (now + 20 days)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=20)
+        end_time_ms = int(trial_end.timestamp() * 1000)
+
         grant_data = {
-            "duration": "P20D"  # Period of 20 Days in ISO 8601 format
+            "end_time_ms": end_time_ms
+        }
+
+        # Add idempotency key to prevent duplicate grants on retry
+        idempotency_headers = {
+            "X-Idempotency-Key": str(uuid.uuid4())
         }
 
         result = await call_revenuecat_api(
             "POST",
             f"/subscribers/{firebase_uid}/entitlements/promotional_trial/promotional",
-            grant_data
+            grant_data,
+            idempotency_headers
         )
 
         logger.info(f"✅ Successfully granted 20-day promotional trial to user {firebase_uid}")
-
-        # Calculate trial end date for response (for informational purposes)
-        from datetime import datetime as dt, timezone as tz
-        trial_end = dt.now(tz.utc) + timedelta(days=20)
 
         return {
             "success": True,
@@ -1092,22 +1102,27 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
 
         # Step 2: Grant 10-day extended trial via RevenueCat API
         # Use RevenueCat's promotional entitlement grant API
-        # RevenueCat API requires duration in ISO 8601 format (e.g., P10D for 10 days)
+        # Calculate end time in milliseconds (now + 10 days)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=10)
+        end_time_ms = int(trial_end.timestamp() * 1000)
+
         grant_data = {
-            "duration": "P10D"  # Period of 10 Days in ISO 8601 format
+            "end_time_ms": end_time_ms
+        }
+
+        # Add idempotency key to prevent duplicate grants on retry
+        idempotency_headers = {
+            "X-Idempotency-Key": str(uuid.uuid4())
         }
 
         result = await call_revenuecat_api(
             "POST",
             f"/subscribers/{firebase_uid}/entitlements/extended_trial/promotional",
-            grant_data
+            grant_data,
+            idempotency_headers
         )
 
         logger.info(f"✅ Successfully granted 10-day extended trial to user {firebase_uid}")
-
-        # Calculate trial end date for response (for informational purposes)
-        from datetime import datetime as dt, timezone as tz
-        trial_end = dt.now(tz.utc) + timedelta(days=10)
 
         return {
             "success": True,
