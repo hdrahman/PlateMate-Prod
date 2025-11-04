@@ -257,14 +257,14 @@ const NutrientsScreen: React.FC = () => {
                     updatedNutrientData.fiber.goal = goals.fiber;
                     updatedNutrientData.sugar.goal = goals.sugar;
                     updatedNutrientData.saturatedFat.goal = goals.saturatedFat || 20;
-                    
+
                     console.log('📊 Nutrients screen goals applied:', {
                         protein: updatedNutrientData.protein.goal,
                         carbs: updatedNutrientData.carbs.goal,
                         fat: updatedNutrientData.fat.goal,
                         source: userGoals ? 'Custom user goals + calculated' : 'Calculated only'
                     });
-                    
+
                     setNutrientData(updatedNutrientData);
                 }
             } catch (error) {
@@ -329,7 +329,7 @@ const NutrientsScreen: React.FC = () => {
                 // Always use context data for today to ensure 100% consistency with Home screen
                 console.log('📊 Using context nutrient totals for today:', nutrientTotals);
                 totals = nutrientTotals;
-                
+
                 // Only fetch fresh data if context data is completely uninitialized (all values undefined/null)
                 // This prevents false positives when user actually has 0 values for nutrients
                 if (totals.calories === undefined || totals.protein === undefined || totals.carbs === undefined) {
@@ -795,7 +795,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10,
+        paddingBottom: 10,
     },
     backButton: {
         padding: 4,
