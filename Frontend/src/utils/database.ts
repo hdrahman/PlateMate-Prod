@@ -1210,30 +1210,31 @@ export const saveSteps = async (count: number, date: string) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
     const lastModified = getCurrentDate();
 
     try {
-        // Check if we already have an entry for this date
+        // Check if we already have an entry for this date and user
         const existingEntry = await db.getFirstAsync<{ id: number, count: number }>(
-            `SELECT id, count FROM steps WHERE date = ?`,
-            [date]
+            `SELECT id, count FROM user_steps WHERE firebase_uid = ? AND date = ?`,
+            [firebaseUserId, date]
         );
 
         if (existingEntry) {
             // Update existing entry
             await db.runAsync(
-                `UPDATE steps SET count = ?, last_modified = ?, synced = 0, sync_action = 'update' WHERE id = ?`,
+                `UPDATE user_steps SET count = ?, last_modified = ?, synced = 0, sync_action = 'update' WHERE id = ?`,
                 [count, lastModified, existingEntry.id]
             );
-            console.log(`✅ Updated steps for ${date} to ${count}`);
+            console.log(`✅ Updated steps for ${date} to ${count} (user: ${firebaseUserId})`);
             return existingEntry.id;
         } else {
             // Insert new entry
             const result = await db.runAsync(
-                `INSERT INTO steps (date, count, last_modified) VALUES (?, ?, ?)`,
-                [date, count, lastModified]
+                `INSERT INTO user_steps (firebase_uid, date, count, last_modified) VALUES (?, ?, ?, ?)`,
+                [firebaseUserId, date, count, lastModified]
             );
-            console.log(`✅ Saved ${count} steps for ${date}`);
+            console.log(`✅ Saved ${count} steps for ${date} (user: ${firebaseUserId})`);
             return result.lastInsertRowId;
         }
     } catch (error) {
@@ -1249,10 +1250,12 @@ export const getStepsForDate = async (date: string) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
     try {
         const result = await db.getFirstAsync<{ count: number }>(
-            `SELECT count FROM steps WHERE date = ?`,
-            [date]
+            `SELECT count FROM user_steps WHERE firebase_uid = ? AND date = ?`,
+            [firebaseUserId, date]
         );
 
         if (result) {
@@ -1273,6 +1276,8 @@ export const getStepsHistory = async (days: number = 7) => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
     try {
         // Get the current date
         const today = new Date();
@@ -1291,8 +1296,8 @@ export const getStepsHistory = async (days: number = 7) => {
 
         // Get steps data for these dates
         const results = await db.getAllAsync<{ date: string, count: number }>(
-            `SELECT date, count FROM steps WHERE date IN (${placeholders}) ORDER BY date ASC`,
-            dateRange
+            `SELECT date, count FROM user_steps WHERE firebase_uid = ? AND date IN (${placeholders}) ORDER BY date ASC`,
+            [firebaseUserId, ...dateRange]
         );
 
         // Create a map for quick lookup
@@ -1331,9 +1336,12 @@ export const getUnsyncedSteps = async () => {
         throw new Error('Database not initialized');
     }
 
+    const firebaseUserId = getCurrentUserId();
+
     try {
         const result = await db.getAllAsync(
-            `SELECT * FROM steps WHERE synced = 0`
+            `SELECT * FROM user_steps WHERE firebase_uid = ? AND synced = 0`,
+            [firebaseUserId]
         );
         return result;
     } catch (error) {
@@ -1354,7 +1362,7 @@ export const markStepsSynced = async (ids: number[]) => {
     try {
         const placeholders = ids.map(() => '?').join(',');
         await db.runAsync(
-            `UPDATE steps SET synced = 1, sync_action = NULL WHERE id IN (${placeholders})`,
+            `UPDATE user_steps SET synced = 1, sync_action = NULL WHERE id IN (${placeholders})`,
             ids
         );
         console.log(`✅ Marked ${ids.length} step records as synced`);
