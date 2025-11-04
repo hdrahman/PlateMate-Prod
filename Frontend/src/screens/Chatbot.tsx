@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
   Image,
   Animated,
-  Alert
+  Alert,
+  Keyboard
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -153,6 +154,38 @@ export default function Chatbot() {
 
     prefetchTokens();
   }, []);
+
+  // Handle keyboard events and auto-scroll
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        // Scroll to bottom when keyboard appears
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        // Optional: scroll adjustment when keyboard hides
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages]);
 
   // Helper function to format date for database queries
   const formatDateForDatabase = (date: Date): string => {
@@ -794,14 +827,16 @@ export default function Chatbot() {
 
       {/* Chat Messages */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
           contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {messages.map((message) => (
             <View
@@ -900,6 +935,11 @@ export default function Chatbot() {
             placeholder="Ask Coach Max about your health and fitness goals..."
             placeholderTextColor="#777"
             multiline
+            onFocus={() => {
+              setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            }}
           />
 
           <TouchableOpacity
@@ -1022,7 +1062,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   messagesContent: {
-    paddingBottom: 10,
+    paddingBottom: 20,
   },
   messageBubble: {
     maxWidth: "80%",
@@ -1070,7 +1110,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: "#333",
-    marginBottom: 20,
   },
   input: {
     flex: 1,
