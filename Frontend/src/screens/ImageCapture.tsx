@@ -1564,7 +1564,12 @@ const ImageCapture: React.FC = () => {
                 locations={[0, 0.5, 1]}
             />
 
-            <View style={styles.content}>
+            <ScrollView
+                style={styles.content}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+            >
                 <View style={styles.instructionsContainer}>
                     <Text style={styles.instructionsTitle}>Capture Your Meal</Text>
                     <Text style={styles.instructionsText}>
@@ -1611,7 +1616,7 @@ const ImageCapture: React.FC = () => {
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </View>
+            </ScrollView>
 
             {/* Analysis Modal */}
             <AnalysisModal
@@ -1679,7 +1684,6 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     content: {
-        flex: 1,
         paddingHorizontal: sidePadding,
         paddingTop: Platform.OS === 'ios' ? 4 : 8,
         paddingBottom: Platform.OS === 'ios' ? 8 : 16,
