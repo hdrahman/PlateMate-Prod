@@ -27,7 +27,10 @@
       "mcp__render__get_service",
       "mcp__render__list_logs",
       "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dir:*)",
+      "WebFetch(domain:docs.expo.dev)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -11,6 +11,11 @@ from datetime import datetime
 from typing import List, Optional
 from openai import AsyncOpenAI
 from auth.supabase_auth import get_current_user
+from PIL import Image
+from pillow_heif import register_heif_opener
+
+# Register HEIF opener with Pillow to enable HEIC/HEIF support
+register_heif_opener()
 
 # Toggle between mock and real API
 USE_MOCK_API = False  # Set to False to use the real OpenAI API
@@ -44,75 +49,127 @@ router = APIRouter()
 def detect_image_format(image_data: bytes) -> str:
     """
     Detect image format from magic bytes (file signature) and return MIME type.
-    Supports formats accepted by OpenAI: PNG, JPEG, GIF, WEBP
+    Supports formats accepted by OpenAI: PNG, JPEG, GIF, WEBP, HEIC/HEIF
     """
     if len(image_data) < 12:
         raise ValueError("Image data too small to detect format")
-    
+
     # Check magic bytes for different image formats
     # PNG: 89 50 4E 47 0D 0A 1A 0A
     if image_data[:8] == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A':
         return "image/png"
-    
+
     # JPEG: FF D8 FF
     elif image_data[:3] == b'\xFF\xD8\xFF':
         return "image/jpeg"
-    
+
     # GIF: 47 49 46 38 (GIF8)
     elif image_data[:4] == b'\x47\x49\x46\x38':
         return "image/gif"
-    
+
     # WEBP: RIFF at start and WEBP at offset 8
     elif image_data[:4] == b'\x52\x49\x46\x46' and image_data[8:12] == b'\x57\x45\x42\x50':
         return "image/webp"
-    
-    else:
-        raise ValueError(f"Unsupported image format. OpenAI supports: PNG, JPEG, GIF, WEBP. First bytes: {image_data[:12].hex()}")
+
+    # HEIC/HEIF: Check for 'ftyp' box with HEIC brand codes
+    # Format: [size] ftyp [brand] where brand can be: heic, heix, hevc, hevx, heim, heis, hevm, hevs, mif1, msf1
+    elif len(image_data) >= 12:
+        # Check if it's an ISO Base Media File Format (which HEIF uses)
+        if image_data[4:8] == b'ftyp':
+            # Check for HEIC/HEIF brand codes
+            brand = image_data[8:12]
+            heic_brands = [b'heic', b'heix', b'hevc', b'hevx', b'heim', b'heis', b'hevm', b'hevs', b'mif1', b'msf1']
+            if brand in heic_brands:
+                return "image/heic"
+
+    # If we get here, format is not recognized
+    raise ValueError(f"Unsupported image format. OpenAI supports: PNG, JPEG, GIF, WEBP, HEIC/HEIF. First bytes: {image_data[:12].hex()}")
+
+
+def convert_heic_to_jpeg(image_data: bytes) -> bytes:
+    """
+    Convert HEIC/HEIF image data to JPEG format using Pillow with pillow-heif.
+    Returns JPEG image data as bytes.
+    """
+    try:
+        import io
+        from PIL import Image
+
+        print("🔄 Converting HEIC to JPEG...")
+        start_time = time.time()
+
+        # Open HEIC image with Pillow (pillow-heif provides the decoder)
+        img = Image.open(io.BytesIO(image_data))
+
+        # Convert to RGB if needed (HEIC may have different color modes)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Save as JPEG to BytesIO buffer
+        output_buffer = io.BytesIO()
+        img.save(output_buffer, format='JPEG', quality=90, optimize=True)
+        jpeg_data = output_buffer.getvalue()
+
+        print(f"✅ HEIC to JPEG conversion took {time.time() - start_time:.2f} seconds")
+        print(f"📊 HEIC size: {len(image_data)} bytes, JPEG size: {len(jpeg_data)} bytes")
+
+        return jpeg_data
+    except Exception as e:
+        print(f"❌ HEIC conversion failed: {e}")
+        raise ValueError(f"Failed to convert HEIC to JPEG: {str(e)}")
 
 
 async def encode_image(image_file):
     """
     Encodes image file to base64 and detects the image format.
+    Converts HEIC to JPEG if needed for better compatibility.
     Returns tuple of (base64_string, mime_type)
     """
     try:
         start_time = time.time()
-        
+
         # CRITICAL: Reset file pointer before reading
         # Without this, subsequent reads return empty data after the first read
         await asyncio.get_event_loop().run_in_executor(None, image_file.seek, 0)
-        
+
         # Read image data in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
         image_data = await loop.run_in_executor(None, image_file.read)
-        
+
         # Validate image data
         if len(image_data) == 0:
             raise ValueError("Image file is empty - this may indicate a file pointer issue or corrupted upload")
-        
+
         if len(image_data) < 100:
             raise ValueError(f"Image data too small ({len(image_data)} bytes) - likely corrupted or not a valid image")
-        
+
         if len(image_data) > 20 * 1024 * 1024:  # 20MB limit
             print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB)")
-        
+
         # Detect image format before encoding
         mime_type = detect_image_format(image_data)
         print(f"🎨 Detected image format: {mime_type}")
-        
+
+        # Convert HEIC to JPEG for OpenAI compatibility
+        if mime_type == "image/heic":
+            print("🔄 HEIC format detected, converting to JPEG for OpenAI...")
+            image_data = await loop.run_in_executor(None, convert_heic_to_jpeg, image_data)
+            mime_type = "image/jpeg"
+            print("✅ Converted HEIC to JPEG successfully")
+
         # Base64 encoding is CPU-intensive, run in thread pool
         encoded_string = await loop.run_in_executor(
-            None, 
+            None,
             lambda: base64.b64encode(image_data).decode('utf-8')
         )
-        
+
         # Validate base64 encoding
         if not encoded_string or len(encoded_string) < 100:
             raise ValueError("Base64 encoding produced invalid result")
-        
+
         print(f"✅ Image encoding took {time.time() - start_time:.2f} seconds")
         print(f"📊 Original size: {len(image_data)} bytes, Base64 size: {len(encoded_string)} characters")
-        
+
         return encoded_string, mime_type
     except Exception as e:
         print(f"❌ Error encoding image: {e}")

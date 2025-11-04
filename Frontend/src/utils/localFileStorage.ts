@@ -17,11 +17,25 @@ export const ensureMealImagesDirectory = async (): Promise<void> => {
     }
 };
 
-// Generate a unique filename for a meal image
-const generateUniqueFilename = (userId: string): string => {
+// Generate a unique filename for a meal image with correct extension
+const generateUniqueFilename = (userId: string, originalUri: string): string => {
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(7);
-    return `meal_${userId}_${timestamp}_${randomId}.jpg`;
+
+    // Extract extension from original URI
+    let extension = 'jpg'; // Default fallback
+    const uriParts = originalUri.split('.');
+    if (uriParts.length > 1) {
+        const lastPart = uriParts[uriParts.length - 1].toLowerCase();
+        // Remove query parameters if any
+        const cleanExtension = lastPart.split('?')[0];
+        // Validate extension
+        if (['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'].includes(cleanExtension)) {
+            extension = cleanExtension;
+        }
+    }
+
+    return `meal_${userId}_${timestamp}_${randomId}.${extension}`;
 };
 
 // Save an image to local device storage
@@ -30,8 +44,8 @@ export const saveImageLocally = async (imageUri: string, userId: string): Promis
         // Ensure directory exists
         await ensureMealImagesDirectory();
 
-        // Generate unique filename
-        const filename = generateUniqueFilename(userId);
+        // Generate unique filename with correct extension
+        const filename = generateUniqueFilename(userId, imageUri);
         const localPath = `${MEAL_IMAGES_DIR}${filename}`;
 
         // Since images are already optimized by optimizeImage() function,
@@ -137,7 +151,14 @@ export const getAllLocalMealImages = async (): Promise<string[]> => {
 
         const files = await FileSystem.readDirectoryAsync(MEAL_IMAGES_DIR);
         const imagePaths = files
-            .filter(file => file.endsWith('.jpg') || file.endsWith('.jpeg') || file.endsWith('.png'))
+            .filter(file =>
+                file.endsWith('.jpg') ||
+                file.endsWith('.jpeg') ||
+                file.endsWith('.png') ||
+                file.endsWith('.heic') ||
+                file.endsWith('.heif') ||
+                file.endsWith('.webp')
+            )
             .map(file => `${MEAL_IMAGES_DIR}${file}`);
 
         console.log(`📊 Found ${imagePaths.length} local meal images`);
@@ -160,7 +181,12 @@ export const getLocalStorageInfo = async (): Promise<{
 
         const files = await FileSystem.readDirectoryAsync(MEAL_IMAGES_DIR);
         const imageFiles = files.filter(file =>
-            file.endsWith('.jpg') || file.endsWith('.jpeg') || file.endsWith('.png')
+            file.endsWith('.jpg') ||
+            file.endsWith('.jpeg') ||
+            file.endsWith('.png') ||
+            file.endsWith('.heic') ||
+            file.endsWith('.heif') ||
+            file.endsWith('.webp')
         );
 
         let totalSize = 0;

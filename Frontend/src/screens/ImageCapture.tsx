@@ -21,6 +21,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import RNHeicConverter from 'react-native-heic-converter';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -251,8 +252,42 @@ const ImageCapture: React.FC = () => {
         });
     }, []);
 
+    // Function to detect if image is HEIC format
+    const isHeicImage = (uri: string): boolean => {
+        const lowerUri = uri.toLowerCase();
+        return lowerUri.endsWith('.heic') || lowerUri.endsWith('.heif');
+    };
+
+    // Function to convert HEIC to JPEG
+    const convertHeicToJpeg = async (uri: string): Promise<string> => {
+        try {
+            console.log('Converting HEIC image to JPEG:', uri);
+            const result = await RNHeicConverter.convert({
+                path: uri,
+                quality: 0.9, // High quality conversion (0.0 - 1.0)
+            });
+
+            console.log('HEIC conversion successful:', result.path);
+            return result.path;
+        } catch (error) {
+            console.error('HEIC conversion failed:', error);
+            // Return original URI if conversion fails - backend will handle it as fallback
+            console.warn('Falling back to original HEIC image, backend will handle conversion');
+            return uri;
+        }
+    };
+
     const optimizeImage = async (uri: string): Promise<string> => {
         try {
+            console.log('Processing image:', uri);
+
+            // Check if image is HEIC format and convert to JPEG
+            if (isHeicImage(uri)) {
+                console.log('HEIC format detected, converting to JPEG...');
+                const convertedUri = await convertHeicToJpeg(uri);
+                return convertedUri;
+            }
+
             console.log('Using optimized image...');
             // For now, return the original URI since expo-image-picker already provides compressed images
             // This can be enhanced later with expo-image or other image processing libraries
