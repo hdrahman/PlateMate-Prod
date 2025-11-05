@@ -100,6 +100,7 @@ const MainTabNavigator = () => {
                     backgroundColor: '#1C1C1E',
                     borderTopColor: '#333',
                 },
+                tabBarHideOnKeyboard: true,
                 headerShown: false,
             })}
         >

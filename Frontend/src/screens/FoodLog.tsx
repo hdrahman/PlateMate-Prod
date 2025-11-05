@@ -17,9 +17,13 @@ import {
     TextInput,
     FlatList,
     ViewStyle,
-    TextStyle
+    TextStyle,
+    KeyboardAvoidingView,
+    Platform,
+    Keyboard
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -150,6 +154,7 @@ const DiaryScreen: React.FC = () => {
     const localMealDataRef = useRef<FoodLogEntry[] | null>(null);
     const scrollRef = useRef(null); // added scroll ref for simultaneous gesture handling
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
     const [nutritionGoals, setNutritionGoals] = useState(getDefaultNutritionGoals());
     const [profileLoading, setProfileLoading] = useState(true);
     const [userStreak, setUserStreak] = useState(0);
@@ -1106,7 +1111,7 @@ const DiaryScreen: React.FC = () => {
         // Bottom actions
         bottomActions: {
             flexDirection: 'column' as const,
-            marginTop: 8,
+            marginTop: 24,
             paddingHorizontal: 0,
             width: '100%',
         },
@@ -1218,7 +1223,7 @@ const DiaryScreen: React.FC = () => {
         },
         scrollInner: {
             paddingHorizontal: 10,
-            paddingBottom: 40,
+            paddingBottom: 0, // Dynamic padding is added inline
             width: '100%',
             alignItems: 'center' as const,
         },
@@ -2279,20 +2284,27 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                     onGestureEvent={onGestureEvent}
                     onHandlerStateChange={onHandlerStateChange}
                     simultaneousHandlers={scrollRef} // Allow simultaneous handling with ScrollView
-                    failOffsetY={[-5, 5]} // If movement starts vertical, fail the gesture
+                    failOffsetY={[-15, 15]} // Increased threshold to prevent conflicts with vertical scrolling
                     activeOffsetX={[-20, 20]} // Decreased horizontal threshold to make it more responsive
                 >
                     <Animated.View style={[styles.animatedContent, { transform: [{ translateX: swipeAnim }, { scale: scaleInterpolation }], opacity: opacityInterpolation }]}>
                         {/* Filter Banner */}
                         {renderFilterBanner()}
 
-                        <ScrollView
-                            ref={scrollRef}
-                            contentContainerStyle={styles.scrollInner}
-                            showsVerticalScrollIndicator={true}
-                            scrollEnabled={true}
-                            bounces={true}
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={{ flex: 1 }}
+                            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                         >
+                            <ScrollView
+                                ref={scrollRef}
+                                contentContainerStyle={[styles.scrollInner, { paddingBottom: 120 + insets.bottom }]}
+                                showsVerticalScrollIndicator={true}
+                                scrollEnabled={true}
+                                bounces={true}
+                                keyboardShouldPersistTaps="handled"
+                                onScrollBeginDrag={Keyboard.dismiss}
+                            >
                             {/* 2) Calories Remaining */}
                             <GradientBorderCard style={styles.summaryCard}>
                                 <Text style={styles.summaryTitle}>Calories Remaining</Text>
@@ -2576,6 +2588,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                             </View>
                             <View style={{ height: 2 }} />
                         </ScrollView>
+                        </KeyboardAvoidingView>
                     </Animated.View>
                 </PanGestureHandler>
 
