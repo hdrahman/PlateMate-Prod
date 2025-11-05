@@ -490,11 +490,9 @@ class PostgreSQLSyncService {
             const unsyncedFoodLogs = await getUnsyncedFoodLogs();
             if (unsyncedFoodLogs.length === 0) return;
 
-            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
-            if (!postgresUserId) {
-                errors.push('Cannot sync food logs: User not found in PostgreSQL');
-                return;
-            }
+            // Note: We use firebaseUid directly for user_id to match RLS policy
+            // The food_logs.user_id column stores firebase_uid (VARCHAR), not postgres UUID
+            // RLS policy checks: auth.uid() = user_id, so we must use firebaseUid here
 
             for (const foodLog of unsyncedFoodLogs) {
                 try {
