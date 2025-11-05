@@ -648,7 +648,7 @@ class PostgreSQLSyncService {
             for (const streak of unsyncedStreaks) {
                 try {
                     const streakData = {
-                        user_id: postgresUserId,
+                        firebase_uid: firebaseUid,  // ✅ Fixed: use firebase_uid, not user_id
                         current_streak: streak.current_streak,
                         longest_streak: streak.longest_streak,
                         last_activity_date: streak.last_activity_date
@@ -658,7 +658,7 @@ class PostgreSQLSyncService {
                     const { data: existingStreak } = await supabase
                         .from('user_streaks')
                         .select('id')
-                        .eq('user_id', postgresUserId)
+                        .eq('firebase_uid', firebaseUid)  // ✅ Fixed: use firebase_uid
                         .single();
 
                     if (existingStreak) {
@@ -666,7 +666,7 @@ class PostgreSQLSyncService {
                         const { error } = await supabase
                             .from('user_streaks')
                             .update(streakData)
-                            .eq('user_id', postgresUserId);
+                            .eq('firebase_uid', firebaseUid);  // ✅ Fixed: use firebase_uid
 
                         if (error) throw error;
                     } else {
@@ -808,45 +808,23 @@ class PostgreSQLSyncService {
             const cheatDaySettings = await getCheatDaySettings(firebaseUid);
             if (!cheatDaySettings) return;
 
-            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
-            if (!postgresUserId) {
-                errors.push('Cannot sync cheat day settings: User not found in PostgreSQL');
-                return;
-            }
-
+            // Sync cheat day settings directly into users table (embedded approach)
             const cheatDayData = {
-                user_id: postgresUserId,
+                cheat_day_enabled: cheatDaySettings.enabled !== false,
                 cheat_day_frequency: cheatDaySettings.frequency || 7,
                 last_cheat_day: cheatDaySettings.lastCheatDay,
                 next_cheat_day: cheatDaySettings.nextCheatDay,
-                enabled: cheatDaySettings.enabled !== false,
-                preferred_day_of_week: cheatDaySettings.preferredDayOfWeek,
+                preferred_cheat_day_of_week: cheatDaySettings.preferredDayOfWeek,
                 updated_at: new Date().toISOString()
             };
 
-            // Check if cheat day settings exist
-            const { data: existingSettings } = await supabase
-                .from('cheat_day_settings')
-                .select('id')
-                .eq('user_id', postgresUserId)
-                .single();
+            // Update users table with cheat day settings
+            const { error } = await supabase
+                .from('users')
+                .update(cheatDayData)
+                .eq('firebase_uid', firebaseUid);
 
-            if (existingSettings) {
-                // Update existing settings
-                const { error } = await supabase
-                    .from('cheat_day_settings')
-                    .update(cheatDayData)
-                    .eq('user_id', postgresUserId);
-
-                if (error) throw error;
-            } else {
-                // Insert new settings
-                const { error } = await supabase
-                    .from('cheat_day_settings')
-                    .insert(cheatDayData);
-
-                if (error) throw error;
-            }
+            if (error) throw error;
 
             stats.cheatDaySettingsUploaded++;
 
@@ -1413,25 +1391,29 @@ class PostgreSQLSyncService {
 
     private async restoreCheatDaySettings(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
-            const { data: settings, error } = await supabase
-                .from('cheat_day_settings')
-                .select('*')
-                .eq('user_id', postgresUserId)
+            // Restore cheat day settings from users table (embedded approach)
+            const { data: user, error } = await supabase
+                .from('users')
+                .select('cheat_day_enabled, cheat_day_frequency, last_cheat_day, next_cheat_day, preferred_cheat_day_of_week')
+                .eq('firebase_uid', firebaseUid)
                 .single();
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    return; // Settings don't exist
+                    return; // User doesn't exist
                 }
                 throw error;
             }
 
-            await initializeCheatDaySettings(
-                firebaseUid,
-                settings.cheat_day_frequency,
-                settings.preferred_day_of_week
-            );
-            stats.cheatDaySettingsRestored++;
+            // Only restore if cheat day is enabled or has settings
+            if (user && (user.cheat_day_enabled || user.cheat_day_frequency)) {
+                await initializeCheatDaySettings(
+                    firebaseUid,
+                    user.cheat_day_frequency || 7,
+                    user.preferred_cheat_day_of_week
+                );
+                stats.cheatDaySettingsRestored++;
+            }
 
         } catch (error) {
             console.error('Error restoring cheat day settings:', error);
