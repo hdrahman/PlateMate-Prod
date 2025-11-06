@@ -185,20 +185,30 @@ const Onboarding = () => {
             <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 20 : Math.max(insets.top, 20) }]}>
                 {currentStep > 1 && currentStep <= 8 && (
                     <View style={styles.progressContainer}>
-                        {Array.from({ length: TOTAL_ONBOARDING_STEPS }).map((_, index) => (
-                            <View
-                                key={index}
-                                style={[
-                                    styles.progressDot,
-                                    index + 2 === currentStep ? styles.activeDot :
-                                        index + 2 < currentStep ? styles.completedDot :
-                                            styles.inactiveDot
-                                ]}
-                            />
-                        ))}
+                        {Array.from({ length: TOTAL_ONBOARDING_STEPS }).map((_, index) => {
+                            // Adjust progress calculation for authenticated users starting at step 3
+                            // For authenticated users: step 3 shows as first dot (index 0)
+                            // For unauthenticated users: step 2 shows as first dot (index 0)
+                            const isAuthenticated = user && user.id;
+                            const effectiveStep = isAuthenticated ? currentStep - 2 : currentStep - 1;
+                            const dotPosition = index + 1;
+
+                            return (
+                                <View
+                                    key={index}
+                                    style={[
+                                        styles.progressDot,
+                                        dotPosition === effectiveStep ? styles.activeDot :
+                                            dotPosition < effectiveStep ? styles.completedDot :
+                                                styles.inactiveDot
+                                    ]}
+                                />
+                            );
+                        })}
                     </View>
                 )}
-                {currentStep > 1 && currentStep < 9 && (
+                {/* Hide back button if user is authenticated and at step 3 (their first real step) */}
+                {currentStep > 1 && currentStep < 9 && !(user && user.id && currentStep === 3) && (
                     <TouchableOpacity
                         style={[styles.backButton, { top: Math.max(insets.top, 20) }]}
                         onPress={handleBack}

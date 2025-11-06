@@ -427,7 +427,15 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
                         setOnboardingComplete(isOnboardingComplete);
                         setProfile(frontendProfile);
-                        setCurrentStep(isOnboardingComplete ? totalSteps : 1);
+
+                        // Set initial step based on authentication status
+                        // Authenticated users skip steps 1-2 (WelcomeStep + AccountCreationStep)
+                        // and start at step 3 (GoalsStep) if onboarding is incomplete
+                        const initialStep = isOnboardingComplete
+                            ? totalSteps
+                            : (user && user.id ? 3 : 1);
+
+                        setCurrentStep(initialStep);
                     } else {
                         // No profile in SQLite - check if onboarding is in progress
                         console.log('⚪ No profile found in SQLite - checking onboarding status');
@@ -447,7 +455,11 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                             // Truly fresh start - no onboarding data exists
                             console.log('🆕 Fresh start - using default profile');
                             setProfile(defaultProfile);
-                            setCurrentStep(1);
+
+                            // Set initial step based on authentication status
+                            // Authenticated users start at step 3 (GoalsStep), skipping intro and signup
+                            const initialStep = user && user.id ? 3 : 1;
+                            setCurrentStep(initialStep);
                         } else {
                             // Onboarding in progress - preserve the data!
                             console.log('🔄 Onboarding in progress - PRESERVING profile data');
