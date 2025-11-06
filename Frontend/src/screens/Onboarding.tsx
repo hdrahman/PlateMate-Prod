@@ -21,7 +21,6 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
-import { isLikelyOffline, isBackendAvailable } from '../utils/networkUtils';
 import * as userApi from '../api/userApi';
 
 // Onboarding step components
@@ -57,8 +56,6 @@ const Onboarding = () => {
     const [selectedFitnessGoal, setSelectedFitnessGoal] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isOffline, setIsOffline] = useState(false);
-    const [hasShownOfflineWarning, setHasShownOfflineWarning] = useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -77,37 +74,6 @@ const Onboarding = () => {
             return () => subscription.remove();
         }, [currentStep])
     );
-
-    // Check network connectivity when user starts onboarding steps
-    useEffect(() => {
-        const checkConnectivity = async () => {
-            if (currentStep === 2 && !hasShownOfflineWarning) { // AccountCreationStep (step 2)
-                const offline = await isLikelyOffline();
-                setIsOffline(offline);
-
-                if (offline) {
-                    setHasShownOfflineWarning(true);
-                    Alert.alert(
-                        'No Internet Connection',
-                        'You appear to be offline. While you can continue with the setup, some features may not work properly until you connect to the internet.',
-                        [
-                            { text: 'Continue Anyway', style: 'default' },
-                            {
-                                text: 'Check Connection',
-                                style: 'cancel',
-                                onPress: () => {
-                                    // User can manually check and try again
-                                    setHasShownOfflineWarning(false);
-                                }
-                            }
-                        ]
-                    );
-                }
-            }
-        };
-
-        checkConnectivity();
-    }, [currentStep, hasShownOfflineWarning]);
 
     // Handle moving to the next step; for GoalsStep (step 3), receive the selected fitnessGoal
     const handleNext = async (selectedGoal?: string) => {
