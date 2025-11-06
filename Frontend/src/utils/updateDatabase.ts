@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DB_VERSION_KEY = 'DB_VERSION';
-const CURRENT_VERSION = 16; // Increment to version 16 for database consolidation (merge nutrition_goals and cheat_day_settings into user_profiles)
+const CURRENT_VERSION = 18; // Increment to version 18 to handle expiry_time -> expires_at column rename
 
 export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
     try {
@@ -369,7 +369,7 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                 async () => {
                     if (currentVersion < 14) {
                         console.log('Running migration to version 14 - Adding water intake table...');
-                        
+
                         try {
                             // Create water_intake table
                             await db.execAsync(`
@@ -386,7 +386,7 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                                     FOREIGN KEY (firebase_uid) REFERENCES user_profiles(firebase_uid)
                                 )
                             `);
-                            
+
                             console.log('✅ water_intake table created successfully');
                             console.log('✅ Migration to version 14 complete');
                         } catch (error) {
@@ -399,7 +399,7 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                 async () => {
                     if (currentVersion < 15) {
                         console.log('Running migration to version 15 - Adding database indexes and performance optimizations...');
-                        
+
                         try {
                             // First, ensure exercises table exists before creating indexes
                             console.log('📊 Creating exercises table if not exists...');
@@ -418,10 +418,10 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                                 )
                             `);
                             console.log('✅ Created exercises table');
-                            
+
                             // Create critical indexes for food_logs table
                             console.log('📊 Creating database indexes for performance optimization...');
-                            
+
                             // Helper function to safely create indexes
                             const createIndexSafely = async (indexSQL: string, indexName: string) => {
                                 try {
@@ -432,53 +432,53 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                                     // Don't throw - continue with other indexes
                                 }
                             };
-                            
+
                             // Composite index for user_id + date queries (most common query pattern)
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_user_date 
                                 ON food_logs(user_id, date)
                             `, 'idx_food_logs_user_date');
-                            
+
                             // Index for user_id + id for recent food lookups
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_user_id 
                                 ON food_logs(user_id, id DESC)
                             `, 'idx_food_logs_user_id');
-                            
+
                             // Index for sync operations
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_synced 
                                 ON food_logs(synced, user_id)
                             `, 'idx_food_logs_synced');
-                            
+
                             // Index for meal_type queries
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_food_logs_meal_type 
                                 ON food_logs(user_id, meal_type, date)
                             `, 'idx_food_logs_meal_type');
-                            
+
                             // Indexes for other frequently queried tables
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_user_profiles_firebase_uid 
                                 ON user_profiles(firebase_uid)
                             `, 'idx_user_profiles_firebase_uid');
-                            
+
                             // Index for exercises table (now safe to create)
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_exercises_user_date 
                                 ON exercises(user_id, date)
                             `, 'idx_exercises_user_date');
-                            
+
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_water_intake_user_date 
                                 ON water_intake(firebase_uid, date)
                             `, 'idx_water_intake_user_date');
-                            
+
                             await createIndexSafely(`
                                 CREATE INDEX IF NOT EXISTS idx_steps_date 
                                 ON steps(date)
                             `, 'idx_steps_date');
-                            
+
                             console.log('✅ Migration to version 15 complete - Database indexes created');
                         } catch (error) {
                             console.error('❌ Error creating database indexes:', error);
@@ -637,6 +637,96 @@ export const updateDatabaseSchema = async (db: SQLite.SQLiteDatabase) => {
                             console.log('📊 Removed 5 unused tables for cleaner schema');
                         } catch (error) {
                             console.error('❌ Error in database consolidation migration:', error);
+                            throw error;
+                        }
+                    }
+                },
+                // Migration to version 17 - Ensure api_tokens table has expires_at column
+                async () => {
+                    if (currentVersion < 17) {
+                        console.log('Running migration to version 17 - Ensuring api_tokens table has expires_at column...');
+
+                        try {
+                            // Check if api_tokens table exists
+                            const tableExists = await db.getFirstAsync(
+                                `SELECT name FROM sqlite_master WHERE type='table' AND name='api_tokens'`
+                            );
+
+                            if (!tableExists) {
+                                console.log('⚠️ api_tokens table does not exist, it will be created by database initialization');
+                                return;
+                            }
+
+                            // Check current columns
+                            const tableInfo = await db.getAllAsync("PRAGMA table_info(api_tokens)");
+                            const existingColumns = tableInfo.map((col: any) => col.name);
+
+                            // Check if we have the old column name or the new one
+                            const hasOldColumn = existingColumns.includes('expiry_time');
+                            const hasNewColumn = existingColumns.includes('expires_at');
+
+                            if (hasOldColumn && !hasNewColumn) {
+                                // Rename old column to new name
+                                console.log('📋 Renaming expiry_time column to expires_at in api_tokens table...');
+                                await db.execAsync(`ALTER TABLE api_tokens RENAME COLUMN expiry_time TO expires_at`);
+                                console.log('✅ Renamed column to expires_at');
+                            } else if (!hasNewColumn) {
+                                // Add new column
+                                console.log('📋 Adding expires_at column to api_tokens table...');
+                                await db.execAsync(`ALTER TABLE api_tokens ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0`);
+                                console.log('✅ Added expires_at column to api_tokens table');
+                            } else {
+                                console.log('✅ expires_at column already exists in api_tokens table');
+                            }
+
+                            console.log('✅ Migration to version 17 complete');
+                        } catch (error) {
+                            console.error('❌ Error in migration to version 17:', error);
+                            throw error;
+                        }
+                    }
+                },
+                // Migration to version 18 - Same as v17 but with proper handling for expiry_time rename
+                async () => {
+                    if (currentVersion < 18) {
+                        console.log('Running migration to version 18 - Handling api_tokens column rename...');
+
+                        try {
+                            // Check if api_tokens table exists
+                            const tableExists = await db.getFirstAsync(
+                                `SELECT name FROM sqlite_master WHERE type='table' AND name='api_tokens'`
+                            );
+
+                            if (!tableExists) {
+                                console.log('⚠️ api_tokens table does not exist, it will be created by database initialization');
+                                return;
+                            }
+
+                            // Check current columns
+                            const tableInfo = await db.getAllAsync("PRAGMA table_info(api_tokens)");
+                            const existingColumns = tableInfo.map((col: any) => col.name);
+
+                            // Check if we have the old column name or the new one
+                            const hasOldColumn = existingColumns.includes('expiry_time');
+                            const hasNewColumn = existingColumns.includes('expires_at');
+
+                            if (hasOldColumn && !hasNewColumn) {
+                                // Rename old column to new name
+                                console.log('📋 Renaming expiry_time column to expires_at in api_tokens table...');
+                                await db.execAsync(`ALTER TABLE api_tokens RENAME COLUMN expiry_time TO expires_at`);
+                                console.log('✅ Renamed expiry_time to expires_at');
+                            } else if (!hasNewColumn) {
+                                // Add new column
+                                console.log('📋 Adding expires_at column to api_tokens table...');
+                                await db.execAsync(`ALTER TABLE api_tokens ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0`);
+                                console.log('✅ Added expires_at column to api_tokens table');
+                            } else {
+                                console.log('✅ expires_at column already exists in api_tokens table');
+                            }
+
+                            console.log('✅ Migration to version 18 complete');
+                        } catch (error) {
+                            console.error('❌ Error in migration to version 18:', error);
                             throw error;
                         }
                     }

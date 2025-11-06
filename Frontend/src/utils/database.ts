@@ -2720,7 +2720,8 @@ export const getCheatDaySettings = async (firebaseUid: string): Promise<CheatDay
 
     try {
         const result = await db.getFirstAsync(
-            `SELECT * FROM cheat_day_settings WHERE firebase_uid = ?`,
+            `SELECT cheat_day_enabled, cheat_day_frequency, last_cheat_day, next_cheat_day, preferred_cheat_day_of_week 
+             FROM user_profiles WHERE firebase_uid = ?`,
             [firebaseUid]
         ) as any;
 
@@ -2729,11 +2730,11 @@ export const getCheatDaySettings = async (firebaseUid: string): Promise<CheatDay
         }
 
         return {
-            enabled: result.enabled === 1,
-            frequency: result.cheat_day_frequency,
+            enabled: result.cheat_day_enabled === 1,
+            frequency: result.cheat_day_frequency || 7,
             lastCheatDay: result.last_cheat_day,
             nextCheatDay: result.next_cheat_day,
-            preferredDayOfWeek: result.preferred_day_of_week
+            preferredDayOfWeek: result.preferred_cheat_day_of_week
         };
     } catch (error) {
         console.error('Error getting cheat day settings:', error);
@@ -2759,10 +2760,14 @@ export const initializeCheatDaySettings = async (firebaseUid: string, frequency:
         const nextCheatDay = calculateNextCheatDayWithPreferredDay(today, frequency, defaultPreferredDay);
 
         await db.runAsync(
-            `INSERT OR REPLACE INTO cheat_day_settings 
-             (firebase_uid, cheat_day_frequency, enabled, next_cheat_day, preferred_day_of_week, last_modified) 
-             VALUES (?, ?, 1, ?, ?, ?)`,
-            [firebaseUid, frequency, nextCheatDay.toISOString(), defaultPreferredDay, getCurrentDate()]
+            `UPDATE user_profiles 
+             SET cheat_day_enabled = 1,
+                 cheat_day_frequency = ?,
+                 next_cheat_day = ?,
+                 preferred_cheat_day_of_week = ?,
+                 last_modified = ?
+             WHERE firebase_uid = ?`,
+            [frequency, nextCheatDay.toISOString(), defaultPreferredDay, getCurrentDate(), firebaseUid]
         );
 
         console.log('✅ Cheat day settings initialized for user:', firebaseUid,
@@ -2784,7 +2789,7 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
         // Get existing settings first
         const existingSettings = await getCheatDaySettings(firebaseUid);
 
-        // Prepare values for INSERT OR REPLACE
+        // Prepare values for UPDATE
         const enabled = settings.enabled !== undefined ? settings.enabled : (existingSettings?.enabled || false);
         const frequency = settings.frequency !== undefined ? settings.frequency : (existingSettings?.frequency || 7);
         const lastCheatDay = settings.lastCheatDay !== undefined ? settings.lastCheatDay : existingSettings?.lastCheatDay;
@@ -2831,22 +2836,24 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
             nextCheatDay = existingSettings?.nextCheatDay;
         }
 
-        // Use INSERT OR REPLACE to handle both new and existing records
+        // Update user_profiles table
         await db.runAsync(
-            `INSERT OR REPLACE INTO cheat_day_settings 
-             (firebase_uid, enabled, cheat_day_frequency, last_cheat_day, next_cheat_day, preferred_day_of_week, created_at, updated_at, synced, sync_action, last_modified) 
-             VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM cheat_day_settings WHERE firebase_uid = ?), ?), ?, 0, 'update', ?)`,
+            `UPDATE user_profiles 
+             SET cheat_day_enabled = ?,
+                 cheat_day_frequency = ?,
+                 last_cheat_day = ?,
+                 next_cheat_day = ?,
+                 preferred_cheat_day_of_week = ?,
+                 last_modified = ?
+             WHERE firebase_uid = ?`,
             [
-                firebaseUid,
                 enabled ? 1 : 0,
                 frequency,
                 lastCheatDay,
                 nextCheatDay,
                 preferredDayOfWeek,
-                firebaseUid,  // for COALESCE subquery
-                getCurrentDate(), // fallback created_at for new records
-                getCurrentDate(), // updated_at
-                getCurrentDate()  // last_modified
+                getCurrentDate(),
+                firebaseUid
             ]
         );
 

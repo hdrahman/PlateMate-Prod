@@ -2,8 +2,6 @@
 // This file provides a purely event-driven notification system for database changes
 // It avoids timer-based polling for better performance and resource usage
 
-import { getFoodLogsByDate } from './database';
-
 type DatabaseChangeListener = () => void;
 
 // Store for all registered listeners
