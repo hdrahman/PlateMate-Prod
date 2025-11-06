@@ -123,6 +123,9 @@ Backend/uploads/
 *.dump
 *.pgpass
 pgdata/
+*.db
+*.sqlite
+*.sqlite3
 
 # =======================
 # ✅ Pytest & Test Files
