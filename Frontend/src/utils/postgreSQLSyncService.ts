@@ -355,6 +355,23 @@ class PostgreSQLSyncService {
 
         } catch (error: any) {
             console.error('❌ PostgreSQL sync failed:', error);
+
+            // Check for RLS policy violation indicating user deleted server-side
+            const isRLSError = error?.message?.includes('does not exist') ||
+                              error?.message?.includes('User from sub claim') ||
+                              error?.code === 'PGRST116' ||
+                              error?.status === 403;
+
+            if (isRLSError) {
+                console.error('🔴 RLS violation detected during sync - user deleted server-side, forcing logout');
+                try {
+                    const supabaseAuth = require('./supabaseAuth').default;
+                    await supabaseAuth.signOut();
+                } catch (logoutError) {
+                    console.error('Error during RLS-triggered logout:', logoutError);
+                }
+            }
+
             errors.push(`Sync failed: ${error.message}`);
             stats.totalErrors = errors.length;
             await updateLastSyncTime('error');
@@ -925,6 +942,23 @@ class PostgreSQLSyncService {
 
         } catch (error: any) {
             console.error('❌ PostgreSQL restore failed:', error);
+
+            // Check for RLS policy violation indicating user deleted server-side
+            const isRLSError = error?.message?.includes('does not exist') ||
+                              error?.message?.includes('User from sub claim') ||
+                              error?.code === 'PGRST116' ||
+                              error?.status === 403;
+
+            if (isRLSError) {
+                console.error('🔴 RLS violation detected during restore - user deleted server-side, forcing logout');
+                try {
+                    const supabaseAuth = require('./supabaseAuth').default;
+                    await supabaseAuth.signOut();
+                } catch (logoutError) {
+                    console.error('Error during RLS-triggered logout:', logoutError);
+                }
+            }
+
             errors.push(`Restore failed: ${error.message}`);
             stats.totalErrors = errors.length;
 

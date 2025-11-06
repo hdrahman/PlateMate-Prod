@@ -449,6 +449,24 @@ class TokenManager {
         client.interceptors.response.use(
             (response) => response,
             async (error) => {
+                // Check for RLS policy violation indicating user deleted server-side
+                if (error.response?.status === 403) {
+                    const errorMsg = error.response.data?.message || error.response.data?.error || '';
+                    if (errorMsg.includes('does not exist') ||
+                        errorMsg.includes('User from sub claim') ||
+                        errorMsg.includes('RLS')) {
+
+                        console.error('🔴 RLS violation detected - user deleted server-side, forcing logout');
+                        try {
+                            const supabaseAuth = require('./supabaseAuth').default;
+                            await supabaseAuth.signOut();
+                        } catch (logoutError) {
+                            console.error('Error during RLS-triggered logout:', logoutError);
+                        }
+                        return Promise.reject(error);
+                    }
+                }
+
                 // Handle 401/403 errors by refreshing token and retrying
                 if (error.response && (error.response.status === 401 || error.response.status === 403)) {
                     try {

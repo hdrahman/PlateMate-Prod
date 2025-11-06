@@ -151,14 +151,26 @@ export const supabaseAuth = {
             return user;
         } catch (error: any) {
             console.error('Error getting current user:', error);
-            // Auto-logout on invalid/expired session so UI can redirect to login
+
+            // Check for RLS policy error indicating user doesn't exist server-side
+            const isRLSError = error?.message?.includes('does not exist') ||
+                              error?.message?.includes('User from sub claim') ||
+                              error?.code === 'PGRST116' || // Row Level Security violation
+                              error?.status === 403;
+
+            // Auto-logout on invalid/expired session, RLS violation, or deleted user
             if (
+                isRLSError ||
                 error?.code === 'refresh_token_already_used' ||
                 error?.code === 'invalid_refresh_token' ||
                 error?.name === 'AuthSessionMissingError'
             ) {
                 try {
-                    console.log('🔒 Invalid Supabase session detected – forcing logout');
+                    if (isRLSError) {
+                        console.log('🔴 User deleted server-side – forcing logout');
+                    } else {
+                        console.log('🔒 Invalid Supabase session detected – forcing logout');
+                    }
                     await supabase.auth.signOut();
                 } catch (signOutErr) {
                     console.warn('Error during forced logout:', signOutErr);

@@ -31,7 +31,10 @@
       "Bash(dir:*)",
       "WebFetch(domain:docs.expo.dev)",
       "Bash(npm install:*)",
-      "WebFetch(domain:community.revenuecat.com)"
+      "WebFetch(domain:community.revenuecat.com)",
+      "Bash(npm run:*)",
+      "Bash(node -e:*)",
+      "Bash(node --check:*)"
     ],
     "deny": [],
     "ask": []
