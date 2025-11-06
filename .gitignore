@@ -78,6 +78,7 @@ service-account.json
 *.keystore
 google-services.json
 GoogleService-Info.plist
+client_*.apps.googleusercontent.com.plist
 *credentials*.json
 *secrets*.json
 *auth*.json
