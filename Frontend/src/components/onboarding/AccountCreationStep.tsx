@@ -16,6 +16,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import { useAuth } from '../../context/AuthContext';
 
+// Safe import AppleAuthentication module at top level (like Auth.tsx)
+let AppleAuthentication: any = null;
+try {
+    if (Platform.OS === 'ios') {
+        AppleAuthentication = require('expo-apple-authentication');
+        console.log('Apple Authentication module loaded in AccountCreationStep');
+    }
+} catch (error) {
+    console.log('Apple Authentication not available in AccountCreationStep', error);
+}
+
 interface AccountCreationStepProps {
     profile: UserProfile;
     updateProfile: (data: Partial<UserProfile>) => Promise<void>;
@@ -54,16 +65,17 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
     // Check if Apple Authentication is available (iOS only)
     useEffect(() => {
         const checkAppleAuth = async () => {
-            if (Platform.OS === 'ios') {
+            if (AppleAuthentication && Platform.OS === 'ios') {
                 try {
-                    // Try to import Apple Authentication
-                    const AppleAuthentication = require('expo-apple-authentication');
                     const isAvailable = await AppleAuthentication.isAvailableAsync();
                     setIsAppleAuthAvailable(isAvailable);
+                    console.log('Apple Authentication available in AccountCreationStep:', isAvailable);
                 } catch (error) {
-                    console.log('Apple Authentication not available:', error);
+                    console.log('Error checking Apple Authentication availability:', error);
                     setIsAppleAuthAvailable(false);
                 }
+            } else {
+                setIsAppleAuthAvailable(false);
             }
         };
         checkAppleAuth();
@@ -206,7 +218,18 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
     const handleGoogleSignIn = async () => {
         setIsLoading(true);
         try {
-            await signInWithGoogle();
+            const result = await signInWithGoogle();
+
+            // Extract name from Google sign-in result if available
+            if (result?.userInfo) {
+                const { firstName: googleFirstName, lastName: googleLastName } = result.userInfo;
+                
+                // Pre-fill the form fields if we got name from Google
+                if (googleFirstName) setFirstName(googleFirstName);
+                if (googleLastName) setLastName(googleLastName);
+                
+                console.log('✅ Pre-filled name from Google:', googleFirstName, googleLastName);
+            }
 
             // Collect manual data after social sign-in
             if (!firstName.trim() || !lastName.trim() || !age) {
@@ -238,7 +261,20 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
     const handleAppleSignIn = async () => {
         setIsLoading(true);
         try {
-            await signInWithApple();
+            const result = await signInWithApple();
+
+            // Extract name from Apple sign-in result if available (only on first sign-in)
+            if (result?.userInfo) {
+                const { firstName: appleFirstName, lastName: appleLastName } = result.userInfo;
+                
+                // Pre-fill the form fields if we got name from Apple
+                if (appleFirstName) setFirstName(appleFirstName);
+                if (appleLastName) setLastName(appleLastName);
+                
+                console.log('✅ Pre-filled name from Apple:', appleFirstName, appleLastName);
+            } else {
+                console.log('⚠️ No name from Apple (normal after first sign-in)');
+            }
 
             // Collect manual data after social sign-in
             if (!firstName.trim() || !lastName.trim() || !age) {

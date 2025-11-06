@@ -95,6 +95,8 @@ export const supabaseAuth = {
             const userInfo = await GoogleSignin.signIn();
 
             console.log('🟡 Google Sign-In successful, getting ID token...');
+            console.log('🟡 Google user info:', userInfo.user);
+            
             const { idToken } = await GoogleSignin.getTokens();
 
             if (!idToken) {
@@ -115,7 +117,40 @@ export const supabaseAuth = {
             }
 
             console.log('🟢 Successfully signed in with Google');
-            return data;
+
+            // Extract and save user name from Google
+            if (userInfo.user) {
+                try {
+                    const firstName = userInfo.user.givenName || '';
+                    const lastName = userInfo.user.familyName || '';
+                    const fullName = userInfo.user.name || `${firstName} ${lastName}`.trim();
+
+                    if (fullName) {
+                        await supabase.auth.updateUser({
+                            data: {
+                                full_name: fullName,
+                                display_name: fullName,
+                                first_name: firstName,
+                                last_name: lastName,
+                            }
+                        });
+                        console.log('✅ Updated user profile with Google name:', fullName);
+                    }
+                } catch (profileError) {
+                    console.warn('⚠️ Could not update profile with Google name:', profileError);
+                }
+            }
+
+            // Return both auth data and user info for downstream use
+            return {
+                ...data,
+                userInfo: {
+                    firstName: userInfo.user?.givenName || '',
+                    lastName: userInfo.user?.familyName || '',
+                    email: userInfo.user?.email || '',
+                    name: userInfo.user?.name || '',
+                }
+            };
         } catch (error) {
             console.error('🔴 Error signing in with Google:', error);
             throw error;
@@ -256,29 +291,39 @@ export const supabaseAuth = {
             console.log('✅ Successfully signed in with Apple');
 
             // Update user profile with Apple name if available
-            if (credential.fullName && (credential.fullName.givenName || credential.fullName.familyName)) {
-                try {
-                    const firstName = credential.fullName.givenName || '';
-                    const lastName = credential.fullName.familyName || '';
-                    const fullName = `${firstName} ${lastName}`.trim();
+            // NOTE: Apple only provides name on FIRST sign-in, then never again
+            const firstName = credential.fullName?.givenName || '';
+            const lastName = credential.fullName?.familyName || '';
+            const fullName = `${firstName} ${lastName}`.trim();
 
-                    if (fullName) {
-                        await supabase.auth.updateUser({
-                            data: {
-                                full_name: fullName,
-                                display_name: fullName,
-                                first_name: firstName,
-                                last_name: lastName,
-                            }
-                        });
-                        console.log('✅ Updated user profile with Apple name');
-                    }
+            if (fullName) {
+                try {
+                    await supabase.auth.updateUser({
+                        data: {
+                            full_name: fullName,
+                            display_name: fullName,
+                            first_name: firstName,
+                            last_name: lastName,
+                        }
+                    });
+                    console.log('✅ Updated user profile with Apple name:', fullName);
                 } catch (profileError) {
                     console.warn('⚠️ Could not update profile with Apple name:', profileError);
                 }
+            } else {
+                console.log('⚠️ Apple did not provide name (this is normal after first sign-in)');
             }
 
-            return data;
+            // Return both auth data and user info for downstream use
+            return {
+                ...data,
+                userInfo: {
+                    firstName,
+                    lastName,
+                    email: credential.email || '',
+                    name: fullName,
+                }
+            };
         } catch (error: any) {
             if (error.code === 'ERR_REQUEST_CANCELED') {
                 console.log('🍎 User canceled Apple Sign-In');

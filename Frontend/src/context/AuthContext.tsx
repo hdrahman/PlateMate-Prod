@@ -17,6 +17,17 @@ console.log('Apple Authentication not available');
 // Type for user (using Supabase User type with Firebase compatibility)
 type UserType = any & { uid?: string }; // Supabase user with Firebase compatibility layer
 
+// Type for social sign-in result with user info
+interface SocialSignInResult {
+    userInfo?: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        name: string;
+    };
+    [key: string]: any; // Allow other properties from auth data
+}
+
 // Define the shape of our context
 interface AuthContextType {
     user: UserType | null;
@@ -25,8 +36,8 @@ interface AuthContextType {
     signUp: (email: string, password: string) => Promise<void>;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
-    signInWithGoogle: () => Promise<any>;
-    signInWithApple: () => Promise<void>;
+    signInWithGoogle: () => Promise<SocialSignInResult>;
+    signInWithApple: () => Promise<SocialSignInResult>;
     signInAnonymously: () => Promise<void>;
 }
 
@@ -38,8 +49,8 @@ const AuthContext = createContext<AuthContextType>({
     signUp: async () => { },
     signIn: async () => { },
     signOut: async () => { },
-    signInWithGoogle: async () => { },
-    signInWithApple: async () => { },
+    signInWithGoogle: async () => ({}),
+    signInWithApple: async () => ({}),
     signInAnonymously: async () => { },
 });
 
@@ -408,10 +419,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    // Sign in with Apple - simplified implementation that shows an error
-    const signInWithApple = async () => {
+    // Sign in with Apple - returns user info when available (first sign-in only)
+    const signInWithApple = async (): Promise<SocialSignInResult> => {
         try {
-            await supabaseAuth.signInWithApple();
+            const result = await supabaseAuth.signInWithApple();
+            return result || {};
         } catch (error: any) {
             Alert.alert('Sign In Error', error.message);
             throw error;
