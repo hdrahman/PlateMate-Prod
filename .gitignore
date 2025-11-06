@@ -27,6 +27,10 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.cer
+*.certSigningRequest
+*.provisionprofile
+*.xcarchive
 
 # =======================
 # ✅ Metro (React Native)
@@ -84,6 +88,8 @@ client_*.apps.googleusercontent.com.plist
 *auth*.json
 firebase-adminsdk-*.json
 client_secret_*.json
+AuthKey_*.p8
+APNsAuthKey_*.p8
 
 # =======================
 # ✅ TypeScript Build Info
