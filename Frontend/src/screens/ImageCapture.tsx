@@ -64,10 +64,11 @@ const { imageHeight, sidePadding, sideViewButtonHeight } = getResponsiveDimensio
 type RootStackParamList = {
     FoodLog: { refresh?: number };
     ImageCapture: { mealType: string; photoUri?: string; foodData?: any; sourcePage?: string };
-    NutritionFactsResult: {
-        nutritionData: any[];
-        mealId: string;
-        mealType: string;
+    FoodDetail: {
+        foodId?: number;
+        nutritionData?: any[];
+        mealId?: string;
+        mealType?: string;
         brandName?: string;
         quantity?: string;
         notes?: string;
@@ -999,9 +1000,9 @@ const ImageCapture: React.FC = () => {
             // Hide the analysis modal immediately to improve perceived performance
             setShowAnalysisModal(false);
 
-            // Navigate to NutritionFactsResult screen instead of directly adding to food log
-            console.log('🚀 About to navigate to NutritionFactsResult...');
-            navigation.navigate('NutritionFactsResult', {
+            // Navigate to FoodDetail screen instead of directly adding to food log
+            console.log('🚀 About to navigate to FoodDetail...');
+            navigation.navigate('FoodDetail', {
                 nutritionData: result.nutrition_data,
                 mealId: (result.meal_id || Date.now()).toString(),
                 mealType: mealType,

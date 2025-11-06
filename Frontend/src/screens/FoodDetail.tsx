@@ -19,8 +19,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFoodLogById, updateFoodLog, getFoodLogsByMealId, addFoodLog } from '../utils/database';
+import { getFoodLogById, updateFoodLog, getFoodLogsByMealId, addFoodLog, addMultipleFoodLogs } from '../utils/database';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
+import { navigateToFoodLog } from '../navigation/RootNavigation';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -49,7 +50,17 @@ const VITAMIN_COLORS = {
 
 // Define navigation types
 type RootStackParamList = {
-    FoodDetail: { foodId: number };
+    FoodDetail: {
+        foodId?: number;
+        nutritionData?: any[];
+        mealId?: string;
+        mealType?: string;
+        brandName?: string;
+        quantity?: string;
+        notes?: string;
+        foodName?: string;
+        localImagePaths?: string[];
+    };
     FoodLog: { refresh?: number; mealIdFilter?: number };
 };
 
@@ -95,19 +106,106 @@ interface FoodLogEntry {
 const FoodDetailScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
-    const { foodId } = route.params as { foodId: number };
+    const params = route.params as any;
+    const {
+        foodId,
+        nutritionData,
+        mealId: routeMealId,
+        mealType: routeMealType,
+        brandName: routeBrandName,
+        quantity: routeQuantity,
+        notes: routeNotes,
+        foodName: routeFoodName,
+        localImagePaths
+    } = params || {};
+
+    // Determine if we're in "new food" mode (scanned food) or "existing food" mode
+    const isNewFoodMode = !foodId && nutritionData;
 
     const [foodData, setFoodData] = useState<FoodLogEntry | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [selectedMealType, setSelectedMealType] = useState(routeMealType || 'Breakfast');
+    const [userNotes, setUserNotes] = useState(routeNotes || '');
+    const [loading, setLoading] = useState(!isNewFoodMode);
     const [imageError, setImageError] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editedFoodData, setEditedFoodData] = useState<Partial<FoodLogEntry>>({});
     const [relatedFoodItems, setRelatedFoodItems] = useState<FoodLogEntry[]>([]);
     const [hasRelatedItems, setHasRelatedItems] = useState(false);
+    const [addingFood, setAddingFood] = useState(false);
 
     useEffect(() => {
-        loadFoodData();
-    }, [foodId]);
+        if (isNewFoodMode) {
+            // Convert nutrition data to food entry format
+            const displayFood = nutritionData[0] || {};
+            const isMultipleItems = nutritionData.length > 1;
+
+            // Calculate total nutrition if multiple items
+            const totalNutrition = isMultipleItems ? {
+                calories: nutritionData.reduce((sum: number, item: any) => sum + (item.calories || 0), 0),
+                proteins: nutritionData.reduce((sum: number, item: any) => sum + (item.proteins || 0), 0),
+                carbs: nutritionData.reduce((sum: number, item: any) => sum + (item.carbs || 0), 0),
+                fats: nutritionData.reduce((sum: number, item: any) => sum + (item.fats || 0), 0),
+                fiber: nutritionData.reduce((sum: number, item: any) => sum + (item.fiber || 0), 0),
+                sugar: nutritionData.reduce((sum: number, item: any) => sum + (item.sugar || 0), 0),
+                saturated_fat: nutritionData.reduce((sum: number, item: any) => sum + (item.saturated_fat || 0), 0),
+                polyunsaturated_fat: nutritionData.reduce((sum: number, item: any) => sum + (item.polyunsaturated_fat || 0), 0),
+                monounsaturated_fat: nutritionData.reduce((sum: number, item: any) => sum + (item.monounsaturated_fat || 0), 0),
+                trans_fat: nutritionData.reduce((sum: number, item: any) => sum + (item.trans_fat || 0), 0),
+                cholesterol: nutritionData.reduce((sum: number, item: any) => sum + (item.cholesterol || 0), 0),
+                sodium: nutritionData.reduce((sum: number, item: any) => sum + (item.sodium || 0), 0),
+                potassium: nutritionData.reduce((sum: number, item: any) => sum + (item.potassium || 0), 0),
+                vitamin_a: nutritionData.reduce((sum: number, item: any) => sum + (item.vitamin_a || 0), 0),
+                vitamin_c: nutritionData.reduce((sum: number, item: any) => sum + (item.vitamin_c || 0), 0),
+                calcium: nutritionData.reduce((sum: number, item: any) => sum + (item.calcium || 0), 0),
+                iron: nutritionData.reduce((sum: number, item: any) => sum + (item.iron || 0), 0),
+            } : displayFood;
+
+            // Create a pseudo food entry for display
+            const primaryImagePath = localImagePaths && localImagePaths.length > 0 ? localImagePaths[0] : '';
+
+            const newFoodEntry: FoodLogEntry = {
+                id: -1, // Temporary ID for new food
+                meal_id: routeMealId ? parseInt(routeMealId) : Date.now(),
+                user_id: 0,
+                food_name: routeFoodName || displayFood.food_name || 'Unknown Food',
+                calories: totalNutrition.calories || 0,
+                proteins: totalNutrition.proteins || 0,
+                carbs: totalNutrition.carbs || 0,
+                fats: totalNutrition.fats || 0,
+                fiber: totalNutrition.fiber || 0,
+                sugar: totalNutrition.sugar || 0,
+                saturated_fat: totalNutrition.saturated_fat || 0,
+                polyunsaturated_fat: totalNutrition.polyunsaturated_fat || 0,
+                monounsaturated_fat: totalNutrition.monounsaturated_fat || 0,
+                trans_fat: totalNutrition.trans_fat || 0,
+                cholesterol: totalNutrition.cholesterol || 0,
+                sodium: totalNutrition.sodium || 0,
+                potassium: totalNutrition.potassium || 0,
+                vitamin_a: totalNutrition.vitamin_a || 0,
+                vitamin_c: totalNutrition.vitamin_c || 0,
+                calcium: totalNutrition.calcium || 0,
+                iron: totalNutrition.iron || 0,
+                weight: undefined,
+                weight_unit: 'g',
+                image_url: primaryImagePath,
+                file_key: 'default_key',
+                healthiness_rating: displayFood.healthiness_rating || 5,
+                date: new Date().toISOString().split('T')[0],
+                meal_type: routeMealType || 'Breakfast',
+                brand_name: routeBrandName || '',
+                quantity: routeQuantity || '',
+                notes: routeNotes || '',
+                synced: 0,
+                sync_action: 'insert',
+                last_modified: new Date().toISOString()
+            };
+
+            setFoodData(newFoodEntry);
+            setLoading(false);
+        } else if (foodId) {
+            loadFoodData();
+        }
+    }, [foodId, isNewFoodMode]);
 
     const loadFoodData = async () => {
         try {
@@ -312,64 +410,165 @@ const FoodDetailScreen: React.FC = () => {
         if (!foodData) return;
 
         try {
-            // Format current date as ISO string (YYYY-MM-DD) - same as ImageCapture
+            setAddingFood(true);
+
+            // Format current date as ISO string (YYYY-MM-DD)
             const today = new Date();
             const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             console.log(`Saving food log from quick add with date: ${formattedDate}`);
 
-            // Create food log entry using the EXACT same structure as ImageCapture
-            const foodLog = {
-                meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
-                food_name: foodData.food_name || 'Unknown Food',
-                brand_name: foodData.brand_name || '',
-                meal_type: foodData.meal_type,
-                date: formattedDate, // Use formatted date
-                quantity: foodData.quantity || '1 serving',
-                weight: foodData.weight || null,
-                weight_unit: foodData.weight_unit || 'g',
-                calories: foodData.calories || 0, // Keep calories as 0 since it's mandatory
-                proteins: foodData.proteins || -1, // Use -1 for missing data
-                carbs: foodData.carbs || -1,
-                fats: foodData.fats || -1,
-                fiber: foodData.fiber || -1,
-                sugar: foodData.sugar || -1,
-                saturated_fat: foodData.saturated_fat || -1,
-                polyunsaturated_fat: foodData.polyunsaturated_fat || -1,
-                monounsaturated_fat: foodData.monounsaturated_fat || -1,
-                trans_fat: foodData.trans_fat || -1,
-                cholesterol: foodData.cholesterol || -1,
-                sodium: foodData.sodium || -1,
-                potassium: foodData.potassium || -1,
-                vitamin_a: foodData.vitamin_a || -1,
-                vitamin_c: foodData.vitamin_c || -1,
-                calcium: foodData.calcium || -1,
-                iron: foodData.iron || -1,
-                healthiness_rating: foodData.healthiness_rating || 5,
-                notes: foodData.notes || '',
-                image_url: foodData.image_url || '', // Required field
-                file_key: foodData.file_key || 'default_key' // Required field
-            };
+            if (isNewFoodMode && nutritionData) {
+                // Handle new scanned food - can be multiple items
+                const isMultipleItems = nutritionData.length > 1;
 
-            console.log('Saving quick add food log to local database:', foodLog);
+                if (isMultipleItems) {
+                    // Handle multiple food items
+                    const foodLogsToInsert = [];
 
-            // Navigate to FoodLog immediately so the user can see the new entry
-            const refreshTimestamp = Date.now();
-            navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+                    for (let index = 0; index < nutritionData.length; index++) {
+                        const item = nutritionData[index];
+                        const primaryImagePath = localImagePaths && localImagePaths.length > 0
+                            ? localImagePaths[0]
+                            : '';
 
-            await addFoodLog(foodLog);
+                        const foodLog = {
+                            meal_id: routeMealId,
+                            food_name: routeFoodName || item.food_name || 'Unknown Food',
+                            calories: item.calories || 0,
+                            proteins: item.proteins || 0,
+                            carbs: item.carbs || 0,
+                            fats: item.fats || 0,
+                            fiber: item.fiber || 0,
+                            sugar: item.sugar || 0,
+                            saturated_fat: item.saturated_fat || 0,
+                            polyunsaturated_fat: item.polyunsaturated_fat || 0,
+                            monounsaturated_fat: item.monounsaturated_fat || 0,
+                            trans_fat: item.trans_fat || 0,
+                            cholesterol: item.cholesterol || 0,
+                            sodium: item.sodium || 0,
+                            potassium: item.potassium || 0,
+                            vitamin_a: item.vitamin_a || 0,
+                            vitamin_c: item.vitamin_c || 0,
+                            calcium: item.calcium || 0,
+                            iron: item.iron || 0,
+                            image_url: primaryImagePath,
+                            file_key: 'default_key',
+                            healthiness_rating: item.healthiness_rating || 5,
+                            date: formattedDate,
+                            meal_type: selectedMealType,
+                            brand_name: routeBrandName,
+                            quantity: routeQuantity,
+                            notes: userNotes
+                        };
 
-            Alert.alert(
-                'Success',
-                'Food item added to today\'s log!',
-                [{ text: 'OK' }]
-            );
+                        foodLogsToInsert.push(foodLog);
+                    }
+
+                    // Navigate before database operation to prevent UI blocking
+                    console.log('🚀 Navigating to FoodLog after adding multiple items...');
+                    navigateToFoodLog();
+
+                    // Continue with database operation after navigation has started
+                    console.log(`Saving ${foodLogsToInsert.length} food logs to local database in batch`);
+                    await addMultipleFoodLogs(foodLogsToInsert);
+                    console.log(`Saved ${nutritionData.length} food items to database`);
+                } else {
+                    // Handle single new food item
+                    const primaryImagePath = localImagePaths && localImagePaths.length > 0
+                        ? localImagePaths[0]
+                        : '';
+
+                    const foodLog = {
+                        meal_id: routeMealId,
+                        food_name: routeFoodName || foodData.food_name || 'Unknown Food',
+                        calories: foodData.calories || 0,
+                        proteins: foodData.proteins || 0,
+                        carbs: foodData.carbs || 0,
+                        fats: foodData.fats || 0,
+                        fiber: foodData.fiber || 0,
+                        sugar: foodData.sugar || 0,
+                        saturated_fat: foodData.saturated_fat || 0,
+                        polyunsaturated_fat: foodData.polyunsaturated_fat || 0,
+                        monounsaturated_fat: foodData.monounsaturated_fat || 0,
+                        trans_fat: foodData.trans_fat || 0,
+                        cholesterol: foodData.cholesterol || 0,
+                        sodium: foodData.sodium || 0,
+                        potassium: foodData.potassium || 0,
+                        vitamin_a: foodData.vitamin_a || 0,
+                        vitamin_c: foodData.vitamin_c || 0,
+                        calcium: foodData.calcium || 0,
+                        iron: foodData.iron || 0,
+                        image_url: primaryImagePath,
+                        file_key: 'default_key',
+                        healthiness_rating: foodData.healthiness_rating || 5,
+                        date: formattedDate,
+                        meal_type: selectedMealType,
+                        brand_name: routeBrandName,
+                        quantity: routeQuantity,
+                        notes: userNotes
+                    };
+
+                    // Navigate before database operation to prevent UI blocking
+                    console.log('🚀 Navigating to FoodLog after adding single item...');
+                    navigateToFoodLog();
+
+                    // Continue with database operation after navigation has started
+                    console.log('Saving food log to local database:', foodLog);
+                    await addFoodLog(foodLog);
+                }
+            } else {
+                // Handle existing food item (quick add from viewing existing entry)
+                const foodLog = {
+                    meal_id: Date.now().toString(), // Generate a unique meal ID
+                    food_name: foodData.food_name || 'Unknown Food',
+                    brand_name: foodData.brand_name || '',
+                    meal_type: foodData.meal_type,
+                    date: formattedDate,
+                    quantity: foodData.quantity || '1 serving',
+                    weight: foodData.weight || null,
+                    weight_unit: foodData.weight_unit || 'g',
+                    calories: foodData.calories || 0,
+                    proteins: foodData.proteins || -1,
+                    carbs: foodData.carbs || -1,
+                    fats: foodData.fats || -1,
+                    fiber: foodData.fiber || -1,
+                    sugar: foodData.sugar || -1,
+                    saturated_fat: foodData.saturated_fat || -1,
+                    polyunsaturated_fat: foodData.polyunsaturated_fat || -1,
+                    monounsaturated_fat: foodData.monounsaturated_fat || -1,
+                    trans_fat: foodData.trans_fat || -1,
+                    cholesterol: foodData.cholesterol || -1,
+                    sodium: foodData.sodium || -1,
+                    potassium: foodData.potassium || -1,
+                    vitamin_a: foodData.vitamin_a || -1,
+                    vitamin_c: foodData.vitamin_c || -1,
+                    calcium: foodData.calcium || -1,
+                    iron: foodData.iron || -1,
+                    healthiness_rating: foodData.healthiness_rating || 5,
+                    notes: foodData.notes || '',
+                    image_url: foodData.image_url || '',
+                    file_key: foodData.file_key || 'default_key'
+                };
+
+                console.log('Saving quick add food log to local database:', foodLog);
+
+                // Navigate to FoodLog immediately
+                const refreshTimestamp = Date.now();
+                navigation.navigate('FoodLog', { refresh: refreshTimestamp });
+
+                await addFoodLog(foodLog);
+
+                Alert.alert(
+                    'Success',
+                    'Food item added to today\'s log!',
+                    [{ text: 'OK' }]
+                );
+            }
         } catch (error) {
-            console.error('Error adding food log:', error);
-            Alert.alert(
-                'Error',
-                'Failed to add food item. Please try again.',
-                [{ text: 'OK' }]
-            );
+            console.error('Error adding food to log:', error);
+            Alert.alert('Error', 'Failed to add food to log. Please try again.');
+        } finally {
+            setAddingFood(false);
         }
     };
 
@@ -485,19 +684,21 @@ const FoodDetailScreen: React.FC = () => {
                                     </View>
                                 )}
 
-                                {/* Meal type and date with edit button on the right */}
-                                <View style={styles.metaContainer}>
-                                    <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                        {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={styles.editButton}
-                                        onPress={handleEditPress}
-                                    >
-                                        <Ionicons name="pencil" size={18} color={WHITE} />
-                                        <Text style={styles.editButtonText}>Edit</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                {/* Meal type and date with edit button on the right - only for existing food */}
+                                {!isNewFoodMode && (
+                                    <View style={styles.metaContainer}>
+                                        <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                            {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.editButton}
+                                            onPress={handleEditPress}
+                                        >
+                                            <Ionicons name="pencil" size={18} color={WHITE} />
+                                            <Text style={styles.editButtonText}>Edit</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
                         </View>
                     </View>
@@ -542,19 +743,21 @@ const FoodDetailScreen: React.FC = () => {
                                         </View>
                                     )}
 
-                                    {/* Meal type and date with edit button on the right */}
-                                    <View style={styles.metaContainer}>
-                                        <Text style={[styles.foodMeta, styles.foodMetaRight]}>
-                                            {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
-                                        </Text>
-                                        <TouchableOpacity
-                                            style={styles.editButton}
-                                            onPress={handleEditPress}
-                                        >
-                                            <Ionicons name="pencil" size={18} color={WHITE} />
-                                            <Text style={styles.editButtonText}>Edit</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    {/* Meal type and date with edit button on the right - only for existing food */}
+                                    {!isNewFoodMode && (
+                                        <View style={styles.metaContainer}>
+                                            <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                                {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={styles.editButton}
+                                                onPress={handleEditPress}
+                                            >
+                                                <Ionicons name="pencil" size={18} color={WHITE} />
+                                                <Text style={styles.editButtonText}>Edit</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
                         </SafeAreaView>
@@ -568,16 +771,68 @@ const FoodDetailScreen: React.FC = () => {
                 ]}>
                     {/* Calories Section */}
                     <View style={styles.calorieSection}>
-                        {/* Quick Add Button - Top (positioned absolutely) */}
-                        <TouchableOpacity
-                            style={styles.quickAddButtonTop}
-                            onPress={handleQuickAdd}
-                        >
-                            <View style={styles.quickAddButtonContent}>
-                                <Ionicons name="add" size={14} color="#4CAF50" />
-                                <Text style={styles.quickAddButtonText}>Add</Text>
+                        {/* Meal selector and Edit/Add buttons row for new food mode */}
+                        {isNewFoodMode && (
+                            <View style={styles.mealAndButtonsRow}>
+                                {/* Meal type selector on the left */}
+                                <View style={styles.mealTypeSelectorContainerHorizontal}>
+                                    <View style={styles.mealTypeButtons}>
+                                        {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map((meal) => (
+                                            <TouchableOpacity
+                                                key={meal}
+                                                style={[
+                                                    styles.mealTypeButtonSmall,
+                                                    selectedMealType === meal && styles.mealTypeButtonSmallActive
+                                                ]}
+                                                onPress={() => setSelectedMealType(meal)}
+                                            >
+                                                <Text style={[
+                                                    styles.mealTypeButtonTextSmall,
+                                                    selectedMealType === meal && styles.mealTypeButtonTextSmallActive
+                                                ]}>
+                                                    {meal}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+
+                                {/* Edit and Add buttons on the right */}
+                                <View style={styles.actionButtonsContainer}>
+                                    <TouchableOpacity
+                                        style={styles.quickEditButtonTop}
+                                        onPress={handleEditPress}
+                                    >
+                                        <View style={styles.quickAddButtonContent}>
+                                            <Ionicons name="pencil" size={14} color="#AA00FF" />
+                                            <Text style={styles.quickEditButtonText}>Edit</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.quickAddButtonTop}
+                                        onPress={handleQuickAdd}
+                                    >
+                                        <View style={styles.quickAddButtonContent}>
+                                            <Ionicons name="add" size={14} color="#4CAF50" />
+                                            <Text style={styles.quickAddButtonText}>Add</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        </TouchableOpacity>
+                        )}
+
+                        {/* Just the Add button for existing food mode */}
+                        {!isNewFoodMode && (
+                            <TouchableOpacity
+                                style={styles.quickAddButtonTopAbsolute}
+                                onPress={handleQuickAdd}
+                            >
+                                <View style={styles.quickAddButtonContent}>
+                                    <Ionicons name="add" size={14} color="#4CAF50" />
+                                    <Text style={styles.quickAddButtonText}>Add</Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
 
                         <View style={styles.calorieAlignmentContainer}>
                             <View style={styles.calorieRow}>
@@ -678,14 +933,40 @@ const FoodDetailScreen: React.FC = () => {
                         )}
                     </View>
 
+                    {/* Notes Section for New Food Mode */}
+                    {isNewFoodMode && (
+                        <View style={styles.notesInputSection}>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="create" size={20} color={PURPLE_ACCENT} />
+                                <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+                            </View>
+                            <TextInput
+                                style={styles.notesTextInput}
+                                value={userNotes}
+                                onChangeText={setUserNotes}
+                                placeholder="Add any notes about this food..."
+                                placeholderTextColor={SUBDUED}
+                                multiline
+                                numberOfLines={3}
+                            />
+                        </View>
+                    )}
+
                     {/* Quick Add Button - Bottom */}
                     <TouchableOpacity
                         style={styles.quickAddButtonBottom}
                         onPress={handleQuickAdd}
+                        disabled={addingFood}
                     >
                         <View style={styles.quickAddButtonContent}>
-                            <Ionicons name="add" size={18} color="#4CAF50" />
-                            <Text style={styles.quickAddButtonTextBottom}>Add</Text>
+                            {addingFood ? (
+                                <ActivityIndicator size="small" color="#4CAF50" />
+                            ) : (
+                                <>
+                                    <Ionicons name="add" size={18} color="#4CAF50" />
+                                    <Text style={styles.quickAddButtonTextBottom}>Add</Text>
+                                </>
+                            )}
                         </View>
                     </TouchableOpacity>
 
@@ -1165,6 +1446,26 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.12)',
     },
+    notesInputSection: {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 16,
+        padding: 20,
+        marginHorizontal: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+    notesTextInput: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        color: WHITE,
+        fontSize: 15,
+        minHeight: 80,
+        textAlignVertical: 'top',
+        marginTop: 8,
+    },
     infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1232,6 +1533,10 @@ const styles = StyleSheet.create({
     metaContainer: {
         flex: 1,
         alignItems: 'flex-end',
+    },
+    metaContainerLeft: {
+        flex: 1,
+        alignItems: 'flex-start',
     },
     editButton: {
         flexDirection: 'row',
@@ -1339,6 +1644,43 @@ const styles = StyleSheet.create({
         color: WHITE,
         fontWeight: '600',
     },
+    mealTypeSelectorContainer: {
+        flex: 1,
+        alignItems: 'flex-start',
+    },
+    mealTypeSelectorLabel: {
+        color: WHITE,
+        fontSize: 12,
+        marginBottom: 6,
+        fontWeight: '500',
+    },
+    mealTypeButtons: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-start',
+        gap: 6,
+    },
+    mealTypeButtonSmall: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    mealTypeButtonSmallActive: {
+        backgroundColor: PURPLE_ACCENT,
+        borderColor: PURPLE_ACCENT,
+    },
+    mealTypeButtonTextSmall: {
+        color: WHITE,
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    mealTypeButtonTextSmallActive: {
+        color: WHITE,
+        fontWeight: '700',
+    },
     saveButton: {
         margin: 16,
     },
@@ -1386,6 +1728,14 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
     quickAddButtonTop: {
+        borderWidth: 1.5,
+        borderColor: '#4CAF50',
+        borderRadius: 20,
+        backgroundColor: 'transparent',
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+    },
+    quickAddButtonTopAbsolute: {
         position: 'absolute',
         top: 5,
         right: 5,
@@ -1396,6 +1746,38 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         paddingHorizontal: 10,
         zIndex: 10,
+    },
+    actionButtonsContainer: {
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: 6,
+    },
+    mealAndButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 8,
+    },
+    mealTypeSelectorContainerHorizontal: {
+        flex: 1,
+        alignItems: 'flex-start',
+    },
+    quickEditButtonTop: {
+        borderWidth: 1.5,
+        borderColor: '#AA00FF',
+        borderRadius: 20,
+        backgroundColor: 'transparent',
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        marginBottom: 6,
+    },
+    quickEditButtonText: {
+        color: '#AA00FF',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 3,
     },
     quickAddButtonBottom: {
         marginTop: 8,

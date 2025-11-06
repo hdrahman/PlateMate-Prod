@@ -19,7 +19,6 @@ import LegalTerms from '../screens/LegalTerms';
 import AboutCalculations from '../screens/AboutCalculations';
 import FoodLog from '../screens/FoodLog';
 import FoodDetail from '../screens/FoodDetail';
-import NutritionFactsResult from '../screens/NutritionFactsResult';
 import Chatbot from '../screens/Chatbot';
 import ImageCapture from '../screens/ImageCapture';
 import Scanner from '../screens/Scanner';
@@ -47,11 +46,11 @@ type RootStackParamList = {
     PrivacyPolicy: undefined;
     LegalTerms: undefined;
     AboutCalculations: undefined;
-    FoodDetail: { foodId: number };
-    NutritionFactsResult: {
-        nutritionData: any[];
-        mealId: string;
-        mealType: string;
+    FoodDetail: {
+        foodId?: number;
+        nutritionData?: any[];
+        mealId?: string;
+        mealType?: string;
         brandName?: string;
         quantity?: string;
         notes?: string;
@@ -136,7 +135,6 @@ const AppNavigator = () => {
                 <Stack.Screen name="LegalTerms" component={LegalTerms} />
                 <Stack.Screen name="AboutCalculations" component={AboutCalculations} />
                 <Stack.Screen name="FoodDetail" component={FoodDetail} />
-                <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
                 <Stack.Screen name="Chatbot" component={Chatbot} />
                 <Stack.Screen name="ImageCapture" component={ImageCapture} />
                 <Stack.Screen name="Scanner" component={Scanner} />

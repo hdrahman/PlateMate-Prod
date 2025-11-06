@@ -60,7 +60,6 @@ import LegalTerms from './src/screens/LegalTerms';
 import AboutCalculations from './src/screens/AboutCalculations';
 import ScannerScreen from './src/screens/Scanner';
 import ImageCaptureScreen from './src/screens/ImageCapture';
-import NutritionFactsResult from './src/screens/NutritionFactsResult';
 import Nutrients from './src/screens/Nutrients';
 import BarcodeResults from './src/screens/BarcodeResults';
 import ScannedProduct from './src/screens/ScannedProduct';
@@ -417,7 +416,6 @@ function AuthenticatedContent() {
       <Stack.Screen name="Main" component={MainTabs} />
       <Stack.Screen name="Scanner" component={ScannerScreen} />
       <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
-      <Stack.Screen name="NutritionFactsResult" component={NutritionFactsResult} />
       <Stack.Screen name="Nutrients" component={Nutrients} />
       <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
       <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
