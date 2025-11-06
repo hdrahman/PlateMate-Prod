@@ -116,10 +116,15 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                         shadowOpacity: 0.8,
                         shadowRadius: 15,
                         elevation: 8,
+                        alignItems: 'center',
                     }}
                 >
                     <MaskedView
-                        style={{ alignItems: "center", justifyContent: "center" }}
+                        style={{
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: textWidth,
+                        }}
                         maskElement={
                             <Text
                                 style={{
@@ -128,6 +133,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                                     letterSpacing: 2,
                                     textTransform: "uppercase",
                                     color: "white",
+                                    textAlign: 'center',
                                 }}
                             >
                                 PlateMate
