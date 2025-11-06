@@ -35,6 +35,7 @@ import GenderStep from '../components/onboarding/GenderStep';
 import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesStep';
 import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
 import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
+import SocialSignInInfoStep from '../components/onboarding/SocialSignInInfoStep';
 
 const { width, height } = Dimensions.get('window');
 
@@ -114,6 +115,10 @@ const Onboarding = () => {
             case 2:
                 return <AccountCreationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 3:
+                // Check if user signed in via social auth and is missing name/age
+                if (user && (!profile.firstName || !profile.lastName || !profile.age)) {
+                    return <SocialSignInInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                }
                 return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 4:
                 return <MotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;

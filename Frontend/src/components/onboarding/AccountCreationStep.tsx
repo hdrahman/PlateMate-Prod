@@ -82,9 +82,10 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
     }, []);
 
     // If user is already authenticated (via social sign-in), proceed to next step
+    // The next step will be SocialSignInInfoStep to collect missing name/age
     useEffect(() => {
         if (user) {
-            // User authenticated via social sign-in, proceed to next step
+            console.log('✅ User authenticated via social sign-in, proceeding to info collection');
             onNext();
         }
     }, [user]);
@@ -194,8 +195,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
 
             // Create account immediately so user is authenticated for rest of onboarding
             // If they drop off, onboardingComplete flag will be false and we can redirect them back
-            const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
-            await signUp(email, password, displayName);
+            await signUp(email, password);
 
             // Proceed to next onboarding step
             onNext();
@@ -219,38 +219,9 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
         setIsLoading(true);
         try {
             const result = await signInWithGoogle();
-
-            // Extract name from Google sign-in result if available
-            if (result?.userInfo) {
-                const { firstName: googleFirstName, lastName: googleLastName } = result.userInfo;
-
-                // Pre-fill the form fields if we got name from Google
-                if (googleFirstName) setFirstName(googleFirstName);
-                if (googleLastName) setLastName(googleLastName);
-
-                console.log('✅ Pre-filled name from Google:', googleFirstName, googleLastName);
-            }
-
-            // Collect manual data after social sign-in
-            if (!firstName.trim() || !lastName.trim() || !age) {
-                // Show alert to collect missing data
-                Alert.alert(
-                    'Complete Your Profile',
-                    'Please enter your name and age to continue',
-                    [{ text: 'OK' }]
-                );
-                setIsLoading(false);
-                return;
-            }
-
-            // Update profile with manual data
-            await updateProfile({
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                age: parseInt(age),
-            });
-
-            // Proceed to next step (will be handled by useEffect when user is set)
+            console.log('✅ Google Sign-In successful');
+            // User will be redirected to SocialSignInInfoStep to complete their profile
+            // The useEffect will handle the navigation when user state updates
         } catch (error) {
             console.error('Google Sign-In error:', error);
         } finally {
@@ -262,39 +233,9 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
         setIsLoading(true);
         try {
             const result = await signInWithApple();
-
-            // Extract name from Apple sign-in result if available (only on first sign-in)
-            if (result?.userInfo) {
-                const { firstName: appleFirstName, lastName: appleLastName } = result.userInfo;
-
-                // Pre-fill the form fields if we got name from Apple
-                if (appleFirstName) setFirstName(appleFirstName);
-                if (appleLastName) setLastName(appleLastName);
-
-                console.log('✅ Pre-filled name from Apple:', appleFirstName, appleLastName);
-            } else {
-                console.log('⚠️ No name from Apple (normal after first sign-in)');
-            }
-
-            // Collect manual data after social sign-in
-            if (!firstName.trim() || !lastName.trim() || !age) {
-                Alert.alert(
-                    'Complete Your Profile',
-                    'Please enter your name and age to continue',
-                    [{ text: 'OK' }]
-                );
-                setIsLoading(false);
-                return;
-            }
-
-            // Update profile with manual data
-            await updateProfile({
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                age: parseInt(age),
-            });
-
-            // Proceed to next step (will be handled by useEffect when user is set)
+            console.log('✅ Apple Sign-In successful');
+            // User will be redirected to SocialSignInInfoStep to complete their profile
+            // The useEffect will handle the navigation when user state updates
         } catch (error) {
             console.error('Apple Sign-In error:', error);
         } finally {
