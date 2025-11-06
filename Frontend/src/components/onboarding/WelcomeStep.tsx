@@ -10,9 +10,11 @@ import {
     FlatList,
     Animated,
     ViewToken,
+    Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../utils/responsive';
 
 import IntroStep1 from './IntroStep1';
@@ -34,6 +36,20 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
+
+    // Reset scroll position and animations when screen comes into focus (fixes Android navigation issues)
+    useFocusEffect(
+        React.useCallback(() => {
+            // Reset scroll position to first item
+            setCurrentIndex(0);
+            scrollX.setValue(0);
+
+            // Scroll FlatList back to start
+            setTimeout(() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            }, 100);
+        }, [scrollX])
+    );
 
     const handleViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
         if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -95,6 +111,8 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
                 disableIntervalMomentum={true}
                 snapToOffsets={[0, width, width * 2]}
                 bounces={false}
+                scrollEnabled={true}
+                removeClippedSubviews={false}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                     { useNativeDriver: false }
@@ -108,7 +126,11 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
                 })}
             />
 
-            <View style={styles.pagination}>
+            <View
+                style={styles.pagination}
+                collapsable={false}
+                pointerEvents="none"
+            >
                 {[0, 1, 2].map((_, i) => {
                     const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
 
@@ -153,12 +175,17 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: spacing(23),
         width: '100%',
+        zIndex: 1000,
+        // Ensure proper elevation on Android
+        elevation: Platform.OS === 'android' ? 10 : 0,
     },
     dot: {
         height: size(8),
         borderRadius: size(4),
         backgroundColor: '#fff',
         marginHorizontal: spacing(1),
+        // Ensure dots render properly on Android
+        overflow: 'visible',
     },
     header: {
         alignItems: 'center',

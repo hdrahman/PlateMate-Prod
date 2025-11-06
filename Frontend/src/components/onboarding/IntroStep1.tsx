@@ -110,11 +110,13 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                     styles.scrollContent,
                     {
                         paddingTop: Platform.OS === 'ios' ? insets.top + spacing(-700) : Math.max(insets.top, spacing(10)),
-                        paddingBottom: Platform.OS === 'ios' ? spacing(15) : spacing(16)
+                        // Add extra bottom padding on Android to prevent content from being covered by fixed button
+                        paddingBottom: Platform.OS === 'ios' ? spacing(15) : spacing(38)
                     }
                 ]}
                 showsVerticalScrollIndicator={false}
                 bounces={false}
+                scrollEventThrottle={16}
             >
                 <Animated.View
                     style={[
@@ -278,11 +280,15 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
             </TouchableOpacity>
 
             {/* Fixed Button at Bottom */}
-            <View style={[styles.fixedButtonContainer, {
-                bottom: Platform.OS === 'ios'
-                    ? Math.max(insets.bottom + spacing(35), spacing(4))
-                    : spacing(30)
-            }]}>
+            <View
+                style={[styles.fixedButtonContainer, {
+                    bottom: Platform.OS === 'ios'
+                        ? Math.max(insets.bottom + spacing(35), spacing(4))
+                        : spacing(30)
+                }]}
+                collapsable={false}
+                pointerEvents="box-none"
+            >
                 <TouchableOpacity style={styles.button} onPress={onNext}>
                     <LinearGradient
                         colors={["#0074dd", "#5c00dd", "#dd0095"]}
@@ -589,6 +595,8 @@ const styles = StyleSheet.create({
         right: 0,
         paddingHorizontal: spacing(5),
         zIndex: 100,
+        // Add a gradient background to prevent black bar issues on Android
+        backgroundColor: 'transparent',
     },
     cta: {
         alignItems: 'center',
