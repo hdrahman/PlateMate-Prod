@@ -223,11 +223,11 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
             // Extract name from Google sign-in result if available
             if (result?.userInfo) {
                 const { firstName: googleFirstName, lastName: googleLastName } = result.userInfo;
-                
+
                 // Pre-fill the form fields if we got name from Google
                 if (googleFirstName) setFirstName(googleFirstName);
                 if (googleLastName) setLastName(googleLastName);
-                
+
                 console.log('✅ Pre-filled name from Google:', googleFirstName, googleLastName);
             }
 
@@ -266,11 +266,11 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
             // Extract name from Apple sign-in result if available (only on first sign-in)
             if (result?.userInfo) {
                 const { firstName: appleFirstName, lastName: appleLastName } = result.userInfo;
-                
+
                 // Pre-fill the form fields if we got name from Apple
                 if (appleFirstName) setFirstName(appleFirstName);
                 if (appleLastName) setLastName(appleLastName);
-                
+
                 console.log('✅ Pre-filled name from Apple:', appleFirstName, appleLastName);
             } else {
                 console.log('⚠️ No name from Apple (normal after first sign-in)');

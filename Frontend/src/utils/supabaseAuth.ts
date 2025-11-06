@@ -96,7 +96,7 @@ export const supabaseAuth = {
 
             console.log('🟡 Google Sign-In successful, getting ID token...');
             console.log('🟡 Google user info:', userInfo.user);
-            
+
             const { idToken } = await GoogleSignin.getTokens();
 
             if (!idToken) {
@@ -189,9 +189,9 @@ export const supabaseAuth = {
 
             // Check for RLS policy error indicating user doesn't exist server-side
             const isRLSError = error?.message?.includes('does not exist') ||
-                              error?.message?.includes('User from sub claim') ||
-                              error?.code === 'PGRST116' || // Row Level Security violation
-                              error?.status === 403;
+                error?.message?.includes('User from sub claim') ||
+                error?.code === 'PGRST116' || // Row Level Security violation
+                error?.status === 403;
 
             // Auto-logout on invalid/expired session, RLS violation, or deleted user
             if (
