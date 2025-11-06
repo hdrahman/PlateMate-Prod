@@ -26,10 +26,10 @@ import * as userApi from '../api/userApi';
 
 // Onboarding step components
 import WelcomeStep from '../components/onboarding/WelcomeStep';
+import AccountCreationStep from '../components/onboarding/AccountCreationStep';
 import GoalsStep from '../components/onboarding/GoalsStep';
 import MotivationStep from '../components/onboarding/MotivationStep';
 import WeightChangeRateStep from '../components/onboarding/WeightChangeRateStep';
-import BasicInfoStep from '../components/onboarding/BasicInfoStep';
 import PhysicalAttributesStep from '../components/onboarding/PhysicalAttributesStep';
 import ActivityLevelStep from '../components/onboarding/ActivityLevelStep';
 import GenderStep from '../components/onboarding/GenderStep';
@@ -81,7 +81,7 @@ const Onboarding = () => {
     // Check network connectivity when user starts onboarding steps
     useEffect(() => {
         const checkConnectivity = async () => {
-            if (currentStep === 2 && !hasShownOfflineWarning) { // After welcome step
+            if (currentStep === 2 && !hasShownOfflineWarning) { // AccountCreationStep (step 2)
                 const offline = await isLikelyOffline();
                 setIsOffline(offline);
 
@@ -109,9 +109,9 @@ const Onboarding = () => {
         checkConnectivity();
     }, [currentStep, hasShownOfflineWarning]);
 
-    // Handle moving to the next step; for GoalsStep, receive the selected fitnessGoal
+    // Handle moving to the next step; for GoalsStep (step 3), receive the selected fitnessGoal
     const handleNext = async (selectedGoal?: string) => {
-        if (currentStep === 2 && selectedGoal) {
+        if (currentStep === 3 && selectedGoal) {
             setSelectedFitnessGoal(selectedGoal);
             await updateProfile({ fitnessGoal: selectedGoal });
         }
@@ -146,10 +146,12 @@ const Onboarding = () => {
             case 1:
                 return <WelcomeStep onNext={handleNext} />;
             case 2:
-                return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <AccountCreationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 3:
-                return <MotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 4:
+                return <MotivationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 5:
                 return (
                     <WeightChangeRateStep
                         profile={profile}
@@ -158,8 +160,6 @@ const Onboarding = () => {
                         fitnessGoalOverride={selectedFitnessGoal || undefined}
                     />
                 );
-            case 5:
-                return <BasicInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 6:
                 return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 7:
@@ -173,13 +173,13 @@ const Onboarding = () => {
         }
     };
 
-    const TOTAL_ONBOARDING_STEPS = 7; // Number of steps after the welcome screen
+    const TOTAL_ONBOARDING_STEPS = 7; // Number of steps after the welcome screen (AccountCreation + Goals + Motivation + WeightChangeRate + Gender + PhysicalAttributes + PredictiveInsights)
 
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
             <LinearGradient
-                colors={(currentStep === 6 || currentStep === 11) ? ['#000000', '#000000'] : ['#000000', '#121212']}
+                colors={(currentStep === 6) ? ['#000000', '#000000'] : ['#000000', '#121212']}
                 style={styles.background}
             />
             <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 20 : Math.max(insets.top, 20) }]}>
@@ -198,7 +198,7 @@ const Onboarding = () => {
                         ))}
                     </View>
                 )}
-                {currentStep > 1 && currentStep < 12 && (
+                {currentStep > 1 && currentStep < 9 && (
                     <TouchableOpacity
                         style={[styles.backButton, { top: Math.max(insets.top, 20) }]}
                         onPress={handleBack}
@@ -218,13 +218,12 @@ const Onboarding = () => {
                 <ScrollView
                     contentContainerStyle={[
                         styles.content,
-                        (currentStep === 1 || currentStep === 12) && styles.introContent,
-                        currentStep === 10 && { flexGrow: 1 },
-                        (currentStep === 6 || currentStep === 11) && { paddingHorizontal: 0, paddingBottom: 0 }
+                        currentStep === 1 && styles.introContent,
+                        (currentStep === 6) && { paddingHorizontal: 0, paddingBottom: 0 }
                     ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 1 && currentStep < 12}
+                    scrollEnabled={currentStep > 1 && currentStep < 9}
                 >
                     {renderCurrentStep()}
                 </ScrollView>

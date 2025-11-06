@@ -188,7 +188,7 @@ const defaultProfile: UserProfile = {
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 8, // Simplified onboarding: Welcome + 6 essential steps + Physical Attributes + Predictive
+    totalSteps: 8, // Welcome + AccountCreation + Goals + Motivation + WeightChangeRate + Gender + PhysicalAttributes + PredictiveInsights
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -358,7 +358,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
     const [tempSessionId, setTempSessionId] = useState<string>('');
 
-    const totalSteps = 14; // 3 intro steps + 11 onboarding steps
+    const totalSteps = 8; // WelcomeStep + AccountCreationStep + Goals + Motivation + WeightChangeRate + Gender + PhysicalAttributes + PredictiveInsights
 
     // Initialize temp session ID on mount
     useEffect(() => {

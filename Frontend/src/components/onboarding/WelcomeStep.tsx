@@ -55,14 +55,19 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
         onNext();
     };
 
+    // All intro steps now navigate directly to onboarding
+    const handleStartOnboarding = () => {
+        onNext();
+    };
+
     const renderItem = ({ item, index }: { item: number; index: number }) => {
         switch (index) {
             case 0:
-                return <IntroStep1 onNext={handleStep1Next} />;
+                return <IntroStep1 onNext={handleStartOnboarding} />;
             case 1:
-                return <IntroStep2 onNext={handleStep2Next} />;
+                return <IntroStep2 onNext={handleStartOnboarding} />;
             case 2:
-                return <IntroStep3 onNext={handleStep3Next} />;
+                return <IntroStep3 onNext={handleStartOnboarding} />;
             default:
                 return null;
         }

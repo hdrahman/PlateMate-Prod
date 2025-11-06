@@ -75,6 +75,7 @@ interface SuccessMetric {
 const { width, height } = Dimensions.get('window');
 
 const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile, updateProfile, onComplete }) => {
+    const { user, signUp } = useAuth(); // Get current user and signUp function
     const [targetDate, setTargetDate] = useState<string>('');
     const [dailyCalories, setDailyCalories] = useState<number>(0);
     const [macros, setMacros] = useState({ protein: 0, carbs: 0, fat: 0 });
@@ -577,7 +578,6 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
         </Animated.View>
     );
 
-    const { signUp } = useAuth();
     const { completeOnboarding } = useOnboarding();
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
@@ -605,23 +605,32 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
 
                 console.log('📊 Calculated metrics prepared:', calculatedData);
 
-                // Create the account using collected info
-                setLoadingMessage('Creating your account...');
-                console.log('👤 Creating user account...');
-                const displayName = `${profile.firstName} ${profile.lastName || ''}`.trim();
-                const newUser = await signUp(profile.email, profile.password, displayName);
-                console.log('✅ Account created successfully!');
-                console.log('🆔 New user UID:', newUser?.id);
-                console.log('📧 New user email:', newUser?.email);
+                // Check if user is already authenticated (from AccountCreationStep)
+                let authUser = user;
+
+                if (!authUser) {
+                    // Create the account if not already authenticated
+                    setLoadingMessage('Creating your account...');
+                    console.log('👤 Creating user account...');
+                    const displayName = `${profile.firstName} ${profile.lastName || ''}`.trim();
+                    authUser = await signUp(profile.email, profile.password, displayName);
+                    console.log('✅ Account created successfully!');
+                    console.log('🆔 New user UID:', authUser?.id);
+                    console.log('📧 New user email:', authUser?.email);
+                } else {
+                    console.log('✅ User already authenticated, skipping account creation');
+                    console.log('🆔 Existing user UID:', authUser?.id);
+                    console.log('📧 Existing user email:', authUser?.email);
+                }
 
                 // No need to wait - we have the user object directly!
                 setLoadingMessage('Saving your profile...');
                 console.log('💾 Calling completeOnboarding with user and calculated data...');
-                console.log('📋 User object being passed:', { id: newUser?.id, email: newUser?.email });
+                console.log('📋 User object being passed:', { id: authUser?.id, email: authUser?.email });
 
                 // Pass user directly to avoid context race condition
-                await completeOnboarding(calculatedData, newUser);
-                console.log('✅ Onboarding completed successfully with UID:', newUser?.id);
+                await completeOnboarding(calculatedData, authUser);
+                console.log('✅ Onboarding completed successfully with UID:', authUser?.id);
 
                 setLoadingMessage('Finalizing setup...');
                 await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UI
