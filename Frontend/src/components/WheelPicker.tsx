@@ -152,6 +152,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
         >
             {/* Selection highlight */}
             <View
+                pointerEvents="none"
                 style={[
                     styles.selectionIndicator,
                     {
