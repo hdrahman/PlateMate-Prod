@@ -7,8 +7,10 @@ import {
     TouchableOpacity,
     TextInput,
     Modal,
-    Alert
+    Alert,
+    StatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FoodItem } from '../services/BarcodeService';
@@ -108,20 +110,23 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
                 colors={[PRIMARY_BG, CARD_BG]}
                 style={styles.container}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                        <Ionicons name="close" size={24} color={WHITE} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Nutrition Facts</Text>
-                    <View style={styles.placeholder} />
-                </View>
+                <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                    <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
 
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollViewContent}
-                    showsVerticalScrollIndicator={false}
-                >
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                            <Ionicons name="close" size={24} color={WHITE} />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                        <View style={styles.placeholder} />
+                    </View>
+
+                    <ScrollView
+                        style={styles.scrollView}
+                        contentContainerStyle={styles.scrollViewContent}
+                        showsVerticalScrollIndicator={false}
+                    >
                     {/* Combined Food Info & Controls Card */}
                     <GradientBorderCard style={styles.cardMargin}>
                         <View style={styles.combinedSection}>
@@ -392,6 +397,7 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
                         </View>
                     </GradientBorderCard>
                 </ScrollView>
+                </SafeAreaView>
             </LinearGradient>
         </Modal>
     );
@@ -406,8 +412,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 10,
+        paddingTop: 10,
+        paddingBottom: 20,
     },
     closeButton: {
         width: 36,

@@ -91,8 +91,11 @@ export const supabaseAuth = {
                 throw new Error('Google Sign-In not available');
             }
 
-            // Get Google ID token
-            await GoogleSignin.hasPlayServices();
+            // Check Google Play Services availability (Android only)
+            if (Platform.OS === 'android') {
+                await GoogleSignin.hasPlayServices();
+            }
+
             const userInfo = await GoogleSignin.signIn();
 
             console.log('🟡 Google Sign-In successful, getting ID token...');
