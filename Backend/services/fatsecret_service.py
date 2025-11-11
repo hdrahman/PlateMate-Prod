@@ -483,7 +483,7 @@ class FatSecretService:
         # Method 1: Direct recipe_image field
         if 'recipe_image' in recipe and recipe['recipe_image']:
             recipe_image = recipe['recipe_image']
-            logger.info(f"Found primary image for recipe {recipe_id}: {recipe_image}")
+            logger.debug(f"Found primary image for recipe {recipe_id}")
         
         # Method 2: Check recipe_images collection
         if not recipe_image and 'recipe_images' in recipe:
@@ -493,15 +493,15 @@ class FatSecretService:
                 if isinstance(images, list) and len(images) > 0:
                     # Take the first image
                     recipe_image = images[0]
-                    logger.info(f"Using first image from collection for recipe {recipe_id}: {recipe_image}")
+                    logger.debug(f"Using first image from collection for recipe {recipe_id}")
                 elif isinstance(images, str) and images:
                     recipe_image = images
-                    logger.info(f"Using single image from collection for recipe {recipe_id}: {recipe_image}")
+                    logger.debug(f"Using single image from collection for recipe {recipe_id}")
         
         # Method 3: Check recipe_image_url if available
         if not recipe_image and 'recipe_image_url' in recipe and recipe['recipe_image_url']:
             recipe_image = recipe['recipe_image_url']
-            logger.info(f"Using image URL field for recipe {recipe_id}: {recipe_image}")
+            logger.debug(f"Using image URL field for recipe {recipe_id}")
             
         # Make sure the image is a valid URL - fix relative URLs
         if recipe_image and isinstance(recipe_image, str):
@@ -555,9 +555,9 @@ class FatSecretService:
 
             # Use a valid image URL from Spoonacular that doesn't require attribution
             recipe_image = f"https://spoonacular.com/recipeImages/{recipe_id}-556x370.jpg"
-            logger.warning(f"No valid image found for recipe {recipe_id}: {recipe_name}, using generated Spoonacular URL: {recipe_image}")
+            logger.debug(f"No valid image found for recipe {recipe_id}, using generated URL")
         
-        logger.info(f"Final image URL for recipe {recipe_id}: {recipe_image}")
+        logger.debug(f"Final image URL for recipe {recipe_id}: {recipe_image}")
             
         # Extract preparation and cooking time
         prep_time = int(recipe.get('preparation_time_min', 0) or 0)

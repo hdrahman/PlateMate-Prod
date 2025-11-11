@@ -1,3 +1,7 @@
+# IMPORTANT: Load environment variables FIRST before any other imports
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, Request, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -8,9 +12,8 @@ import time
 import asyncio
 from pathlib import Path
 from starlette.middleware.base import BaseHTTPMiddleware
-from auth.supabase_auth import get_current_user
 
-# Import and run env_check before loading dotenv
+# Import and run env_check after loading dotenv
 try:
     from utils.env_check import check_env_file
     if check_env_file():
@@ -21,9 +24,7 @@ except Exception as e:
     print(f"⚠️ Error running environment file check: {e}")
     print(traceback.format_exc())
 
-# Now load environment variables after fixing any issues
-from dotenv import load_dotenv
-load_dotenv()
+from auth.supabase_auth import get_current_user
 
 from routes.image import router as image_router
 from routes.gpt import router as gpt_router

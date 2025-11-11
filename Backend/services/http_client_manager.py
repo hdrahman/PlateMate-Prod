@@ -25,26 +25,26 @@ class HTTPClientManager:
             "openai": {
                 "base_url": "https://api.openai.com/v1",
                 "timeout": 60.0,
-                "limits": httpx.Limits(max_keepalive_connections=20, max_connections=50)
+                "limits": httpx.Limits(max_keepalive_connections=10, max_connections=20)
             },
             "deepseek": {
                 "base_url": "https://api.deepseek.com",
                 "timeout": 60.0,
-                "limits": httpx.Limits(max_keepalive_connections=10, max_connections=30)
+                "limits": httpx.Limits(max_keepalive_connections=5, max_connections=15)
             },
             "fatsecret_api": {
                 "base_url": "https://platform.fatsecret.com/rest",
                 "timeout": 30.0,
-                "limits": httpx.Limits(max_keepalive_connections=10, max_connections=30)
+                "limits": httpx.Limits(max_keepalive_connections=5, max_connections=15)
             },
             "fatsecret_auth": {
                 "base_url": "https://oauth.fatsecret.com",
                 "timeout": 30.0,
-                "limits": httpx.Limits(max_keepalive_connections=5, max_connections=10)
+                "limits": httpx.Limits(max_keepalive_connections=3, max_connections=8)
             },
             "general": {
                 "timeout": 30.0,
-                "limits": httpx.Limits(max_keepalive_connections=20, max_connections=50)
+                "limits": httpx.Limits(max_keepalive_connections=10, max_connections=20)
             }
         }
     

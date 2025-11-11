@@ -18,7 +18,7 @@ class RedisManager:
         
         # Create connection pool for better performance
         pool_kwargs = {
-            "max_connections": 20,
+            "max_connections": 10,
             "retry_on_timeout": True,
             "health_check_interval": 30,
             "decode_responses": False  # Keep as bytes for Lua script compatibility

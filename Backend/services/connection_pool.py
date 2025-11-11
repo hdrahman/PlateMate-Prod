@@ -8,9 +8,11 @@ performance and reduce connection overhead.
 import time
 import asyncio
 import httpx
+import json
 from typing import Dict, Any, Optional, Callable, Awaitable
 import logging
 from functools import wraps
+from .redis_connection import get_redis
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,11 +30,10 @@ http_clients: Dict[str, httpx.AsyncClient] = {}
 client_last_used: Dict[str, float] = {}
 client_creation_time: Dict[str, float] = {}
 
-# Cache for responses
-response_cache: Dict[str, Dict[str, Any]] = {
-    "data": {},
-    "expiry": {}
-}
+# Constants for Redis caching
+MAX_CACHE_SIZE = 100  # Maximum number of cache entries
+CACHE_KEY_PREFIX = "api_cache:"
+CACHE_LRU_KEY = "api_cache_lru"  # Sorted set for LRU tracking
 
 async def get_http_client(service_name: str, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None) -> httpx.AsyncClient:
     """
@@ -107,8 +108,8 @@ async def close_all_connections():
 
 def cache_response(ttl_seconds: int = 300):
     """
-    Decorator to cache API responses
-    
+    Decorator to cache API responses in Redis with LRU eviction
+
     Args:
         ttl_seconds: Time-to-live for cached responses in seconds
     """
@@ -116,22 +117,47 @@ def cache_response(ttl_seconds: int = 300):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # Generate a cache key based on function name and arguments
-            cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
-            current_time = time.time()
-            
-            # Check if we have a valid cached response
-            if cache_key in response_cache["data"] and current_time < response_cache["expiry"].get(cache_key, 0):
-                logger.info(f"Cache hit for {func.__name__}")
-                return response_cache["data"][cache_key]
-            
-            # Call the original function
-            result = await func(*args, **kwargs)
-            
-            # Cache the result
-            response_cache["data"][cache_key] = result
-            response_cache["expiry"][cache_key] = current_time + ttl_seconds
-            
-            return result
+            cache_key = f"{CACHE_KEY_PREFIX}{func.__name__}:{str(args)}:{str(kwargs)}"
+
+            try:
+                redis = await get_redis()
+
+                # Check if we have a cached response
+                cached_data = await redis.get(cache_key)
+                if cached_data:
+                    logger.info(f"Redis cache hit for {func.__name__}")
+                    # Update LRU score (access time)
+                    await redis.zadd(CACHE_LRU_KEY, {cache_key: time.time()})
+                    return json.loads(cached_data)
+
+                # Cache miss - call the original function
+                logger.info(f"Redis cache miss for {func.__name__}")
+                result = await func(*args, **kwargs)
+
+                # Check cache size and evict if necessary
+                cache_size = await redis.zcard(CACHE_LRU_KEY)
+                if cache_size >= MAX_CACHE_SIZE:
+                    # Evict oldest entries (lowest scores)
+                    entries_to_evict = max(1, cache_size - MAX_CACHE_SIZE + 1)
+                    oldest_keys = await redis.zrange(CACHE_LRU_KEY, 0, entries_to_evict - 1)
+
+                    if oldest_keys:
+                        # Delete the cache entries
+                        await redis.delete(*oldest_keys)
+                        # Remove from LRU tracking
+                        await redis.zrem(CACHE_LRU_KEY, *oldest_keys)
+                        logger.info(f"Evicted {len(oldest_keys)} cache entries (LRU)")
+
+                # Cache the result
+                await redis.setex(cache_key, ttl_seconds, json.dumps(result))
+                # Track in LRU sorted set (score = access time)
+                await redis.zadd(CACHE_LRU_KEY, {cache_key: time.time()})
+
+                return result
+            except Exception as e:
+                logger.error(f"Redis cache error for {func.__name__}: {e}")
+                # Fallback: call function without caching
+                return await func(*args, **kwargs)
         return wrapper
     return decorator
 
@@ -197,34 +223,14 @@ async def request_with_retry(
                 logger.error(f"Request to {url} failed after {retry_count} retries: {str(e)}")
                 raise last_exception
 
-async def cleanup_response_cache():
-    """Clean up expired entries from response cache"""
-    current_time = time.time()
-    expired_keys = []
-    
-    for key, expiry in response_cache["expiry"].items():
-        if expiry < current_time:
-            expired_keys.append(key)
-    
-    # Remove expired entries
-    for key in expired_keys:
-        del response_cache["data"][key]
-        del response_cache["expiry"][key]
-    
-    if expired_keys:
-        logger.info(f"Cleaned up {len(expired_keys)} expired cache entries")
-
 # Cleanup task
 async def run_connection_pool_maintenance():
-    """Background task to clean up idle connections and cache"""
+    """Background task to clean up idle connections"""
     while True:
         await asyncio.sleep(POOL_TIMEOUT // 2)  # Run every 30 seconds
-        
+
         # Clean up idle connections
         await close_idle_connections()
-        
-        # Clean up expired cache entries
-        await cleanup_response_cache()
 
 # Start the maintenance task
 maintenance_task = None
