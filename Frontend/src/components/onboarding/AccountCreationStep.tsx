@@ -195,7 +195,10 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
 
             // Create account immediately so user is authenticated for rest of onboarding
             // If they drop off, onboardingComplete flag will be false and we can redirect them back
-            await signUp(email, password);
+            // CRITICAL FIX: Pass display name to signUp so it's stored in Supabase Auth
+            const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
+            await signUp(email, password, displayName);
+            console.log('✅ Account created with display name:', displayName);
 
             // Proceed to next onboarding step
             onNext();
