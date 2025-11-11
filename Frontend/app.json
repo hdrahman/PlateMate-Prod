@@ -19,7 +19,7 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "19",
+      "buildNumber": "22",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
@@ -51,8 +51,7 @@
       },
       "runtimeVersion": {
         "policy": "appVersion"
-      },
-      "googleServicesFile": "./GoogleService-Info.plist"
+      }
     },
     "android": {
       "package": "com.platemate.app",
@@ -75,8 +74,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "runtimeVersion": "1.0.0",
-      "googleServicesFile": "./google-services.json"
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -93,6 +91,12 @@
         {
           "cameraPermissionText": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
           "enableMicrophonePermission": false
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.733542950842-rhdunis2qkjeicinjgmcmcf6lp3qt69v"
         }
       ],
       "expo-sqlite",

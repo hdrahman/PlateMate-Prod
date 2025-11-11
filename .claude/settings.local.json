@@ -34,7 +34,11 @@
       "WebFetch(domain:community.revenuecat.com)",
       "Bash(npm run:*)",
       "Bash(node -e:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(keytool:*)",
+      "Bash(findstr:*)",
+      "Bash(if exist androidbuild rd /s /q androidbuild)",
+      "Bash(if exist androidappbuild rd /s /q androidappbuild)"
     ],
     "deny": [],
     "ask": []
