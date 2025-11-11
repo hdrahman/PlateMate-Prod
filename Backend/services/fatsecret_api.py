@@ -16,12 +16,11 @@ from typing import Dict, Any, List, Optional
 from .connection_pool import cache_response, request_with_retry
 from .http_client_manager import get_http_client
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger (configuration done in main.py)
 logger = logging.getLogger(__name__)
 
 # Log module initialization
-logger.info("Initializing FatSecret API module")
+logger.debug("Initializing FatSecret API module")
 
 # FatSecret API credentials
 FATSECRET_CLIENT_ID = os.environ.get("FATSECRET_CLIENT_ID", "")

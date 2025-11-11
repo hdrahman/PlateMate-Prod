@@ -13,8 +13,7 @@ import time
 # Load environment variables
 load_dotenv()
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Get logger (configuration done in main.py)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/arli-ai", tags=["arli-ai"])

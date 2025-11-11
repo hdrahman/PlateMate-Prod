@@ -14,8 +14,7 @@ import logging
 from functools import wraps
 from .redis_connection import get_redis
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger (configuration done in main.py)
 logger = logging.getLogger(__name__)
 
 # Constants

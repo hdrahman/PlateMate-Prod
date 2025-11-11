@@ -2,6 +2,22 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import logging
+import os
+
+# Configure logging level based on environment
+# Production: WARNING (less verbose, only important messages)
+# Development: INFO (detailed logs for debugging)
+ENV = os.getenv('ENVIRONMENT', 'development').lower()
+LOG_LEVEL = logging.WARNING if ENV == 'production' else logging.INFO
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Starting server in {ENV} mode with log level: {logging.getLevelName(LOG_LEVEL)}")
+
 from fastapi import FastAPI, Request, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles

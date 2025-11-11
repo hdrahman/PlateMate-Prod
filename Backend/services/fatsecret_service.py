@@ -100,7 +100,7 @@ class FatSecretService:
             expires_in = token_data.get('expires_in', 86400)  # Default 24 hours
             self._token_expires_at = time.time() + expires_in
             
-            logger.info(f"Successfully obtained FatSecret access token, expires in {expires_in} seconds")
+            logger.debug(f"Successfully obtained FatSecret access token, expires in {expires_in} seconds")
             return self._access_token
             
         except requests.exceptions.RequestException as e:
@@ -132,9 +132,9 @@ class FatSecretService:
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
                 
-            logger.info(f"API request to {endpoint}: {response.status_code}")
+            logger.debug(f"API request to {endpoint}: {response.status_code}")
             
-            if response.status_code != 200:
+            if response.status_code == 200:
                 logger.error(f"API request failed: {response.status_code} - {response.text}")
                 return None
                 
@@ -335,7 +335,7 @@ class FatSecretService:
             else:
                 foods_list = []
             
-            logger.info(f"FatSecret search returned {len(foods_list)} foods for query: {query}")
+            logger.debug(f"FatSecret search returned {len(foods_list)} foods for query: {query}")
             
             # Get detailed nutrition for each food
             detailed_results = []
@@ -393,7 +393,7 @@ class FatSecretService:
         if not self._ensure_configured():
             raise Exception('FatSecret API key not configured')
 
-        logger.info(f'Searching for food by barcode: {barcode}')
+        logger.debug(f'Searching for food by barcode: {barcode}')
         
         try:
             # Clean and validate the barcode
@@ -421,14 +421,14 @@ class FatSecretService:
                 'Content-Type': 'application/json'
             }
             
-            logger.info(f"Making barcode API request to {url} for barcode: {clean_barcode}")
+            logger.debug(f"Making barcode API request to {url} for barcode: {clean_barcode}")
             response = requests.get(url, params=params, headers=headers, timeout=15)
             
-            logger.info(f"Barcode API response status: {response.status_code}")
+            logger.debug(f"Barcode API response status: {response.status_code}")
             
             # Parse response data
             response_data = response.json()
-            logger.info(f"Barcode API response: {json.dumps(response_data)}")
+            logger.debug(f"Barcode API response: {json.dumps(response_data)}")
                 
             # Check for FatSecret API errors and raise exceptions
             if 'error' in response_data:
@@ -456,7 +456,7 @@ class FatSecretService:
                 logger.warning(f"Could not extract food_id from response for barcode: {clean_barcode}")
                 return None
             
-            logger.info(f"Found food_id: {food_id} for barcode: {clean_barcode}")
+            logger.debug(f"Found food_id: {food_id} for barcode: {clean_barcode}")
             
             # Get detailed food information using the food_id
             return self.get_food_details_by_id(food_id)
@@ -507,14 +507,14 @@ class FatSecretService:
         if recipe_image and isinstance(recipe_image, str):
             # Skip FatSecret default image which doesn't work
             if recipe_image == "https://www.fatsecret.com/static/recipe/default.jpg" or recipe_image.endswith("/static/recipe/default.jpg"):
-                logger.warning(f"Discarding FatSecret default image for recipe {recipe_id}: {recipe_image}")
+                logger.debug(f"Discarding FatSecret default image for recipe {recipe_id}")
                 recipe_image = None
             elif not recipe_image.startswith(('http://', 'https://')):
                 if recipe_image.startswith('/'):
                     recipe_image = f"https://www.fatsecret.com{recipe_image}"
                 else:
                     recipe_image = f"https://www.fatsecret.com/{recipe_image}"
-                logger.info(f"Converted relative URL to absolute for recipe {recipe_id}: {recipe_image}")
+                logger.debug(f"Converted relative URL to absolute for recipe {recipe_id}")
                 
             # Validate the URL format
             if recipe_image and not recipe_image.startswith(('http://', 'https://')):
@@ -534,28 +534,9 @@ class FatSecretService:
                 elif isinstance(categories, dict):
                     category = categories.get('recipe_category_name', '').lower()
 
-            # Map category to a more specific image
-            image_category = 'food'
-            if 'pasta' in category or 'italian' in category:
-                image_category = 'pasta'
-            elif 'chicken' in category:
-                image_category = 'chicken'
-            elif 'beef' in category or 'meat' in category:
-                image_category = 'beef'  
-            elif 'breakfast' in category:
-                image_category = 'breakfast'
-            elif 'dessert' in category or 'sweet' in category:
-                image_category = 'dessert'
-            elif 'seafood' in category or 'fish' in category:
-                image_category = 'seafood'
-            elif 'vegetable' in category or 'veggie' in category:
-                image_category = 'vegetable'
-            elif 'beverage' in category or 'drink' in category:
-                image_category = 'beverage'
-
             # Use a valid image URL from Spoonacular that doesn't require attribution
             recipe_image = f"https://spoonacular.com/recipeImages/{recipe_id}-556x370.jpg"
-            logger.debug(f"No valid image found for recipe {recipe_id}, using generated URL")
+            logger.warning(f"No valid image found for recipe {recipe_id}: {recipe_name}, using generated Spoonacular URL: {recipe_image}")
         
         logger.debug(f"Final image URL for recipe {recipe_id}: {recipe_image}")
             
@@ -680,14 +661,7 @@ class FatSecretService:
                 recipes_list = []
             
             # Log the raw response for debugging
-            logger.info(f"Found {len(recipes_list)} recipes for search: {query}")
-            
-            # Check if recipes have images
-            for recipe in recipes_list:
-                has_image = 'recipe_image' in recipe and recipe['recipe_image']
-                logger.info(f"Recipe {recipe.get('recipe_id', 'unknown')}: {recipe.get('recipe_name', 'unknown')} - Has image: {has_image}")
-                if has_image:
-                    logger.info(f"Image URL: {recipe['recipe_image']}")
+            logger.debug(f"Found {len(recipes_list)} recipes for search: {query}")
             
             # Extract recipe IDs from search results
             recipe_ids = [str(recipe.get('recipe_id', '')) for recipe in recipes_list if recipe.get('recipe_id')]
@@ -707,7 +681,7 @@ class FatSecretService:
                 logger.warning("Falling back to basic recipe data without full details")
                 return [self._map_fatsecret_recipe_to_recipe(recipe) for recipe in recipes_list]
             
-            logger.info(f"Retrieved full details for {len(detailed_recipes)} recipes")
+            logger.debug(f"Retrieved full details for {len(detailed_recipes)} recipes")
             return detailed_recipes
             
         except Exception as e:
@@ -734,27 +708,14 @@ class FatSecretService:
             
             # Log the response structure to help with debugging
             logger.debug(f"Recipe detail response keys: {list(response.keys() if response else [])}")
-            
-            # Check if the response has an image
-            if 'recipe' in response:
-                has_image = 'recipe_image' in response['recipe'] and response['recipe']['recipe_image']
-                logger.info(f"Recipe {recipe_id} has image: {has_image}")
-                if has_image:
-                    logger.info(f"Original image URL: {response['recipe']['recipe_image']}")
-                    
-                # Check if it has recipe_images collection
-                has_recipe_images = 'recipe_images' in response['recipe'] and 'recipe_image' in response['recipe']['recipe_images']
-                if has_recipe_images:
-                    logger.info(f"Recipe {recipe_id} has recipe_images collection")
                     
             # Map the response to our recipe format
             recipe = self._map_fatsecret_recipe_to_recipe(response)
-            logger.info(f"Successfully retrieved recipe details for ID: {recipe_id}")
+            logger.debug(f"Successfully retrieved recipe details for ID: {recipe_id}")
             
             # Log whether we got instructions and ingredients
             logger.debug(f"Recipe has instructions: {bool(recipe.get('instructions'))}")
             logger.debug(f"Recipe has ingredients: {len(recipe.get('ingredients', []))}")
-            logger.info(f"Final image URL: {recipe.get('image')}")
             
             return recipe
             
@@ -820,13 +781,7 @@ class FatSecretService:
             }
             
             results = self.search_recipes(params)
-            logger.info(f"Found {len(results)} recipes for meal type: {meal_type}")
-            
-            # Log detailed information about each recipe
-            for i, recipe in enumerate(results):
-                logger.info(f"Recipe {i+1} for {meal_type}: ID={recipe.get('id', 'unknown')}, Title={recipe.get('title', 'unknown')}, Has Image: {bool(recipe.get('image'))}")
-                if recipe.get('image'):
-                    logger.info(f"Image URL for recipe {i+1}: {recipe.get('image')}")
+            logger.debug(f"Found {len(results)} recipes for meal type: {meal_type}")
             
             return results
             
@@ -916,7 +871,7 @@ class FatSecretService:
         # Check cache first
         current_time = time.time()
         if cache_key in self._autocomplete_cache['recipes'] and self._cache_expiry.get(cache_key, 0) > current_time:
-            logger.info(f"Using cached recipe autocomplete results for: {normalized_query}")
+            logger.debug(f"Using cached recipe autocomplete results for: {normalized_query}")
             return self._autocomplete_cache['recipes'][cache_key]
         
         # For short queries (2-3 chars), only search if it's a prefix of a cached query
@@ -924,7 +879,7 @@ class FatSecretService:
         if len(normalized_query) <= 3:
             for cached_query, results in self._autocomplete_cache['recipes'].items():
                 if cached_query.startswith(normalized_query) and self._cache_expiry.get(f"recipe_{cached_query}", 0) > current_time:
-                    logger.info(f"Using prefix-matched cache for recipe autocomplete: {normalized_query} -> {cached_query}")
+                    logger.debug(f"Using prefix-matched cache for recipe autocomplete: {normalized_query} -> {cached_query}")
                     return results
         
         try:
@@ -980,14 +935,14 @@ class FatSecretService:
         # Check cache first
         current_time = time.time()
         if cache_key in self._autocomplete_cache['ingredients'] and self._cache_expiry.get(cache_key, 0) > current_time:
-            logger.info(f"Using cached ingredient autocomplete results for: {normalized_query}")
+            logger.debug(f"Using cached ingredient autocomplete results for: {normalized_query}")
             return self._autocomplete_cache['ingredients'][cache_key]
         
         # For short queries (2-3 chars), only search if it's a prefix of a cached query
         if len(normalized_query) <= 3:
             for cached_query, results in self._autocomplete_cache['ingredients'].items():
                 if cached_query.startswith(normalized_query) and self._cache_expiry.get(f"ingredient_{cached_query}", 0) > current_time:
-                    logger.info(f"Using prefix-matched cache for ingredient autocomplete: {normalized_query} -> {cached_query}")
+                    logger.debug(f"Using prefix-matched cache for ingredient autocomplete: {normalized_query} -> {cached_query}")
                     return results
         
         try:
