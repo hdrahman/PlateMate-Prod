@@ -45,7 +45,8 @@ export const formatHeight = (cm: number, isImperial: boolean): string => {
         const { feet, inches } = cmToFeetInches(cm);
         return `${feet}' ${inches}"`;
     } else {
-        return `${cm} cm`;
+        // Always format metric to 1 decimal place for consistency
+        return `${Number(cm).toFixed(1)} cm`;
     }
 };
 
@@ -57,6 +58,7 @@ export const formatWeight = (kg: number, isImperial: boolean): string => {
         const lbs = kgToLbs(kg);
         return `${lbs} lbs`;
     } else {
-        return `${kg} kg`;
+        // Always format metric to 1 decimal place for consistency
+        return `${Number(kg).toFixed(1)} kg`;
     }
 }; 

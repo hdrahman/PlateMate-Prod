@@ -34,7 +34,7 @@ const DEV_BACKEND_URL = Platform.OS === 'web'
     : `http://${localIp}:8000`;
 
 // Backend URL - Use production URL by default, dev URL only in __DEV__ mode
-export const BACKEND_URL = __DEV__ && localIp !== '172.31.90.70'
+export const BACKEND_URL = __DEV__
     ? DEV_BACKEND_URL
     : 'https://platemateserver.onrender.com';
 

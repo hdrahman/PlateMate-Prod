@@ -47,6 +47,7 @@ export const supabaseAuth = {
     // Sign up with email and password
     signUp: async (email: string, password: string, displayName?: string) => {
         try {
+            console.log('🔐 Attempting to sign up user:', { email, displayName });
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
@@ -58,10 +59,36 @@ export const supabaseAuth = {
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Supabase signUp error:', error);
+                throw error;
+            }
+            
+            // Log user creation details
+            if (data.user) {
+                console.log('✅ User created successfully in Supabase Auth:', {
+                    id: data.user.id,
+                    email: data.user.email,
+                    confirmed: data.user.confirmed_at ? 'YES' : 'NO (email verification required)',
+                    created: data.user.created_at
+                });
+                
+                // IMPORTANT: If email confirmation is enabled in Supabase, the user won't appear
+                // in the Auth Users tab until they click the confirmation link in their email.
+                // To disable email confirmation: Supabase Dashboard > Authentication > Providers > 
+                // Email > "Confirm email" toggle OFF
+                if (!data.user.confirmed_at) {
+                    console.warn('⚠️ User created but NOT confirmed. Email verification may be required.');
+                    console.warn('⚠️ User will NOT appear in Supabase Auth Users tab until email is confirmed.');
+                    console.warn('⚠️ To fix: Disable email confirmation in Supabase Dashboard or have user check their email.');
+                }
+            } else {
+                console.warn('⚠️ SignUp succeeded but no user object returned');
+            }
+            
             return data.user;
         } catch (error) {
-            console.error('Error signing up with email and password:', error);
+            console.error('❌ Error signing up with email and password:', error);
             throw error;
         }
     },

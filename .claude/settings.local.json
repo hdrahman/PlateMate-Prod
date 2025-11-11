@@ -38,7 +38,8 @@
       "Bash(keytool:*)",
       "Bash(findstr:*)",
       "Bash(if exist androidbuild rd /s /q androidbuild)",
-      "Bash(if exist androidappbuild rd /s /q androidappbuild)"
+      "Bash(if exist androidappbuild rd /s /q androidappbuild)",
+      "Bash(ipconfig:*)"
     ],
     "deny": [],
     "ask": []

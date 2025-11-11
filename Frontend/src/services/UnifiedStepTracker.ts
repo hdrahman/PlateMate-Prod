@@ -697,47 +697,20 @@ class UnifiedStepTracker {
                     throw new Error('Native step counter not available');
                 }
             } else {
-                // iOS: Use HealthKit or fallback to Expo Pedometer
+                // iOS: Use HealthKit exclusively for step tracking
+                // Note: We don't use Pedometer.watchStepCount() on iOS because:
+                // 1. It tracks session steps (since device boot), not daily steps
+                // 2. Converting session to daily steps is error-prone and causes inflation
+                // 3. HealthKit is more accurate and is synced periodically via syncFromSensor()
+                // 4. If HealthKit fails, syncFromSensor() has a safe fallback to Pedometer.getStepCountAsync()
+
                 if (this.state.healthKitInitialized) {
                     console.log('🍎 Using HealthKit for step tracking...');
                     // HealthKit doesn't have real-time listeners, so we'll use periodic sync
                     console.log('✅ HealthKit tracking enabled (uses periodic sync)');
                 } else {
-                    // Fallback to Expo Pedometer for iOS
-                    console.log('🍎 Falling back to Expo Pedometer...');
-                    const available = await Pedometer.isAvailableAsync();
-                    if (!available) {
-                        throw new Error('Pedometer not available on this device');
-                    }
-
-                    // Start real-time tracking with Expo Pedometer
-                    this.pedometerSubscription = Pedometer.watchStepCount((result) => {
-                        const sessionSteps = result.steps;
-
-                        if (this.isFirstReading) {
-                            this.sessionBaseline = sessionSteps;
-                            this.isFirstReading = false;
-                            console.log(`📱 Session baseline set: ${sessionSteps}`);
-                            return;
-                        }
-
-                        // Handle pedometer resets
-                        if (sessionSteps < this.sessionBaseline) {
-                            console.log('🔄 Pedometer reset detected');
-                            this.sessionBaseline = sessionSteps;
-                            return;
-                        }
-
-                        // Calculate new steps
-                        const newSteps = sessionSteps - this.sessionBaseline;
-                        if (newSteps > 0) {
-                            const newTotal = this.state.currentSteps + newSteps;
-                            this.updateStepCount(newTotal);
-                            this.sessionBaseline = sessionSteps;
-                        }
-                    });
-                    
-                    console.log('✅ Expo Pedometer fallback started');
+                    console.log('🍎 HealthKit not initialized - will use Pedometer.getStepCountAsync() during periodic syncs');
+                    console.log('⚠️ Please grant Health app permissions for more accurate tracking');
                 }
             }
 

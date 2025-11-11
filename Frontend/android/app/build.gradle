@@ -116,7 +116,12 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.release
+            // Use debug key for APK builds
+            signingConfig signingConfigs.debug
+            // Use release key for bundles
+            if (System.getenv('BUILD_BUNDLE') == 'true') {
+                signingConfig signingConfigs.release
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

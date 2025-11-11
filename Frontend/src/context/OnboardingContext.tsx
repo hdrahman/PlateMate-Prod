@@ -637,6 +637,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             activity_level: finalProfile.activityLevel || null,
             weight_goal: finalProfile.weightGoal || null,
             target_weight: finalProfile.targetWeight || null,
+            starting_weight: finalProfile.weight || null, // CRITICAL FIX: Set starting_weight to current weight during onboarding
             dietary_restrictions: Array.isArray(finalProfile.dietaryRestrictions) ? finalProfile.dietaryRestrictions : [],
             food_allergies: Array.isArray(finalProfile.foodAllergies) ? finalProfile.foodAllergies : [],
             cuisine_preferences: Array.isArray(finalProfile.cuisinePreferences) ? finalProfile.cuisinePreferences : [],
@@ -679,6 +680,10 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             diet_type: finalProfile.dietType || '',
             use_metric_system: finalProfile.useMetricSystem !== false ? 1 : 0,
             premium: false,
+            // CRITICAL FIX: Add cheat day settings
+            cheat_day_enabled: finalProfile.cheatDayEnabled !== false ? 1 : 0,
+            cheat_day_frequency: finalProfile.cheatDayFrequency || 7,
+            preferred_cheat_day_of_week: finalProfile.preferredCheatDayOfWeek !== undefined ? finalProfile.preferredCheatDayOfWeek : null,
         };
 
         try {
@@ -709,6 +714,37 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             console.log('👤 User ID:', profileData.firebase_uid);
             console.log('📧 Email:', profileData.email);
             console.log('🎯 Goals: Calories=' + profileData.daily_calorie_target + ', Protein=' + profileData.protein_goal + 'g, Carbs=' + profileData.carb_goal + 'g, Fat=' + profileData.fat_goal + 'g');
+
+            // CRITICAL FIX: Calculate and store BMR data to ensure consistency across the app
+            // This populates the bmr, maintenance_calories columns in addition to daily_calorie_target
+            console.log('🧮 Calculating and storing BMR data for consistency...');
+            const { calculateAndStoreBMR } = await import('../utils/nutritionCalculator');
+            const bmrResult = await calculateAndStoreBMR({
+                ...finalProfile,
+                // Convert snake_case to camelCase for the calculator
+                firstName: finalProfile.firstName,
+                lastName: finalProfile.lastName,
+                weight: finalProfile.weight,
+                height: finalProfile.height,
+                age: finalProfile.age,
+                gender: finalProfile.gender,
+                activityLevel: finalProfile.activityLevel,
+                weightGoal: finalProfile.weightGoal,
+                targetWeight: finalProfile.targetWeight,
+                startingWeight: finalProfile.weight, // Use current weight as starting weight
+                dailyCalorieTarget: finalProfile.dailyCalorieTarget,
+            } as any, authUser.id);
+
+            if (bmrResult) {
+                console.log('✅ BMR data stored:', {
+                    bmr: bmrResult.bmr,
+                    maintenance: bmrResult.maintenanceCalories,
+                    dailyTarget: bmrResult.dailyTarget,
+                    adjustment: bmrResult.weightGoalAdjustment
+                });
+            } else {
+                console.warn('⚠️ BMR calculation skipped (may be missing data) - will be calculated on first app load');
+            }
 
             // CRITICAL: Immediately backup to Supabase after onboarding completion
             // This ensures data is backed up even if user uninstalls or loses device
@@ -784,10 +820,14 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             console.log('☁️ Supabase Cloud Backup: ⏳ IN PROGRESS (background)');
             console.log('👤 User:', profileData.firebase_uid);
             console.log('📧 Email:', profileData.email);
-            console.log('🎯 Daily Calories:', profileData.daily_calorie_target);
+            console.log('⚖️  Current Weight:', profileData.weight + 'kg');
+            console.log('🎯 Target Weight:', profileData.target_weight + 'kg');
+            console.log('📏 Starting Weight:', profileData.starting_weight + 'kg');
+            console.log('🔥 Daily Calories:', profileData.daily_calorie_target);
             console.log('💪 Macros: P=' + profileData.protein_goal + 'g, C=' + profileData.carb_goal + 'g, F=' + profileData.fat_goal + 'g');
             console.log('📅 Target Date:', profileData.projected_completion_date);
             console.log('⏱️  Duration:', profileData.estimated_duration_weeks + ' weeks');
+            console.log('🍰 Cheat Days: ' + (profileData.cheat_day_enabled ? 'ENABLED (every ' + profileData.cheat_day_frequency + ' days)' : 'DISABLED'));
             console.log('✅ Onboarding Complete:', profileData.onboarding_complete);
             console.log('═══════════════════════════════════════════════════');
 
