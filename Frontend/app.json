@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/logo.png",
+    "scheme": "platemate",
     "userInterfaceStyle": "light",
     "sdkVersion": "54.0.0",
     "splash": {
@@ -36,19 +37,18 @@
           "fetch"
         ],
         "NSMotionUsageDescription": "PlateMate uses motion and fitness data to track your daily steps and help you achieve your fitness goals.",
-        "NSHealthShareUsageDescription": "PlateMate uses HealthKit to read your step count data and provide accurate fitness tracking.",
-        "NSHealthUpdateUsageDescription": "PlateMate may write step data to HealthKit to keep your fitness data synchronized.",
         "NSCameraUsageDescription": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
         "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": [],
         "com.apple.developer.applesignin": [
           "Default"
         ]
       },
+      "associatedDomains": [
+        "applinks:platemate.app"
+      ],
       "runtimeVersion": {
         "policy": "appVersion"
       }
@@ -56,6 +56,21 @@
     "android": {
       "package": "com.platemate.app",
       "versionCode": 8,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "platemate"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.BODY_SENSORS",
@@ -104,7 +119,6 @@
       "expo-task-manager",
       "./notifee.plugin.js",
       "expo-font",
-      "react-native-health",
       "expo-asset",
       "expo-apple-authentication"
     ],

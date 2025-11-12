@@ -39,6 +39,8 @@ interface AuthContextType {
     signInWithGoogle: () => Promise<SocialSignInResult>;
     signInWithApple: () => Promise<SocialSignInResult>;
     signInAnonymously: () => Promise<void>;
+    resetPasswordForEmail: (email: string, redirectTo?: string) => Promise<void>;
+    resetPassword: (newPassword: string) => Promise<void>;
 }
 
 // Create context with default values
@@ -52,6 +54,8 @@ const AuthContext = createContext<AuthContextType>({
     signInWithGoogle: async () => ({}),
     signInWithApple: async () => ({}),
     signInAnonymously: async () => { },
+    resetPasswordForEmail: async () => { },
+    resetPassword: async () => { },
 });
 
 // Helper function to grant promotional trial to new users
@@ -176,6 +180,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log('Supabase auth state change:', event, session?.user?.id);
+
+            // Handle password recovery event
+            if (event === 'PASSWORD_RECOVERY') {
+                console.log('🔐 Password recovery event detected');
+                // Note: For React Native, navigation to ResetPassword screen
+                // is handled via deep linking in AppNavigator
+            }
 
             const authUser = session?.user || null;
             const currentUserId = authUser?.id || null;
@@ -468,6 +479,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    // Reset password - send email
+    const resetPasswordForEmail = async (email: string, redirectTo?: string) => {
+        try {
+            await supabaseAuth.resetPasswordForEmail(email, redirectTo);
+        } catch (error: any) {
+            console.error('Reset password error:', error);
+            throw error;
+        }
+    };
+
+    // Reset password - update password
+    const resetPassword = async (newPassword: string) => {
+        try {
+            await supabaseAuth.resetPassword(newPassword);
+        } catch (error: any) {
+            Alert.alert('Reset Password Error', error.message);
+            throw error;
+        }
+    };
+
     return (
         <AuthContext.Provider
             value={{
@@ -480,6 +511,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 signInWithGoogle,
                 signInWithApple,
                 signInAnonymously,
+                resetPasswordForEmail,
+                resetPassword,
             }}
         >
             {children}

@@ -109,6 +109,48 @@ export const supabaseAuth = {
         }
     },
 
+    // Reset password - send reset email
+    resetPasswordForEmail: async (email: string, redirectTo?: string) => {
+        try {
+            console.log('🔐 Sending password reset email to:', email);
+            const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: redirectTo || undefined,
+            });
+
+            if (error) {
+                console.error('❌ Error sending password reset email:', error);
+                throw error;
+            }
+
+            console.log('✅ Password reset email sent successfully');
+            return data;
+        } catch (error) {
+            console.error('❌ Error in resetPasswordForEmail:', error);
+            throw error;
+        }
+    },
+
+    // Reset password - update to new password
+    resetPassword: async (newPassword: string) => {
+        try {
+            console.log('🔐 Updating password...');
+            const { data, error } = await supabase.auth.updateUser({
+                password: newPassword,
+            });
+
+            if (error) {
+                console.error('❌ Error updating password:', error);
+                throw error;
+            }
+
+            console.log('✅ Password updated successfully');
+            return data.user;
+        } catch (error) {
+            console.error('❌ Error in resetPassword:', error);
+            throw error;
+        }
+    },
+
     // Sign in with Google using native Google Sign-In + Supabase
     signInWithGoogle: async () => {
         try {

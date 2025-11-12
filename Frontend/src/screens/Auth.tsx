@@ -436,6 +436,16 @@ const Auth = ({ navigation, route }: any) => {
                                                 </TouchableOpacity>
                                             </View>
 
+                                            {/* Forgot Password Link (Sign In only) */}
+                                            {isLogin && (
+                                                <TouchableOpacity
+                                                    onPress={() => navigation.navigate('ForgotPassword')}
+                                                    style={styles.forgotPasswordButton}
+                                                >
+                                                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                                                </TouchableOpacity>
+                                            )}
+
                                             {/* Confirm Password Input (Sign Up only) */}
                                             {!isLogin && (
                                                 <View style={styles.inputContainer}>
@@ -722,6 +732,17 @@ const styles = StyleSheet.create({
     },
     eyeIcon: {
         padding: 8,
+    },
+    forgotPasswordButton: {
+        alignSelf: 'flex-end',
+        marginTop: 8,
+        marginBottom: 8,
+        paddingVertical: 4,
+    },
+    forgotPasswordText: {
+        color: '#9B00FF',
+        fontSize: 14,
+        fontWeight: '600',
     },
     authButton: {
         marginTop: 8,

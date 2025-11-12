@@ -14,6 +14,8 @@ import ChangePassword from '../screens/ChangePassword';
 import Settings from '../screens/Settings';
 import NotificationsScreen from '../screens/Notifications';
 import DataSharing from '../screens/DataSharing';
+import ForgotPassword from '../screens/ForgotPassword';
+import ResetPassword from '../screens/ResetPassword';
 import PrivacyPolicy from '../screens/PrivacyPolicy';
 import LegalTerms from '../screens/LegalTerms';
 import AboutCalculations from '../screens/AboutCalculations';
@@ -40,6 +42,8 @@ type RootStackParamList = {
     EditGoals: undefined;
     PremiumSubscription: undefined;
     ChangePassword: undefined;
+    ForgotPassword: undefined;
+    ResetPassword: undefined;
     Settings: undefined;
     Notifications: undefined;
     DataSharing: undefined;
@@ -128,6 +132,8 @@ const AppNavigator = () => {
                 <Stack.Screen name="EditGoals" component={EditGoals} />
                 <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
                 <Stack.Screen name="ChangePassword" component={ChangePassword} />
+                <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+                <Stack.Screen name="ResetPassword" component={ResetPassword} />
                 <Stack.Screen name="Settings" component={Settings} />
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="DataSharing" component={DataSharing} />

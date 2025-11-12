@@ -542,68 +542,24 @@ async def extend_trial(
         logger.error(f"Error extending trial: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/validate-receipt")
-async def validate_receipt(
-    request: ReceiptValidationRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    """Validate App Store or Play Store receipt"""
-    try:
-        firebase_uid = current_user["supabase_uid"]
-        
-        # Here you would implement actual receipt validation
-        # For iOS: Send to Apple's verifyReceipt endpoint
-        # For Android: Use Google Play Developer API
-        
-        # Mock validation for now
-        validation_result = {
-            "is_valid": True,
-            "product_id": request.product_id,
-            "transaction_id": f"mock_transaction_{firebase_uid}",
-            "expires_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
-            "is_trial_period": False
-        }
-        
-        if validation_result["is_valid"]:
-            # Update subscription based on validated receipt
-            conn = await get_db_connection()
-            async with conn.transaction():
-                now = datetime.utcnow()
-                status = 'premium_monthly' if 'monthly' in request.product_id else 'premium_annual'
-                end_date = datetime.fromisoformat(validation_result["expires_date"].replace('Z', '+00:00'))
-                
-                await conn.execute("""
-                    UPDATE user_subscriptions SET
-                        subscription_status = $2,
-                        end_date = $3,
-                        auto_renew = $4,
-                        subscription_id = $5,
-                        original_transaction_id = $6,
-                        latest_receipt_data = $7,
-                        receipt_validation_date = $8,
-                        updated_at = $9
-                    WHERE firebase_uid = $1
-                """, firebase_uid, status, end_date.isoformat(), True,
-                    request.product_id, validation_result["transaction_id"],
-                    request.receipt_data, now, now)
-                
-                logger.info(f"Receipt validated and subscription updated for user {firebase_uid}")
-                
-                return {
-                    "status": "success",
-                    "message": "Receipt validated and subscription activated",
-                    "subscription_status": status,
-                    "expires_date": validation_result["expires_date"]
-                }
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid receipt"
-            )
-            
-    except Exception as e:
-        logger.error(f"Error validating receipt: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+# DEPRECATED ENDPOINT - NOT USED
+# This endpoint is no longer needed because RevenueCat handles all receipt validation
+# server-side automatically. RevenueCat validates receipts with Apple/Google and updates
+# subscription status through webhooks (see revenuecat_webhook endpoint below).
+#
+# RevenueCat automatically implements the production-to-sandbox fallback pattern as
+# required by Apple's guidelines. All IAP flows in the app use RevenueCat SDK exclusively.
+#
+# If you need custom receipt validation in the future, implement proper Apple receipt
+# validation with the production-to-sandbox fallback pattern:
+# 1. Try production: https://buy.itunes.apple.com/verifyReceipt
+# 2. If status == 21007 (sandbox receipt in production), retry with sandbox:
+#    https://sandbox.itunes.apple.com/verifyReceipt
+#
+# @router.post("/validate-receipt")
+# async def validate_receipt(...):
+#     """DEPRECATED - RevenueCat handles receipt validation"""
+#     pass
 
 @router.get("/status")
 async def get_subscription_status(current_user: dict = Depends(get_current_user)):

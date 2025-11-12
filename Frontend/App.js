@@ -51,6 +51,8 @@ import EditProfile from './src/screens/EditProfile';
 import EditGoals from './src/screens/EditGoals';
 import DeleteAccount from './src/screens/DeleteAccount';
 import ChangePassword from './src/screens/ChangePassword';
+import ForgotPassword from './src/screens/ForgotPassword';
+import ResetPassword from './src/screens/ResetPassword';
 import AboutUs from './src/screens/AboutUs';
 import Settings from './src/screens/Settings';
 import NotificationsScreen from './src/screens/Notifications';
@@ -488,6 +490,8 @@ function AppNavigator() {
             <>
               <Stack.Screen name="Onboarding" component={Onboarding} />
               <Stack.Screen name="Auth" component={Auth} />
+              <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+              <Stack.Screen name="ResetPassword" component={ResetPassword} />
             </>
           ) : (
             // Authenticated user content wrapped with remaining context providers
