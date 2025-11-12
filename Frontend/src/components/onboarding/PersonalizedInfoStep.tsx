@@ -10,6 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { syncUnitPreferenceFields, parseUnitPreference } from '../../utils/unitConversion';
 
 interface PersonalizedInfoStepProps {
     profile: UserProfile;
@@ -19,7 +20,11 @@ interface PersonalizedInfoStepProps {
 
 const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, updateProfile, onNext }) => {
     const [location, setLocation] = useState(profile.location || '');
-    const [unitPreference, setUnitPreference] = useState(profile.unitPreference || 'metric');
+    // Parse unit preference consistently from profile
+    const initialUseMetric = parseUnitPreference(profile);
+    const [unitPreference, setUnitPreference] = useState<'metric' | 'imperial'>(
+        initialUseMetric ? 'metric' : 'imperial'
+    );
     const [weightGoal, setWeightGoal] = useState(profile.weightGoal || 'maintain');
     const [showLocationPicker, setShowLocationPicker] = useState(false);
 
@@ -72,10 +77,14 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
     ];
 
     const handleNext = async () => {
+        // Sync both unit preference fields to prevent desynchronization
+        const useMetric = unitPreference === 'metric';
+        const unitFields = syncUnitPreferenceFields(useMetric);
+        
         await updateProfile({
             location: location.trim() || null,
-            unitPreference,
             weightGoal,
+            ...unitFields, // Includes both useMetricSystem and unitPreference
         });
         onNext();
     };

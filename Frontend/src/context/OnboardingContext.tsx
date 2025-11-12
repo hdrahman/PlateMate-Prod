@@ -16,6 +16,7 @@ import {
 } from '../utils/database';
 import supabaseAuth from '../utils/supabaseAuth';
 import { postgreSQLSyncService } from '../utils/postgreSQLSyncService';
+import { syncUnitPreferenceFields } from '../utils/unitConversion';
 
 interface OnboardingContextType {
     // Basic onboarding state
@@ -135,6 +136,7 @@ export interface UserProfile {
 }
 
 // Default values for user profile
+// Note: Unit preference fields are kept in sync using syncUnitPreferenceFields helper
 const defaultProfile: UserProfile = {
     firstName: '',
     lastName: '',
@@ -163,7 +165,7 @@ const defaultProfile: UserProfile = {
     futureSelfMessageType: null,
     futureSelfMessageCreatedAt: null,
     futureSelfMessageUri: null,
-    useMetricSystem: true,
+    useMetricSystem: true, // Default to metric
     darkMode: false,
     pushNotificationsEnabled: true,
     emailNotificationsEnabled: true,
@@ -174,7 +176,7 @@ const defaultProfile: UserProfile = {
     defaultPaymentMethodId: null,
     preferredLanguage: 'en',
     timezone: 'UTC',
-    unitPreference: 'metric',
+    unitPreference: 'metric', // Synced with useMetricSystem
     syncDataOffline: true,
     defaultAddress: null,
     preferredDeliveryTimes: [],
@@ -228,6 +230,11 @@ const safeParseArrayField = (value: any): string[] => {
 const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile => {
     if (!sqliteProfile) return defaultProfile;
 
+    // Parse use_metric_system, preferring it as source of truth
+    const useMetricSystem = Boolean(sqliteProfile.use_metric_system);
+    // Sync both fields to ensure consistency
+    const unitFields = syncUnitPreferenceFields(useMetricSystem);
+
     return {
         firstName: sqliteProfile.first_name || '',
         lastName: sqliteProfile.last_name || '',
@@ -240,7 +247,7 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         age: sqliteProfile.age,
         gender: sqliteProfile.gender,
         activityLevel: sqliteProfile.activity_level,
-        unitPreference: sqliteProfile.unit_preference || 'metric',
+        ...unitFields, // Synced unitPreference and useMetricSystem
         dietaryRestrictions: safeParseArrayField(sqliteProfile.dietary_restrictions),
         foodAllergies: safeParseArrayField(sqliteProfile.food_allergies),
         cuisinePreferences: safeParseArrayField(sqliteProfile.cuisine_preferences),
@@ -283,7 +290,6 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         timezone: sqliteProfile.timezone || 'UTC',
         darkMode: Boolean(sqliteProfile.dark_mode),
         syncDataOffline: Boolean(sqliteProfile.sync_data_offline),
-        useMetricSystem: Boolean(sqliteProfile.use_metric_system),
         onboardingComplete: Boolean(sqliteProfile.onboarding_complete),
         premium: Boolean(sqliteProfile.premium),
     };
@@ -291,6 +297,9 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
 
 // Helper to convert frontend profile to SQLite format
 const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, firebaseUid: string, email: string): any => {
+    // Ensure unit preference fields are synced before saving
+    const unitFields = syncUnitPreferenceFields(frontendProfile.useMetricSystem);
+    
     return {
         firebase_uid: firebaseUid,
         email: email,
@@ -305,7 +314,7 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         activity_level: frontendProfile.activityLevel,
         target_weight: frontendProfile.targetWeight,
         starting_weight: frontendProfile.startingWeight,
-        unit_preference: frontendProfile.unitPreference,
+        unit_preference: unitFields.unitPreference, // Synced
         dietary_restrictions: frontendProfile.dietaryRestrictions,
         food_allergies: frontendProfile.foodAllergies,
         cuisine_preferences: frontendProfile.cuisinePreferences,
@@ -341,7 +350,7 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         timezone: frontendProfile.timezone,
         dark_mode: frontendProfile.darkMode,
         sync_data_offline: frontendProfile.syncDataOffline,
-        use_metric_system: frontendProfile.useMetricSystem,
+        use_metric_system: unitFields.useMetricSystem, // Synced
         premium: frontendProfile.premium,
         onboarding_complete: frontendProfile.onboardingComplete,
     };

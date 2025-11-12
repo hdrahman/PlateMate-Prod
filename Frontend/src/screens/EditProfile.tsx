@@ -35,7 +35,11 @@ import {
     kgToLbs,
     lbsToKg,
     formatHeight,
-    formatWeight
+    formatWeight,
+    syncUnitPreferenceFields,
+    parseUnitPreference,
+    roundToOneDecimal,
+    convertAndRoundLbsToKg
 } from '../utils/unitConversion';
 import { resetNutritionGoals } from '../utils/resetNutritionGoals';
 import _ from 'lodash'; // Import lodash for deep cloning
@@ -261,8 +265,9 @@ const EditProfile = () => {
                     // Try to get location from database, fall back to AsyncStorage if not available
                     setLocation(profile.location || savedLocation);
 
-                    // Check if profile has unit_preference and map it to isImperialUnits
-                    const isImperial = profile.unit_preference === 'imperial';
+                    // Use helper to parse unit preference consistently from both fields
+                    const useMetric = parseUnitPreference(profile);
+                    const isImperial = !useMetric;
                     setIsImperialUnits(isImperial);
 
                     // Set height (convert from cm if needed)
@@ -467,15 +472,15 @@ const EditProfile = () => {
                 heightInCm = 0;
             }
 
-            // Convert weight to metric (kg) for storage
+            // Convert weight to metric (kg) for storage with proper rounding
             let weightInKg;
             if (editedWeight) {
                 if (editedIsImperialUnits) {
-                    // Convert from lbs to kg
-                    weightInKg = lbsToKg(parseFloat(editedWeight));
+                    // Convert from lbs to kg with rounding
+                    weightInKg = convertAndRoundLbsToKg(parseFloat(editedWeight));
                 } else {
-                    // Already in kg
-                    weightInKg = parseFloat(editedWeight);
+                    // Already in kg, but round to 1 decimal
+                    weightInKg = roundToOneDecimal(parseFloat(editedWeight));
                 }
             } else {
                 weightInKg = 0;
@@ -508,16 +513,20 @@ const EditProfile = () => {
                 });
             }
 
+            // Sync both unit preference fields to prevent desynchronization
+            const unitFields = syncUnitPreferenceFields(!editedIsImperialUnits);
+            
             // Create profile data object based strictly on the fields that exist in user_profiles table
             // IMPORTANT: Preserve target_weight and other fields that shouldn't be cleared
             const baseProfileData = {
                 first_name: firstName,
                 last_name: lastName,
                 // Conditionally include physical attributes only when they have valid (>0) values.
-                ...(heightInCm && heightInCm > 0 ? { height: heightInCm } : {}),
+                ...(heightInCm && heightInCm > 0 ? { height: roundToOneDecimal(heightInCm) } : {}),
                 ...(weightInKg && weightInKg > 0 ? { weight: weightInKg } : {}),
                 gender: editedSex.toLowerCase(),
-                unit_preference: editedIsImperialUnits ? 'imperial' : 'metric',
+                unit_preference: unitFields.unitPreference, // Synced
+                use_metric_system: unitFields.useMetricSystem ? 1 : 0, // Synced (convert boolean to integer for SQLite)
                 timezone: editedTimeZone || 'UTC',
                 email: email,
                 // Include date of birth and calculated age

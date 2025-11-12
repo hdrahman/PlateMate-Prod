@@ -61,4 +61,64 @@ export const formatWeight = (kg: number, isImperial: boolean): string => {
         // Always format metric to 1 decimal place for consistency
         return `${Number(kg).toFixed(1)} kg`;
     }
+};
+
+/**
+ * Round a number to 1 decimal place for storage
+ * This ensures consistent, clean values in the database
+ */
+export const roundToOneDecimal = (value: number): number => {
+    if (value === null || value === undefined) return null;
+    return Math.round(value * 10) / 10;
+};
+
+/**
+ * Convert imperial weight to metric with proper rounding
+ */
+export const convertAndRoundLbsToKg = (lbs: number): number => {
+    return roundToOneDecimal(lbs / 2.20462);
+};
+
+/**
+ * Convert imperial height to metric with proper rounding
+ */
+export const convertAndRoundInchesToCm = (totalInches: number): number => {
+    return roundToOneDecimal(totalInches * 2.54);
+};
+
+/**
+ * Sync unit preference fields to prevent desynchronization
+ * Returns both fields based on a single boolean value
+ */
+export const syncUnitPreferenceFields = (useMetric: boolean): {
+    useMetricSystem: boolean;
+    unitPreference: 'metric' | 'imperial';
+} => {
+    return {
+        useMetricSystem: useMetric,
+        unitPreference: useMetric ? 'metric' : 'imperial'
+    };
+};
+
+/**
+ * Parse unit preference from either field format
+ * Returns a consistent boolean value
+ */
+export const parseUnitPreference = (profile: any): boolean => {
+    // Prefer use_metric_system as source of truth
+    if (profile.useMetricSystem !== undefined && profile.useMetricSystem !== null) {
+        return Boolean(profile.useMetricSystem);
+    }
+    if (profile.use_metric_system !== undefined && profile.use_metric_system !== null) {
+        return Boolean(profile.use_metric_system);
+    }
+    // Fallback to unitPreference string
+    if (profile.unitPreference) {
+        return profile.unitPreference === 'metric';
+    }
+    if (profile.unit_preference) {
+        return profile.unit_preference === 'metric';
+    }
+    // Default to metric
+    return true;
 }; 

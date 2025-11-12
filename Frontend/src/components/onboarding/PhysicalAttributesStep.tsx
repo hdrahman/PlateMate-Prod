@@ -11,6 +11,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import WheelPicker from '../WheelPicker';
+import {
+    roundToOneDecimal,
+    convertAndRoundLbsToKg,
+    convertAndRoundInchesToCm,
+    syncUnitPreferenceFields,
+    parseUnitPreference
+} from '../../utils/unitConversion';
 
 interface PhysicalAttributesStepProps {
     profile: UserProfile;
@@ -19,7 +26,8 @@ interface PhysicalAttributesStepProps {
 }
 
 const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile, updateProfile, onNext }) => {
-    const [useMetric, setUseMetric] = useState(profile.useMetricSystem ?? true);
+    // Use the helper to parse unit preference consistently
+    const [useMetric, setUseMetric] = useState(parseUnitPreference(profile));
 
     // For metric system
     const [weightKg, setWeightKg] = useState<number>(profile.weight ? Math.round(profile.weight) : 70);
@@ -146,9 +154,10 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                     return;
                 }
 
-                finalWeight = weightKg;
-                finalHeight = heightCm;
-                finalTargetWeight = targetWeightKg;
+                // Round to 1 decimal place for clean storage
+                finalWeight = roundToOneDecimal(weightKg);
+                finalHeight = roundToOneDecimal(heightCm);
+                finalTargetWeight = roundToOneDecimal(targetWeightKg);
             } else {
                 if (weightLbs <= 0 || weightLbs > 660) {
                     Alert.alert('Invalid Weight', 'Please enter a valid weight between 1-660 lbs');
@@ -170,18 +179,21 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                     return;
                 }
 
-                // Convert to metric for storage
-                finalWeight = weightLbs / 2.20462;
+                // Convert to metric for storage and round to 1 decimal place
+                finalWeight = convertAndRoundLbsToKg(weightLbs);
                 const totalInches = (heightFt * 12) + heightIn;
-                finalHeight = totalInches * 2.54;
-                finalTargetWeight = targetWeightLbs / 2.20462;
+                finalHeight = convertAndRoundInchesToCm(totalInches);
+                finalTargetWeight = convertAndRoundLbsToKg(targetWeightLbs);
             }
 
+            // Sync both unit preference fields to prevent desynchronization
+            const unitFields = syncUnitPreferenceFields(useMetric);
+            
             await updateProfile({
                 weight: finalWeight,
                 height: finalHeight,
                 targetWeight: finalTargetWeight,
-                useMetricSystem: useMetric,
+                ...unitFields,
             });
 
             onNext();
