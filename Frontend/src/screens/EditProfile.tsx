@@ -448,8 +448,44 @@ const EditProfile = () => {
     };
 
     const handleUnitSystemChange = (imperial: boolean) => {
+        const wasImperial = editedIsImperialUnits;
         setEditedIsImperialUnits(imperial);
         setShowUnitPicker(false);
+
+        // Convert the displayed weight value when switching units
+        if (editedWeight) {
+            const currentWeight = parseFloat(editedWeight);
+            if (!isNaN(currentWeight) && currentWeight > 0) {
+                let convertedWeight: number;
+
+                if (imperial && !wasImperial) {
+                    // Switching from kg to lbs
+                    convertedWeight = Math.round(kgToLbs(currentWeight));
+                } else if (!imperial && wasImperial) {
+                    // Switching from lbs to kg
+                    convertedWeight = Math.round(convertAndRoundLbsToKg(currentWeight) * 10) / 10;
+                } else {
+                    convertedWeight = currentWeight;
+                }
+
+                setEditedWeight(convertedWeight.toString());
+            }
+        }
+
+        // Convert height when switching units
+        if (imperial && !wasImperial && height !== '---') {
+            // Switching from cm to ft/in - parse the height string
+            const heightValue = parseFloat(height);
+            if (!isNaN(heightValue)) {
+                const { feet, inches } = cmToFeetInches(heightValue);
+                setEditedHeightFeet(feet.toString());
+                setEditedHeightInches(inches.toString());
+            }
+        } else if (!imperial && wasImperial && editedHeightFeet && editedHeightInches) {
+            // Switching from ft/in to cm - the form will show the cm input
+            // The height will be converted when saving
+        }
+
         checkForChanges('units', imperial);
     };
 

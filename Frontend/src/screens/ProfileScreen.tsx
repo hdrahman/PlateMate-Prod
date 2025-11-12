@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
+import { formatWeight, parseUnitPreference, kgToLbs } from '../utils/unitConversion';
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
@@ -26,6 +27,9 @@ const BLUE_ACCENT = '#2196F3';
 const ProfileScreen = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+
+    // Unit preference state
+    const [isImperialUnits, setIsImperialUnits] = useState(false);
 
     // Mock data - in a real app, this would come from an API/database
     const [profileData, setProfileData] = useState({
@@ -56,6 +60,10 @@ const ProfileScreen = () => {
                 const userGoals = await getUserGoals(user.id);
 
                 if (profile) {
+                    // Parse and set unit preference
+                    const useMetric = parseUnitPreference(profile);
+                    setIsImperialUnits(!useMetric);
+
                     // Update profile data with fetched information
                     setProfileData(prevData => ({
                         ...prevData,
@@ -137,13 +145,23 @@ const ProfileScreen = () => {
                         <View style={styles.progressCircle}>
                             <View style={styles.progressCircleInner}>
                                 <Ionicons name="scale-outline" size={32} color={WHITE} />
-                                <Text style={styles.weightLostText}>{profileData.weightLost} kg lost</Text>
-                                <Text style={styles.currentWeightText}>Current: {profileData.currentWeight} kg</Text>
+                                <Text style={styles.weightLostText}>
+                                    {isImperialUnits
+                                        ? `${Math.round(kgToLbs(profileData.weightLost) * 10) / 10} lbs lost`
+                                        : `${profileData.weightLost} kg lost`}
+                                </Text>
+                                <Text style={styles.currentWeightText}>
+                                    Current: {formatWeight(profileData.currentWeight, isImperialUnits)}
+                                </Text>
                             </View>
                         </View>
                         <View style={styles.progressLimits}>
-                            <Text style={styles.limitText}>{profileData.startingWeight}</Text>
-                            <Text style={styles.limitText}>{profileData.goalWeight}</Text>
+                            <Text style={styles.limitText}>
+                                {formatWeight(profileData.startingWeight, isImperialUnits)}
+                            </Text>
+                            <Text style={styles.limitText}>
+                                {formatWeight(profileData.goalWeight, isImperialUnits)}
+                            </Text>
                         </View>
                     </View>
 
@@ -158,7 +176,9 @@ const ProfileScreen = () => {
 
                     <View style={styles.goalItem}>
                         <Text style={styles.goalLabel}>Weight</Text>
-                        <Text style={styles.goalValue}>{profileData.goalWeight} kg</Text>
+                        <Text style={styles.goalValue}>
+                            {formatWeight(profileData.goalWeight, isImperialUnits)}
+                        </Text>
                     </View>
                     <View style={styles.goalSubItem}>
                         <Text style={styles.goalSubtext}>{profileData.weeklyGoal}</Text>

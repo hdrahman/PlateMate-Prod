@@ -14,6 +14,7 @@ import {
   updateUserProfile,
   getUserBMRData
 } from '../utils/database';
+import { formatWeight, parseUnitPreference, kgToLbs } from '../utils/unitConversion';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import { useFoodLog } from '../context/FoodLogContext';
 import { subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from '../utils/databaseWatcher';
@@ -122,6 +123,7 @@ interface WeightModalProps {
   onChangeText: (text: string) => void;
   onCancel: () => void;
   onSave: () => void;
+  isImperialUnits: boolean;
 }
 
 const WeightModal = React.memo<WeightModalProps>(({
@@ -129,7 +131,8 @@ const WeightModal = React.memo<WeightModalProps>(({
   newWeight,
   onChangeText,
   onCancel,
-  onSave
+  onSave,
+  isImperialUnits
 }) => {
   const inputRef = useRef<TextInput>(null);
 
@@ -193,11 +196,11 @@ const WeightModal = React.memo<WeightModalProps>(({
               style={[styles.weightInput, inputDynamicStyle]}
               value={newWeight}
               onChangeText={onChangeText}
-              placeholder="Enter weight in kg"
+              placeholder={`Enter weight in ${isImperialUnits ? 'lbs' : 'kg'}`}
               keyboardType="numeric"
               placeholderTextColor="rgba(150, 150, 150, 0.6)"
             />
-            <Text style={unitLabelStyle}>kg</Text>
+            <Text style={unitLabelStyle}>{isImperialUnits ? 'lbs' : 'kg'}</Text>
           </View>
           <View style={styles.modalButtons}>
             <TouchableOpacity
@@ -345,6 +348,9 @@ export default function Home() {
   const [showTodayWeight, setShowTodayWeight] = useState(false);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
 
+  // Add state for unit preference
+  const [isImperialUnits, setIsImperialUnits] = useState(false);
+
   // Add state for cheat day data
   const [cheatDayData, setCheatDayData] = useState<CheatDayProgress>({
     daysCompleted: 0,
@@ -396,6 +402,10 @@ export default function Home() {
             gender: profile.gender,
             activity_level: profile.activity_level
           });
+
+          // Parse and set unit preference
+          const useMetric = parseUnitPreference(profile);
+          setIsImperialUnits(!useMetric);
 
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
@@ -743,11 +753,20 @@ export default function Home() {
     if (!user || !newWeight) return;
 
     try {
-      const weightValue = parseFloat(newWeight);
+      let weightValue = parseFloat(newWeight);
 
       if (isNaN(weightValue) || weightValue <= 0) {
         Alert.alert('Invalid Weight', 'Please enter a valid weight value.');
         return;
+      }
+
+      // Store the display value for the success message
+      const displayWeight = weightValue;
+      const displayUnit = isImperialUnits ? 'lbs' : 'kg';
+
+      // Convert to kg if user is using imperial units (backend always stores in kg)
+      if (isImperialUnits) {
+        weightValue = Math.round((weightValue / 2.20462) * 10) / 10; // Convert lbs to kg
       }
 
       // Get the current user profile
@@ -804,7 +823,7 @@ export default function Home() {
       // Success message with feedback
       Alert.alert(
         'Weight Updated',
-        `Your weight has been updated to ${weightValue} kg.`,
+        `Your weight has been updated to ${displayWeight} ${displayUnit}.`,
         [{ text: 'OK' }],
         { cancelable: true }
       );
@@ -816,7 +835,7 @@ export default function Home() {
       console.error('Error adding weight entry:', error);
       Alert.alert('Error', 'Failed to add weight entry. Please try again.');
     }
-  }, [user, newWeight, startingWeight, weightHistory]);
+  }, [user, newWeight, startingWeight, weightHistory, isImperialUnits]);
 
   // Memoized callbacks for WeightModal to prevent unnecessary re-renders
   const handleWeightChange = useCallback((text: string) => {
@@ -972,16 +991,24 @@ export default function Home() {
             )}
           </View>
           <View style={styles.weightLabelsContainer}>
-            <Text style={styles.weightLabel}>{startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : '--')} kg</Text>
+            <Text style={styles.weightLabel}>
+              {startingWeight
+                ? formatWeight(startingWeight, isImperialUnits)
+                : (weightHistory.length > 0
+                    ? formatWeight(weightHistory[0].weight, isImperialUnits)
+                    : '--')}
+            </Text>
             <Text style={[
               styles.burnDetails,
               !isAlignedWithGoal && styles.burnDetailsGain // Apply red style if not aligned with goal
             ]}>
               {weightLost >= 0
-                ? `${Math.abs(weightLost)} Kilograms Lost!`
-                : `${Math.abs(weightLost)} Kilograms Gained!`}
+                ? `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Lost!`
+                : `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Gained!`}
             </Text>
-            <Text style={styles.weightLabel}>{targetWeight ? `${targetWeight} kg` : '---'}</Text>
+            <Text style={styles.weightLabel}>
+              {targetWeight ? formatWeight(targetWeight, isImperialUnits) : '---'}
+            </Text>
           </View>
         </View>
       </GradientBorderCard>
@@ -1672,6 +1699,7 @@ export default function Home() {
         onChangeText={handleWeightChange}
         onCancel={handleModalCancel}
         onSave={handleModalSave}
+        isImperialUnits={isImperialUnits}
       />
       <WelcomePremiumModal
         visible={showWelcomeModal}
