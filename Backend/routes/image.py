@@ -5,6 +5,7 @@ import json
 import time
 import traceback
 import asyncio
+import logging
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
 from datetime import datetime
@@ -13,12 +14,13 @@ from openai import AsyncOpenAI
 from auth.supabase_auth import get_current_user
 from PIL import Image
 from pillow_heif import register_heif_opener
+from services.ai_limiter import ai_limiter
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 # Register HEIF opener with Pillow to enable HEIC/HEIF support
 register_heif_opener()
-
-# Toggle between mock and real API
-USE_MOCK_API = False  # Set to False to use the real OpenAI API
 
 # Load environment variables
 load_dotenv()
@@ -29,18 +31,18 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Initialize OpenAI Client with API key from environment
 try:
     if not OPENAI_API_KEY:
-        print("❌ OPENAI_API_KEY not found in environment variables")
-        print("❌ OpenAI functionality will not work")
+        logger.error("OPENAI_API_KEY not found in environment variables")
+        logger.error("OpenAI functionality will not work")
         client = None
     elif not OPENAI_API_KEY.startswith('sk-'):
-        print("❌ Invalid OpenAI API key format")
-        print("❌ OpenAI functionality will not work")
+        logger.error("Invalid OpenAI API key format")
+        logger.error("OpenAI functionality will not work")
         client = None
     else:
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        print("✅ OpenAI Async API client initialized successfully")
+        logger.info("OpenAI Async API client initialized successfully")
 except Exception as e:
-    print(f"❌ Failed to initialize OpenAI Async client: {e}")
+    logger.error(f"Failed to initialize OpenAI Async client: {e}")
     client = None
 
 router = APIRouter()
@@ -331,7 +333,25 @@ async def upload_image(
         overall_start_time = time.time()
         print(f"📸 Processing image upload from user {user_id}")
         print(f"✅ Upload limit validation passed: {upload_validation.get('reason', 'unknown')}")
-        
+
+        # Validate image file size (max 20MB to prevent memory exhaustion)
+        MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
+        await image.seek(0, 2)  # Seek to end to get file size
+        file_size = image.file.tell()
+        await image.seek(0)  # Reset to beginning
+
+        if file_size > MAX_IMAGE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Image file too large. Maximum size is 20MB, uploaded file is {file_size / (1024*1024):.1f}MB. Please compress the image and try again."
+            )
+
+        if file_size < 100:  # Suspiciously small file
+            raise HTTPException(
+                status_code=400,
+                detail="Image file appears to be corrupted or empty. Please try uploading a different image."
+            )
+
         # Encode image directly from upload (in-memory, no disk I/O)
         image_base64 = None
         image_mime_type = None
@@ -512,8 +532,9 @@ IMPORTANT REMINDERS:
                 
                 return response.choices[0].message.content.strip()
 
-            # Analyze the image
-            gpt_response = await analyze_food_image(image_base64, image_mime_type)
+            # Analyze the image with AI operation limiting to prevent resource exhaustion
+            async with ai_limiter.limit("OpenAI image analysis"):
+                gpt_response = await analyze_food_image(image_base64, image_mime_type)
             print(f"📝 GPT-4 Vision Response: {gpt_response}")
             
             # Parse the response
@@ -618,7 +639,37 @@ async def upload_multiple_images(
             print(f"📝 User provided additional context: {', '.join(context_provided)}")
         else:
             print("📝 No additional context provided by user")
-        
+
+        # Validate each image file size before processing
+        MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB per image
+        MAX_TOTAL_SIZE = 50 * 1024 * 1024  # 50MB total for all images
+        total_size = 0
+
+        for i, image in enumerate(images):
+            await image.seek(0, 2)
+            file_size = image.file.tell()
+            await image.seek(0)
+
+            if file_size > MAX_IMAGE_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Image {i+1} is too large ({file_size / (1024*1024):.1f}MB). Maximum size per image is 20MB."
+                )
+
+            if file_size < 100:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Image {i+1} appears to be corrupted or empty."
+                )
+
+            total_size += file_size
+
+        if total_size > MAX_TOTAL_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Total size of all images ({total_size / (1024*1024):.1f}MB) exceeds maximum of 50MB. Please reduce the number or size of images."
+            )
+
         # Encode all images directly from uploads (in-memory, no disk I/O)
         encoding_start_time = time.time()
         encoded_images = []  # Will store tuples of (base64_string, mime_type)
@@ -695,37 +746,38 @@ USER PROVIDED CONTEXT:
 Use this context to guide identification and portion estimation. If the user provided a food name, quantity, or brand, factor that into your analysis.
 """
             
-            # Real API call with retry logic for reliability
+            # Real API call with retry logic for reliability, wrapped in AI limiter to prevent resource exhaustion
             api_start_time = time.time()
-            
+
             # Retry configuration
             max_retries = 3
             retry_delay = 1.0  # Start with 1 second
             models_to_try = ["gpt-4o", "gpt-5-2025-08-07"]  # Fallback to GPT-5 if needed
-            
+
             response = None
             last_error = None
             successful_model = None
-            
-            for model_idx, model in enumerate(models_to_try):
-                retries_for_this_model = max_retries if model_idx == 0 else 2  # Retry fallback model too
-                
-                for attempt in range(retries_for_this_model):
-                    try:
-                        if attempt > 0:
-                            print(f"🔄 Retry attempt {attempt + 1}/{retries_for_this_model} with {model} after {retry_delay}s delay...")
-                            await asyncio.sleep(retry_delay)
-                            retry_delay *= 2  # Exponential backoff
-                        
-                        if model_idx > 0 and attempt == 0:
-                            print(f"🔀 Falling back to {model} model...")
-                        
-                        response = await client.chat.completions.create(
-                            model=model,
-                            messages=[
-                                {
-                                    "role": "system",
-                                    "content": f"""You are a professional nutritionist and food analysis expert. Analyze food images with scientific precision and mathematical accuracy.
+
+            async with ai_limiter.limit("OpenAI multiple image analysis"):
+                for model_idx, model in enumerate(models_to_try):
+                    retries_for_this_model = max_retries if model_idx == 0 else 2  # Retry fallback model too
+
+                    for attempt in range(retries_for_this_model):
+                        try:
+                            if attempt > 0:
+                                print(f"🔄 Retry attempt {attempt + 1}/{retries_for_this_model} with {model} after {retry_delay}s delay...")
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2  # Exponential backoff
+
+                            if model_idx > 0 and attempt == 0:
+                                print(f"🔀 Falling back to {model} model...")
+
+                            response = await client.chat.completions.create(
+                                model=model,
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": f"""You are a professional nutritionist and food analysis expert. Analyze food images with scientific precision and mathematical accuracy.
 
 IMPORTANT CONTEXT: This is a nutrition tracking app analyzing user meal photos. Background items (water bottles, sauce containers, utensils, table surfaces) are normal context for food photography. Focus ONLY on identifying and analyzing the food items on the plate.
 
@@ -859,65 +911,65 @@ IMPORTANT REMINDERS:
 • Be objective; use standardized nutritional data and realistic oil/sauce additions.
 • Enforce the calories ≈ 4/4/9 macro check internally.
 • Output ONLY the JSON array—no other text."""
-                                },
-                                {
-                                    "role": "user",
-                                    "content": content
-                                }
-                            ],
-                            max_tokens=4000,
-                            temperature=0  # Zero temperature for maximum determinism
-                        )
-                        
-                        # Check if response is valid (not a refusal)
-                        response_content = response.choices[0].message.content
-                        
-                        # Check for refusal indicators
-                        refusal_indicators = [
-                            "I'm sorry, I can't assist",
-                            "I cannot identify", 
-                            "I'm not able to",
-                            "I can't analyze",
-                            "unable to identify",
-                            "cannot analyze",
-                            "not able to provide"
-                        ]
-                        
-                        response_lower = response_content.lower()
-                        is_refusal = any(indicator.lower() in response_lower for indicator in refusal_indicators)
-                        
-                        if is_refusal:
-                            # This is a refusal, not a success - raise to trigger retry
-                            raise ValueError(f"OpenAI content policy refusal: {response_content[:100]}")
-                        
-                        # Success! Break out of retry loop
-                        successful_model = model
-                        print(f"✅ Successfully analyzed with {model} on attempt {attempt + 1}")
+                                    },
+                                    {
+                                        "role": "user",
+                                        "content": content
+                                    }
+                                ],
+                                max_tokens=4000,
+                                temperature=0  # Zero temperature for maximum determinism
+                            )
+
+                            # Check if response is valid (not a refusal)
+                            response_content = response.choices[0].message.content
+
+                            # Check for refusal indicators
+                            refusal_indicators = [
+                                "I'm sorry, I can't assist",
+                                "I cannot identify",
+                                "I'm not able to",
+                                "I can't analyze",
+                                "unable to identify",
+                                "cannot analyze",
+                                "not able to provide"
+                            ]
+
+                            response_lower = response_content.lower()
+                            is_refusal = any(indicator.lower() in response_lower for indicator in refusal_indicators)
+
+                            if is_refusal:
+                                # This is a refusal, not a success - raise to trigger retry
+                                raise ValueError(f"OpenAI content policy refusal: {response_content[:100]}")
+
+                            # Success! Break out of retry loop
+                            successful_model = model
+                            print(f"✅ Successfully analyzed with {model} on attempt {attempt + 1}")
+                            break
+
+                        except ValueError as e:
+                            # Content policy refusal - can retry
+                            last_error = e
+                            print(f"⚠️ Attempt {attempt + 1} with {model} failed: {str(e)[:100]}")
+                            if attempt < retries_for_this_model - 1:
+                                continue  # Retry this model
+                            else:
+                                print(f"❌ All retries exhausted for {model}")
+                                break  # Try next model
+
+                        except Exception as e:
+                            # API error - can retry
+                            last_error = e
+                            print(f"⚠️ API error on attempt {attempt + 1} with {model}: {str(e)[:100]}")
+                            if attempt < retries_for_this_model - 1:
+                                continue  # Retry this model
+                            else:
+                                print(f"❌ All retries exhausted for {model}")
+                                break  # Try next model
+
+                    # If we got a successful response, break out of model loop
+                    if response and successful_model:
                         break
-                        
-                    except ValueError as e:
-                        # Content policy refusal - can retry
-                        last_error = e
-                        print(f"⚠️ Attempt {attempt + 1} with {model} failed: {str(e)[:100]}")
-                        if attempt < retries_for_this_model - 1:
-                            continue  # Retry this model
-                        else:
-                            print(f"❌ All retries exhausted for {model}")
-                            break  # Try next model
-                    
-                    except Exception as e:
-                        # API error - can retry
-                        last_error = e
-                        print(f"⚠️ API error on attempt {attempt + 1} with {model}: {str(e)[:100]}")
-                        if attempt < retries_for_this_model - 1:
-                            continue  # Retry this model
-                        else:
-                            print(f"❌ All retries exhausted for {model}")
-                            break  # Try next model
-                
-                # If we got a successful response, break out of model loop
-                if response and successful_model:
-                    break
             
             # If all retries and fallbacks failed, raise error
             if not response or not successful_model:

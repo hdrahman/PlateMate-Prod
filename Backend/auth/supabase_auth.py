@@ -30,10 +30,19 @@ def get_supabase_jwt_secret():
     """Get Supabase JWT secret from environment or fetch from Supabase"""
     if SUPABASE_JWT_SECRET:
         return SUPABASE_JWT_SECRET
-    
-    # For development, you can use the anon key as secret
-    # In production, use the proper JWT secret from Supabase dashboard
-    return os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5veWlldXdiaGFsYm1kbnRveG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDIxNDQsImV4cCI6MjA2NjI3ODE0NH0.OwnfpOt6LhXv7sWQoF56I619sLSOS0pKLjGxsDyc7rA")
+
+    # Try to get anon key as fallback for development
+    # WARNING: In production, SUPABASE_JWT_SECRET must be set!
+    anon_key = os.getenv("SUPABASE_ANON_KEY")
+    if anon_key:
+        logger.warning("Using SUPABASE_ANON_KEY as fallback for JWT secret - set SUPABASE_JWT_SECRET in production!")
+        return anon_key
+
+    # Fail loudly if no credentials are available
+    raise ValueError(
+        "CRITICAL: No Supabase JWT secret configured! "
+        "Set SUPABASE_JWT_SECRET or SUPABASE_ANON_KEY environment variable."
+    )
 
 
 def get_redis_client():

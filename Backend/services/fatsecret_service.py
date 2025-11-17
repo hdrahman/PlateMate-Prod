@@ -1,5 +1,4 @@
 import os
-import requests
 import logging
 import json
 import time
@@ -63,56 +62,59 @@ class FatSecretService:
             self._load_credentials()
         return self.is_configured
     
-    def _get_access_token(self) -> Optional[str]:
+    async def _get_access_token(self) -> Optional[str]:
         """Get a valid access token, refreshing if necessary"""
         if not self._ensure_configured():
             return None
-            
+
         # Check if current token is still valid (with 5 minute buffer)
         if self._access_token and time.time() < (self._token_expires_at - 300):
             return self._access_token
-        
+
         try:
             # Prepare Basic Auth header
             credentials = f"{self.client_id}:{self.client_secret}"
             encoded_credentials = base64.b64encode(credentials.encode()).decode()
-            
+
             headers = {
                 'Authorization': f'Basic {encoded_credentials}',
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-            
+
             # Request the barcode scope for barcode scanning functionality
             data = {
                 'grant_type': 'client_credentials',
                 'scope': 'basic premier barcode'  # Including barcode scope for barcode scanning
             }
-            
+
             logger.info(f"Requesting OAuth token with client_id: {self.client_id}")
-            response = requests.post(self.oauth_url, headers=headers, data=data, timeout=15)
-            
+
+            # Use async httpx instead of sync requests
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(self.oauth_url, headers=headers, data=data)
+
             if response.status_code != 200:
                 logger.error(f"OAuth token request failed: {response.status_code} - {response.text}")
                 return None
-                
+
             token_data = response.json()
             self._access_token = token_data['access_token']
             expires_in = token_data.get('expires_in', 86400)  # Default 24 hours
             self._token_expires_at = time.time() + expires_in
-            
+
             logger.debug(f"Successfully obtained FatSecret access token, expires in {expires_in} seconds")
             return self._access_token
-            
-        except requests.exceptions.RequestException as e:
+
+        except httpx.HTTPError as e:
             logger.error(f'Error getting FatSecret access token: {e}')
             return None
         except Exception as e:
             logger.error(f'Unexpected error getting FatSecret access token: {e}')
             return None
     
-    def _make_request(self, method: str, endpoint: str, params: Dict = None) -> Optional[Dict]:
+    async def _make_request(self, method: str, endpoint: str, params: Dict = None) -> Optional[Dict]:
         """Make an authenticated request to FatSecret API"""
-        access_token = self._get_access_token()
+        access_token = await self._get_access_token()
         if not access_token:
             logger.error("Could not obtain access token")
             return None
@@ -123,42 +125,44 @@ class FatSecretService:
         }
         
         url = f"{self.base_url}/{endpoint}"
-        
+
         try:
-            if method.upper() == 'GET':
-                response = requests.get(url, params=params, headers=headers, timeout=15)
-            elif method.upper() == 'POST':
-                response = requests.post(url, json=params, headers=headers, timeout=15)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
-                
+            # Use async httpx instead of sync requests
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                if method.upper() == 'GET':
+                    response = await client.get(url, params=params, headers=headers)
+                elif method.upper() == 'POST':
+                    response = await client.post(url, json=params, headers=headers)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
+
             logger.debug(f"API request to {endpoint}: {response.status_code}")
-            
-            if response.status_code == 200:
+
+            if response.status_code != 200:
                 logger.error(f"API request failed: {response.status_code} - {response.text}")
                 return None
-                
+
             response_data = response.json()
-            
+
             # Check for FatSecret API errors
             if 'error' in response_data:
                 error_code = response_data['error'].get('code')
                 error_message = response_data['error'].get('message')
                 logger.error(f"FatSecret API error {error_code}: {error_message}")
-                
+
                 # Handle specific error cases
                 if error_code == 21:  # IP address error
                     logger.error("IP address not whitelisted.")
                     self._api_available = False
                     return None
-                    
+
                 return None
-            
+
             # API is working
             self._api_available = True
             return response_data
-            
-        except requests.exceptions.RequestException as e:
+
+        except httpx.HTTPError as e:
             logger.error(f'Error making FatSecret API request to {endpoint}: {e}')
             return None
         except Exception as e:

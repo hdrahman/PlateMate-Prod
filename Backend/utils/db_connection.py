@@ -10,9 +10,13 @@ from supabase.client import ClientOptions
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://noyieuwbhalbmdntoxoj.supabase.co")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # Service role key for server-side operations
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5veWlldXdiaGFsYm1kbnRveG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDIxNDQsImV4cCI6MjA2NjI3ODE0NH0.OwnfpOt6LhXv7sWQoF56I619sLSOS0pKLjGxsDyc7rA")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+
+# Validate required environment variables
+if not SUPABASE_URL:
+    raise ValueError("CRITICAL: SUPABASE_URL environment variable not set!")
 
 # Global Supabase client instance
 _supabase_client: Optional[Client] = None
@@ -26,7 +30,13 @@ def get_supabase_client() -> Client:
     if _supabase_client is None:
         # Use service key if available, otherwise use anon key
         key = SUPABASE_SERVICE_KEY if SUPABASE_SERVICE_KEY else SUPABASE_ANON_KEY
-        
+
+        if not key:
+            raise ValueError(
+                "CRITICAL: No Supabase API key configured! "
+                "Set SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY environment variable."
+            )
+
         _supabase_client = create_client(
             SUPABASE_URL,
             key,
@@ -36,7 +46,7 @@ def get_supabase_client() -> Client:
                 schema="public",
             )
         )
-        
+
         logger.info(f"✅ Supabase client initialized with URL: {SUPABASE_URL}")
     
     return _supabase_client
@@ -61,26 +71,6 @@ async def test_connection() -> bool:
     except Exception as e:
         logger.error(f"❌ Database connection test failed: {e}")
         return False
-
-async def execute_query(query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Execute a raw SQL query (for compatibility with existing code)
-    Note: This is a simplified implementation. For production use, consider using
-    Supabase's table methods instead of raw SQL.
-    """
-    try:
-        client = await get_db_connection()
-        
-        # This is a placeholder implementation
-        # In practice, you would use Supabase's table methods or RPC calls
-        logger.warning("execute_query called with raw SQL - consider using Supabase table methods")
-        
-        # For now, return empty result
-        return {"data": [], "error": None}
-        
-    except Exception as e:
-        logger.error(f"❌ Query execution failed: {e}")
-        return {"data": None, "error": str(e)}
 
 # Compatibility functions for existing code
 async def get_user_subscription(user_id: str) -> Optional[Dict[str, Any]]:
