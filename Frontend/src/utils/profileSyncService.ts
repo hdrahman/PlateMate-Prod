@@ -5,7 +5,6 @@ import {
     updateUserProfile as updateLocalUserProfile,
     markUserProfileSynced
 } from './database';
-import { isOnline } from './syncService';
 import { supabase } from './supabaseClient';
 import { BACKEND_URL } from './config';
 

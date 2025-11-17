@@ -49,7 +49,6 @@ const PasswordRequirement: React.FC<{ text: string; met: boolean }> = ({ text, m
 
 const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, updateProfile, onNext }) => {
     const [firstName, setFirstName] = useState(profile.firstName || '');
-    const [lastName, setLastName] = useState(profile.lastName || '');
     const [email, setEmail] = useState(profile.email || '');
     const [age, setAge] = useState(profile.age?.toString() || '');
     const [password, setPassword] = useState('');
@@ -143,12 +142,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
 
     const handleEmailPasswordSignUp = async () => {
         if (!firstName.trim()) {
-            Alert.alert('Missing Information', 'Please enter your first name');
-            return;
-        }
-
-        if (!lastName.trim()) {
-            Alert.alert('Missing Information', 'Please enter your last name');
+            Alert.alert('Missing Information', 'Please enter your name');
             return;
         }
 
@@ -187,7 +181,6 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
             // Save user data to profile first
             await updateProfile({
                 firstName: firstName.trim(),
-                lastName: lastName.trim(),
                 email: email.trim(),
                 age: parseInt(age),
                 password: password,
@@ -195,8 +188,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
 
             // Create account immediately so user is authenticated for rest of onboarding
             // If they drop off, onboardingComplete flag will be false and we can redirect them back
-            // CRITICAL FIX: Pass display name to signUp so it's stored in Supabase Auth
-            const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
+            const displayName = firstName.trim();
             await signUp(email, password, displayName);
             console.log('✅ Account created with display name:', displayName);
 
@@ -264,29 +256,14 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                 {/* Form Fields */}
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>First Name</Text>
+                        <Text style={styles.label}>Name</Text>
                         <View style={styles.inputContainer}>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Enter your first name"
+                                placeholder="Enter your name"
                                 placeholderTextColor="#666"
                                 value={firstName}
                                 onChangeText={setFirstName}
-                                autoCapitalize="words"
-                                editable={!isLoading}
-                            />
-                        </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Last Name</Text>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter your last name"
-                                placeholderTextColor="#666"
-                                value={lastName}
-                                onChangeText={setLastName}
                                 autoCapitalize="words"
                                 editable={!isLoading}
                             />

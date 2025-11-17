@@ -29,6 +29,7 @@ import AccountCreationStep from '../components/onboarding/AccountCreationStep';
 import GoalsStep from '../components/onboarding/GoalsStep';
 import MotivationStep from '../components/onboarding/MotivationStep';
 import WeightChangeRateStep from '../components/onboarding/WeightChangeRateStep';
+import CheatDayStep from '../components/onboarding/CheatDayStep';
 import PhysicalAttributesStep from '../components/onboarding/PhysicalAttributesStep';
 import ActivityLevelStep from '../components/onboarding/ActivityLevelStep';
 import GenderStep from '../components/onboarding/GenderStep';
@@ -116,7 +117,7 @@ const Onboarding = () => {
                 return <AccountCreationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 3:
                 // Check if user signed in via social auth and is missing name/age
-                if (user && (!profile.firstName || !profile.lastName || !profile.age)) {
+                if (user && (!profile.firstName || !profile.age)) {
                     return <SocialSignInInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
                 }
                 return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
@@ -132,10 +133,14 @@ const Onboarding = () => {
                     />
                 );
             case 6:
-                return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <ActivityLevelStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 7:
-                return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+                return <CheatDayStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 8:
+                return <GenderStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 9:
+                return <PhysicalAttributesStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
+            case 10:
                 return <PredictiveInsightsStep profile={profile} updateProfile={updateProfile} onComplete={handleCompleteOnboarding} />;
             default:
                 // This case should ideally not be reached if totalSteps is accurate.
@@ -144,7 +149,7 @@ const Onboarding = () => {
         }
     };
 
-    const TOTAL_ONBOARDING_STEPS = 7; // Number of steps after the welcome screen (AccountCreation + Goals + Motivation + WeightChangeRate + Gender + PhysicalAttributes + PredictiveInsights)
+    const TOTAL_ONBOARDING_STEPS = 9; // Number of steps after the welcome screen (AccountCreation + Goals + Motivation + WeightChangeRate + ActivityLevel + CheatDay + Gender + PhysicalAttributes + PredictiveInsights)
 
     return (
         <SafeAreaView style={styles.container}>
@@ -154,7 +159,7 @@ const Onboarding = () => {
                 style={styles.background}
             />
             <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 20 : Math.max(insets.top, 20) }]}>
-                {currentStep > 1 && currentStep <= 8 && (
+                {currentStep > 1 && currentStep <= 9 && (
                     <View style={styles.progressContainer}>
                         {Array.from({ length: TOTAL_ONBOARDING_STEPS }).map((_, index) => {
                             // Adjust progress calculation for authenticated users starting at step 3
@@ -179,7 +184,7 @@ const Onboarding = () => {
                     </View>
                 )}
                 {/* Hide back button if user is authenticated and at step 3 (their first real step) */}
-                {currentStep > 1 && currentStep < 9 && !(user && user.id && currentStep === 3) && (
+                {currentStep > 1 && currentStep < 10 && !(user && user.id && currentStep === 3) && (
                     <TouchableOpacity
                         style={[styles.backButton, { top: Math.max(insets.top, 20) }]}
                         onPress={handleBack}
@@ -204,7 +209,7 @@ const Onboarding = () => {
                     ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 1 && currentStep < 9}
+                    scrollEnabled={currentStep > 1 && currentStep < 10}
                 >
                     {renderCurrentStep()}
                 </ScrollView>

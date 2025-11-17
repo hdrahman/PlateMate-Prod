@@ -44,7 +44,6 @@ interface OnboardingContextType {
 export interface UserProfile {
     // Basic info
     firstName: string;
-    lastName: string;
     email: string;
     // Optional password captured during onboarding for account creation
     password?: string | null;
@@ -139,7 +138,6 @@ export interface UserProfile {
 // Note: Unit preference fields are kept in sync using syncUnitPreferenceFields helper
 const defaultProfile: UserProfile = {
     firstName: '',
-    lastName: '',
     email: '',
     password: null,
     dateOfBirth: null,
@@ -190,7 +188,7 @@ const defaultProfile: UserProfile = {
 const OnboardingContext = createContext<OnboardingContextType>({
     onboardingComplete: false,
     currentStep: 1,
-    totalSteps: 8, // Welcome + AccountCreation + Goals + Motivation + WeightChangeRate + Gender + PhysicalAttributes + PredictiveInsights
+    totalSteps: 10, // Welcome + AccountCreation + Goals + Motivation + WeightChangeRate + ActivityLevel + CheatDay + Gender + PhysicalAttributes + PredictiveInsights
     profile: defaultProfile,
     updateProfile: async () => { },
     goToNextStep: () => { },
@@ -237,7 +235,6 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
 
     return {
         firstName: sqliteProfile.first_name || '',
-        lastName: sqliteProfile.last_name || '',
         email: sqliteProfile.email || '',
         password: sqliteProfile.password,
         dateOfBirth: sqliteProfile.date_of_birth,
@@ -304,7 +301,6 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         firebase_uid: firebaseUid,
         email: email,
         first_name: frontendProfile.firstName,
-        last_name: frontendProfile.lastName,
         date_of_birth: frontendProfile.dateOfBirth,
         location: frontendProfile.location,
         height: frontendProfile.height,
@@ -367,7 +363,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
     const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
     const [tempSessionId, setTempSessionId] = useState<string>('');
 
-    const totalSteps = 8; // WelcomeStep + AccountCreationStep + Goals + Motivation + WeightChangeRate + Gender + PhysicalAttributes + PredictiveInsights
+    const totalSteps = 10; // WelcomeStep + AccountCreationStep + Goals + Motivation + WeightChangeRate + ActivityLevel + CheatDay + Gender + PhysicalAttributes + PredictiveInsights
 
     // Initialize temp session ID on mount
     useEffect(() => {
@@ -638,7 +634,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             firebase_uid: authUser.id,  // Use passed user's ID (fresh from signUp)
             email: authUser.email || finalProfile.email,
             first_name: finalProfile.firstName || '',
-            last_name: finalProfile.lastName || '',
             height: finalProfile.height || null,
             weight: finalProfile.weight || null,
             age: finalProfile.age || null,
@@ -732,7 +727,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                 ...finalProfile,
                 // Convert snake_case to camelCase for the calculator
                 firstName: finalProfile.firstName,
-                lastName: finalProfile.lastName,
                 weight: finalProfile.weight,
                 height: finalProfile.height,
                 age: finalProfile.age,

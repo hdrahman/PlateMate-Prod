@@ -233,7 +233,7 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
     };
 
     const calculateSuccessRate = () => {
-        let baseRate = 80;
+        let baseRate = 90;
 
         if (profile.fitnessGoal === 'balanced') {
             baseRate += 5;
@@ -253,7 +253,7 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
             baseRate += 3;
         }
 
-        setSuccessRate(Math.min(Math.max(Math.round(baseRate), 75), 92));
+        setSuccessRate(Math.min(Math.max(Math.round(baseRate), 85), 97));
     };
 
     const generateMilestones = (weeks: number) => {

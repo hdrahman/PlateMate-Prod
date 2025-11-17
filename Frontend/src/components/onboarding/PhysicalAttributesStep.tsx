@@ -5,7 +5,6 @@ import {
     TouchableOpacity,
     StyleSheet,
     Alert,
-    ScrollView,
     Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -217,11 +216,7 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
 
     return (
         <View style={styles.container}>
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
+            <View style={styles.content}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Physical Attributes</Text>
                     <Text style={styles.subtitle}>
@@ -293,7 +288,7 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                         Your measurements help us calculate accurate nutrition goals and recommendations
                     </Text>
                 </View>
-            </ScrollView>
+            </View>
 
             <View style={styles.buttonContainer}>
                 <TouchableOpacity
@@ -449,17 +444,15 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
+        justifyContent: 'space-between',
     },
-    scrollView: {
+    content: {
         flex: 1,
-    },
-    scrollContent: {
         paddingTop: 20,
         paddingHorizontal: 20,
-        paddingBottom: 20,
     },
     header: {
-        marginBottom: 32,
+        marginBottom: 24,
         alignItems: 'center',
     },
     title: {
@@ -481,7 +474,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
         borderRadius: 12,
         padding: 3,
-        marginBottom: 32,
+        marginBottom: 20,
         alignSelf: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -506,10 +499,10 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     attributesSection: {
-        marginBottom: 32,
+        marginBottom: 20,
     },
     attributeGroup: {
-        marginBottom: 20,
+        marginBottom: 16,
     },
     attributeLabel: {
         fontSize: 16,

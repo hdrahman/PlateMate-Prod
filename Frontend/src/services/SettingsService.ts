@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationSettings, DataSharingSettings } from '../types/notifications';
+import supabaseAuth from '../utils/supabaseAuth';
+import { supabase } from '../utils/supabaseClient';
 
 class SettingsService {
     private static instance: SettingsService;
@@ -82,6 +84,44 @@ class SettingsService {
         return SettingsService.instance;
     }
 
+    // Helper method to sync settings to Supabase cloud backup
+    private async syncSettingsToCloud(settingsType: 'notification' | 'data_sharing' | 'privacy', data: any): Promise<void> {
+        try {
+            const currentUser = await supabaseAuth.getCurrentUser();
+            if (!currentUser) {
+                console.log('ℹ️ No user logged in, skipping cloud sync for settings');
+                return;
+            }
+
+            const fieldMap = {
+                'notification': 'notification_settings',
+                'data_sharing': 'data_sharing_settings',
+                'privacy': 'privacy_settings'
+            };
+
+            const fieldName = fieldMap[settingsType];
+            const updateData = {
+                firebase_uid: currentUser.id,
+                [fieldName]: data,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await supabase
+                .from('user_settings')
+                .upsert(updateData, { onConflict: 'firebase_uid' });
+
+            if (error) {
+                console.warn(`⚠️ Failed to sync ${settingsType} settings to cloud:`, error.message);
+                // Don't throw - settings are saved locally, cloud sync will happen later
+            } else {
+                console.log(`✅ ${settingsType} settings synced to cloud`);
+            }
+        } catch (error) {
+            console.warn(`⚠️ Error syncing ${settingsType} settings to cloud:`, error);
+            // Don't throw - settings are saved locally
+        }
+    }
+
     // Notification Settings Methods
     async getNotificationSettings(): Promise<NotificationSettings> {
         try {
@@ -92,15 +132,23 @@ class SettingsService {
                 // Handle migration for existing users who don't have snackTimes property
                 if (parsed.mealReminders && !parsed.mealReminders.snackTimes) {
                     parsed.mealReminders.snackTimes = this.defaultNotificationSettings.mealReminders.snackTimes;
-                    // Save the migrated settings
+                    // Save the migrated settings locally
                     await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
+                    // Non-blocking cloud sync
+                    this.syncSettingsToCloud('notification', parsed).catch(error => {
+                        console.warn('⚠️ Migration sync failed:', error);
+                    });
                 }
 
                 // Handle migration for existing users who don't have behavioral notifications
                 if (!parsed.behavioralNotifications) {
                     parsed.behavioralNotifications = this.defaultNotificationSettings.behavioralNotifications;
-                    // Save the migrated settings
+                    // Save the migrated settings locally
                     await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(parsed));
+                    // Non-blocking cloud sync
+                    this.syncSettingsToCloud('notification', parsed).catch(error => {
+                        console.warn('⚠️ Migration sync failed:', error);
+                    });
                 }
 
                 // Merge with defaults to ensure all properties exist
@@ -115,7 +163,14 @@ class SettingsService {
 
     async saveNotificationSettings(settings: NotificationSettings): Promise<void> {
         try {
+            // Save to local AsyncStorage
             await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+            console.log('✅ Notification settings saved (local)');
+
+            // DUAL-WRITE: Non-blocking cloud sync (fire-and-forget for better UX)
+            this.syncSettingsToCloud('notification', settings).catch(error => {
+                console.warn('⚠️ Background settings sync failed (will retry later):', error);
+            });
         } catch (error) {
             console.error('Error saving notification settings:', error);
             throw error;
@@ -143,8 +198,14 @@ class SettingsService {
             const lastPart = pathParts[pathParts.length - 1];
             current[lastPart] = value;
 
-            // Save the updated settings
+            // Save to local AsyncStorage
             await AsyncStorage.setItem(this.NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+            console.log('✅ Notification setting updated (local)');
+
+            // DUAL-WRITE: Non-blocking cloud sync (fire-and-forget for better UX)
+            this.syncSettingsToCloud('notification', settings).catch(error => {
+                console.warn('⚠️ Background settings sync failed (will retry later):', error);
+            });
 
             return settings;
         } catch (error) {
@@ -170,7 +231,14 @@ class SettingsService {
 
     async saveDataSharingSettings(settings: DataSharingSettings): Promise<void> {
         try {
+            // Save to local AsyncStorage
             await AsyncStorage.setItem(this.DATA_SHARING_SETTINGS_KEY, JSON.stringify(settings));
+            console.log('✅ Data sharing settings saved (local)');
+
+            // DUAL-WRITE: Non-blocking cloud sync (fire-and-forget for better UX)
+            this.syncSettingsToCloud('data_sharing', settings).catch(error => {
+                console.warn('⚠️ Background settings sync failed (will retry later):', error);
+            });
         } catch (error) {
             console.error('Error saving data sharing settings:', error);
             throw error;
@@ -197,7 +265,14 @@ class SettingsService {
 
     async savePrivacySettings(settings: any): Promise<void> {
         try {
+            // Save to local AsyncStorage
             await AsyncStorage.setItem(this.PRIVACY_SETTINGS_KEY, JSON.stringify(settings));
+            console.log('✅ Privacy settings saved (local)');
+
+            // DUAL-WRITE: Non-blocking cloud sync (fire-and-forget for better UX)
+            this.syncSettingsToCloud('privacy', settings).catch(error => {
+                console.warn('⚠️ Background settings sync failed (will retry later):', error);
+            });
         } catch (error) {
             console.error('Error saving privacy settings:', error);
             throw error;

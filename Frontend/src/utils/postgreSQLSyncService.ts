@@ -18,8 +18,6 @@ import {
     markUserProfileSynced,
     markWeightEntriesSynced,
     markStreakSynced,
-    getUserGoals,
-    updateUserGoals,
     updateUserProfile
 } from './database';
 import { AppState, AppStateStatus } from 'react-native';
@@ -27,14 +25,14 @@ import { subscribeToDatabaseChanges } from './databaseWatcher';
 import { getLastSyncTime, updateLastSyncTime } from './database';
 import { isLikelyOffline } from './networkUtils';
 
-const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+// REMOVED: Periodic sync is no longer needed with dual-write architecture
+// const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 export interface SyncStats {
     usersUploaded: number;
     foodLogsUploaded: number;
     weightsUploaded: number;
     streaksUploaded: number;
-    nutritionGoalsUploaded: number;
     subscriptionsUploaded: number;
     cheatDaySettingsUploaded: number;
     userSettingsUploaded: number;
@@ -53,7 +51,6 @@ export interface RestoreStats {
     foodLogsRestored: number;
     weightsRestored: number;
     streaksRestored: number;
-    nutritionGoalsRestored: number;
     subscriptionsRestored: number;
     cheatDaySettingsRestored: number;
     userSettingsRestored: number;
@@ -77,58 +74,56 @@ class PostgreSQLSyncService {
     private dbChangeUnsubscribe: (() => void) | null = null;
 
     constructor() {
-        this.setupEventDrivenSync();
-        // Listen for database changes so we know when local data mutated
-        this.dbChangeUnsubscribe = subscribeToDatabaseChanges(() => {
-            // Track a generic change and decide if we should sync
-            this.trackChange('user'); // type not important – just indicates change
-            this.maybeSyncAfterChange();
-        });
+        // REMOVED: No longer need event-driven sync with dual-write architecture
+        // this.setupEventDrivenSync();
+
+        // REMOVED: Database change subscription for sync is no longer needed
+        // Changes are immediately written to cloud with dual-write
+        // this.dbChangeUnsubscribe = subscribeToDatabaseChanges(() => {
+        //     this.trackChange('user');
+        //     this.maybeSyncAfterChange();
+        // });
+
+        console.log('✅ PostgreSQLSyncService initialized (restore-only mode)');
     }
 
-    // Setup event-driven sync instead of periodic sync
-    private setupEventDrivenSync() {
-        // Listen to app state changes
-        this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+    // REMOVED: No longer needed with dual-write architecture
+    // private setupEventDrivenSync() {
+    //     this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+    //     if (this.syncIntervalId) {
+    //         clearInterval(this.syncIntervalId);
+    //         this.syncIntervalId = null;
+    //     }
+    // }
 
-        // Remove any leftover periodic sync
-        if (this.syncIntervalId) {
-            clearInterval(this.syncIntervalId);
-            this.syncIntervalId = null;
-        }
-    }
+    // REMOVED: No longer needed with dual-write architecture
+    // private handleAppStateChange(nextAppState: AppStateStatus) {
+    //     const wasActive = this.isAppActive;
+    //     this.isAppActive = nextAppState === 'active';
+    //     if (wasActive && nextAppState === 'background') {
+    //         this.checkAndPerformBackgroundSync();
+    //     }
+    // }
 
-    private handleAppStateChange(nextAppState: AppStateStatus) {
-        const wasActive = this.isAppActive;
-        this.isAppActive = nextAppState === 'active';
-
-        // If app is going to background and we have changes, check if we should sync
-        if (wasActive && nextAppState === 'background') {
-            this.checkAndPerformBackgroundSync();
-        }
-    }
-
-    private async checkAndPerformBackgroundSync() {
-        try {
-            const currentUser = await supabaseAuth.getCurrentUser();
-            if (!currentUser) return;
-
-            if (!(await this.hasUnsyncedChanges())) {
-                console.log('📱 No unsynced changes detected for background sync');
-                return;
-            }
-
-            if (!this.isIntervalElapsed()) {
-                console.log('📱 Background sync skipped – 6-hour interval not reached');
-                return;
-            }
-
-            console.log('📱 Background sync triggered');
-            await this.syncToPostgreSQL();
-        } catch (error) {
-            console.error('Error in background sync:', error);
-        }
-    }
+    // REMOVED: No longer needed with dual-write architecture
+    // private async checkAndPerformBackgroundSync() {
+    //     try {
+    //         const currentUser = await supabaseAuth.getCurrentUser();
+    //         if (!currentUser) return;
+    //         if (!(await this.hasUnsyncedChanges())) {
+    //             console.log('📱 No unsynced changes detected for background sync');
+    //             return;
+    //         }
+    //         if (!this.isIntervalElapsed()) {
+    //             console.log('📱 Background sync skipped – 6-hour interval not reached');
+    //             return;
+    //         }
+    //         console.log('📱 Background sync triggered');
+    //         await this.syncToPostgreSQL();
+    //     } catch (error) {
+    //         console.error('Error in background sync:', error);
+    //     }
+    // }
 
     private async isOnline(): Promise<boolean> {
         try {
@@ -138,31 +133,32 @@ class PostgreSQLSyncService {
         }
     }
 
-    private isIntervalElapsed(): boolean {
-        const now = Date.now();
-        if (!this.lastSyncTime) return true;
-        return (now - this.lastSyncTime.getTime()) >= SYNC_INTERVAL_MS;
-    }
+    // REMOVED: No longer needed with dual-write architecture
+    // private isIntervalElapsed(): boolean {
+    //     const now = Date.now();
+    //     if (!this.lastSyncTime) return true;
+    //     return (now - this.lastSyncTime.getTime()) >= SYNC_INTERVAL_MS;
+    // }
 
-    private async maybeSyncAfterChange(): Promise<void> {
-        if (this.isSyncing) return;
-        if (!(await this.hasUnsyncedChanges())) return;
-
-        if (!(await this.isOnline())) {
-            console.log('🚫 Device offline – marking sync as pending');
-            this.pendingSync = true;
-            await updateLastSyncTime('pending');
-            return;
-        }
-
-        if (this.isIntervalElapsed()) {
-            await this.syncToPostgreSQL();
-        } else {
-            console.log('⏳ Sync interval not yet elapsed – will sync later');
-            this.pendingSync = true;
-            await updateLastSyncTime('pending');
-        }
-    }
+    // REMOVED: No longer needed with dual-write architecture
+    // Changes are immediately written to cloud, no need to wait for interval
+    // private async maybeSyncAfterChange(): Promise<void> {
+    //     if (this.isSyncing) return;
+    //     if (!(await this.hasUnsyncedChanges())) return;
+    //     if (!(await this.isOnline())) {
+    //         console.log('🚫 Device offline – marking sync as pending');
+    //         this.pendingSync = true;
+    //         await updateLastSyncTime('pending');
+    //         return;
+    //     }
+    //     if (this.isIntervalElapsed()) {
+    //         await this.syncToPostgreSQL();
+    //     } else {
+    //         console.log('⏳ Sync interval not yet elapsed – will sync later');
+    //         this.pendingSync = true;
+    //         await updateLastSyncTime('pending');
+    //     }
+    // }
 
     // Load metadata at app start
     private async loadMeta(): Promise<void> {
@@ -178,44 +174,27 @@ class PostgreSQLSyncService {
     }
 
     public async initializeOnAppLaunch(): Promise<void> {
-        await this.loadMeta();
-
-        const currentUser = await supabaseAuth.getCurrentUser();
-        if (!currentUser) return;
-
-        // If user has no backup yet, push immediately
-        const postgresUserId = await this.getPostgreSQLUserId(currentUser.id);
-        if (!postgresUserId) {
-            console.log('📤 No remote backup detected – pushing initial backup');
-            await this.syncToPostgreSQL();
-            return;
-        }
-
-        // If pending or interval elapsed with changes, attempt sync
-        if (this.pendingSync && (await this.hasUnsyncedChanges())) {
-            await this.syncToPostgreSQL();
-            return;
-        }
-
-        if (await this.hasUnsyncedChanges() && this.isIntervalElapsed()) {
-            await this.syncToPostgreSQL();
-        }
+        // REMOVED: Periodic sync logic - dual-write handles immediate cloud backup
+        // With dual-write architecture, data is immediately written to cloud
+        // This method is no longer needed but kept for potential future use
+        console.log('ℹ️ Sync service initialized (dual-write mode - no periodic sync needed)');
     }
 
-    // Track changes to specific data types
-    public trackChange(dataType: 'user' | 'foodlog' | 'weight' | 'streak' | 'goals' | 'subscription' | 'cheatday') {
-        this.changeTracker.add(dataType);
-        console.log(`📝 Change tracked: ${dataType}`);
-    }
+    // REMOVED: No longer needed with dual-write architecture
+    // Changes are immediately written to cloud, no need to track them
+    // public trackChange(dataType: 'user' | 'foodlog' | 'weight' | 'streak' | 'goals' | 'subscription' | 'cheatday') {
+    //     this.changeTracker.add(dataType);
+    //     console.log(`📝 Change tracked: ${dataType}`);
+    // }
 
-    // Clear change tracking for specific data type
-    public clearChangeTracking(dataType?: string) {
-        if (dataType) {
-            this.changeTracker.delete(dataType);
-        } else {
-            this.changeTracker.clear();
-        }
-    }
+    // REMOVED: No longer needed with dual-write architecture
+    // public clearChangeTracking(dataType?: string) {
+    //     if (dataType) {
+    //         this.changeTracker.delete(dataType);
+    //     } else {
+    //         this.changeTracker.clear();
+    //     }
+    // }
 
     // Remove the old periodic sync method
     private async checkAndPerformSync() {
@@ -291,7 +270,6 @@ class PostgreSQLSyncService {
                     foodLogsUploaded: 0,
                     weightsUploaded: 0,
                     streaksUploaded: 0,
-                    nutritionGoalsUploaded: 0,
                     subscriptionsUploaded: 0,
                     cheatDaySettingsUploaded: 0,
                     userSettingsUploaded: 0,
@@ -309,7 +287,6 @@ class PostgreSQLSyncService {
             foodLogsUploaded: 0,
             weightsUploaded: 0,
             streaksUploaded: 0,
-            nutritionGoalsUploaded: 0,
             subscriptionsUploaded: 0,
             cheatDaySettingsUploaded: 0,
             userSettingsUploaded: 0,
@@ -337,7 +314,10 @@ class PostgreSQLSyncService {
             // 4. Sync Subscriptions
             await this.syncSubscriptions(currentUser.id, stats, errors);
 
-            // 5. Sync User Settings (includes AsyncStorage: streaks, daily goals, notifications, privacy)
+            // 5. Sync User Streaks to user_streaks table
+            await this.syncUserStreaks(currentUser.id, stats, errors);
+
+            // 6. Sync User Settings (includes AsyncStorage: streaks, daily goals, notifications, privacy)
             await this.syncUserSettings(currentUser.id, stats, errors);
 
             this.lastSyncTime = new Date();
@@ -665,61 +645,6 @@ class PostgreSQLSyncService {
         }
     }
 
-    private async syncNutritionGoals(firebaseUid: string, stats: SyncStats, errors: string[]) {
-        try {
-            const goals = await getUserGoals(firebaseUid);
-            if (!goals) return;
-
-            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
-            if (!postgresUserId) {
-                errors.push('Cannot sync nutrition goals: User not found in PostgreSQL');
-                return;
-            }
-
-            const goalData = {
-                user_id: postgresUserId,
-                target_weight: goals.targetWeight ? Number(goals.targetWeight) : null,
-                daily_calorie_goal: Number(goals.calorieGoal || 2000),
-                protein_goal: Number(goals.proteinGoal || 150),
-                carb_goal: Number(goals.carbGoal || 250),
-                fat_goal: Number(goals.fatGoal || 65),
-                weight_goal: this.mapFitnessGoalToWeightGoal(goals.fitnessGoal),
-                activity_level: String(goals.activityLevel || 'moderate'),
-                updated_at: new Date().toISOString()
-            };
-
-            // Check if nutrition goals exist
-            const { data: existingGoals } = await supabase
-                .from('nutrition_goals')
-                .select('id')
-                .eq('firebase_uid', firebaseUid)
-                .single();
-
-            if (existingGoals) {
-                // Update existing goals
-                const { error } = await supabase
-                    .from('nutrition_goals')
-                    .update(goalData)
-                    .eq('firebase_uid', firebaseUid);
-
-                if (error) throw error;
-            } else {
-                // Insert new goals
-                const { error } = await supabase
-                    .from('nutrition_goals')
-                    .insert(goalData);
-
-                if (error) throw error;
-            }
-
-            stats.nutritionGoalsUploaded++;
-
-        } catch (error: any) {
-            console.error('Error syncing nutrition goals:', error);
-            errors.push(`Nutrition goals sync error: ${error.message}`);
-        }
-    }
-
     private async syncSubscriptions(firebaseUid: string, stats: SyncStats, errors: string[]) {
         try {
             const subscription = await getSubscriptionStatus(firebaseUid);
@@ -892,7 +817,6 @@ class PostgreSQLSyncService {
             foodLogsRestored: 0,
             weightsRestored: 0,
             streaksRestored: 0,
-            nutritionGoalsRestored: 0,
             subscriptionsRestored: 0,
             cheatDaySettingsRestored: 0,
             userSettingsRestored: 0,
@@ -918,16 +842,22 @@ class PostgreSQLSyncService {
             // 1. Restore User Profile (includes goals and cheat day settings)
             await this.restoreUserProfile(currentUser.id, postgresUserId, stats, errors);
 
-            // 2. Restore Food Logs
+            // 2. Restore Cheat Day Settings
+            await this.restoreCheatDaySettings(currentUser.id, postgresUserId, stats, errors);
+
+            // 3. Restore Food Logs
             await this.restoreFoodLogs(currentUser.id, postgresUserId, stats, errors);
 
-            // 3. Restore Weight Entries
+            // 4. Restore Weight Entries
             await this.restoreWeightEntries(currentUser.id, postgresUserId, stats, errors);
 
-            // 4. Restore Subscriptions
+            // 5. Restore Subscriptions
             await this.restoreSubscriptions(currentUser.id, postgresUserId, stats, errors);
 
-            // 5. Restore User Settings (includes AsyncStorage: streaks, daily goals, notifications, privacy)
+            // 6. Restore User Streaks from user_streaks table
+            await this.restoreUserStreaks(currentUser.id, postgresUserId, stats, errors);
+
+            // 7. Restore User Settings (includes AsyncStorage: streaks, daily goals, notifications, privacy)
             await this.restoreUserSettings(currentUser.id, postgresUserId, stats, errors);
 
             stats.totalErrors = errors.length;
@@ -1069,59 +999,6 @@ class PostgreSQLSyncService {
         }
     }
 
-    private async restoreNutritionGoals(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
-        try {
-            console.log('🔄 Attempting to restore nutrition goals for user:', firebaseUid);
-
-            const { data: goals, error } = await supabase
-                .from('nutrition_goals')
-                .select('*')
-                .eq('firebase_uid', firebaseUid)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    console.log('ℹ️ No nutrition goals found in PostgreSQL for user:', firebaseUid);
-                    return; // Goals don't exist
-                }
-                throw error;
-            }
-
-            console.log('✅ Found nutrition goals in PostgreSQL:', {
-                targetWeight: goals.target_weight,
-                calorieGoal: goals.daily_calorie_goal,
-                proteinGoal: goals.protein_goal
-            });
-
-            const existingGoals = await getUserGoals(firebaseUid);
-            console.log('📋 Existing local goals:', existingGoals ? 'Found' : 'Not found');
-
-            if (!existingGoals) {
-                // Create new goals
-                const goalData = {
-                    targetWeight: goals.target_weight,
-                    calorieGoal: goals.daily_calorie_goal,
-                    proteinGoal: goals.protein_goal,
-                    carbGoal: goals.carb_goal,
-                    fatGoal: goals.fat_goal,
-                    fitnessGoal: this.mapWeightGoalToFitnessGoal(goals.weight_goal),
-                    activityLevel: goals.activity_level
-                };
-
-                console.log('💾 Creating new local nutrition goals:', goalData);
-                await updateUserGoals(firebaseUid, goalData);
-                stats.nutritionGoalsRestored++;
-                console.log('✅ Nutrition goals restored successfully');
-            } else {
-                console.log('ℹ️ Local nutrition goals already exist, skipping restore');
-            }
-
-        } catch (error: any) {
-            console.error('❌ Error restoring nutrition goals:', error);
-            errors.push(`Nutrition goals restore error: ${error.message}`);
-        }
-    }
-
     private async restoreFoodLogs(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
             // Get local user profile to get the correct local user_id
@@ -1222,6 +1099,8 @@ class PostgreSQLSyncService {
 
     private async restoreUserStreaks(firebaseUid: string, postgresUserId: string, stats: RestoreStats, errors: string[]) {
         try {
+            console.log('🔄 Restoring user streaks from Supabase...');
+
             const { data: streak, error } = await supabase
                 .from('user_streaks')
                 .select('*')
@@ -1230,13 +1109,31 @@ class PostgreSQLSyncService {
 
             if (error) {
                 if (error.code === 'PGRST116') {
+                    console.log('ℹ️ No streak data found in Supabase - will initialize fresh');
                     return; // Streak doesn't exist
                 }
                 throw error;
             }
 
-            // Update streak will create if it doesn't exist
+            console.log('✅ Found streak data in Supabase:', {
+                current_streak: streak.current_streak,
+                longest_streak: streak.longest_streak,
+                last_activity_date: streak.last_activity_date
+            });
+
+            // Restore to AsyncStorage
+            const streakData = [{
+                currentStreak: streak.current_streak || 0,
+                longestStreak: streak.longest_streak || 0,
+                lastActivityDate: streak.last_activity_date || new Date().toISOString().split('T')[0]
+            }];
+            await AsyncStorage.setItem('user_streaks', JSON.stringify(streakData));
+            console.log('✅ Restored streak data to AsyncStorage');
+
+            // Also update SQLite database
             await checkAndUpdateStreak(firebaseUid);
+            console.log('✅ Restored streak data to SQLite');
+
             stats.streaksRestored++;
 
         } catch (error: any) {
@@ -1398,77 +1295,44 @@ class PostgreSQLSyncService {
         return updates;
     }
 
-    // Helper method to map fitness goal to weight goal
-    private mapFitnessGoalToWeightGoal(fitnessGoal?: string): string {
-        const mapping: { [key: string]: string } = {
-            'lose': 'lose_0_5',
-            'gain': 'gain_0_5',
-            'fat_loss': 'lose_0_75',
-            'muscle_gain': 'gain_0_25',
-            'balanced': 'maintain',
-            'maintain': 'maintain'
-        };
+    // REMOVED: Manual sync trigger no longer needed with dual-write
+    // async triggerManualSync(): Promise<SyncResult> {
+    //     this.changeTracker.clear();
+    //     return this.syncToPostgreSQL();
+    // }
 
-        return mapping[fitnessGoal || ''] || 'maintain';
-    }
+    // REMOVED: Sync status no longer relevant with dual-write architecture
+    // getSyncStatus() {
+    //     return {
+    //         lastSyncTime: this.lastSyncTime,
+    //         isSyncing: this.isSyncing,
+    //         pendingChanges: Array.from(this.changeTracker),
+    //         isAppActive: this.isAppActive
+    //     };
+    // }
 
-    // Helper method to map weight goal back to fitness goal
-    private mapWeightGoalToFitnessGoal(weightGoal?: string): string {
-        const mapping: { [key: string]: string } = {
-            'lose_1': 'lose',
-            'lose_0_75': 'fat_loss',
-            'lose_0_5': 'lose',
-            'lose_0_25': 'lose',
-            'maintain': 'maintain',
-            'gain_0_25': 'muscle_gain',
-            'gain_0_5': 'gain'
-        };
+    // REMOVED: Auto-sync controls no longer needed with dual-write
+    // disableAutoSync() {
+    //     if (this.appStateSubscription) {
+    //         this.appStateSubscription?.remove();
+    //         this.appStateSubscription = null;
+    //     }
+    //     this.changeTracker.clear();
+    //     console.log('🔄 Auto-sync disabled');
+    // }
 
-        return mapping[weightGoal || ''] || 'maintain';
-    }
+    // REMOVED: Auto-sync controls no longer needed with dual-write
+    // enableAutoSync() {
+    //     if (!this.appStateSubscription) {
+    //         this.setupEventDrivenSync();
+    //     }
+    //     console.log('🔄 Auto-sync enabled');
+    // }
 
-    // Manual sync trigger
-    async triggerManualSync(): Promise<SyncResult> {
-        // Clear change tracking since we're doing manual sync
-        this.changeTracker.clear();
-        return this.syncToPostgreSQL();
-    }
-
-    getSyncStatus() {
-        return {
-            lastSyncTime: this.lastSyncTime,
-            isSyncing: this.isSyncing,
-            pendingChanges: Array.from(this.changeTracker),
-            isAppActive: this.isAppActive
-        };
-    }
-
-    disableAutoSync() {
-        if (this.appStateSubscription) {
-            this.appStateSubscription?.remove();
-            this.appStateSubscription = null;
-        }
-        this.changeTracker.clear();
-        console.log('🔄 Auto-sync disabled');
-    }
-
-    enableAutoSync() {
-        if (!this.appStateSubscription) {
-            this.setupEventDrivenSync();
-        }
-        console.log('🔄 Auto-sync enabled');
-    }
-
-    // Clean up resources
+    // Clean up resources (simplified for dual-write mode)
     destroy() {
-        this.disableAutoSync();
-        if (this.syncIntervalId) {
-            clearInterval(this.syncIntervalId);
-            this.syncIntervalId = null;
-        }
-        if (this.dbChangeUnsubscribe) {
-            this.dbChangeUnsubscribe();
-        }
+        // Nothing to clean up anymore - dual-write handles everything immediately
+        console.log('🔄 Sync service destroyed');
     }
 }
 

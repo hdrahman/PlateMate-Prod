@@ -10,8 +10,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoadingScreen from './src/components/LoadingScreen';
 import GlobalErrorBoundary from './src/components/GlobalErrorBoundary';
-import { getDatabase } from './src/utils/database';
-import { startPeriodicSync, setupOnlineSync } from './src/utils/syncService';
+import { getDatabase, processFailedWrites } from './src/utils/database';
 import { StepProvider } from './src/context/StepContext';
 import { ThemeProvider } from './src/ThemeContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
@@ -26,6 +25,7 @@ import tokenManager from './src/utils/tokenManager';
 import UnifiedStepTracker from './src/services/UnifiedStepTracker';
 import PersistentStepTracker from './src/services/PersistentStepTracker';
 import * as Notifications from 'expo-notifications';
+import * as Linking from 'expo-linking';
 // Import Subscription Manager for automatic trials
 import SubscriptionManager from './src/utils/SubscriptionManager';
 
@@ -450,8 +450,84 @@ function AuthenticatedContent() {
   );
 }
 
+// Deep linking configuration for password reset
+const linking = {
+  prefixes: ['platemate://', 'exp://'],
+  config: {
+    screens: {
+      ResetPassword: 'reset-password',
+      ForgotPassword: 'forgot-password',
+      Auth: 'auth',
+      Onboarding: 'onboarding',
+    },
+  },
+};
+
 function AppNavigator() {
   const { user, isLoading } = useAuth();
+
+  // Handle deep link URLs for password reset
+  useEffect(() => {
+    // Handle initial URL if app was opened via deep link
+    Linking.getInitialURL().then(url => {
+      if (url) {
+        console.log('🔗 App opened with URL:', url);
+        handleDeepLink(url);
+      }
+    });
+
+    // Listen for deep links while app is running
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      console.log('🔗 Deep link received:', url);
+      handleDeepLink(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleDeepLink = async (url) => {
+    if (!url) return;
+
+    // Check if it's a password reset link
+    if (url.includes('reset-password') || url.includes('type=recovery') || url.includes('access_token')) {
+      console.log('🔐 Password reset link detected');
+
+      try {
+        // Import supabase client
+        const { supabase } = require('./src/utils/supabaseClient');
+
+        // Parse URL to extract tokens
+        // Supabase uses hash fragments for tokens: #access_token=xxx&refresh_token=yyy
+        const urlObj = new URL(url.replace('platemate://', 'https://dummy.com/'));
+        const hashParams = new URLSearchParams(urlObj.hash.replace('#', ''));
+        const queryParams = new URLSearchParams(urlObj.search);
+
+        // Try to get tokens from hash or query params
+        const access_token = hashParams.get('access_token') || queryParams.get('access_token');
+        const refresh_token = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+
+        if (access_token && refresh_token) {
+          console.log('🔐 Setting Supabase session from URL tokens');
+
+          // Set the session with the tokens from the URL
+          const { data, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (error) {
+            console.error('❌ Error setting session:', error);
+          } else {
+            console.log('✅ Session set successfully, PASSWORD_RECOVERY event should trigger');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error handling password reset link:', error);
+      }
+    }
+  };
 
   // Show loading screen while checking auth state
   if (isLoading) {
@@ -459,7 +535,11 @@ function AppNavigator() {
   }
 
   return (
-    <NavigationContainer theme={DefaultTheme} ref={navigationRef}>
+    <NavigationContainer
+      theme={DefaultTheme}
+      ref={navigationRef}
+      linking={linking}
+    >
       <OnboardingProvider>
         <Stack.Navigator
           screenOptions={{
@@ -537,6 +617,15 @@ export default function App() {
 
         // Small delay to ensure database is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Process any failed writes from when user was offline (dual-write architecture)
+        try {
+          await processFailedWrites();
+          console.log('✅ Failed writes processed successfully');
+        } catch (error) {
+          console.warn('⚠️ Error processing failed writes (will retry later):', error);
+          // Don't block app startup if this fails
+        }
 
         // Register Notifee foreground service for step tracking (Android only)
         if (Platform.OS === 'android' && notifee && EventType) {

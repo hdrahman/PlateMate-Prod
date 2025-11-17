@@ -3,8 +3,10 @@ import * as SQLite from 'expo-sqlite';
 
 import { updateDatabaseSchema } from './updateDatabase';
 import { supabase } from './supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { notifyDatabaseChanged, subscribeToDatabaseChanges, unsubscribeFromDatabaseChanges } from './databaseWatcher';
 import { formatDateToString } from './dateUtils';
+import { isLikelyOffline } from './networkUtils';
 
 // Import subscription types
 import { SubscriptionStatus, SubscriptionDetails } from '../types/user';
@@ -23,6 +25,144 @@ declare global {
 
 // Set initial value
 global.dbInitialized = false;
+
+// ============================================================================
+// Failed Write Queue for Offline Support
+// ============================================================================
+const FAILED_WRITES_QUEUE_KEY = 'failed_supabase_writes';
+
+interface FailedWrite {
+    id: string;
+    table: string;
+    operation: 'insert' | 'update' | 'delete' | 'upsert';
+    data: any;
+    filter?: {field: string; value: any};
+    timestamp: string;
+    retryCount: number;
+}
+
+// Queue a failed write for later retry
+const queueFailedWrite = async (table: string, operation: string, data: any, filter?: {field: string; value: any}) => {
+    try {
+        const existingQueue = await AsyncStorage.getItem(FAILED_WRITES_QUEUE_KEY);
+        const queue: FailedWrite[] = existingQueue ? JSON.parse(existingQueue) : [];
+
+        const failedWrite: FailedWrite = {
+            id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            table,
+            operation: operation as any,
+            data,
+            filter,
+            timestamp: new Date().toISOString(),
+            retryCount: 0
+        };
+
+        queue.push(failedWrite);
+        await AsyncStorage.setItem(FAILED_WRITES_QUEUE_KEY, JSON.stringify(queue));
+        console.log(`📝 Queued failed write to ${table} (${operation})`);
+    } catch (error) {
+        console.error('❌ Failed to queue write:', error);
+    }
+};
+
+// Process queued failed writes (call on app launch when online)
+export const processFailedWrites = async () => {
+    try {
+        // CRITICAL: Check connectivity first to prevent data loss from failed retries
+        if (await isLikelyOffline()) {
+            console.log('🚫 Device offline - skipping queue processing to preserve retry attempts');
+            return;
+        }
+
+        const queueData = await AsyncStorage.getItem(FAILED_WRITES_QUEUE_KEY);
+        if (!queueData) return;
+
+        const queue: FailedWrite[] = JSON.parse(queueData);
+        if (queue.length === 0) return;
+
+        console.log(`🔄 Processing ${queue.length} queued writes...`);
+        const failedItems: FailedWrite[] = [];
+
+        for (const item of queue) {
+            try {
+                let query = supabase.from(item.table);
+
+                switch (item.operation) {
+                    case 'insert':
+                        await query.insert(item.data);
+                        break;
+                    case 'update':
+                        if (item.filter) {
+                            await query.update(item.data).eq(item.filter.field, item.filter.value);
+                        }
+                        break;
+                    case 'delete':
+                        if (item.filter) {
+                            await query.delete().eq(item.filter.field, item.filter.value);
+                        }
+                        break;
+                    case 'upsert':
+                        await query.upsert(item.data);
+                        break;
+                }
+
+                console.log(`✅ Successfully processed queued write to ${item.table}`);
+            } catch (error) {
+                console.error(`❌ Failed to process queued write to ${item.table}:`, error);
+                item.retryCount++;
+                if (item.retryCount < 3) {
+                    failedItems.push(item);
+                }
+            }
+        }
+
+        // Update queue with only failed items
+        await AsyncStorage.setItem(FAILED_WRITES_QUEUE_KEY, JSON.stringify(failedItems));
+
+        if (failedItems.length > 0) {
+            console.log(`⚠️ ${failedItems.length} writes still pending retry`);
+        } else {
+            console.log('✅ All queued writes processed successfully');
+        }
+    } catch (error) {
+        console.error('❌ Error processing failed writes queue:', error);
+    }
+};
+
+// Helper to write to Supabase with error handling
+const writeToSupabase = async (table: string, operation: string, data: any, filter?: {field: string; value: any}) => {
+    try {
+        let query = supabase.from(table);
+
+        switch (operation) {
+            case 'insert':
+                const insertResult = await query.insert(data);
+                if (insertResult.error) throw insertResult.error;
+                break;
+            case 'update':
+                if (!filter) throw new Error('Filter required for update');
+                const updateResult = await query.update(data).eq(filter.field, filter.value);
+                if (updateResult.error) throw updateResult.error;
+                break;
+            case 'delete':
+                if (!filter) throw new Error('Filter required for delete');
+                const deleteResult = await query.delete().eq(filter.field, filter.value);
+                if (deleteResult.error) throw deleteResult.error;
+                break;
+            case 'upsert':
+                const upsertResult = await query.upsert(data);
+                if (upsertResult.error) throw upsertResult.error;
+                break;
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error(`❌ Supabase write failed for ${table}:`, error);
+        // Queue for retry
+        await queueFailedWrite(table, operation, data, filter);
+        return { success: false, error };
+    }
+};
 
 // @ts-nocheck
 // Get or initialize the database with proper singleton pattern
@@ -143,7 +283,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         firebase_uid TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
         first_name TEXT NOT NULL,
-        last_name TEXT,
         date_of_birth TEXT,
         location TEXT,
         height REAL,
@@ -211,6 +350,21 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
             }
         } catch (error) {
             console.error('❌ Error verifying premium column:', error);
+        }
+
+        // Migration: Remove last_name column (if it exists)
+        // SQLite doesn't support DROP COLUMN in older versions, so we need to check if it exists
+        // For new installations, the column won't be created. For existing installations, we'll leave it but stop using it.
+        try {
+            const tableInfo2 = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+            const lastNameColumn = tableInfo2.find((col: any) => col.name === 'last_name');
+            if (lastNameColumn) {
+                console.log('ℹ️ last_name column exists in legacy database schema (will be ignored)');
+                // Note: We don't drop it to avoid complex table recreation migration
+                // The app simply won't use this column anymore
+            }
+        } catch (error) {
+            console.error('❌ Error checking last_name column:', error);
         }
 
         // Create user_weights table for weight history
@@ -480,7 +634,53 @@ export const addFoodLog = async (foodData: {
             ]
         );
 
-        // No need for separate sync tracking - handled by notifyDatabaseChanged
+        console.log('✅ Food log added successfully (local)', result.lastInsertRowId);
+
+        // DUAL-WRITE: Immediately write to Supabase cloud backup
+        try {
+            const supabaseData = {
+                user_id: userId,
+                meal_id: foodData.meal_id,
+                food_name: foodData.food_name,
+                brand_name: foodData.brand_name || null,
+                meal_type: foodData.meal_type,
+                date: foodData.date,
+                quantity: foodData.quantity || null,
+                weight: foodData.weight || null,
+                weight_unit: foodData.weight_unit || 'g',
+                calories: foodData.calories,
+                proteins: foodData.proteins,
+                carbs: foodData.carbs,
+                fats: foodData.fats,
+                fiber: foodData.fiber || -1,
+                sugar: foodData.sugar || -1,
+                saturated_fat: foodData.saturated_fat || -1,
+                polyunsaturated_fat: foodData.polyunsaturated_fat || -1,
+                monounsaturated_fat: foodData.monounsaturated_fat || -1,
+                trans_fat: foodData.trans_fat || -1,
+                cholesterol: foodData.cholesterol || -1,
+                sodium: foodData.sodium || -1,
+                potassium: foodData.potassium || -1,
+                vitamin_a: foodData.vitamin_a || -1,
+                vitamin_c: foodData.vitamin_c || -1,
+                calcium: foodData.calcium || -1,
+                iron: foodData.iron || -1,
+                healthiness_rating: foodData.healthiness_rating || null,
+                notes: foodData.notes || null,
+                image_url: foodData.image_url,
+                file_key: foodData.file_key || 'default_file_key',
+                created_at: getCurrentDate()
+            };
+
+            writeToSupabase('food_logs', 'insert', supabaseData)
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ Food log synced to cloud');
+                    }
+                });
+        } catch (cloudError) {
+            console.warn('⚠️ Failed to sync food log to cloud (will retry):', cloudError);
+        }
 
         // Trigger notification for observers
         try {
@@ -550,6 +750,29 @@ export const updateFoodLog = async (id: number, updates: any) => {
         const sql = `UPDATE food_logs SET ${setClauses.join(', ')} WHERE id = ?`;
         const result = await db.runAsync(sql, values);
 
+        console.log('✅ Food log updated successfully (local)', result.changes);
+
+        // DUAL-WRITE: Immediately write to Supabase cloud backup
+        try {
+            // Prepare data for Supabase (exclude sync-related fields)
+            const supabaseData: any = {};
+            for (const [key, value] of Object.entries(updates)) {
+                if (key !== 'synced' && key !== 'sync_action' && key !== 'last_modified' && key !== 'id') {
+                    supabaseData[key] = value;
+                }
+            }
+            supabaseData.updated_at = getCurrentDate();
+
+            // Use meal_id from the logEntry to identify the record in Supabase
+            writeToSupabase('food_logs', 'update', supabaseData, { field: 'meal_id', value: logEntry.meal_id })
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ Food log update synced to cloud');
+                    }
+                });
+        } catch (cloudError) {
+            console.warn('⚠️ Failed to sync food log update to cloud (will retry):', cloudError);
+        }
 
         // Trigger notification for observers
         try {
@@ -588,6 +811,21 @@ export const deleteFoodLog = async (id: number) => {
 
     try {
         await db.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
+
+        console.log('✅ Food log deleted successfully (local)');
+
+        // DUAL-WRITE: Immediately delete from Supabase cloud backup
+        try {
+            // Use meal_id from the logEntry to identify the record in Supabase
+            writeToSupabase('food_logs', 'delete', null, { field: 'meal_id', value: logEntry.meal_id })
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ Food log deletion synced to cloud');
+                    }
+                });
+        } catch (cloudError) {
+            console.warn('⚠️ Failed to sync food log deletion to cloud (will retry):', cloudError);
+        }
 
         // Trigger notification for observers
         try {
@@ -1503,7 +1741,6 @@ export const addUserProfile = async (profile: any) => {
         firebase_uid,
         email,
         first_name,
-        last_name = null,
         date_of_birth = null,
         height = null,
         weight = null,
@@ -1594,24 +1831,23 @@ export const addUserProfile = async (profile: any) => {
 
         const result = await db.runAsync(
             `INSERT INTO user_profiles (
-                firebase_uid, email, first_name, last_name, date_of_birth, height, weight, age, gender, 
-                activity_level, weight_goal, target_weight, dietary_restrictions, food_allergies, 
-                cuisine_preferences, spice_tolerance, health_conditions, fitness_goal, daily_calorie_target, 
-                nutrient_focus, future_self_message_uri, unit_preference, push_notifications_enabled, email_notifications_enabled, 
-                sms_notifications_enabled, marketing_emails_enabled, preferred_language, timezone, 
+                firebase_uid, email, first_name, date_of_birth, height, weight, age, gender,
+                activity_level, weight_goal, target_weight, dietary_restrictions, food_allergies,
+                cuisine_preferences, spice_tolerance, health_conditions, fitness_goal, daily_calorie_target,
+                nutrient_focus, future_self_message_uri, unit_preference, push_notifications_enabled, email_notifications_enabled,
+                sms_notifications_enabled, marketing_emails_enabled, preferred_language, timezone,
                 dark_mode, sync_data_offline, onboarding_complete, synced, last_modified,
                 protein_goal, carb_goal, fat_goal, weekly_workouts, step_goal, water_goal, sleep_goal,
                 workout_frequency, sleep_quality, stress_level, eating_pattern, motivations, why_motivation,
                 projected_completion_date, estimated_metabolic_age, estimated_duration_weeks,
                 future_self_message, future_self_message_type, future_self_message_created_at,
                 diet_type, use_metric_system, starting_weight, location, premium
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
             [
                 firebase_uid,                                      // 1
                 email,                                            // 2
                 first_name,                                       // 3
-                last_name,                                        // 4
-                date_of_birth,                                    // 5
+                date_of_birth,                                    // 4
                 height,                                           // 6
                 weight,                                           // 7
                 age,                                              // 8
@@ -1670,7 +1906,71 @@ export const addUserProfile = async (profile: any) => {
         // Commit the transaction
         await db.runAsync('COMMIT');
 
-        console.log('✅ User profile added successfully', result.lastInsertRowId);
+        console.log('✅ User profile added successfully (local)', result.lastInsertRowId);
+
+        // ============================================================================
+        // DUAL-WRITE: Immediately write to Supabase cloud backup
+        // ============================================================================
+        try {
+            // Prepare data for Supabase (convert from SQLite format to Supabase format)
+            const supabaseData: any = {
+                firebase_uid,
+                email,
+                first_name,
+                height,
+                weight,
+                age,
+                gender,
+                activity_level,
+                weight_goal,
+                target_weight,
+                starting_weight: profile.starting_weight || null,
+                fitness_goal,
+                daily_calorie_target,
+                nutrient_focus: nutrient_focus ? JSON.stringify(nutrient_focus) : null,
+                unit_preference,
+                push_notifications_enabled: push_notifications_enabled ? true : false,
+                email_notifications_enabled: email_notifications_enabled ? true : false,
+                sms_notifications_enabled: sms_notifications_enabled ? true : false,
+                marketing_emails_enabled: marketing_emails_enabled ? true : false,
+                preferred_language,
+                dark_mode: dark_mode ? true : false,
+                sync_data_offline: sync_data_offline ? true : false,
+                onboarding_complete: onboarding_complete ? true : false,
+                protein_goal,
+                carb_goal,
+                fat_goal,
+                weekly_workouts,
+                step_goal,
+                water_goal,
+                sleep_goal,
+                workout_frequency,
+                motivations,
+                projected_completion_date,
+                estimated_metabolic_age,
+                estimated_duration_weeks,
+                use_metric_system: use_metric_system ? true : false,
+                cheat_day_enabled: profile.cheat_day_enabled || false,
+                cheat_day_frequency: profile.cheat_day_frequency || 7,
+                preferred_cheat_day_of_week: profile.preferred_cheat_day_of_week || null,
+                last_cheat_day: profile.last_cheat_day || null,
+                next_cheat_day: profile.next_cheat_day || null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            // Write to Supabase (non-blocking, with error handling and queuing)
+            writeToSupabase('users', 'insert', supabaseData)
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ User profile synced to cloud');
+                    }
+                });
+        } catch (cloudError) {
+            // Log but don't throw - local write succeeded
+            console.warn('⚠️ Failed to sync user profile to cloud (will retry):', cloudError);
+        }
+
         return result.lastInsertRowId;
     } catch (error) {
         // Rollback the transaction in case of error
@@ -1705,7 +2005,6 @@ interface UserProfile {
     firebase_uid: string;
     email: string;
     first_name: string;
-    last_name?: string;
     date_of_birth?: string;
     location?: string;
     height?: number;
@@ -1944,7 +2243,52 @@ export const updateUserProfile = async (firebaseUid: string, updates: any, isAut
         // Commit the transaction
         await db.runAsync('COMMIT');
 
-        console.log('✅ User profile updated successfully', result.changes);
+        console.log('✅ User profile updated successfully (local)', result.changes);
+
+        // ============================================================================
+        // DUAL-WRITE: Immediately write to Supabase cloud backup
+        // ============================================================================
+        if (!isAutomatic) { // Only sync user-initiated changes
+            try {
+                // Prepare data for Supabase (convert back from SQLite format)
+                const supabaseData: any = {};
+
+                for (const [key, value] of Object.entries(updates)) {
+                    if (key === 'firebase_uid' || key === 'password') continue;
+
+                    // Convert SQLite boolean (0/1) back to actual boolean
+                    if (typeof value === 'number' && (value === 0 || value === 1)) {
+                        // Check if this field is a boolean field
+                        const booleanFields = ['use_metric_system', 'dark_mode', 'push_notifications_enabled',
+                                              'email_notifications_enabled', 'sms_notifications_enabled',
+                                              'marketing_emails_enabled', 'sync_data_offline', 'onboarding_complete',
+                                              'cheat_day_enabled'];
+                        if (booleanFields.includes(key)) {
+                            supabaseData[key] = value === 1;
+                        } else {
+                            supabaseData[key] = value;
+                        }
+                    } else {
+                        supabaseData[key] = value;
+                    }
+                }
+
+                // Add timestamp
+                supabaseData.updated_at = new Date().toISOString();
+
+                // Write to Supabase (non-blocking, with error handling and queuing)
+                writeToSupabase('users', 'update', supabaseData, { field: 'firebase_uid', value: firebaseUid })
+                    .then(result => {
+                        if (result.success) {
+                            console.log('✅ User profile synced to cloud');
+                        }
+                    });
+            } catch (cloudError) {
+                // Log but don't throw - local write succeeded
+                console.warn('⚠️ Failed to sync user profile to cloud (will retry):', cloudError);
+            }
+        }
+
         return result.changes;
     } catch (error) {
         // Rollback the transaction in case of error
@@ -2342,21 +2686,44 @@ export const checkAndUpdateStreak = async (firebaseUid: string): Promise<number>
         // If user has a streak record, update it
         if (streakRecord) {
             await db.runAsync(
-                `UPDATE user_streaks 
-                SET current_streak = ?, longest_streak = ?, last_activity_date = ?, 
+                `UPDATE user_streaks
+                SET current_streak = ?, longest_streak = ?, last_activity_date = ?,
                 sync_action = 'update', last_modified = ?
                 WHERE firebase_uid = ?`,
                 [currentStreak, longestStreak, todayStr, now, firebaseUid]
             );
+            console.log('✅ Streak updated successfully (local)', { currentStreak, longestStreak });
         }
         // Otherwise, create a new streak record
         else {
             await db.runAsync(
-                `INSERT INTO user_streaks 
-                (firebase_uid, current_streak, longest_streak, last_activity_date, sync_action, last_modified) 
+                `INSERT INTO user_streaks
+                (firebase_uid, current_streak, longest_streak, last_activity_date, sync_action, last_modified)
                 VALUES (?, ?, ?, ?, ?, ?)`,
                 [firebaseUid, currentStreak, longestStreak, todayStr, 'create', now]
             );
+            console.log('✅ Streak created successfully (local)', { currentStreak, longestStreak });
+        }
+
+        // DUAL-WRITE: Immediately write to Supabase cloud backup
+        try {
+            const supabaseData = {
+                firebase_uid: firebaseUid,
+                current_streak: currentStreak,
+                longest_streak: longestStreak,
+                last_activity_date: todayStr,
+                updated_at: now
+            };
+
+            // Use upsert to handle both insert and update cases
+            writeToSupabase('user_streaks', 'upsert', supabaseData)
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ Streak synced to cloud');
+                    }
+                });
+        } catch (cloudError) {
+            console.warn('⚠️ Failed to sync streak to cloud (will retry):', cloudError);
         }
 
         return currentStreak;
@@ -2532,16 +2899,49 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number, i
             // Update existing entry for today if weight is different
             if (Math.abs(existingEntry.weight - weight) >= 0.01) {
                 await database.runAsync(
-                    `UPDATE user_weights SET 
-                     weight = ?, 
-                     synced = 0, 
+                    `UPDATE user_weights SET
+                     weight = ?,
+                     synced = 0,
                      sync_action = 'update',
                      last_modified = ?
                      WHERE id = ?`,
                     [weight, timestamp, existingEntry.id]
                 );
-                console.log(`✅ Updated today's weight entry: ${weight}kg`);
+                console.log(`✅ Updated today's weight entry (local): ${weight}kg`);
                 shouldNotify = true;
+
+                // DUAL-WRITE: Immediately write to Supabase cloud backup
+                try {
+                    const supabaseData = {
+                        weight: weight,
+                        recorded_at: timestamp,
+                        updated_at: timestamp
+                    };
+
+                    // Update by firebase_uid AND today's date range (prevent overwriting all weight history)
+                    supabase
+                        .from('user_weights')
+                        .update(supabaseData)
+                        .eq('firebase_uid', firebaseUid)
+                        .gte('recorded_at', todayStart)
+                        .lt('recorded_at', todayEnd)
+                        .then(({ error }) => {
+                            if (error) {
+                                console.error('❌ Failed to sync weight update to cloud:', error);
+                                // Queue for retry
+                                queueFailedWrite('user_weights', 'update_with_date_range', supabaseData, {
+                                    field: 'firebase_uid',
+                                    value: firebaseUid
+                                }).catch(queueError => {
+                                    console.warn('⚠️ Failed to queue weight update:', queueError);
+                                });
+                            } else {
+                                console.log('✅ Weight entry update synced to cloud');
+                            }
+                        });
+                } catch (cloudError) {
+                    console.warn('⚠️ Failed to sync weight entry update to cloud (will retry):', cloudError);
+                }
             }
         } else {
             // Create new weight entry
@@ -2550,8 +2950,27 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number, i
                  VALUES (?, ?, ?, 0, 'create', ?)`,
                 [firebaseUid, weight, timestamp, timestamp]
             );
-            console.log(`✅ Added new weight entry: ${weight}kg`);
+            console.log(`✅ Added new weight entry (local): ${weight}kg`);
             shouldNotify = true;
+
+            // DUAL-WRITE: Immediately write to Supabase cloud backup
+            try {
+                const supabaseData = {
+                    firebase_uid: firebaseUid,
+                    weight: weight,
+                    recorded_at: timestamp,
+                    created_at: timestamp
+                };
+
+                writeToSupabase('user_weights', 'insert', supabaseData)
+                    .then(result => {
+                        if (result.success) {
+                            console.log('✅ Weight entry synced to cloud');
+                        }
+                    });
+            } catch (cloudError) {
+                console.warn('⚠️ Failed to sync weight entry to cloud (will retry):', cloudError);
+            }
         }
 
         // Also update current weight in user profile
@@ -2838,7 +3257,7 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
 
         // Update user_profiles table
         await db.runAsync(
-            `UPDATE user_profiles 
+            `UPDATE user_profiles
              SET cheat_day_enabled = ?,
                  cheat_day_frequency = ?,
                  last_cheat_day = ?,
@@ -2857,13 +3276,35 @@ export const updateCheatDaySettings = async (firebaseUid: string, settings: Part
             ]
         );
 
-        console.log('✅ Cheat day settings updated for user:', firebaseUid, {
+        console.log('✅ Cheat day settings updated (local) for user:', firebaseUid, {
             enabled,
             frequency,
             lastCheatDay,
             nextCheatDay: nextCheatDay ? new Date(nextCheatDay).toISOString().split('T')[0] : null,
             preferredDayOfWeek: preferredDayOfWeek !== undefined ? getDayName(preferredDayOfWeek) : 'No preference'
         });
+
+        // DUAL-WRITE: Immediately write to Supabase cloud backup
+        try {
+            const supabaseData = {
+                cheat_day_enabled: enabled,
+                cheat_day_frequency: frequency,
+                last_cheat_day: lastCheatDay,
+                next_cheat_day: nextCheatDay,
+                preferred_cheat_day_of_week: preferredDayOfWeek,
+                updated_at: new Date().toISOString()
+            };
+
+            // Write to Supabase (non-blocking, with error handling and queuing)
+            writeToSupabase('users', 'update', supabaseData, { field: 'firebase_uid', value: firebaseUid })
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ Cheat day settings synced to cloud');
+                    }
+                });
+        } catch (cloudError) {
+            console.warn('⚠️ Failed to sync cheat day settings to cloud (will retry):', cloudError);
+        }
     } catch (error) {
         console.error('Error updating cheat day settings:', error);
         throw error;
@@ -4038,7 +4479,6 @@ const convertFrontendProfileToSQLiteFormatHelper = (frontendProfile: any, fireba
         firebase_uid: firebaseUid,
         email: email,
         first_name: frontendProfile.firstName || '',
-        last_name: frontendProfile.lastName || '',
         date_of_birth: frontendProfile.dateOfBirth,
         location: frontendProfile.location,
         height: frontendProfile.height,

@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -100,7 +99,7 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>What Motivates You?</Text>
                 <Text style={styles.subtitle}>Choose up to 3 reasons why you want to achieve your goal</Text>
@@ -162,20 +161,19 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
                     <Ionicons name="arrow-forward" size={18} color="#fff" />
                 </LinearGradient>
             </TouchableOpacity>
-        </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    contentContainer: {
         paddingTop: 20,
-        paddingBottom: 40,
+        paddingHorizontal: 20,
+        justifyContent: 'space-between',
     },
     header: {
-        marginBottom: 32,
+        marginBottom: 24,
     },
     title: {
         fontSize: 28,
@@ -193,14 +191,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 20,
+        marginBottom: 16,
     },
     motivationCard: {
         width: '48%',
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
         borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
+        padding: 12,
+        marginBottom: 12,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
@@ -210,12 +208,12 @@ const styles = StyleSheet.create({
         borderColor: '#0074dd',
     },
     iconContainer: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
+        marginBottom: 8,
     },
     motivationLabel: {
         fontSize: 14,
@@ -240,7 +238,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginVertical: 16,
+        marginBottom: 16,
     },
     selectionInfoText: {
         color: '#888',
@@ -250,8 +248,7 @@ const styles = StyleSheet.create({
     button: {
         borderRadius: 12,
         overflow: 'hidden',
-        marginHorizontal: 20,
-        marginTop: 20,
+        marginBottom: 20,
     },
     buttonDisabled: {
         opacity: 0.6,
