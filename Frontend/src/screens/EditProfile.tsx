@@ -200,7 +200,7 @@ const EditProfile = () => {
     // Add a state to track unsaved changes
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-    // Add age calculation function (same logic as BasicInfoStep.tsx)
+    // Add age calculation function
     const calculateAge = (dob: string): number | null => {
         if (!dob || !/^\d{2}-\d{2}-\d{4}$/.test(dob)) return null;
 
