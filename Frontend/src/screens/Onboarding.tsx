@@ -33,8 +33,6 @@ import CheatDayStep from '../components/onboarding/CheatDayStep';
 import PhysicalAttributesStep from '../components/onboarding/PhysicalAttributesStep';
 import ActivityLevelStep from '../components/onboarding/ActivityLevelStep';
 import GenderStep from '../components/onboarding/GenderStep';
-import DietaryPreferencesStep from '../components/onboarding/DietaryPreferencesStep';
-import FutureSelfMotivationStep from '../components/onboarding/FutureSelfMotivationStep';
 import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsStep';
 import SocialSignInInfoStep from '../components/onboarding/SocialSignInInfoStep';
 
