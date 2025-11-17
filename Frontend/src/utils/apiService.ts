@@ -209,15 +209,12 @@ class ApiService {
             // Make the request with retry logic
             const response = await makeRequestWithRetry<T>(() => axios(fullConfig));
 
-            // Cache the response if applicable (do this in the background)
+            // Cache the response if applicable
             if (useCache && isCacheable(fullConfig)) {
                 const cacheKey = generateCacheKey(fullConfig);
                 const cache = getCache(fullConfig);
-
-                // Use setTimeout to make caching non-blocking
-                setTimeout(() => {
-                    cache.set(cacheKey, response.data);
-                }, 0);
+                // Cache immediately (synchronous operation)
+                cache.set(cacheKey, response.data);
             }
 
             return response.data;

@@ -162,7 +162,12 @@ export const supabaseAuth = {
 
             // Check Google Play Services availability (Android only)
             if (Platform.OS === 'android') {
-                await GoogleSignin.hasPlayServices();
+                try {
+                    await GoogleSignin.hasPlayServices();
+                } catch (error) {
+                    console.error('Google Play Services not available:', error);
+                    throw new Error('Google Sign-In is not available on this device. Please ensure Google Play Services is installed and up to date.');
+                }
             }
 
             const userInfo = await GoogleSignin.signIn();
@@ -353,7 +358,7 @@ export const supabaseAuth = {
             const { data, error } = await supabase.auth.signInWithIdToken({
                 provider: 'apple',
                 token: credential.identityToken!,
-                nonce: credential.nonce,
+                nonce: credential.nonce || undefined, // Handle potentially undefined nonce
             });
 
             if (error) {

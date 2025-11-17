@@ -284,23 +284,30 @@ export const useConnectionStatus = () => {
     const [networkStatus, setNetworkStatus] = useState(false);
 
     useEffect(() => {
+        let isMounted = true;
+
         const checkNetworkStatus = async () => {
+            if (!isMounted) return;
             const online = await isOnline();
-            setNetworkStatus(online);
+            if (isMounted) {
+                setNetworkStatus(online);
+            }
         };
 
         const checkRealtimeConnection = () => {
+            if (!isMounted) return;
             setConnectionStatus(featureRequestsRealtime.getConnectionStatus());
         };
 
         const networkInterval = setInterval(checkNetworkStatus, 3000);
         const connectionInterval = setInterval(checkRealtimeConnection, 5000);
-        
+
         // Initial checks
         checkNetworkStatus();
         checkRealtimeConnection();
 
         return () => {
+            isMounted = false;
             clearInterval(networkInterval);
             clearInterval(connectionInterval);
         };

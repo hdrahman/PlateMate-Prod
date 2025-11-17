@@ -406,8 +406,10 @@ const EditProfile = () => {
 
     // Modify input handlers to track changes
     const handleUsernameChange = (text: string) => {
-        setEditedUsername(text);
-        checkForChanges('username', text);
+        // Sanitize username: allow alphanumeric, spaces, underscores, and hyphens, max 50 chars
+        const sanitized = text.replace(/[^a-zA-Z0-9\s_-]/g, '').slice(0, 50);
+        setEditedUsername(sanitized);
+        checkForChanges('username', sanitized);
     };
 
     const handleSexChange = (value: string) => {
@@ -416,13 +418,17 @@ const EditProfile = () => {
     };
 
     const handleHeightFeetChange = (text: string) => {
-        setEditedHeightFeet(text);
-        checkForChanges('heightFeet', text);
+        // Validate numeric input only, max 1 digit
+        const sanitized = text.replace(/[^0-9]/g, '').slice(0, 1);
+        setEditedHeightFeet(sanitized);
+        checkForChanges('heightFeet', sanitized);
     };
 
     const handleHeightInchesChange = (text: string) => {
-        setEditedHeightInches(text);
-        checkForChanges('heightInches', text);
+        // Validate numeric input only, max 2 digits
+        const sanitized = text.replace(/[^0-9]/g, '').slice(0, 2);
+        setEditedHeightInches(sanitized);
+        checkForChanges('heightInches', sanitized);
     };
 
     const handleHeightCmChange = (value: string) => {

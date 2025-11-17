@@ -422,7 +422,8 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
 
             // Update UI state optimistically without waiting for database operation
             // This creates a smoother user experience
-            const optimisticLog = { ...foodLog, id: Date.now() } as FoodLogEntry;
+            // Use negative timestamp to distinguish from real database IDs
+            const optimisticLog = { ...foodLog, id: -Date.now() } as FoodLogEntry;
             setFoodLogs(prevLogs => [...prevLogs, optimisticLog]);
 
             // If this is today's log, update today's logs and nutrition totals
@@ -460,14 +461,15 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
             const id = await idPromise;
 
             // Notify other components in the background
-            setTimeout(async () => {
+            // Using Promise to track completion even though it's async
+            Promise.resolve().then(async () => {
                 try {
                     await notifyDatabaseChanged();
                 } catch (notifyError) {
                     console.error('Error notifying database changes:', notifyError);
-                    // Continue anyway
+                    // Continue anyway - this is a background operation
                 }
-            }, 0);
+            });
 
             // Reset error state on successful add
             resetErrorState();

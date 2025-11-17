@@ -116,7 +116,7 @@ const Onboarding = () => {
                 return <AccountCreationStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
             case 3:
                 // Check if user signed in via social auth and is missing name/age
-                if (user && (!profile.firstName || !profile.lastName || !profile.age)) {
+                if (user && (!profile?.firstName || !profile?.lastName || !profile?.age)) {
                     return <SocialSignInInfoStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;
                 }
                 return <GoalsStep profile={profile} updateProfile={updateProfile} onNext={handleNext} />;

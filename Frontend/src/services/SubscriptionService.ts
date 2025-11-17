@@ -49,8 +49,13 @@ type EntitlementInfo = {
 };
 
 // Configure your RevenueCat API keys from environment
-const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID || 'goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA';
-const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS || 'appl_YOUR_APPLE_API_KEY_HERE';
+const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID;
+const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS;
+
+// Validate API keys are configured
+if (!REVENUECAT_API_KEY_ANDROID || !REVENUECAT_API_KEY_IOS) {
+  console.error('❌ RevenueCat API keys not configured in environment variables');
+}
 
 // Product IDs from App Store Connect and Google Play Console
 // These match your RevenueCat dashboard configuration
@@ -123,16 +128,19 @@ class SubscriptionService {
   }
 
   // Clear cache when needed (e.g., user logout, subscription change)
-  clearCache(): void {
+  async clearCache(): Promise<void> {
     this.premiumStatusCache.hasPremiumAccess = null;
     this.premiumStatusCache.tier = null;
     this.premiumStatusCache.lastUpdate = 0;
     console.log('🗑️ Premium status cache cleared from memory');
 
     // Also clear AsyncStorage cache
-    AsyncStorage.removeItem(this.CACHE_STORAGE_KEY)
-      .then(() => console.log('🗑️ Premium status cache cleared from storage'))
-      .catch(error => console.warn('⚠️ Failed to clear storage cache:', error));
+    try {
+      await AsyncStorage.removeItem(this.CACHE_STORAGE_KEY);
+      console.log('🗑️ Premium status cache cleared from storage');
+    } catch (error) {
+      console.warn('⚠️ Failed to clear storage cache:', error);
+    }
 
     // Emit subscription change event
     this.emitSubscriptionChange();
@@ -685,8 +693,13 @@ class SubscriptionService {
           },
         });
 
-        if (response.ok) {
-          const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (true) { // Keep the if block structure for data handling
 
           // If VIP or has premium access via backend validation, cache and return true
           if (data.has_premium_access) {
@@ -816,8 +829,13 @@ class SubscriptionService {
           },
         });
 
-        if (response.ok) {
-          const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (true) { // Keep the if block structure for data handling
 
           // If VIP, cache and return VIP tier
           if (data.tier === 'vip_lifetime') {

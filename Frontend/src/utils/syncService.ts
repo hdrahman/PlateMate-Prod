@@ -184,18 +184,26 @@ export const startPeriodicSync = async () => {
     // }, SYNC_INTERVAL);
 
     // Store a dummy interval ID
-    await AsyncStorage.setItem('syncIntervalId', '0');
+    try {
+        await AsyncStorage.setItem('syncIntervalId', '0');
+    } catch (error) {
+        console.warn('Failed to persist sync interval:', error);
+    }
 
     return 0; // Return dummy interval ID
 };
 
 // Stop periodic sync
 export const stopPeriodicSync = async () => {
-    const intervalIdStr = await AsyncStorage.getItem('syncIntervalId');
-    if (intervalIdStr) {
-        const intervalId = parseInt(intervalIdStr, 10);
-        clearInterval(intervalId);
-        await AsyncStorage.removeItem('syncIntervalId');
+    try {
+        const intervalIdStr = await AsyncStorage.getItem('syncIntervalId');
+        if (intervalIdStr) {
+            const intervalId = parseInt(intervalIdStr, 10);
+            clearInterval(intervalId);
+            await AsyncStorage.removeItem('syncIntervalId');
+        }
+    } catch (error) {
+        console.warn('Failed to stop periodic sync:', error);
     }
 };
 
