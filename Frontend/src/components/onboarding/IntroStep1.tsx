@@ -5,7 +5,6 @@ import {
     StyleSheet,
     Image,
     TouchableOpacity,
-    Dimensions,
     StatusBar,
     Animated,
     ScrollView,
@@ -18,9 +17,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../utils/responsive';
 
-// Module-level dimensions for StyleSheet (styles are created once at module load)
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 interface IntroStep1Props {
     onNext: () => void;
 }
@@ -28,8 +24,8 @@ interface IntroStep1Props {
 const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
-    const { width, height } = useWindowDimensions(); // Use hook for dynamic calculations
-    const isSmallScreen = height < 700; // Calculate inside component
+    const { width, height } = useWindowDimensions();
+    const isSmallScreen = height < 700;
     const fadeIn = useRef(new Animated.Value(0)).current;
     const slideUp = useRef(new Animated.Value(20)).current;
     const scanAnimation = useRef(new Animated.Value(0)).current;
@@ -95,7 +91,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { width, height }]}>
             {/* Make status bar transparent so background shows instead of black overlay */}
             <StatusBar backgroundColor="transparent" barStyle="light-content" />
             <LinearGradient
@@ -109,9 +105,8 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? insets.top + spacing(-700) : Math.max(insets.top, spacing(10)),
-                        // Add extra bottom padding on Android to prevent content from being covered by fixed button
-                        paddingBottom: Platform.OS === 'ios' ? spacing(15) : spacing(38)
+                        paddingTop: Math.max(insets.top, spacing(3)),
+                        paddingBottom: spacing(35)
                     }
                 ]}
                 showsVerticalScrollIndicator={false}
@@ -266,12 +261,8 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
             {/* Sign In Button */}
             <TouchableOpacity
                 style={[styles.signInButton, {
-                    top: Platform.OS === 'ios'
-                        ? Math.max(insets.top - spacing(14), spacing(1))
-                        : spacing(2),
-                    right: Platform.OS === 'ios'
-                        ? insets.right + spacing(1)
-                        : spacing(2)
+                    top: Math.max(insets.top, spacing(2)),
+                    right: spacing(2)
                 }]}
                 onPress={handleSignIn}
                 activeOpacity={0.7}
@@ -282,9 +273,7 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
             {/* Fixed Button at Bottom */}
             <View
                 style={[styles.fixedButtonContainer, {
-                    bottom: Platform.OS === 'ios'
-                        ? Math.max(insets.bottom + spacing(35), spacing(4))
-                        : spacing(30)
+                    bottom: Math.max(insets.bottom + spacing(4), spacing(4))
                 }]}
                 collapsable={false}
                 pointerEvents="box-none"
@@ -308,14 +297,14 @@ const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
 
 const styles = StyleSheet.create({
     container: {
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
         backgroundColor: '#000',
     },
     background: {
         position: 'absolute',
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
     },
     scrollView: {
         flex: 1,

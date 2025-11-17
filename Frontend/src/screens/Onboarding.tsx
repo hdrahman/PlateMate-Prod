@@ -151,6 +151,25 @@ const Onboarding = () => {
 
     const TOTAL_ONBOARDING_STEPS = 9; // Number of steps after the welcome screen (AccountCreation + Goals + Motivation + WeightChangeRate + ActivityLevel + CheatDay + Gender + PhysicalAttributes + PredictiveInsights)
 
+    // Render WelcomeStep separately without the header/ScrollView wrapper
+    if (currentStep === 1) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <StatusBar barStyle="light-content" />
+                <LinearGradient
+                    colors={['#000000', '#121212']}
+                    style={styles.background}
+                />
+                <WelcomeStep onNext={handleNext} />
+                {error && (
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                )}
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
@@ -204,12 +223,11 @@ const Onboarding = () => {
                 <ScrollView
                     contentContainerStyle={[
                         styles.content,
-                        currentStep === 1 && styles.introContent,
                         (currentStep === 6) && { paddingHorizontal: 0, paddingBottom: 0 }
                     ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 1 && currentStep < 10}
+                    scrollEnabled={currentStep < 10}
                 >
                     {renderCurrentStep()}
                 </ScrollView>
@@ -294,12 +312,6 @@ const styles = StyleSheet.create({
     content: {
         paddingHorizontal: 20,
         paddingBottom: 40,
-    },
-    introContent: {
-        paddingHorizontal: 0,
-        paddingBottom: 0,
-        paddingTop: 0,
-        flex: 1
     },
     errorContainer: {
         backgroundColor: '#FF3B30',

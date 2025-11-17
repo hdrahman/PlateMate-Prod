@@ -5,12 +5,12 @@ import {
     StyleSheet,
     Image,
     TouchableOpacity,
-    Dimensions,
     ScrollView,
     FlatList,
     Animated,
     ViewToken,
     Platform,
+    useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +20,6 @@ import { scale, spacing, fontSize, wp, hp, size, borderRadius } from '../../util
 import IntroStep1 from './IntroStep1';
 import IntroStep2 from './IntroStep2';
 import IntroStep3 from './IntroStep3';
-
-const { width, height } = Dimensions.get('window');
 
 interface WelcomeStepProps {
     onNext: () => void;
@@ -33,6 +31,7 @@ interface ViewableItemsChangedInfo {
 }
 
 const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
+    const { width } = useWindowDimensions();
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
@@ -96,7 +95,7 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { width }]}>
             <FlatList
                 ref={flatListRef}
                 data={[0, 1, 2]}
@@ -164,7 +163,6 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        width: width,
         backgroundColor: '#000',
     },
     pagination: {
