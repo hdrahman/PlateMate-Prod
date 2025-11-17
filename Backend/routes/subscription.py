@@ -88,9 +88,14 @@ async def check_vip_status(firebase_uid: str) -> dict:
         return vip_result
         
     except Exception as e:
-        logger.error(f"Error checking VIP status for {firebase_uid}: {str(e)}")
-        # Fail safely - return non-VIP on error
-        return {'is_vip': False}
+        logger.error(f"CRITICAL: VIP status check failed for {firebase_uid}: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+
+        # Fail safely - return non-VIP on error (security-first approach)
+        # This prevents unauthorized access even if there's a system failure
+        return {'is_vip': False, 'error': 'VIP check failed', 'error_message': str(e)}
 
 # Helper function for RevenueCat API calls using httpx
 async def call_revenuecat_api(method: str, endpoint: str, data: Optional[dict] = None, extra_headers: Optional[dict] = None) -> dict:

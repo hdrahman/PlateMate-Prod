@@ -138,12 +138,12 @@ const WeightModal = React.memo<WeightModalProps>(({
 
   // Focus input when modal becomes visible
   useEffect(() => {
-    if (visible) {
-      // Small delay to ensure modal is fully rendered
-      const timer = setTimeout(() => {
+    if (visible && inputRef.current) {
+      // Use requestAnimationFrame for better UI synchronization
+      const frameId = requestAnimationFrame(() => {
         inputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
+      });
+      return () => cancelAnimationFrame(frameId);
     }
   }, [visible]);
 

@@ -87,6 +87,18 @@ class PostgreSQLSyncService {
         console.log('✅ PostgreSQLSyncService initialized (restore-only mode)');
     }
 
+    // Helper function to safely parse JSON with error handling
+    private safeJSONParse<T>(jsonString: string | null, fallback: T): T {
+        if (!jsonString) return fallback;
+        try {
+            return JSON.parse(jsonString);
+        } catch (error) {
+            console.error('JSON parse error:', error);
+            console.warn('Corrupted data detected, using fallback value');
+            return fallback;
+        }
+    }
+
     // REMOVED: No longer needed with dual-write architecture
     // private setupEventDrivenSync() {
     //     this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
@@ -751,12 +763,12 @@ class PostgreSQLSyncService {
                 AsyncStorage.getItem('privacy_settings')
             ]);
 
-            // Parse the data
-            const parsedStreaks = streaksData ? JSON.parse(streaksData) : null;
-            const parsedGoals = dailyGoalsData ? JSON.parse(dailyGoalsData) : null;
-            const parsedNotifications = notificationSettings ? JSON.parse(notificationSettings) : {};
-            const parsedDataSharing = dataSharingSettings ? JSON.parse(dataSharingSettings) : {};
-            const parsedPrivacy = privacySettings ? JSON.parse(privacySettings) : {};
+            // Parse the data with error handling
+            const parsedStreaks = this.safeJSONParse(streaksData, null);
+            const parsedGoals = this.safeJSONParse(dailyGoalsData, null);
+            const parsedNotifications = this.safeJSONParse(notificationSettings, {});
+            const parsedDataSharing = this.safeJSONParse(dataSharingSettings, {});
+            const parsedPrivacy = this.safeJSONParse(privacySettings, {});
 
             // Build ui_preferences object with streaks and daily goals
             const uiPreferences: any = {};
