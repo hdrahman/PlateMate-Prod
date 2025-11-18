@@ -39,6 +39,8 @@ import PredictiveInsightsStep from '../components/onboarding/PredictiveInsightsS
 import SocialSignInInfoStep from '../components/onboarding/SocialSignInInfoStep';
 
 const { width, height } = Dimensions.get('window');
+const TOTAL_ONBOARDING_STEPS = 9; // AccountCreation + Goals + Motivation + WeightChangeRate + ActivityLevel + CheatDay + Gender + PhysicalAttributes + PredictiveInsights
+const SCROLL_LOCKED_STEPS = new Set([5, 6, 9, 10]);
 
 const Onboarding = () => {
     const navigation = useNavigation();
@@ -149,7 +151,12 @@ const Onboarding = () => {
         }
     };
 
-    const TOTAL_ONBOARDING_STEPS = 9; // Number of steps after the welcome screen (AccountCreation + Goals + Motivation + WeightChangeRate + ActivityLevel + CheatDay + Gender + PhysicalAttributes + PredictiveInsights)
+    const isScrollLockedStep = SCROLL_LOCKED_STEPS.has(currentStep);
+    const contentPaddingStyle = [
+        styles.content,
+        currentStep === 1 ? styles.introContent : undefined,
+        (currentStep === 6 || currentStep === 10) ? styles.fullBleedContent : undefined,
+    ];
 
     return (
         <SafeAreaView style={styles.container}>
@@ -201,18 +208,20 @@ const Onboarding = () => {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
-                <ScrollView
-                    contentContainerStyle={[
-                        styles.content,
-                        currentStep === 1 && styles.introContent,
-                        (currentStep === 6 || currentStep === 10) && { paddingHorizontal: 0, paddingBottom: 0 }
-                    ]}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 1 && currentStep !== 5 && currentStep !== 6 && currentStep !== 9 && currentStep !== 10}
-                >
-                    {renderCurrentStep()}
-                </ScrollView>
+                {isScrollLockedStep ? (
+                    <View style={[styles.lockedContentContainer, ...contentPaddingStyle]}>
+                        {renderCurrentStep()}
+                    </View>
+                ) : (
+                    <ScrollView
+                        contentContainerStyle={contentPaddingStyle}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        scrollEnabled={currentStep > 1 && currentStep < 10}
+                    >
+                        {renderCurrentStep()}
+                    </ScrollView>
+                )}
             </KeyboardAvoidingView>
             {error && (
                 <View style={styles.errorContainer}>
@@ -300,6 +309,13 @@ const styles = StyleSheet.create({
         paddingBottom: 0,
         paddingTop: 0,
         flex: 1
+    },
+    fullBleedContent: {
+        paddingHorizontal: 0,
+        paddingBottom: 0,
+    },
+    lockedContentContainer: {
+        flex: 1,
     },
     errorContainer: {
         backgroundColor: '#FF3B30',
