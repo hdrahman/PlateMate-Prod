@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +18,7 @@ interface ActivityLevelStepProps {
 const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updateProfile, onNext }) => {
     const [activityLevel, setActivityLevel] = useState<string>(profile.activityLevel || 'sedentary');
 
-    // Activity levels with detailed descriptions
+    // Activity levels with concise descriptions
     const activityLevels = [
         {
             id: 'sedentary',
@@ -70,55 +69,57 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Activity Level</Text>
                 <Text style={styles.subtitle}>How active are you in your daily life?</Text>
             </View>
 
-            <View style={styles.activityContainer}>
-                {activityLevels.map((level) => (
-                    <TouchableOpacity
-                        key={level.id}
-                        style={[
-                            styles.activityCard,
-                            activityLevel === level.id && styles.selectedActivity
-                        ]}
-                        onPress={() => {
-                            setActivityLevel(level.id);
-                            updateProfile({ activityLevel: level.id }).catch(console.error);
-                        }}
-                    >
-                        <View style={[styles.activityIcon, { backgroundColor: `${level.color}20` }]}>
-                            <Ionicons
-                                name={level.icon as any}
-                                size={24}
-                                color={activityLevel === level.id ? level.color : '#777'}
-                            />
-                        </View>
-                        <View style={styles.activityContent}>
-                            <Text style={[
-                                styles.activityLabel,
-                                activityLevel === level.id && { color: level.color }
-                            ]}>
-                                {level.label}
-                            </Text>
-                            <Text style={styles.activityDescription}>
-                                {level.description}
-                            </Text>
-                        </View>
-                        {activityLevel === level.id && (
-                            <Ionicons name="checkmark-circle" size={22} color={level.color} />
-                        )}
-                    </TouchableOpacity>
-                ))}
-            </View>
+            <View style={styles.content}>
+                <View style={styles.activityContainer}>
+                    {activityLevels.map((level) => (
+                        <TouchableOpacity
+                            key={level.id}
+                            style={[
+                                styles.activityCard,
+                                activityLevel === level.id && styles.selectedActivity
+                            ]}
+                            onPress={() => {
+                                setActivityLevel(level.id);
+                                updateProfile({ activityLevel: level.id }).catch(console.error);
+                            }}
+                        >
+                            <View style={[styles.activityIcon, { backgroundColor: `${level.color}20` }]}>
+                                <Ionicons
+                                    name={level.icon as any}
+                                    size={24}
+                                    color={activityLevel === level.id ? level.color : '#777'}
+                                />
+                            </View>
+                            <View style={styles.activityContent}>
+                                <Text style={[
+                                    styles.activityLabel,
+                                    activityLevel === level.id && { color: level.color }
+                                ]}>
+                                    {level.label}
+                                </Text>
+                                <Text style={styles.activityDescription}>
+                                    {level.description}
+                                </Text>
+                            </View>
+                            {activityLevel === level.id && (
+                                <Ionicons name="checkmark-circle" size={22} color={level.color} />
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
-            <View style={styles.infoContainer}>
-                <Ionicons name="information-circle-outline" size={20} color="#888" />
-                <Text style={styles.infoText}>
-                    Your activity level helps us calculate your daily calorie needs accurately
-                </Text>
+                <View style={styles.infoContainer}>
+                    <Ionicons name="information-circle-outline" size={20} color="#888" />
+                    <Text style={styles.infoText}>
+                        Your activity level helps us calculate your daily calorie needs. You can leave it at sedentary and the app will track your steps for accurate calorie targets.
+                    </Text>
+                </View>
             </View>
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
@@ -132,20 +133,19 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
                     <Ionicons name="arrow-forward" size={18} color="#fff" />
                 </LinearGradient>
             </TouchableOpacity>
-        </ScrollView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    contentContainer: {
         paddingTop: 20,
-        paddingBottom: 40,
+        justifyContent: 'space-between',
     },
     header: {
-        marginBottom: 32,
+        paddingHorizontal: 20,
+        marginBottom: 24,
     },
     title: {
         fontSize: 28,
@@ -159,16 +159,20 @@ const styles = StyleSheet.create({
         color: '#aaa',
         lineHeight: 22,
     },
+    content: {
+        flex: 1,
+        paddingHorizontal: 20,
+    },
     activityContainer: {
-        marginBottom: 24,
+        marginBottom: 8,
     },
     activityCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 16,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
     },
@@ -177,33 +181,33 @@ const styles = StyleSheet.create({
         borderColor: '#0074dd',
     },
     activityIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 16,
+        marginRight: 12,
     },
     activityContent: {
         flex: 1,
     },
     activityLabel: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: '#fff',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     activityDescription: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#aaa',
-        lineHeight: 20,
+        lineHeight: 18,
     },
     infoContainer: {
         flexDirection: 'row',
         backgroundColor: 'rgba(255, 255, 255, 0.04)',
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 24,
+        padding: 14,
+        marginBottom: 16,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.06)',
     },
@@ -218,7 +222,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         overflow: 'hidden',
         marginHorizontal: 20,
-        marginTop: 20,
+        marginBottom: 20,
     },
     buttonGradient: {
         flexDirection: 'row',

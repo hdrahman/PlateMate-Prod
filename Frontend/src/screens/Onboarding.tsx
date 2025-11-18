@@ -205,11 +205,11 @@ const Onboarding = () => {
                     contentContainerStyle={[
                         styles.content,
                         currentStep === 1 && styles.introContent,
-                        (currentStep === 6) && { paddingHorizontal: 0, paddingBottom: 0 }
+                        (currentStep === 6 || currentStep === 10) && { paddingHorizontal: 0, paddingBottom: 0 }
                     ]}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    scrollEnabled={currentStep > 1 && currentStep < 10}
+                    scrollEnabled={currentStep > 1 && currentStep !== 5 && currentStep !== 6 && currentStep !== 9 && currentStep !== 10}
                 >
                     {renderCurrentStep()}
                 </ScrollView>

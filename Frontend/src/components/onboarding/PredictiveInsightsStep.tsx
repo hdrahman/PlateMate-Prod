@@ -672,8 +672,8 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
     };
 
     return (
-        <View style={{ flex: 1 }}>
-            <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.container}>
+            <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
                 {/* Header handled at screen level – removed duplicate back/progress bar */}
 
                 {renderHeroCard()}
@@ -721,8 +721,9 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flexGrow: 1,
-        paddingBottom: 0,
-        paddingTop: 0,
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+        paddingTop: 20,
     },
     heroCardContainer: {
         marginHorizontal: 0,

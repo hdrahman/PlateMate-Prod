@@ -187,7 +187,7 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
 
             // Sync both unit preference fields to prevent desynchronization
             const unitFields = syncUnitPreferenceFields(useMetric);
-            
+
             await updateProfile({
                 weight: finalWeight,
                 height: finalHeight,
@@ -443,7 +443,6 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
         justifyContent: 'space-between',
     },
     content: {
@@ -453,20 +452,18 @@ const styles = StyleSheet.create({
     },
     header: {
         marginBottom: 24,
-        alignItems: 'center',
+        paddingHorizontal: 20,
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
         color: '#fff',
-        textAlign: 'center',
         marginBottom: 8,
         letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
         color: '#aaa',
-        textAlign: 'center',
         lineHeight: 22,
     },
     toggleContainer: {

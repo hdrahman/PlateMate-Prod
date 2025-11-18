@@ -4,7 +4,6 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,58 +81,54 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
 
     return (
         <View style={styles.container}>
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={styles.header}>
-                    <Text style={styles.title}>Choose Your Rate</Text>
-                    <Text style={styles.subtitle}>
-                        Based on your goal of "{effectiveGoal === 'fat_loss' ? 'weight loss' :
-                            effectiveGoal === 'muscle_gain' ? 'muscle gain' : 'balanced fitness'}",
-                        choose a comfortable rate of progress
-                    </Text>
-                </View>
-
-                <View style={styles.rateContainer}>
-                {getWeightGoalOptions().map((option) => (
-                    <TouchableOpacity
-                        key={option.id}
-                        style={[
-                            styles.rateCard,
-                            weightGoal === option.id && styles.selectedRate,
-                            weightGoal === option.id && { borderColor: option.color }
-                        ]}
-                        onPress={() => setWeightGoal(option.id)}
-                    >
-                        <View style={[styles.rateIconContainer, { backgroundColor: `${option.color}20` }]}>
-                            <Ionicons
-                                name={option.icon as any}
-                                size={24}
-                                color={option.color}
-                            />
-                        </View>
-                        <View style={styles.rateContent}>
-                            <Text style={[
-                                styles.rateLabel,
-                                weightGoal === option.id && { color: option.color }
-                            ]}>
-                                {option.label}
-                            </Text>
-                            <Text style={[
-                                styles.rateDescription,
-                                weightGoal === option.id && styles.selectedRateDescription
-                            ]}>
-                                {option.description}
-                            </Text>
-                        </View>
-                        {weightGoal === option.id && (
-                            <Ionicons name="checkmark-circle" size={24} color={option.color} style={styles.checkIcon} />
-                        )}
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.header}>
+                <Text style={styles.title}>Choose Your Rate</Text>
+                <Text style={styles.subtitle}>
+                    Based on your goal of "{effectiveGoal === 'fat_loss' ? 'weight loss' :
+                        effectiveGoal === 'muscle_gain' ? 'muscle gain' : 'balanced fitness'}",
+                    choose a comfortable rate of progress
+                </Text>
             </View>
+
+            <View style={styles.content}>
+                <View style={styles.rateContainer}>
+                    {getWeightGoalOptions().map((option) => (
+                        <TouchableOpacity
+                            key={option.id}
+                            style={[
+                                styles.rateCard,
+                                weightGoal === option.id && styles.selectedRate,
+                                weightGoal === option.id && { borderColor: option.color }
+                            ]}
+                            onPress={() => setWeightGoal(option.id)}
+                        >
+                            <View style={[styles.rateIconContainer, { backgroundColor: `${option.color}20` }]}>
+                                <Ionicons
+                                    name={option.icon as any}
+                                    size={24}
+                                    color={option.color}
+                                />
+                            </View>
+                            <View style={styles.rateContent}>
+                                <Text style={[
+                                    styles.rateLabel,
+                                    weightGoal === option.id && { color: option.color }
+                                ]}>
+                                    {option.label}
+                                </Text>
+                                <Text style={[
+                                    styles.rateDescription,
+                                    weightGoal === option.id && styles.selectedRateDescription
+                                ]}>
+                                    {option.description}
+                                </Text>
+                            </View>
+                            {weightGoal === option.id && (
+                                <Ionicons name="checkmark-circle" size={24} color={option.color} style={styles.checkIcon} />
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
                 <View style={styles.infoContainer}>
                     <Ionicons name="information-circle-outline" size={20} color="#0074dd" />
@@ -142,19 +137,19 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
                         Slower rates are more sustainable long-term.
                     </Text>
                 </View>
+            </View>
 
-                <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-                    <LinearGradient
-                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.buttonGradient}
-                    >
-                        <Text style={styles.buttonText}>Continue</Text>
-                        <Ionicons name="arrow-forward" size={18} color="#fff" />
-                    </LinearGradient>
-                </TouchableOpacity>
-            </ScrollView>
+            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+                <LinearGradient
+                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.buttonGradient}
+                >
+                    <Text style={styles.buttonText}>Continue</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#fff" />
+                </LinearGradient>
+            </TouchableOpacity>
         </View>
     );
 };
@@ -162,18 +157,12 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
         paddingTop: 20,
-        paddingBottom: 20,
+        justifyContent: 'space-between',
     },
     header: {
-        marginBottom: 32,
         paddingHorizontal: 20,
+        marginBottom: 32,
     },
     title: {
         fontSize: 28,
@@ -187,9 +176,12 @@ const styles = StyleSheet.create({
         color: '#aaa',
         lineHeight: 22,
     },
+    content: {
+        flex: 1,
+        paddingHorizontal: 20,
+    },
     rateContainer: {
         marginBottom: 20,
-        paddingHorizontal: 20,
     },
     rateCard: {
         flexDirection: 'row',
@@ -236,7 +228,6 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.06)',
-        marginHorizontal: 20,
     },
     infoText: {
         flex: 1,
