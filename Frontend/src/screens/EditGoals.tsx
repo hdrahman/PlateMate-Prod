@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid } from '../utils/database'; // Local database functions
 import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile, resetNutritionGoals } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
-import { calculateNutritionGoalsFromProfile, Gender, ActivityLevel, WeightGoal, mapWeightGoal } from '../utils/offlineNutritionCalculator';
+import { calculateNutritionGoalsFromProfile, Gender, ActivityLevel, WeightGoal, mapWeightGoal } from '../utils/nutritionCalculator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Slider from '@react-native-community/slider';
 import WheelPicker from '@quidone/react-native-wheel-picker';
@@ -498,7 +498,7 @@ export default function EditGoals() {
                         if (!profileForCalculation.age) missingFields.push('age');
                         if (!profileForCalculation.gender) missingFields.push('gender');
                         if (!profileForCalculation.activity_level) missingFields.push('activity level');
-                        
+
                         console.log('❌ Nutrition goals calculation failed. Missing fields:', missingFields);
                         console.log('📋 Profile data available:', {
                             currentWeight: profileForCalculation.weight,
@@ -508,7 +508,7 @@ export default function EditGoals() {
                             gender: profileForCalculation.gender,
                             activityLevel: profileForCalculation.activity_level
                         });
-                        
+
                         throw new Error(`Unable to calculate nutrition goals. Missing required fields: ${missingFields.join(', ')}. Note: Target weight is optional.`);
                     }
 

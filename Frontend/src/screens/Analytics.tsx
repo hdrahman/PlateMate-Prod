@@ -25,6 +25,7 @@ import {
     getTodayExerciseCalories,
     getUserProfileBySupabaseUid
 } from '../utils/database';
+import { calculateNutritionGoals, calculateBMRData } from '../utils/nutritionCalculator';
 
 const { width, height } = Dimensions.get('window');
 
@@ -155,7 +156,7 @@ const Analytics: React.FC = () => {
             if (profile) {
                 setUserProfile(profile);
                 // Calculate TDEE and goals based on user data
-                goals = calculateTDEE(profile);
+                goals = calculateGoalsFromProfile(profile);
                 setUserGoals(goals);
             }
 
@@ -233,11 +234,11 @@ const Analytics: React.FC = () => {
 
         // Recovery Score (based on adequate nutrition for recovery)
         const avgProtein = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
-        const proteinGoalGrams = userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal;
+        const proteinGoalGrams = userGoals?.proteinGoal || calculateGoalsFromProfile(userProfile).proteinGoal;
 
         // Recovery factors: adequate protein, sufficient calories, consistent intake
         const proteinRecoveryScore = Math.min(100, (avgProtein / proteinGoalGrams) * 100);
-        const calorieRecoveryScore = Math.min(100, (avgCalories / (userGoals?.targetCalories || calculateTDEE(userProfile).targetCalories)) * 100);
+        const calorieRecoveryScore = Math.min(100, (avgCalories / (userGoals?.targetCalories || calculateGoalsFromProfile(userProfile).targetCalories)) * 100);
         const recoveryConsistency = 100 - (Math.sqrt(variance) / avgCalories * 50); // Less penalty for recovery
 
         const recoveryScore = (proteinRecoveryScore * 0.4 + calorieRecoveryScore * 0.3 + recoveryConsistency * 0.3);
@@ -313,7 +314,7 @@ const Analytics: React.FC = () => {
 
         // Calorie Analysis
         const avgCalories = validDays.reduce((sum, day) => sum + day.calories, 0) / validDays.length;
-        const goalData = calculateTDEE(profile);
+        const goalData = calculateGoalsFromProfile(profile);
         const estimatedTDEE = goalData.tdee;
 
         if (avgCalories < estimatedTDEE * 0.8) {
@@ -334,7 +335,7 @@ const Analytics: React.FC = () => {
 
         // Protein Analysis
         const avgProtein = validDays.reduce((sum, day) => sum + day.protein, 0) / validDays.length;
-        const proteinTargetInsights = calculateTDEE(profile).proteinGoal; // Use evidence-based calculation
+        const proteinTargetInsights = calculateGoalsFromProfile(profile).proteinGoal; // Use evidence-based calculation
 
         if (avgProtein < proteinTargetInsights * 0.8) {
             insights.push({
@@ -387,68 +388,64 @@ const Analytics: React.FC = () => {
         });
     };
 
-    const calculateBMR = (profile: any) => {
-        if (!profile?.weight || !profile?.height || !profile?.age) {
-            // Evidence-based average BMR estimates by gender if no profile data
-            return profile?.gender === 'male' ? 1800 : 1400;
+    // Reuse canonical calculator for consistency with rest of app
+    const calculateGoalsFromProfile = (profile: any) => {
+        if (!profile) {
+            return {
+                tdee: 2000,
+                targetCalories: 2000,
+                proteinGoal: 100,
+                currentWeight: 70,
+                targetWeight: 70,
+                age: 30
+            };
         }
 
-        // Mifflin-St Jeor Equation (most accurate for general population)
-        if (profile.gender === 'male') {
-            return 10 * profile.weight + 6.25 * profile.height - 5 * profile.age + 5;
-        } else {
-            return 10 * profile.weight + 6.25 * profile.height - 5 * profile.age - 161;
-        }
-    };
-
-    const calculateTDEE = (profile: any) => {
-        const bmr = calculateBMR(profile);
-
-        // Evidence-based activity multipliers (updated 2024 research)
-        const activityMultipliers = {
-            'sedentary': 1.2,     // Desk job, little exercise
-            'light': 1.375,      // Light exercise 1-3 days/week
-            'moderate': 1.55,     // Moderate exercise 3-5 days/week
-            'active': 1.725,     // Heavy exercise 6-7 days/week
-            'very_active': 1.9   // Very heavy exercise, physical job
+        // Convert snake_case DB fields to UserProfile format
+        const userProfile = {
+            firstName: '',
+            lastName: '',
+            email: '',
+            dateOfBirth: null,
+            location: null,
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            activityLevel: profile.activity_level,
+            dietaryRestrictions: [],
+            foodAllergies: [],
+            cuisinePreferences: [],
+            spiceTolerance: null,
+            weightGoal: profile.weight_goal || null,
+            targetWeight: profile.target_weight || null,
+            startingWeight: null,
+            fitnessGoal: profile.weight_goal || profile.fitness_goal,
+            healthConditions: [],
+            dailyCalorieTarget: null,
+            nutrientFocus: null,
+            motivations: [],
+            futureSelfMessage: null,
+            futureSelfMessageType: null,
+            futureSelfMessageCreatedAt: null,
+            futureSelfMessageUri: null,
+            onboardingComplete: true,
+            premium: false,
+            defaultAddress: null,
+            preferredDeliveryTimes: [],
+            deliveryInstructions: null,
         };
 
-        const multiplier = activityMultipliers[profile?.activity_level as keyof typeof activityMultipliers] || 1.375;
-        const tdee = Math.round(bmr * multiplier);
-
-        // Evidence-based protein recommendations (2024 nutrition guidelines)
-        // 1.6-2.2g per kg for active individuals, 0.8-1.2g per kg for sedentary
-        const weight = profile?.weight || (profile?.gender === 'male' ? 80 : 65);
-        const activityLevel = profile?.activity_level || 'light';
-
-        let proteinMultiplier;
-        if (['sedentary', 'light'].includes(activityLevel)) {
-            proteinMultiplier = 1.2; // Lower end for less active
-        } else if (['moderate', 'active'].includes(activityLevel)) {
-            proteinMultiplier = 1.8; // Mid-range for moderately active
-        } else {
-            proteinMultiplier = 2.0; // Higher for very active
-        }
-
-        const proteinGoal = Math.round(weight * proteinMultiplier);
-
-        // Calculate target calories based on goal
-        let targetCalories = tdee; // Default to maintenance
-        if (profile?.fitness_goal === 'lose_weight') {
-            // 0.5-1kg per week = 500-750 calorie deficit (evidence-based safe range)
-            targetCalories = tdee - 500;
-        } else if (profile?.fitness_goal === 'gain_weight' || profile?.fitness_goal === 'build_muscle') {
-            // 0.25-0.5kg per week = 250-500 calorie surplus
-            targetCalories = tdee + 300;
-        }
+        const goals = calculateNutritionGoals(userProfile);
+        const bmrData = calculateBMRData(userProfile);
 
         return {
-            tdee,
-            targetCalories: Math.max(targetCalories, bmr * 1.2), // Never go below 1.2x BMR
-            proteinGoal,
-            currentWeight: weight,
-            targetWeight: profile?.target_weight || weight,
-            age: profile?.age || (profile?.gender === 'male' ? 30 : 28) // Average age by gender
+            tdee: bmrData?.maintenanceCalories || 2000,
+            targetCalories: bmrData?.dailyTarget || 2000,
+            proteinGoal: goals.protein,
+            currentWeight: profile.weight || 70,
+            targetWeight: profile.target_weight || profile.weight || 70,
+            age: profile.age || 30
         };
     };
 
@@ -798,7 +795,7 @@ const Analytics: React.FC = () => {
         const periodData = macroTrends.slice(-periodLength);
 
         // Calculate days on track for the selected period
-        const targetCalories = userGoals?.targetCalories || calculateTDEE(userProfile).targetCalories;
+        const targetCalories = userGoals?.targetCalories || calculateGoalsFromProfile(userProfile).targetCalories;
         const daysOnTrack = periodData.filter(day =>
             day.calories >= targetCalories * 0.9 && day.calories <= targetCalories * 1.1
         ).length;
@@ -828,7 +825,7 @@ const Analytics: React.FC = () => {
                     </View>
                     <View style={styles.weeklyStat}>
                         <Text style={[styles.weeklyStatNumber, {
-                            color: Math.round(avgProtein) >= (userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: Math.round(avgProtein) >= (userGoals?.proteinGoal || calculateGoalsFromProfile(userProfile).proteinGoal) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
                         }]}>
                             {Math.round(avgProtein)}g
                         </Text>
@@ -932,7 +929,7 @@ const Analytics: React.FC = () => {
     };
 
     const renderQuickWins = () => {
-        const proteinGoal = userGoals?.proteinGoal || calculateTDEE(userProfile).proteinGoal;
+        const proteinGoal = userGoals?.proteinGoal || calculateGoalsFromProfile(userProfile).proteinGoal;
         const needsMoreProtein = avgDailyNutrition.protein < proteinGoal;
         // Dynamic thresholds based on user experience and goals
         const consistencyThreshold = userProfile?.experience_level === 'beginner' ? 60 : 75; // More lenient for beginners

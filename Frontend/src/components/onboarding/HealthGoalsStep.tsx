@@ -19,6 +19,7 @@ import { UserProfile } from '../../types/user';
 import WheelPicker from '../WheelPicker';
 import { initializeCheatDaySettings } from '../../utils/database';
 import { useAuth } from '../../context/AuthContext';
+import { calculateNutritionGoals } from '../../utils/nutritionCalculator';
 
 interface HealthGoalsStepProps {
     profile: UserProfile;
@@ -113,78 +114,17 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
     }, [mainGoal, detailedGoal, profile]);
 
     const calculateNutrition = () => {
-        // Calculate BMR using Mifflin-St Jeor Equation
-        let bmr = 0;
+        // Build a UserProfile with the selected goal
+        const profileWithGoal: UserProfile = {
+            ...profile,
+            weightGoal: detailedGoal,
+            fitnessGoal: detailedGoal,
+        };
 
-        if (profile.gender === 'male') {
-            bmr = 10 * profile.weight! + 6.25 * profile.height! - 5 * profile.age! + 5;
-        } else {
-            bmr = 10 * profile.weight! + 6.25 * profile.height! - 5 * profile.age! - 161;
-        }
+        // Use canonical calculator
+        const goals = calculateNutritionGoals(profileWithGoal);
 
-        // Activity multiplier
-        let activityMultiplier = 1.2; // Sedentary
-
-        switch (profile.activityLevel) {
-            case 'light':
-                activityMultiplier = 1.375;
-                break;
-            case 'moderate':
-                activityMultiplier = 1.55;
-                break;
-            case 'active':
-                activityMultiplier = 1.725;
-                break;
-            case 'very_active':
-                activityMultiplier = 1.9;
-                break;
-        }
-
-        // Calculate TDEE (Total Daily Energy Expenditure)
-        let tdee = Math.round(bmr * activityMultiplier);
-
-        // Adjust based on detailed goal
-        if (detailedGoal.startsWith('lose')) {
-            const option = weightLossOptions.find(opt => opt.id === detailedGoal);
-            if (option) {
-                tdee -= option.deficit;
-            }
-        } else if (detailedGoal.startsWith('gain')) {
-            const option = weightGainOptions.find(opt => opt.id === detailedGoal);
-            if (option) {
-                tdee += option.surplus;
-            }
-        }
-
-        // Removed minimum calorie constraint
-
-        setCalculatedCalories(tdee);
-
-        // Evidence-based macronutrient distribution (2024 nutrition guidelines)
-        let proteinPct, carbsPct, fatPct;
-
-        if (mainGoal === 'lose') {
-            // Higher protein for muscle preservation during weight loss
-            proteinPct = 0.30; // 25-35% protein range for weight loss
-            carbsPct = 0.35; // Lower carbs to support fat loss
-            fatPct = 0.35;   // Adequate fat for hormone production
-        } else if (mainGoal === 'gain') {
-            // Balanced for muscle gain with adequate energy
-            proteinPct = 0.25; // 20-30% protein for muscle building
-            carbsPct = 0.50;   // Higher carbs for training energy
-            fatPct = 0.25;     // Moderate fat for calorie density
-        } else { // maintain
-            // Balanced approach for general health
-            proteinPct = 0.25; // 20-35% protein for maintenance
-            carbsPct = 0.45;   // 45-65% carbs for energy
-            fatPct = 0.30;     // 20-35% fat for essential functions
-        }
-
-        // Calculate macros in grams
-        // 1g protein = 4 calories, 1g carbs = 4 calories, 1g fat = 9 calories
-        const proteinG = Math.round((tdee * proteinPct) / 4);
-        const carbsG = Math.round((tdee * carbsPct) / 4);
-        const fatG = Math.round((tdee * fatPct) / 9);
+        setCalculatedCalories(goals.calories);
 
         // Evidence-based fiber recommendations (2024 dietary guidelines)
         // Men: 38g/day, Women: 25g/day (or 14g per 1000 calories)
@@ -192,7 +132,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
 
         // Added sugar recommendations (WHO/AHA guidelines)
         // <10% of total calories from added sugars (WHO), <6% ideal (AHA)
-        const sugarsG = Math.round(tdee * 0.06 / 4); // 6% of calories as added sugars
+        const sugarsG = Math.round(goals.calories * 0.06 / 4); // 6% of calories as added sugars
 
         // Sodium recommendations based on health conditions and age
         let sodiumMg = 2300; // Standard adult recommendation
@@ -203,9 +143,9 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
         }
 
         setCalculatedNutrients({
-            protein: proteinG,
-            carbs: carbsG,
-            fats: fatG,
+            protein: goals.protein,
+            carbs: goals.carbs,
+            fats: goals.fat,
             fiber: fiberG,
             sugar: sugarsG,
             sodium: sodiumMg

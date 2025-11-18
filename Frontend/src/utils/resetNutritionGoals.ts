@@ -1,5 +1,5 @@
 import { getUserProfileBySupabaseUid, updateUserGoals, getUserGoals } from './database';
-import { calculateNutritionGoalsFromProfile } from './offlineNutritionCalculator';
+import { calculateNutritionGoalsFromProfile } from './nutritionCalculator';
 import { lbsToKg } from './unitConversion';
 
 export interface ResetNutritionGoalsOptions {
