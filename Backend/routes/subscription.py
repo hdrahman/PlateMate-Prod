@@ -935,11 +935,44 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
     Grant 20-day promotional trial to new users - Backend managed (automatic for new accounts)
     FAILS IMMEDIATELY if RevenueCat API is unavailable or returns an error.
     NO FALLBACKS - this is core subscription functionality.
+    
+    IMPORTANT: We verify the user exists in the database first to prevent race conditions
+    where the webhook fires before the user profile sync completes.
     """
     try:
         firebase_uid = current_user["supabase_uid"]
 
         logger.info(f"🎆 Attempting to grant 20-day promotional trial to user: {firebase_uid}")
+
+        # CRITICAL: Verify user exists in database before granting trial
+        # This prevents race condition where webhook fires before profile sync completes
+        supabase = await get_db_connection()
+        max_retries = 3
+        retry_count = 0
+        user_exists = False
+        
+        while not user_exists and retry_count < max_retries:
+            retry_count += 1
+            logger.info(f"🔍 Verifying user exists in database (attempt {retry_count}/{max_retries})...")
+            
+            user_result = supabase.table("users").select("firebase_uid").eq("firebase_uid", firebase_uid).execute()
+            
+            if user_result.data and len(user_result.data) > 0:
+                user_exists = True
+                logger.info(f"✅ User verified in database: {firebase_uid}")
+            else:
+                if retry_count < max_retries:
+                    wait_time = retry_count * 2  # 2s, 4s, 6s
+                    logger.warning(f"⚠️ User not found in database yet, waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"❌ User not found in database after {max_retries} attempts: {firebase_uid}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="User profile not found in database. Please complete onboarding first."
+                    )
+        
+        logger.info(f"🎫 User verified in database, proceeding to grant promotional trial...")
 
         # Step 1: Check if user already has entitlements
         try:

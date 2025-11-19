@@ -48,7 +48,6 @@ const getIdToken = async (): Promise<string> => {
 // Types for profile data
 export interface UserProfile {
     first_name: string;
-    last_name?: string;
     height?: number;
     weight?: number;
     gender?: 'male' | 'female' | 'other';

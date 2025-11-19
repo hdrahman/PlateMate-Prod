@@ -36,13 +36,13 @@ interface FailedWrite {
     table: string;
     operation: 'insert' | 'update' | 'delete' | 'upsert';
     data: any;
-    filter?: {field: string; value: any};
+    filter?: { field: string; value: any };
     timestamp: string;
     retryCount: number;
 }
 
 // Queue a failed write for later retry
-const queueFailedWrite = async (table: string, operation: string, data: any, filter?: {field: string; value: any}) => {
+const queueFailedWrite = async (table: string, operation: string, data: any, filter?: { field: string; value: any }) => {
     try {
         const existingQueue = await AsyncStorage.getItem(FAILED_WRITES_QUEUE_KEY);
         const queue: FailedWrite[] = existingQueue ? JSON.parse(existingQueue) : [];
@@ -130,7 +130,7 @@ export const processFailedWrites = async () => {
 };
 
 // Helper to write to Supabase with error handling
-const writeToSupabase = async (table: string, operation: string, data: any, filter?: {field: string; value: any}) => {
+const writeToSupabase = async (table: string, operation: string, data: any, filter?: { field: string; value: any }) => {
     try {
         let query = supabase.from(table);
 
@@ -242,6 +242,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
     `);
 
         // Create user_subscriptions table for subscription management (SECURE - separate from profile)
+        // Note: Trial management is handled by RevenueCat, not stored locally
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS user_subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,11 +250,6 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         subscription_status TEXT NOT NULL DEFAULT 'free_trial',
         start_date TEXT NOT NULL,
         end_date TEXT,
-        trial_start_date TEXT,
-        trial_end_date TEXT,
-        extended_trial_granted INTEGER DEFAULT 0,
-        extended_trial_start_date TEXT,
-        extended_trial_end_date TEXT,
         auto_renew INTEGER DEFAULT 0,
         payment_method TEXT,
         subscription_id TEXT,
@@ -2260,9 +2256,9 @@ export const updateUserProfile = async (firebaseUid: string, updates: any, isAut
                     if (typeof value === 'number' && (value === 0 || value === 1)) {
                         // Check if this field is a boolean field
                         const booleanFields = ['use_metric_system', 'dark_mode', 'push_notifications_enabled',
-                                              'email_notifications_enabled', 'sms_notifications_enabled',
-                                              'marketing_emails_enabled', 'sync_data_offline', 'onboarding_complete',
-                                              'cheat_day_enabled'];
+                            'email_notifications_enabled', 'sms_notifications_enabled',
+                            'marketing_emails_enabled', 'sync_data_offline', 'onboarding_complete',
+                            'cheat_day_enabled'];
                         if (booleanFields.includes(key)) {
                             supabaseData[key] = value === 1;
                         } else {
@@ -3745,8 +3741,7 @@ export const getSubscriptionStatus = async (firebaseUid: string): Promise<Subscr
     try {
         const db = await getDatabase();
         const result = await db.getFirstAsync(
-            `SELECT subscription_status, start_date, end_date, trial_start_date, trial_end_date,
-             extended_trial_granted, extended_trial_start_date, extended_trial_end_date,
+            `SELECT subscription_status, start_date, end_date,
              auto_renew, payment_method, subscription_id, original_transaction_id,
              latest_receipt_data, receipt_validation_date, app_store_subscription_id,
              play_store_subscription_id, canceled_at, cancellation_reason,
@@ -3762,11 +3757,6 @@ export const getSubscriptionStatus = async (firebaseUid: string): Promise<Subscr
             status: result.subscription_status as SubscriptionStatus,
             startDate: result.start_date,
             endDate: result.end_date,
-            trialStartDate: result.trial_start_date,
-            trialEndDate: result.trial_end_date,
-            extendedTrialGranted: !!result.extended_trial_granted,
-            extendedTrialStartDate: result.extended_trial_start_date,
-            extendedTrialEndDate: result.extended_trial_end_date,
             autoRenew: !!result.auto_renew,
             paymentMethod: result.payment_method,
             subscriptionId: result.subscription_id,
@@ -3806,24 +3796,17 @@ export const updateSubscriptionStatus = async (
             // Create new subscription
             await db.runAsync(
                 `INSERT INTO user_subscriptions (
-          firebase_uid, subscription_status, start_date, end_date, trial_start_date, 
-          trial_end_date, extended_trial_granted, extended_trial_start_date, 
-          extended_trial_end_date, auto_renew, payment_method, subscription_id,
+          firebase_uid, subscription_status, start_date, end_date, auto_renew, payment_method, subscription_id,
           original_transaction_id, latest_receipt_data, receipt_validation_date,
           app_store_subscription_id, play_store_subscription_id, canceled_at,
           cancellation_reason, grace_period_end_date, is_in_intro_offer_period,
           intro_offer_end_date, last_modified
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     firebaseUid,
                     details.status || 'free_trial',
                     details.startDate || now,
                     details.endDate || null,
-                    details.trialStartDate || null,
-                    details.trialEndDate || null,
-                    details.extendedTrialGranted ? 1 : 0,
-                    details.extendedTrialStartDate || null,
-                    details.extendedTrialEndDate || null,
                     details.autoRenew ? 1 : 0,
                     details.paymentMethod || null,
                     details.subscriptionId || null,
@@ -3858,31 +3841,6 @@ export const updateSubscriptionStatus = async (
             if (details.endDate !== undefined) {
                 updateFields.push('end_date = ?');
                 updateValues.push(details.endDate);
-            }
-
-            if (details.trialStartDate !== undefined) {
-                updateFields.push('trial_start_date = ?');
-                updateValues.push(details.trialStartDate);
-            }
-
-            if (details.trialEndDate !== undefined) {
-                updateFields.push('trial_end_date = ?');
-                updateValues.push(details.trialEndDate);
-            }
-
-            if (details.extendedTrialGranted !== undefined) {
-                updateFields.push('extended_trial_granted = ?');
-                updateValues.push(details.extendedTrialGranted ? 1 : 0);
-            }
-
-            if (details.extendedTrialStartDate !== undefined) {
-                updateFields.push('extended_trial_start_date = ?');
-                updateValues.push(details.extendedTrialStartDate);
-            }
-
-            if (details.extendedTrialEndDate !== undefined) {
-                updateFields.push('extended_trial_end_date = ?');
-                updateValues.push(details.extendedTrialEndDate);
             }
 
             if (details.autoRenew !== undefined) {

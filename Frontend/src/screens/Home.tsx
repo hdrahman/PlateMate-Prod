@@ -410,7 +410,6 @@ export default function Home() {
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
             firstName: profile.first_name,
-            lastName: profile.last_name,
             dateOfBirth: profile.date_of_birth,
             location: profile.location,
             height: profile.height,
@@ -459,7 +458,7 @@ export default function Home() {
 
           // Update state with calculated goals, prioritizing BMR data, then database, then calculated
           let finalCalorieGoal = goals.calories;
-          
+
           if (bmrData?.dailyTarget) {
             finalCalorieGoal = bmrData.dailyTarget;
             console.log('📋 Using BMR daily target as calorie goal:', finalCalorieGoal);
@@ -492,7 +491,7 @@ export default function Home() {
       loadUserProfile();
       // Reload cheat day data to get the latest settings
       loadCheatDayData();
-      
+
       // Refresh step data to ensure latest count
       if (refreshStepData) {
         refreshStepData().catch(error => {
@@ -995,8 +994,8 @@ export default function Home() {
               {startingWeight
                 ? formatWeight(startingWeight, isImperialUnits)
                 : (weightHistory.length > 0
-                    ? formatWeight(weightHistory[0].weight, isImperialUnits)
-                    : '--')}
+                  ? formatWeight(weightHistory[0].weight, isImperialUnits)
+                  : '--')}
             </Text>
             <Text style={[
               styles.burnDetails,
@@ -2272,7 +2271,7 @@ interface MacroRingProps {
 const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroRingProps) => {
   const MACRO_STROKE_WIDTH = 6;
   const isOther = label.toUpperCase() === 'OTHER';
-  
+
   // Always recalculate diff to ensure it's fresh
   const diff = goal - current;
   let subText = '';
@@ -2296,10 +2295,10 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
 
   // Debug logging AFTER calculating subText
   if (!isOther) {
-    console.log(`🔍 MacroRing ${label}:`, { 
-      current: Math.round(current * 100) / 100, 
-      goal: Math.round(goal * 100) / 100, 
-      diff: Math.round(diff * 100) / 100, 
+    console.log(`🔍 MacroRing ${label}:`, {
+      current: Math.round(current * 100) / 100,
+      goal: Math.round(goal * 100) / 100,
+      diff: Math.round(diff * 100) / 100,
       subText: subText
     });
   }

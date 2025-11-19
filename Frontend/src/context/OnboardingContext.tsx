@@ -296,7 +296,7 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
 const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, firebaseUid: string, email: string): any => {
     // Ensure unit preference fields are synced before saving
     const unitFields = syncUnitPreferenceFields(frontendProfile.useMetricSystem);
-    
+
     return {
         firebase_uid: firebaseUid,
         email: email,
@@ -751,54 +751,118 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
             // CRITICAL: Immediately backup to Supabase after onboarding completion
             // This ensures data is backed up even if user uninstalls or loses device
-            // IMPORTANT: This is non-blocking - if it fails, background sync will retry
-            console.log('☁️ Starting immediate backup to Supabase...');
-            try {
-                // Check if session is ready before attempting sync
-                console.log('🔐 Verifying Supabase session is ready...');
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            // BLOCKING: We must ensure user exists in cloud before granting promotional trial
+            console.log('☁️ Starting immediate backup to Supabase (BLOCKING)...');
+            let syncSucceeded = false;
+            let syncAttempts = 0;
+            const maxSyncAttempts = 3;
 
-                if (sessionError || !session) {
-                    console.warn('⚠️ Session not ready, waiting 3 seconds for auth to propagate...');
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+            while (!syncSucceeded && syncAttempts < maxSyncAttempts) {
+                syncAttempts++;
+                console.log(`🔄 Sync attempt ${syncAttempts}/${maxSyncAttempts}...`);
 
-                    // Try once more
-                    const { data: { session: retrySession } } = await supabase.auth.getSession();
-                    if (!retrySession) {
-                        throw new Error('Session not available after retry - background sync will handle backup');
+                try {
+                    // Check if session is ready before attempting sync
+                    console.log('🔐 Verifying Supabase session is ready...');
+                    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                    if (sessionError || !session) {
+                        const waitTime = syncAttempts * 2000; // 2s, 4s, 6s
+                        console.warn(`⚠️ Session not ready, waiting ${waitTime}ms for auth to propagate...`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                        // Try once more
+                        const { data: { session: retrySession } } = await supabase.auth.getSession();
+                        if (!retrySession) {
+                            throw new Error('Session not available after retry');
+                        }
+                        console.log('✅ Session ready after retry');
+                    } else {
+                        console.log('✅ Session ready');
                     }
-                    console.log('✅ Session ready after retry');
-                } else {
-                    console.log('✅ Session ready');
+
+                    // Attempt sync with increased timeout for first attempt
+                    const timeoutMs = syncAttempts === 1 ? 120000 : 60000; // 2 min first attempt, 1 min for retries
+                    console.log(`📤 Attempting sync to Supabase (timeout: ${timeoutMs}ms)...`);
+
+                    // Create abort controller for timeout
+                    const abortController = new AbortController();
+                    const timeoutId = setTimeout(() => {
+                        console.warn('⏱️ Sync timeout reached, cancelling...');
+                        postgreSQLSyncService.cancelSync();
+                        abortController.abort();
+                    }, timeoutMs);
+
+                    const syncPromise = postgreSQLSyncService.syncToPostgreSQL(abortController.signal);
+                    const timeoutPromise = new Promise<any>((_, reject) =>
+                        abortController.signal.addEventListener('abort', () => reject(new Error('Sync timeout')))
+                    );
+
+                    const syncResult = await Promise.race([syncPromise, timeoutPromise]);
+                    clearTimeout(timeoutId); // Clear timeout if sync completes first
+
+                    const usersUploaded = syncResult?.stats?.usersUploaded ?? 0;
+                    const syncErrors = syncResult?.errors ?? [];
+                    const offlineError = syncErrors.some(err => typeof err === 'string' && err.toLowerCase().includes('offline'));
+
+                    if (usersUploaded > 0) {
+                        if (!syncResult.success && syncErrors.length) {
+                            console.warn('⚠️ Sync completed with additional errors. Proceeding because profile upload succeeded.', syncErrors);
+                        }
+                        console.log('✅ Immediate backup to Supabase completed successfully!');
+                        console.log('📊 Sync stats:', syncResult.stats);
+                        syncSucceeded = true;
+                    } else {
+                        if (offlineError) {
+                            throw new Error('Unable to reach the cloud. Please check your internet connection and try again.');
+                        }
+
+                        console.log('ℹ️ No users uploaded - user might already exist in cloud');
+                        try {
+                            const { data: existingUser, error: existingUserError } = await supabase
+                                .from('users')
+                                .select('id')
+                                .eq('firebase_uid', authUser.id)
+                                .single();
+
+                            if (existingUserError) {
+                                console.error('❌ Failed to verify existing cloud profile:', existingUserError);
+                                throw existingUserError;
+                            }
+
+                            if (existingUser) {
+                                console.log('✅ User already exists in cloud, proceeding...');
+                                syncSucceeded = true;
+                            } else {
+                                const aggregatedErrors = syncErrors.length ? syncErrors.join('; ') : 'User not found in cloud after sync';
+                                throw new Error(aggregatedErrors);
+                            }
+                        } catch (verificationError: any) {
+                            throw new Error(verificationError?.message || 'Failed to verify cloud backup status');
+                        }
+                    }
+                } catch (backupError) {
+                    console.error(`❌ Sync attempt ${syncAttempts} failed:`, backupError.message || backupError);
+
+                    if (syncAttempts < maxSyncAttempts) {
+                        const backoffDelay = Math.min(1000 * Math.pow(2, syncAttempts), 10000); // Exponential backoff: 2s, 4s, 8s
+                        console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                    } else {
+                        // All attempts failed - show error to user
+                        console.error('❌ All sync attempts failed - cloud backup unsuccessful');
+                        throw new Error('Failed to backup your data to the cloud. Your profile is saved locally, but we recommend trying to complete onboarding again when you have a stable internet connection.');
+                    }
                 }
-
-                // Attempt sync with timeout
-                // Note: Render free tier can sleep for 15+ minutes, but we don't want to block onboarding
-                // The background sync service will continue retrying even after onboarding completes
-                console.log('📤 Attempting immediate sync to Supabase...');
-                const syncPromise = postgreSQLSyncService.syncToPostgreSQL();
-                const timeoutPromise = new Promise<any>((_, reject) =>
-                    setTimeout(() => reject(new Error('Sync timeout - will continue in background')), 90000) // 90 second timeout
-                );
-
-                const syncResult = await Promise.race([syncPromise, timeoutPromise]);
-
-                if (syncResult.success) {
-                    console.log('✅ Immediate backup to Supabase completed successfully!');
-                    console.log('📊 Sync stats:', syncResult.stats);
-                } else {
-                    console.warn('⚠️ Immediate backup completed with errors (background sync will retry)');
-                    console.warn('📋 Errors:', syncResult.errors);
-                    // Don't throw - continue with onboarding even if backup had issues
-                }
-            } catch (backupError) {
-                // Log the error but DON'T block onboarding completion
-                // The profile is already saved to SQLite (synced=0), so background sync will retry
-                console.error('⚠️ Immediate backup failed - will retry in background');
-                console.error('📋 Error details:', backupError.message || backupError);
-                console.log('💾 Note: Profile is saved locally with synced=0, background sync will handle cloud backup');
-                // The background sync service will continue retrying automatically
             }
+
+            if (!syncSucceeded) {
+                throw new Error('Failed to sync profile to cloud');
+            }
+
+            // Add a small delay to ensure database changes are fully propagated
+            console.log('⏳ Waiting 2 seconds for database propagation...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // Mark onboarding as complete immediately
             console.log('🏁 Marking onboarding as complete...');

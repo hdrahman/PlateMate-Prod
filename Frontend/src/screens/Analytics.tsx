@@ -404,7 +404,6 @@ const Analytics: React.FC = () => {
         // Convert snake_case DB fields to UserProfile format
         const userProfile = {
             firstName: '',
-            lastName: '',
             email: '',
             dateOfBirth: null,
             location: null,

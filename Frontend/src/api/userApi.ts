@@ -55,13 +55,11 @@ interface CreateUserData {
     email: string;
     firebase_uid: string;
     first_name: string;
-    last_name?: string;
     phone_number?: string;
 }
 
 interface UpdateUserData {
     first_name?: string;
-    last_name?: string;
     phone_number?: string;
     physical_attributes?: PhysicalAttributes;
     dietary_preferences?: DietaryPreferences;
@@ -453,7 +451,6 @@ export const updateSubscription = async (firebaseUid: string, subscriptionStatus
 export const convertProfileToBackendFormat = (profile: any): UpdateUserData => {
     return {
         first_name: profile.first_name,
-        last_name: profile.last_name,
         physical_attributes: {
             height: profile.height,
             weight: profile.weight,

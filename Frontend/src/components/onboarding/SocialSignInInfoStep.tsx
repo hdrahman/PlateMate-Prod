@@ -24,7 +24,6 @@ interface SocialSignInInfoStepProps {
 
 const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, updateProfile, onNext }) => {
     const [firstName, setFirstName] = useState(profile.firstName || '');
-    const [lastName, setLastName] = useState(profile.lastName || '');
     const [age, setAge] = useState(profile.age?.toString() || '');
     const [isLoading, setIsLoading] = useState(false);
     const { user } = useAuth();
@@ -39,13 +38,9 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
                 if (metadata.first_name && !firstName) {
                     setFirstName(metadata.first_name);
                 }
-                if (metadata.last_name && !lastName) {
-                    setLastName(metadata.last_name);
-                }
 
                 console.log('📋 Pre-filled from user metadata:', {
-                    firstName: metadata.first_name,
-                    lastName: metadata.last_name
+                    firstName: metadata.first_name
                 });
             }
         };
@@ -67,11 +62,6 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
             return false;
         }
 
-        if (!lastName.trim()) {
-            Alert.alert('Missing Information', 'Please enter your last name');
-            return false;
-        }
-
         if (!age || parseInt(age) < 13 || parseInt(age) > 120) {
             Alert.alert('Invalid Age', 'Please enter a valid age (13-120)');
             return false;
@@ -89,7 +79,6 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
         try {
             await updateProfile({
                 firstName: firstName.trim(),
-                lastName: lastName.trim(),
                 age: parseInt(age),
             });
 
@@ -135,24 +124,6 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
                             onChangeText={setFirstName}
                             autoCapitalize="words"
                             autoComplete="name-given"
-                            returnKeyType="next"
-                        />
-                    </View>
-                </View>
-
-                {/* Last Name Input */}
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Last Name</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your last name"
-                            placeholderTextColor="#666"
-                            value={lastName}
-                            onChangeText={setLastName}
-                            autoCapitalize="words"
-                            autoComplete="name-family"
                             returnKeyType="next"
                         />
                     </View>

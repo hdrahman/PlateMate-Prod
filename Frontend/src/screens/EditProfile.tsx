@@ -256,8 +256,7 @@ const EditProfile = () => {
                 if (profile) {
                     // Set basic profile info (for display in profile card)
                     const firstName = profile.first_name || '---';
-                    const lastName = profile.last_name || '';
-                    const displayUsername = `${firstName}${lastName ? '_' + lastName : ''}`;
+                    const displayUsername = firstName;
 
                     setUsername(displayUsername);
                     setEmail(profile.email || '---');
@@ -523,9 +522,7 @@ const EditProfile = () => {
             }
 
             // Extract first and last name from username
-            const nameParts = editedUsername.split('_');
-            const firstName = nameParts[0] || '';
-            const lastName = nameParts.length > 1 ? nameParts[1] : '';
+            const firstName = editedUsername.trim() || '';
 
             // Calculate age from date of birth if available
             const calculatedAge = dateOfBirth && dateOfBirth !== '---' ? calculateAge(dateOfBirth) : null;
@@ -551,12 +548,11 @@ const EditProfile = () => {
 
             // Sync both unit preference fields to prevent desynchronization
             const unitFields = syncUnitPreferenceFields(!editedIsImperialUnits);
-            
+
             // Create profile data object based strictly on the fields that exist in user_profiles table
             // IMPORTANT: Preserve target_weight and other fields that shouldn't be cleared
             const baseProfileData = {
                 first_name: firstName,
-                last_name: lastName,
                 // Conditionally include physical attributes only when they have valid (>0) values.
                 ...(heightInCm && heightInCm > 0 ? { height: roundToOneDecimal(heightInCm) } : {}),
                 ...(weightInKg && weightInKg > 0 ? { weight: weightInKg } : {}),
@@ -574,7 +570,7 @@ const EditProfile = () => {
                 ...(existingProfile?.weight_goal ? { weight_goal: existingProfile.weight_goal } : {}),
                 ...(existingProfile?.activity_level ? { activity_level: existingProfile.activity_level } : {})
             };
-            
+
             console.log('💾 Preserving target weight during profile update:', {
                 existingTargetWeight: existingProfile?.target_weight || 'not set',
                 preservedInUpdate: baseProfileData.target_weight || 'not preserved'

@@ -213,7 +213,7 @@ export default function MealPlanner() {
     const { profile: onboardingProfile, isLoading: isOnboardingLoading } = useOnboarding();
     const { nutrientTotals, refreshLogs, isLoading: foodLogLoading,
         startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
-    
+
     // Subscription status
     const [hasPremiumAccess, setHasPremiumAccess] = useState(true); // Start optimistic
     const [isCheckingAccess, setIsCheckingAccess] = useState(true);
@@ -517,7 +517,7 @@ export default function MealPlanner() {
         checkPremiumAccess();
         loadFeaturedRecipes();
     }, []);
-    
+
     // Re-check premium access when user changes (e.g., after subscription)
     useEffect(() => {
         if (user) {
@@ -547,7 +547,7 @@ export default function MealPlanner() {
             loadFeaturedRecipes();
         }
     }, [hasPremiumAccess, isCheckingAccess]);
-    
+
     // Check if user has premium access
     const checkPremiumAccess = async () => {
         try {
@@ -597,7 +597,6 @@ export default function MealPlanner() {
                     if (dbProfile) {
                         currentProfile = {
                             firstName: dbProfile.first_name,
-                            lastName: dbProfile.last_name,
                             phoneNumber: '',
                             height: dbProfile.height,
                             weight: dbProfile.weight,
@@ -691,7 +690,7 @@ export default function MealPlanner() {
     const loadFeaturedRecipes = async () => {
         try {
             setIsLoading(true);
-            
+
             // For non-premium users, show generic/demo recipes
             if (!hasPremiumAccess && !isCheckingAccess) {
                 const genericRecipes = getGenericRecipes();
@@ -777,7 +776,7 @@ export default function MealPlanner() {
             setIsLoading(false);
         }
     };
-    
+
     // Generic recipes for non-premium users
     const getGenericRecipes = (): Recipe[] => {
         return [
@@ -1072,13 +1071,13 @@ export default function MealPlanner() {
                     </Text>
                 </View>
             </ScrollView>
-            
+
             {/* Paywall overlay for non-premium users */}
             {!isCheckingAccess && !hasPremiumAccess && (
                 <View style={styles.paywallOverlay}>
                     {Platform.OS === 'ios' ? (
-                        <BlurView 
-                            intensity={15} 
+                        <BlurView
+                            intensity={15}
                             tint="dark"
                             style={styles.blurOverlay}
                         >
@@ -1111,7 +1110,7 @@ export default function MealPlanner() {
                                             <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
                                         </View>
                                     </View>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.paywallButton}
                                         onPress={() => navigation.navigate('PremiumSubscription', {
                                             source: 'meal_planner_overlay',
@@ -1156,7 +1155,7 @@ export default function MealPlanner() {
                                             <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
                                         </View>
                                     </View>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.paywallButton}
                                         onPress={() => navigation.navigate('PremiumSubscription', {
                                             source: 'meal_planner_overlay',

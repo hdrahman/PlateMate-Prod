@@ -2,7 +2,6 @@
 export interface UserProfile {
     // Basic info
     firstName: string;
-    lastName: string;
     email: string;
     password?: string; // Optional password for account creation during onboarding
 
@@ -117,36 +116,36 @@ export interface AuthState {
 }
 
 // User subscription types
-export type SubscriptionStatus = 
-  | 'free_trial'           // Initial 20-day trial
-  | 'free_trial_extended'  // Extended 30-day trial (with payment method)
-  | 'premium_monthly'      // Paid monthly subscription
-  | 'premium_annual'       // Paid annual subscription
-  | 'canceled'             // Canceled subscription (still active until end)
-  | 'expired';             // Expired subscription
+export type SubscriptionStatus =
+    | 'free_trial'           // Initial 20-day trial
+    | 'free_trial_extended'  // Extended 30-day trial (with payment method)
+    | 'premium_monthly'      // Paid monthly subscription
+    | 'premium_annual'       // Paid annual subscription
+    | 'canceled'             // Canceled subscription (still active until end)
+    | 'expired';             // Expired subscription
 
 export interface SubscriptionDetails {
-  status: SubscriptionStatus;
-  startDate: string;
-  endDate?: string | null;
-  trialStartDate?: string | null;
-  trialEndDate?: string | null;
-  extendedTrialGranted?: boolean;
-  extendedTrialStartDate?: string | null;
-  extendedTrialEndDate?: string | null;
-  autoRenew: boolean;
-  paymentMethod?: string;
-  subscriptionId?: string | null;
-  originalTransactionId?: string | null;
-  latestReceiptData?: string | null;
-  receiptValidationDate?: string | null;
-  appStoreSubscriptionId?: string | null;
-  playStoreSubscriptionId?: string | null;
-  canceledAt?: string | null;
-  cancellationReason?: string | null;
-  gracePeriodEndDate?: string | null;
-  isInIntroOfferPeriod?: boolean;
-  introOfferEndDate?: string | null;
+    status: SubscriptionStatus;
+    startDate: string;
+    endDate?: string | null;
+    trialStartDate?: string | null;
+    trialEndDate?: string | null;
+    extendedTrialGranted?: boolean;
+    extendedTrialStartDate?: string | null;
+    extendedTrialEndDate?: string | null;
+    autoRenew: boolean;
+    paymentMethod?: string;
+    subscriptionId?: string | null;
+    originalTransactionId?: string | null;
+    latestReceiptData?: string | null;
+    receiptValidationDate?: string | null;
+    appStoreSubscriptionId?: string | null;
+    playStoreSubscriptionId?: string | null;
+    canceledAt?: string | null;
+    cancellationReason?: string | null;
+    gracePeriodEndDate?: string | null;
+    isInIntroOfferPeriod?: boolean;
+    introOfferEndDate?: string | null;
 }
 
 // User notification types

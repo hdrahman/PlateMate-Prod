@@ -20,10 +20,9 @@ import {
     markStreakSynced,
     updateUserProfile
 } from './database';
-import { AppState, AppStateStatus } from 'react-native';
-import { subscribeToDatabaseChanges } from './databaseWatcher';
 import { getLastSyncTime, updateLastSyncTime } from './database';
 import { isLikelyOffline } from './networkUtils';
+import { SubscriptionDetails } from '../types/user';
 
 // REMOVED: Periodic sync is no longer needed with dual-write architecture
 // const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -63,15 +62,108 @@ export interface RestoreResult {
     errors: string[];
 }
 
+// Local SQLite representations used during sync/restore operations
+interface SQLiteUserProfileRecord {
+    firebase_uid: string;
+    email?: string | null;
+    first_name?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    height?: number | null;
+    weight?: number | null;
+    target_weight?: number | null;
+    starting_weight?: number | null;
+    age?: number | null;
+    location?: string | null;
+    timezone?: string | null;
+    activity_level?: string | null;
+    fitness_goal?: string | null;
+    weight_goal?: string | null;
+    daily_calorie_target?: number | null;
+    protein_goal?: number | null;
+    carb_goal?: number | null;
+    fat_goal?: number | null;
+    unit_preference?: string | null;
+    use_metric_system?: boolean | number | null;
+    preferred_language?: string | null;
+    dark_mode?: boolean | number | null;
+    nutrient_focus?: Record<string, any> | null;
+    weekly_workouts?: number | null;
+    step_goal?: number | null;
+    water_goal?: number | null;
+    sleep_goal?: number | null;
+    workout_frequency?: string | null;
+    motivations?: string | null;
+    projected_completion_date?: string | null;
+    estimated_metabolic_age?: number | null;
+    estimated_duration_weeks?: number | null;
+    push_notifications_enabled?: boolean | number | null;
+    email_notifications_enabled?: boolean | number | null;
+    sms_notifications_enabled?: boolean | number | null;
+    marketing_emails_enabled?: boolean | number | null;
+    sync_data_offline?: boolean | number | null;
+    onboarding_complete?: boolean | number | null;
+    cheat_day_enabled?: boolean | number | null;
+    cheat_day_frequency?: number | null;
+    last_cheat_day?: string | null;
+    next_cheat_day?: string | null;
+    preferred_cheat_day_of_week?: number | null;
+}
+
+interface SQLiteFoodLogRecord {
+    id: number;
+    meal_id: number | string;
+    food_name: string;
+    brand_name?: string | null;
+    meal_type: string;
+    date: string;
+    quantity?: string | null;
+    weight?: number | string | null;
+    weight_unit?: string | null;
+    calories: number | string;
+    proteins: number | string;
+    carbs: number | string;
+    fats: number | string;
+    fiber?: number | string | null;
+    sugar?: number | string | null;
+    saturated_fat?: number | string | null;
+    polyunsaturated_fat?: number | string | null;
+    monounsaturated_fat?: number | string | null;
+    trans_fat?: number | string | null;
+    cholesterol?: number | string | null;
+    sodium?: number | string | null;
+    potassium?: number | string | null;
+    vitamin_a?: number | string | null;
+    vitamin_c?: number | string | null;
+    calcium?: number | string | null;
+    iron?: number | string | null;
+    healthiness_rating?: number | string | null;
+    notes?: string | null;
+    image_url?: string | null;
+    file_key?: string | null;
+    synced?: number;
+    sync_action?: string;
+}
+
+interface SQLiteWeightEntryRecord {
+    id: number;
+    weight: number | string;
+    recorded_at: string;
+}
+
+interface SQLiteStreakRecord {
+    firebase_uid: string;
+    current_streak: number;
+    longest_streak: number;
+    last_activity_date?: string | null;
+}
+
 class PostgreSQLSyncService {
     private lastSyncTime: Date | null = null;
     private isSyncing: boolean = false;
-    private syncIntervalId: NodeJS.Timeout | null = null;
     private changeTracker: Set<string> = new Set(); // Track what data has changed
-    private appStateSubscription: any = null;
-    private isAppActive: boolean = true;
     private pendingSync: boolean = false;
-    private dbChangeUnsubscribe: (() => void) | null = null;
+    private currentSyncAbortController: AbortController | null = null;
 
     constructor() {
         // REMOVED: No longer need event-driven sync with dual-write architecture
@@ -254,10 +346,13 @@ class PostgreSQLSyncService {
     }
 
     // Sync SQLite data to PostgreSQL (Backup)
-    async syncToPostgreSQL(): Promise<SyncResult> {
+    async syncToPostgreSQL(abortSignal?: AbortSignal): Promise<SyncResult> {
         if (this.isSyncing) {
             throw new Error('Sync already in progress');
         }
+
+        // Create abort controller for this sync
+        this.currentSyncAbortController = new AbortController();
 
         if (!(await this.isOnline())) {
             console.log('🚫 Cannot sync – device offline');
@@ -302,6 +397,11 @@ class PostgreSQLSyncService {
 
             console.log('🔄 Starting PostgreSQL sync...');
 
+            // Check if sync was aborted
+            if (abortSignal?.aborted || this.currentSyncAbortController?.signal.aborted) {
+                throw new Error('Sync aborted');
+            }
+
             // 1. Sync User Profile (includes goals and cheat day settings)
             await this.syncUserProfile(currentUser.id, stats, errors);
 
@@ -338,9 +438,9 @@ class PostgreSQLSyncService {
 
             // Check for RLS policy violation indicating user deleted server-side
             const isRLSError = error?.message?.includes('does not exist') ||
-                              error?.message?.includes('User from sub claim') ||
-                              error?.code === 'PGRST116' ||
-                              error?.status === 403;
+                error?.message?.includes('User from sub claim') ||
+                error?.code === 'PGRST116' ||
+                error?.status === 403;
 
             if (isRLSError) {
                 console.error('🔴 RLS violation detected during sync - user deleted server-side, forcing logout');
@@ -363,12 +463,21 @@ class PostgreSQLSyncService {
             };
         } finally {
             this.isSyncing = false;
+            this.currentSyncAbortController = null;
+        }
+    }
+
+    // Cancel ongoing sync operation
+    cancelSync(): void {
+        if (this.currentSyncAbortController) {
+            this.currentSyncAbortController.abort();
+            console.log('🚫 Sync cancellation requested');
         }
     }
 
     private async syncUserProfile(firebaseUid: string, stats: SyncStats, errors: string[]) {
         try {
-            const unsyncedUsers = await getUnsyncedUserProfiles();
+            const unsyncedUsers = (await getUnsyncedUserProfiles()) as unknown as SQLiteUserProfileRecord[];
             const userProfile = unsyncedUsers.find(u => u.firebase_uid === firebaseUid);
 
             if (!userProfile) return;
@@ -385,16 +494,12 @@ class PostgreSQLSyncService {
                 firebase_uid: userProfile.firebase_uid,
                 email: userProfile.email,
                 first_name: userProfile.first_name,
-                last_name: userProfile.last_name,
-                date_of_birth: userProfile.date_of_birth,
                 gender: userProfile.gender,
                 height: userProfile.height,
                 weight: userProfile.weight,
                 target_weight: userProfile.target_weight,
                 starting_weight: startingWeightValue,
                 age: userProfile.age,
-                location: userProfile.location,
-                timezone: userProfile.timezone || 'UTC',
                 activity_level: userProfile.activity_level,
                 fitness_goal: userProfile.fitness_goal,
                 weight_goal: userProfile.weight_goal,
@@ -406,28 +511,16 @@ class PostgreSQLSyncService {
                 use_metric_system: Boolean(userProfile.use_metric_system),
                 preferred_language: userProfile.preferred_language || 'en',
                 dark_mode: Boolean(userProfile.dark_mode),
-                dietary_restrictions: userProfile.dietary_restrictions,
-                food_allergies: userProfile.food_allergies,
-                cuisine_preferences: userProfile.cuisine_preferences,
-                health_conditions: userProfile.health_conditions,
-                diet_type: userProfile.diet_type,
                 nutrient_focus: userProfile.nutrient_focus,
                 weekly_workouts: userProfile.weekly_workouts,
                 step_goal: userProfile.step_goal,
                 water_goal: userProfile.water_goal,
                 sleep_goal: userProfile.sleep_goal,
                 workout_frequency: userProfile.workout_frequency,
-                sleep_quality: userProfile.sleep_quality,
-                stress_level: userProfile.stress_level,
-                eating_pattern: userProfile.eating_pattern,
                 motivations: userProfile.motivations,
-                why_motivation: userProfile.why_motivation,
                 projected_completion_date: userProfile.projected_completion_date,
                 estimated_metabolic_age: userProfile.estimated_metabolic_age,
                 estimated_duration_weeks: userProfile.estimated_duration_weeks,
-                future_self_message: userProfile.future_self_message,
-                future_self_message_type: userProfile.future_self_message_type,
-                future_self_message_created_at: userProfile.future_self_message_created_at,
                 push_notifications_enabled: Boolean(userProfile.push_notifications_enabled),
                 email_notifications_enabled: Boolean(userProfile.email_notifications_enabled),
                 sms_notifications_enabled: Boolean(userProfile.sms_notifications_enabled),
@@ -455,22 +548,39 @@ class PostgreSQLSyncService {
 
             if (postgresUserId) {
                 // Update existing user
+                console.log('📝 Updating existing user in cloud:', postgresUserId);
                 const { error } = await supabase
                     .from('users')
                     .update(userData)
                     .eq('id', postgresUserId);
 
-                if (error) throw error;
+                if (error) {
+                    console.error('❌ Failed to update user:', error);
+                    throw error;
+                }
+                console.log('✅ User updated successfully');
             } else {
-                // Insert new user
+                // Insert new user - use upsert to handle race conditions
+                console.log('➕ Inserting new user to cloud:', firebaseUid);
                 const { data, error } = await supabase
                     .from('users')
-                    .insert(userData)
+                    .upsert(userData, {
+                        onConflict: 'firebase_uid',
+                        ignoreDuplicates: false
+                    })
                     .select('id')
                     .single();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('❌ Failed to insert user:', error);
+                    // Check if it's an RLS error
+                    if (error.code === 'PGRST301' || error.message?.includes('policy')) {
+                        console.error('🔒 RLS policy blocked insert - this should not happen during onboarding');
+                    }
+                    throw error;
+                }
                 postgresUserId = data.id;
+                console.log('✅ User inserted successfully:', postgresUserId);
             }
 
             await markUserProfileSynced(firebaseUid);
@@ -484,7 +594,7 @@ class PostgreSQLSyncService {
 
     private async syncFoodLogs(firebaseUid: string, stats: SyncStats, errors: string[]) {
         try {
-            const unsyncedFoodLogs = await getUnsyncedFoodLogs();
+            const unsyncedFoodLogs = (await getUnsyncedFoodLogs()) as unknown as SQLiteFoodLogRecord[];
             if (unsyncedFoodLogs.length === 0) return;
 
             // Note: We use firebaseUid directly for user_id to match RLS policy
@@ -547,7 +657,7 @@ class PostgreSQLSyncService {
 
     private async syncWeightEntries(firebaseUid: string, stats: SyncStats, errors: string[]) {
         try {
-            const unsyncedWeights = await getUnsyncedWeightEntries();
+            const unsyncedWeights = (await getUnsyncedWeightEntries()) as unknown as SQLiteWeightEntryRecord[];
             if (unsyncedWeights.length === 0) return;
 
             const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
@@ -589,7 +699,7 @@ class PostgreSQLSyncService {
 
     private async syncUserStreaks(firebaseUid: string, stats: SyncStats, errors: string[]) {
         try {
-            const unsyncedStreaks = await getUnsyncedStreaks();
+            const unsyncedStreaks = (await getUnsyncedStreaks()) as unknown as SQLiteStreakRecord[];
             if (unsyncedStreaks.length === 0) return;
 
             const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
@@ -650,22 +760,16 @@ class PostgreSQLSyncService {
             const subscription = await getSubscriptionStatus(firebaseUid);
             if (!subscription) return;
 
-            const postgresUserId = await this.getPostgreSQLUserId(firebaseUid);
-            if (!postgresUserId) {
-                errors.push('Cannot sync subscription: User not found in PostgreSQL');
-                return;
-            }
-
             const subscriptionData = {
-                user_id: postgresUserId,
-                subscription_status: String(subscription.subscription_status || 'free'),
-                start_date: String(subscription.start_date),
-                end_date: subscription.end_date ? String(subscription.end_date) : null,
-                trial_ends_at: subscription.trial_ends_at ? String(subscription.trial_ends_at) : null,
-                canceled_at: subscription.canceled_at ? String(subscription.canceled_at) : null,
-                auto_renew: Boolean(subscription.auto_renew),
-                payment_method: subscription.payment_method ? String(subscription.payment_method) : null,
-                subscription_id: subscription.subscription_id ? String(subscription.subscription_id) : null,
+                firebase_uid: firebaseUid,
+                subscription_status: String(subscription.status || 'free_trial'),
+                start_date: subscription.startDate ? String(subscription.startDate) : null,
+                end_date: subscription.endDate ? String(subscription.endDate) : null,
+                trial_ends_at: subscription.trialEndDate ? String(subscription.trialEndDate) : null,
+                canceled_at: subscription.canceledAt ? String(subscription.canceledAt) : null,
+                auto_renew: Boolean(subscription.autoRenew),
+                payment_method: subscription.paymentMethod ? String(subscription.paymentMethod) : null,
+                subscription_id: subscription.subscriptionId ? String(subscription.subscriptionId) : null,
                 updated_at: new Date().toISOString()
             };
 
@@ -875,9 +979,9 @@ class PostgreSQLSyncService {
 
             // Check for RLS policy violation indicating user deleted server-side
             const isRLSError = error?.message?.includes('does not exist') ||
-                              error?.message?.includes('User from sub claim') ||
-                              error?.code === 'PGRST116' ||
-                              error?.status === 403;
+                error?.message?.includes('User from sub claim') ||
+                error?.code === 'PGRST116' ||
+                error?.status === 403;
 
             if (isRLSError) {
                 console.error('🔴 RLS violation detected during restore - user deleted server-side, forcing logout');
@@ -924,16 +1028,12 @@ class PostgreSQLSyncService {
                     firebase_uid: user.firebase_uid,
                     email: user.email,
                     first_name: user.first_name,
-                    last_name: user.last_name,
-                    date_of_birth: user.date_of_birth,
                     gender: user.gender,
                     height: user.height,
                     weight: user.weight,
                     target_weight: user.target_weight,
                     starting_weight: user.starting_weight,
                     age: user.age,
-                    location: user.location,
-                    timezone: user.timezone,
                     activity_level: user.activity_level,
                     fitness_goal: user.fitness_goal,
                     weight_goal: user.weight_goal,
@@ -945,28 +1045,16 @@ class PostgreSQLSyncService {
                     use_metric_system: user.use_metric_system ? 1 : 0,
                     preferred_language: user.preferred_language,
                     dark_mode: user.dark_mode ? 1 : 0,
-                    dietary_restrictions: user.dietary_restrictions,
-                    food_allergies: user.food_allergies,
-                    cuisine_preferences: user.cuisine_preferences,
-                    health_conditions: user.health_conditions,
-                    diet_type: user.diet_type,
                     nutrient_focus: user.nutrient_focus,
                     weekly_workouts: user.weekly_workouts,
                     step_goal: user.step_goal,
                     water_goal: user.water_goal,
                     sleep_goal: user.sleep_goal,
                     workout_frequency: user.workout_frequency,
-                    sleep_quality: user.sleep_quality,
-                    stress_level: user.stress_level,
-                    eating_pattern: user.eating_pattern,
                     motivations: user.motivations,
-                    why_motivation: user.why_motivation,
                     projected_completion_date: user.projected_completion_date,
                     estimated_metabolic_age: user.estimated_metabolic_age,
                     estimated_duration_weeks: user.estimated_duration_weeks,
-                    future_self_message: user.future_self_message,
-                    future_self_message_type: user.future_self_message_type,
-                    future_self_message_created_at: user.future_self_message_created_at,
                     push_notifications_enabled: user.push_notifications_enabled ? 1 : 0,
                     email_notifications_enabled: user.email_notifications_enabled ? 1 : 0,
                     sms_notifications_enabled: user.sms_notifications_enabled ? 1 : 0,
@@ -1157,15 +1245,15 @@ class PostgreSQLSyncService {
                 throw error;
             }
 
-            const subscriptionData = {
-                subscription_status: subscription.subscription_status,
-                start_date: subscription.start_date,
-                end_date: subscription.end_date,
-                trial_ends_at: subscription.trial_ends_at,
-                canceled_at: subscription.canceled_at,
-                auto_renew: subscription.auto_renew,
-                payment_method: subscription.payment_method,
-                subscription_id: subscription.subscription_id
+            const subscriptionData: Partial<SubscriptionDetails> = {
+                status: subscription.subscription_status,
+                startDate: subscription.start_date,
+                endDate: subscription.end_date,
+                trialEndDate: subscription.trial_ends_at,
+                canceledAt: subscription.canceled_at,
+                autoRenew: Boolean(subscription.auto_renew),
+                paymentMethod: subscription.payment_method,
+                subscriptionId: subscription.subscription_id
             };
 
             await updateSubscriptionStatus(firebaseUid, subscriptionData);

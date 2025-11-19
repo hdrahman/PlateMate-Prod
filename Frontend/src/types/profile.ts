@@ -1,7 +1,6 @@
 // User profile data structure
 export interface UserProfile {
     first_name: string;
-    last_name?: string;
     height?: number;
     weight?: number;
     gender?: 'male' | 'female' | 'other';

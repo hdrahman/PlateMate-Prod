@@ -612,7 +612,7 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
                     // Create the account if not already authenticated
                     setLoadingMessage('Creating your account...');
                     console.log('👤 Creating user account...');
-                    const displayName = `${profile.firstName} ${profile.lastName || ''}`.trim();
+                    const displayName = profile.firstName?.trim() || 'there';
                     authUser = await signUp(profile.email, profile.password, displayName);
                     console.log('✅ Account created successfully!');
                     console.log('🆔 New user UID:', authUser?.id);

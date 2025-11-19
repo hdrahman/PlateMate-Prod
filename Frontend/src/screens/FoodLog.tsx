@@ -578,7 +578,6 @@ const DiaryScreen: React.FC = () => {
                     // Create a properly formatted UserProfile object for the calculator
                     const userProfileForCalc = {
                         firstName: profile.first_name,
-                        lastName: profile.last_name || '',
                         email: profile.email || '',
                         dateOfBirth: profile.date_of_birth,
                         location: profile.location,
@@ -2304,289 +2303,289 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                 keyboardShouldPersistTaps="handled"
                                 onScrollBeginDrag={Keyboard.dismiss}
                             >
-                            {/* 2) Calories Remaining */}
-                            <GradientBorderCard style={styles.summaryCard}>
-                                <Text style={styles.summaryTitle}>Calories Remaining</Text>
-                                <View style={styles.equationRow}>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
-                                            {goal}
-                                        </Text>
-                                        <Text style={styles.equationLabel}>Base</Text>
+                                {/* 2) Calories Remaining */}
+                                <GradientBorderCard style={styles.summaryCard}>
+                                    <Text style={styles.summaryTitle}>Calories Remaining</Text>
+                                    <View style={styles.equationRow}>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                                                {goal}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Base</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                                                {foodTotal}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Food</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                                                {totalExerciseCalories}
+                                            </Text>
+                                            <Text style={styles.equationLabel}>Exercise</Text>
+                                        </View>
+                                        <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
+                                        <View style={styles.equationColumn}>
+                                            <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
+                                            <Text style={styles.equationLabel}>Remaining</Text>
+                                        </View>
                                     </View>
-                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
-                                            {foodTotal}
-                                        </Text>
-                                        <Text style={styles.equationLabel}>Food</Text>
-                                    </View>
-                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
-                                            {totalExerciseCalories}
-                                        </Text>
-                                        <Text style={styles.equationLabel}>Exercise</Text>
-                                    </View>
-                                    <Text style={[styles.equationSign, { marginTop: -10 }]}>=</Text>
-                                    <View style={styles.equationColumn}>
-                                        <Text style={[styles.equationResult, { marginLeft: 10 }]}>{remaining}</Text>
-                                        <Text style={styles.equationLabel}>Remaining</Text>
-                                    </View>
-                                </View>
-                            </GradientBorderCard>
+                                </GradientBorderCard>
 
-                            {/* 3) Meals */}
-                            {mealData.map((meal, idx) => (
-                                <GradientBorderCard key={idx} style={styles.mealSection}>
-                                    {/* Always show meal title and calories */}
-                                    <View style={styles.mealHeader}>
-                                        <Text style={styles.mealTitle}>{meal.title}</Text>
-                                        <Text style={styles.mealCal}>{meal.total}</Text>
-                                    </View>
+                                {/* 3) Meals */}
+                                {mealData.map((meal, idx) => (
+                                    <GradientBorderCard key={idx} style={styles.mealSection}>
+                                        {/* Always show meal title and calories */}
+                                        <View style={styles.mealHeader}>
+                                            <Text style={styles.mealTitle}>{meal.title}</Text>
+                                            <Text style={styles.mealCal}>{meal.total}</Text>
+                                        </View>
 
-                                    {/* Always show macros, even if they're all zero */}
-                                    <TouchableOpacity onPress={toggleMacrosDisplay}>
-                                        <Text style={styles.macrosText}>
-                                            {showMacrosAsPercent
-                                                ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
-                                                : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
-                                        </Text>
-                                    </TouchableOpacity>
+                                        {/* Always show macros, even if they're all zero */}
+                                        <TouchableOpacity onPress={toggleMacrosDisplay}>
+                                            <Text style={styles.macrosText}>
+                                                {showMacrosAsPercent
+                                                    ? `Carbs ${meal.macros.carbs}% • Fat ${meal.macros.fat}% • Protein ${meal.macros.protein}%`
+                                                    : `Carbs ${meal.macros.carbs}g • Fat ${meal.macros.fat}g • Protein ${meal.macros.protein}g`}
+                                            </Text>
+                                        </TouchableOpacity>
 
-                                    <View style={styles.dividerLine} />
+                                        <View style={styles.dividerLine} />
 
-                                    {/* Only show items if there are any */}
-                                    {meal.items.length > 0 ? (
-                                        <View>
-                                            {meal.items
-                                                .map((item, i) => {
-                                                    // First extract food name without the weight info
-                                                    const foodName = item.name.split('\n')[0];
-                                                    // Try to find the ID from localMealDataRef
-                                                    let foodId = undefined;
+                                        {/* Only show items if there are any */}
+                                        {meal.items.length > 0 ? (
+                                            <View>
+                                                {meal.items
+                                                    .map((item, i) => {
+                                                        // First extract food name without the weight info
+                                                        const foodName = item.name.split('\n')[0];
+                                                        // Try to find the ID from localMealDataRef
+                                                        let foodId = undefined;
 
-                                                    if (localMealDataRef.current) {
-                                                        // Try exact match first
-                                                        const exactMatch = localMealDataRef.current.find(entry =>
-                                                            entry.food_name === foodName &&
-                                                            entry.meal_type.toLowerCase() === meal.title.toLowerCase()
-                                                        );
-
-                                                        if (exactMatch) {
-                                                            foodId = exactMatch.id;
-                                                        } else {
-                                                            // If no exact match, try just by food name
-                                                            const nameMatch = localMealDataRef.current.find(entry =>
-                                                                entry.food_name === foodName
+                                                        if (localMealDataRef.current) {
+                                                            // Try exact match first
+                                                            const exactMatch = localMealDataRef.current.find(entry =>
+                                                                entry.food_name === foodName &&
+                                                                entry.meal_type.toLowerCase() === meal.title.toLowerCase()
                                                             );
 
-                                                            if (nameMatch) {
-                                                                foodId = nameMatch.id;
+                                                            if (exactMatch) {
+                                                                foodId = exactMatch.id;
+                                                            } else {
+                                                                // If no exact match, try just by food name
+                                                                const nameMatch = localMealDataRef.current.find(entry =>
+                                                                    entry.food_name === foodName
+                                                                );
+
+                                                                if (nameMatch) {
+                                                                    foodId = nameMatch.id;
+                                                                }
                                                             }
                                                         }
-                                                    }
 
-                                                    return (
-                                                        <TouchableHighlight
-                                                            key={i}
-                                                            underlayColor="#333"
-                                                            onPress={() => handleFoodItemTap(foodId)}
-                                                            onLongPress={() => {
-                                                                handleFoodItemLongPress(foodId, foodName, meal.title, i);
-                                                            }}
-                                                            delayLongPress={500}
-                                                        >
-                                                            <View>
-                                                                <View style={styles.logRow}>
-                                                                    <View style={{ flex: 1 }}>
-                                                                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                                                                            <Text style={styles.logItemText}>{foodName}</Text>
-                                                                            <View style={[
-                                                                                styles.healthinessCircle,
-                                                                                { borderColor: getHealthinessColor(item.healthiness || 5), marginLeft: 4 }
-                                                                            ]}>
-                                                                                <Text style={[styles.healthinessText, { color: getHealthinessColor(item.healthiness || 5) }]}>
-                                                                                    {Math.round(item.healthiness || 5)}
-                                                                                </Text>
+                                                        return (
+                                                            <TouchableHighlight
+                                                                key={i}
+                                                                underlayColor="#333"
+                                                                onPress={() => handleFoodItemTap(foodId)}
+                                                                onLongPress={() => {
+                                                                    handleFoodItemLongPress(foodId, foodName, meal.title, i);
+                                                                }}
+                                                                delayLongPress={500}
+                                                            >
+                                                                <View>
+                                                                    <View style={styles.logRow}>
+                                                                        <View style={{ flex: 1 }}>
+                                                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                                <Text style={styles.logItemText}>{foodName}</Text>
+                                                                                <View style={[
+                                                                                    styles.healthinessCircle,
+                                                                                    { borderColor: getHealthinessColor(item.healthiness || 5), marginLeft: 4 }
+                                                                                ]}>
+                                                                                    <Text style={[styles.healthinessText, { color: getHealthinessColor(item.healthiness || 5) }]}>
+                                                                                        {Math.round(item.healthiness || 5)}
+                                                                                    </Text>
+                                                                                </View>
                                                                             </View>
+                                                                            <Text style={styles.weightText}>{item.name.split('\n').slice(1).join('\n')}</Text>
                                                                         </View>
-                                                                        <Text style={styles.weightText}>{item.name.split('\n').slice(1).join('\n')}</Text>
+                                                                        <Text style={styles.logCalText}>{item.calories}</Text>
                                                                     </View>
-                                                                    <Text style={styles.logCalText}>{item.calories}</Text>
+                                                                    {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
                                                                 </View>
-                                                                {i < meal.items.length - 1 && <View style={styles.entryDividerLine} />}
-                                                            </View>
-                                                        </TouchableHighlight>
-                                                    );
-                                                })}
-                                            <View style={styles.dividerLine} />
-                                        </View>
-                                    ) : null}
+                                                            </TouchableHighlight>
+                                                        );
+                                                    })}
+                                                <View style={styles.dividerLine} />
+                                            </View>
+                                        ) : null}
 
-                                    <TouchableOpacity
-                                        style={styles.addBtn}
-                                        onPress={() => navigation.navigate('Manual', { mealType: meal.title, sourcePage: 'FoodLog' })}
-                                    >
-                                        <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                        <TouchableOpacity
+                                            style={styles.addBtn}
+                                            onPress={() => navigation.navigate('Manual', { mealType: meal.title, sourcePage: 'FoodLog' })}
+                                        >
+                                            <Text style={styles.addBtnText}>ADD FOOD</Text>
+                                        </TouchableOpacity>
+                                    </GradientBorderCard>
+                                ))}
+
+                                {/* 4) Exercise */}
+                                <GradientBorderCard style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
+                                        <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
+                                    </View>
+
+                                    {/* Divider line under heading */}
+                                    <View style={styles.dividerLine} />
+
+                                    {renderExerciseList()}
+
+                                    {/* Only show divider line if there are exercises already */}
+                                    {exerciseList.length > 0 && <View style={styles.dividerLine} />}
+
+                                    <TouchableOpacity style={styles.addBtn} onPress={openExerciseModal}>
+                                        <Text style={styles.addBtnText}>Add Exercise</Text>
                                     </TouchableOpacity>
                                 </GradientBorderCard>
-                            ))}
 
-                            {/* 4) Exercise */}
-                            <GradientBorderCard style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={[styles.mealTitle, { fontSize: 18 }]}>Exercise</Text>
-                                    <Text style={styles.mealCal}>{totalExerciseCalories}</Text>
-                                </View>
-
-                                {/* Divider line under heading */}
-                                <View style={styles.dividerLine} />
-
-                                {renderExerciseList()}
-
-                                {/* Only show divider line if there are exercises already */}
-                                {exerciseList.length > 0 && <View style={styles.dividerLine} />}
-
-                                <TouchableOpacity style={styles.addBtn} onPress={openExerciseModal}>
-                                    <Text style={styles.addBtnText}>Add Exercise</Text>
-                                </TouchableOpacity>
-                            </GradientBorderCard>
-
-                            {/* 5) Water */}
-                            <GradientBorderCard style={styles.mealSection}>
-                                <View style={styles.mealHeader}>
-                                    <Text style={styles.mealTitle}>Water</Text>
-                                    <View style={styles.waterHeaderRight}>
-                                        <Text style={styles.waterCurrentAmount}>{totalWaterIntake}</Text>
-                                        <Text style={styles.waterGoalAmount}>/{userProfile?.water_goal || 2500}ml</Text>
-                                    </View>
-                                </View>
-
-                                {/* Water progress bar */}
-                                <View style={styles.waterProgressContainer}>
-                                    <View style={styles.waterProgressBar}>
-                                        <View
-                                            style={[
-                                                styles.waterProgressFill,
-                                                {
-                                                    width: `${Math.min(100, (totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%`,
-                                                    backgroundColor: totalWaterIntake >= (userProfile?.water_goal || 2500) ? '#4CAF50' : '#AA00FF'
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={styles.waterProgressText}>
-                                        {Math.round((totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%
-                                    </Text>
-                                </View>
-
-                                {/* Divider line under heading */}
-                                <View style={styles.dividerLine} />
-
-                                {/* Water intake entries */}
-                                {renderWaterIntakeList()}
-
-                                {/* Only show divider line if there are water entries already */}
-                                {waterIntake.length > 0 && <View style={styles.dividerLine} />}
-
-                                <TouchableOpacity style={styles.addBtn} onPress={openWaterIntakeModal}>
-                                    <Text style={styles.addBtnText}>ADD WATER</Text>
-                                </TouchableOpacity>
-                            </GradientBorderCard>
-
-                            {/* 7) Bottom action row */}
-                            <View style={styles.bottomActions}>
-                                <View style={styles.topActionsRow}>
-                                    <TouchableOpacity
-                                        style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}
-                                        onPress={() => navigation.navigate('Nutrients' as never)}
-                                    >
-                                        <Text style={styles.tabBtnText}>Nutrition</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.analyzeBtn, { flex: 1 }]}
-                                        onPress={handleGenerateReport}
-                                    >
-                                        <Text style={styles.analyzeBtnText}>Generate Report</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Weight Prediction Display - Single Line */}
-                                {(() => {
-                                    const prediction = calculateWeightPrediction();
-                                    if (!prediction || !userProfile) return null;
-
-                                    // Get daily calories consumed and prepare data
-                                    const dailyCaloriesConsumed = mealData.reduce((sum, meal) => sum + meal.total, 0);
-                                    const baseWeight = userProfile?.weight || 70;
-                                    const estimatedWeight = baseWeight + prediction.projectedWeightChangeKg;
-
-                                    // Enhanced message with deficit/surplus info
-                                    let displayText = '';
-                                    let textColor = '#AAAAAA';
-
-                                    // Check if user prefers imperial units
-                                    const isImperial = !userProfile?.use_metric_system;
-
-                                    // Prepare weight change text with proper units
-                                    const weightChangeAmount = Math.abs(prediction.projectedWeightChangeKg);
-                                    const weightChangeAmountDisplay = isImperial
-                                        ? kgToLbs(weightChangeAmount).toFixed(1)
-                                        : weightChangeAmount.toFixed(1);
-                                    const weightChangeUnit = isImperial ? 'lbs' : 'kg';
-
-                                    const weightChangeText = prediction.projectedWeightChangeKg > 0
-                                        ? `gain ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`
-                                        : `lose ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`;
-
-                                    // Format final weight with proper units (rounded to 1 decimal)
-                                    const finalWeightDisplay = isImperial
-                                        ? `${kgToLbs(estimatedWeight).toFixed(1)}\u00A0lbs`
-                                        : `${estimatedWeight.toFixed(1)}\u00A0kg`;
-
-                                    // Check if user is 1000+ calories below their MAINTENANCE (not goal)
-                                    const maintenanceDeficit = prediction.trueMaintenance - dailyCaloriesConsumed;
-
-                                    if (maintenanceDeficit >= 1000) {
-                                        // User is dangerously under-eating - show warning instead of prediction
-                                        displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
-                                        textColor = '#FF5252'; // Red color for warning
-                                    } else {
-                                        // Normal prediction display
-                                        displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
-
-                                        // Removed minimum calorie check
-                                        if (prediction.dailyDeficit < -500) {
-                                            // Large surplus - caution
-                                            textColor = '#FFD740';
-                                        } else if (prediction.dailyDeficit > 1000) {
-                                            // Very large deficit - caution
-                                            textColor = '#FFD740';
-                                        }
-                                    }
-
-
-                                    // Single line for all cases
-                                    return (
-                                        <View style={{ marginTop: 8, alignItems: 'center' }}>
-                                            <Text style={{ color: textColor, fontSize: 12, textAlign: 'center' }}>
-                                                {displayText}
-                                            </Text>
-                                            <TouchableOpacity
-                                                onPress={() => (navigation as any).navigate('AboutCalculations')}
-                                                style={{ marginTop: 4 }}
-                                            >
-                                                <Text style={{ color: '#AA00FF', fontSize: 11, textDecorationLine: 'underline' }}>
-                                                    Learn about our calculations
-                                                </Text>
-                                            </TouchableOpacity>
+                                {/* 5) Water */}
+                                <GradientBorderCard style={styles.mealSection}>
+                                    <View style={styles.mealHeader}>
+                                        <Text style={styles.mealTitle}>Water</Text>
+                                        <View style={styles.waterHeaderRight}>
+                                            <Text style={styles.waterCurrentAmount}>{totalWaterIntake}</Text>
+                                            <Text style={styles.waterGoalAmount}>/{userProfile?.water_goal || 2500}ml</Text>
                                         </View>
-                                    );
-                                })()}
-                            </View>
-                            <View style={{ height: 2 }} />
-                        </ScrollView>
+                                    </View>
+
+                                    {/* Water progress bar */}
+                                    <View style={styles.waterProgressContainer}>
+                                        <View style={styles.waterProgressBar}>
+                                            <View
+                                                style={[
+                                                    styles.waterProgressFill,
+                                                    {
+                                                        width: `${Math.min(100, (totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%`,
+                                                        backgroundColor: totalWaterIntake >= (userProfile?.water_goal || 2500) ? '#4CAF50' : '#AA00FF'
+                                                    }
+                                                ]}
+                                            />
+                                        </View>
+                                        <Text style={styles.waterProgressText}>
+                                            {Math.round((totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%
+                                        </Text>
+                                    </View>
+
+                                    {/* Divider line under heading */}
+                                    <View style={styles.dividerLine} />
+
+                                    {/* Water intake entries */}
+                                    {renderWaterIntakeList()}
+
+                                    {/* Only show divider line if there are water entries already */}
+                                    {waterIntake.length > 0 && <View style={styles.dividerLine} />}
+
+                                    <TouchableOpacity style={styles.addBtn} onPress={openWaterIntakeModal}>
+                                        <Text style={styles.addBtnText}>ADD WATER</Text>
+                                    </TouchableOpacity>
+                                </GradientBorderCard>
+
+                                {/* 7) Bottom action row */}
+                                <View style={styles.bottomActions}>
+                                    <View style={styles.topActionsRow}>
+                                        <TouchableOpacity
+                                            style={[styles.tabBtn, { flex: 1, marginRight: 8 }]}
+                                            onPress={() => navigation.navigate('Nutrients' as never)}
+                                        >
+                                            <Text style={styles.tabBtnText}>Nutrition</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.analyzeBtn, { flex: 1 }]}
+                                            onPress={handleGenerateReport}
+                                        >
+                                            <Text style={styles.analyzeBtnText}>Generate Report</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Weight Prediction Display - Single Line */}
+                                    {(() => {
+                                        const prediction = calculateWeightPrediction();
+                                        if (!prediction || !userProfile) return null;
+
+                                        // Get daily calories consumed and prepare data
+                                        const dailyCaloriesConsumed = mealData.reduce((sum, meal) => sum + meal.total, 0);
+                                        const baseWeight = userProfile?.weight || 70;
+                                        const estimatedWeight = baseWeight + prediction.projectedWeightChangeKg;
+
+                                        // Enhanced message with deficit/surplus info
+                                        let displayText = '';
+                                        let textColor = '#AAAAAA';
+
+                                        // Check if user prefers imperial units
+                                        const isImperial = !userProfile?.use_metric_system;
+
+                                        // Prepare weight change text with proper units
+                                        const weightChangeAmount = Math.abs(prediction.projectedWeightChangeKg);
+                                        const weightChangeAmountDisplay = isImperial
+                                            ? kgToLbs(weightChangeAmount).toFixed(1)
+                                            : weightChangeAmount.toFixed(1);
+                                        const weightChangeUnit = isImperial ? 'lbs' : 'kg';
+
+                                        const weightChangeText = prediction.projectedWeightChangeKg > 0
+                                            ? `gain ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`
+                                            : `lose ${weightChangeAmountDisplay}\u00A0${weightChangeUnit}`;
+
+                                        // Format final weight with proper units (rounded to 1 decimal)
+                                        const finalWeightDisplay = isImperial
+                                            ? `${kgToLbs(estimatedWeight).toFixed(1)}\u00A0lbs`
+                                            : `${estimatedWeight.toFixed(1)}\u00A0kg`;
+
+                                        // Check if user is 1000+ calories below their MAINTENANCE (not goal)
+                                        const maintenanceDeficit = prediction.trueMaintenance - dailyCaloriesConsumed;
+
+                                        if (maintenanceDeficit >= 1000) {
+                                            // User is dangerously under-eating - show warning instead of prediction
+                                            displayText = 'Warning: Your calorie intake is below the minimum recommended level.';
+                                            textColor = '#FF5252'; // Red color for warning
+                                        } else {
+                                            // Normal prediction display
+                                            displayText = `If every day was like today, you'd ${weightChangeText} in 1 month, weighing ${finalWeightDisplay}.`;
+
+                                            // Removed minimum calorie check
+                                            if (prediction.dailyDeficit < -500) {
+                                                // Large surplus - caution
+                                                textColor = '#FFD740';
+                                            } else if (prediction.dailyDeficit > 1000) {
+                                                // Very large deficit - caution
+                                                textColor = '#FFD740';
+                                            }
+                                        }
+
+
+                                        // Single line for all cases
+                                        return (
+                                            <View style={{ marginTop: 8, alignItems: 'center' }}>
+                                                <Text style={{ color: textColor, fontSize: 12, textAlign: 'center' }}>
+                                                    {displayText}
+                                                </Text>
+                                                <TouchableOpacity
+                                                    onPress={() => (navigation as any).navigate('AboutCalculations')}
+                                                    style={{ marginTop: 4 }}
+                                                >
+                                                    <Text style={{ color: '#AA00FF', fontSize: 11, textDecorationLine: 'underline' }}>
+                                                        Learn about our calculations
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })()}
+                                </View>
+                                <View style={{ height: 2 }} />
+                            </ScrollView>
                         </KeyboardAvoidingView>
                     </Animated.View>
                 </PanGestureHandler>

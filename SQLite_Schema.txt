@@ -6,8 +6,9 @@ PlateMate uses SQLite for local offline functionality. This document outlines th
 ## Database Information
 - **Database Name**: `platemate.db`
 - **Location**: Frontend React Native app (Expo SQLite)
-- **Current Migration Version**: 11
+- **Current Migration Version**: 12 (Updated: Nov 19, 2025 - Removed trial_start_date fields)
 - **Primary Key Strategy**: Firebase UID is used as the user identifier across tables
+- **Note**: Trial management is handled by RevenueCat, not stored locally
 
 ## Tables
 
@@ -114,6 +115,7 @@ Comprehensive user profile information with extensive onboarding data.
 
 ### 3. user_subscriptions
 Subscription management for premium features.
+**Note**: Trial management is handled entirely by RevenueCat (not stored locally).
 
 **Columns:**
 - `id`: INTEGER PRIMARY KEY AUTOINCREMENT
@@ -124,8 +126,16 @@ Subscription management for premium features.
 - `auto_renew`: INTEGER DEFAULT 0
 - `payment_method`: TEXT
 - `subscription_id`: TEXT
-- `trial_ends_at`: TEXT
+- `original_transaction_id`: TEXT
+- `latest_receipt_data`: TEXT
+- `receipt_validation_date`: TEXT
+- `app_store_subscription_id`: TEXT
+- `play_store_subscription_id`: TEXT
 - `canceled_at`: TEXT
+- `cancellation_reason`: TEXT
+- `grace_period_end_date`: TEXT
+- `is_in_intro_offer_period`: INTEGER DEFAULT 0
+- `intro_offer_end_date`: TEXT
 - `created_at`: TEXT NOT NULL DEFAULT (datetime('now'))
 - `updated_at`: TEXT NOT NULL DEFAULT (datetime('now'))
 - `synced`: INTEGER DEFAULT 0

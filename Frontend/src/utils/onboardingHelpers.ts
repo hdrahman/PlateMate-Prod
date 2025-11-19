@@ -52,7 +52,6 @@ export const saveOnboardingDataIncremental = async (
 export const hasMinimumProfileData = (profile: any): boolean => {
     return !!(
         profile.firstName ||
-        profile.lastName ||
         profile.age ||
         profile.height ||
         profile.weight ||

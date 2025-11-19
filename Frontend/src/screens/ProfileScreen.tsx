@@ -67,9 +67,7 @@ const ProfileScreen = () => {
                     // Update profile data with fetched information
                     setProfileData(prevData => ({
                         ...prevData,
-                        username: profile.first_name && profile.last_name ?
-                            `${profile.first_name}_${profile.last_name}`.toLowerCase() :
-                            profile.first_name || 'user',
+                        username: profile.first_name ? profile.first_name.toLowerCase() : 'user',
                         location: profile.location || 'Not set',
                         startingWeight: profile.starting_weight || profile.weight || 0,
                         currentWeight: profile.weight || 0,

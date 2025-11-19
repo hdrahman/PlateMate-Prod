@@ -216,7 +216,6 @@ const NutrientsScreen: React.FC = () => {
                     // Calculate nutrition goals based on user profile
                     const goals = calculateNutritionGoals({
                         firstName: profile.first_name,
-                        lastName: profile.last_name,
                         phoneNumber: '',
                         height: profile.height,
                         weight: profile.weight,
