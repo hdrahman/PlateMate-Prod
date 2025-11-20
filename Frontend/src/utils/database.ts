@@ -2910,8 +2910,7 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number, i
                 try {
                     const supabaseData = {
                         weight: weight,
-                        recorded_at: timestamp,
-                        updated_at: timestamp
+                        recorded_at: timestamp
                     };
 
                     // Update by firebase_uid AND today's date range (prevent overwriting all weight history)
@@ -2954,8 +2953,7 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number, i
                 const supabaseData = {
                     firebase_uid: firebaseUid,
                     weight: weight,
-                    recorded_at: timestamp,
-                    created_at: timestamp
+                    recorded_at: timestamp
                 };
 
                 writeToSupabase('user_weights', 'insert', supabaseData)
