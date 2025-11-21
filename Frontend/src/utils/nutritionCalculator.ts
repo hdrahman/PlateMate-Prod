@@ -408,6 +408,7 @@ export function calculateNutritionGoalsFromProfile(profile: any): CalculatedNutr
     // Convert snake_case profile to UserProfile format
     const userProfile: UserProfile = {
         firstName: '',
+        lastName: '',
         email: '',
         dateOfBirth: null,
         location: null,
@@ -437,6 +438,18 @@ export function calculateNutritionGoalsFromProfile(profile: any): CalculatedNutr
         defaultAddress: null,
         preferredDeliveryTimes: [],
         deliveryInstructions: null,
+        pushNotificationsEnabled: false,
+        emailNotificationsEnabled: false,
+        smsNotificationsEnabled: false,
+        marketingEmailsEnabled: false,
+        paymentMethods: [],
+        billingAddress: null,
+        defaultPaymentMethodId: null,
+        preferredLanguage: 'en',
+        timezone: 'UTC',
+        unitPreference: 'metric',
+        syncDataOffline: true,
+        stepTrackingCalorieMode: profile.step_tracking_calorie_mode || 'disabled',
     };
 
     // Calculate using canonical function
