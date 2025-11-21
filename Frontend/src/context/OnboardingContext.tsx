@@ -182,6 +182,7 @@ const defaultProfile: UserProfile = {
     defaultAddress: null,
     preferredDeliveryTimes: [],
     deliveryInstructions: null,
+    stepTrackingCalorieMode: 'disabled',
     onboardingComplete: false,
     premium: false,
     trialEndDate: null,

@@ -408,7 +408,6 @@ export function calculateNutritionGoalsFromProfile(profile: any): CalculatedNutr
     // Convert snake_case profile to UserProfile format
     const userProfile: UserProfile = {
         firstName: '',
-        lastName: '',
         email: '',
         dateOfBirth: null,
         location: null,

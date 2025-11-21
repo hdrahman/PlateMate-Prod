@@ -343,6 +343,9 @@ export default function Home() {
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [weightLost, setWeightLost] = useState(0);
   const [weightGoal, setWeightGoal] = useState<string>('maintain'); // Add state for weight goal
+  
+  // Add state for step tracking mode
+  const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
 
   // Add state for temporary today's weight display
   const [showTodayWeight, setShowTodayWeight] = useState(false);
@@ -406,6 +409,11 @@ export default function Home() {
           // Parse and set unit preference
           const useMetric = parseUnitPreference(profile);
           setIsImperialUnits(!useMetric);
+
+          // Load step tracking mode
+          if (profile.step_tracking_calorie_mode) {
+            setStepTrackingMode(profile.step_tracking_calorie_mode as 'disabled' | 'with_calories' | 'without_calories');
+          }
 
           // Calculate nutrition goals based on user profile
           const goals = calculateNutritionGoals({
@@ -858,7 +866,12 @@ export default function Home() {
   };
 
   // Calculate adjusted goal (base + exercise calories)
-  const adjustedGoal = dailyCalorieGoal + exerciseCalories;
+  // Only add exercise calories if:
+  // - Step tracking mode is 'with_calories' (steps add bonus calories), OR
+  // - Step tracking mode is 'disabled' (normal behavior)
+  // Do NOT add if mode is 'without_calories' (steps tracked but don't affect calorie goal)
+  const shouldAddExerciseCalories = stepTrackingMode === 'with_calories' || stepTrackingMode === 'disabled';
+  const adjustedGoal = dailyCalorieGoal + (shouldAddExerciseCalories ? exerciseCalories : 0);
 
   // Calculate values for the main ring based on adjusted goal.
   const circumference = 2 * Math.PI * radius;
