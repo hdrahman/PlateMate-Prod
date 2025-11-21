@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid } from '../utils/database'; // Local database functions
+import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid, getUserProfileByFirebaseUid } from '../utils/database'; // Local database functions
 import { updateNutritionGoals, updateFitnessGoals, getProfile, CompleteProfile, updateProfile, resetNutritionGoals } from '../api/profileApi'; // Backend API functions
 import { formatWeight, kgToLbs, lbsToKg } from '../utils/unitConversion'; // Import unit conversion utilities
 import { calculateNutritionGoalsFromProfile, Gender, ActivityLevel, WeightGoal, mapWeightGoal } from '../utils/nutritionCalculator';
@@ -194,6 +194,7 @@ export default function EditGoals() {
         activityLevel?: string;
     }>({});
     const [showCaloricWarning, setShowCaloricWarning] = useState(false);
+    const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
 
     useEffect(() => {
         // Animation on component mount
@@ -297,6 +298,12 @@ export default function EditGoals() {
                                 cheatDayFrequency: 7,
                                 preferredCheatDayOfWeek: undefined
                             }));
+                        }
+
+                        // Load step tracking mode
+                        const profile = await getUserProfileByFirebaseUid(user.uid);
+                        if (profile?.step_tracking_calorie_mode) {
+                            setStepTrackingMode(profile.step_tracking_calorie_mode as 'disabled' | 'with_calories' | 'without_calories');
                         }
                     } catch (error) {
                         console.error('Error loading cheat day progress:', error);
@@ -922,6 +929,18 @@ export default function EditGoals() {
                                 </Text>
                             </View>
                         </View>
+
+                        {/* Step Tracking Mode Info */}
+                        {stepTrackingMode !== 'disabled' && (
+                            <View style={styles.stepTrackingInfo}>
+                                <Ionicons name="information-circle-outline" size={18} color="#0074dd" />
+                                <Text style={styles.stepTrackingInfoText}>
+                                    {stepTrackingMode === 'with_calories'
+                                        ? 'Step tracking is enabled with dynamic calories. Your base calories use a sedentary level, but protein and macros are calculated based on your selected activity level above.'
+                                        : 'Step tracking is enabled without calorie adjustments. Your steps are tracked for motivation, and all calculations use your selected activity level.'}
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 </GradientBorderBox>
 
@@ -1995,6 +2014,23 @@ const styles = StyleSheet.create({
         color: GRAY,
         fontSize: 14,
         marginTop: 4,
+    },
+    stepTrackingInfo: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(0, 116, 221, 0.1)',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 116, 221, 0.3)',
+        alignItems: 'flex-start',
+    },
+    stepTrackingInfoText: {
+        flex: 1,
+        color: '#0074dd',
+        fontSize: 13,
+        lineHeight: 18,
+        marginLeft: 8,
     },
     warningModalContent: {
         backgroundColor: CARD_BG,

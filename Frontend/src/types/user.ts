@@ -93,6 +93,9 @@ export interface UserProfile {
     timezone: string;
     unitPreference: string;
     syncDataOffline: boolean;
+
+    // Step tracking preferences
+    stepTrackingCalorieMode?: 'disabled' | 'with_calories' | 'without_calories';
 }
 
 // Weight entry for tracking weight history

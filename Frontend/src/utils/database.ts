@@ -332,7 +332,8 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
         diet_type TEXT,
         use_metric_system INTEGER DEFAULT 1,
         future_self_message_uri TEXT,
-        premium INTEGER DEFAULT 0
+        premium INTEGER DEFAULT 0,
+        step_tracking_calorie_mode TEXT DEFAULT 'disabled'
       )
     `);
 
@@ -346,6 +347,19 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
             }
         } catch (error) {
             console.error('❌ Error verifying premium column:', error);
+        }
+
+        // Verify the step_tracking_calorie_mode column exists
+        try {
+            const tableInfo = await db.getAllAsync("PRAGMA table_info(user_profiles)");
+            const stepTrackingColumn = tableInfo.find((col: any) => col.name === 'step_tracking_calorie_mode');
+            if (!stepTrackingColumn) {
+                console.log('🔄 Adding step_tracking_calorie_mode column to user_profiles table...');
+                await db.execAsync(`ALTER TABLE user_profiles ADD COLUMN step_tracking_calorie_mode TEXT DEFAULT 'disabled'`);
+                console.log('✅ step_tracking_calorie_mode column added successfully');
+            }
+        } catch (error) {
+            console.error('❌ Error verifying step_tracking_calorie_mode column:', error);
         }
 
         // Migration: Remove last_name column (if it exists)
@@ -1788,6 +1802,7 @@ export const addUserProfile = async (profile: any) => {
         diet_type = '',
         use_metric_system = 1,
         premium = false,
+        step_tracking_calorie_mode = 'disabled',
     } = profile;
 
     try {
@@ -1837,8 +1852,8 @@ export const addUserProfile = async (profile: any) => {
                 workout_frequency, sleep_quality, stress_level, eating_pattern, motivations, why_motivation,
                 projected_completion_date, estimated_metabolic_age, estimated_duration_weeks,
                 future_self_message, future_self_message_type, future_self_message_created_at,
-                diet_type, use_metric_system, starting_weight, location, premium
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                diet_type, use_metric_system, starting_weight, location, premium, step_tracking_calorie_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
             [
                 firebase_uid,                                      // 1
                 email,                                            // 2
@@ -1895,7 +1910,8 @@ export const addUserProfile = async (profile: any) => {
                 use_metric_system,                                // 54
                 null, // starting_weight                          // 55
                 null, // location                                 // 56
-                premium ? 1 : 0                                    // 57
+                premium ? 1 : 0,                                   // 57
+                step_tracking_calorie_mode                        // 58
             ]
         );
 
@@ -1951,6 +1967,7 @@ export const addUserProfile = async (profile: any) => {
                 preferred_cheat_day_of_week: profile.preferred_cheat_day_of_week || null,
                 last_cheat_day: profile.last_cheat_day || null,
                 next_cheat_day: profile.next_cheat_day || null,
+                step_tracking_calorie_mode: step_tracking_calorie_mode || 'disabled',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
@@ -2054,6 +2071,7 @@ interface UserProfile {
     diet_type?: string;
     use_metric_system?: number;
     premium?: number;
+    step_tracking_calorie_mode?: string;
 }
 
 // Get user profile from local SQLite by Firebase UID

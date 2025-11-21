@@ -136,8 +136,10 @@ export interface BMRCalculationResult {
 /**
  * Calculate BMR and related calorie data based on user profile
  * Using the Mifflin-St Jeor Equation for BMR and proper weight goal adjustments
+ * @param profile - User profile with physical attributes
+ * @param forceActivityLevel - Optional: Override activity level for calorie calculation only
  */
-export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | null => {
+export const calculateBMRData = (profile: UserProfile, forceActivityLevel?: string): BMRCalculationResult | null => {
     // Validate required fields for BMR calculation
     if (!profile.height || !profile.weight || !profile.age || !profile.gender || !profile.activityLevel) {
         console.log('❌ Cannot calculate BMR - missing required fields:', {
@@ -151,7 +153,9 @@ export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | n
         return null;
     }
 
-    const normalizedActivityLevel = normalizeActivityLevel(profile.activityLevel);
+    // Use forceActivityLevel if provided (for step tracking calorie mode), otherwise use profile's activity level
+    const activityLevelForCalories = forceActivityLevel || profile.activityLevel;
+    const normalizedActivityLevel = normalizeActivityLevel(activityLevelForCalories);
     const normalizedWeightGoal = normalizeWeightGoal(profile.weightGoal || profile.fitnessGoal);
     const gender = (profile.gender || '').toLowerCase();
 
@@ -163,6 +167,7 @@ export const calculateBMRData = (profile: UserProfile): BMRCalculationResult | n
         age: profile.age,
         gender,
         activityLevel: normalizedActivityLevel,
+        forceActivityLevel: forceActivityLevel || 'none',
         weightGoal: normalizedWeightGoal
     });
 
@@ -224,17 +229,33 @@ export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals =>
         targetWeight: profile.targetWeight || 'not set (this is fine)',
         age: profile.age,
         gender: profile.gender,
-        activityLevel: profile.activityLevel
+        activityLevel: profile.activityLevel,
+        stepTrackingCalorieMode: profile.stepTrackingCalorieMode || 'disabled'
     });
 
-    // Use the new BMR calculation function
-    const bmrData = calculateBMRData(profile);
+    // Handle step tracking calorie modes
+    let bmrData;
+    const stepMode = profile.stepTrackingCalorieMode || 'disabled';
+    
+    if (stepMode === 'with_calories') {
+        // Mode: Steps + Calories
+        // Use sedentary for base calories (steps will add bonus calories separately)
+        // Use actual activity level for macros
+        console.log('📊 Step tracking mode: with_calories - Using sedentary for calories, actual activity for macros');
+        bmrData = calculateBMRData(profile, 'sedentary');
+    } else {
+        // Mode: without_calories or disabled
+        // Use actual activity level for both calories and macros
+        bmrData = calculateBMRData(profile);
+    }
+    
     if (!bmrData) {
         console.log('❌ calculateNutritionGoals - BMR calculation failed');
         return getDefaultNutritionGoals();
     }
 
     const tdee = bmrData.dailyTarget;
+    // Always use actual activity level for macro calculations (protein multiplier)
     const normalizedActivityLevel = normalizeActivityLevel(profile.activityLevel);
     const normalizedWeightGoal = normalizeWeightGoal(profile.weightGoal || profile.fitnessGoal);
     const goalCategory = getGoalCategory(normalizedWeightGoal);

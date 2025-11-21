@@ -110,6 +110,9 @@ export interface UserProfile {
     preferredDeliveryTimes: string[];
     deliveryInstructions: string | null;
 
+    // Step tracking preferences
+    stepTrackingCalorieMode?: 'disabled' | 'with_calories' | 'without_calories';
+
     // Notification preferences
     pushNotificationsEnabled: boolean;
     emailNotificationsEnabled: boolean;

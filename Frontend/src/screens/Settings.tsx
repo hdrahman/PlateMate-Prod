@@ -5,19 +5,22 @@ import { ThemeContext } from "../ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getMealGalleryStats, clearOldestMealImages } from "../utils/database";
+import { getMealGalleryStats, clearOldestMealImages, getUserProfileByFirebaseUid, updateUserProfile } from "../utils/database";
 import UnifiedStepTracker from "../services/UnifiedStepTracker";
 import PersistentStepTracker from "../services/PersistentStepTracker";
+import StepTrackingModeModal from "../components/StepTrackingModeModal";
 
 const SettingsScreen = () => {
     const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
-    const { signOut } = useAuth();
+    const { signOut, user } = useAuth();
     const [mealGalleryStats, setMealGalleryStats] = useState<{ totalMeals: number, storageUsedMB: number }>({ totalMeals: 0, storageUsedMB: 0 });
     const [isPersistentTrackingEnabled, setIsPersistentTrackingEnabled] = useState(false);
     const [isLoadingStepSettings, setIsLoadingStepSettings] = useState(false);
     const [showClearMealModal, setShowClearMealModal] = useState(false);
     const [clearMealCount, setClearMealCount] = useState("");
+    const [showStepModeModal, setShowStepModeModal] = useState(false);
+    const [pendingStepTrackingEnable, setPendingStepTrackingEnable] = useState(false);
 
     useEffect(() => {
         loadMealGalleryStats();
@@ -45,39 +48,75 @@ const SettingsScreen = () => {
     const handlePersistentTrackingToggle = async (enabled: boolean) => {
         if (isLoadingStepSettings) return;
 
-        setIsLoadingStepSettings(true);
-        try {
-            if (enabled) {
-                const success = await UnifiedStepTracker.startTracking();
-                if (success) {
-                    setIsPersistentTrackingEnabled(true);
-                    Alert.alert(
-                        'Step Tracking Enabled',
-                        'Step counting is now active with real-time notifications.',
-                        [{ text: 'OK' }]
-                    );
-                } else {
-                    Alert.alert('Error', 'Failed to enable step tracking. Please check permissions.');
-                }
-            } else {
-                // Stop both step tracking services
+        if (enabled) {
+            // Show modal to select step tracking mode
+            setPendingStepTrackingEnable(true);
+            setShowStepModeModal(true);
+        } else {
+            // Disable step tracking
+            setIsLoadingStepSettings(true);
+            try {
                 await Promise.all([
                     UnifiedStepTracker.stopTracking(),
                     PersistentStepTracker.stopService()
                 ]);
+                
+                // Update database to set mode to disabled
+                if (user?.uid) {
+                    await updateUserProfile(user.uid, { step_tracking_calorie_mode: 'disabled' });
+                }
+                
                 setIsPersistentTrackingEnabled(false);
                 Alert.alert(
                     'Step Tracking Disabled',
                     'Step counting has been completely stopped.',
                     [{ text: 'OK' }]
                 );
+            } catch (error) {
+                console.error('Error disabling persistent tracking:', error);
+                Alert.alert('Error', 'Failed to disable step tracking. Please try again.');
+            } finally {
+                setIsLoadingStepSettings(false);
+            }
+        }
+    };
+
+    const handleStepModeSelection = async (mode: 'with_calories' | 'without_calories') => {
+        setIsLoadingStepSettings(true);
+        setPendingStepTrackingEnable(false);
+        
+        try {
+            // Save the selected mode to database
+            if (user?.uid) {
+                await updateUserProfile(user.uid, { step_tracking_calorie_mode: mode });
+                console.log(`✅ Step tracking mode saved: ${mode}`);
+            }
+
+            // Start step tracking
+            const success = await UnifiedStepTracker.startTracking();
+            if (success) {
+                setIsPersistentTrackingEnabled(true);
+                const modeText = mode === 'with_calories' ? 'Steps + Calories' : 'Steps Only';
+                Alert.alert(
+                    'Step Tracking Enabled',
+                    `Step counting is now active in "${modeText}" mode.`,
+                    [{ text: 'OK' }]
+                );
+            } else {
+                Alert.alert('Error', 'Failed to enable step tracking. Please check permissions.');
             }
         } catch (error) {
-            console.error('Error toggling persistent tracking:', error);
-            Alert.alert('Error', 'Failed to change step tracking settings. Please try again.');
+            console.error('Error enabling step tracking with mode:', error);
+            Alert.alert('Error', 'Failed to enable step tracking. Please try again.');
         } finally {
             setIsLoadingStepSettings(false);
         }
+    };
+
+    const handleStepModeModalClose = () => {
+        setShowStepModeModal(false);
+        setPendingStepTrackingEnable(false);
+        setIsLoadingStepSettings(false);
     };
 
     const handleClearMealCache = () => {
@@ -420,6 +459,13 @@ const SettingsScreen = () => {
                     </View>
                 </View>
             </Modal>
+
+            {/* Step Tracking Mode Modal */}
+            <StepTrackingModeModal
+                visible={showStepModeModal}
+                onClose={handleStepModeModalClose}
+                onSelectMode={handleStepModeSelection}
+            />
         </SafeAreaView>
     );
 };

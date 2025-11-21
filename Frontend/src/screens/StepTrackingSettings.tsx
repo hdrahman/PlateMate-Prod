@@ -16,6 +16,9 @@ import { useNavigation } from '@react-navigation/native';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import PersistentStepTracker from '../services/PersistentStepTracker';
 import { Platform, PermissionsAndroid } from 'react-native';
+import { getUserProfileByFirebaseUid, updateUserProfile } from '../utils/database';
+import { useAuth } from '../context/AuthContext';
+import StepTrackingModeModal from '../components/StepTrackingModeModal';
 
 interface PermissionStatus {
     notifications: boolean;
@@ -118,6 +121,7 @@ const showBatteryOptimizationDialog = () => {
 
 export default function StepTrackingSettings() {
     const navigation = useNavigation();
+    const { user } = useAuth();
     const [permissions, setPermissions] = useState<PermissionStatus>({
         notifications: false,
         activityRecognition: false,
@@ -132,6 +136,8 @@ export default function StepTrackingSettings() {
     const [currentSteps, setCurrentSteps] = useState(0);
     const [loading, setLoading] = useState(true);
     const [statusMessage, setStatusMessage] = useState('');
+    const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
+    const [showModeModal, setShowModeModal] = useState(false);
 
     useEffect(() => {
         loadStatus();
@@ -139,6 +145,23 @@ export default function StepTrackingSettings() {
 
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        loadStepTrackingMode();
+    }, [user]);
+
+    const loadStepTrackingMode = async () => {
+        if (!user?.uid) return;
+        
+        try {
+            const profile = await getUserProfileByFirebaseUid(user.uid);
+            if (profile?.step_tracking_calorie_mode) {
+                setStepTrackingMode(profile.step_tracking_calorie_mode as 'disabled' | 'with_calories' | 'without_calories');
+            }
+        } catch (error) {
+            console.error('Error loading step tracking mode:', error);
+        }
+    };
 
     const loadStatus = async () => {
         try {
@@ -185,6 +208,40 @@ export default function StepTrackingSettings() {
         } catch (error) {
             console.error('❌ Error requesting permissions:', error);
             setLoading(false);
+        }
+    };
+
+    const handleChangeModePress = () => {
+        if (!services.combinedTracking) {
+            Alert.alert(
+                'Step Tracking Disabled',
+                'Please enable step tracking first before changing the mode.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+        setShowModeModal(true);
+    };
+
+    const handleModeSelection = async (mode: 'with_calories' | 'without_calories') => {
+        if (!user?.uid) {
+            Alert.alert('Error', 'User not authenticated');
+            return;
+        }
+
+        try {
+            await updateUserProfile(user.uid, { step_tracking_calorie_mode: mode });
+            setStepTrackingMode(mode);
+            
+            const modeText = mode === 'with_calories' ? 'Steps + Calories' : 'Steps Only';
+            Alert.alert(
+                'Mode Updated',
+                `Step tracking mode changed to "${modeText}". Your calorie and macro calculations have been updated.`,
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Error updating step tracking mode:', error);
+            Alert.alert('Error', 'Failed to update step tracking mode');
         }
     };
 
@@ -345,6 +402,37 @@ export default function StepTrackingSettings() {
                     </View>
                 </View>
 
+                {/* Step Tracking Mode Section */}
+                {services.combinedTracking && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>📊 Tracking Mode</Text>
+                        <View style={styles.modeCard}>
+                            <View style={styles.modeInfo}>
+                                <Text style={styles.modeTitle}>Current Mode</Text>
+                                <Text style={styles.modeValue}>
+                                    {stepTrackingMode === 'with_calories' ? '🏃 Steps + Calories' : 
+                                     stepTrackingMode === 'without_calories' ? '👟 Steps Only' : 
+                                     '❌ Not Set'}
+                                </Text>
+                                <Text style={styles.modeDescription}>
+                                    {stepTrackingMode === 'with_calories' 
+                                        ? 'Steps add bonus calories. Base calories use sedentary level, macros match your activity level.'
+                                        : stepTrackingMode === 'without_calories'
+                                        ? 'Steps tracked for motivation. Calories and macros fixed based on activity level.'
+                                        : 'Please set your tracking mode'}
+                                </Text>
+                            </View>
+                            <TouchableOpacity 
+                                style={styles.changeModeButton}
+                                onPress={handleChangeModePress}
+                            >
+                                <Text style={styles.changeModeText}>Change Mode</Text>
+                                <Ionicons name="chevron-forward" size={20} color="#FF00F5" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
                 {/* Permissions Section */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -411,6 +499,14 @@ export default function StepTrackingSettings() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Step Tracking Mode Modal */}
+            <StepTrackingModeModal
+                visible={showModeModal}
+                onClose={() => setShowModeModal(false)}
+                onSelectMode={handleModeSelection}
+                currentMode={stepTrackingMode === 'with_calories' || stepTrackingMode === 'without_calories' ? stepTrackingMode : 'with_calories'}
+            />
         </SafeAreaView>
     );
 }
@@ -600,5 +696,48 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         marginLeft: 10,
+    },
+    modeCard: {
+        backgroundColor: '#1a1a1a',
+        borderRadius: 10,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#FF00F5',
+    },
+    modeInfo: {
+        marginBottom: 12,
+    },
+    modeTitle: {
+        fontSize: 14,
+        color: '#999',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    modeValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 8,
+    },
+    modeDescription: {
+        fontSize: 13,
+        color: '#bbb',
+        lineHeight: 18,
+    },
+    changeModeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255, 0, 245, 0.1)',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 0, 245, 0.3)',
+    },
+    changeModeText: {
+        color: '#FF00F5',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
