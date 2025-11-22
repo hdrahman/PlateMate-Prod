@@ -12,6 +12,7 @@ import re
 
 from auth.supabase_auth import get_current_user
 from services import fatsecret_api
+from services.http_client_manager import http_client_manager
 
 logger = logging.getLogger(__name__)
 
@@ -464,8 +465,12 @@ async def fatsecret_diagnostic():
         
         # Make a direct request
         logger.info(f"Making direct token request to {token_url}")
-        async with httpx.AsyncClient() as client:
-            response = await client.post(token_url, headers=headers, data=data, timeout=30)
+        client = http_client_manager.get_client("fatsecret_auth")
+        if client:
+            response = await client.post(token_url, headers=headers, data=data)
+        else:
+            async with httpx.AsyncClient() as temp_client:
+                response = await temp_client.post(token_url, headers=headers, data=data, timeout=30)
             
         success = response.status_code == 200
         token_data = response.json() if success else None
@@ -542,16 +547,31 @@ async def fatsecret_direct_test():
             if access_token:
                 # Make a search request
                 api_url = "https://platform.fatsecret.com/rest/server.api"
-                search_response = await client.get(
-                    api_url,
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    params={
-                        "method": "foods.search",
-                        "search_expression": "apple",
-                        "max_results": 5,
-                        "format": "json"
-                    }
-                )
+                
+                search_client = http_client_manager.get_client("fatsecret_api")
+                if search_client:
+                    search_response = await search_client.get(
+                        api_url,
+                        headers={"Authorization": f"Bearer {access_token}"},
+                        params={
+                            "method": "foods.search",
+                            "search_expression": "apple",
+                            "max_results": 5,
+                            "format": "json"
+                        }
+                    )
+                else:
+                    async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                        search_response = await temp_client.get(
+                            api_url,
+                            headers={"Authorization": f"Bearer {access_token}"},
+                            params={
+                                "method": "foods.search",
+                                "search_expression": "apple",
+                                "max_results": 5,
+                                "format": "json"
+                            }
+                        )
                 
                 search_success = search_response.status_code == 200
                 search_data = search_response.json() if search_success else None
@@ -609,10 +629,13 @@ async def debug_food_search(
         credentials = f"{client_id}:{client_secret}"
         encoded_credentials = base64.b64encode(credentials.encode()).decode()
         
-        # Create a new httpx client
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Get token
-            token_url = "https://oauth.fatsecret.com/connect/token"
+        # Get shared client
+        client = http_client_manager.get_client("fatsecret_auth")
+        
+        # Get token
+        token_url = "https://oauth.fatsecret.com/connect/token"
+        
+        if client:
             token_response = await client.post(
                 token_url,
                 headers={
@@ -624,26 +647,42 @@ async def debug_food_search(
                     "scope": "basic premier barcode"
                 }
             )
+        else:
+            async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                token_response = await temp_client.post(
+                    token_url,
+                    headers={
+                        "Authorization": f"Basic {encoded_credentials}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data={
+                        "grant_type": "client_credentials",
+                        "scope": "basic premier barcode"
+                    }
+                )
+        
+        if token_response.status_code != 200:
+            return {
+                "error": "Failed to get token",
+                "status_code": token_response.status_code,
+                "response": token_response.text
+            }
             
-            if token_response.status_code != 200:
-                return {
-                    "error": "Failed to get token",
-                    "status_code": token_response.status_code,
-                    "response": token_response.text
-                }
-                
-            token_data = token_response.json()
-            access_token = token_data.get("access_token")
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            return {
+                "error": "No access token in response",
+                "response": token_data
+            }
             
-            if not access_token:
-                return {
-                    "error": "No access token in response",
-                    "response": token_data
-                }
-                
-            # Make search request
-            api_url = "https://platform.fatsecret.com/rest/server.api"
-            search_response = await client.get(
+        # Make search request
+        api_url = "https://platform.fatsecret.com/rest/server.api"
+        
+        search_client = http_client_manager.get_client("fatsecret_api")
+        if search_client:
+            search_response = await search_client.get(
                 api_url,
                 headers={"Authorization": f"Bearer {access_token}"},
                 params={
@@ -653,20 +692,32 @@ async def debug_food_search(
                     "format": "json"
                 }
             )
-            
-            if search_response.status_code != 200:
-                return {
-                    "error": "Search request failed",
-                    "status_code": search_response.status_code,
-                    "response": search_response.text
-                }
-                
-            # Return raw data
+        else:
+            async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                search_response = await temp_client.get(
+                    api_url,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={
+                        "method": "foods.search",
+                        "search_expression": query,
+                        "max_results": 5,
+                        "format": "json"
+                    }
+                )
+        
+        if search_response.status_code != 200:
             return {
-                "query": query,
-                "raw_response": search_response.json(),
-                "mapped_response": await fatsecret_api.search_food(query, 5)
+                "error": "Search request failed",
+                "status_code": search_response.status_code,
+                "response": search_response.text
             }
+        
+        # Return raw data
+        return {
+            "query": query,
+            "raw_response": search_response.json(),
+            "mapped_response": await fatsecret_api.search_food(query, 5)
+        }
     except Exception as e:
         logger.error(f"Error in debug search: {str(e)}")
         return {
@@ -701,10 +752,13 @@ async def debug_food_search_api(
         credentials = f"{client_id}:{client_secret}"
         encoded_credentials = base64.b64encode(credentials.encode()).decode()
         
-        # Create a new httpx client
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Get token
-            token_url = "https://oauth.fatsecret.com/connect/token"
+        # Get shared client
+        client = http_client_manager.get_client("fatsecret_auth")
+        
+        # Get token
+        token_url = "https://oauth.fatsecret.com/connect/token"
+        
+        if client:
             token_response = await client.post(
                 token_url,
                 headers={
@@ -716,26 +770,42 @@ async def debug_food_search_api(
                     "scope": "basic premier barcode"
                 }
             )
+        else:
+            async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                token_response = await temp_client.post(
+                    token_url,
+                    headers={
+                        "Authorization": f"Basic {encoded_credentials}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data={
+                        "grant_type": "client_credentials",
+                        "scope": "basic premier barcode"
+                    }
+                )
+        
+        if token_response.status_code != 200:
+            return {
+                "error": "Failed to get token",
+                "status_code": token_response.status_code,
+                "response": token_response.text
+            }
             
-            if token_response.status_code != 200:
-                return {
-                    "error": "Failed to get token",
-                    "status_code": token_response.status_code,
-                    "response": token_response.text
-                }
-                
-            token_data = token_response.json()
-            access_token = token_data.get("access_token")
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            return {
+                "error": "No access token in response",
+                "response": token_data
+            }
             
-            if not access_token:
-                return {
-                    "error": "No access token in response",
-                    "response": token_data
-                }
-                
-            # Make search request
-            api_url = "https://platform.fatsecret.com/rest/server.api"
-            search_response = await client.get(
+        # Make search request
+        api_url = "https://platform.fatsecret.com/rest/server.api"
+        
+        search_client = http_client_manager.get_client("fatsecret_api")
+        if search_client:
+            search_response = await search_client.get(
                 api_url,
                 headers={"Authorization": f"Bearer {access_token}"},
                 params={
@@ -745,75 +815,87 @@ async def debug_food_search_api(
                     "format": "json"
                 }
             )
+        else:
+            async with httpx.AsyncClient(timeout=30.0) as temp_client:
+                search_response = await temp_client.get(
+                    api_url,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={
+                        "method": "foods.search",
+                        "search_expression": query,
+                        "max_results": 5,
+                        "format": "json"
+                    }
+                )
+        
+        if search_response.status_code != 200:
+            return {
+                "error": "Search request failed",
+                "status_code": search_response.status_code,
+                "response": search_response.text
+            }
+        
+        # Get raw response
+        raw_data = search_response.json()
+        
+        # Extract foods from response
+        foods_data = raw_data.get("foods", {}).get("food", [])
+        if isinstance(foods_data, dict):
+            foods_data = [foods_data]
+        
+        # Process first food item for demonstration
+        if foods_data:
+            food_item = foods_data[0]
+            food_description = food_item.get("food_description", "")
             
-            if search_response.status_code != 200:
-                return {
-                    "error": "Search request failed",
-                    "status_code": search_response.status_code,
-                    "response": search_response.text
-                }
+            # Extract nutritional info from description
+            nutrition_data = {}
             
-            # Get raw response
-            raw_data = search_response.json()
+            if food_description:
+                # Try to extract serving info
+                serving_match = re.search(r'Per\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', food_description)
+                if serving_match:
+                    nutrition_data["serving_amount"] = serving_match.group(1)
+                    nutrition_data["serving_unit"] = serving_match.group(2)
+                
+                # Try to extract calories - format: "Calories: 300kcal"
+                cal_match = re.search(r'Calories:\s*(\d+(?:\.\d+)?)(?:kcal)?', food_description)
+                if cal_match:
+                    nutrition_data["calories"] = cal_match.group(1)
+                
+                # Try to extract fat - format: "Fat: 13.00g"
+                fat_match = re.search(r'Fat:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
+                if fat_match:
+                    nutrition_data["fat"] = fat_match.group(1)
+                
+                # Try to extract carbs - format: "Carbs: 32.00g"
+                carbs_match = re.search(r'Carbs:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
+                if carbs_match:
+                    nutrition_data["carbs"] = carbs_match.group(1)
+                
+                # Try to extract protein - format: "Protein: 15.00g"
+                protein_match = re.search(r'Protein:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
+                if protein_match:
+                    nutrition_data["protein"] = protein_match.group(1)
             
-            # Extract foods from response
-            foods_data = raw_data.get("foods", {}).get("food", [])
-            if isinstance(foods_data, dict):
-                foods_data = [foods_data]
+            # Get mapped results from our API
+            mapped_results = await fatsecret_api.search_food(query, 5)
+            mapped_item = mapped_results[0] if mapped_results else None
             
-            # Process first food item for demonstration
-            if foods_data:
-                food_item = foods_data[0]
-                food_description = food_item.get("food_description", "")
-                
-                # Extract nutritional info from description
-                nutrition_data = {}
-                
-                if food_description:
-                    # Try to extract serving info
-                    serving_match = re.search(r'Per\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)', food_description)
-                    if serving_match:
-                        nutrition_data["serving_amount"] = serving_match.group(1)
-                        nutrition_data["serving_unit"] = serving_match.group(2)
-                    
-                    # Try to extract calories - format: "Calories: 300kcal"
-                    cal_match = re.search(r'Calories:\s*(\d+(?:\.\d+)?)(?:kcal)?', food_description)
-                    if cal_match:
-                        nutrition_data["calories"] = cal_match.group(1)
-                    
-                    # Try to extract fat - format: "Fat: 13.00g"
-                    fat_match = re.search(r'Fat:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
-                    if fat_match:
-                        nutrition_data["fat"] = fat_match.group(1)
-                    
-                    # Try to extract carbs - format: "Carbs: 32.00g"
-                    carbs_match = re.search(r'Carbs:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
-                    if carbs_match:
-                        nutrition_data["carbs"] = carbs_match.group(1)
-                    
-                    # Try to extract protein - format: "Protein: 15.00g"
-                    protein_match = re.search(r'Protein:\s*(\d+(?:\.\d+)?)(?:g)?', food_description)
-                    if protein_match:
-                        nutrition_data["protein"] = protein_match.group(1)
-                
-                # Get mapped results from our API
-                mapped_results = await fatsecret_api.search_food(query, 5)
-                mapped_item = mapped_results[0] if mapped_results else None
-                
-                return {
-                    "query": query,
-                    "raw_food_item": food_item,
-                    "food_description": food_description,
-                    "extracted_nutrition": nutrition_data,
-                    "mapped_food_item": mapped_item,
-                    "missing_fields": [k for k, v in mapped_item.items() if v is None] if mapped_item else []
-                }
-            else:
-                return {
-                    "query": query,
-                    "error": "No foods found in search results",
-                    "raw_response": raw_data
-                }
+            return {
+                "query": query,
+                "raw_food_item": food_item,
+                "food_description": food_description,
+                "extracted_nutrition": nutrition_data,
+                "mapped_food_item": mapped_item,
+                "missing_fields": [k for k, v in mapped_item.items() if v is None] if mapped_item else []
+            }
+        else:
+            return {
+                "query": query,
+                "error": "No foods found in search results",
+                "raw_response": raw_data
+            }
     except Exception as e:
         logger.error(f"Error in debug food search: {str(e)}")
         return {

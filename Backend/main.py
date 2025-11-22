@@ -230,7 +230,13 @@ app.add_middleware(TimeoutMiddleware)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    # TODO: Update this list with your production domain before deploying
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "exp://localhost:19000",
+        "exp://127.0.0.1:19000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],

@@ -1,5 +1,5 @@
-import { BACKEND_URL } from '../utils/config';
-import { supabase, getAuthHeaders } from '../utils/supabaseClient';
+import { apiClient } from './client';
+import { supabase } from '../utils/supabaseClient';
 
 // User profile data interfaces
 interface PhysicalAttributes {
@@ -80,20 +80,7 @@ export interface WeightHistoryResponse {
     weights: WeightEntry[];
 }
 
-// Function to get Supabase auth token
-const getSupabaseToken = async () => {
-    try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            throw new Error('User not authenticated. Please sign in again.');
-        }
-        return session.access_token;
-    } catch (error: any) {
-        console.error('Error getting Supabase token:', error);
-        throw new Error('User not authenticated. Please sign in again.');
-    }
-};
-
+// Create a new user with improved error handling
 // Create a new user with improved error handling
 export const createUser = async (userData: CreateUserData) => {
     try {
@@ -103,58 +90,15 @@ export const createUser = async (userData: CreateUserData) => {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        // Add timeout to fetch request
-        const timeout = 8000; // 8 seconds timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-            const token = await getSupabaseToken();
-            console.log(`Creating user at ${BACKEND_URL}/users for ${userData.firebase_uid}`);
-
-            const response = await fetch(`${BACKEND_URL}/users`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(userData),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to create user');
-            }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            // Handle specific network errors
-            if (fetchError.name === 'AbortError') {
-                console.warn(`Request timed out after ${timeout}ms`);
-                throw new Error('Connection to server timed out. Please try again later.');
-            }
-
-            console.warn('Network error creating user:', fetchError.message);
-            // Handle known network errors
-            if (fetchError.message && (
-                fetchError.message.includes('Network request failed') ||
-                fetchError.message.includes('Failed to fetch') ||
-                fetchError.message.includes('Network error')
-            )) {
-                throw new Error('Network connection failed. Please check your internet connection and try again.');
-            }
-
-            throw fetchError;
-        }
+        console.log(`Creating user for ${userData.firebase_uid}`);
+        return await apiClient.post('/users', userData, { timeout: 8000 });
     } catch (error: any) {
         console.error('Error creating user:', error);
         throw error;
     }
 };
 
+// Get user profile with improved error handling
 // Get user profile with improved error handling
 export const getUserProfile = async (firebaseUid: string) => {
     try {
@@ -170,70 +114,26 @@ export const getUserProfile = async (firebaseUid: string) => {
             firebaseUid = currentUser.id; // Force to use the authenticated user's UID
         }
 
-        // Add timeout to fetch request
-        const timeout = 10000; // Increased from 5000ms to 10000ms for better connectivity
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
+        console.log(`Fetching profile for ${firebaseUid}`);
         try {
-            const token = await getSupabaseToken();
-            console.log(`Fetching profile from ${BACKEND_URL}/users/${firebaseUid}`);
-
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                // If 404, user hasn't been created yet - return null
-                if (response.status === 404) {
-                    console.log('User not found in database (404 response)');
-                    return null;
-                }
-
-                try {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Failed to get user profile');
-                } catch (jsonError) {
-                    throw new Error(`Failed to get user profile: ${response.status} ${response.statusText}`);
-                }
+            return await apiClient.get(`/users/${firebaseUid}`, { timeout: 10000 });
+        } catch (error: any) {
+            if (error.message === 'Not Found') {
+                console.log('User not found in database (404 response)');
+                return null;
             }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            // Handle specific network errors
-            if (fetchError.name === 'AbortError') {
-                console.warn(`Request timed out after ${timeout}ms`);
-                // Return error with a timeout flag
-                return { error: 'timeout' };
-            }
-
-            console.warn('Network error:', fetchError.message);
-            // Handle known network errors
-            if (fetchError.message && (
-                fetchError.message.includes('Network request failed') ||
-                fetchError.message.includes('Failed to fetch') ||
-                fetchError.message.includes('Network error')
-            )) {
-                console.warn('Network connection failed - backend may be unavailable');
-                // Return error with a network flag
-                return { error: 'network' };
-            }
-
-            throw fetchError;
+            // Return error object for specific handling if needed, or throw
+            if (error.message.includes('timed out')) return { error: 'timeout' };
+            if (error.message.includes('Network connection failed')) return { error: 'network' };
+            throw error;
         }
     } catch (error: any) {
         console.error('Error getting user profile:', error);
-        // Return more structured error
         return { error: error.message || 'unknown' };
     }
 };
 
+// Update user profile with improved error handling
 // Update user profile with improved error handling
 export const updateUserProfile = async (firebaseUid: string, userData: UpdateUserData, skipWeightHistory: boolean = false) => {
     try {
@@ -243,64 +143,15 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        // Add timeout to fetch request
-        const timeout = 15000; // Increased from 8000ms to 15000ms for better connectivity
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        console.log(`Updating profile for ${firebaseUid}`);
+        const endpoint = `/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`;
 
         try {
-            const token = await getSupabaseToken();
-            console.log(`Updating profile at ${BACKEND_URL}/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`);
-
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}${skipWeightHistory ? '?skip_weight_history=true' : ''}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(userData),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                // Handle specific HTTP error codes
-                if (response.status === 404) {
-                    throw new Error('User not found. Please sign up first.');
-                }
-
-                if (response.status === 403) {
-                    throw new Error('Not authorized to update this profile.');
-                }
-
-                try {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Failed to update user profile');
-                } catch (jsonError) {
-                    throw new Error(`Failed to update user profile: ${response.status} ${response.statusText}`);
-                }
-            }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            // Handle specific network errors
-            if (fetchError.name === 'AbortError') {
-                console.warn(`Request timed out after ${timeout}ms`);
-                throw new Error('Connection to server timed out. Please try again later.');
-            }
-
-            console.warn('Network error updating user:', fetchError.message);
-            // Handle known network errors
-            if (fetchError.message && (
-                fetchError.message.includes('Network request failed') ||
-                fetchError.message.includes('Failed to fetch') ||
-                fetchError.message.includes('Network error')
-            )) {
-                throw new Error('Network connection failed. Please check your internet connection and try again.');
-            }
-
-            throw fetchError;
+            return await apiClient.put(endpoint, userData, { timeout: 15000 });
+        } catch (error: any) {
+            if (error.message === 'Not Found') throw new Error('User not found. Please sign up first.');
+            if (error.message.includes('403') || error.message === 'Forbidden') throw new Error('Not authorized to update this profile.');
+            throw error;
         }
     } catch (error: any) {
         console.error('Error updating user profile:', error);
@@ -308,6 +159,7 @@ export const updateUserProfile = async (firebaseUid: string, userData: UpdateUse
     }
 };
 
+// Add weight entry
 // Add weight entry
 export const addWeightEntry = async (firebaseUid: string, weight: number) => {
     try {
@@ -317,44 +169,15 @@ export const addWeightEntry = async (firebaseUid: string, weight: number) => {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const timeout = 8000; // 8 seconds timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-            const token = await getSupabaseToken();
-            console.log(`Adding weight entry at ${BACKEND_URL}/users/${firebaseUid}/weights`);
-
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weights`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ weight }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to add weight entry');
-            }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            if (fetchError.name === 'AbortError') {
-                throw new Error('Connection to server timed out. Please try again later.');
-            }
-            throw fetchError;
-        }
+        console.log(`Adding weight entry for ${firebaseUid}`);
+        return await apiClient.post(`/users/${firebaseUid}/weights`, { weight }, { timeout: 8000 });
     } catch (error: any) {
         console.error('Error adding weight entry:', error);
         throw error;
     }
 };
 
+// Get weight history
 // Get weight history
 export const getWeightHistory = async (firebaseUid: string, limit: number = 100): Promise<WeightHistoryResponse> => {
     try {
@@ -364,42 +187,20 @@ export const getWeightHistory = async (firebaseUid: string, limit: number = 100)
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const timeout = 10000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
+        console.log(`Fetching weight history for ${firebaseUid}`);
         try {
-            const token = await getSupabaseToken();
-            console.log(`Fetching weight history from ${BACKEND_URL}/users/${firebaseUid}/weights?limit=${limit}`);
-
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weights?limit=${limit}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to get weight history');
-            }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            if (fetchError.name === 'AbortError') {
-                return { weights: [] }; // Return empty array on timeout
-            }
-            throw fetchError;
+            return await apiClient.get<WeightHistoryResponse>(`/users/${firebaseUid}/weights?limit=${limit}`, { timeout: 10000 });
+        } catch (error: any) {
+            if (error.message.includes('timed out')) return { weights: [] };
+            throw error;
         }
     } catch (error: any) {
         console.error('Error getting weight history:', error);
-        return { weights: [] }; // Return empty array on error
+        return { weights: [] };
     }
 };
 
+// Update subscription status
 // Update subscription status
 export const updateSubscription = async (firebaseUid: string, subscriptionStatus: string) => {
     try {
@@ -409,38 +210,8 @@ export const updateSubscription = async (firebaseUid: string, subscriptionStatus
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const timeout = 8000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-            const token = await getSupabaseToken();
-            console.log(`Updating subscription at ${BACKEND_URL}/users/${firebaseUid}/subscription`);
-
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/subscription`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ subscription_status: subscriptionStatus }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to update subscription');
-            }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            if (fetchError.name === 'AbortError') {
-                throw new Error('Connection to server timed out. Please try again later.');
-            }
-            throw fetchError;
-        }
+        console.log(`Updating subscription for ${firebaseUid}`);
+        return await apiClient.put(`/users/${firebaseUid}/subscription`, { subscription_status: subscriptionStatus }, { timeout: 8000 });
     } catch (error: any) {
         console.error('Error updating subscription:', error);
         throw error;
@@ -516,6 +287,7 @@ export const convertBackendToProfileFormat = (backendData: any): any => {
 };
 
 // Clear weight history
+// Clear weight history
 export const clearWeightHistory = async (firebaseUid: string): Promise<any> => {
     try {
         // Validate that the user is signed in and matches the requested profile
@@ -524,36 +296,8 @@ export const clearWeightHistory = async (firebaseUid: string): Promise<any> => {
             throw new Error('Authentication mismatch. Please sign in again.');
         }
 
-        const timeout = 10000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-            const token = await getSupabaseToken();
-            console.log(`Clearing weight history at ${BACKEND_URL}/users/${firebaseUid}/weights`);
-
-            const response = await fetch(`${BACKEND_URL}/users/${firebaseUid}/weights`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to clear weight history');
-            }
-
-            return await response.json();
-        } catch (fetchError: any) {
-            if (fetchError.name === 'AbortError') {
-                throw new Error('Connection to server timed out. Please try again later.');
-            }
-            throw fetchError;
-        }
+        console.log(`Clearing weight history for ${firebaseUid}`);
+        return await apiClient.delete(`/users/${firebaseUid}/weights`, { timeout: 10000 });
     } catch (error: any) {
         console.error('Error clearing weight history:', error);
         throw error;

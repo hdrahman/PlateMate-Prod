@@ -33,7 +33,12 @@ def get_supabase_jwt_secret():
     
     # For development, you can use the anon key as secret
     # In production, use the proper JWT secret from Supabase dashboard
-    return os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5veWlldXdiaGFsYm1kbnRveG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDIxNDQsImV4cCI6MjA2NjI3ODE0NH0.OwnfpOt6LhXv7sWQoF56I619sLSOS0pKLjGxsDyc7rA")
+    secret = os.getenv("SUPABASE_ANON_KEY")
+    if not secret:
+        logger.error("SUPABASE_ANON_KEY not found in environment variables")
+        # We don't raise here to allow the app to start, but auth will fail
+        return None
+    return secret
 
 
 def get_redis_client():
@@ -123,6 +128,13 @@ async def verify_supabase_token(credentials: HTTPAuthorizationCredentials = Depe
         
         # Cache miss - decode and validate token
         secret = get_supabase_jwt_secret()
+        
+        # Check if secret is available
+        if secret is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Authentication configuration error: SUPABASE_ANON_KEY not set"
+            )
         
         # Decode without verification first to check the algorithm
         unverified_header = jwt.get_unverified_header(token)

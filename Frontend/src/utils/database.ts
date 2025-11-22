@@ -241,6 +241,10 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       )
     `);
 
+        // Create indexes for better performance
+        await db.execAsync('CREATE INDEX IF NOT EXISTS idx_food_logs_date ON food_logs(date)');
+        await db.execAsync('CREATE INDEX IF NOT EXISTS idx_food_logs_meal_type ON food_logs(meal_type)');
+
         // Create user_subscriptions table for subscription management (SECURE - separate from profile)
         // Note: Trial management is handled by RevenueCat, not stored locally
         await db.execAsync(`

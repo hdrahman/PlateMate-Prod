@@ -145,8 +145,12 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
 }
 
 // Configure your RevenueCat API keys from environment
-const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID || 'goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA';
-const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS || 'appl_YOUR_APPLE_API_KEY_HERE';
+const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID;
+const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS;
+
+if (!REVENUECAT_API_KEY_ANDROID || !REVENUECAT_API_KEY_IOS) {
+  console.warn('⚠️ RevenueCat API keys not found in environment variables');
+}
 
 // Product IDs from App Store Connect and Google Play Console
 // These match your RevenueCat dashboard configuration
@@ -317,6 +321,12 @@ class SubscriptionService {
 
     try {
       const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+
+      // Validate API key is available
+      if (!apiKey) {
+        console.error('❌ RevenueCat API key not configured for platform:', Platform.OS);
+        throw new Error('RevenueCat API key not configured. Please set REVENUECAT_API_KEY_ANDROID and REVENUECAT_API_KEY_IOS environment variables.');
+      }
 
       // Configure Purchases SDK with enhanced settings
       await Purchases.configure({
