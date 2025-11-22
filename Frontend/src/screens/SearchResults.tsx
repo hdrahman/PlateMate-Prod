@@ -70,6 +70,17 @@ export default function SearchResults() {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
     const [filtering, setFiltering] = useState(false);
+    const inputRef = React.useRef<TextInput>(null);
+
+    // Delayed focus to prevent keyboard stealing issues
+    useEffect(() => {
+        if (!route.params?.query) {
+            const timer = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [route.params?.query]);
 
     const handleSearchSubmit = async () => {
         if (!searchQuery.trim()) return;
@@ -127,6 +138,7 @@ export default function SearchResults() {
                     <View style={styles.searchContainer}>
                         <Ionicons name="search" size={20} color={SUBDUED} />
                         <TextInput
+                            ref={inputRef}
                             style={styles.searchInput}
                             placeholder="Search recipes, ingredients..."
                             placeholderTextColor={SUBDUED}
@@ -134,7 +146,6 @@ export default function SearchResults() {
                             onChangeText={setSearchQuery}
                             onSubmitEditing={handleSearchSubmit}
                             returnKeyType="search"
-                            autoFocus={!route.params?.query}
                         />
                         {searchQuery.length > 0 && (
                             <TouchableOpacity
