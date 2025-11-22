@@ -19,6 +19,8 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import { getUserProfileByFirebaseUid, updateUserProfile } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
 import StepTrackingModeModal from '../components/StepTrackingModeModal';
+import StepTrackingPermissionModal from '../components/StepTrackingPermissionModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface PermissionStatus {
     notifications: boolean;
@@ -81,7 +83,7 @@ const requestAllPermissions = async (showRationale: boolean = true): Promise<boo
         ];
 
         const results = await PermissionsAndroid.requestMultiple(permissions);
-        
+
         const allGranted = Object.values(results).every(
             result => result === PermissionsAndroid.RESULTS.GRANTED
         );
@@ -95,16 +97,16 @@ const requestAllPermissions = async (showRationale: boolean = true): Promise<boo
 
 const getPermissionStatusMessage = async (): Promise<string> => {
     const status = await checkPermissionStatus();
-    
+
     if (status.allGranted) {
         return 'All permissions granted - Step tracking ready';
     }
-    
+
     const missing = [];
     if (!status.notifications) missing.push('Notifications');
     if (!status.activityRecognition) missing.push('Activity Recognition');
     if (!status.bodySensors) missing.push('Body Sensors');
-    
+
     return `Missing permissions: ${missing.join(', ')}`;
 };
 
@@ -113,7 +115,7 @@ const showBatteryOptimizationDialog = () => {
     // This would typically open Android settings for battery optimization
     // For now, just show an alert with instructions
     Alert.alert(
-        'Battery Optimization', 
+        'Battery Optimization',
         'To ensure accurate step tracking, please disable battery optimization for PlateMate in your device settings.',
         [{ text: 'OK' }]
     );
@@ -138,6 +140,7 @@ export default function StepTrackingSettings() {
     const [statusMessage, setStatusMessage] = useState('');
     const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
     const [showModeModal, setShowModeModal] = useState(false);
+    const [showPermissionModal, setShowPermissionModal] = useState(false);
 
     useEffect(() => {
         loadStatus();
@@ -152,7 +155,7 @@ export default function StepTrackingSettings() {
 
     const loadStepTrackingMode = async () => {
         if (!user?.uid) return;
-        
+
         try {
             const profile = await getUserProfileByFirebaseUid(user.uid);
             if (profile?.step_tracking_calorie_mode) {
@@ -232,7 +235,7 @@ export default function StepTrackingSettings() {
         try {
             await updateUserProfile(user.uid, { step_tracking_calorie_mode: mode });
             setStepTrackingMode(mode);
-            
+
             const modeText = mode === 'with_calories' ? 'Steps + Calories' : 'Steps Only';
             Alert.alert(
                 'Mode Updated',
@@ -247,46 +250,97 @@ export default function StepTrackingSettings() {
 
     const handleToggleStepTracking = async (enabled: boolean) => {
         try {
-            setLoading(true);
-
             if (enabled) {
-                if (!permissions.allGranted) {
-                    const granted = await requestAllPermissions(true);
-                    if (!granted) {
-                        setLoading(false);
-                        return;
-                    }
+                // Check if user has seen the permission explanation modal
+                const hasSeenExplanation = await AsyncStorage.getItem('step_tracking_permission_explained');
+
+                if (!hasSeenExplanation) {
+                    // Show the permission explanation modal first
+                    setShowPermissionModal(true);
+                    return;
                 }
 
-                // Start both trackers for complete step tracking
-                console.log('🚀 Starting complete step tracking (unified + persistent)...');
-                
-                // Start unified tracker first
-                await UnifiedStepTracker.startTracking();
-                console.log('✅ Unified tracker started');
-                
-                // Start persistent/background tracker
-                await PersistentStepTracker.startService();
-                console.log('✅ Persistent tracker started');
-                
+                // If they've seen it before, proceed with enabling
+                await enableStepTracking();
             } else {
-                console.log('🛑 Stopping complete step tracking...');
-                
-                // Stop both trackers
-                await Promise.all([
-                    UnifiedStepTracker.stopTracking(),
-                    PersistentStepTracker.stopService()
-                ]);
-                
-                console.log('✅ All step tracking stopped');
+                // Disable step tracking
+                await disableStepTracking();
             }
-
-            await loadStatus();
         } catch (error) {
             console.error('❌ Error toggling step tracking:', error);
             Alert.alert('Error', 'Failed to toggle step tracking. Please try again.');
             setLoading(false);
         }
+    };
+
+    const enableStepTracking = async () => {
+        try {
+            setLoading(true);
+
+            if (!permissions.allGranted) {
+                const granted = await requestAllPermissions(true);
+                if (!granted) {
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // Start both trackers for complete step tracking
+            console.log('🚀 Starting complete step tracking (unified + persistent)...');
+
+            // Start unified tracker first
+            await UnifiedStepTracker.startTracking();
+            console.log('✅ Unified tracker started');
+
+            // Start persistent/background tracker
+            await PersistentStepTracker.startService();
+            console.log('✅ Persistent tracker started');
+
+            await loadStatus();
+        } catch (error) {
+            console.error('❌ Error enabling step tracking:', error);
+            Alert.alert('Error', 'Failed to enable step tracking. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const disableStepTracking = async () => {
+        try {
+            setLoading(true);
+
+            console.log('🛑 Stopping complete step tracking...');
+
+            // Stop both trackers
+            await Promise.all([
+                UnifiedStepTracker.stopTracking(),
+                PersistentStepTracker.stopService()
+            ]);
+
+            console.log('✅ All step tracking stopped');
+
+            await loadStatus();
+        } catch (error) {
+            console.error('❌ Error disabling step tracking:', error);
+            Alert.alert('Error', 'Failed to disable step tracking. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEnableTrackingFromModal = async () => {
+        setShowPermissionModal(false);
+
+        // Mark that user has seen the explanation
+        await AsyncStorage.setItem('step_tracking_permission_explained', 'true');
+
+        // Now proceed with enabling step tracking
+        await enableStepTracking();
+    };
+
+    const handleSkipPermissionModal = () => {
+        setShowPermissionModal(false);
+        setLoading(false);
     };
 
     const handleForceSync = async () => {
@@ -410,19 +464,19 @@ export default function StepTrackingSettings() {
                             <View style={styles.modeInfo}>
                                 <Text style={styles.modeTitle}>Current Mode</Text>
                                 <Text style={styles.modeValue}>
-                                    {stepTrackingMode === 'with_calories' ? '🏃 Steps + Calories' : 
-                                     stepTrackingMode === 'without_calories' ? '👟 Steps Only' : 
-                                     '❌ Not Set'}
+                                    {stepTrackingMode === 'with_calories' ? '🏃 Steps + Calories' :
+                                        stepTrackingMode === 'without_calories' ? '👟 Steps Only' :
+                                            '❌ Not Set'}
                                 </Text>
                                 <Text style={styles.modeDescription}>
-                                    {stepTrackingMode === 'with_calories' 
+                                    {stepTrackingMode === 'with_calories'
                                         ? 'Steps add bonus calories. Base calories use sedentary level, macros match your activity level.'
                                         : stepTrackingMode === 'without_calories'
-                                        ? 'Steps tracked for motivation. Calories and macros fixed based on activity level.'
-                                        : 'Please set your tracking mode'}
+                                            ? 'Steps tracked for motivation. Calories and macros fixed based on activity level.'
+                                            : 'Please set your tracking mode'}
                                 </Text>
                             </View>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.changeModeButton}
                                 onPress={handleChangeModePress}
                             >
@@ -506,6 +560,13 @@ export default function StepTrackingSettings() {
                 onClose={() => setShowModeModal(false)}
                 onSelectMode={handleModeSelection}
                 currentMode={stepTrackingMode === 'with_calories' || stepTrackingMode === 'without_calories' ? stepTrackingMode : 'with_calories'}
+            />
+
+            {/* Permission Explanation Modal */}
+            <StepTrackingPermissionModal
+                visible={showPermissionModal}
+                onEnableTracking={handleEnableTrackingFromModal}
+                onSkip={handleSkipPermissionModal}
             />
         </SafeAreaView>
     );

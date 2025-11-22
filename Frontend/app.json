@@ -36,7 +36,7 @@
           "fetch",
           "fetch"
         ],
-        "NSMotionUsageDescription": "PlateMate uses motion and fitness data to track your daily steps and help you achieve your fitness goals.",
+        "NSMotionUsageDescription": "PlateMate uses your device's motion sensors to automatically track your daily steps and help you achieve your fitness goals. Your step data is stored privately and only used to provide you with personalized health insights.",
         "NSCameraUsageDescription": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
         "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
         "ITSAppUsesNonExemptEncryption": false

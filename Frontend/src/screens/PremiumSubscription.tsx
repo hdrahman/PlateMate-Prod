@@ -288,23 +288,45 @@ const PremiumSubscription = () => {
                 'Your subscription is now active. Enjoy unlimited access to all premium features!',
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
+            setIsLoading(false);
         } catch (error: any) {
             console.error('Error subscribing:', error);
 
-            let errorMessage = 'There was an error processing your subscription. Please try again.';
-
-            if (error.message?.includes('user cancelled') || error.code === '1') {
-                // User cancelled the purchase, no need to show error
+            // Check if user cancelled (don't show error for cancellation)
+            if ((error.message || '').toLowerCase().includes('cancel')) {
+                setIsLoading(false);
                 return;
-            } else if (error.message?.includes('network') || error.code === '2') {
-                errorMessage = 'Network error. Please check your connection and try again.';
-            } else if (error.message?.includes('payment') || error.code === '3') {
-                errorMessage = 'Payment method error. Please check your payment information.';
             }
 
-            Alert.alert('Subscription Error', errorMessage);
-        } finally {
-            setIsLoading(false);
+            // Use the enhanced error message from SubscriptionService
+            const errorMessage = error.message || 'There was an error processing your subscription. Please try again.';
+            const shouldRetry = error.shouldRetry !== false; // Default to true if not specified
+
+            if (shouldRetry) {
+                // Show error with retry option - don't set loading to false until user responds
+                Alert.alert(
+                    'Subscription Error',
+                    errorMessage,
+                    [
+                        {
+                            text: 'Cancel',
+                            style: 'cancel',
+                            onPress: () => setIsLoading(false)
+                        },
+                        {
+                            text: 'Retry',
+                            onPress: () => {
+                                // Don't reset loading state - let the new attempt handle it
+                                handleSubscribe(planToUse);
+                            }
+                        }
+                    ]
+                );
+            } else {
+                // Show error without retry
+                Alert.alert('Subscription Error', errorMessage);
+                setIsLoading(false);
+            }
         }
     };
 

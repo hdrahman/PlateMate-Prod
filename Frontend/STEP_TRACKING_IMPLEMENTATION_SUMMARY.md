@@ -25,16 +25,16 @@ Successfully implemented Pacer-level always-on step tracking that works even whe
    - Separate process for better survival
 
 ### iOS Implementation
-1. **HealthKit Integration** (`HealthKitStepCounter.ts`)
-   - Uses existing `react-native-health` library
-   - Background step data access via HealthKit
-   - Automatic permission handling
+1. **Core Motion Integration** (via Expo Pedometer)
+   - Uses Core Motion's CMPedometer API through expo-sensors
+   - Reads step count data from device motion sensors
+   - Simple Motion & Fitness permission request
    - Daily and historical step count retrieval
 
 2. **Background Modes Configuration**
-   - Added HealthKit entitlements to `app.json`
-   - Configured background processing modes
-   - Proper permission descriptions
+   - Configured background fetch modes in `app.json`
+   - Motion & Fitness permission description (NSMotionUsageDescription)
+   - No HealthKit entitlements required
 
 ### Unified System
 1. **Enhanced UnifiedStepTracker**
@@ -45,14 +45,14 @@ Successfully implemented Pacer-level always-on step tracking that works even whe
 
 2. **Smart Sensor Selection**
    - Android: Native sensor → Expo Pedometer fallback
-   - iOS: HealthKit → Expo Pedometer fallback
+   - iOS: Expo Pedometer (Core Motion CMPedometer)
    - Automatic availability detection
 
 ## 🔧 Key Features
 
 ### Always-On Operation
 - **Android**: Native sensor in foreground service with separate process
-- **iOS**: HealthKit background delivery with system wake-up
+- **iOS**: Expo Pedometer with periodic background sync
 - **Both**: Automatic restart after app termination
 
 ### Cumulative Math Handling
@@ -62,12 +62,12 @@ Successfully implemented Pacer-level always-on step tracking that works even whe
 
 ### Minimal Permissions (Pacer-like UX)
 - **Android**: Only `ACTIVITY_RECOGNITION` and `BODY_SENSORS` 
-- **iOS**: Only HealthKit permissions via system dialog
+- **iOS**: Only Motion & Fitness permission via system dialog
 - **No user guidance required**: Just press "Allow" and it works
 
 ### Battery Optimization
 - **Android**: Non-wake-up sensors, efficient foreground service
-- **iOS**: HealthKit handles background optimization automatically
+- **iOS**: Efficient Core Motion APIs with periodic sync
 - **Both**: Smart sync intervals and database batching
 
 ## 📱 Platform-Specific Details
@@ -79,10 +79,10 @@ Successfully implemented Pacer-level always-on step tracking that works even whe
 - **Restart**: `onTaskRemoved` + AlarmManager + BOOT_COMPLETED receiver
 
 ### iOS
-- **Permissions**: HealthKit read/write access
-- **API**: `react-native-health` with HealthKit background delivery
-- **Background**: System automatically wakes app for new data
-- **Modes**: `fitness`, `fetch`, `background-processing`
+- **Permissions**: Motion & Fitness access (NSMotionUsageDescription)
+- **API**: Expo Pedometer (Core Motion CMPedometer)
+- **Background**: Periodic sync with background fetch
+- **Modes**: `fetch`, `background-processing`
 
 ## 🔍 Testing Instructions
 

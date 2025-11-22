@@ -7,7 +7,7 @@ This document describes the implementation of always-on step tracking using `rea
 The PlateMate app now includes a robust step tracking system that combines:
 1. **Standard Background Tracking**: Uses `expo-background-fetch` and `expo-task-manager` for periodic background syncing
 2. **Always-On Persistent Tracking**: Uses `react-native-background-actions` to maintain a continuous background service
-3. **iOS HealthKit Integration**: Leverages iOS HealthKit for optimal battery usage and accuracy
+3. **iOS Core Motion Integration**: Leverages iOS Core Motion (CMPedometer) via expo-sensors for optimal battery usage and accuracy
 4. **Android Sensor Integration**: Direct access to device step sensors with proper permissions
 
 ## Architecture
@@ -48,8 +48,8 @@ The PlateMate app now includes a robust step tracking system that combines:
 
 #### iOS
 - Leverages iOS background task system
-- Integrates with HealthKit when available
-- Uses `expo-sensors` as fallback
+- Uses Core Motion (CMPedometer) via `expo-sensors`
+- Periodic background fetch for step count updates
 - Handles iOS background time limitations with expiration callbacks
 
 ## User Experience

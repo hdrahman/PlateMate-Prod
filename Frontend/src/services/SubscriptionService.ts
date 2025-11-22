@@ -48,6 +48,102 @@ type EntitlementInfo = {
   billingIssueDetectedAt?: string;
 };
 
+// RevenueCat error codes and types
+interface RevenueCatError extends Error {
+  code?: string;
+  userCancelled?: boolean;
+  underlyingErrorMessage?: string;
+}
+
+// Helper function to parse RevenueCat errors and provide user-friendly messages
+function parseRevenueCatError(error: any): { userMessage: string; technicalMessage: string; shouldRetry: boolean } {
+  const revenueCatError = error as RevenueCatError;
+
+  console.log('🔍 Parsing RevenueCat error:', {
+    code: revenueCatError.code,
+    message: revenueCatError.message,
+    userCancelled: revenueCatError.userCancelled,
+    underlyingError: revenueCatError.underlyingErrorMessage,
+  });
+
+  // User cancelled the purchase
+  if (revenueCatError.userCancelled || revenueCatError.code === 'PURCHASE_CANCELLED_ERROR') {
+    return {
+      userMessage: 'Purchase cancelled',
+      technicalMessage: 'User cancelled the purchase flow',
+      shouldRetry: false,
+    };
+  }
+
+  // Network errors
+  if (revenueCatError.code === 'NETWORK_ERROR' || (revenueCatError.message || '').toLowerCase().includes('network')) {
+    return {
+      userMessage: 'No internet connection. Please check your network and try again.',
+      technicalMessage: `Network error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Product not available (common in sandbox testing)
+  if (revenueCatError.code === 'PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR' ||
+    (revenueCatError.message || '').toLowerCase().includes('product not found')) {
+    return {
+      userMessage: 'This subscription is currently unavailable. Please try again later or contact support.',
+      technicalMessage: `Product not available: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Payment declined
+  if (revenueCatError.code === 'PAYMENT_PENDING_ERROR' ||
+    (revenueCatError.message || '').toLowerCase().includes('payment') ||
+    (revenueCatError.message || '').toLowerCase().includes('declined')) {
+    return {
+      userMessage: 'Payment could not be processed. Please check your payment method and try again.',
+      technicalMessage: `Payment error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // StoreKit configuration issues (common during App Review)
+  if (revenueCatError.code === 'CONFIGURATION_ERROR' ||
+    (revenueCatError.message || '').toLowerCase().includes('configuration') ||
+    (revenueCatError.message || '').toLowerCase().includes('storekit')) {
+    return {
+      userMessage: 'There was a problem with the App Store connection. Please try again in a few moments.',
+      technicalMessage: `StoreKit configuration error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Sandbox tester not signed in (critical for App Review)
+  if ((revenueCatError.message || '').toLowerCase().includes('sandbox') ||
+    (revenueCatError.message || '').toLowerCase().includes('test')) {
+    return {
+      userMessage: 'Unable to complete purchase in test environment. Please ensure you\'re signed in with the correct Apple ID.',
+      technicalMessage: `Sandbox error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Receipt validation errors
+  if (revenueCatError.code === 'INVALID_RECEIPT_ERROR' ||
+    (revenueCatError.message || '').toLowerCase().includes('receipt')) {
+    return {
+      userMessage: 'Purchase receipt validation failed. Please try again or contact support if this persists.',
+      technicalMessage: `Receipt validation error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Generic unknown error
+  return {
+    userMessage: 'An unexpected error occurred. Please try again or contact support if this persists.',
+    technicalMessage: `Unknown error: ${revenueCatError.message || 'No error message'}`,
+    shouldRetry: true,
+  };
+}
+
 // Configure your RevenueCat API keys from environment
 const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID || 'goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA';
 const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS || 'appl_YOUR_APPLE_API_KEY_HERE';
@@ -354,8 +450,17 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
+      console.log('🛒 Attempting purchase:', {
+        packageId: packageToPurchase.identifier,
+        productId: packageToPurchase.product.identifier,
+        platform: Platform.OS,
+      });
+
       const { customerInfo, productIdentifier } = await Purchases.purchasePackage(packageToPurchase);
-      console.log('✅ Purchase successful:', productIdentifier);
+      console.log('✅ Purchase successful:', {
+        productId: productIdentifier,
+        entitlements: Object.keys(customerInfo.entitlements.active),
+      });
 
       // Clear cache immediately to reflect new subscription status
       console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
@@ -363,8 +468,20 @@ class SubscriptionService {
 
       return { customerInfo, productIdentifier };
     } catch (error) {
-      console.error('❌ Purchase failed:', error);
-      throw error;
+      const parsedError = parseRevenueCatError(error);
+      console.error('❌ Purchase failed:', {
+        userMessage: parsedError.userMessage,
+        technicalMessage: parsedError.technicalMessage,
+        shouldRetry: parsedError.shouldRetry,
+        rawError: error,
+      });
+
+      // Re-throw with parsed error information
+      const enhancedError = new Error(parsedError.userMessage) as any;
+      enhancedError.originalError = error;
+      enhancedError.technicalMessage = parsedError.technicalMessage;
+      enhancedError.shouldRetry = parsedError.shouldRetry;
+      throw enhancedError;
     }
   }
 
@@ -373,14 +490,25 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
+      console.log('🛒 Attempting direct product purchase:', {
+        productId: productIdentifier,
+        platform: Platform.OS,
+      });
+
       // First get the product, then purchase it
       const products = await Purchases.getProducts([productIdentifier]);
       if (products.length === 0) {
-        throw new Error(`Product not found: ${productIdentifier}`);
+        const error = new Error(`Product not found: ${productIdentifier}`) as any;
+        error.code = 'PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR';
+        throw error;
       }
 
+      console.log('📦 Product found, initiating purchase...');
       const { customerInfo, productIdentifier: purchasedProductId } = await Purchases.purchaseStoreProduct(products[0]);
-      console.log('✅ Purchase successful:', purchasedProductId);
+      console.log('✅ Purchase successful:', {
+        productId: purchasedProductId,
+        entitlements: Object.keys(customerInfo.entitlements.active),
+      });
 
       // Clear cache immediately to reflect new subscription status
       console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
@@ -388,15 +516,31 @@ class SubscriptionService {
 
       return { customerInfo, productIdentifier: purchasedProductId };
     } catch (error) {
-      console.error('❌ Purchase failed:', error);
-      throw error;
+      const parsedError = parseRevenueCatError(error);
+      console.error('❌ Purchase failed:', {
+        userMessage: parsedError.userMessage,
+        technicalMessage: parsedError.technicalMessage,
+        shouldRetry: parsedError.shouldRetry,
+        rawError: error,
+      });
+
+      // Re-throw with parsed error information
+      const enhancedError = new Error(parsedError.userMessage) as any;
+      enhancedError.originalError = error;
+      enhancedError.technicalMessage = parsedError.technicalMessage;
+      enhancedError.shouldRetry = parsedError.shouldRetry;
+      throw enhancedError;
     }
   }
 
   async restorePurchases(): Promise<CustomerInfo> {
     try {
+      console.log('🔄 Attempting to restore purchases...');
       const customerInfo = await Purchases.restorePurchases();
-      console.log('✅ Purchases restored successfully');
+      console.log('✅ Purchases restored successfully:', {
+        entitlements: Object.keys(customerInfo.entitlements.active),
+        hasActiveSubscription: Object.keys(customerInfo.entitlements.active).length > 0,
+      });
 
       // Clear cache to reflect restored purchases immediately
       console.log('🔄 Purchases restored - invalidating cache for immediate refresh');
@@ -404,8 +548,20 @@ class SubscriptionService {
 
       return customerInfo;
     } catch (error) {
-      console.error('❌ Error restoring purchases:', error);
-      throw error;
+      const parsedError = parseRevenueCatError(error);
+      console.error('❌ Error restoring purchases:', {
+        userMessage: parsedError.userMessage,
+        technicalMessage: parsedError.technicalMessage,
+        shouldRetry: parsedError.shouldRetry,
+        rawError: error,
+      });
+
+      // Re-throw with parsed error information
+      const enhancedError = new Error(parsedError.userMessage) as any;
+      enhancedError.originalError = error;
+      enhancedError.technicalMessage = parsedError.technicalMessage;
+      enhancedError.shouldRetry = parsedError.shouldRetry;
+      throw enhancedError;
     }
   }
 

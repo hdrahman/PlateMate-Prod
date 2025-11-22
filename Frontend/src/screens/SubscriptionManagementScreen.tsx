@@ -158,6 +158,7 @@ const SubscriptionManagementScreen: React.FC = () => {
             const product = products.find(p => p.identifier === plan.productId);
             if (!product) {
                 Alert.alert('Error', 'Product not available');
+                setIsLoading(false);
                 return;
             }
 
@@ -166,7 +167,11 @@ const SubscriptionManagementScreen: React.FC = () => {
                 'Confirm Subscription',
                 `Subscribe to ${plan.title} for ${plan.price}${plan.period}?`,
                 [
-                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Cancel',
+                        style: 'cancel',
+                        onPress: () => setIsLoading(false)
+                    },
                     {
                         text: 'Subscribe',
                         onPress: async () => {
@@ -185,9 +190,41 @@ const SubscriptionManagementScreen: React.FC = () => {
                                     `Welcome to PlateMate Premium! Your ${plan.title} subscription is now active.`,
                                     [{ text: 'Great!', onPress: () => navigation.goBack() }]
                                 );
-                            } catch (error) {
+                                setIsLoading(false);
+                            } catch (error: any) {
                                 console.error('Purchase failed:', error);
-                                Alert.alert('Purchase Failed', 'There was an issue processing your subscription. Please try again.');
+
+                                // Check if user cancelled (don't show error for cancellation)
+                                if ((error.message || '').toLowerCase().includes('cancel')) {
+                                    setIsLoading(false);
+                                    return;
+                                }
+
+                                // Use the enhanced error message from SubscriptionService
+                                const errorMessage = error.message || 'There was an issue processing your subscription. Please try again.';
+                                const shouldRetry = error.shouldRetry !== false;
+
+                                if (shouldRetry) {
+                                    // Show error with retry option
+                                    Alert.alert(
+                                        'Purchase Failed',
+                                        errorMessage,
+                                        [
+                                            {
+                                                text: 'Cancel',
+                                                style: 'cancel',
+                                                onPress: () => setIsLoading(false)
+                                            },
+                                            {
+                                                text: 'Retry',
+                                                onPress: () => handleSubscribe(plan)
+                                            }
+                                        ]
+                                    );
+                                } else {
+                                    Alert.alert('Purchase Failed', errorMessage);
+                                    setIsLoading(false);
+                                }
                             }
                         },
                     },
@@ -195,7 +232,6 @@ const SubscriptionManagementScreen: React.FC = () => {
             );
         } catch (error) {
             console.error('Error initiating purchase:', error);
-        } finally {
             setIsLoading(false);
         }
     };
