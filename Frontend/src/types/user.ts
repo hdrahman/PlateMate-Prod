@@ -17,10 +17,6 @@ export interface UserProfile {
     activityLevel: string | null;
 
     // Dietary preferences
-    dietaryRestrictions: string[];
-    foodAllergies: string[];
-    cuisinePreferences: string[];
-    spiceTolerance: string | null;
     dietType?: string;
 
     // Health & fitness goals
@@ -28,7 +24,6 @@ export interface UserProfile {
     targetWeight: number | null;
     startingWeight: number | null;
     fitnessGoal: string | null;
-    healthConditions: string[];
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
 

@@ -61,17 +61,12 @@ export interface UserProfile {
     unitPreference: string;
 
     // Dietary preferences
-    dietaryRestrictions: string[];
-    foodAllergies: string[];
-    cuisinePreferences: string[];
-    spiceTolerance: string | null;
     dietType?: string;
 
     // Health & fitness goals
     weightGoal: string | null;
     targetWeight: number | null;
     startingWeight: number | null;
-    healthConditions: string[];
     fitnessGoal: string | null;
     dailyCalorieTarget: number | null;
     nutrientFocus: { [key: string]: any } | null;
@@ -150,15 +145,10 @@ const defaultProfile: UserProfile = {
     age: null,
     gender: null,
     activityLevel: 'moderate',
-    dietaryRestrictions: [],
-    foodAllergies: [],
-    cuisinePreferences: [],
-    spiceTolerance: null,
     weightGoal: null,
     targetWeight: null,
     startingWeight: null,
     fitnessGoal: null,
-    healthConditions: [],
     dailyCalorieTarget: null,
     nutrientFocus: null,
     motivations: [],
@@ -249,14 +239,9 @@ const convertSQLiteProfileToFrontendFormat = (sqliteProfile: any): UserProfile =
         gender: sqliteProfile.gender,
         activityLevel: sqliteProfile.activity_level,
         ...unitFields, // Synced unitPreference and useMetricSystem
-        dietaryRestrictions: safeParseArrayField(sqliteProfile.dietary_restrictions),
-        foodAllergies: safeParseArrayField(sqliteProfile.food_allergies),
-        cuisinePreferences: safeParseArrayField(sqliteProfile.cuisine_preferences),
-        spiceTolerance: sqliteProfile.spice_tolerance,
         weightGoal: sqliteProfile.weight_goal,
         targetWeight: sqliteProfile.target_weight,
         startingWeight: sqliteProfile.starting_weight,
-        healthConditions: safeParseArrayField(sqliteProfile.health_conditions),
         fitnessGoal: sqliteProfile.fitness_goal,
         dailyCalorieTarget: sqliteProfile.daily_calorie_target,
         nutrientFocus: sqliteProfile.nutrient_focus ?
@@ -315,12 +300,7 @@ const convertFrontendProfileToSQLiteFormat = (frontendProfile: UserProfile, fire
         target_weight: frontendProfile.targetWeight,
         starting_weight: frontendProfile.startingWeight,
         unit_preference: unitFields.unitPreference, // Synced
-        dietary_restrictions: frontendProfile.dietaryRestrictions,
-        food_allergies: frontendProfile.foodAllergies,
-        cuisine_preferences: frontendProfile.cuisinePreferences,
-        spice_tolerance: frontendProfile.spiceTolerance,
         weight_goal: frontendProfile.weightGoal,
-        health_conditions: frontendProfile.healthConditions,
         fitness_goal: frontendProfile.fitnessGoal,
         daily_calorie_target: frontendProfile.dailyCalorieTarget,
         nutrient_focus: frontendProfile.nutrientFocus,
@@ -646,11 +626,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
             weight_goal: finalProfile.weightGoal || null,
             target_weight: finalProfile.targetWeight || null,
             starting_weight: finalProfile.weight || null, // CRITICAL FIX: Set starting_weight to current weight during onboarding
-            dietary_restrictions: Array.isArray(finalProfile.dietaryRestrictions) ? finalProfile.dietaryRestrictions : [],
-            food_allergies: Array.isArray(finalProfile.foodAllergies) ? finalProfile.foodAllergies : [],
-            cuisine_preferences: Array.isArray(finalProfile.cuisinePreferences) ? finalProfile.cuisinePreferences : [],
-            spice_tolerance: finalProfile.spiceTolerance || null,
-            health_conditions: Array.isArray(finalProfile.healthConditions) ? finalProfile.healthConditions : [],
             fitness_goal: finalProfile.fitnessGoal || null,
             daily_calorie_target: finalProfile.dailyCalorieTarget || null,
             nutrient_focus: finalProfile.nutrientFocus || null,
@@ -823,11 +798,24 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
                         console.log('ℹ️ No users uploaded - user might already exist in cloud');
                         try {
-                            const { data: existingUser, error: existingUserError } = await supabase
+                            // Use maybeSingle() to avoid error on 0 rows
+                            let { data: existingUser, error: existingUserError } = await supabase
                                 .from('users')
                                 .select('id')
                                 .eq('firebase_uid', authUser.id)
-                                .single();
+                                .maybeSingle();
+
+                            // If not found by firebase_uid, try by email (covers account recreation case)
+                            if (!existingUser && !existingUserError) {
+                                const result = await supabase
+                                    .from('users')
+                                    .select('id')
+                                    .eq('email', authUser.email)
+                                    .maybeSingle();
+                                
+                                existingUser = result.data;
+                                existingUserError = result.error;
+                            }
 
                             if (existingUserError) {
                                 console.error('❌ Failed to verify existing cloud profile:', existingUserError);

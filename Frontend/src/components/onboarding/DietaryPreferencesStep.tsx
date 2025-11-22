@@ -76,30 +76,17 @@ const commonAllergies = [
 
 const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile, updateProfile, onNext }) => {
     const [selectedDiet, setSelectedDiet] = useState<string>(profile.dietType || 'classic');
-    const [allergies, setAllergies] = useState<string[]>(profile.foodAllergies || []);
 
     useEffect(() => {
         updateProfile({
             dietType: selectedDiet,
-            foodAllergies: allergies,
-            dietaryRestrictions: [selectedDiet],
         }).catch(() => { });
-    }, [selectedDiet, allergies]);
-
-    const toggleAllergy = (allergyId: string) => {
-        if (allergies.includes(allergyId)) {
-            setAllergies(allergies.filter(id => id !== allergyId));
-        } else {
-            setAllergies([...allergies, allergyId]);
-        }
-    };
+    }, [selectedDiet]);
 
     const handleSubmit = async () => {
         try {
             await updateProfile({
                 dietType: selectedDiet,
-                foodAllergies: allergies,
-                dietaryRestrictions: [selectedDiet], // Using diet type as restriction too
             });
             onNext();
         } catch (error) {
@@ -145,34 +132,6 @@ const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile
                             </View>
                             {selectedDiet === diet.id && (
                                 <Ionicons name="checkmark-circle" size={22} color="#0074dd" />
-                            )}
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
-
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Do you have any food allergies?</Text>
-                <Text style={styles.sectionSubtitle}>Select all that apply</Text>
-
-                <View style={styles.allergiesContainer}>
-                    {commonAllergies.map((allergy) => (
-                        <TouchableOpacity
-                            key={allergy.id}
-                            style={[
-                                styles.allergyChip,
-                                allergies.includes(allergy.id) && styles.selectedAllergyChip
-                            ]}
-                            onPress={() => toggleAllergy(allergy.id)}
-                        >
-                            <Text style={[
-                                styles.allergyLabel,
-                                allergies.includes(allergy.id) && styles.selectedAllergyLabel
-                            ]}>
-                                {allergy.label}
-                            </Text>
-                            {allergies.includes(allergy.id) && (
-                                <Ionicons name="close-circle" size={16} color="#fff" style={styles.allergyIcon} />
                             )}
                         </TouchableOpacity>
                     ))}

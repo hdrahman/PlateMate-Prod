@@ -572,15 +572,70 @@ class PostgreSQLSyncService {
                     .single();
 
                 if (error) {
-                    console.error('❌ Failed to insert user:', error);
-                    // Check if it's an RLS error
-                    if (error.code === 'PGRST301' || error.message?.includes('policy')) {
-                        console.error('🔒 RLS policy blocked insert - this should not happen during onboarding');
+                    // If duplicate email constraint, check if it's the same user with updated firebase_uid
+                    if (error.code === '23505' && error.message?.includes('users_email_key')) {
+                        console.log('⚠️ Email already exists in cloud, checking if same user...');
+                        
+                        // First, check who owns this email
+                        const { data: existingUser, error: checkError } = await supabase
+                            .from('users')
+                            .select('id, firebase_uid')
+                            .eq('email', userData.email)
+                            .maybeSingle();
+                        
+                        if (checkError) {
+                            console.error('❌ Failed to check existing user:', checkError);
+                            throw checkError;
+                        }
+                        
+                        if (existingUser) {
+                            // Update the existing user's firebase_uid and profile data
+                            // This handles account recreation scenarios where firebase_uid changed
+                            console.log(`🔄 Updating existing user's profile (old: ${existingUser.firebase_uid}, new: ${userData.firebase_uid})`);
+                            
+                            const { data: updateData, error: updateError } = await supabase
+                                .from('users')
+                                .update(userData)
+                                .eq('id', existingUser.id)
+                                .select('id')
+                                .single();
+                            
+                            if (updateError) {
+                                console.error('❌ Failed to update user profile:', updateError);
+                                throw updateError;
+                            }
+                            
+                            postgresUserId = updateData.id;
+                            console.log('✅ User profile updated with new firebase_uid:', postgresUserId);
+                        } else {
+                            // Email doesn't exist, try INSERT again (race condition scenario)
+                            console.log('⚠️ No user found with email, attempting INSERT again');
+                            const { data: insertData, error: insertError } = await supabase
+                                .from('users')
+                                .insert(userData)
+                                .select('id')
+                                .single();
+                            
+                            if (insertError) {
+                                console.error('❌ Failed to insert user:', insertError);
+                                throw insertError;
+                            }
+                            
+                            postgresUserId = insertData.id;
+                            console.log('✅ User inserted successfully:', postgresUserId);
+                        }
+                    } else {
+                        console.error('❌ Failed to insert user:', error);
+                        // Check if it's an RLS error
+                        if (error.code === 'PGRST301' || error.message?.includes('policy')) {
+                            console.error('🔒 RLS policy blocked insert - this should not happen during onboarding');
+                        }
+                        throw error;
                     }
-                    throw error;
+                } else {
+                    postgresUserId = data.id;
+                    console.log('✅ User inserted successfully:', postgresUserId);
                 }
-                postgresUserId = data.id;
-                console.log('✅ User inserted successfully:', postgresUserId);
             }
 
             await markUserProfileSynced(firebaseUid);

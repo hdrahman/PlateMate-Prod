@@ -1759,11 +1759,6 @@ export const addUserProfile = async (profile: any) => {
         activity_level = null,
         weight_goal = null,
         target_weight = null,
-        dietary_restrictions = [],
-        food_allergies = [],
-        cuisine_preferences = [],
-        spice_tolerance = null,
-        health_conditions = [],
         fitness_goal = null,
         daily_calorie_target = null,
         nutrient_focus = null,
@@ -1866,11 +1861,11 @@ export const addUserProfile = async (profile: any) => {
                 activity_level,                                   // 10
                 weight_goal,                                      // 11
                 target_weight,                                    // 12
-                JSON.stringify(dietary_restrictions),             // 13
-                JSON.stringify(food_allergies),                   // 14
-                JSON.stringify(cuisine_preferences),              // 15
-                spice_tolerance,                                  // 16
-                JSON.stringify(health_conditions),                // 17
+                '[]',                                             // 13 dietary_restrictions (empty array)
+                '[]',                                             // 14 food_allergies (empty array)
+                '[]',                                             // 15 cuisine_preferences (empty array)
+                null,                                             // 16 spice_tolerance
+                '[]',                                             // 17 health_conditions (empty array)
                 fitness_goal,                                     // 18
                 daily_calorie_target,                             // 19
                 nutrient_focus ? JSON.stringify(nutrient_focus) : null, // 20
@@ -2027,11 +2022,6 @@ interface UserProfile {
     activity_level?: string;
     target_weight?: number;
     starting_weight?: number;
-    dietary_restrictions?: string;
-    food_allergies?: string;
-    cuisine_preferences?: string;
-    spice_tolerance?: string;
-    health_conditions?: string;
     fitness_goal?: string;
     weight_goal?: string;
     daily_calorie_target?: number;
@@ -2268,6 +2258,7 @@ export const updateUserProfile = async (firebaseUid: string, updates: any, isAut
                 const supabaseData: any = {};
 
                 for (const [key, value] of Object.entries(updates)) {
+                    // Skip fields that don't exist in cloud schema or are internal
                     if (key === 'firebase_uid' || key === 'password') continue;
 
                     // Convert SQLite boolean (0/1) back to actual boolean
@@ -4462,19 +4453,6 @@ const convertFrontendProfileToSQLiteFormatHelper = (frontendProfile: any, fireba
         activity_level: frontendProfile.activityLevel,
         target_weight: frontendProfile.targetWeight,
         starting_weight: frontendProfile.startingWeight,
-        dietary_restrictions: Array.isArray(frontendProfile.dietaryRestrictions)
-            ? frontendProfile.dietaryRestrictions.join(',')
-            : (frontendProfile.dietaryRestrictions || ''),
-        food_allergies: Array.isArray(frontendProfile.foodAllergies)
-            ? frontendProfile.foodAllergies.join(',')
-            : (frontendProfile.foodAllergies || ''),
-        cuisine_preferences: Array.isArray(frontendProfile.cuisinePreferences)
-            ? frontendProfile.cuisinePreferences.join(',')
-            : (frontendProfile.cuisinePreferences || ''),
-        spice_tolerance: frontendProfile.spiceTolerance,
-        health_conditions: Array.isArray(frontendProfile.healthConditions)
-            ? frontendProfile.healthConditions.join(',')
-            : (frontendProfile.healthConditions || ''),
         fitness_goal: frontendProfile.fitnessGoal,
         weight_goal: frontendProfile.weightGoal,
         daily_calorie_target: frontendProfile.dailyCalorieTarget,

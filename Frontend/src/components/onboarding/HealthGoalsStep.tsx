@@ -40,17 +40,6 @@ const weightGainOptions = [
     { id: 'gain_moderate', label: 'Gain 0.5 kg per week', description: 'Moderate calorie surplus', surplus: 500 },
 ];
 
-// Health conditions
-const healthConditions = [
-    { id: 'diabetes', label: 'Diabetes' },
-    { id: 'hypertension', label: 'Hypertension' },
-    { id: 'heart_disease', label: 'Heart Disease' },
-    { id: 'high_cholesterol', label: 'High Cholesterol' },
-    { id: 'celiac', label: 'Celiac Disease' },
-    { id: 'ibs', label: 'IBS' },
-    { id: 'acid_reflux', label: 'Acid Reflux' },
-    { id: 'thyroid', label: 'Thyroid Condition' },
-];
 
 // Nutrient focus options (with default daily values)
 const nutrientFocus = [
@@ -78,7 +67,6 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             profile.weightGoal?.startsWith('gain') ? 'gain' : 'maintain'
     );
     const [detailedGoal, setDetailedGoal] = useState<string>(profile.weightGoal || 'maintain');
-    const [selectedConditions, setSelectedConditions] = useState<string[]>(profile.healthConditions || []);
     const [calculatedCalories, setCalculatedCalories] = useState<number>(0);
     const [calculatedNutrients, setCalculatedNutrients] = useState<any>({});
     const [showFitnessGoalPicker, setShowFitnessGoalPicker] = useState(false);
@@ -134,12 +122,13 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
         // <10% of total calories from added sugars (WHO), <6% ideal (AHA)
         const sugarsG = Math.round(goals.calories * 0.06 / 4); // 6% of calories as added sugars
 
-        // Sodium recommendations based on health conditions and age
-        let sodiumMg = 2300; // Standard adult recommendation
-        if (selectedConditions.includes('hypertension') || selectedConditions.includes('heart_disease')) {
-            sodiumMg = 1500; // Lower for cardiovascular conditions
-        } else if (profile.age && profile.age > 50) {
-            sodiumMg = 1500; // Lower for adults over 50
+        // Sodium recommendations (conservative approach since we don't track health conditions)
+        // Using 2000mg as default instead of 2300mg to be more health-conscious
+        let sodiumMg = 2000; // Conservative general recommendation
+        if (profile.age && profile.age > 50) {
+            sodiumMg = 1500; // Lower for adults over 50 (higher cardiovascular risk)
+        } else if (profile.age && profile.age > 40) {
+            sodiumMg = 1800; // Moderately lower for 40-50 age group
         }
 
         setCalculatedNutrients({
@@ -150,14 +139,6 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             sugar: sugarsG,
             sodium: sodiumMg
         });
-    };
-
-    const toggleCondition = (id: string) => {
-        if (selectedConditions.includes(id)) {
-            setSelectedConditions(selectedConditions.filter(item => item !== id));
-        } else {
-            setSelectedConditions([...selectedConditions, id]);
-        }
     };
 
     const handleMainGoalSelect = (goal: 'lose' | 'maintain' | 'gain') => {
@@ -180,7 +161,6 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
     const handleSubmit = async () => {
         await updateProfile({
             weightGoal: detailedGoal,
-            healthConditions: selectedConditions,
             dailyCalorieTarget: calculatedCalories,
             nutrientFocus: calculatedNutrients,
             cheatDayEnabled: cheatDayEnabled,
@@ -394,36 +374,6 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                 </View>
             </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Any health conditions?</Text>
-                <Text style={styles.sectionSubtitle}>This helps us provide appropriate recommendations</Text>
-                <View style={styles.conditionsGrid}>
-                    {healthConditions.map((condition) => (
-                        <TouchableOpacity
-                            key={condition.id}
-                            style={[
-                                styles.conditionButton,
-                                selectedConditions.includes(condition.id) && styles.selectedCondition
-                            ]}
-                            onPress={() => toggleCondition(condition.id)}
-                        >
-                            {selectedConditions.includes(condition.id) && (
-                                <View style={styles.checkMark}>
-                                    <Ionicons name="checkmark" size={16} color="#fff" />
-                                </View>
-                            )}
-                            <Text
-                                style={[
-                                    styles.conditionText,
-                                    selectedConditions.includes(condition.id) && styles.selectedConditionText
-                                ]}
-                            >
-                                {condition.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Cheat Day Preferences</Text>
