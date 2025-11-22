@@ -302,21 +302,23 @@ const PremiumSubscription = () => {
             const errorMessage = error.message || 'There was an error processing your subscription. Please try again.';
             const shouldRetry = error.shouldRetry !== false; // Default to true if not specified
 
+            // Reset loading state before showing any alert
+            setIsLoading(false);
+
             if (shouldRetry) {
-                // Show error with retry option - don't set loading to false until user responds
+                // Show error with retry option
                 Alert.alert(
                     'Subscription Error',
                     errorMessage,
                     [
                         {
                             text: 'Cancel',
-                            style: 'cancel',
-                            onPress: () => setIsLoading(false)
+                            style: 'cancel'
                         },
                         {
                             text: 'Retry',
                             onPress: () => {
-                                // Don't reset loading state - let the new attempt handle it
+                                // Retry will set loading state when handleSubscribe is called
                                 handleSubscribe(planToUse);
                             }
                         }
@@ -325,7 +327,6 @@ const PremiumSubscription = () => {
             } else {
                 // Show error without retry
                 Alert.alert('Subscription Error', errorMessage);
-                setIsLoading(false);
             }
         }
     };

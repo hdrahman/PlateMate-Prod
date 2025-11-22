@@ -152,13 +152,10 @@ const SubscriptionManagementScreen: React.FC = () => {
         if (!user?.uid) return;
 
         try {
-            setIsLoading(true);
-
             // Get the product for purchase
             const product = products.find(p => p.identifier === plan.productId);
             if (!product) {
                 Alert.alert('Error', 'Product not available');
-                setIsLoading(false);
                 return;
             }
 
@@ -169,13 +166,15 @@ const SubscriptionManagementScreen: React.FC = () => {
                 [
                     {
                         text: 'Cancel',
-                        style: 'cancel',
-                        onPress: () => setIsLoading(false)
+                        style: 'cancel'
                     },
                     {
                         text: 'Subscribe',
                         onPress: async () => {
                             try {
+                                // Set loading state when user actually confirms purchase
+                                setIsLoading(true);
+                                
                                 // Attempt purchase through RevenueCat
                                 const { customerInfo } = await SubscriptionService.purchaseProduct(plan.productId);
 
@@ -204,6 +203,9 @@ const SubscriptionManagementScreen: React.FC = () => {
                                 const errorMessage = error.message || 'There was an issue processing your subscription. Please try again.';
                                 const shouldRetry = error.shouldRetry !== false;
 
+                                // Reset loading state before showing any alert
+                                setIsLoading(false);
+
                                 if (shouldRetry) {
                                     // Show error with retry option
                                     Alert.alert(
@@ -212,8 +214,7 @@ const SubscriptionManagementScreen: React.FC = () => {
                                         [
                                             {
                                                 text: 'Cancel',
-                                                style: 'cancel',
-                                                onPress: () => setIsLoading(false)
+                                                style: 'cancel'
                                             },
                                             {
                                                 text: 'Retry',
@@ -223,7 +224,6 @@ const SubscriptionManagementScreen: React.FC = () => {
                                     );
                                 } else {
                                     Alert.alert('Purchase Failed', errorMessage);
-                                    setIsLoading(false);
                                 }
                             }
                         },
@@ -232,7 +232,7 @@ const SubscriptionManagementScreen: React.FC = () => {
             );
         } catch (error) {
             console.error('Error initiating purchase:', error);
-            setIsLoading(false);
+            Alert.alert('Error', 'Failed to initiate purchase. Please try again.');
         }
     };
 

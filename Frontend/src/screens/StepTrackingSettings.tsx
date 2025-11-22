@@ -256,14 +256,16 @@ export default function StepTrackingSettings() {
 
                 if (!hasSeenExplanation) {
                     // Show the permission explanation modal first
+                    // Don't set loading state - we're waiting for user input, not performing async operations
                     setShowPermissionModal(true);
                     return;
                 }
 
                 // If they've seen it before, proceed with enabling
+                // enableStepTracking will set and manage loading state
                 await enableStepTracking();
             } else {
-                // Disable step tracking
+                // Disable step tracking (manages its own loading state)
                 await disableStepTracking();
             }
         } catch (error) {
@@ -329,18 +331,25 @@ export default function StepTrackingSettings() {
     };
 
     const handleEnableTrackingFromModal = async () => {
+        try {
+            // Mark that user has seen the explanation (do this while modal is still visible)
+            await AsyncStorage.setItem('step_tracking_permission_explained', 'true');
+        } catch (error) {
+            // Log the error but don't block step tracking - the flag is just to prevent showing modal again
+            console.error('❌ Error saving permission modal flag:', error);
+            // Continue with enabling step tracking regardless
+        }
+
+        // Close modal immediately before starting tracking to ensure smooth transition
         setShowPermissionModal(false);
 
-        // Mark that user has seen the explanation
-        await AsyncStorage.setItem('step_tracking_permission_explained', 'true');
-
-        // Now proceed with enabling step tracking
+        // Immediately start enabling step tracking (this will set loading state right away)
         await enableStepTracking();
     };
 
     const handleSkipPermissionModal = () => {
         setShowPermissionModal(false);
-        setLoading(false);
+        // No need to set loading to false since it was never set to true
     };
 
     const handleForceSync = async () => {
