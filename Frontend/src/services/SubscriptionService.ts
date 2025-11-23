@@ -27,13 +27,10 @@ if (!isExpoGo) {
     PurchasesPackage = PurchasesModule.PurchasesPackage;
     PurchasesStoreProduct = PurchasesModule.PurchasesStoreProduct;
     INTRO_ELIGIBILITY_STATUS = PurchasesModule.INTRO_ELIGIBILITY_STATUS;
-    console.log('✅ RevenueCat SDK loaded successfully');
   } catch (error) {
-    console.log('⚠️ RevenueCat failed to load:', error);
+    console.warn('RevenueCat failed to load:', error);
     Purchases = null;
   }
-} else {
-  console.log('Expo Go app detected. Using RevenueCat in Preview API Mode.');
 }
 
 // Define EntitlementInfo type locally (it's part of CustomerInfo but not exported separately)
@@ -58,13 +55,6 @@ interface RevenueCatError extends Error {
 // Helper function to parse RevenueCat errors and provide user-friendly messages
 function parseRevenueCatError(error: any): { userMessage: string; technicalMessage: string; shouldRetry: boolean } {
   const revenueCatError = error as RevenueCatError;
-
-  console.log('🔍 Parsing RevenueCat error:', {
-    code: revenueCatError.code,
-    message: revenueCatError.message,
-    userCancelled: revenueCatError.userCancelled,
-    underlyingError: revenueCatError.underlyingErrorMessage,
-  });
 
   // User cancelled the purchase
   if (revenueCatError.userCancelled || revenueCatError.code === 'PURCHASE_CANCELLED_ERROR') {
@@ -145,8 +135,21 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
 }
 
 // Configure your RevenueCat API keys from environment
-const REVENUECAT_API_KEY_ANDROID = process.env.REVENUECAT_API_KEY_ANDROID || 'goog_KQRoCcYPcMGUcdeSPJcJbyxBVWA';
-const REVENUECAT_API_KEY_IOS = process.env.REVENUECAT_API_KEY_IOS || 'appl_YOUR_APPLE_API_KEY_HERE';
+// Use Expo Constants to access environment variables in React Native
+// These are set in eas.json and exposed via app.config.js
+const REVENUECAT_API_KEY_ANDROID = Constants.expoConfig?.extra?.REVENUECAT_API_KEY_ANDROID;
+const REVENUECAT_API_KEY_IOS = Constants.expoConfig?.extra?.REVENUECAT_API_KEY_IOS;
+
+// Validate API keys are configured (fail hard if missing)
+if (!REVENUECAT_API_KEY_IOS || !REVENUECAT_API_KEY_ANDROID) {
+  const missingKeys = [];
+  if (!REVENUECAT_API_KEY_IOS) missingKeys.push('iOS');
+  if (!REVENUECAT_API_KEY_ANDROID) missingKeys.push('Android');
+  throw new Error(
+    `CONFIGURATION ERROR: RevenueCat API key(s) not configured for ${missingKeys.join(', ')}. ` +
+    `Set REVENUECAT_API_KEY_IOS and REVENUECAT_API_KEY_ANDROID in eas.json`
+  );
+}
 
 // Product IDs from App Store Connect and Google Play Console
 // These match your RevenueCat dashboard configuration
@@ -203,18 +206,15 @@ class SubscriptionService {
   // Add subscription change listener
   addSubscriptionChangeListener(listener: () => void): void {
     this.eventEmitter.on('subscriptionChanged', listener);
-    console.log('✅ Subscription change listener added');
   }
 
   // Remove subscription change listener
   removeSubscriptionChangeListener(listener: () => void): void {
     this.eventEmitter.off('subscriptionChanged', listener);
-    console.log('🗑️ Subscription change listener removed');
   }
 
   // Emit subscription change event
   private emitSubscriptionChange(): void {
-    console.log('📢 Emitting subscription change event to all listeners');
     this.eventEmitter.emit('subscriptionChanged');
   }
 
@@ -223,12 +223,10 @@ class SubscriptionService {
     this.premiumStatusCache.hasPremiumAccess = null;
     this.premiumStatusCache.tier = null;
     this.premiumStatusCache.lastUpdate = 0;
-    console.log('🗑️ Premium status cache cleared from memory');
 
     // Also clear AsyncStorage cache
     AsyncStorage.removeItem(this.CACHE_STORAGE_KEY)
-      .then(() => console.log('🗑️ Premium status cache cleared from storage'))
-      .catch(error => console.warn('⚠️ Failed to clear storage cache:', error));
+      .catch(error => console.warn('Failed to clear storage cache:', error));
 
     // Emit subscription change event
     this.emitSubscriptionChange();
@@ -239,7 +237,6 @@ class SubscriptionService {
     try {
       const cachedData = await AsyncStorage.getItem(this.CACHE_STORAGE_KEY);
       if (!cachedData) {
-        console.log('📦 No persistent cache found');
         return false;
       }
 
@@ -255,15 +252,8 @@ class SubscriptionService {
           this.premiumStatusCache.tier = parsed.tier;
           this.premiumStatusCache.lastUpdate = parsed.lastUpdate;
 
-          console.log('✅ Loaded valid cache from storage:', {
-            tier: parsed.tier,
-            hasPremiumAccess: parsed.hasPremiumAccess,
-            ageHours: (cacheAge / (1000 * 60 * 60)).toFixed(1)
-          });
-
           return true;
         } else {
-          console.log('⏰ Persistent cache expired, will refetch');
           // Clear expired cache
           await AsyncStorage.removeItem(this.CACHE_STORAGE_KEY);
         }
@@ -271,7 +261,7 @@ class SubscriptionService {
 
       return false;
     } catch (error) {
-      console.warn('⚠️ Failed to load cache from storage:', error);
+      console.warn('Failed to load cache from storage:', error);
       return false;
     }
   }
@@ -286,9 +276,8 @@ class SubscriptionService {
       };
 
       await AsyncStorage.setItem(this.CACHE_STORAGE_KEY, JSON.stringify(cacheData));
-      console.log('💾 Saved cache to storage (24h TTL)');
     } catch (error) {
-      console.warn('⚠️ Failed to save cache to storage:', error);
+      console.warn('Failed to save cache to storage:', error);
     }
   }
 
@@ -300,13 +289,15 @@ class SubscriptionService {
   }
 
   async initialize(userId: string): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      return;
+    }
 
     // Store current user ID for VIP listener
     this.currentUserId = userId;
 
     if (!Purchases) {
-      console.log('⚠️ RevenueCat not available - skipping initialization');
+      console.warn('RevenueCat not available - skipping initialization');
       this.isInitialized = true;
 
       // Still set up Supabase Realtime listener for VIP changes
@@ -317,6 +308,13 @@ class SubscriptionService {
 
     try {
       const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+
+      if (!apiKey) {
+        throw new Error(
+          `RevenueCat API key not configured for ${Platform.OS}. ` +
+          `Set REVENUECAT_API_KEY_${Platform.OS.toUpperCase()} in eas.json`
+        );
+      }
 
       // Configure Purchases SDK with enhanced settings
       await Purchases.configure({
@@ -331,7 +329,6 @@ class SubscriptionService {
       }
 
       this.isInitialized = true;
-      console.log('✅ RevenueCat SDK initialized successfully for user:', userId);
 
       // Set up real-time subscription change listener (for immediate cache invalidation)
       this.setupRevenueCatListener();
@@ -341,19 +338,14 @@ class SubscriptionService {
 
       // Get initial customer info to sync trial status
       try {
-        const customerInfo = await this.getCustomerInfo();
-        console.log('💰 Initial customer info:', {
-          activeEntitlements: Object.keys(customerInfo.entitlements.active),
-          originalPurchaseDate: customerInfo.originalPurchaseDate,
-          firstSeen: customerInfo.firstSeen,
-        });
+        await this.getCustomerInfo();
       } catch (customerError) {
-        console.warn('⚠️ Could not fetch initial customer info (may be expected for unpublished apps):', customerError);
+        console.warn('Could not fetch initial customer info:', customerError);
       }
 
     } catch (error) {
-      console.error('❌ Error initializing RevenueCat SDK:', error);
-      throw error;
+      console.error('RevenueCat initialization failed:', error);
+      // Don't throw - allow app to continue without RevenueCat
     }
   }
 
@@ -364,17 +356,13 @@ class SubscriptionService {
     try {
       // Add listener for customer info updates (fires when subscription status changes)
       Purchases.addCustomerInfoUpdateListener((customerInfo) => {
-        console.log('💫 RevenueCat: Subscription status changed, invalidating cache');
-        console.log('📊 New entitlements:', Object.keys(customerInfo.entitlements.active));
-
         // Clear cache immediately to fetch fresh status
         this.clearCache();
       });
 
       this.revenueCatListenerAdded = true;
-      console.log('✅ RevenueCat real-time listener set up');
     } catch (error) {
-      console.error('❌ Error setting up RevenueCat listener:', error);
+      console.error('Error setting up RevenueCat listener:', error);
     }
   }
 
@@ -398,34 +386,52 @@ class SubscriptionService {
             filter: `firebase_uid=eq.${userId}`
           },
           (payload) => {
-            console.log('🔔 Supabase Realtime: VIP status changed for user:', userId);
-            console.log('📊 Change details:', payload);
-
             // Clear cache immediately to reflect VIP status change
             this.clearCache();
           }
         )
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Supabase Realtime: Listening for VIP status changes');
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Supabase Realtime: Error subscribing to VIP changes');
+          if (status === 'CHANNEL_ERROR') {
+            console.error('Error subscribing to VIP changes');
           }
         });
 
     } catch (error) {
-      console.error('❌ Error setting up Supabase VIP listener:', error);
+      console.error('Error setting up Supabase VIP listener:', error);
     }
   }
 
   async getOfferings(): Promise<PurchasesOffering | null> {
-    if (!Purchases) return null;
+    if (!Purchases) {
+      console.error('RevenueCat SDK not available');
+      return null;
+    }
 
     try {
       const offerings = await Purchases.getOfferings();
+
+      if (!offerings.current) {
+        console.warn('No current offering found in RevenueCat');
+      }
+
+      if (offerings.current && (!offerings.current.availablePackages || offerings.current.availablePackages.length === 0)) {
+        console.warn('Current offering has no packages');
+      }
+
       return offerings.current;
-    } catch (error) {
-      console.error('❌ Error fetching offerings:', error);
+    } catch (error: any) {
+      console.error('Error fetching offerings:', error.message);
+
+      // Check for common configuration issues
+      if (error.message?.includes('API key') || error.code?.includes('INVALID_CREDENTIALS')) {
+        const maskedKey = REVENUECAT_API_KEY_IOS
+          ? `${REVENUECAT_API_KEY_IOS.substring(0, 5)}...`
+          : 'MISSING';
+        console.error('🔴 CONFIGURATION ERROR: RevenueCat API key is invalid or not configured');
+        console.error('🔴 Current iOS API key:', maskedKey);
+        console.error('🔴 Expected format: appl_XXXXXXXXXXXXXXXXXXXX');
+      }
+
       return null;
     }
   }
@@ -450,31 +456,15 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
-      console.log('🛒 Attempting purchase:', {
-        packageId: packageToPurchase.identifier,
-        productId: packageToPurchase.product.identifier,
-        platform: Platform.OS,
-      });
-
       const { customerInfo, productIdentifier } = await Purchases.purchasePackage(packageToPurchase);
-      console.log('✅ Purchase successful:', {
-        productId: productIdentifier,
-        entitlements: Object.keys(customerInfo.entitlements.active),
-      });
 
       // Clear cache immediately to reflect new subscription status
-      console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
       this.clearCache();
 
       return { customerInfo, productIdentifier };
     } catch (error) {
       const parsedError = parseRevenueCatError(error);
-      console.error('❌ Purchase failed:', {
-        userMessage: parsedError.userMessage,
-        technicalMessage: parsedError.technicalMessage,
-        shouldRetry: parsedError.shouldRetry,
-        rawError: error,
-      });
+      console.error('Purchase failed:', parsedError.userMessage);
 
       // Re-throw with parsed error information
       const enhancedError = new Error(parsedError.userMessage) as any;
@@ -490,11 +480,6 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
-      console.log('🛒 Attempting direct product purchase:', {
-        productId: productIdentifier,
-        platform: Platform.OS,
-      });
-
       // First get the product, then purchase it
       const products = await Purchases.getProducts([productIdentifier]);
       if (products.length === 0) {
@@ -503,26 +488,15 @@ class SubscriptionService {
         throw error;
       }
 
-      console.log('📦 Product found, initiating purchase...');
       const { customerInfo, productIdentifier: purchasedProductId } = await Purchases.purchaseStoreProduct(products[0]);
-      console.log('✅ Purchase successful:', {
-        productId: purchasedProductId,
-        entitlements: Object.keys(customerInfo.entitlements.active),
-      });
 
       // Clear cache immediately to reflect new subscription status
-      console.log('🔄 Purchase completed - invalidating cache for immediate refresh');
       this.clearCache();
 
       return { customerInfo, productIdentifier: purchasedProductId };
     } catch (error) {
       const parsedError = parseRevenueCatError(error);
-      console.error('❌ Purchase failed:', {
-        userMessage: parsedError.userMessage,
-        technicalMessage: parsedError.technicalMessage,
-        shouldRetry: parsedError.shouldRetry,
-        rawError: error,
-      });
+      console.error('Purchase failed:', parsedError.userMessage);
 
       // Re-throw with parsed error information
       const enhancedError = new Error(parsedError.userMessage) as any;
@@ -535,26 +509,15 @@ class SubscriptionService {
 
   async restorePurchases(): Promise<CustomerInfo> {
     try {
-      console.log('🔄 Attempting to restore purchases...');
       const customerInfo = await Purchases.restorePurchases();
-      console.log('✅ Purchases restored successfully:', {
-        entitlements: Object.keys(customerInfo.entitlements.active),
-        hasActiveSubscription: Object.keys(customerInfo.entitlements.active).length > 0,
-      });
 
       // Clear cache to reflect restored purchases immediately
-      console.log('🔄 Purchases restored - invalidating cache for immediate refresh');
       this.clearCache();
 
       return customerInfo;
     } catch (error) {
       const parsedError = parseRevenueCatError(error);
-      console.error('❌ Error restoring purchases:', {
-        userMessage: parsedError.userMessage,
-        technicalMessage: parsedError.technicalMessage,
-        shouldRetry: parsedError.shouldRetry,
-        rawError: error,
-      });
+      console.error('Error restoring purchases:', parsedError.userMessage);
 
       // Re-throw with parsed error information
       const enhancedError = new Error(parsedError.userMessage) as any;
@@ -589,14 +552,12 @@ class SubscriptionService {
       if (this.vipRealtimeSubscription) {
         this.vipRealtimeSubscription.unsubscribe();
         this.vipRealtimeSubscription = null;
-        console.log('✅ Supabase VIP listener unsubscribed');
       }
 
       this.isInitialized = false;
       this.currentUserId = null;
-      console.log('✅ User logged out from RevenueCat and Supabase listeners cleaned up');
     } catch (error) {
-      console.error('❌ Error logging out:', error);
+      console.error('Error logging out:', error);
       throw error;
     }
   }
@@ -604,10 +565,9 @@ class SubscriptionService {
   async login(userId: string): Promise<{ customerInfo: CustomerInfo; created: boolean }> {
     try {
       const result = await Purchases.logIn(userId);
-      console.log('✅ User logged in to RevenueCat');
       return result;
     } catch (error) {
-      console.error('❌ Error logging in:', error);
+      console.error('Error logging in:', error);
       throw error;
     }
   }
@@ -779,8 +739,6 @@ class SubscriptionService {
   // Setup auto-renew to extend trial (user adds payment method)
   async setupAutoRenewForTrialExtension(): Promise<boolean> {
     try {
-      console.log('💳 Setting up auto-renew for trial extension...');
-
       // Get current offerings to find the products
       const offerings = await this.getOfferings();
       if (!offerings || !offerings.availablePackages) {
@@ -801,10 +759,9 @@ class SubscriptionService {
       // This will prompt the user to set up payment method and extend trial
       const { customerInfo } = await this.purchasePackage(packageToUse);
 
-      console.log('✅ Auto-renew setup successful, trial extended');
       return true;
     } catch (error) {
-      console.error('❌ Error setting up auto-renew for trial extension:', error);
+      console.error('Error setting up auto-renew for trial extension:', error);
       return false;
     }
   }
@@ -813,17 +770,13 @@ class SubscriptionService {
     try {
       // STEP 1: Check in-memory cache first (fastest)
       if (this.isCacheValid() && this.premiumStatusCache.hasPremiumAccess !== null) {
-        console.log('⚡ Using in-memory cached premium access status:', this.premiumStatusCache.hasPremiumAccess);
         return this.premiumStatusCache.hasPremiumAccess;
       }
 
       // STEP 2: Try loading from AsyncStorage (persistent cache)
       if (await this.loadCacheFromStorage()) {
-        console.log('📦 Using persistent cached premium access status:', this.premiumStatusCache.hasPremiumAccess);
         return this.premiumStatusCache.hasPremiumAccess!;
       }
-
-      console.log('🔄 No valid cache found, fetching premium access status from server...');
 
       // PRIORITY 1: Check backend for VIP status (server-side validation)
       try {
@@ -846,7 +799,6 @@ class SubscriptionService {
 
           // If VIP or has premium access via backend validation, cache and return true
           if (data.has_premium_access) {
-            console.log('👑 VIP/Premium Access granted via backend:', data);
             this.premiumStatusCache.hasPremiumAccess = true;
             this.premiumStatusCache.tier = data.tier || 'vip_lifetime';
             this.premiumStatusCache.lastUpdate = Date.now();
@@ -858,7 +810,7 @@ class SubscriptionService {
           }
         }
       } catch (backendError) {
-        console.warn('⚠️ Backend VIP check failed, falling back to RevenueCat:', backendError);
+        console.warn('Backend VIP check failed, falling back to RevenueCat:', backendError);
         // Continue to RevenueCat check if backend fails
       }
 
@@ -879,14 +831,6 @@ class SubscriptionService {
 
       const hasAccess = hasPremiumSub || hasPromotionalTrial || hasExtendedTrial || hasStoreTrial;
 
-      console.log('🔒 Premium Access Check:', {
-        premiumSubscription: hasPremiumSub,
-        promotionalTrial: hasPromotionalTrial,
-        extendedTrial: hasExtendedTrial,
-        storeTrial: hasStoreTrial,
-        totalAccess: hasAccess
-      });
-
       // Cache the result (in-memory and persistent storage)
       this.premiumStatusCache.hasPremiumAccess = hasAccess;
       this.premiumStatusCache.lastUpdate = Date.now();
@@ -896,7 +840,7 @@ class SubscriptionService {
 
       return hasAccess;
     } catch (error) {
-      console.error('❌ Error checking premium access:', error);
+      console.error('Error checking premium access:', error);
       return false;
     }
   }
@@ -944,17 +888,13 @@ class SubscriptionService {
     try {
       // STEP 1: Check in-memory cache first (fastest)
       if (this.isCacheValid() && this.premiumStatusCache.tier !== null) {
-        console.log('⚡ Using in-memory cached tier:', this.premiumStatusCache.tier);
         return this.premiumStatusCache.tier;
       }
 
       // STEP 2: Try loading from AsyncStorage (persistent cache)
       if (await this.loadCacheFromStorage()) {
-        console.log('📦 Using persistent cached tier:', this.premiumStatusCache.tier);
         return this.premiumStatusCache.tier!;
       }
-
-      console.log('🔄 No valid cache found, fetching subscription tier from server...');
 
       // PRIORITY 1: Check backend for VIP status first
       try {
@@ -977,7 +917,6 @@ class SubscriptionService {
 
           // If VIP, cache and return VIP tier
           if (data.tier === 'vip_lifetime') {
-            console.log('👑 VIP tier detected from backend');
             this.premiumStatusCache.tier = 'vip_lifetime';
             this.premiumStatusCache.hasPremiumAccess = true;
             this.premiumStatusCache.lastUpdate = Date.now();
@@ -989,7 +928,7 @@ class SubscriptionService {
           }
         }
       } catch (backendError) {
-        console.warn('⚠️ Backend VIP tier check failed, falling back to RevenueCat:', backendError);
+        console.warn('Backend VIP tier check failed, falling back to RevenueCat:', backendError);
         // Continue to RevenueCat check if backend fails
       }
 
@@ -1026,25 +965,21 @@ class SubscriptionService {
   // Start free trial for new users (20 days) - THIS IS THE AUTOMATIC PART
   async startFreeTrial(): Promise<boolean> {
     try {
-      console.log('🎆 Starting automatic 20-day free trial...');
-
       const customerInfo = await this.getCustomerInfo();
 
       // Check if user already has any trial/subscription history
       const hasAnyEntitlements = Object.keys(customerInfo.entitlements.all).length > 0;
 
       if (hasAnyEntitlements) {
-        console.log('📊 User already has entitlement history, checking current status...');
         return this.isInTrialPeriod(customerInfo);
       }
 
       // For truly new users, we need to create a local trial record
       // Since RevenueCat doesn't have "automatic" trials, we'll track this locally
-      console.log('🎆 New user detected - creating local trial record');
 
       return true; // Trial logic handled by RevenueCat
     } catch (error) {
-      console.error('❌ Error starting free trial:', error);
+      console.error('Error starting free trial:', error);
       return false;
     }
   }

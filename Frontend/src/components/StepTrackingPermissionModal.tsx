@@ -322,3 +322,4 @@ const styles = StyleSheet.create({
 
 export default StepTrackingPermissionModal;
 
+

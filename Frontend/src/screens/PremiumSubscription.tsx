@@ -106,16 +106,13 @@ const PremiumSubscription = () => {
                 if (user?.uid) {
                     // FAST PATH: Use cached subscription data (instant display, no loading)
                     // SubscriptionService cache is already populated during app launch in AuthContext
-                    console.log('⚡ Fast load: Using cached subscription data');
 
                     // Get subscription tier from cache (VIP, premium, trial, or free)
                     const tier = await SubscriptionService.getSubscriptionTier();
-                    console.log('📊 Subscription tier:', tier);
 
                     // Set current plan info based on cached tier
                     if (tier === 'vip_lifetime') {
                         // VIP user - show special status
-                        console.log('👑 VIP user detected from cache');
                         const vipPlanInfo = {
                             planName: 'VIP Lifetime Access',
                             isActive: true,
@@ -179,7 +176,6 @@ const PremiumSubscription = () => {
         // Background loading of RevenueCat offerings (doesn't block UI)
         const loadOfferingsInBackground = async () => {
             try {
-                console.log('🔄 Background: Loading RevenueCat offerings');
                 // SubscriptionService is already initialized in AuthContext, so we can just get offerings
                 const offerings = await SubscriptionService.getOfferings();
                 setRevenueCatOfferings(offerings);
@@ -188,9 +184,8 @@ const PremiumSubscription = () => {
                 const customerInfo = await SubscriptionService.getCustomerInfo();
                 const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
                 setSubscriptionStatus(revenueCatStatus);
-                console.log('✅ Background: RevenueCat data loaded');
-            } catch (error) {
-                console.warn('⚠️ Background: Failed to load RevenueCat offerings:', error);
+            } catch (error: any) {
+                console.error('Failed to load RevenueCat offerings:', error);
                 // Non-critical error - user can still see their status from cache
             }
         };
@@ -199,7 +194,6 @@ const PremiumSubscription = () => {
 
         // Set up subscription change listener for real-time updates
         const handleSubscriptionChange = () => {
-            console.log('📢 Subscription changed, reloading data');
             loadSubscriptionData();
         };
 
@@ -659,6 +653,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
         marginLeft: 10,
+        flex: 1,
     },
     scrollView: {
         flex: 1,

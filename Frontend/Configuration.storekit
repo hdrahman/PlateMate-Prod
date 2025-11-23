@@ -1,0 +1,81 @@
+{
+  "identifier" : "BC0F5F5D",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6753904511",
+    "_developerTeamID" : "Z99FP4W4S3",
+    "_lastSynchronizedDate" : 754627200.0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21812530",
+      "localizations" : [
+
+      ],
+      "name" : "PlateMate Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "6.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6754295694",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited AI uploads, meal planner, and context mode",
+              "displayName" : "PlateMate Premium Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.zentraai.platematepro.premium_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "PlateMate Premium Monthly",
+          "subscriptionGroupID" : "21812530",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "59.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6754298091",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited image uploads + meal planner + coach context",
+              "displayName" : "PlateMate Premium Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.zentraai.platematepro.premium_annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "PlateMate Premium Annual",
+          "subscriptionGroupID" : "21812530",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
+
+

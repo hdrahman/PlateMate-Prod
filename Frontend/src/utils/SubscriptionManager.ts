@@ -63,11 +63,9 @@ class SubscriptionManager {
       // Delegate directly to SubscriptionService - it handles all caching
       const hasPremiumAccess = await SubscriptionService.hasPremiumAccess();
 
-      console.log('🔒 SECURE: Premium access check:', hasPremiumAccess);
-
       return hasPremiumAccess;
     } catch (error) {
-      console.error('❌ Error checking premium access:', error);
+      console.error('Error checking premium access:', error);
       return false; // Fail securely - deny access on error
     }
   }
@@ -106,7 +104,6 @@ class SubscriptionManager {
       }
 
       const data = await response.json();
-      console.log('✅ Upload limit validation:', data);
 
       return {
         allowed: data.upload_allowed || false,
@@ -114,7 +111,7 @@ class SubscriptionManager {
         limit: data.limit || 1
       };
     } catch (error) {
-      console.error('❌ Error validating upload limit:', error);
+      console.error('Error validating upload limit:', error);
       // On error, be conservative and deny upload for free users
       return { allowed: false, uploadsToday: undefined, limit: 1 };
     }
@@ -122,7 +119,6 @@ class SubscriptionManager {
 
   // Image upload tracking removed - handled server-side for security
   async recordImageUpload(): Promise<void> {
-    console.log('📸 Image upload tracking handled by backend for security');
     // No local tracking - backend will handle rate limiting securely
   }
 
@@ -133,8 +129,6 @@ class SubscriptionManager {
     showTrialOffer?: boolean;
   }): void {
     const { source = 'unknown', feature = 'premium feature', showTrialOffer = true } = options || {};
-
-    console.log(`🚀 Navigating to subscription screen from ${source} for ${feature}`);
 
     navigation.navigate('PremiumSubscription', {
       source,
@@ -381,16 +375,16 @@ class SubscriptionManager {
   // Main initialization method - call this on app launch
   async initialize(userId: string): Promise<void> {
     try {
-      console.log('🚀 Initializing SubscriptionManager for user:', userId);
+      // CRITICAL: Initialize the underlying SubscriptionService (RevenueCat SDK)
+      await SubscriptionService.initialize(userId);
 
       // Set up subscription change listener from SubscriptionService
       // This allows us to react to subscription changes (e.g., show notifications)
       this.setupSubscriptionChangeListener();
 
-      console.log('✅ SubscriptionManager initialized successfully');
-
     } catch (error) {
-      console.error('❌ Error initializing SubscriptionManager:', error);
+      console.error('Error initializing SubscriptionManager:', error);
+      // Don't throw - allow app to continue
     }
   }
 
@@ -398,7 +392,6 @@ class SubscriptionManager {
   private setupSubscriptionChangeListener(): void {
     // Listen for subscription changes from SubscriptionService
     SubscriptionService.addSubscriptionChangeListener(() => {
-      console.log('📢 SubscriptionManager: Received subscription change event from SubscriptionService');
       // No cache to clear - we always delegate to SubscriptionService
       // This listener is kept for future use (e.g., showing notifications to users)
     });
