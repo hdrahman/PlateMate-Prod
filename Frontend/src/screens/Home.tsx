@@ -120,1503 +120,1608 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 interface WeightModalProps {
   visible: boolean;
   newWeight: string;
+  onChangeText: (text: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+  isImperialUnits: boolean;
+}
+
+const WeightModal = React.memo<WeightModalProps>(({
+  visible,
+  newWeight,
+  onChangeText,
+  onCancel,
+  onSave,
+  isImperialUnits
+}) => {
+  const inputRef = useRef<TextInput>(null);
+
+  // Focus input when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      // Small delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  // Extract styles to avoid inline object creation
+  const inputContainerStyle = useMemo(() => ({
+    width: '100%',
+    position: 'relative' as const,
+    marginBottom: 20,
+  }), []);
+
+  const inputDynamicStyle = useMemo(() => ({
+    borderColor: newWeight ? 'rgba(155, 0, 255, 0.6)' : '#555',
+    paddingRight: 40,
+  }), [newWeight]);
+
+  const unitLabelStyle = useMemo(() => ({
+    position: 'absolute' as const,
+    right: 15,
+    top: 15,
+    color: 'rgba(170, 170, 170, 0.8)',
+    fontSize: 16,
+    fontWeight: '400' as const,
+  }), []);
+
+  const cancelButtonStyle = useMemo(() => ({
+    backgroundColor: 'rgba(60, 60, 60, 0.8)',
+    borderWidth: 1,
+    borderColor: '#555',
+  }), []);
+
+  const saveButtonStyle = useMemo(() => ({
+    backgroundColor: 'rgba(55, 0, 110, 0.6)',
+    borderWidth: 1,
+    borderColor: '#9B00FF',
+  }), []);
+
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onCancel}
+    >
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Update Weight</Text>
+          <View style={inputContainerStyle}>
+            <TextInput
+              ref={inputRef}
+              style={[styles.weightInput, inputDynamicStyle]}
+              value={newWeight}
+              onChangeText={onChangeText}
+              placeholder={`Enter weight in ${isImperialUnits ? 'lbs' : 'kg'}`}
+              keyboardType="numeric"
+              placeholderTextColor="rgba(150, 150, 150, 0.6)"
+            />
+            <Text style={unitLabelStyle}>{isImperialUnits ? 'lbs' : 'kg'}</Text>
+          </View>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, cancelButtonStyle]}
+              onPress={onCancel}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, saveButtonStyle]}
+              onPress={onSave}
+            >
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+export default function Home() {
+  const navigation = useNavigation();
+  const { isDarkTheme } = useContext(ThemeContext);
   const { user } = useAuth();
-const { onboardingComplete, justCompletedOnboarding, markWelcomeModalShown } = useOnboarding();
-const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
+  const { onboardingComplete, justCompletedOnboarding, markWelcomeModalShown } = useOnboarding();
+  const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
 
-// Responsive dimensions for iPad support
-const { width } = useWindowDimensions();
-const isTablet = Platform.isPad || width >= 768;
-const scaleFactor = isTablet
-  ? Math.min(width / BASE_WIDTH, 1.4) // Reduced from 2.7x to 1.4x for better iPad proportions
-  : Math.min(width / BASE_WIDTH, 1.5); // Slightly more flexible for large phones
-const CIRCLE_SIZE = isTablet
-  ? Math.min(width * 0.38, 350) // For tablets: 38% of width, max 350px
-  : Math.min(width * 0.50 * scaleFactor, width * 0.85); // For phones: existing logic
-const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2);
-const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
+  // Responsive dimensions for iPad support
+  const { width } = useWindowDimensions();
+  const isTablet = Platform.isPad || width >= 768;
+  const scaleFactor = isTablet
+    ? Math.min(width / BASE_WIDTH, 1.4) // Reduced from 2.7x to 1.4x for better iPad proportions
+    : Math.min(width / BASE_WIDTH, 1.5); // Slightly more flexible for large phones
+  const CIRCLE_SIZE = isTablet
+    ? Math.min(width * 0.38, 350) // For tablets: 38% of width, max 350px
+    : Math.min(width * 0.50 * scaleFactor, width * 0.85); // For phones: existing logic
+  const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2);
+  const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 
-// Date change detection for midnight rollover
-useEffect(() => {
-  const formatDateToString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  // Date change detection for midnight rollover
+  useEffect(() => {
+    const formatDateToString = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
 
-  const getMillisecondsUntilMidnight = (): number => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    return tomorrow.getTime() - now.getTime();
-  };
+    const getMillisecondsUntilMidnight = (): number => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow.getTime() - now.getTime();
+    };
 
-  const refreshAllData = async () => {
-    console.log('🏠 Date changed - refreshing all home screen data...');
-    try {
-      await refreshLogs();
-      const todayExerciseCals = await getTodayExerciseCalories();
-      setExerciseCalories(todayExerciseCals);
-      if (refreshStepData) await refreshStepData();
-      if (user?.uid) {
-        const newStreak = await getUserStreak(user.uid);
-        setCurrentStreak(newStreak);
-      }
-    } catch (error) {
-      console.error('❌ Error refreshing data on date change:', error);
-    }
-  };
-
-  let currentDate = formatDateToString(new Date());
-  let timeoutId: NodeJS.Timeout;
-
-  const scheduleNextCheck = () => {
-    const msUntilMidnight = getMillisecondsUntilMidnight();
-    timeoutId = setTimeout(() => {
-      const newDate = formatDateToString(new Date());
-      if (newDate !== currentDate) {
-        currentDate = newDate;
-        refreshAllData();
-      }
-      scheduleNextCheck(); // Schedule next midnight
-    }, msUntilMidnight);
-  };
-
-  scheduleNextCheck();
-
-  return () => {
-    if (timeoutId) clearTimeout(timeoutId);
-  };
-}, [refreshLogs, refreshStepData, user?.uid]);
-
-// Keep track of which "page" (card) we are on in the horizontal scroll
-const [activeIndex, setActiveIndex] = useState(0);
-
-// Add state for user goals from profile
-const [dailyCalorieGoal, setDailyCalorieGoal] = useState(defaultGoals.calories);
-const [macroGoals, setMacroGoals] = useState({
-  protein: defaultGoals.protein,
-  carbs: defaultGoals.carbs,
-  fat: defaultGoals.fat
-});
-const [profileLoading, setProfileLoading] = useState(true);
-
-// Add state for consumed calories and loading
-const [consumedCalories, setConsumedCalories] = useState(0);
-const [remainingCals, setRemainingCals] = useState(dailyCalorieGoal);
-const [percentCons, setPercentCons] = useState(0);
-const [foodLoading, setFoodLoading] = useState(true);
-
-// Add state for exercise calories and loading
-const [exerciseCalories, setExerciseCalories] = useState(0);
-const [exerciseLoading, setExerciseLoading] = useState(true);
-
-// Macros loading state
-const [macrosLoading, setMacrosLoading] = useState(true);
-
-// Use the step context instead of the hook directly
-const {
-  todaySteps,
-  stepHistory,
-  isAvailable,
-  loading: stepsLoading,
-  refreshStepData
-} = useSteps();
-
-// Add state for weight history
-const [weightHistory, setWeightHistory] = useState<Array<{ date: string; weight: number }>>([]);
-const [weightLoading, setWeightLoading] = useState(true);
-const [weightModalVisible, setWeightModalVisible] = useState(false);
-const [newWeight, setNewWeight] = useState('');
-
-// Add state for streak tracking
-const [currentStreak, setCurrentStreak] = useState(0);
-const [startingWeight, setStartingWeight] = useState<number | null>(null);
-const [targetWeight, setTargetWeight] = useState<number | null>(null);
-const [currentWeight, setCurrentWeight] = useState<number | null>(null);
-const [weightLost, setWeightLost] = useState(0);
-const [weightGoal, setWeightGoal] = useState<string>('maintain'); // Add state for weight goal
-
-// Add state for step tracking mode
-const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
-
-// Add state for temporary today's weight display
-const [showTodayWeight, setShowTodayWeight] = useState(false);
-const [todayWeight, setTodayWeight] = useState<number | null>(null);
-
-// Add state for unit preference
-const [isImperialUnits, setIsImperialUnits] = useState(false);
-
-// Add state for cheat day data
-const [cheatDayData, setCheatDayData] = useState<CheatDayProgress>({
-  daysCompleted: 0,
-  totalDays: 7,
-  daysUntilNext: 7,
-  enabled: false
-});
-const [cheatDayLoading, setCheatDayLoading] = useState(true);
-
-// Add state for welcome modal
-const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-
-// Load user profile and calculate nutrition goals
-useEffect(() => {
-  const loadUserProfile = async () => {
-    if (!user) return;
-
-    try {
-      setProfileLoading(true);
-      // Get user profile from local database
-      const profile = await getUserProfileByFirebaseUid(user.uid);
-
-      if (profile) {
-        // Update target weight if it exists in the profile
-        if (profile.target_weight) {
-          setTargetWeight(profile.target_weight);
-        }
-
-        // Get user goals for calorie goal
-        const userGoals = await getUserGoals(user.uid);
-        console.log('📋 Loaded user goals from database:', {
-          calorieGoal: userGoals?.calorieGoal,
-          fitnessGoal: userGoals?.fitnessGoal,
-          targetWeight: userGoals?.targetWeight
-        });
-
-        // Store the user's weight goal
-        if (userGoals?.fitnessGoal) {
-          setWeightGoal(userGoals.fitnessGoal);
-        }
-
-        console.log('📋 User profile data:', {
-          daily_calorie_target: profile.daily_calorie_target,
-          fitness_goal: profile.fitness_goal,
-          weight_goal: profile.weight_goal,
-          height: profile.height,
-          weight: profile.weight,
-          age: profile.age,
-          gender: profile.gender,
-          activity_level: profile.activity_level
-        });
-
-        // Parse and set unit preference
-        const useMetric = parseUnitPreference(profile);
-        setIsImperialUnits(!useMetric);
-
-        // Load step tracking mode
-        if (profile.step_tracking_calorie_mode) {
-          setStepTrackingMode(profile.step_tracking_calorie_mode as 'disabled' | 'with_calories' | 'without_calories');
-        }
-
-        // Calculate nutrition goals based on user profile
-        const goals = calculateNutritionGoals({
-          firstName: profile.first_name,
-          dateOfBirth: profile.date_of_birth,
-          location: profile.location,
-          height: profile.height,
-          weight: profile.weight,
-          age: profile.age,
-          gender: profile.gender,
-          activityLevel: profile.activity_level,
-          unitPreference: profile.unit_preference || 'metric',
-          dietaryRestrictions: profile.dietary_restrictions || [],
-          foodAllergies: profile.food_allergies || [],
-          cuisinePreferences: profile.cuisine_preferences || [],
-          spiceTolerance: profile.spice_tolerance,
-          weightGoal: userGoals?.fitnessGoal || 'maintain', // Get from nutrition_goals table instead
-          targetWeight: profile.target_weight,
-          startingWeight: profile.starting_weight,
-          healthConditions: profile.health_conditions || [],
-          fitnessGoal: profile.fitness_goal,
-          dailyCalorieTarget: profile.daily_calorie_target,
-          nutrientFocus: profile.nutrient_focus,
-          defaultAddress: null,
-          preferredDeliveryTimes: [],
-          deliveryInstructions: null,
-          pushNotificationsEnabled: !!profile.push_notifications_enabled,
-          emailNotificationsEnabled: !!profile.email_notifications_enabled,
-          smsNotificationsEnabled: !!profile.sms_notifications_enabled,
-          marketingEmailsEnabled: !!profile.marketing_emails_enabled,
-          paymentMethods: [],
-          billingAddress: null,
-          defaultPaymentMethodId: null,
-          preferredLanguage: profile.preferred_language || 'en',
-          timezone: profile.timezone || 'UTC',
-          darkMode: !!profile.dark_mode,
-          syncDataOffline: !!profile.sync_data_offline
-        } as any);
-
-        console.log('📋 Calculated nutrition goals:', {
-          calories: goals.calories,
-          protein: goals.protein,
-          carbs: goals.carbs,
-          fat: goals.fat
-        });
-
-        // Try to get BMR data first (if available, it will have more accurate calorie targets)
-        const bmrData = await getUserBMRData(user.uid);
-        console.log('📊 BMR data loaded:', bmrData);
-
-        // Update state with calculated goals, prioritizing BMR data, then database, then calculated
-        let finalCalorieGoal = goals.calories;
-
-        if (bmrData?.dailyTarget) {
-          finalCalorieGoal = bmrData.dailyTarget;
-          console.log('📋 Using BMR daily target as calorie goal:', finalCalorieGoal);
-        } else if (userGoals?.calorieGoal) {
-          finalCalorieGoal = userGoals.calorieGoal;
-          console.log('📋 Using database calorie goal:', finalCalorieGoal);
-        } else {
-          console.log('📋 Using calculated calorie goal:', finalCalorieGoal);
-        }
-
-        setDailyCalorieGoal(finalCalorieGoal);
-        setMacroGoals({
-          protein: userGoals?.proteinGoal || goals.protein,
-          carbs: userGoals?.carbGoal || goals.carbs,
-          fat: userGoals?.fatGoal || goals.fat
-        });
-      }
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  loadUserProfile();
-
-  // Add focus listener to refresh data when returning to this screen
-  const unsubscribe = navigation.addListener('focus', () => {
-    // Reload user profile to get the latest target weight
-    loadUserProfile();
-    // Reload cheat day data to get the latest settings
-    loadCheatDayData();
-
-    // Refresh step data to ensure latest count
-    if (refreshStepData) {
-      refreshStepData().catch(error => {
-        console.warn('Failed to refresh step data on focus:', error);
-      });
-    }
-  });
-
-  // Clean up the listener when component unmounts
-  return unsubscribe;
-}, [user, navigation, refreshStepData]);
-
-// Set up food log watching when component mounts
-useEffect(() => {
-  console.log('Home screen starting to watch food logs');
-  startWatchingFoodLogs();
-
-  // Clean up when component unmounts
-  return () => {
-    console.log('Home screen stopping food log watch');
-    stopWatchingFoodLogs();
-  };
-}, [startWatchingFoodLogs, stopWatchingFoodLogs]);
-
-// Load user streak when component mounts
-useEffect(() => {
-  if (user?.uid) {
-    getUserStreak(user.uid)
-      .then(streak => setCurrentStreak(streak))
-      .catch(error => console.error('Error loading streak:', error));
-  }
-}, [user]);
-
-// Show welcome modal when onboarding is just completed
-useEffect(() => {
-  console.log('🔍 Checking for welcome modal:', {
-    justCompletedOnboarding,
-    userUid: user?.uid,
-    showWelcomeModal
-  });
-
-  if (justCompletedOnboarding && user?.uid && !showWelcomeModal) {
-    console.log('✅ Showing welcome modal for just completed onboarding');
-    // Small delay to ensure the home screen is fully loaded
-    setTimeout(() => {
-      setShowWelcomeModal(true);
-    }, 1500);
-  }
-}, [justCompletedOnboarding, user, showWelcomeModal]);
-
-// Load today's nutrition data from the food log context
-useEffect(() => {
-  const loadTodayNutrients = async () => {
-    if (profileLoading) return;
-
-    try {
-      // Only set loading states if we don't have data yet (prevent flickering on refresh)
-      const hasExistingData = consumedCalories !== 0 || nutrientTotals.calories !== undefined;
-      if (!hasExistingData) {
-        setFoodLoading(true);
-        setMacrosLoading(true);
-      }
-
-      // Only refresh logs if context data is uninitialized (avoid false positives for 0 values)
-      if (nutrientTotals.calories === undefined || nutrientTotals.protein === undefined) {
+    const refreshAllData = async () => {
+      console.log('🏠 Date changed - refreshing all home screen data...');
+      try {
         await refreshLogs();
-      }
-
-      // Get the nutrition values from the context
-      setConsumedCalories(nutrientTotals.calories);
-
-      console.log('🏠 Home screen nutrient values (FIXED):', {
-        protein: nutrientTotals.protein,
-        carbs: nutrientTotals.carbs,
-        fat: nutrientTotals.fat,
-        calories: nutrientTotals.calories,
-        lastUpdated: lastUpdated,
-        dataSource: 'FoodLogContext'
-      });
-
-      console.log('🏠 Home screen macro goals:', {
-        protein: macroGoals.protein,
-        carbs: macroGoals.carbs,
-        fat: macroGoals.fat,
-        profileLoading: profileLoading
-      });
-
-      console.log('🏠 Home screen macro calculations:', {
-        proteinDiff: macroGoals.protein - nutrientTotals.protein,
-        carbsDiff: macroGoals.carbs - nutrientTotals.carbs,
-        fatDiff: macroGoals.fat - nutrientTotals.fat,
-        macrosLoading: macrosLoading
-      });
-
-      // Load exercise calories (only set loading if we don't have data yet)
-      if (exerciseCalories === 0) {
-        setExerciseLoading(true);
-      }
-      const todayExerciseCals = await getTodayExerciseCalories();
-      setExerciseCalories(todayExerciseCals);
-
-      // Calculate adjusted goal and remaining calories
-      const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
-      const remaining = adjustedDailyGoal - nutrientTotals.calories;
-
-      // Instead of capping at 0, show actual value (negative if over)
-      setRemainingCals(Math.round(remaining));
-
-      // Calculate percent consumed based on base goal (for legacy compatibility)
-      // Ensure we don't cap at 100% so the progress bar doesn't unwind
-      const percentConsumed = (nutrientTotals.calories / dailyCalorieGoal) * 100;
-      setPercentCons(Math.round(percentConsumed));
-
-      // Update streak when nutrition data changes
-      if (user?.uid) {
-        const hasActivity = await hasActivityForToday(user.uid);
-        if (hasActivity) {
-          const newStreak = await checkAndUpdateStreak(user.uid);
+        const todayExerciseCals = await getTodayExerciseCalories();
+        setExerciseCalories(todayExerciseCals);
+        if (refreshStepData) await refreshStepData();
+        if (user?.uid) {
+          const newStreak = await getUserStreak(user.uid);
           setCurrentStreak(newStreak);
-        } else {
-          const currentStreak = await getUserStreak(user.uid);
-          setCurrentStreak(currentStreak);
         }
+      } catch (error) {
+        console.error('❌ Error refreshing data on date change:', error);
       }
-    } catch (error) {
-      console.error('Error loading today nutrients:', error);
-    } finally {
-      // Always reset loading states
-      setFoodLoading(false);
-      setMacrosLoading(false);
-      setExerciseLoading(false);
+    };
+
+    let currentDate = formatDateToString(new Date());
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNextCheck = () => {
+      const msUntilMidnight = getMillisecondsUntilMidnight();
+      timeoutId = setTimeout(() => {
+        const newDate = formatDateToString(new Date());
+        if (newDate !== currentDate) {
+          currentDate = newDate;
+          refreshAllData();
+        }
+        scheduleNextCheck(); // Schedule next midnight
+      }, msUntilMidnight);
+    };
+
+    scheduleNextCheck();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [refreshLogs, refreshStepData, user?.uid]);
+
+  // Keep track of which "page" (card) we are on in the horizontal scroll
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Add state for user goals from profile
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(defaultGoals.calories);
+  const [macroGoals, setMacroGoals] = useState({
+    protein: defaultGoals.protein,
+    carbs: defaultGoals.carbs,
+    fat: defaultGoals.fat
+  });
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  // Add state for consumed calories and loading
+  const [consumedCalories, setConsumedCalories] = useState(0);
+  const [remainingCals, setRemainingCals] = useState(dailyCalorieGoal);
+  const [percentCons, setPercentCons] = useState(0);
+  const [foodLoading, setFoodLoading] = useState(true);
+
+  // Add state for exercise calories and loading
+  const [exerciseCalories, setExerciseCalories] = useState(0);
+  const [exerciseLoading, setExerciseLoading] = useState(true);
+
+  // Macros loading state
+  const [macrosLoading, setMacrosLoading] = useState(true);
+
+  // Use the step context instead of the hook directly
+  const {
+    todaySteps,
+    stepHistory,
+    isAvailable,
+    loading: stepsLoading,
+    refreshStepData
+  } = useSteps();
+
+  // Add state for weight history
+  const [weightHistory, setWeightHistory] = useState<Array<{ date: string; weight: number }>>([]);
+  const [weightLoading, setWeightLoading] = useState(true);
+  const [weightModalVisible, setWeightModalVisible] = useState(false);
+  const [newWeight, setNewWeight] = useState('');
+
+  // Add state for streak tracking
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [startingWeight, setStartingWeight] = useState<number | null>(null);
+  const [targetWeight, setTargetWeight] = useState<number | null>(null);
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [weightLost, setWeightLost] = useState(0);
+  const [weightGoal, setWeightGoal] = useState<string>('maintain'); // Add state for weight goal
+  
+  // Add state for step tracking mode
+  const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
+
+  // Add state for temporary today's weight display
+  const [showTodayWeight, setShowTodayWeight] = useState(false);
+  const [todayWeight, setTodayWeight] = useState<number | null>(null);
+
+  // Add state for unit preference
+  const [isImperialUnits, setIsImperialUnits] = useState(false);
+
+  // Add state for cheat day data
+  const [cheatDayData, setCheatDayData] = useState<CheatDayProgress>({
+    daysCompleted: 0,
+    totalDays: 7,
+    daysUntilNext: 7,
+    enabled: false
+  });
+  const [cheatDayLoading, setCheatDayLoading] = useState(true);
+
+  // Add state for welcome modal
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  // Load user profile and calculate nutrition goals
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user) return;
+
+      try {
+        setProfileLoading(true);
+        // Get user profile from local database
+        const profile = await getUserProfileByFirebaseUid(user.uid);
+
+        if (profile) {
+          // Update target weight if it exists in the profile
+          if (profile.target_weight) {
+            setTargetWeight(profile.target_weight);
+          }
+
+          // Get user goals for calorie goal
+          const userGoals = await getUserGoals(user.uid);
+          console.log('📋 Loaded user goals from database:', {
+            calorieGoal: userGoals?.calorieGoal,
+            fitnessGoal: userGoals?.fitnessGoal,
+            targetWeight: userGoals?.targetWeight
+          });
+
+          // Store the user's weight goal
+          if (userGoals?.fitnessGoal) {
+            setWeightGoal(userGoals.fitnessGoal);
+          }
+
+          console.log('📋 User profile data:', {
+            daily_calorie_target: profile.daily_calorie_target,
+            fitness_goal: profile.fitness_goal,
+            weight_goal: profile.weight_goal,
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            activity_level: profile.activity_level
+          });
+
+          // Parse and set unit preference
+          const useMetric = parseUnitPreference(profile);
+          setIsImperialUnits(!useMetric);
+
+          // Load step tracking mode
+          if (profile.step_tracking_calorie_mode) {
+            setStepTrackingMode(profile.step_tracking_calorie_mode as 'disabled' | 'with_calories' | 'without_calories');
+          }
+
+          // Calculate nutrition goals based on user profile
+          const goals = calculateNutritionGoals({
+            firstName: profile.first_name,
+            dateOfBirth: profile.date_of_birth,
+            location: profile.location,
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            gender: profile.gender,
+            activityLevel: profile.activity_level,
+            unitPreference: profile.unit_preference || 'metric',
+            dietaryRestrictions: profile.dietary_restrictions || [],
+            foodAllergies: profile.food_allergies || [],
+            cuisinePreferences: profile.cuisine_preferences || [],
+            spiceTolerance: profile.spice_tolerance,
+            weightGoal: userGoals?.fitnessGoal || 'maintain', // Get from nutrition_goals table instead
+            targetWeight: profile.target_weight,
+            startingWeight: profile.starting_weight,
+            healthConditions: profile.health_conditions || [],
+            fitnessGoal: profile.fitness_goal,
+            dailyCalorieTarget: profile.daily_calorie_target,
+            nutrientFocus: profile.nutrient_focus,
+            defaultAddress: null,
+            preferredDeliveryTimes: [],
+            deliveryInstructions: null,
+            pushNotificationsEnabled: !!profile.push_notifications_enabled,
+            emailNotificationsEnabled: !!profile.email_notifications_enabled,
+            smsNotificationsEnabled: !!profile.sms_notifications_enabled,
+            marketingEmailsEnabled: !!profile.marketing_emails_enabled,
+            paymentMethods: [],
+            billingAddress: null,
+            defaultPaymentMethodId: null,
+            preferredLanguage: profile.preferred_language || 'en',
+            timezone: profile.timezone || 'UTC',
+            darkMode: !!profile.dark_mode,
+            syncDataOffline: !!profile.sync_data_offline
+          } as any);
+
+          console.log('📋 Calculated nutrition goals:', {
+            calories: goals.calories,
+            protein: goals.protein,
+            carbs: goals.carbs,
+            fat: goals.fat
+          });
+
+          // Try to get BMR data first (if available, it will have more accurate calorie targets)
+          const bmrData = await getUserBMRData(user.uid);
+          console.log('📊 BMR data loaded:', bmrData);
+
+          // Update state with calculated goals, prioritizing BMR data, then database, then calculated
+          let finalCalorieGoal = goals.calories;
+
+          if (bmrData?.dailyTarget) {
+            finalCalorieGoal = bmrData.dailyTarget;
+            console.log('📋 Using BMR daily target as calorie goal:', finalCalorieGoal);
+          } else if (userGoals?.calorieGoal) {
+            finalCalorieGoal = userGoals.calorieGoal;
+            console.log('📋 Using database calorie goal:', finalCalorieGoal);
+          } else {
+            console.log('📋 Using calculated calorie goal:', finalCalorieGoal);
+          }
+
+          setDailyCalorieGoal(finalCalorieGoal);
+          setMacroGoals({
+            protein: userGoals?.proteinGoal || goals.protein,
+            carbs: userGoals?.carbGoal || goals.carbs,
+            fat: userGoals?.fatGoal || goals.fat
+          });
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadUserProfile();
+
+    // Add focus listener to refresh data when returning to this screen
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Reload user profile to get the latest target weight
+      loadUserProfile();
+      // Reload cheat day data to get the latest settings
+      loadCheatDayData();
+
+      // Refresh step data to ensure latest count
+      if (refreshStepData) {
+        refreshStepData().catch(error => {
+          console.warn('Failed to refresh step data on focus:', error);
+        });
+      }
+    });
+
+    // Clean up the listener when component unmounts
+    return unsubscribe;
+  }, [user, navigation, refreshStepData]);
+
+  // Set up food log watching when component mounts
+  useEffect(() => {
+    console.log('Home screen starting to watch food logs');
+    startWatchingFoodLogs();
+
+    // Clean up when component unmounts
+    return () => {
+      console.log('Home screen stopping food log watch');
+      stopWatchingFoodLogs();
+    };
+  }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+
+  // Load user streak when component mounts
+  useEffect(() => {
+    if (user?.uid) {
+      getUserStreak(user.uid)
+        .then(streak => setCurrentStreak(streak))
+        .catch(error => console.error('Error loading streak:', error));
     }
-  };
+  }, [user]);
 
-  loadTodayNutrients();
-}, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user, macroGoals, consumedCalories, exerciseCalories]);
+  // Show welcome modal when onboarding is just completed
+  useEffect(() => {
+    console.log('🔍 Checking for welcome modal:', {
+      justCompletedOnboarding,
+      userUid: user?.uid,
+      showWelcomeModal
+    });
 
-// Load weight history only once when the component mounts
-useEffect(() => {
-  const loadWeightHistory = async () => {
-    if (!user) return;
+    if (justCompletedOnboarding && user?.uid && !showWelcomeModal) {
+      console.log('✅ Showing welcome modal for just completed onboarding');
+      // Small delay to ensure the home screen is fully loaded
+      setTimeout(() => {
+        setShowWelcomeModal(true);
+      }, 1500);
+    }
+  }, [justCompletedOnboarding, user, showWelcomeModal]);
+
+  // Load today's nutrition data from the food log context
+  useEffect(() => {
+    const loadTodayNutrients = async () => {
+      if (profileLoading) return;
+
+      try {
+        // Only set loading states if we don't have data yet (prevent flickering on refresh)
+        const hasExistingData = consumedCalories !== 0 || nutrientTotals.calories !== undefined;
+        if (!hasExistingData) {
+          setFoodLoading(true);
+          setMacrosLoading(true);
+        }
+
+        // Only refresh logs if context data is uninitialized (avoid false positives for 0 values)
+        if (nutrientTotals.calories === undefined || nutrientTotals.protein === undefined) {
+          await refreshLogs();
+        }
+
+        // Get the nutrition values from the context
+        setConsumedCalories(nutrientTotals.calories);
+
+        console.log('🏠 Home screen nutrient values (FIXED):', {
+          protein: nutrientTotals.protein,
+          carbs: nutrientTotals.carbs,
+          fat: nutrientTotals.fat,
+          calories: nutrientTotals.calories,
+          lastUpdated: lastUpdated,
+          dataSource: 'FoodLogContext'
+        });
+
+        console.log('🏠 Home screen macro goals:', {
+          protein: macroGoals.protein,
+          carbs: macroGoals.carbs,
+          fat: macroGoals.fat,
+          profileLoading: profileLoading
+        });
+
+        console.log('🏠 Home screen macro calculations:', {
+          proteinDiff: macroGoals.protein - nutrientTotals.protein,
+          carbsDiff: macroGoals.carbs - nutrientTotals.carbs,
+          fatDiff: macroGoals.fat - nutrientTotals.fat,
+          macrosLoading: macrosLoading
+        });
+
+        // Load exercise calories (only set loading if we don't have data yet)
+        if (exerciseCalories === 0) {
+          setExerciseLoading(true);
+        }
+        const todayExerciseCals = await getTodayExerciseCalories();
+        setExerciseCalories(todayExerciseCals);
+
+        // Calculate adjusted goal and remaining calories
+        const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
+        const remaining = adjustedDailyGoal - nutrientTotals.calories;
+
+        // Instead of capping at 0, show actual value (negative if over)
+        setRemainingCals(Math.round(remaining));
+
+        // Calculate percent consumed based on base goal (for legacy compatibility)
+        // Ensure we don't cap at 100% so the progress bar doesn't unwind
+        const percentConsumed = (nutrientTotals.calories / dailyCalorieGoal) * 100;
+        setPercentCons(Math.round(percentConsumed));
+
+        // Update streak when nutrition data changes
+        if (user?.uid) {
+          const hasActivity = await hasActivityForToday(user.uid);
+          if (hasActivity) {
+            const newStreak = await checkAndUpdateStreak(user.uid);
+            setCurrentStreak(newStreak);
+          } else {
+            const currentStreak = await getUserStreak(user.uid);
+            setCurrentStreak(currentStreak);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading today nutrients:', error);
+      } finally {
+        // Always reset loading states
+        setFoodLoading(false);
+        setMacrosLoading(false);
+        setExerciseLoading(false);
+      }
+    };
+
+    loadTodayNutrients();
+  }, [profileLoading, dailyCalorieGoal, nutrientTotals, refreshLogs, lastUpdated, user, macroGoals, consumedCalories, exerciseCalories]);
+
+  // Load weight history only once when the component mounts
+  useEffect(() => {
+    const loadWeightHistory = async () => {
+      if (!user) return;
+
+      try {
+        setWeightLoading(true);
+
+        // Get user profile from local database to get starting weight and current weight
+        const profile = await getUserProfileByFirebaseUid(user.uid);
+        if (!profile) {
+          console.log('No profile found');
+          setWeightLoading(false);
+          return;
+        }
+
+        // Get weight history from local SQLite database
+        const historyEntries = await getWeightHistoryLocal(user.uid);
+
+        // Initialize the weight history array
+        let formattedHistory = [];
+
+        // Add starting weight as the first point if available
+        if (profile.starting_weight) {
+          // Use profile creation date or a date earlier than all weight entries
+          const startDate = profile.last_modified || new Date(2000, 0, 1).toISOString();
+          formattedHistory.push({
+            date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            weight: profile.starting_weight
+          });
+          // Set starting weight state
+          setStartingWeight(profile.starting_weight);
+        }
+
+        // Add intermediary weights from weight history
+        if (historyEntries && historyEntries.length > 0) {
+          // Sort history chronologically - oldest first
+          const sortedWeights = [...historyEntries].sort((a, b) =>
+            new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+          );
+
+          // Format and add all intermediary weight entries
+          const intermediaryWeights = sortedWeights.map(entry => ({
+            date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            weight: entry.weight
+          }));
+
+          formattedHistory = [...formattedHistory, ...intermediaryWeights];
+
+          // If we don't have a starting weight yet, use the first weight entry
+          if (!profile.starting_weight && sortedWeights.length > 0) {
+            setStartingWeight(sortedWeights[0].weight);
+          }
+        }
+
+        // Add current weight as the last point if different from the last history entry
+        if (profile.weight) {
+          const lastEntryWeight = formattedHistory.length > 0 ?
+            formattedHistory[formattedHistory.length - 1].weight : null;
+
+          // Only add current weight if it's different from the last history entry
+          // or if there are no history entries
+          if (!lastEntryWeight || Math.abs(lastEntryWeight - profile.weight) >= 0.01) {
+            formattedHistory.push({
+              date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+              weight: profile.weight
+            });
+          }
+
+          // Set current weight state
+          setCurrentWeight(profile.weight);
+        }
+
+        // Set the complete weight history
+        setWeightHistory(formattedHistory);
+
+        // If there's no entry for today, set up the temporary today point
+        const today = new Date();
+        const hasEntryForToday = formattedHistory.some(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate.getDate() === today.getDate() &&
+            entryDate.getMonth() === today.getMonth() &&
+            entryDate.getFullYear() === today.getFullYear();
+        });
+
+        if (!hasEntryForToday && currentWeight) {
+          setShowTodayWeight(true);
+          setTodayWeight(currentWeight);
+        } else {
+          setShowTodayWeight(false);
+          setTodayWeight(null);
+        }
+      } catch (error) {
+        console.error('Error loading weight history:', error);
+      } finally {
+        setWeightLoading(false);
+      }
+    };
+
+    // We still need user to be available for this to work
+    if (user) {
+      loadWeightHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, setWeightHistory, setCurrentWeight, setTargetWeight, setStartingWeight, setWeightLost]);
+
+  // Calculate weight lost when profile and weight history are loaded - fix the logic
+  useEffect(() => {
+    if (!profileLoading && !weightLoading && currentWeight !== null) {
+      // If starting_weight is available, use it; otherwise use the first weight entry
+      const initialWeight = startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : currentWeight);
+
+      // Calculate weight change (can be positive for loss or negative for gain)
+      const weightChange = initialWeight - currentWeight;
+      setWeightLost(parseFloat(weightChange.toFixed(1)));
+    }
+  }, [profileLoading, weightLoading, currentWeight, startingWeight, weightHistory]);
+
+  // Update the handleAddWeight function - wrapped with useCallback for stability
+  const handleAddWeight = useCallback(async () => {
+    if (!user || !newWeight) return;
 
     try {
-      setWeightLoading(true);
+      let weightValue = parseFloat(newWeight);
 
-      // Get user profile from local database to get starting weight and current weight
-      const profile = await getUserProfileByFirebaseUid(user.uid);
-      if (!profile) {
-        console.log('No profile found');
-        setWeightLoading(false);
+      if (isNaN(weightValue) || weightValue <= 0) {
+        Alert.alert('Invalid Weight', 'Please enter a valid weight value.');
         return;
       }
 
-      // Get weight history from local SQLite database
-      const historyEntries = await getWeightHistoryLocal(user.uid);
+      // Store the display value for the success message
+      const displayWeight = weightValue;
+      const displayUnit = isImperialUnits ? 'lbs' : 'kg';
 
-      // Initialize the weight history array
-      let formattedHistory = [];
-
-      // Add starting weight as the first point if available
-      if (profile.starting_weight) {
-        // Use profile creation date or a date earlier than all weight entries
-        const startDate = profile.last_modified || new Date(2000, 0, 1).toISOString();
-        formattedHistory.push({
-          date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-          weight: profile.starting_weight
-        });
-        // Set starting weight state
-        setStartingWeight(profile.starting_weight);
+      // Convert to kg if user is using imperial units (backend always stores in kg)
+      if (isImperialUnits) {
+        weightValue = Math.round((weightValue / 2.20462) * 10) / 10; // Convert lbs to kg
       }
 
-      // Add intermediary weights from weight history
-      if (historyEntries && historyEntries.length > 0) {
-        // Sort history chronologically - oldest first
-        const sortedWeights = [...historyEntries].sort((a, b) =>
-          new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-        );
-
-        // Format and add all intermediary weight entries
-        const intermediaryWeights = sortedWeights.map(entry => ({
-          date: new Date(entry.recorded_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-          weight: entry.weight
-        }));
-
-        formattedHistory = [...formattedHistory, ...intermediaryWeights];
-
-        // If we don't have a starting weight yet, use the first weight entry
-        if (!profile.starting_weight && sortedWeights.length > 0) {
-          setStartingWeight(sortedWeights[0].weight);
-        }
+      // Get the current user profile
+      const profile = await getUserProfileByFirebaseUid(user.uid);
+      if (!profile) {
+        Alert.alert('Error', 'Unable to find user profile.');
+        return;
       }
 
-      // Add current weight as the last point if different from the last history entry
-      if (profile.weight) {
-        const lastEntryWeight = formattedHistory.length > 0 ?
-          formattedHistory[formattedHistory.length - 1].weight : null;
-
-        // Only add current weight if it's different from the last history entry
-        // or if there are no history entries
-        if (!lastEntryWeight || Math.abs(lastEntryWeight - profile.weight) >= 0.01) {
-          formattedHistory.push({
-            date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-            weight: profile.weight
-          });
-        }
-
-        // Set current weight state
-        setCurrentWeight(profile.weight);
+      // Check if this is the first weight entry and we need to set starting weight
+      if (!startingWeight) {
+        // Update the starting_weight in the user profile
+        await updateUserProfile(user.uid, { starting_weight: weightValue });
+        setStartingWeight(weightValue);
       }
 
-      // Set the complete weight history
-      setWeightHistory(formattedHistory);
+      // Always update the current weight in user profile
+      await updateUserProfile(user.uid, { weight: weightValue });
+      setCurrentWeight(weightValue);
 
-      // If there's no entry for today, set up the temporary today point
-      const today = new Date();
-      const hasEntryForToday = formattedHistory.some(entry => {
-        const entryDate = new Date(entry.date);
-        return entryDate.getDate() === today.getDate() &&
-          entryDate.getMonth() === today.getMonth() &&
-          entryDate.getFullYear() === today.getFullYear();
-      });
+      // Add weight entry to history
+      await addWeightEntryLocal(user.uid, weightValue);
 
-      if (!hasEntryForToday && currentWeight) {
-        setShowTodayWeight(true);
-        setTodayWeight(currentWeight);
+      // Update local state with the new entry
+      const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+
+      // Add the new entry to the existing weight history
+      const updatedHistory = [...weightHistory];
+
+      // If the last entry is also from today, replace it instead of adding a new one
+      const lastEntryIndex = updatedHistory.length - 1;
+      const lastEntry = lastEntryIndex >= 0 ? updatedHistory[lastEntryIndex] : null;
+
+      if (lastEntry && lastEntry.date === today) {
+        // Replace today's entry
+        updatedHistory[lastEntryIndex] = { date: today, weight: weightValue };
       } else {
-        setShowTodayWeight(false);
-        setTodayWeight(null);
+        // Add new entry
+        updatedHistory.push({ date: today, weight: weightValue });
       }
+
+      setWeightHistory(updatedHistory);
+
+      // No need to show temporary today weight anymore
+      setShowTodayWeight(false);
+      setTodayWeight(null);
+
+      // Recalculate weight lost or gained
+      if (startingWeight) {
+        const weightChange = startingWeight - weightValue;
+        setWeightLost(parseFloat(weightChange.toFixed(1)));
+      }
+
+      // Success message with feedback
+      Alert.alert(
+        'Weight Updated',
+        `Your weight has been updated to ${displayWeight} ${displayUnit}.`,
+        [{ text: 'OK' }],
+        { cancelable: true }
+      );
+
+      // Close modal and clear input
+      setWeightModalVisible(false);
+      setNewWeight('');
     } catch (error) {
-      console.error('Error loading weight history:', error);
-    } finally {
-      setWeightLoading(false);
+      console.error('Error adding weight entry:', error);
+      Alert.alert('Error', 'Failed to add weight entry. Please try again.');
     }
-  };
+  }, [user, newWeight, startingWeight, weightHistory, isImperialUnits]);
 
-  // We still need user to be available for this to work
-  if (user) {
-    loadWeightHistory();
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [user, setWeightHistory, setCurrentWeight, setTargetWeight, setStartingWeight, setWeightLost]);
+  // Memoized callbacks for WeightModal to prevent unnecessary re-renders
+  const handleWeightChange = useCallback((text: string) => {
+    setNewWeight(text);
+  }, []);
 
-// Calculate weight lost when profile and weight history are loaded - fix the logic
-useEffect(() => {
-  if (!profileLoading && !weightLoading && currentWeight !== null) {
-    // If starting_weight is available, use it; otherwise use the first weight entry
-    const initialWeight = startingWeight || (weightHistory.length > 0 ? weightHistory[0].weight : currentWeight);
-
-    // Calculate weight change (can be positive for loss or negative for gain)
-    const weightChange = initialWeight - currentWeight;
-    setWeightLost(parseFloat(weightChange.toFixed(1)));
-  }
-}, [profileLoading, weightLoading, currentWeight, startingWeight, weightHistory]);
-
-// Update the handleAddWeight function - wrapped with useCallback for stability
-const handleAddWeight = useCallback(async () => {
-  if (!user || !newWeight) return;
-
-  try {
-    let weightValue = parseFloat(newWeight);
-
-    if (isNaN(weightValue) || weightValue <= 0) {
-      Alert.alert('Invalid Weight', 'Please enter a valid weight value.');
-      return;
-    }
-
-    // Store the display value for the success message
-    const displayWeight = weightValue;
-    const displayUnit = isImperialUnits ? 'lbs' : 'kg';
-
-    // Convert to kg if user is using imperial units (backend always stores in kg)
-    if (isImperialUnits) {
-      weightValue = Math.round((weightValue / 2.20462) * 10) / 10; // Convert lbs to kg
-    }
-
-    // Get the current user profile
-    const profile = await getUserProfileByFirebaseUid(user.uid);
-    if (!profile) {
-      Alert.alert('Error', 'Unable to find user profile.');
-      return;
-    }
-
-    // Check if this is the first weight entry and we need to set starting weight
-    if (!startingWeight) {
-      // Update the starting_weight in the user profile
-      await updateUserProfile(user.uid, { starting_weight: weightValue });
-      setStartingWeight(weightValue);
-    }
-
-    // Always update the current weight in user profile
-    await updateUserProfile(user.uid, { weight: weightValue });
-    setCurrentWeight(weightValue);
-
-    // Add weight entry to history
-    await addWeightEntryLocal(user.uid, weightValue);
-
-    // Update local state with the new entry
-    const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-
-    // Add the new entry to the existing weight history
-    const updatedHistory = [...weightHistory];
-
-    // If the last entry is also from today, replace it instead of adding a new one
-    const lastEntryIndex = updatedHistory.length - 1;
-    const lastEntry = lastEntryIndex >= 0 ? updatedHistory[lastEntryIndex] : null;
-
-    if (lastEntry && lastEntry.date === today) {
-      // Replace today's entry
-      updatedHistory[lastEntryIndex] = { date: today, weight: weightValue };
-    } else {
-      // Add new entry
-      updatedHistory.push({ date: today, weight: weightValue });
-    }
-
-    setWeightHistory(updatedHistory);
-
-    // No need to show temporary today weight anymore
-    setShowTodayWeight(false);
-    setTodayWeight(null);
-
-    // Recalculate weight lost or gained
-    if (startingWeight) {
-      const weightChange = startingWeight - weightValue;
-      setWeightLost(parseFloat(weightChange.toFixed(1)));
-    }
-
-    // Success message with feedback
-    Alert.alert(
-      'Weight Updated',
-      `Your weight has been updated to ${displayWeight} ${displayUnit}.`,
-      [{ text: 'OK' }],
-      { cancelable: true }
-    );
-
-    // Close modal and clear input
+  const handleModalCancel = useCallback(() => {
     setWeightModalVisible(false);
     setNewWeight('');
-  } catch (error) {
-    console.error('Error adding weight entry:', error);
-    Alert.alert('Error', 'Failed to add weight entry. Please try again.');
-  }
-}, [user, newWeight, startingWeight, weightHistory, isImperialUnits]);
+  }, []);
 
-// Memoized callbacks for WeightModal to prevent unnecessary re-renders
-const handleWeightChange = useCallback((text: string) => {
-  setNewWeight(text);
-}, []);
+  const handleModalSave = useCallback(() => {
+    handleAddWeight();
+  }, [handleAddWeight]);
 
-const handleModalCancel = useCallback(() => {
-  setWeightModalVisible(false);
-  setNewWeight('');
-}, []);
-
-const handleModalSave = useCallback(() => {
-  handleAddWeight();
-}, [handleAddWeight]);
-
-// Handler: updates activeIndex when user scrolls horizontally
-const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-  const offsetX = e.nativeEvent.contentOffset.x;
-  const newIndex = Math.round(offsetX / width);
-  setActiveIndex(newIndex);
-};
-
-// Calculate adjusted goal (base + exercise calories)
-// Only add exercise calories if:
-// - Step tracking mode is 'with_calories' (steps add bonus calories), OR
-// - Step tracking mode is 'disabled' (normal behavior)
-// Do NOT add if mode is 'without_calories' (steps tracked but don't affect calorie goal)
-const shouldAddExerciseCalories = stepTrackingMode === 'with_calories' || stepTrackingMode === 'disabled';
-const adjustedGoal = dailyCalorieGoal + (shouldAddExerciseCalories ? exerciseCalories : 0);
-
-// Calculate values for the main ring based on adjusted goal.
-const circumference = 2 * Math.PI * radius;
-const adjustedPercentCons = adjustedGoal > 0 ? (consumedCalories / adjustedGoal) * 100 : 0;
-// Don't allow progress to exceed 100% of the circle circumference
-const consumedStroke = Math.min(circumference, circumference * (Math.min(100, adjustedPercentCons) / 100));
-
-// Data for the right card with updated colors.
-const rightStats = [
-  {
-    label: 'Goal',
-    value: adjustedGoal || '---',
-    icon: 'flag-outline',
-    color: '#FFB74D'
-  },
-  {
-    label: 'Food',
-    value: foodLoading ? '-' : consumedCalories,
-    icon: 'restaurant-outline',
-    color: '#FF8A65'
-  }, // soft red hue
-  {
-    label: 'Exercise',
-    value: exerciseLoading ? '-' : exerciseCalories,
-    icon: 'barbell-outline',
-    color: '#66BB6A'
-  }, // updated green
-  {
-    label: 'Steps',
-    value: stepsLoading ? '-' : todaySteps,
-    icon: 'walk',
-    iconSet: 'MaterialCommunityIcons',
-    color: '#E040FB' // updated purple
-  }
-];
-
-// Use actual step history from the context
-const formattedStepHistory = stepsLoading ? [] : stepHistory.map(item => ({
-  date: new Date(item.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }),
-  steps: item.steps
-}));
-
-// Add error handling UI component at the top of HomeScreen
-const renderErrorBanner = () => {
-  if (!hasError) return null;
-
-  return (
-    <TouchableOpacity
-      style={styles.errorBanner}
-      onPress={forceSingleRefresh}
-    >
-      <Ionicons name="warning-outline" size={20} color="#FFD700" />
-      <Text style={styles.errorText}>
-        Database connection issue. Tap to retry.
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
-// Update the weight lost card render function
-const renderWeightLostCard = () => {
-  // Check if the user's goal is to gain weight
-  const isGainGoal = weightGoal.startsWith('gain');
-
-  // Determine if the weight change aligns with the goal
-  const isAlignedWithGoal = (isGainGoal && weightLost < 0) || (!isGainGoal && weightLost >= 0);
-
-  // Set background colors based on goal
-  const lossBackgroundColor = isGainGoal ? 'rgba(139, 0, 0, 0.2)' : 'rgba(0, 100, 0, 0.2)';
-  const gainBackgroundColor = isGainGoal ? 'rgba(0, 100, 0, 0.2)' : 'rgba(139, 0, 0, 0.2)';
-
-  // Set gradient colors based on goal
-  const lossGradientColors = isGainGoal
-    ? ['#8B0000', '#8B0000', '#FF0000'] as const
-    : ['#006400', '#006400', '#00FF00'] as const;
-
-  const gainGradientColors = isGainGoal
-    ? ['#006400', '#006400', '#00FF00'] as const
-    : ['#8B0000', '#8B0000', '#FF0000'] as const;
-
-  return (
-    <GradientBorderCard>
-      <View style={styles.burnContainer}>
-        <Text style={styles.burnTitle}>
-          {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
-        </Text>
-        <View style={[
-          styles.burnBarBackground,
-          {
-            backgroundColor: weightLost >= 0
-              ? lossBackgroundColor  // For weight loss
-              : gainBackgroundColor  // For weight gain
-          }
-        ]}>
-          {weightLost >= 0 ? (
-            // Weight loss - use appropriate gradient based on goal
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={lossGradientColors}
-              style={[
-                styles.burnBarFill,
-                {
-                  width: `${Math.min(
-                    (Math.abs(weightLost) / (startingWeight && targetWeight && startingWeight > targetWeight
-                      ? startingWeight - targetWeight
-                      : 10)) * 100,
-                    100
-                  )}%`
-                }
-              ]}
-            />
-          ) : (
-            // Weight gain - use appropriate gradient based on goal
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={gainGradientColors}
-              style={[
-                styles.burnBarFill,
-                {
-                  width: `${Math.min(
-                    (Math.abs(weightLost) / 10) * 100, // use a default of 10kg for the scale if no target
-                    100
-                  )}%`
-                }
-              ]}
-            />
-          )}
-        </View>
-        <View style={styles.weightLabelsContainer}>
-          <Text style={styles.weightLabel}>
-            {startingWeight
-              ? formatWeight(startingWeight, isImperialUnits)
-              : (weightHistory.length > 0
-                ? formatWeight(weightHistory[0].weight, isImperialUnits)
-                : '--')}
-          </Text>
-          <Text style={[
-            styles.burnDetails,
-            !isAlignedWithGoal && styles.burnDetailsGain // Apply red style if not aligned with goal
-          ]}>
-            {weightLost >= 0
-              ? `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Lost!`
-              : `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Gained!`}
-          </Text>
-          <Text style={styles.weightLabel}>
-            {targetWeight ? formatWeight(targetWeight, isImperialUnits) : '---'}
-          </Text>
-        </View>
-      </View>
-    </GradientBorderCard>
-  );
-};
-
-// Add function to clear weight history
-const handleClearWeightHistory = async () => {
-  Alert.alert(
-    "Clear Weight History",
-    "This will remove all weight entries except your starting weight and current weight. This action cannot be undone.",
-    [
-      {
-        text: "Cancel",
-        style: "cancel"
-      },
-      {
-        text: "Clear",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setWeightLoading(true);
-
-            // Call local SQLite function to clear weight history
-            await clearWeightHistoryLocal(user.uid);
-
-            // Reload weight history with just starting and current weights
-            // Get updated profile
-            const updatedProfile = await getUserProfileByFirebaseUid(user.uid);
-            if (!updatedProfile) {
-              throw new Error('Failed to load updated profile');
-            }
-
-            // Reset the weight history with only starting and current weight
-            let formattedHistory = [];
-
-            // Add starting weight
-            if (updatedProfile.starting_weight) {
-              const startDate = updatedProfile.last_modified || new Date(2000, 0, 1).toISOString();
-              formattedHistory.push({
-                date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-                weight: updatedProfile.starting_weight
-              });
-              setStartingWeight(updatedProfile.starting_weight);
-            }
-
-            // Add current weight if different from starting weight
-            if (updatedProfile.weight &&
-              (!updatedProfile.starting_weight ||
-                Math.abs(updatedProfile.weight - updatedProfile.starting_weight) >= 0.01)) {
-              formattedHistory.push({
-                date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-                weight: updatedProfile.weight
-              });
-              setCurrentWeight(updatedProfile.weight);
-            }
-
-            // Update weight history
-            setWeightHistory(formattedHistory);
-
-            // Calculate weight lost
-            if (updatedProfile.starting_weight && updatedProfile.weight) {
-              const lost = updatedProfile.starting_weight - updatedProfile.weight;
-              setWeightLost(parseFloat(lost.toFixed(1)));
-            }
-
-            // Show success message
-            Alert.alert(
-              "Success",
-              "Weight history has been cleared, keeping only your starting and current weights."
-            );
-          } catch (error) {
-            console.error('Error clearing weight history:', error);
-            Alert.alert("Error", "Failed to clear weight history. Please try again.");
-          } finally {
-            setWeightLoading(false);
-          }
-        }
-      }
-    ]
-  );
-};
-
-// In the Home component, add this function to check if today's weight has been recorded
-// Check if a weight entry exists for today
-const hasTodayWeightEntry = (weightHistory: Array<{ date: string; weight: number }>) => {
-  const today = new Date();
-  const todayString = today.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-
-  return weightHistory.some(entry => entry.date === todayString);
-};
-
-// Track if automatic weight recording has been done today
-const [hasRecordedToday, setHasRecordedToday] = useState(false);
-
-// Update the automatic weight recording effect - run only once when needed
-useEffect(() => {
-  if (!user || !currentWeight || hasRecordedToday) return;
-
-  // Function to record today's weight if it hasn't been recorded yet
-  const recordTodayWeight = async () => {
-    if (!user || !currentWeight) return;
-
-    try {
-      // Check if we already have a weight entry for today
-      const historyEntries = await getWeightHistoryLocal(user.uid);
-      const today = new Date();
-      const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-      // Check if there's an entry for today
-      const hasEntryForToday = historyEntries && historyEntries.length > 0 &&
-        historyEntries.some(entry => entry.recorded_at.startsWith(todayString));
-
-      // If no entry for today, record the current weight (WITHOUT triggering change notifications)
-      if (!hasEntryForToday) {
-        // Use addWeightEntryLocal but prevent it from triggering database change notifications
-        await addWeightEntryLocal(user.uid, currentWeight, true); // Pass true for isAutomatic
-        console.log('Daily weight recorded automatically');
-
-        // Mark as recorded to prevent repeated attempts
-        setHasRecordedToday(true);
-
-        // Update the local weight history display
-        const newEntry = {
-          date: today.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-          weight: currentWeight
-        };
-
-        // Update weight history state
-        setWeightHistory(prev => {
-          const updatedHistory = [...prev];
-          const lastEntryIndex = updatedHistory.length - 1;
-
-          if (lastEntryIndex >= 0 && updatedHistory[lastEntryIndex].date === newEntry.date) {
-            updatedHistory[lastEntryIndex] = newEntry;
-          } else {
-            updatedHistory.push(newEntry);
-          }
-          return updatedHistory;
-        });
-
-        setShowTodayWeight(false);
-
-        // Recalculate weight change
-        if (startingWeight) {
-          const weightChange = startingWeight - currentWeight;
-          setWeightLost(parseFloat(weightChange.toFixed(1)));
-        }
-      } else {
-        // Mark as recorded since it already exists
-        setHasRecordedToday(true);
-      }
-    } catch (error) {
-      console.error('Error in automatic weight recording:', error);
-    }
+  // Handler: updates activeIndex when user scrolls horizontally
+  const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / width);
+    setActiveIndex(newIndex);
   };
 
-  // Run once when the component mounts to ensure today's weight is recorded
-  recordTodayWeight();
+  // Calculate adjusted goal (base + exercise calories)
+  // Only add exercise calories if:
+  // - Step tracking mode is 'with_calories' (steps add bonus calories), OR
+  // - Step tracking mode is 'disabled' (normal behavior)
+  // Do NOT add if mode is 'without_calories' (steps tracked but don't affect calorie goal)
+  const shouldAddExerciseCalories = stepTrackingMode === 'with_calories' || stepTrackingMode === 'disabled';
+  const adjustedGoal = dailyCalorieGoal + (shouldAddExerciseCalories ? exerciseCalories : 0);
 
-  // Calculate milliseconds until next midnight
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setHours(24, 0, 0, 0); // Set to midnight tonight/tomorrow
-  const msUntilMidnight = tomorrow.getTime() - now.getTime();
+  // Calculate values for the main ring based on adjusted goal.
+  const circumference = 2 * Math.PI * radius;
+  const adjustedPercentCons = adjustedGoal > 0 ? (consumedCalories / adjustedGoal) * 100 : 0;
+  // Don't allow progress to exceed 100% of the circle circumference
+  const consumedStroke = Math.min(circumference, circumference * (Math.min(100, adjustedPercentCons) / 100));
 
-  // Set up a single timeout until midnight (more efficient than polling every minute)
-  const timeoutId = setTimeout(() => {
-    console.log('Midnight reached - resetting daily weight recording flag');
-    setHasRecordedToday(false);
-    // The effect will re-run due to hasRecordedToday changing, which will call recordTodayWeight
-  }, msUntilMidnight);
+  // Data for the right card with updated colors.
+  const rightStats = [
+    {
+      label: 'Goal',
+      value: adjustedGoal || '---',
+      icon: 'flag-outline',
+      color: '#FFB74D'
+    },
+    {
+      label: 'Food',
+      value: foodLoading ? '-' : consumedCalories,
+      icon: 'restaurant-outline',
+      color: '#FF8A65'
+    }, // soft red hue
+    {
+      label: 'Exercise',
+      value: exerciseLoading ? '-' : exerciseCalories,
+      icon: 'barbell-outline',
+      color: '#66BB6A'
+    }, // updated green
+    {
+      label: 'Steps',
+      value: stepsLoading ? '-' : todaySteps,
+      icon: 'walk',
+      iconSet: 'MaterialCommunityIcons',
+      color: '#E040FB' // updated purple
+    }
+  ];
 
-  // Clear timeout on unmount
-  return () => clearTimeout(timeoutId);
-}, [user, currentWeight, hasRecordedToday, startingWeight]); // Removed weightHistory from dependencies
+  // Use actual step history from the context
+  const formattedStepHistory = stepsLoading ? [] : stepHistory.map(item => ({
+    date: new Date(item.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }),
+    steps: item.steps
+  }));
 
-useEffect(() => {
-  const setStartingWeightTo110 = async () => {
-    if (user) {
+  // Add error handling UI component at the top of HomeScreen
+  const renderErrorBanner = () => {
+    if (!hasError) return null;
+
+    return (
+      <TouchableOpacity
+        style={styles.errorBanner}
+        onPress={forceSingleRefresh}
+      >
+        <Ionicons name="warning-outline" size={20} color="#FFD700" />
+        <Text style={styles.errorText}>
+          Database connection issue. Tap to retry.
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // Update the weight lost card render function
+  const renderWeightLostCard = () => {
+    // Check if the user's goal is to gain weight
+    const isGainGoal = weightGoal.startsWith('gain');
+
+    // Determine if the weight change aligns with the goal
+    const isAlignedWithGoal = (isGainGoal && weightLost < 0) || (!isGainGoal && weightLost >= 0);
+
+    // Set background colors based on goal
+    const lossBackgroundColor = isGainGoal ? 'rgba(139, 0, 0, 0.2)' : 'rgba(0, 100, 0, 0.2)';
+    const gainBackgroundColor = isGainGoal ? 'rgba(0, 100, 0, 0.2)' : 'rgba(139, 0, 0, 0.2)';
+
+    // Set gradient colors based on goal
+    const lossGradientColors = isGainGoal
+      ? ['#8B0000', '#8B0000', '#FF0000'] as const
+      : ['#006400', '#006400', '#00FF00'] as const;
+
+    const gainGradientColors = isGainGoal
+      ? ['#006400', '#006400', '#00FF00'] as const
+      : ['#8B0000', '#8B0000', '#FF0000'] as const;
+
+    return (
+      <GradientBorderCard>
+        <View style={styles.burnContainer}>
+          <Text style={styles.burnTitle}>
+            {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
+          </Text>
+          <View style={[
+            styles.burnBarBackground,
+            {
+              backgroundColor: weightLost >= 0
+                ? lossBackgroundColor  // For weight loss
+                : gainBackgroundColor  // For weight gain
+            }
+          ]}>
+            {weightLost >= 0 ? (
+              // Weight loss - use appropriate gradient based on goal
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={lossGradientColors}
+                style={[
+                  styles.burnBarFill,
+                  {
+                    width: `${Math.min(
+                      (Math.abs(weightLost) / (startingWeight && targetWeight && startingWeight > targetWeight
+                        ? startingWeight - targetWeight
+                        : 10)) * 100,
+                      100
+                    )}%`
+                  }
+                ]}
+              />
+            ) : (
+              // Weight gain - use appropriate gradient based on goal
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={gainGradientColors}
+                style={[
+                  styles.burnBarFill,
+                  {
+                    width: `${Math.min(
+                      (Math.abs(weightLost) / 10) * 100, // use a default of 10kg for the scale if no target
+                      100
+                    )}%`
+                  }
+                ]}
+              />
+            )}
+          </View>
+          <View style={styles.weightLabelsContainer}>
+            <Text style={styles.weightLabel}>
+              {startingWeight
+                ? formatWeight(startingWeight, isImperialUnits)
+                : (weightHistory.length > 0
+                  ? formatWeight(weightHistory[0].weight, isImperialUnits)
+                  : '--')}
+            </Text>
+            <Text style={[
+              styles.burnDetails,
+              !isAlignedWithGoal && styles.burnDetailsGain // Apply red style if not aligned with goal
+            ]}>
+              {weightLost >= 0
+                ? `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Lost!`
+                : `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Gained!`}
+            </Text>
+            <Text style={styles.weightLabel}>
+              {targetWeight ? formatWeight(targetWeight, isImperialUnits) : '---'}
+            </Text>
+          </View>
+        </View>
+      </GradientBorderCard>
+    );
+  };
+
+  // Add function to clear weight history
+  const handleClearWeightHistory = async () => {
+    Alert.alert(
+      "Clear Weight History",
+      "This will remove all weight entries except your starting weight and current weight. This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setWeightLoading(true);
+
+              // Call local SQLite function to clear weight history
+              await clearWeightHistoryLocal(user.uid);
+
+              // Reload weight history with just starting and current weights
+              // Get updated profile
+              const updatedProfile = await getUserProfileByFirebaseUid(user.uid);
+              if (!updatedProfile) {
+                throw new Error('Failed to load updated profile');
+              }
+
+              // Reset the weight history with only starting and current weight
+              let formattedHistory = [];
+
+              // Add starting weight
+              if (updatedProfile.starting_weight) {
+                const startDate = updatedProfile.last_modified || new Date(2000, 0, 1).toISOString();
+                formattedHistory.push({
+                  date: new Date(startDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                  weight: updatedProfile.starting_weight
+                });
+                setStartingWeight(updatedProfile.starting_weight);
+              }
+
+              // Add current weight if different from starting weight
+              if (updatedProfile.weight &&
+                (!updatedProfile.starting_weight ||
+                  Math.abs(updatedProfile.weight - updatedProfile.starting_weight) >= 0.01)) {
+                formattedHistory.push({
+                  date: new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+                  weight: updatedProfile.weight
+                });
+                setCurrentWeight(updatedProfile.weight);
+              }
+
+              // Update weight history
+              setWeightHistory(formattedHistory);
+
+              // Calculate weight lost
+              if (updatedProfile.starting_weight && updatedProfile.weight) {
+                const lost = updatedProfile.starting_weight - updatedProfile.weight;
+                setWeightLost(parseFloat(lost.toFixed(1)));
+              }
+
+              // Show success message
+              Alert.alert(
+                "Success",
+                "Weight history has been cleared, keeping only your starting and current weights."
+              );
+            } catch (error) {
+              console.error('Error clearing weight history:', error);
+              Alert.alert("Error", "Failed to clear weight history. Please try again.");
+            } finally {
+              setWeightLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // In the Home component, add this function to check if today's weight has been recorded
+  // Check if a weight entry exists for today
+  const hasTodayWeightEntry = (weightHistory: Array<{ date: string; weight: number }>) => {
+    const today = new Date();
+    const todayString = today.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+
+    return weightHistory.some(entry => entry.date === todayString);
+  };
+
+  // Track if automatic weight recording has been done today
+  const [hasRecordedToday, setHasRecordedToday] = useState(false);
+
+  // Update the automatic weight recording effect - run only once when needed
+  useEffect(() => {
+    if (!user || !currentWeight || hasRecordedToday) return;
+
+    // Function to record today's weight if it hasn't been recorded yet
+    const recordTodayWeight = async () => {
+      if (!user || !currentWeight) return;
+
       try {
-        // Skip if onboarding has not completed to avoid conflicts
-        if (!onboardingComplete) {
-          console.log("🔄 Skipping automatic weight update - onboarding not complete yet");
-          return;
-        }
+        // Check if we already have a weight entry for today
+        const historyEntries = await getWeightHistoryLocal(user.uid);
+        const today = new Date();
+        const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-        console.log("Checking if user profile exists...");
+        // Check if there's an entry for today
+        const hasEntryForToday = historyEntries && historyEntries.length > 0 &&
+          historyEntries.some(entry => entry.recorded_at.startsWith(todayString));
 
-        // Check if the user profile exists using proper function
-        const userProfile = await getUserProfileBySupabaseUid(user.uid);
+        // If no entry for today, record the current weight (WITHOUT triggering change notifications)
+        if (!hasEntryForToday) {
+          // Use addWeightEntryLocal but prevent it from triggering database change notifications
+          await addWeightEntryLocal(user.uid, currentWeight, true); // Pass true for isAutomatic
+          console.log('Daily weight recorded automatically');
 
-        if (!userProfile) {
-          console.log("⚠️ User profile doesn't exist yet, skipping weight update");
-          return;
-        }
+          // Mark as recorded to prevent repeated attempts
+          setHasRecordedToday(true);
 
-        // Only update if starting_weight is not already set
-        if (!userProfile.starting_weight && userProfile.weight) {
-          console.log("📝 Setting starting weight to user's current weight from profile");
+          // Update the local weight history display
+          const newEntry = {
+            date: today.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+            weight: currentWeight
+          };
 
-          // Use the user's actual weight from their profile as the starting weight
-          await updateUserProfile(user.uid, {
-            starting_weight: userProfile.weight
+          // Update weight history state
+          setWeightHistory(prev => {
+            const updatedHistory = [...prev];
+            const lastEntryIndex = updatedHistory.length - 1;
+
+            if (lastEntryIndex >= 0 && updatedHistory[lastEntryIndex].date === newEntry.date) {
+              updatedHistory[lastEntryIndex] = newEntry;
+            } else {
+              updatedHistory.push(newEntry);
+            }
+            return updatedHistory;
           });
 
-          console.log(`✅ Starting weight set to ${userProfile.weight}kg (user's actual weight from profile)`);
+          setShowTodayWeight(false);
 
-          // Update the local state
-          setStartingWeight(userProfile.weight);
-
-          // Since starting weight equals current weight initially, weight lost should be 0
-          setWeightLost(0);
-        } else if (userProfile.starting_weight) {
-          console.log("ℹ️ Starting weight already set, using existing value");
-          setStartingWeight(userProfile.starting_weight);
-
-          // Calculate weight lost properly
-          if (userProfile.weight) {
-            const weightChange = userProfile.starting_weight - userProfile.weight;
+          // Recalculate weight change
+          if (startingWeight) {
+            const weightChange = startingWeight - currentWeight;
             setWeightLost(parseFloat(weightChange.toFixed(1)));
           }
         } else {
-          console.log("⚠️ No weight data available in profile yet");
+          // Mark as recorded since it already exists
+          setHasRecordedToday(true);
         }
       } catch (error) {
-        console.error("⚠️ Error in automatic weight management:", error);
-        // Don't show fallback errors since this is now a background operation
+        console.error('Error in automatic weight recording:', error);
       }
-    }
-  };
+    };
 
-  // Add a small delay to ensure onboarding completion has finished
-  const timer = setTimeout(setStartingWeightTo110, 1000);
-  return () => clearTimeout(timer);
+    // Run once when the component mounts to ensure today's weight is recorded
+    recordTodayWeight();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [user, currentWeight, onboardingComplete]);
+    // Calculate milliseconds until next midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setHours(24, 0, 0, 0); // Set to midnight tonight/tomorrow
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
 
-// Load cheat day data
-const loadCheatDayData = async () => {
-  if (!user) return;
+    // Set up a single timeout until midnight (more efficient than polling every minute)
+    const timeoutId = setTimeout(() => {
+      console.log('Midnight reached - resetting daily weight recording flag');
+      setHasRecordedToday(false);
+      // The effect will re-run due to hasRecordedToday changing, which will call recordTodayWeight
+    }, msUntilMidnight);
 
-  try {
-    setCheatDayLoading(true);
-    const progress = await getCheatDayProgress(user.uid);
-    setCheatDayData(progress);
-  } catch (error) {
-    console.error('Error loading cheat day data:', error);
-    // Set default values on error
-    setCheatDayData({
-      daysCompleted: 0,
-      totalDays: 7,
-      daysUntilNext: 7,
-      enabled: false
-    });
-  } finally {
-    setCheatDayLoading(false);
-  }
-};
+    // Clear timeout on unmount
+    return () => clearTimeout(timeoutId);
+  }, [user, currentWeight, hasRecordedToday, startingWeight]); // Removed weightHistory from dependencies
 
-// Load cheat day data when component mounts or user changes
-useEffect(() => {
-  loadCheatDayData();
-}, [user]);
+  useEffect(() => {
+    const setStartingWeightTo110 = async () => {
+      if (user) {
+        try {
+          // Skip if onboarding has not completed to avoid conflicts
+          if (!onboardingComplete) {
+            console.log("🔄 Skipping automatic weight update - onboarding not complete yet");
+            return;
+          }
 
-// Calculate cheat day progress for display
-const cheatDayProgress = cheatDayData.enabled && cheatDayData.totalDays > 0
-  ? Math.max(5, (cheatDayData.daysCompleted / cheatDayData.totalDays) * 100) // Minimum 5% to show like a dot
-  : 5; // Show 5% when disabled to maintain visual consistency
+          console.log("Checking if user profile exists...");
 
-// Start watching food logs when the component mounts
-useEffect(() => {
-  startWatchingFoodLogs();
-  return () => stopWatchingFoodLogs();
-}, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+          // Check if the user profile exists using proper function
+          const userProfile = await getUserProfileBySupabaseUid(user.uid);
 
-// Subscribe to database changes for exercise data updates
-useEffect(() => {
-  const refreshExerciseData = async () => {
-    try {
-      const todayExerciseCals = await getTodayExerciseCalories();
-      setExerciseCalories(todayExerciseCals);
+          if (!userProfile) {
+            console.log("⚠️ User profile doesn't exist yet, skipping weight update");
+            return;
+          }
 
-      // Recalculate remaining calories using adjusted goal
-      const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
-      const remaining = adjustedDailyGoal - consumedCalories;
-      // Don't cap at zero to allow "X over" display
-      setRemainingCals(Math.round(remaining));
-    } catch (error) {
-      console.error('Error refreshing exercise data:', error);
-    }
-  };
+          // Only update if starting_weight is not already set
+          if (!userProfile.starting_weight && userProfile.weight) {
+            console.log("📝 Setting starting weight to user's current weight from profile");
 
-  // Subscribe to database changes
-  const unsubscribe = subscribeToDatabaseChanges(refreshExerciseData);
+            // Use the user's actual weight from their profile as the starting weight
+            await updateUserProfile(user.uid, {
+              starting_weight: userProfile.weight
+            });
 
-  // Clean up subscription on unmount
-  return unsubscribe;
-}, [dailyCalorieGoal, consumedCalories]);
+            console.log(`✅ Starting weight set to ${userProfile.weight}kg (user's actual weight from profile)`);
 
-return (
-  <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
-    {renderErrorBanner()}
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      {/* CHEAT DAY CARD */}
-      <GradientBorderCard>
-        <View style={styles.cheatDayContainer}>
-          {/* STREAK INDICATOR - Top Right Corner */}
-          <View style={styles.streakContainer}>
-            <MaskedView
-              maskElement={<Text style={[styles.streakText, { opacity: 1 }]}>{currentStreak}</Text>}
-            >
-              <LinearGradient
-                colors={["#0080FF", "#FF1493"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                locations={[0.33, 0.8]}
-              >
-                <Text style={[styles.streakText, { opacity: 0 }]}>{currentStreak}</Text>
-              </LinearGradient>
-            </MaskedView>
-            <MaskedView
-              maskElement={<MaterialCommunityIcons name="fire" size={28} color="#FFF" />}
-              style={{ marginLeft: 0 }}
-            >
-              <LinearGradient
-                colors={["#0080FF", "#FF1493"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                locations={[0.33, 0.8]}
-                style={{ width: 28, height: 28 }}
-              />
-            </MaskedView>
-          </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={styles.cheatDayLabel}>
-              {!cheatDayData.enabled
-                ? 'Cheat day disabled'
-                : cheatDayData.daysUntilNext === 0
-                  ? 'Cheat day today!'
-                  : `${cheatDayData.daysUntilNext} days until cheat day`}
-            </Text>
-          </View>
-          <View style={[
-            styles.cheatDayBarBackground,
-            { backgroundColor: 'rgba(0, 207, 255, 0.2)' } // subdued light blue background matching the cheat day gradient
-          ]}>
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-              style={[styles.cheatDayBarFill, { width: `${cheatDayProgress}%` }]}
-            />
-          </View>
-          <Text style={styles.cheatDayStatus}>
-            {cheatDayLoading
-              ? '---'
-              : !cheatDayData.enabled
-                ? 'Enable in goals to track'
-                : `${cheatDayData.daysCompleted} / ${cheatDayData.totalDays} days`}
-          </Text>
-        </View>
-      </GradientBorderCard>
+            // Update the local state
+            setStartingWeight(userProfile.weight);
 
-      {/* Add space between the cards */}
-      <View style={{ height: 4 }} />
+            // Since starting weight equals current weight initially, weight lost should be 0
+            setWeightLost(0);
+          } else if (userProfile.starting_weight) {
+            console.log("ℹ️ Starting weight already set, using existing value");
+            setStartingWeight(userProfile.starting_weight);
 
-      {/* GOAL CARD (Unified circular bar + stats overlay) */}
-      <GradientBorderCard>
-        {/* Analytics Button - Top Left Corner */}
-        <TouchableOpacity
-          style={styles.goalCardAnalyticsButton}
-          onPress={() => navigation.navigate('Analytics' as never)}
-        >
-          <MaskedView
-            style={styles.goalCardAnalyticsMask}
-            maskElement={
-              <Ionicons name="analytics" size={22} color="black" />
+            // Calculate weight lost properly
+            if (userProfile.weight) {
+              const weightChange = userProfile.starting_weight - userProfile.weight;
+              setWeightLost(parseFloat(weightChange.toFixed(1)));
             }
-          >
-            <LinearGradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              colors={['#FF00F5', '#9B00FF', '#00CFFF']}
-              style={styles.goalCardAnalyticsGradient}
-            />
-          </MaskedView>
-        </TouchableOpacity>
-        <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
-          <View style={styles.ringContainer}>
-            <View style={[styles.ringGlow, {
-              width: CIRCLE_SIZE - STROKE_WIDTH * 2,
-              height: CIRCLE_SIZE - STROKE_WIDTH * 2,
-              borderRadius: CIRCLE_SIZE,
-              top: STROKE_WIDTH + SVG_PADDING,
-              left: STROKE_WIDTH + SVG_PADDING
-            }]} />
-            <Svg width={SVG_SIZE} height={SVG_SIZE}>
-              <Defs>
-                <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#2E0854" />
-                  <Stop offset="50%" stopColor="#9B00FF" />
-                  <Stop offset="100%" stopColor="#00CFFF" />
-                </SvgLinearGradient>
-                <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#8B6914" />
-                  <Stop offset="100%" stopColor="#FFD700" />
-                </SvgLinearGradient>
-                <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#4B0082" />
-                  <Stop offset="100%" stopColor="#8A2BE2" />
-                </SvgLinearGradient>
-              </Defs>
-              {/* Outer dark grey outline */}
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius + STROKE_WIDTH / 2 + OUTLINE_WIDTH / 2}
-                stroke="#444444"
-                strokeWidth={0}
-                fill="none"
-              />
-              {/* Inner dark grey outline */}
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius - STROKE_WIDTH / 2 - OUTLINE_WIDTH / 2}
-                stroke="#444444"
-                strokeWidth={0}
-                fill="none"
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="rgba(155, 0, 255, 0.15)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="url(#ringGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="butt"
-                transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="url(#ringGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="round"
-                transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="url(#exerciseGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference + (dailyCalorieGoal > 0 ? (exerciseCalories / dailyCalorieGoal) * circumference : 0)}
-                strokeLinecap="butt"
-                transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="url(#exerciseGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference + (dailyCalorieGoal > 0 ? (exerciseCalories / dailyCalorieGoal) * circumference : 0)}
-                strokeLinecap="round"
-                transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="url(#eatenGradient)" // Gradient for calories eaten bar
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="butt"
-                transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
-              />
-              <Circle
-                cx={SVG_SIZE / 2}
-                cy={SVG_SIZE / 2}
-                r={radius}
-                stroke="url(#eatenGradient)" // Gradient for calories eaten bar
-                strokeWidth={STROKE_WIDTH}
-                fill="none"
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={circumference - consumedStroke}
-                strokeLinecap="round"
-                transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
-              />
-            </Svg>
-            <View style={[styles.centerTextContainer, {
-              width: SVG_SIZE,
-              height: SVG_SIZE
-            }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                <Text style={[styles.remainingValue, {
-                  fontSize: Math.min(30 * scaleFactor, 60) // Scale font, max 60px
-                }]}>
-                  {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
-                </Text>
-                <Text style={{
-                  color: '#FFF',
-                  fontSize: Math.min(16 * scaleFactor, 28),
-                  fontWeight: '500',
-                  opacity: 0.7,
-                  marginLeft: 4
-                }}>
-                  kcal
-                </Text>
-              </View>
-              <Text style={[styles.remainingLabel, {
-                fontSize: Math.min(14 * scaleFactor, 24) // Scale font, max 24px
-              }]}>
-                {remainingCals < 0 ? 'OVER' : 'REMAINING'}
+          } else {
+            console.log("⚠️ No weight data available in profile yet");
+          }
+        } catch (error) {
+          console.error("⚠️ Error in automatic weight management:", error);
+          // Don't show fallback errors since this is now a background operation
+        }
+      }
+    };
+
+    // Add a small delay to ensure onboarding completion has finished
+    const timer = setTimeout(setStartingWeightTo110, 1000);
+    return () => clearTimeout(timer);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, currentWeight, onboardingComplete]);
+
+  // Load cheat day data
+  const loadCheatDayData = async () => {
+    if (!user) return;
+
+    try {
+      setCheatDayLoading(true);
+      const progress = await getCheatDayProgress(user.uid);
+      setCheatDayData(progress);
+    } catch (error) {
+      console.error('Error loading cheat day data:', error);
+      // Set default values on error
+      setCheatDayData({
+        daysCompleted: 0,
+        totalDays: 7,
+        daysUntilNext: 7,
+        enabled: false
+      });
+    } finally {
+      setCheatDayLoading(false);
+    }
+  };
+
+  // Load cheat day data when component mounts or user changes
+  useEffect(() => {
+    loadCheatDayData();
+  }, [user]);
+
+  // Calculate cheat day progress for display
+  const cheatDayProgress = cheatDayData.enabled && cheatDayData.totalDays > 0
+    ? Math.max(5, (cheatDayData.daysCompleted / cheatDayData.totalDays) * 100) // Minimum 5% to show like a dot
+    : 5; // Show 5% when disabled to maintain visual consistency
+
+  // Start watching food logs when the component mounts
+  useEffect(() => {
+    startWatchingFoodLogs();
+    return () => stopWatchingFoodLogs();
+  }, [startWatchingFoodLogs, stopWatchingFoodLogs]);
+
+  // Subscribe to database changes for exercise data updates
+  useEffect(() => {
+    const refreshExerciseData = async () => {
+      try {
+        const todayExerciseCals = await getTodayExerciseCalories();
+        setExerciseCalories(todayExerciseCals);
+
+        // Recalculate remaining calories using adjusted goal
+        const adjustedDailyGoal = dailyCalorieGoal + todayExerciseCals;
+        const remaining = adjustedDailyGoal - consumedCalories;
+        // Don't cap at zero to allow "X over" display
+        setRemainingCals(Math.round(remaining));
+      } catch (error) {
+        console.error('Error refreshing exercise data:', error);
+      }
+    };
+
+    // Subscribe to database changes
+    const unsubscribe = subscribeToDatabaseChanges(refreshExerciseData);
+
+    // Clean up subscription on unmount
+    return unsubscribe;
+  }, [dailyCalorieGoal, consumedCalories]);
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
+      {renderErrorBanner()}
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* CHEAT DAY CARD */}
+        <GradientBorderCard>
+          <View style={styles.cheatDayContainer}>
+            {/* STREAK INDICATOR - Top Right Corner */}
+            <View style={styles.streakContainer}>
+              <MaskedView
+                maskElement={<Text style={[styles.streakText, { opacity: 1 }]}>{currentStreak}</Text>}
+              >
+                <LinearGradient
+                  colors={["#0080FF", "#FF1493"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0.33, 0.8]}
+                >
+                  <Text style={[styles.streakText, { opacity: 0 }]}>{currentStreak}</Text>
+                </LinearGradient>
+              </MaskedView>
+              <MaskedView
+                maskElement={<MaterialCommunityIcons name="fire" size={28} color="#FFF" />}
+                style={{ marginLeft: 0 }}
+              >
+                <LinearGradient
+                  colors={["#0080FF", "#FF1493"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  locations={[0.33, 0.8]}
+                  style={{ width: 28, height: 28 }}
+                />
+              </MaskedView>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.cheatDayLabel}>
+                {!cheatDayData.enabled
+                  ? 'Cheat day disabled'
+                  : cheatDayData.daysUntilNext === 0
+                    ? 'Cheat day today!'
+                    : `${cheatDayData.daysUntilNext} days until cheat day`}
               </Text>
             </View>
-          </View>
-          <View style={[styles.rightCardVertical, { marginTop: 13 }]}>
-            {rightStats.map((item) => {
-              const IconComponent = item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
-              return (
-                <View key={item.label} style={styles.statRowVertical}>
-                  <IconComponent name={item.icon as any} size={20} color={item.color} />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text
-                      style={[styles.statLabel, { color: item.color }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                    >
-                      {item.label}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                      <Text style={styles.statValue}>
-                        {item.label === 'Steps' && stepsLoading ? (
-                          <ActivityIndicator size="small" color="#E040FB" />
-                        ) : (
-                          item.value
-                        )}
-                      </Text>
-                      {item.label !== 'Steps' && item.value !== '---' && item.value !== '-' && (
-                        <Text style={{
-                          color: '#FFF',
-                          fontSize: 10,
-                          fontWeight: '500',
-                          opacity: 0.7,
-                          marginLeft: 2
-                        }}>
-                          kcal
-                        </Text>
-                      )}
-                      {item.label === 'Steps' && item.value !== '---' && item.value !== '-' && !stepsLoading && (
-                        <Text style={{
-                          color: '#FFF',
-                          fontSize: 10,
-                          fontWeight: '500',
-                          opacity: 0.7,
-                          marginLeft: 2
-                        }}>
-                          steps
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      </GradientBorderCard>
-
-      {/* Add space between the cards */}
-      <View style={{ height: 3 }} />
-
-      {/* MACROS CARD */}
-      <GradientBorderCard>
-        <View style={styles.macrosRow}>
-          <MacroRing
-            key={`protein-${nutrientTotals.protein}-${macroGoals.protein}-${lastUpdated}`}
-            label="PROTEIN"
-            percent={macrosLoading ? 0 : (nutrientTotals.protein / macroGoals.protein) * 100}
-            current={macrosLoading ? 0 : nutrientTotals.protein}
-            goal={macroGoals.protein}
-          />
-          <MacroRing
-            key={`carbs-${nutrientTotals.carbs}-${macroGoals.carbs}-${lastUpdated}`}
-            label="CARBS"
-            percent={macrosLoading ? 0 : (nutrientTotals.carbs / macroGoals.carbs) * 100}
-            current={macrosLoading ? 0 : nutrientTotals.carbs}
-            goal={macroGoals.carbs}
-          />
-          <MacroRing
-            key={`fats-${nutrientTotals.fat}-${macroGoals.fat}-${lastUpdated}`}
-            label="FATS"
-            percent={macrosLoading ? 0 : (nutrientTotals.fat / macroGoals.fat) * 100}
-            current={macrosLoading ? 0 : nutrientTotals.fat}
-            goal={macroGoals.fat}
-          />
-          <MacroRing
-            label="OTHER"
-            percent={100}
-            current={0}
-            goal={0}
-            onPress={() => navigation.navigate('Nutrients' as never)}
-          />
-        </View>
-      </GradientBorderCard>
-
-      {/* Add space between the cards */}
-      <View style={{ height: 3 }} />
-
-      {/* WEIGHT LOST CARD */}
-      {renderWeightLostCard()}
-
-      {/* HORIZONTALLY SCROLLABLE TREND CARDS */}
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onScrollEnd}
-        snapToInterval={width}
-        decelerationRate="fast"
-        snapToAlignment="center"
-      >
-        {/* WEIGHT TREND CARD */}
-        <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-          <GradientBorderCard>
-            <View style={styles.trendContainer}>
-              <WeightGraph
-                data={weightHistory}
-                onAddPress={() => setWeightModalVisible(true)}
-                weightLoading={weightLoading}
-                showTodayWeight={showTodayWeight}
-                todayWeight={todayWeight}
+            <View style={[
+              styles.cheatDayBarBackground,
+              { backgroundColor: 'rgba(0, 207, 255, 0.2)' } // subdued light blue background matching the cheat day gradient
+            ]}>
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={[styles.cheatDayBarFill, { width: `${cheatDayProgress}%` }]}
               />
             </View>
-          </GradientBorderCard>
-        </View>
+            <Text style={styles.cheatDayStatus}>
+              {cheatDayLoading
+                ? '---'
+                : !cheatDayData.enabled
+                  ? 'Enable in goals to track'
+                  : `${cheatDayData.daysCompleted} / ${cheatDayData.totalDays} days`}
+            </Text>
+          </View>
+        </GradientBorderCard>
 
-        {/* STEPS TREND CARD */}
-        <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-          <GradientBorderCard>
-            <View style={styles.trendContainer}>
-              {stepsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#E040FB" />
-                  <Text style={styles.loadingText}>Loading step data...</Text>
+        {/* Add space between the cards */}
+        <View style={{ height: 4 }} />
+
+        {/* GOAL CARD (Unified circular bar + stats overlay) */}
+        <GradientBorderCard>
+          {/* Analytics Button - Top Left Corner */}
+          <TouchableOpacity
+            style={styles.goalCardAnalyticsButton}
+            onPress={() => navigation.navigate('Analytics' as never)}
+          >
+            <MaskedView
+              style={styles.goalCardAnalyticsMask}
+              maskElement={
+                <Ionicons name="analytics" size={22} color="black" />
+              }
+            >
+              <LinearGradient
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                style={styles.goalCardAnalyticsGradient}
+              />
+            </MaskedView>
+          </TouchableOpacity>
+          <View style={[styles.goalCardContent, { flexDirection: 'row' }]}>
+            <View style={styles.ringContainer}>
+              <View style={[styles.ringGlow, {
+                width: CIRCLE_SIZE - STROKE_WIDTH * 2,
+                height: CIRCLE_SIZE - STROKE_WIDTH * 2,
+                borderRadius: CIRCLE_SIZE,
+                top: STROKE_WIDTH + SVG_PADDING,
+                left: STROKE_WIDTH + SVG_PADDING
+              }]} />
+              <Svg width={SVG_SIZE} height={SVG_SIZE}>
+                <Defs>
+                  <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#2E0854" />
+                    <Stop offset="50%" stopColor="#9B00FF" />
+                    <Stop offset="100%" stopColor="#00CFFF" />
+                  </SvgLinearGradient>
+                  <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#8B6914" />
+                    <Stop offset="100%" stopColor="#FFD700" />
+                  </SvgLinearGradient>
+                  <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <Stop offset="0%" stopColor="#4B0082" />
+                    <Stop offset="100%" stopColor="#8A2BE2" />
+                  </SvgLinearGradient>
+                </Defs>
+                {/* Outer dark grey outline */}
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius + STROKE_WIDTH / 2 + OUTLINE_WIDTH / 2}
+                  stroke="#444444"
+                  strokeWidth={0}
+                  fill="none"
+                />
+                {/* Inner dark grey outline */}
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius - STROKE_WIDTH / 2 - OUTLINE_WIDTH / 2}
+                  stroke="#444444"
+                  strokeWidth={0}
+                  fill="none"
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="rgba(155, 0, 255, 0.15)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="url(#ringGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="butt"
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="url(#ringGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="round"
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="url(#exerciseGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference + (dailyCalorieGoal > 0 ? (exerciseCalories / dailyCalorieGoal) * circumference : 0)}
+                  strokeLinecap="butt"
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="url(#exerciseGradient)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference + (dailyCalorieGoal > 0 ? (exerciseCalories / dailyCalorieGoal) * circumference : 0)}
+                  strokeLinecap="round"
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`} // 12 o'clock counterclockwise
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="url(#eatenGradient)" // Gradient for calories eaten bar
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="butt"
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
+                />
+                <Circle
+                  cx={SVG_SIZE / 2}
+                  cy={SVG_SIZE / 2}
+                  r={radius}
+                  stroke="url(#eatenGradient)" // Gradient for calories eaten bar
+                  strokeWidth={STROKE_WIDTH}
+                  fill="none"
+                  strokeDasharray={`${circumference} ${circumference}`}
+                  strokeDashoffset={circumference - consumedStroke}
+                  strokeLinecap="round"
+                  transform={`rotate(-90, ${SVG_SIZE / 2}, ${SVG_SIZE / 2})`}
+                />
+              </Svg>
+              <View style={[styles.centerTextContainer, {
+                width: SVG_SIZE,
+                height: SVG_SIZE
+              }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                  <Text style={[styles.remainingValue, {
+                    fontSize: Math.min(30 * scaleFactor, 60) // Scale font, max 60px
+                  }]}>
+                    {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
+                  </Text>
+                  <Text style={{
+                    color: '#FFF',
+                    fontSize: Math.min(16 * scaleFactor, 28),
+                    fontWeight: '500',
+                    opacity: 0.7,
+                    marginLeft: 4
+                  }}>
+                    kcal
+                  </Text>
                 </View>
-              ) : (
-                <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
-              )}
+                <Text style={[styles.remainingLabel, {
+                  fontSize: Math.min(14 * scaleFactor, 24) // Scale font, max 24px
+                }]}>
+                  {remainingCals < 0 ? 'OVER' : 'REMAINING'}
+                </Text>
+              </View>
             </View>
-          </GradientBorderCard>
+            <View style={[styles.rightCardVertical, { marginTop: 13 }]}>
+              {rightStats.map((item) => {
+                const IconComponent = item.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
+                return (
+                  <View key={item.label} style={styles.statRowVertical}>
+                    <IconComponent name={item.icon as any} size={20} color={item.color} />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text
+                        style={[styles.statLabel, { color: item.color }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
+                        {item.label}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <Text style={styles.statValue}>
+                          {item.label === 'Steps' && stepsLoading ? (
+                            <ActivityIndicator size="small" color="#E040FB" />
+                          ) : (
+                            item.value
+                          )}
+                        </Text>
+                        {item.label !== 'Steps' && item.value !== '---' && item.value !== '-' && (
+                          <Text style={{
+                            color: '#FFF',
+                            fontSize: 10,
+                            fontWeight: '500',
+                            opacity: 0.7,
+                            marginLeft: 2
+                          }}>
+                            kcal
+                          </Text>
+                        )}
+                        {item.label === 'Steps' && item.value !== '---' && item.value !== '-' && !stepsLoading && (
+                          <Text style={{
+                            color: '#FFF',
+                            fontSize: 10,
+                            fontWeight: '500',
+                            opacity: 0.7,
+                            marginLeft: 2
+                          }}>
+                            steps
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </GradientBorderCard>
+
+        {/* Add space between the cards */}
+        <View style={{ height: 3 }} />
+
+        {/* MACROS CARD */}
+        <GradientBorderCard>
+          <View style={styles.macrosRow}>
+            <MacroRing
+              key={`protein-${nutrientTotals.protein}-${macroGoals.protein}-${lastUpdated}`}
+              label="PROTEIN"
+              percent={macrosLoading ? 0 : (nutrientTotals.protein / macroGoals.protein) * 100}
+              current={macrosLoading ? 0 : nutrientTotals.protein}
+              goal={macroGoals.protein}
+            />
+            <MacroRing
+              key={`carbs-${nutrientTotals.carbs}-${macroGoals.carbs}-${lastUpdated}`}
+              label="CARBS"
+              percent={macrosLoading ? 0 : (nutrientTotals.carbs / macroGoals.carbs) * 100}
+              current={macrosLoading ? 0 : nutrientTotals.carbs}
+              goal={macroGoals.carbs}
+            />
+            <MacroRing
+              key={`fats-${nutrientTotals.fat}-${macroGoals.fat}-${lastUpdated}`}
+              label="FATS"
+              percent={macrosLoading ? 0 : (nutrientTotals.fat / macroGoals.fat) * 100}
+              current={macrosLoading ? 0 : nutrientTotals.fat}
+              goal={macroGoals.fat}
+            />
+            <MacroRing
+              label="OTHER"
+              percent={100}
+              current={0}
+              goal={0}
+              onPress={() => navigation.navigate('Nutrients' as never)}
+            />
+          </View>
+        </GradientBorderCard>
+
+        {/* Add space between the cards */}
+        <View style={{ height: 3 }} />
+
+        {/* WEIGHT LOST CARD */}
+        {renderWeightLostCard()}
+
+        {/* HORIZONTALLY SCROLLABLE TREND CARDS */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onScrollEnd}
+          snapToInterval={width}
+          decelerationRate="fast"
+          snapToAlignment="center"
+        >
+          {/* WEIGHT TREND CARD */}
+          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            <GradientBorderCard>
+              <View style={styles.trendContainer}>
+                <WeightGraph
+                  data={weightHistory}
+                  onAddPress={() => setWeightModalVisible(true)}
+                  weightLoading={weightLoading}
+                  showTodayWeight={showTodayWeight}
+                  todayWeight={todayWeight}
+                />
+              </View>
+            </GradientBorderCard>
+          </View>
+
+          {/* STEPS TREND CARD */}
+          <View style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            <GradientBorderCard>
+              <View style={styles.trendContainer}>
+                {stepsLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#E040FB" />
+                    <Text style={styles.loadingText}>Loading step data...</Text>
+                  </View>
+                ) : (
+                  <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
+                )}
+              </View>
+            </GradientBorderCard>
+          </View>
+        </ScrollView>
+
+        {/* PAGINATION DOTS */}
+        <View style={styles.dotsContainer}>
+          <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
+          <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
         </View>
       </ScrollView>
-
-      {/* PAGINATION DOTS */}
-      <View style={styles.dotsContainer}>
-        <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
-        <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
-      </View>
-    </ScrollView>
-    <WeightModal
-      visible={weightModalVisible}
-      newWeight={newWeight}
-      onChangeText={handleWeightChange}
-      onCancel={handleModalCancel}
-      onSave={handleModalSave}
-      isImperialUnits={isImperialUnits}
-    />
-    <WelcomePremiumModal
-      visible={showWelcomeModal}
-      onClose={() => {
-        setShowWelcomeModal(false);
-        markWelcomeModalShown();
-      }}
-    />
-  </SafeAreaView>
-);
+      <WeightModal
+        visible={weightModalVisible}
+        newWeight={newWeight}
+        onChangeText={handleWeightChange}
+        onCancel={handleModalCancel}
+        onSave={handleModalSave}
+        isImperialUnits={isImperialUnits}
+      />
+      <WelcomePremiumModal
+        visible={showWelcomeModal}
+        onClose={() => {
+          setShowWelcomeModal(false);
+          markWelcomeModalShown();
+        }}
+      />
+    </SafeAreaView>
+  );
 }
 
 /************************************
