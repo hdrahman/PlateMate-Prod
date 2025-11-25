@@ -80,7 +80,7 @@ const requestAllPermissions = async (showRationale: boolean = true): Promise<boo
             PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
             'android.permission.ACTIVITY_RECOGNITION',
             PermissionsAndroid.PERMISSIONS.BODY_SENSORS
-        ];
+        ] as any;
 
         const results = await PermissionsAndroid.requestMultiple(permissions);
 
@@ -252,7 +252,11 @@ export default function StepTrackingSettings() {
         try {
             if (enabled) {
                 // Check if user has seen the permission explanation modal
-                const hasSeenExplanation = await AsyncStorage.getItem('step_tracking_permission_explained');
+                let hasSeenExplanation = null;
+                if (user?.uid) {
+                    const permissionKey = `step_tracking_permission_explained_${user.uid}`;
+                    hasSeenExplanation = await AsyncStorage.getItem(permissionKey);
+                }
 
                 if (!hasSeenExplanation) {
                     // Show the permission explanation modal first
@@ -333,7 +337,10 @@ export default function StepTrackingSettings() {
     const handleEnableTrackingFromModal = async () => {
         try {
             // Mark that user has seen the explanation (do this while modal is still visible)
-            await AsyncStorage.setItem('step_tracking_permission_explained', 'true');
+            if (user?.uid) {
+                const permissionKey = `step_tracking_permission_explained_${user.uid}`;
+                await AsyncStorage.setItem(permissionKey, 'true');
+            }
         } catch (error) {
             // Log the error but don't block step tracking - the flag is just to prevent showing modal again
             console.error('❌ Error saving permission modal flag:', error);

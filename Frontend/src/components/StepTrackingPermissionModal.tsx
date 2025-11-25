@@ -6,159 +6,121 @@ import {
     Modal,
     TouchableOpacity,
     ScrollView,
+    Dimensions,
     Platform
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 interface StepTrackingPermissionModalProps {
     visible: boolean;
-    onEnableTracking: () => void;
-    onSkip: () => void;
+    onEnableTracking: () => void | Promise<void>;
+    onSkip: () => void | Promise<void>;
 }
 
 const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = ({
     visible,
     onEnableTracking,
-    onSkip
+    onSkip,
 }) => {
+    const handleRequestClose = () => {
+        Promise.resolve(onSkip()).catch((error) => {
+            console.error('Error in onSkip callback (back button):', error);
+        });
+    };
+
     return (
         <Modal
             visible={visible}
-            transparent={true}
+            transparent
             animationType="fade"
-            onRequestClose={onSkip}
+            onRequestClose={handleRequestClose}
         >
             <View style={styles.overlay}>
                 <View style={styles.modalContainer}>
-                    <ScrollView
-                        style={styles.scrollView}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                    >
-                        {/* Header Icon */}
-                        <View style={styles.iconContainer}>
-                            <LinearGradient
-                                colors={['#FF00F5', '#00D9FF']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.iconGradient}
-                            >
-                                <Ionicons name="walk" size={48} color="#fff" />
-                            </LinearGradient>
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Enable Step Tracking</Text>
+                    </View>
+
+                    <Text style={styles.subtitle}>
+                        Track your daily steps automatically to stay motivated.
+                    </Text>
+
+                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                        {/* Info Section - Privacy/Data Usage */}
+                        <View style={styles.infoBox}>
+                            <Ionicons name="shield-checkmark-outline" size={20} color="#00D9FF" />
+                            <Text style={styles.infoText}>
+                                PlateMate uses your device's Motion & Fitness sensors to track steps.
+                                {'\n\n'}
+                                This data is used solely for your fitness goals. It is stored securely and never shared with third parties.
+                            </Text>
                         </View>
 
-                        {/* Title */}
-                        <Text style={styles.title}>Step Tracking Feature</Text>
-
-                        {/* Description */}
-                        <Text style={styles.description}>
-                            Track your daily steps automatically to stay motivated and reach your fitness goals.
-                        </Text>
-
-                        {/* How It Works Section */}
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>How It Works:</Text>
-
-                            <View style={styles.featureItem}>
-                                <View style={styles.featureIcon}>
-                                    <Ionicons name="phone-portrait-outline" size={20} color="#FF00F5" />
+                        {/* Feature Card 1: How it works */}
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureHeader}>
+                                <View style={styles.featureIconContainer}>
+                                    <Ionicons name="walk" size={24} color="#FF00F5" />
                                 </View>
-                                <Text style={styles.featureText}>
-                                    Uses your device's Motion & Fitness sensors
-                                </Text>
+                                <Text style={styles.featureTitle}>Automatic Tracking</Text>
                             </View>
-
-                            <View style={styles.featureItem}>
-                                <View style={styles.featureIcon}>
-                                    <Ionicons name="refresh-outline" size={20} color="#FF00F5" />
-                                </View>
-                                <Text style={styles.featureText}>
-                                    Counts steps automatically throughout the day
-                                </Text>
-                            </View>
-
-                            <View style={styles.featureItem}>
-                                <View style={styles.featureIcon}>
-                                    <Ionicons name="time-outline" size={20} color="#FF00F5" />
-                                </View>
-                                <Text style={styles.featureText}>
-                                    Works in the background while app is closed
-                                </Text>
-                            </View>
-
-                            <View style={styles.featureItem}>
-                                <View style={styles.featureIcon}>
-                                    <Ionicons name="lock-closed-outline" size={20} color="#FF00F5" />
-                                </View>
-                                <Text style={styles.featureText}>
-                                    Data stored privately and securely
-                                </Text>
-                            </View>
+                            <Text style={styles.featureDescription}>
+                                • Counts steps in the background{'\n'}
+                                • Works while phone is in your pocket{'\n'}
+                                • Low battery usage
+                            </Text>
                         </View>
 
-                        {/* Technical Details Section */}
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Technical Details:</Text>
-                            <Text style={styles.technicalText}>
+                        {/* Feature Card 2: Technical */}
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureHeader}>
+                                <View style={styles.featureIconContainer}>
+                                    <Ionicons name="hardware-chip-outline" size={24} color="#00D9FF" />
+                                </View>
+                                <Text style={styles.featureTitle}>Device Sensors</Text>
+                            </View>
+                            <Text style={styles.featureDescription}>
                                 {Platform.OS === 'ios'
-                                    ? '• iOS: Uses Core Motion (CMPedometer) API'
-                                    : '• Android: Uses built-in step counter sensor'}
-                            </Text>
-                            <Text style={styles.technicalText}>
-                                • Does NOT access HealthKit or health records
-                            </Text>
-                            <Text style={styles.technicalText}>
-                                • Only reads step count data from motion sensors
-                            </Text>
-                            <Text style={styles.technicalText}>
-                                • Data used solely for fitness tracking features
+                                    ? '• Uses Core Motion (CMPedometer)\n• No HealthKit access required'
+                                    : '• Uses built-in step counter\n• No extra permissions needed'}
                             </Text>
                         </View>
 
-                        {/* Permission Required Section */}
-                        <View style={styles.permissionBox}>
-                            <Ionicons name="information-circle" size={24} color="#00D9FF" style={styles.permissionIcon} />
-                            <View style={styles.permissionTextContainer}>
-                                <Text style={styles.permissionTitle}>Permission Required</Text>
-                                <Text style={styles.permissionText}>
-                                    {Platform.OS === 'ios'
-                                        ? 'iOS will ask for "Motion & Fitness" access to read step count data from your device\'s motion sensors.'
-                                        : 'Android will ask for "Physical Activity" permission to access your device\'s step counter sensor.'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        {/* Privacy Notice */}
-                        <Text style={styles.privacyNotice}>
-                            Your step data is stored privately on your device and our secure servers.
-                            We never share your data with third parties without your explicit consent.
-                        </Text>
                     </ScrollView>
 
                     {/* Action Buttons */}
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity
-                            style={styles.enableButton}
-                            onPress={onEnableTracking}
-                            activeOpacity={0.8}
+                            style={styles.cancelButton}
+                            onPress={() => {
+                                Promise.resolve(onSkip()).catch((error) => {
+                                    console.error('Error in onSkip callback:', error);
+                                });
+                            }}
+                        >
+                            <Text style={styles.cancelButtonText}>Don't track my steps</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.confirmButton}
+                            onPress={() => {
+                                Promise.resolve(onEnableTracking()).catch((error) => {
+                                    console.error('Error in onEnableTracking callback:', error);
+                                });
+                            }}
                         >
                             <LinearGradient
-                                colors={['#FF00F5', '#00D9FF']}
+                                colors={['#0074dd', '#5c00dd', '#dd0095']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
-                                style={styles.enableButtonGradient}
+                                style={styles.confirmButtonGradient}
                             >
-                                <Text style={styles.enableButtonText}>Enable Step Tracking</Text>
+                                <Text style={styles.confirmButtonText}>Enable Step Tracking</Text>
+                                <Ionicons name="arrow-forward" size={20} color="#fff" />
                             </LinearGradient>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.skipButton}
-                            onPress={onSkip}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.skipButtonText}>Skip for Now</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -178,148 +140,120 @@ const styles = StyleSheet.create({
     modalContainer: {
         backgroundColor: '#1a1a1a',
         borderRadius: 20,
-        width: '100%',
-        maxWidth: 500,
-        maxHeight: '90%',
-        borderWidth: 1,
-        borderColor: '#333',
+        width: Math.min(width - 40, 500),
+        maxHeight: '85%',
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        padding: 24,
-    },
-    iconContainer: {
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
-    },
-    iconGradient: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingTop: 24,
+        paddingBottom: 12,
     },
     title: {
-        fontSize: 26,
-        fontWeight: 'bold',
+        fontSize: 24,
+        fontWeight: '700',
         color: '#fff',
-        textAlign: 'center',
-        marginBottom: 12,
-    },
-    description: {
-        fontSize: 16,
-        color: '#bbb',
-        textAlign: 'center',
-        marginBottom: 24,
-        lineHeight: 22,
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#fff',
-        marginBottom: 12,
-    },
-    featureItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    featureIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 0, 245, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    featureText: {
         flex: 1,
-        fontSize: 15,
-        color: '#ddd',
-        lineHeight: 20,
     },
-    technicalText: {
-        fontSize: 14,
-        color: '#999',
-        marginBottom: 6,
-        lineHeight: 20,
+    subtitle: {
+        fontSize: 16,
+        color: '#aaa',
+        paddingHorizontal: 24,
+        marginBottom: 20,
     },
-    permissionBox: {
+    content: {
+        paddingHorizontal: 24,
+        maxHeight: 500,
+    },
+    infoBox: {
         flexDirection: 'row',
         backgroundColor: 'rgba(0, 217, 255, 0.1)',
         borderRadius: 12,
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 20,
         borderWidth: 1,
         borderColor: 'rgba(0, 217, 255, 0.3)',
     },
-    permissionIcon: {
-        marginRight: 12,
-        marginTop: 2,
-    },
-    permissionTextContainer: {
+    infoText: {
         flex: 1,
-    },
-    permissionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#00D9FF',
-        marginBottom: 6,
-    },
-    permissionText: {
         fontSize: 14,
-        color: '#bbb',
+        color: '#00D9FF',
+        marginLeft: 12,
         lineHeight: 20,
     },
-    privacyNotice: {
-        fontSize: 13,
-        color: '#888',
-        textAlign: 'center',
-        lineHeight: 18,
-        fontStyle: 'italic',
-    },
-    buttonContainer: {
+    featureCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 16,
         padding: 20,
-        paddingTop: 0,
-        gap: 12,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
-    enableButton: {
-        borderRadius: 12,
-        overflow: 'hidden',
+    featureHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
     },
-    enableButtonGradient: {
-        paddingVertical: 16,
+    featureIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
+        marginRight: 12,
     },
-    enableButtonText: {
+    featureTitle: {
+        fontSize: 18,
+        fontWeight: '600',
         color: '#fff',
-        fontSize: 17,
-        fontWeight: 'bold',
     },
-    skipButton: {
+    featureDescription: {
+        fontSize: 14,
+        color: '#bbb',
+        lineHeight: 22,
+    },
+    buttonContainer: {
+        flexDirection: 'column', // Stacked buttons for better touch targets on mobile
+        padding: 24,
+        paddingTop: 16,
+        gap: 12,
+    },
+    cancelButton: {
+        width: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderWidth: 1,
-        borderColor: '#333',
     },
-    skipButtonText: {
-        color: '#999',
+    cancelButtonText: {
+        color: '#aaa',
         fontSize: 16,
         fontWeight: '600',
+    },
+    confirmButton: {
+        width: '100%',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    confirmButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        gap: 8,
+    },
+    confirmButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
     },
 });
 
 export default StepTrackingPermissionModal;
-
-

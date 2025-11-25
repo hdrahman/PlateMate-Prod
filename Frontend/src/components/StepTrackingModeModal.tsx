@@ -68,9 +68,11 @@ const StepTrackingModeModal: React.FC<StepTrackingModeModalProps> = ({
                             <View style={styles.infoBox}>
                                 <Ionicons name="bulb-outline" size={20} color="#FFA726" />
                                 <Text style={styles.infoText}>
-                                    This setting determines how your step count affects your daily calorie goal and macros.
-                                    Choose "Steps + Calories" for dynamic calorie adjustments based on your activity, 
-                                    or "Steps Only" if you prefer a fixed calorie goal.
+                                    To help you reach your fitness goals, PlateMate uses your device's Motion & Fitness sensors (Pedometer) to track your daily step count.
+                                    {'\n\n'}
+                                    This data is used solely for displaying your activity progress and calculating calorie adjustments. Your step data is stored securely and is never shared with third parties for marketing purposes.
+                                    {'\n\n'}
+                                    You can choose how this data affects your nutrition goals below.
                                 </Text>
                             </View>
                         )}
@@ -98,7 +100,7 @@ const StepTrackingModeModal: React.FC<StepTrackingModeModalProps> = ({
                                 )}
                             </View>
                             <Text style={styles.optionDescription}>
-                                Your steps add bonus calories to your daily goal. We'll use a sedentary base for calories 
+                                Your steps add bonus calories to your daily goal. We'll use a sedentary base for calories
                                 but calculate protein and macros based on your actual activity level for optimal nutrition.
                             </Text>
                             <View style={styles.exampleBox}>
@@ -135,7 +137,7 @@ const StepTrackingModeModal: React.FC<StepTrackingModeModalProps> = ({
                                 )}
                             </View>
                             <Text style={styles.optionDescription}>
-                                Track steps for motivation and progress tracking only. Your calories and macros are based 
+                                Track steps for motivation and progress tracking only. Your calories and macros are based
                                 on your selected activity level, without step-based adjustments to your daily goal.
                             </Text>
                             <View style={styles.exampleBox}>
@@ -152,6 +154,7 @@ const StepTrackingModeModal: React.FC<StepTrackingModeModalProps> = ({
                             </View>
                         </TouchableOpacity>
                     </ScrollView>
+
 
                     {/* Action Buttons */}
                     <View style={styles.buttonContainer}>
@@ -171,8 +174,8 @@ const StepTrackingModeModal: React.FC<StepTrackingModeModalProps> = ({
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
-        </Modal>
+            </View >
+        </Modal >
     );
 };
 

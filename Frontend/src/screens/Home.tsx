@@ -25,6 +25,9 @@ import {
 } from '../utils/database';
 import { useOnboarding } from '../context/OnboardingContext';
 import WelcomePremiumModal from '../components/WelcomePremiumModal';
+import StepTrackingPermissionModal from '../components/StepTrackingPermissionModal';
+import UnifiedStepTracker from '../services/UnifiedStepTracker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import TrialCountdown from '../components/TrialCountdown';
 
 import {
@@ -241,6 +244,15 @@ export default function Home() {
   const SVG_SIZE = CIRCLE_SIZE + (SVG_PADDING * 2);
   const radius = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 
+  // Use the step context instead of the hook directly
+  const {
+    todaySteps,
+    stepHistory,
+    isAvailable,
+    loading: stepsLoading,
+    refreshStepData
+  } = useSteps();
+
   // Date change detection for midnight rollover
   useEffect(() => {
     const formatDateToString = (date: Date): string => {
@@ -321,14 +333,7 @@ export default function Home() {
   // Macros loading state
   const [macrosLoading, setMacrosLoading] = useState(true);
 
-  // Use the step context instead of the hook directly
-  const {
-    todaySteps,
-    stepHistory,
-    isAvailable,
-    loading: stepsLoading,
-    refreshStepData
-  } = useSteps();
+
 
   // Add state for weight history
   const [weightHistory, setWeightHistory] = useState<Array<{ date: string; weight: number }>>([]);
@@ -343,7 +348,7 @@ export default function Home() {
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [weightLost, setWeightLost] = useState(0);
   const [weightGoal, setWeightGoal] = useState<string>('maintain'); // Add state for weight goal
-  
+
   // Add state for step tracking mode
   const [stepTrackingMode, setStepTrackingMode] = useState<'disabled' | 'with_calories' | 'without_calories'>('disabled');
 
@@ -365,6 +370,22 @@ export default function Home() {
 
   // Add state for welcome modal
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+
+  // Add state for step tracking permission modal
+  const [showStepPermissionModal, setShowStepPermissionModal] = useState(false);
+
+  // Ref to track setTimeout for showing step permission modal
+  const stepPermissionModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => {
+      if (stepPermissionModalTimeoutRef.current) {
+        clearTimeout(stepPermissionModalTimeoutRef.current);
+        stepPermissionModalTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Load user profile and calculate nutrition goals
   useEffect(() => {
@@ -1715,9 +1736,79 @@ export default function Home() {
       />
       <WelcomePremiumModal
         visible={showWelcomeModal}
-        onClose={() => {
+        onClose={async () => {
+          console.log('🔒 WelcomePremiumModal onClose triggered');
           setShowWelcomeModal(false);
           markWelcomeModalShown();
+
+          // Check if we need to show step tracking permission modal
+          try {
+            if (user?.uid) {
+              const permissionKey = `step_tracking_permission_explained_${user.uid}`;
+              const hasSeenExplanation = await AsyncStorage.getItem(permissionKey);
+              console.log(`🔍 Checking step permission status for user ${user.uid}:`, hasSeenExplanation);
+
+              if (!hasSeenExplanation) {
+                console.log('✨ User has not seen explanation, scheduling modal...');
+                // Small delay to make the transition smooth
+                // Clear any existing timeout first
+                if (stepPermissionModalTimeoutRef.current) {
+                  clearTimeout(stepPermissionModalTimeoutRef.current);
+                }
+                stepPermissionModalTimeoutRef.current = setTimeout(() => {
+                  console.log('🚀 Showing StepTrackingPermissionModal now');
+                  setShowStepPermissionModal(true);
+                  stepPermissionModalTimeoutRef.current = null;
+                }, 500);
+              } else {
+                console.log('ℹ️ User has already seen explanation, skipping modal');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error checking step permission status:', error);
+          }
+        }}
+      />
+
+      <StepTrackingPermissionModal
+        visible={showStepPermissionModal}
+        onSkip={async () => {
+          setShowStepPermissionModal(false);
+          // Mark as explained so we don't show it again
+          try {
+            if (user?.uid) {
+              const permissionKey = `step_tracking_permission_explained_${user.uid}`;
+              await AsyncStorage.setItem(permissionKey, 'true');
+            }
+          } catch (error) {
+            console.error('Error saving step permission preference:', error);
+          }
+        }}
+        onEnableTracking={async () => {
+          setShowStepPermissionModal(false);
+          // Mark as explained
+          try {
+            if (user?.uid) {
+              const permissionKey = `step_tracking_permission_explained_${user.uid}`;
+              await AsyncStorage.setItem(permissionKey, 'true');
+            }
+          } catch (error) {
+            console.error('Error saving step permission preference:', error);
+          }
+
+          // Start tracking
+          try {
+            // UnifiedStepTracker is exported as an instance
+            await UnifiedStepTracker.startTracking();
+
+            // Refresh step data
+            if (refreshStepData) {
+              await refreshStepData();
+            }
+          } catch (error) {
+            console.error('Error enabling step tracking:', error);
+            Alert.alert('Error', 'Failed to enable step tracking. Please try again in Settings.');
+          }
         }}
       />
     </SafeAreaView>

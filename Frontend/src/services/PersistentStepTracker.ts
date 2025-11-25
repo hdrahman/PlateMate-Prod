@@ -11,18 +11,18 @@ let BackgroundService: any = null;
 
 // Detect if we're running in Expo Go BEFORE trying to require native modules
 const isExpoGo = Constants?.executionEnvironment === 'storeClient' ||
-                 Constants?.appOwnership === 'expo';
+    Constants?.appOwnership === 'expo';
 
 if (!isExpoGo) {
-  try {
-    BackgroundService = require('react-native-background-actions').default;
-    console.log('✅ react-native-background-actions loaded');
-  } catch (error) {
-    console.log('⚠️ react-native-background-actions not available (Expo Go mode)');
-    BackgroundService = null;
-  }
+    try {
+        BackgroundService = require('react-native-background-actions').default;
+        console.log('✅ react-native-background-actions loaded');
+    } catch (error) {
+        console.log('⚠️ react-native-background-actions not available (Expo Go mode)');
+        BackgroundService = null;
+    }
 } else {
-  console.log('Expo Go detected - background actions disabled');
+    console.log('Expo Go detected - background actions disabled');
 }
 
 // Keys for AsyncStorage
@@ -48,7 +48,7 @@ const isDatabaseReady = async (): Promise<boolean> => {
 
 class PersistentStepTracker {
     private static instance: PersistentStepTracker;
-    private isServiceRunning: boolean = false;
+    private _isServiceRunning: boolean = false;
     private syncInterval: number = 30000; // 30 seconds for better responsiveness
     private lastKnownStepCount: number = 0;
     private retryAttempts: number = 0;
@@ -58,7 +58,7 @@ class PersistentStepTracker {
     private consecutiveErrors: number = 0;
     private maxConsecutiveErrors: number = 5;
 
-    private constructor() {}
+    private constructor() { }
 
     public static getInstance(): PersistentStepTracker {
         if (!PersistentStepTracker.instance) {
@@ -91,18 +91,18 @@ class PersistentStepTracker {
                         console.log('📴 Background service stopped, exiting loop');
                         break;
                     }
-                    
+
                     await this.syncStepsInBackground();
                     console.log('📊 Background sync completed, sleeping for', delay, 'ms');
                 } catch (error) {
                     console.error('❌ Background step sync error:', error);
                     // Continue running even if sync fails
                 }
-                
+
                 // Always sleep, even if sync fails
                 await this.sleep(delay);
             }
-            
+
             console.log('🔴 Persistent step tracking service stopped');
         } catch (error) {
             console.error('❌ Critical error in background step task:', error);
@@ -123,7 +123,7 @@ class PersistentStepTracker {
     private async syncStepsInBackground(): Promise<void> {
         try {
             console.log('🔄 Starting background step sync...');
-            
+
             // Check if database is ready before attempting sync
             const dbReady = await isDatabaseReady();
             if (!dbReady) {
@@ -133,16 +133,16 @@ class PersistentStepTracker {
 
             const today = new Date().toISOString().split('T')[0];
             const lastSyncDate = await AsyncStorage.getItem(LAST_BACKGROUND_SYNC_DATE_KEY);
-            
+
             // Check if we need to reset for a new day
             if (lastSyncDate !== today) {
                 console.log('📅 New day detected in background service, performing midnight reset');
-                
+
                 // Reset step count and cached data
                 this.lastKnownStepCount = 0;
                 await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, '0');
                 await AsyncStorage.setItem(LAST_BACKGROUND_SYNC_DATE_KEY, today);
-                
+
                 // Reset sensor baselines for consistent midnight reset
                 if (Platform.OS === 'android') {
                     try {
@@ -153,14 +153,14 @@ class PersistentStepTracker {
                         console.error('❌ Failed to reset Android baseline in background:', error);
                     }
                 }
-                
+
                 console.log('✅ Background midnight reset completed for:', today);
             }
 
             // Get the most up-to-date step count from various sources
             // This ensures consistency with the main app's step count
             let currentSteps = this.lastKnownStepCount;
-            
+
             try {
                 // Get the most up-to-date step count from various sources
                 const [dbSteps, mainTrackerSteps, sensorSteps] = await Promise.all([
@@ -171,48 +171,48 @@ class PersistentStepTracker {
                     // Direct sensor reading (as fallback)
                     this.getSensorSteps().catch(() => 0)
                 ]);
-                
+
                 // Use the highest value to avoid losing steps
                 currentSteps = Math.max(dbSteps, mainTrackerSteps, sensorSteps, this.lastKnownStepCount);
-                
+
                 console.log(`📊 Step sync sources - DB: ${dbSteps}, MainTracker: ${mainTrackerSteps}, Sensor: ${sensorSteps}, Using: ${currentSteps}`);
             } catch (error) {
                 console.warn('⚠️ Error getting step counts from sources, using last known:', error);
             }
-            
+
             // Always attempt to sync even if no change (in case previous sync failed)
             const stepChange = Math.abs(currentSteps - this.lastKnownStepCount);
-            
+
             if (stepChange > 0 || this.consecutiveErrors > 0) {
                 // Try to update database with error handling
                 try {
                     await updateTodaySteps(currentSteps);
                     console.log(`📊 Background sync: ${currentSteps} steps updated in database`);
-                    
+
                     // Reset error count on successful sync
                     this.consecutiveErrors = 0;
                 } catch (dbError) {
                     console.warn('⚠️ Database update failed in background:', dbError);
                     this.consecutiveErrors++;
-                    
+
                     // If too many consecutive errors, reduce sync frequency
                     if (this.consecutiveErrors >= 3) {
                         console.warn('⚠️ Multiple sync failures, reducing sync frequency');
                         this.syncInterval = Math.min(this.syncInterval * 1.5, 300000); // Max 5 minutes
                     }
                 }
-                
+
                 this.lastKnownStepCount = currentSteps;
                 await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, currentSteps.toString());
-                
+
                 console.log(`📊 Background sync completed: ${currentSteps} steps updated (+${stepChange})`);
             } else {
                 console.log('📊 No step count change detected');
             }
-            
+
             // Always update the notification with the latest step count
             await this.updateNotification(currentSteps);
-            
+
         } catch (error) {
             console.error('❌ Error in background step sync:', error);
             // Don't throw error to keep the background service running
@@ -231,7 +231,7 @@ class PersistentStepTracker {
                     console.log('⚠️ Native step counter not available');
                     return 0;
                 }
-                
+
                 const steps = await NativeStepCounter.getCurrentSteps();
                 console.log(`🤖 Android native sensor steps: ${steps}`);
                 return steps;
@@ -246,7 +246,7 @@ class PersistentStepTracker {
                 // Get steps from midnight until now (iOS only)
                 const sinceMidnight = new Date();
                 sinceMidnight.setHours(0, 0, 0, 0);
-                
+
                 const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
                 console.log(`🍎 iOS pedometer steps: ${result.steps}`);
                 return result.steps;
@@ -268,7 +268,7 @@ class PersistentStepTracker {
 
         try {
             // Only update if the service is actually running
-            if (!this.isServiceRunning || !BackgroundService.isRunning()) {
+            if (!this._isServiceRunning || !BackgroundService.isRunning()) {
                 console.log('⚠️ Background service not running, skipping notification update');
                 return;
             }
@@ -287,7 +287,7 @@ class PersistentStepTracker {
                     type: 'mipmap',
                 },
             });
-            
+
             // Update foreground service notification with detailed info
             try {
                 await StepNotificationService.updateNotification(steps);
@@ -296,15 +296,15 @@ class PersistentStepTracker {
                 console.log(`📱 Background notification updated: ${formattedSteps} steps`);
                 console.warn('⚠️ Foreground service notification update failed:', fgError);
             }
-            
+
         } catch (error) {
             console.error('❌ Error updating notification:', error);
-            
+
             // If notification update fails, the service might have been killed
             // Mark as not running so it can be restarted
             if (error.message && error.message.includes('not running')) {
                 console.warn('⚠️ Background service appears to have stopped, marking as not running');
-                this.isServiceRunning = false;
+                this._isServiceRunning = false;
             }
         }
     }
@@ -319,7 +319,7 @@ class PersistentStepTracker {
         }
 
         try {
-            if (this.isServiceRunning) {
+            if (this._isServiceRunning) {
                 console.log('ℹ️ Persistent step tracking already running');
                 return;
             }
@@ -332,7 +332,7 @@ class PersistentStepTracker {
                     console.error('❌ Native step counter not available - cannot start persistent tracking');
                     return;
                 }
-                
+
                 // Initialize native step counter
                 console.log('🚀 Starting native step counter...');
                 const started = await NativeStepCounter.startStepCounting();
@@ -383,23 +383,23 @@ class PersistentStepTracker {
             try {
                 // Add a small delay before starting the service to ensure app is fully ready
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                
+
                 await BackgroundService.start(this.backgroundStepTask, options);
-                this.isServiceRunning = true;
-                
+                this._isServiceRunning = true;
+
                 // Mark as enabled in storage
                 await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'true');
-                
+
                 // Start heartbeat to keep service alive - temporarily disabled
                 // this.startHeartbeat();
-                
+
                 console.log('✅ Persistent step tracking service started');
             } catch (startError) {
                 console.error('❌ Failed to start background service:', startError);
-                
+
                 // Enhanced error handling for Android 14+ compatibility issues
                 if (startError.message) {
-                    if (startError.message.includes('ForegroundService') || 
+                    if (startError.message.includes('ForegroundService') ||
                         startError.message.includes('foreground service') ||
                         startError.message.includes('FOREGROUND_SERVICE') ||
                         startError.message.includes('PendingIntent') ||
@@ -407,36 +407,36 @@ class PersistentStepTracker {
                         startError.message.includes('SDK_INT >= 34')) {
                         console.error('❌ Android 14+ compatibility error - foreground service restrictions');
                         // Don't throw error, just log and continue without persistent tracking
-                        this.isServiceRunning = false;
+                        this._isServiceRunning = false;
                         await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
                         console.warn('⚠️ Continuing without persistent step tracking due to Android 14+ restrictions');
-                        
+
                         // Continue without persistent tracking on Android 14+
                         console.warn('⚠️ Background service not available on this Android version');
                         return;
                     }
-                    
-                    if (startError.message.includes('permission') || 
+
+                    if (startError.message.includes('permission') ||
                         startError.message.includes('Permission')) {
                         console.error('❌ Permission error for background service');
-                        this.isServiceRunning = false;
+                        this._isServiceRunning = false;
                         await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
                         console.warn('⚠️ Continuing without persistent step tracking due to permission restrictions');
                         return;
                     }
                 }
-                
+
                 // For other errors, still don't crash the app
                 console.error('❌ Unknown error starting background service:', startError);
-                this.isServiceRunning = false;
+                this._isServiceRunning = false;
                 await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
                 console.warn('⚠️ Continuing without persistent step tracking due to unknown error');
                 return;
             }
         } catch (error) {
             console.error('❌ Failed to start persistent step tracking:', error);
-            this.isServiceRunning = false;
-            
+            this._isServiceRunning = false;
+
             // Don't throw error to prevent app crash
             await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
             console.warn('⚠️ Continuing without persistent step tracking');
@@ -453,14 +453,14 @@ class PersistentStepTracker {
         }
 
         try {
-            if (!this.isServiceRunning) {
+            if (!this._isServiceRunning) {
                 console.log('ℹ️ Persistent step tracking not running');
                 return;
             }
 
             await BackgroundService.stop();
-            this.isServiceRunning = false;
-            
+            this._isServiceRunning = false;
+
             // Stop native step counter on Android
             if (Platform.OS === 'android') {
                 try {
@@ -470,13 +470,13 @@ class PersistentStepTracker {
                     console.warn('⚠️ Error stopping native step counter:', error);
                 }
             }
-            
+
             // Mark as disabled in storage
             await AsyncStorage.setItem(PERSISTENT_STEP_SERVICE_KEY, 'false');
-            
+
             // Stop heartbeat - temporarily disabled
             // this.stopHeartbeat();
-            
+
             console.log('✅ Persistent step tracking service stopped');
         } catch (error) {
             console.error('❌ Failed to stop persistent step tracking:', error);
@@ -505,12 +505,12 @@ class PersistentStepTracker {
             return false;
         }
 
-        const actuallyRunning = this.isServiceRunning && BackgroundService.isRunning();
+        const actuallyRunning = this._isServiceRunning && BackgroundService.isRunning();
 
         // If we think it's running but it's actually not, update our state
-        if (this.isServiceRunning && !BackgroundService.isRunning()) {
+        if (this._isServiceRunning && !BackgroundService.isRunning()) {
             console.warn('⚠️ Persistent service state mismatch detected, correcting...');
-            this.isServiceRunning = false;
+            this._isServiceRunning = false;
         }
 
         return actuallyRunning;
@@ -523,13 +523,13 @@ class PersistentStepTracker {
         try {
             const shouldBeRunning = await this.wasPersistentTrackingEnabled();
             const isActuallyRunning = this.isPersistentTrackingRunning();
-            
+
             if (shouldBeRunning && !isActuallyRunning) {
                 console.log('🔄 Persistent service should be running but isn\'t, restarting...');
                 await this.startPersistentTrackingWithRetry();
                 return true;
             }
-            
+
             return false;
         } catch (error) {
             console.error('❌ Error checking/restarting persistent service:', error);
@@ -569,9 +569,9 @@ class PersistentStepTracker {
     public async forceSyncSteps(): Promise<number> {
         try {
             console.log('🔄 Forcing immediate step sync...');
-            
+
             let currentSteps = this.lastKnownStepCount;
-            
+
             // Get current steps from appropriate sensor
             if (Platform.OS === 'android') {
                 try {
@@ -586,7 +586,7 @@ class PersistentStepTracker {
                 try {
                     const sinceMidnight = new Date();
                     sinceMidnight.setHours(0, 0, 0, 0);
-                    
+
                     const result = await Pedometer.getStepCountAsync(sinceMidnight, new Date());
                     currentSteps = result.steps;
                     console.log(`📊 iOS force sync: ${currentSteps} steps from sensor`);
@@ -594,12 +594,12 @@ class PersistentStepTracker {
                     console.warn('⚠️ iOS sensor reading failed, using cached value:', sensorError);
                 }
             }
-            
+
             // Update database and cache
             await updateTodaySteps(currentSteps);
             this.lastKnownStepCount = currentSteps;
             await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, currentSteps.toString());
-            
+
             console.log(`✅ Force sync completed: ${currentSteps} steps`);
             return currentSteps;
         } catch (error) {
@@ -632,15 +632,15 @@ class PersistentStepTracker {
         try {
             // Wait a bit before first attempt to ensure database is ready
             await this.sleep(2000);
-            
+
             await this.startPersistentTracking();
-            
+
             // Reset retry attempts on success
             this.retryAttempts = 0;
             console.log('✅ Persistent step tracking started successfully');
         } catch (error) {
             console.error('❌ Error in startPersistentTrackingWithRetry:', error);
-            
+
             // Don't retry if it's a known permission/foreground service issue
             if (error.message && (
                 error.message.includes('ForegroundService') ||
@@ -651,11 +651,11 @@ class PersistentStepTracker {
                 console.warn('⚠️ Persistent tracking failed due to system restrictions, not retrying');
                 return;
             }
-            
+
             if (this.retryAttempts < this.maxRetryAttempts) {
                 this.retryAttempts++;
-                console.log(`⏳ Retrying persistent tracking start in ${this.retryDelay/1000}s (attempt ${this.retryAttempts}/${this.maxRetryAttempts})`);
-                
+                console.log(`⏳ Retrying persistent tracking start in ${this.retryDelay / 1000}s (attempt ${this.retryAttempts}/${this.maxRetryAttempts})`);
+
                 setTimeout(() => {
                     this.startPersistentTrackingWithRetry();
                 }, this.retryDelay);
@@ -689,7 +689,7 @@ class PersistentStepTracker {
                     this.consecutiveErrors = 0;
                 } else {
                     console.warn('⚠️ Background service stopped unexpectedly');
-                    this.isServiceRunning = false;
+                    this._isServiceRunning = false;
                 }
             } catch (error) {
                 console.error('❌ Heartbeat error:', error);
@@ -719,20 +719,20 @@ class PersistentStepTracker {
     public async resetDailyBaseline(): Promise<void> {
         try {
             console.log('📅 Resetting daily step baseline...');
-            
+
             if (Platform.OS === 'android') {
                 // Use native Android step counter reset
                 await NativeStepCounter.resetDailyBaseline();
                 console.log('✅ Native Android step baseline reset');
             }
-            
+
             // Reset our internal tracking
             this.lastKnownStepCount = 0;
             await AsyncStorage.setItem(LAST_BACKGROUND_STEP_COUNT_KEY, '0');
-            
+
             const today = new Date().toISOString().split('T')[0];
             await AsyncStorage.setItem(LAST_BACKGROUND_SYNC_DATE_KEY, today);
-            
+
             console.log('✅ Daily step baseline reset completed');
         } catch (error) {
             console.error('❌ Error resetting daily baseline:', error);
@@ -744,10 +744,10 @@ class PersistentStepTracker {
      */
     public async startService(): Promise<void> {
         console.log('🚀 Starting persistent step tracking service...');
-        
+
         // Start the background service
         await this.startPersistentTrackingWithRetry();
-        
+
         // Start the Notifee foreground service notification
         try {
             const currentSteps = await this.getLastBackgroundStepCount();
@@ -764,10 +764,10 @@ class PersistentStepTracker {
      */
     public async stopService(): Promise<void> {
         console.log('🛑 Stopping persistent step tracking service...');
-        
+
         // Stop the background service
         await this.stopPersistentTracking();
-        
+
         // Stop the Notifee foreground service
         try {
             await StepNotificationService.stopForegroundService();

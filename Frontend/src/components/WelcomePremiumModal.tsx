@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -13,18 +13,45 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface WelcomePremiumModalProps {
     visible: boolean;
-    onClose: () => void;
+    onClose: () => void | Promise<void>;
 }
 
 const { width, height } = Dimensions.get('window');
 
 const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onClose }) => {
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    // Reset processing state when modal becomes visible
+    useEffect(() => {
+        if (visible) {
+            setIsProcessing(false);
+        }
+    }, [visible]);
+
+    const handleRequestClose = () => {
+        if (isProcessing) return;
+        setIsProcessing(true);
+        Promise.resolve(onClose()).catch((error) => {
+            console.error('Error in onClose callback (back button):', error);
+            setIsProcessing(false); // Reset on error
+        });
+    };
+
+    const handleButtonPress = () => {
+        if (isProcessing) return;
+        setIsProcessing(true);
+        Promise.resolve(onClose()).catch((error) => {
+            console.error('Error in onClose callback:', error);
+            setIsProcessing(false); // Reset on error
+        });
+    };
+
     return (
         <Modal
             visible={visible}
             transparent={true}
             animationType="fade"
-            onRequestClose={onClose}
+            onRequestClose={handleRequestClose}
         >
             <View style={styles.overlay}>
                 <View style={styles.modalContainer}>
@@ -106,17 +133,29 @@ const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onCl
                         </View>
 
                         <TouchableOpacity
-                            style={styles.startButton}
-                            onPress={onClose}
+                            style={[styles.startButton, isProcessing && styles.startButtonDisabled]}
+                            onPress={handleButtonPress}
+                            disabled={isProcessing}
+                            activeOpacity={isProcessing ? 1 : 0.7}
                         >
                             <LinearGradient
-                                colors={['#0074dd', '#5c00dd', '#dd0095']}
+                                colors={isProcessing 
+                                    ? ['#666', '#666', '#666'] 
+                                    : ['#0074dd', '#5c00dd', '#dd0095']
+                                }
                                 style={styles.startButtonGradient}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                             >
-                                <Text style={styles.startButtonText}>Start My Journey</Text>
-                                <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.startButtonIcon} />
+                                <Text style={styles.startButtonText}>
+                                    {isProcessing ? 'Starting...' : 'Start My Journey'}
+                                </Text>
+                                <Ionicons 
+                                    name="arrow-forward" 
+                                    size={20} 
+                                    color={isProcessing ? '#999' : '#fff'} 
+                                    style={styles.startButtonIcon} 
+                                />
                             </LinearGradient>
                         </TouchableOpacity>
 
@@ -253,6 +292,9 @@ const styles = StyleSheet.create({
     },
     startButton: {
         marginBottom: 16,
+    },
+    startButtonDisabled: {
+        opacity: 0.6,
     },
     startButtonGradient: {
         paddingVertical: 16,
