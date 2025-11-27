@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -45,6 +46,7 @@ interface PlanOption {
 const PremiumSubscription = () => {
     const navigation = useNavigation();
     const { user } = useAuth();
+    const { subscription, refreshSubscription } = useSubscription();
     const insets = useSafeAreaInsets();
     const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -52,15 +54,6 @@ const PremiumSubscription = () => {
     const [revenueCatOfferings, setRevenueCatOfferings] = useState<PurchasesOffering | null>(null);
     const [fadeAnim] = useState(new Animated.Value(0));
     const [slideAnim] = useState(new Animated.Value(50));
-
-    // Current plan status for prominent display - IMPROVED UX
-    const [currentPlanInfo, setCurrentPlanInfo] = useState<{
-        planName: string;
-        isActive: boolean;
-        statusText: string;
-        statusColor: string;
-        showUpgradePrompt: boolean;
-    } | null>(null);
 
     // Premium features that apply to both plans
     const premiumFeatures = [
@@ -100,104 +93,64 @@ const PremiumSubscription = () => {
         }
     ];
 
-    useEffect(() => {
-        const loadSubscriptionData = async () => {
-            try {
-                if (user?.uid) {
-                    // FAST PATH: Use cached subscription data (instant display, no loading)
-                    // SubscriptionService cache is already populated during app launch in AuthContext
+    // Derive current plan info from subscription context (auto-updates)
+    const currentPlanInfo = React.useMemo(() => {
+        const tier = subscription.tier;
 
-                    // Get subscription tier from cache (VIP, premium, trial, or free)
-                    const tier = await SubscriptionService.getSubscriptionTier();
+        if (tier === 'vip_lifetime') {
+            return {
+                planName: 'VIP Lifetime Access',
+                isActive: true,
+                statusText: 'VIP Member • Lifetime Access',
+                statusColor: '#FFD700',
+                showUpgradePrompt: false
+            };
+        }
 
-                    // Set current plan info based on cached tier
-                    if (tier === 'vip_lifetime') {
-                        // VIP user - show special status
-                        const vipPlanInfo = {
-                            planName: 'VIP Lifetime Access',
-                            isActive: true,
-                            statusText: 'VIP Member • Lifetime Access',
-                            statusColor: '#FFD700', // Gold color for VIP
-                            showUpgradePrompt: false
-                        };
-                        setCurrentPlanInfo(vipPlanInfo);
-                        // Don't need to load offerings for VIPs
-                        return;
-                    }
-
-                    // For non-VIP users, get detailed subscription info from cache
-                    const hasPremiumAccess = await SubscriptionService.hasPremiumAccess();
-
-                    // Map tier to plan info for display
-                    const planInfo = {
-                        planName: tier === 'premium_monthly' ? 'Premium Monthly' :
-                            tier === 'premium_annual' ? 'Premium Annual' :
-                                tier === 'trial' ? 'Free Trial' : 'Free Plan',
-                        isActive: ['premium_monthly', 'premium_annual', 'trial'].includes(tier),
-                        statusText: tier === 'premium_monthly' ? 'Renews monthly' :
-                            tier === 'premium_annual' ? 'Renews annually - Save 30%' :
-                                tier === 'trial' ? 'Trial active' :
-                                    'Limited to 1 image upload per day',
-                        statusColor: ['premium_monthly', 'premium_annual'].includes(tier) ? '#00aa44' :
-                            tier === 'trial' ? '#ff8800' : '#ff4444',
-                        showUpgradePrompt: !['premium_monthly', 'premium_annual'].includes(tier)
-                    };
-                    setCurrentPlanInfo(planInfo);
-
-                    // Pre-select current plan
-                    if (tier === 'premium_monthly') {
-                        setSelectedPlan('premium_monthly');
-                    } else if (tier === 'premium_annual') {
-                        setSelectedPlan('premium_annual');
-                    } else {
-                        setSelectedPlan('premium_monthly'); // Default to monthly
-                    }
-
-                    // Load RevenueCat offerings ONLY if needed for purchase flow (non-blocking)
-                    // This happens in background and doesn't affect initial display
-                    if (tier !== 'vip_lifetime') {
-                        loadOfferingsInBackground();
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading subscription data:', error);
-                // On error, show safe default (free tier)
-                setCurrentPlanInfo({
-                    planName: 'Free Plan',
-                    isActive: false,
-                    statusText: 'Limited to 1 image upload per day',
-                    statusColor: '#ff4444',
-                    showUpgradePrompt: true
-                });
-                setSelectedPlan('premium_monthly');
-            }
+        return {
+            planName: tier === 'premium_monthly' ? 'Premium Monthly' :
+                tier === 'premium_annual' ? 'Premium Annual' :
+                    tier === 'promotional_trial' ? 'Free Trial (20 days)' :
+                        tier === 'extended_trial' ? 'Extended Trial (30 days)' : 'Free Plan',
+            isActive: ['premium_monthly', 'premium_annual', 'promotional_trial', 'extended_trial'].includes(tier),
+            statusText: tier === 'premium_monthly' ? 'Renews monthly' :
+                tier === 'premium_annual' ? 'Renews annually - Save 30%' :
+                    tier === 'promotional_trial' ? `${subscription.daysRemaining || 0} days remaining` :
+                        tier === 'extended_trial' ? `${subscription.daysRemaining || 0} days remaining` :
+                            'Limited to 1 image upload per day',
+            statusColor: ['premium_monthly', 'premium_annual'].includes(tier) ? '#00aa44' :
+                ['promotional_trial', 'extended_trial'].includes(tier) ? '#ff8800' : '#ff4444',
+            showUpgradePrompt: !['premium_monthly', 'premium_annual', 'vip_lifetime'].includes(tier)
         };
+    }, [subscription.tier, subscription.daysRemaining]);
 
-        // Background loading of RevenueCat offerings (doesn't block UI)
+    useEffect(() => {
+        // Load RevenueCat offerings in background for purchase flow
         const loadOfferingsInBackground = async () => {
+            if (!user?.uid || subscription.tier === 'vip_lifetime') return;
+
             try {
-                // SubscriptionService is already initialized in AuthContext, so we can just get offerings
                 const offerings = await SubscriptionService.getOfferings();
                 setRevenueCatOfferings(offerings);
 
-                // Also get detailed customer info for purchase history
                 const customerInfo = await SubscriptionService.getCustomerInfo();
                 const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
                 setSubscriptionStatus(revenueCatStatus);
             } catch (error: any) {
                 console.error('Failed to load RevenueCat offerings:', error);
-                // Non-critical error - user can still see their status from cache
             }
         };
 
-        loadSubscriptionData();
+        loadOfferingsInBackground();
 
-        // Set up subscription change listener for real-time updates
-        const handleSubscriptionChange = () => {
-            loadSubscriptionData();
-        };
-
-        SubscriptionService.addSubscriptionChangeListener(handleSubscriptionChange);
+        // Pre-select plan based on current tier
+        if (subscription.tier === 'premium_monthly') {
+            setSelectedPlan('premium_monthly');
+        } else if (subscription.tier === 'premium_annual') {
+            setSelectedPlan('premium_annual');
+        } else {
+            setSelectedPlan('premium_monthly'); // Default to monthly
+        }
 
         // Animate entrance
         Animated.parallel([
@@ -212,12 +165,7 @@ const PremiumSubscription = () => {
                 useNativeDriver: true
             })
         ]).start();
-
-        // Cleanup listener on unmount
-        return () => {
-            SubscriptionService.removeSubscriptionChangeListener(handleSubscriptionChange);
-        };
-    }, [user]);
+    }, [user, subscription.tier]);
 
     const handleSubscribe = async (planId?: string) => {
         const planToUse = planId || selectedPlan;
@@ -277,6 +225,12 @@ const PremiumSubscription = () => {
             // Store subscription info in AsyncStorage for quick access
             await AsyncStorage.setItem('subscription_plan', 'premium');
 
+            // Force refresh subscription context - this will update ALL UI automatically
+            console.log('🔄 Refreshing subscription context after purchase...');
+            await refreshSubscription();
+            console.log('✅ Subscription context refreshed');
+
+            // Show success alert
             Alert.alert(
                 'Welcome to Premium!',
                 'Your subscription is now active. Enjoy unlimited access to all premium features!',
@@ -366,6 +320,47 @@ const PremiumSubscription = () => {
                 }
             ]
         );
+    };
+
+    const handleRestorePurchases = async () => {
+        setIsLoading(true);
+        try {
+            console.log('🔄 Restoring purchases...');
+
+            // Restore purchases via RevenueCat
+            const customerInfo = await SubscriptionService.restorePurchases();
+
+            // Update local state
+            const revenueCatStatus = SubscriptionService.customerInfoToSubscriptionDetails(customerInfo);
+            setSubscriptionStatus(revenueCatStatus);
+
+            // Force refresh subscription context
+            await refreshSubscription();
+
+            // Check if any active subscriptions were restored
+            if (SubscriptionService.hasActiveSubscription(customerInfo)) {
+                Alert.alert(
+                    'Purchases Restored!',
+                    'Your premium subscription has been successfully restored.',
+                    [{ text: 'OK' }]
+                );
+            } else {
+                Alert.alert(
+                    'No Purchases Found',
+                    'No active subscriptions were found to restore. If you believe this is an error, please contact support.',
+                    [{ text: 'OK' }]
+                );
+            }
+        } catch (error: any) {
+            console.error('Error restoring purchases:', error);
+            Alert.alert(
+                'Restore Failed',
+                'There was an error restoring your purchases. Please try again or contact support if this persists.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handlePlanPurchase = async (planId: string) => {
@@ -538,6 +533,16 @@ const PremiumSubscription = () => {
                             <View style={styles.plansContainer}>
                                 {plans.map(plan => renderPlanCard(plan))}
                             </View>
+
+                            {/* Restore Purchases Button - Required for App Review */}
+                            <TouchableOpacity
+                                style={styles.restorePurchasesButton}
+                                onPress={handleRestorePurchases}
+                                disabled={isLoading}
+                            >
+                                <Ionicons name="refresh-outline" size={20} color="#5A60EA" />
+                                <Text style={styles.restorePurchasesText}>Restore Purchases</Text>
+                            </TouchableOpacity>
 
                             {/* Store-compliant trial disclaimer */}
                             <View style={styles.trialDisclaimerSection}>
@@ -994,6 +999,25 @@ const styles = StyleSheet.create({
     legalLink: {
         color: '#5A60EA',
         textDecorationLine: 'underline',
+        fontWeight: '600',
+    },
+    restorePurchasesButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 20,
+        marginBottom: 20,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        backgroundColor: 'rgba(90, 96, 234, 0.1)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(90, 96, 234, 0.3)',
+        gap: 8,
+    },
+    restorePurchasesText: {
+        color: '#5A60EA',
+        fontSize: 15,
         fontWeight: '600',
     },
 });

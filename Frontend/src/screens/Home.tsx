@@ -28,7 +28,6 @@ import WelcomePremiumModal from '../components/WelcomePremiumModal';
 import StepTrackingPermissionModal from '../components/StepTrackingPermissionModal';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import TrialCountdown from '../components/TrialCountdown';
 
 import {
   View,
@@ -1343,6 +1342,7 @@ export default function Home() {
     return unsubscribe;
   }, [dailyCalorieGoal, consumedCalories]);
 
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
       {renderErrorBanner()}
@@ -2203,10 +2203,29 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: -10
+          marginBottom: 4
         }}
       >
-        <Text style={styles.weightGraphTitle}>Steps Trend:</Text>
+        <View style={{ flexDirection: 'column' }}>
+          <Text style={styles.weightGraphTitle}>Steps Trend:</Text>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 217, 255, 0.1)',
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 12,
+            borderWidth: 0.5,
+            borderColor: 'rgba(0, 217, 255, 0.3)',
+            alignSelf: 'flex-start',
+            marginTop: 4,
+          }}>
+            <Ionicons name="fitness" size={11} color="#00D9FF" />
+            <Text style={{ fontSize: 10, fontWeight: '600', color: '#00D9FF', marginLeft: 4 }}>
+              Motion & Fitness
+            </Text>
+          </View>
+        </View>
         <TouchableOpacity
           onPress={() => console.log('Add more steps!')}
           style={{

@@ -362,7 +362,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await tokenManager.initialize();
             console.log('✅ Background: TokenManager initialized');
 
-            // Initialize subscription manager
+            // Initialize SubscriptionService FIRST (RevenueCat + cache pre-loading)
+            try {
+                const SubscriptionService = require('../services/SubscriptionService').default;
+                await SubscriptionService.initialize(userId);
+                console.log('✅ Background: SubscriptionService initialized (RevenueCat + cache)');
+
+                // Pre-load subscription status into cache for instant UI display
+                await SubscriptionService.hasPremiumAccess();
+                await SubscriptionService.getSubscriptionTier();
+                console.log('✅ Background: Subscription cache pre-loaded');
+            } catch (error) {
+                console.warn('⚠️ Background: SubscriptionService initialization failed:', error);
+            }
+
+            // Initialize subscription manager (depends on SubscriptionService)
             try {
                 await SubscriptionManager.initialize(userId);
                 console.log('✅ Background: SubscriptionManager initialized');

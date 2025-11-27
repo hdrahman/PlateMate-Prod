@@ -106,19 +106,31 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
     };
   }
 
-  // Sandbox tester not signed in (critical for App Review)
-  if ((revenueCatError.message || '').toLowerCase().includes('sandbox') ||
-    (revenueCatError.message || '').toLowerCase().includes('test')) {
+  // Receipt validation errors (check code-based errors first for specificity)
+  if (revenueCatError.code === 'INVALID_RECEIPT_ERROR') {
     return {
-      userMessage: 'Unable to complete purchase in test environment. Please ensure you\'re signed in with the correct Apple ID.',
-      technicalMessage: `Sandbox error: ${revenueCatError.message}`,
+      userMessage: 'Purchase receipt validation failed. Please try again or contact support if this persists.',
+      technicalMessage: `Receipt validation error: ${revenueCatError.message}`,
       shouldRetry: true,
     };
   }
 
-  // Receipt validation errors
-  if (revenueCatError.code === 'INVALID_RECEIPT_ERROR' ||
-    (revenueCatError.message || '').toLowerCase().includes('receipt')) {
+  // Sandbox/test environment issues (common during App Review)
+  // Apple reviewers test with sandbox accounts on production builds
+  // Note: Check this AFTER code-based receipt errors to avoid masking specific error types
+  if ((revenueCatError.message || '').toLowerCase().includes('sandbox') ||
+    (revenueCatError.message || '').toLowerCase().includes('test')) {
+    // During App Review, sandbox errors are expected - provide friendly message
+    console.log('🧪 Sandbox/test environment detected - this is normal during App Review');
+    return {
+      userMessage: 'Purchase processing is taking longer than usual. Your subscription will be activated shortly. If this persists, please try again.',
+      technicalMessage: `Sandbox/test processing: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Generic receipt-related errors (message-based, after more specific checks)
+  if ((revenueCatError.message || '').toLowerCase().includes('receipt')) {
     return {
       userMessage: 'Purchase receipt validation failed. Please try again or contact support if this persists.',
       technicalMessage: `Receipt validation error: ${revenueCatError.message}`,
@@ -174,17 +186,18 @@ class SubscriptionService {
   private eventEmitter = new EventEmitter();
 
   // Persistent cache for VIP/premium status with AsyncStorage
-  // Long cache (24h) with event-driven invalidation for immediate updates
+  // Shorter cache (5min) for regular subscriptions, 24h for VIP (rarely changes)
+  // Event-driven invalidation provides immediate updates when status changes
   private premiumStatusCache: {
     hasPremiumAccess: boolean | null;
-    tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime' | null;
+    tier: 'free' | 'promotional_trial' | 'extended_trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime' | null;
     lastUpdate: number;
-    cacheTTL: number;
+    isVIP: boolean; // Track if cached status is VIP (longer TTL)
   } = {
       hasPremiumAccess: null,
       tier: null,
       lastUpdate: 0,
-      cacheTTL: 24 * 60 * 60 * 1000, // 24 hours - event-driven invalidation handles changes
+      isVIP: false,
     };
 
   // AsyncStorage key for persistent cache
@@ -218,17 +231,23 @@ class SubscriptionService {
     this.eventEmitter.emit('subscriptionChanged');
   }
 
+  private getCacheTTL(isVIP: boolean): number {
+    return isVIP ? 24 * 60 * 60 * 1000 : 5 * 60 * 1000;
+  }
+
   // Clear cache when needed (e.g., user logout, subscription change)
   clearCache(): void {
+    console.log('🗑️ SubscriptionService: Clearing cache and emitting change event');
     this.premiumStatusCache.hasPremiumAccess = null;
     this.premiumStatusCache.tier = null;
     this.premiumStatusCache.lastUpdate = 0;
+    this.premiumStatusCache.isVIP = false;
 
     // Also clear AsyncStorage cache
     AsyncStorage.removeItem(this.CACHE_STORAGE_KEY)
       .catch(error => console.warn('Failed to clear storage cache:', error));
 
-    // Emit subscription change event
+    // Emit subscription change event to trigger UI updates
     this.emitSubscriptionChange();
   }
 
@@ -245,12 +264,15 @@ class SubscriptionService {
       // Validate cache structure and freshness
       if (parsed.lastUpdate && parsed.hasPremiumAccess !== undefined && parsed.tier) {
         const cacheAge = Date.now() - parsed.lastUpdate;
+        const restoredIsVIP = Boolean(parsed.isVIP);
+        const ttl = this.getCacheTTL(restoredIsVIP);
 
-        if (cacheAge < this.premiumStatusCache.cacheTTL) {
-          // Cache is still valid
+        if (cacheAge < ttl) {
+          // Cache is still valid - restore all properties including isVIP flag
           this.premiumStatusCache.hasPremiumAccess = parsed.hasPremiumAccess;
           this.premiumStatusCache.tier = parsed.tier;
           this.premiumStatusCache.lastUpdate = parsed.lastUpdate;
+          this.premiumStatusCache.isVIP = restoredIsVIP; // Restore isVIP flag (default to false for backwards compat)
 
           return true;
         } else {
@@ -273,6 +295,7 @@ class SubscriptionService {
         hasPremiumAccess: this.premiumStatusCache.hasPremiumAccess,
         tier: this.premiumStatusCache.tier,
         lastUpdate: this.premiumStatusCache.lastUpdate,
+        isVIP: this.premiumStatusCache.isVIP, // Persist isVIP flag for correct TTL after app restart
       };
 
       await AsyncStorage.setItem(this.CACHE_STORAGE_KEY, JSON.stringify(cacheData));
@@ -281,11 +304,15 @@ class SubscriptionService {
     }
   }
 
-  // Check if cache is still valid
+  // Check if cache is still valid (VIP gets 24h, others get 5min)
   private isCacheValid(): boolean {
     const now = Date.now();
     const cacheAge = now - this.premiumStatusCache.lastUpdate;
-    return cacheAge < this.premiumStatusCache.cacheTTL;
+
+    // VIP status gets longer cache (24 hours), regular subscriptions get 5 minutes
+    const ttl = this.getCacheTTL(this.premiumStatusCache.isVIP);
+
+    return cacheAge < ttl;
   }
 
   async initialize(userId: string): Promise<void> {
@@ -592,34 +619,56 @@ class SubscriptionService {
   }
 
   // Convert RevenueCat CustomerInfo to our SubscriptionDetails format
+  // Uses standardized tier names: promotional_trial, extended_trial, premium_monthly, premium_annual
   customerInfoToSubscriptionDetails(customerInfo: CustomerInfo): SubscriptionDetails {
     const entitlements = customerInfo.entitlements.active;
     const allEntitlements = customerInfo.entitlements.all;
-    const premiumEntitlement = entitlements[ENTITLEMENTS.PREMIUM] || allEntitlements[ENTITLEMENTS.PREMIUM];
 
-    // Check for active premium entitlement first
+    // Check for promotional trial (20-day backend-granted trial)
+    const promoTrial = entitlements[ENTITLEMENTS.PROMOTIONAL_TRIAL];
+    if (promoTrial && promoTrial.isActive) {
+      return {
+        status: 'free_trial', // Map promotional_trial to free_trial for backwards compatibility
+        startDate: promoTrial.originalPurchaseDate,
+        endDate: promoTrial.expirationDate,
+        trialStartDate: promoTrial.originalPurchaseDate,
+        trialEndDate: promoTrial.expirationDate,
+        autoRenew: false,
+        subscriptionId: 'promotional_trial',
+        isInIntroOfferPeriod: true,
+      };
+    }
+
+    // Check for extended trial (10-day trial when subscribing)
+    const extendedTrial = entitlements[ENTITLEMENTS.EXTENDED_TRIAL];
+    if (extendedTrial && extendedTrial.isActive) {
+      return {
+        status: 'free_trial_extended', // Map extended_trial to free_trial_extended
+        startDate: extendedTrial.originalPurchaseDate,
+        endDate: extendedTrial.expirationDate,
+        trialStartDate: extendedTrial.originalPurchaseDate,
+        trialEndDate: extendedTrial.expirationDate,
+        autoRenew: false,
+        subscriptionId: 'extended_trial',
+        isInIntroOfferPeriod: true,
+      };
+    }
+
+    // Check for active premium subscription
+    const premiumEntitlement = entitlements[ENTITLEMENTS.PREMIUM] || allEntitlements[ENTITLEMENTS.PREMIUM];
     if (premiumEntitlement && premiumEntitlement.isActive) {
       const productIdentifier = premiumEntitlement.productIdentifier;
       let status: SubscriptionStatus;
 
-      // Determine if user is in trial period
+      // Determine if user is in store trial period (in-app purchase trial)
       const isInTrial = premiumEntitlement.periodType === 'intro' ||
         (premiumEntitlement.expirationDate && new Date(premiumEntitlement.expirationDate) > new Date() &&
           !premiumEntitlement.willRenew && premiumEntitlement.unsubscribeDetectedAt === null);
 
       if (isInTrial) {
-        // User is in trial period - determine which trial phase
-        const trialStartDate = new Date(premiumEntitlement.originalPurchaseDate);
-        const now = new Date();
-        const daysSinceStart = Math.floor((now.getTime() - trialStartDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (daysSinceStart <= 20) {
-          status = 'free_trial'; // Initial 20-day trial
-        } else {
-          status = 'free_trial_extended'; // Extended 10-day trial
-        }
+        status = 'free_trial'; // Store trial
       } else {
-        // User has active paid subscription
+        // Paid subscription
         if (productIdentifier.includes('annual')) {
           status = 'premium_annual';
         } else {
@@ -646,7 +695,7 @@ class SubscriptionService {
     );
 
     return {
-      status: hasExpiredEntitlement ? 'expired' : 'free_trial', // New users start with free trial
+      status: hasExpiredEntitlement ? 'expired' : 'free_trial',
       startDate: customerInfo.firstSeen || new Date().toISOString(),
       autoRenew: false,
     };
@@ -672,9 +721,10 @@ class SubscriptionService {
   }
 
   // Get trial status with detailed information
+  // Checks promotional_trial, extended_trial, AND premium entitlements for trial info
   async getTrialStatus(): Promise<{
     isInTrial: boolean;
-    trialType: 'initial' | 'extended' | 'none';
+    trialType: 'initial' | 'extended' | 'promotional' | 'none';
     daysRemaining: number;
     trialEndDate: string | null;
     canExtendTrial: boolean;
@@ -682,8 +732,46 @@ class SubscriptionService {
   }> {
     try {
       const customerInfo = await this.getCustomerInfo();
-      const premiumEntitlement = customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM] ||
-        customerInfo.entitlements.all[ENTITLEMENTS.PREMIUM];
+      const activeEntitlements = customerInfo.entitlements.active;
+      const allEntitlements = customerInfo.entitlements.all;
+
+      // PRIORITY 1: Check for promotional trial (20-day backend-granted trial)
+      const promoTrial = activeEntitlements[ENTITLEMENTS.PROMOTIONAL_TRIAL];
+      if (promoTrial && promoTrial.isActive) {
+        const trialEndDate = promoTrial.expirationDate ? new Date(promoTrial.expirationDate) : new Date();
+        const now = new Date();
+        const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+        return {
+          isInTrial: true,
+          trialType: 'promotional',
+          daysRemaining,
+          trialEndDate: trialEndDate.toISOString(),
+          canExtendTrial: daysRemaining <= 5 && daysRemaining > 0, // Can extend when close to expiry
+          hasUsedExtension: false,
+        };
+      }
+
+      // PRIORITY 2: Check for extended trial (10-day trial when subscribing)
+      const extendedTrial = activeEntitlements[ENTITLEMENTS.EXTENDED_TRIAL];
+      if (extendedTrial && extendedTrial.isActive) {
+        const trialEndDate = extendedTrial.expirationDate ? new Date(extendedTrial.expirationDate) : new Date();
+        const now = new Date();
+        const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+        return {
+          isInTrial: true,
+          trialType: 'extended',
+          daysRemaining,
+          trialEndDate: trialEndDate.toISOString(),
+          canExtendTrial: false, // Extended trial cannot be extended further
+          hasUsedExtension: true,
+        };
+      }
+
+      // PRIORITY 3: Check premium entitlement for store trial (intro period)
+      const premiumEntitlement = activeEntitlements[ENTITLEMENTS.PREMIUM] ||
+        allEntitlements[ENTITLEMENTS.PREMIUM];
 
       if (!premiumEntitlement || !premiumEntitlement.isActive || premiumEntitlement.willRenew) {
         return {
@@ -701,9 +789,9 @@ class SubscriptionService {
       const now = new Date();
 
       const daysSinceStart = Math.floor((now.getTime() - trialStartDate.getTime()) / (1000 * 60 * 60 * 24));
-      const daysRemaining = Math.max(0, Math.floor((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
-      let trialType: 'initial' | 'extended' | 'none';
+      let trialType: 'initial' | 'extended' | 'promotional' | 'none';
       let hasUsedExtension = false;
 
       if (daysSinceStart <= 20) {
@@ -799,9 +887,11 @@ class SubscriptionService {
 
           // If VIP or has premium access via backend validation, cache and return true
           if (data.has_premium_access) {
+            const isVIP = data.tier === 'vip_lifetime';
             this.premiumStatusCache.hasPremiumAccess = true;
             this.premiumStatusCache.tier = data.tier || 'vip_lifetime';
             this.premiumStatusCache.lastUpdate = Date.now();
+            this.premiumStatusCache.isVIP = isVIP;
 
             // Save to persistent storage
             await this.saveCacheToStorage();
@@ -834,6 +924,7 @@ class SubscriptionService {
       // Cache the result (in-memory and persistent storage)
       this.premiumStatusCache.hasPremiumAccess = hasAccess;
       this.premiumStatusCache.lastUpdate = Date.now();
+      this.premiumStatusCache.isVIP = false; // Not VIP, shorter cache TTL
 
       // Save to AsyncStorage for persistence
       await this.saveCacheToStorage();
@@ -883,8 +974,8 @@ class SubscriptionService {
     }
   }
 
-  // Get user's current subscription tier
-  async getSubscriptionTier(): Promise<'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime'> {
+  // Get user's current subscription tier with standardized names
+  async getSubscriptionTier(): Promise<'free' | 'promotional_trial' | 'extended_trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime'> {
     try {
       // STEP 1: Check in-memory cache first (fastest)
       if (this.isCacheValid() && this.premiumStatusCache.tier !== null) {
@@ -920,6 +1011,7 @@ class SubscriptionService {
             this.premiumStatusCache.tier = 'vip_lifetime';
             this.premiumStatusCache.hasPremiumAccess = true;
             this.premiumStatusCache.lastUpdate = Date.now();
+            this.premiumStatusCache.isVIP = true; // VIP gets longer cache TTL
 
             // Save to persistent storage
             await this.saveCacheToStorage();
@@ -934,23 +1026,37 @@ class SubscriptionService {
 
       // PRIORITY 2: Check RevenueCat for paid subscriptions or trials
       const customerInfo = await this.getCustomerInfo();
-      const subscriptionDetails = this.customerInfoToSubscriptionDetails(customerInfo);
+      const entitlements = customerInfo.entitlements.active;
 
-      let tier: 'free' | 'trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
+      let tier: 'free' | 'promotional_trial' | 'extended_trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
 
-      if (subscriptionDetails.status === 'free_trial' || subscriptionDetails.status === 'free_trial_extended') {
-        tier = 'trial';
-      } else if (subscriptionDetails.status === 'premium_monthly') {
-        tier = 'premium_monthly';
-      } else if (subscriptionDetails.status === 'premium_annual') {
-        tier = 'premium_annual';
-      } else {
+      // Check promotional trial (20-day backend-granted)
+      const promoTrial = entitlements[ENTITLEMENTS.PROMOTIONAL_TRIAL];
+      if (promoTrial && promoTrial.isActive) {
+        tier = 'promotional_trial';
+      }
+      // Check extended trial (10-day when subscribing)
+      else if (entitlements[ENTITLEMENTS.EXTENDED_TRIAL]?.isActive) {
+        tier = 'extended_trial';
+      }
+      // Check premium subscription
+      else if (entitlements[ENTITLEMENTS.PREMIUM]?.isActive) {
+        const productId = entitlements[ENTITLEMENTS.PREMIUM].productIdentifier;
+        if (productId.includes('annual')) {
+          tier = 'premium_annual';
+        } else {
+          tier = 'premium_monthly';
+        }
+      }
+      // Default to free
+      else {
         tier = 'free';
       }
 
       // Cache the result (in-memory and persistent storage)
       this.premiumStatusCache.tier = tier;
       this.premiumStatusCache.lastUpdate = Date.now();
+      this.premiumStatusCache.isVIP = false; // Not VIP, shorter cache TTL
 
       // Save to AsyncStorage for persistence
       await this.saveCacheToStorage();

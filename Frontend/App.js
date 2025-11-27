@@ -17,6 +17,7 @@ import { FavoritesProvider } from './src/context/FavoritesContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider, useOnboarding } from './src/context/OnboardingContext';
 import { FoodLogProvider } from './src/context/FoodLogContext';
+import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import StepErrorBoundary from './src/components/StepErrorBoundary';
 
 // Import Supabase token manager for optimized authentication
@@ -339,17 +340,19 @@ function MainTabs() {
 // Component to conditionally wrap authenticated app content with context providers
 function AuthenticatedApp({ children }) {
   return (
-    <ThemeProvider>
-      <StepErrorBoundary>
-        <StepProvider>
-          <FavoritesProvider>
-            <FoodLogProvider>
-              {children}
-            </FoodLogProvider>
-          </FavoritesProvider>
-        </StepProvider>
-      </StepErrorBoundary>
-    </ThemeProvider>
+    <SubscriptionProvider>
+      <ThemeProvider>
+        <StepErrorBoundary>
+          <StepProvider>
+            <FavoritesProvider>
+              <FoodLogProvider>
+                {children}
+              </FoodLogProvider>
+            </FavoritesProvider>
+          </StepProvider>
+        </StepErrorBoundary>
+      </ThemeProvider>
+    </SubscriptionProvider>
   );
 }
 

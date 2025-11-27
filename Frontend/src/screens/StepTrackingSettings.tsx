@@ -440,6 +440,15 @@ export default function StepTrackingSettings() {
                 <Text style={styles.headerTitle}>Step Tracking Settings</Text>
             </View>
 
+            {/* Motion & Fitness Badge */}
+            <View style={styles.badgeContainer}>
+                <View style={styles.badge}>
+                    <Ionicons name="fitness" size={14} color="#00D9FF" />
+                    <Text style={styles.badgeText}>Motion & Fitness</Text>
+                </View>
+                <Text style={styles.badgeSubtext}>Uses {Platform.OS === 'ios' ? 'Core Motion' : 'device sensors'}, not HealthKit</Text>
+            </View>
+
             <ScrollView style={styles.content}>
                 {/* Status Overview */}
                 <View style={styles.section}>
@@ -608,6 +617,35 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
         color: '#fff',
+    },
+    badgeContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    badge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(0, 217, 255, 0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 217, 255, 0.4)',
+        gap: 5,
+        marginBottom: 6,
+    },
+    badgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#00D9FF',
+    },
+    badgeSubtext: {
+        fontSize: 11,
+        color: '#888',
+        marginTop: 4,
     },
     content: {
         flex: 1,

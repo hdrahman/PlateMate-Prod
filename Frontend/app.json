@@ -20,7 +20,7 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
@@ -33,10 +33,9 @@
           "UIInterfaceOrientationLandscapeRight"
         ],
         "UIBackgroundModes": [
-          "fetch",
           "fetch"
         ],
-        "NSMotionUsageDescription": "PlateMate uses your device's motion sensors to automatically track your daily steps and help you achieve your fitness goals. Your step data is stored privately and only used to provide you with personalized health insights.",
+        "NSMotionUsageDescription": "PlateMate uses your device's Motion & Fitness sensors to automatically count your daily steps and help you achieve your fitness goals. Your step data is stored privately on your device for fitness tracking purposes.",
         "NSCameraUsageDescription": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
         "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
         "ITSAppUsesNonExemptEncryption": false
@@ -72,14 +71,6 @@
         }
       ],
       "permissions": [
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.BODY_SENSORS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.WAKE_LOCK",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.BODY_SENSORS",
         "android.permission.FOREGROUND_SERVICE",

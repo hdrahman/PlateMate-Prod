@@ -45,6 +45,14 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
                         <Text style={styles.title}>Enable Step Tracking</Text>
                     </View>
 
+                    {/* Motion & Fitness Badge */}
+                    <View style={styles.badgeContainer}>
+                        <View style={styles.badge}>
+                            <Ionicons name="fitness" size={16} color="#00D9FF" />
+                            <Text style={styles.badgeText}>Motion & Fitness</Text>
+                        </View>
+                    </View>
+
                     <Text style={styles.subtitle}>
                         Track your daily steps automatically to stay motivated.
                     </Text>
@@ -159,6 +167,27 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#fff',
         flex: 1,
+    },
+    badgeContainer: {
+        paddingHorizontal: 24,
+        marginBottom: 12,
+    },
+    badge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(0, 217, 255, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 217, 255, 0.4)',
+        gap: 6,
+    },
+    badgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#00D9FF',
     },
     subtitle: {
         fontSize: 16,

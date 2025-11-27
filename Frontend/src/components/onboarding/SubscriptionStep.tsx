@@ -17,6 +17,8 @@ import { useOnboarding } from '../../context/OnboardingContext';
 import { useAuth } from '../../context/AuthContext';
 import { UserProfile } from '../../types/user';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BACKEND_URL } from '../../utils/config';
+import tokenManager, { ServiceTokenType } from '../../utils/tokenManager';
 
 interface SubscriptionStepProps {
     profile: UserProfile;
@@ -80,34 +82,52 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
     const { signUp } = useAuth();
 
     const handleStartTrial = async () => {
-        // Automatically create account and start 20-day premium trial
+        // Automatically create account and grant 20-day promotional trial via backend
         if (profile.email && profile.password) {
             setIsLoading(true);
             try {
-                console.log('Creating account with collected profile data:', profile.email);
+                console.log('✅ Creating account with collected profile data:', profile.email);
 
                 // Create the account using collected info
-                await signUp(profile.email, profile.password);
+                const newUser = await signUp(profile.email, profile.password);
 
-                console.log('Account created successfully');
+                if (!newUser?.id) {
+                    throw new Error('Failed to create user account');
+                }
 
-                // Calculate trial end date (20 days from now)
-                const trialEndDate = new Date();
-                trialEndDate.setDate(trialEndDate.getDate() + 20);
+                console.log('✅ Account created successfully, user ID:', newUser.id);
 
-                // Auto-start 20-day premium trial
-                await updateProfile({
-                    premium: true,
-                    trialEndDate: trialEndDate.toISOString(),
-                });
-
-                console.log('✅ 20-day premium trial activated');
-
-                // Wait for auth state to fully propagate
+                // Wait for auth state to fully propagate and backend to be ready
                 console.log('⏳ Waiting for auth state to propagate...');
                 await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
 
-                // Retry mechanism for completing onboarding
+                // Grant 20-day promotional trial via backend (RevenueCat integration)
+                console.log('🎆 Granting 20-day promotional trial via backend...');
+                try {
+                    const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
+
+                    const response = await fetch(`${BACKEND_URL}/api/subscription/grant-promotional-trial`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        console.log('✅ 20-day promotional trial granted successfully');
+                    } else {
+                        console.warn('⚠️ Promotional trial grant failed (non-critical):', result.message || result.detail);
+                        // Don't block onboarding if trial grant fails - user can still use free tier
+                    }
+                } catch (trialError) {
+                    console.warn('⚠️ Failed to grant promotional trial (non-critical):', trialError);
+                    // Don't block onboarding if trial grant fails
+                }
+
+                // Complete onboarding with retry mechanism
                 let retryCount = 0;
                 const maxRetries = 3;
 
@@ -131,7 +151,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
 
                 onComplete();
             } catch (error) {
-                console.error('Account creation error:', error);
+                console.error('❌ Account creation error:', error);
                 Alert.alert('Error', 'Failed to create account. Please try again.');
             } finally {
                 setIsLoading(false);
