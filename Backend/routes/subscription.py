@@ -420,7 +420,7 @@ def map_revenuecat_event_to_status(event_type: str, entitlements: dict) -> str:
     """Map RevenueCat event type to our subscription status"""
     if event_type in ['INITIAL_PURCHASE', 'RENEWAL']:
         # Check if it's a trial or paid subscription
-        premium_entitlement = entitlements.get('premium', {})
+        premium_entitlement = entitlements.get('Premium', {})  # Capital P - matches RevenueCat
         if premium_entitlement.get('is_active', False):
             # Check if in trial period
             if premium_entitlement.get('period_type') == 'intro':
@@ -431,7 +431,7 @@ def map_revenuecat_event_to_status(event_type: str, entitlements: dict) -> str:
     elif event_type == 'TRIAL_STARTED':
         return 'free_trial'
     elif event_type == 'TRIAL_CONVERTED':
-        premium_entitlement = entitlements.get('premium', {})
+        premium_entitlement = entitlements.get('Premium', {})  # Capital P - matches RevenueCat
         product_id = premium_entitlement.get('product_identifier', '')
         # Use raise_on_unknown=False for webhook processing - don't crash on missing/unknown product ID
         return map_product_identifier_to_tier(product_id, raise_on_unknown=False)
@@ -466,7 +466,7 @@ async def update_subscription_from_webhook(
             return
 
         # Get premium entitlement data
-        premium_entitlement = entitlements.get('premium', {})
+        premium_entitlement = entitlements.get('Premium', {})  # Capital P - matches RevenueCat
 
         # Prepare subscription data
         now = datetime.utcnow().isoformat()
@@ -925,7 +925,7 @@ async def validate_premium_access(current_user: dict = Depends(get_current_user)
                 tier = 'extended_trial'
 
         # Check premium subscription (highest priority)
-        premium = entitlements.get('premium', {})
+        premium = entitlements.get('Premium', {})  # Capital P - matches RevenueCat
         if premium.get('expires_date'):
             expires = datetime.fromisoformat(premium['expires_date'].replace('Z', '+00:00'))
             if expires > now:
@@ -1153,7 +1153,7 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
                     }
 
             # Check for existing premium subscription
-            premium = entitlements.get('premium', {})
+            premium = entitlements.get('Premium', {})  # Capital P - matches RevenueCat
             if premium.get('expires_date'):
                 expires = datetime.fromisoformat(premium['expires_date'].replace('Z', '+00:00'))
                 if expires > datetime.now(timezone.utc):

@@ -172,7 +172,7 @@ export const PRODUCT_IDS = {
 
 // Entitlement identifiers for features
 export const ENTITLEMENTS = {
-  PREMIUM: 'premium',           // Full premium access from paid subscription
+  PREMIUM: 'Premium',           // Full premium access from paid subscription (capital P - matches RevenueCat)
   PROMOTIONAL_TRIAL: 'promotional_trial', // 20-day backend-granted trial (automatic for new users)
   EXTENDED_TRIAL: 'extended_trial', // Additional 10-day trial when user starts subscription trial
 } as const;
@@ -347,7 +347,7 @@ class SubscriptionService {
       await Purchases.configure({
         apiKey,
         appUserID: userId,
-        usesStoreKit2IfAvailable: true, // Enable StoreKit 2 for production - better transaction handling, family sharing
+        usesStoreKit2IfAvailable: false, // Disabled - StoreKit 2 can cause sandbox receipt validation issues during App Review
       });
 
       // Enable debug logging in development
