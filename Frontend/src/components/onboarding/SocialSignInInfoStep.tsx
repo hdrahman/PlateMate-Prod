@@ -80,10 +80,16 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
             await updateProfile({
                 firstName: firstName.trim(),
                 age: parseInt(age),
+                email: user?.email, // Populate email from authenticated user for data consistency
             });
 
-            console.log('✅ Profile updated with social sign-in info');
-            onNext();
+            console.log('✅ Profile updated with social sign-in info, email:', user?.email);
+            // NOTE: We intentionally do NOT call onNext() here.
+            // After updating the profile, the parent Onboarding component will re-render.
+            // Since profile.firstName and profile.age are now set, the condition
+            // `user && (!profile.firstName || !profile.age)` will be false,
+            // and GoalsStep will render instead of SocialSignInInfoStep (both at step 3).
+            // This ensures the user sees the "What's your goal?" screen.
         } catch (error) {
             console.error('❌ Error updating profile:', error);
             Alert.alert('Error', 'Failed to save your information. Please try again.');

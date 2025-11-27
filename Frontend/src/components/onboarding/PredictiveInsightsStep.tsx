@@ -584,10 +584,11 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
 
     const handleSubmit = async () => {
         // Automatically create account and start 15-day premium trial
-        if (profile.email && profile.password) {
+        // Allow: (1) already authenticated users (social sign-in), OR (2) users with email+password
+        if (user || (profile.email && profile.password)) {
             setIsLoading(true);
             try {
-                console.log('🚀 Starting account creation with collected profile data:', profile.email);
+                console.log('🚀 Starting account creation with collected profile data:', profile.email || user?.email);
 
                 // Prepare calculated data to pass directly (avoids React state race condition)
                 const calculatedData = {
@@ -664,6 +665,7 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
             }
         } else {
             console.error('❌ Missing account information:', {
+                hasUser: !!user,
                 hasEmail: !!profile.email,
                 hasPassword: !!profile.password
             });

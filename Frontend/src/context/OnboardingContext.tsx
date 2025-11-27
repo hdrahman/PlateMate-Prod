@@ -782,7 +782,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
 
                     const usersUploaded = syncResult?.stats?.usersUploaded ?? 0;
                     const syncErrors = syncResult?.errors ?? [];
-                    const offlineError = syncErrors.some(err => typeof err === 'string' && err.toLowerCase().includes('offline'));
 
                     if (usersUploaded > 0) {
                         if (!syncResult.success && syncErrors.length) {
@@ -792,10 +791,6 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                         console.log('📊 Sync stats:', syncResult.stats);
                         syncSucceeded = true;
                     } else {
-                        if (offlineError) {
-                            throw new Error('Unable to reach the cloud. Please check your internet connection and try again.');
-                        }
-
                         console.log('ℹ️ No users uploaded - user might already exist in cloud');
                         try {
                             // Use maybeSingle() to avoid error on 0 rows
@@ -812,7 +807,7 @@ export const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children
                                     .select('id')
                                     .eq('email', authUser.email)
                                     .maybeSingle();
-                                
+
                                 existingUser = result.data;
                                 existingUserError = result.error;
                             }

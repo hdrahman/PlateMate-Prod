@@ -21,7 +21,6 @@ import {
     updateUserProfile
 } from './database';
 import { getLastSyncTime, updateLastSyncTime } from './database';
-import { isLikelyOffline } from './networkUtils';
 import { SubscriptionDetails } from '../types/user';
 
 // REMOVED: Periodic sync is no longer needed with dual-write architecture
@@ -217,13 +216,8 @@ class PostgreSQLSyncService {
     //     }
     // }
 
-    private async isOnline(): Promise<boolean> {
-        try {
-            return !(await isLikelyOffline());
-        } catch (_) {
-            return false;
-        }
-    }
+    // REMOVED: isOnline check was unreliable on app initialization
+    // Network errors are now handled gracefully during actual sync operations
 
     // REMOVED: No longer needed with dual-write architecture
     // private isIntervalElapsed(): boolean {
@@ -354,26 +348,9 @@ class PostgreSQLSyncService {
         // Create abort controller for this sync
         this.currentSyncAbortController = new AbortController();
 
-        if (!(await this.isOnline())) {
-            console.log('🚫 Cannot sync – device offline');
-            this.pendingSync = true;
-            await updateLastSyncTime('pending');
-            return {
-                success: false,
-                stats: {
-                    usersUploaded: 0,
-                    foodLogsUploaded: 0,
-                    weightsUploaded: 0,
-                    streaksUploaded: 0,
-                    subscriptionsUploaded: 0,
-                    cheatDaySettingsUploaded: 0,
-                    userSettingsUploaded: 0,
-                    totalErrors: 1,
-                    lastSyncTime: new Date().toISOString()
-                },
-                errors: ['Device offline']
-            };
-        }
+        // NOTE: Removed early offline check as it was unreliable on app initialization
+        // (would incorrectly report offline on first attempt, then work on retry)
+        // Network errors are now handled gracefully during actual sync operations
 
         this.isSyncing = true;
         const errors: string[] = [];
@@ -575,36 +552,36 @@ class PostgreSQLSyncService {
                     // If duplicate email constraint, check if it's the same user with updated firebase_uid
                     if (error.code === '23505' && error.message?.includes('users_email_key')) {
                         console.log('⚠️ Email already exists in cloud, checking if same user...');
-                        
+
                         // First, check who owns this email
                         const { data: existingUser, error: checkError } = await supabase
                             .from('users')
                             .select('id, firebase_uid')
                             .eq('email', userData.email)
                             .maybeSingle();
-                        
+
                         if (checkError) {
                             console.error('❌ Failed to check existing user:', checkError);
                             throw checkError;
                         }
-                        
+
                         if (existingUser) {
                             // Update the existing user's firebase_uid and profile data
                             // This handles account recreation scenarios where firebase_uid changed
                             console.log(`🔄 Updating existing user's profile (old: ${existingUser.firebase_uid}, new: ${userData.firebase_uid})`);
-                            
+
                             const { data: updateData, error: updateError } = await supabase
                                 .from('users')
                                 .update(userData)
                                 .eq('id', existingUser.id)
                                 .select('id')
                                 .single();
-                            
+
                             if (updateError) {
                                 console.error('❌ Failed to update user profile:', updateError);
                                 throw updateError;
                             }
-                            
+
                             postgresUserId = updateData.id;
                             console.log('✅ User profile updated with new firebase_uid:', postgresUserId);
                         } else {
@@ -615,12 +592,12 @@ class PostgreSQLSyncService {
                                 .insert(userData)
                                 .select('id')
                                 .single();
-                            
+
                             if (insertError) {
                                 console.error('❌ Failed to insert user:', insertError);
                                 throw insertError;
                             }
-                            
+
                             postgresUserId = insertData.id;
                             console.log('✅ User inserted successfully:', postgresUserId);
                         }
