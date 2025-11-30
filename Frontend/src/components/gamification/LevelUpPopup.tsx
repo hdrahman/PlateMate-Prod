@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { ThemeContext } from '../../ThemeContext';
 
 interface LevelUpPopupProps {
     visible: boolean;
@@ -21,18 +22,6 @@ interface LevelUpPopupProps {
 
 const { width, height } = Dimensions.get('window');
 
-const COLORS = {
-    WHITE: '#FFFFFF',
-    BLACK: '#000000',
-    GRAY: '#8E8E93',
-    GRADIENT_START: '#FF6B6B',
-    GRADIENT_MIDDLE: '#4ECDC4',
-    GRADIENT_END: '#45B7D1',
-    GOLD: '#FFD700',
-    PURPLE: '#8A2BE2',
-    ORANGE: '#FF8C00',
-};
-
 const LevelUpPopup: React.FC<LevelUpPopupProps> = ({
     visible,
     newLevel,
@@ -40,6 +29,21 @@ const LevelUpPopup: React.FC<LevelUpPopupProps> = ({
     levelsGained = 1,
     onClose,
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
+    const COLORS = {
+        WHITE: theme.colors.text,
+        BLACK: theme.colors.shadow,
+        GRAY: theme.colors.textSecondary,
+        GRADIENT_START: '#FF6B6B',
+        GRADIENT_MIDDLE: '#4ECDC4',
+        GRADIENT_END: '#45B7D1',
+        GOLD: '#FFD700',
+        PURPLE: '#8A2BE2',
+        ORANGE: '#FF8C00',
+        OVERLAY: theme.colors.overlay,
+    };
+
     const [scaleAnim] = useState(new Animated.Value(0));
     const [pulseAnim] = useState(new Animated.Value(1));
     const [slideAnim] = useState(new Animated.Value(-100));
@@ -145,6 +149,7 @@ const LevelUpPopup: React.FC<LevelUpPopupProps> = ({
     };
 
     const rankColors = getRankColor(newRank);
+    const styles = createStyles(theme, isDarkTheme);
 
     return (
         <Modal
@@ -246,10 +251,10 @@ const LevelUpPopup: React.FC<LevelUpPopupProps> = ({
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any, isDarkTheme: boolean) => StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: theme.colors.overlay,
         justifyContent: 'center',
         alignItems: 'center',
     },

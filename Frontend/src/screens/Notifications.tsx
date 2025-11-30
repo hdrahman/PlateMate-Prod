@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -22,17 +22,20 @@ import { NotificationSettings } from '../types/notifications';
 import SettingsService from '../services/SettingsService';
 import NotificationService from '../services/NotificationService';
 import WheelPicker from '../components/WheelPicker';
+import { ThemeContext } from '../ThemeContext';
 
-// Define theme colors - matching the app's dark theme
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
+// Accent colors that stay constant
 const ACCENT_BLUE = '#2196F3';
 const ACCENT_RED = '#FF6B6B';
 const ACCENT_TEAL = '#4ECDC4';
 const ACCENT_ORANGE = '#F39C12';
 const ACCENT_PURPLE = '#8E44AD';
+
+// Fallback colors (used in StyleSheet, overridden inline with theme)
+const PRIMARY_BG = '#121212';
+const CARD_BG = '#1E1E1E';
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
 
 interface NotificationSetting {
     id: string;
@@ -46,9 +49,11 @@ interface NotificationSetting {
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
+    theme?: any;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style, theme }) => {
+    const cardBg = theme?.colors?.cardBackground || CARD_BG;
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
@@ -68,7 +73,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1,
                     borderRadius: 9,
-                    backgroundColor: style?.backgroundColor || CARD_BG,
+                    backgroundColor: style?.backgroundColor || cardBg,
                     padding: 16,
                 }}
             >
@@ -80,6 +85,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 
 export default function NotificationsScreen() {
     const navigation = useNavigation<any>();
+    const { theme } = useContext(ThemeContext);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [hasPermission, setHasPermission] = useState(false);
@@ -456,7 +462,7 @@ export default function NotificationsScreen() {
 
                         {/* Permission Status */}
                         {permissionStatus !== 'granted' && (
-                            <GradientBorderCard>
+                            <GradientBorderCard theme={theme}>
                                 <View style={styles.permissionContent}>
                                     <Ionicons name="warning" size={24} color={ACCENT_RED} />
                                     <View style={styles.permissionText}>
@@ -480,7 +486,7 @@ export default function NotificationsScreen() {
                         )}
 
                         {/* Master Toggle */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="notifications" size={24} color={ACCENT_BLUE} />
                                 <Text style={styles.sectionTitle}>Master Control</Text>
@@ -502,7 +508,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Meal Reminders */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="restaurant" size={24} color={ACCENT_RED} />
                                 <Text style={styles.sectionTitle}>Meal Reminders</Text>
@@ -583,7 +589,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Water Reminders */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="water" size={24} color={ACCENT_TEAL} />
                                 <Text style={styles.sectionTitle}>Water Reminders</Text>
@@ -638,7 +644,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Status Notifications */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="stats-chart" size={24} color={ACCENT_BLUE} />
                                 <Text style={styles.sectionTitle}>Progress Updates</Text>
@@ -691,7 +697,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Engagement Notifications */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="trophy" size={24} color={ACCENT_ORANGE} />
                                 <Text style={styles.sectionTitle}>Motivation & Updates</Text>
@@ -744,7 +750,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Quiet Hours */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="moon" size={24} color={ACCENT_PURPLE} />
                                 <Text style={styles.sectionTitle}>Quiet Hours</Text>
@@ -787,7 +793,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Behavioral Notifications */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="pulse" size={24} color={ACCENT_PURPLE} />
                                 <Text style={styles.sectionTitle}>Smart Notifications</Text>
@@ -855,7 +861,7 @@ export default function NotificationsScreen() {
                         </GradientBorderCard>
 
                         {/* Savage Mode */}
-                        <GradientBorderCard>
+                        <GradientBorderCard theme={theme}>
                             <View style={styles.sectionHeader}>
                                 <Ionicons name="flame" size={24} color={ACCENT_RED} />
                                 <Text style={styles.sectionTitle}>Savage Mode</Text>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -15,6 +15,7 @@ import {
     SafeAreaView,
     StatusBar
 } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, StackActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -103,6 +104,7 @@ const ImageCapture: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
     const insets = useSafeAreaInsets();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { mealType: initialMealType, photoUri: initialPhotoUri, foodData } = route.params as { mealType: string; photoUri?: string; foodData?: any };
 
     const [mealType, setMealType] = useState(initialMealType);
@@ -1111,7 +1113,7 @@ const ImageCapture: React.FC = () => {
                     style={styles.imagePlaceholderGradient}
                     locations={[0, 0.5, 1]}
                 >
-                    <View style={styles.imagePlaceholder}>
+                    <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.cardBackground }]}>
                         {image.uri ? (
                             // Image is present - show the image with an X button
                             <View style={styles.imageContainer}>
@@ -1120,7 +1122,7 @@ const ImageCapture: React.FC = () => {
                                     style={styles.removeImageButton}
                                     onPress={handleRemoveImage}
                                 >
-                                    <Ionicons name="close" size={16} color="#fff" />
+                                    <Ionicons name="close" size={16} color={theme.colors.text} />
                                 </TouchableOpacity>
                             </View>
                         ) : (
@@ -1129,8 +1131,8 @@ const ImageCapture: React.FC = () => {
                                 style={styles.placeholderContent}
                                 onPress={() => handleTakePhoto(index)}
                             >
-                                <Ionicons name="camera" size={index === 0 ? 50 : 40} color={isRequired ? "#8A2BE2" : "#666"} />
-                                <Text style={[styles.placeholderText, { color: isRequired ? "#8A2BE2" : "#888" }]}>
+                                <Ionicons name="camera" size={index === 0 ? 50 : 40} color={isRequired ? theme.colors.primary : theme.colors.textSecondary} />
+                                <Text style={[styles.placeholderText, { color: isRequired ? theme.colors.primary : theme.colors.textSecondary }]}>
                                     {index === 0 ? 'Tap to capture your meal' : 'Side view (optional)'}
                                 </Text>
                                 {isRequired && <Text style={styles.requiredText}>Required</Text>}
@@ -1139,10 +1141,10 @@ const ImageCapture: React.FC = () => {
 
                         {/* Gallery button */}
                         <TouchableOpacity
-                            style={[styles.galleryButton, { backgroundColor: isRequired ? "#8A2BE2" : "#4a4a4a" }]}
+                            style={[styles.galleryButton, { backgroundColor: isRequired ? theme.colors.primary : "#4a4a4a" }]}
                             onPress={() => handlePickImage(index)}
                         >
-                            <Ionicons name="images" size={16} color="#fff" />
+                            <Ionicons name="images" size={16} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
                 </LinearGradient>
@@ -1165,10 +1167,10 @@ const ImageCapture: React.FC = () => {
                     style={styles.addSideViewGradient}
                     locations={[0, 0.5, 1]}
                 >
-                    <View style={styles.addSideViewContent}>
-                        <Ionicons name="add" size={24} color="#fff" />
-                        <Text style={styles.addSideViewText}>Add side view (optional)</Text>
-                        <Text style={styles.addSideViewSubtext}>For better nutrition analysis</Text>
+                    <View style={[styles.addSideViewContent, { backgroundColor: theme.colors.cardBackground }]}>
+                        <Ionicons name="add" size={24} color={theme.colors.text} />
+                        <Text style={[styles.addSideViewText, { color: theme.colors.text }]}>Add side view (optional)</Text>
+                        <Text style={[styles.addSideViewSubtext, { color: theme.colors.textSecondary }]}>For better nutrition analysis</Text>
                     </View>
                 </LinearGradient>
             </TouchableOpacity>
@@ -1181,9 +1183,9 @@ const ImageCapture: React.FC = () => {
         const hasBothImages = images[0].uri && images[1].uri;
 
         return (
-            <View style={styles.optionalDetailsWrapper}>
+            <View style={[styles.optionalDetailsWrapper, { backgroundColor: theme.colors.cardBackground }]}>
                 <TouchableOpacity
-                    style={styles.sectionHeader}
+                    style={[styles.sectionHeader, { backgroundColor: theme.colors.cardBackground }]}
                     onPress={() => {
                         if (sideImage.uri) {
                             if (hasBothImages) {
@@ -1197,9 +1199,9 @@ const ImageCapture: React.FC = () => {
                     }}
                 >
                     <View style={styles.sectionHeaderContent}>
-                        <Ionicons name="camera-outline" size={20} color="#8A2BE2" />
-                        <Text style={styles.sectionHeaderTitle}>Side View</Text>
-                        <Text style={styles.sectionHeaderSubtitle}>{sideImage.uri ? 'Added' : 'Optional'}</Text>
+                        <Ionicons name="camera-outline" size={20} color={theme.colors.primary} />
+                        <Text style={[styles.sectionHeaderTitle, { color: theme.colors.text }]}>Side View</Text>
+                        <Text style={[styles.sectionHeaderSubtitle, { color: theme.colors.primary }]}>{sideImage.uri ? 'Added' : 'Optional'}</Text>
                     </View>
                     {sideImage.uri ? (
                         <View style={styles.sideImagePreview}>
@@ -1218,14 +1220,14 @@ const ImageCapture: React.FC = () => {
                                     scrollToImage(0); // Switch back to main image
                                 }}
                             >
-                                <Ionicons name="close" size={12} color="#fff" />
+                                <Ionicons name="close" size={12} color={theme.colors.text} />
                             </TouchableOpacity>
                         </View>
                     ) : (
                         <Ionicons
                             name="add"
                             size={24}
-                            color="#8A2BE2"
+                            color={theme.colors.primary}
                         />
                     )}
                 </TouchableOpacity>
@@ -1275,7 +1277,7 @@ const ImageCapture: React.FC = () => {
                                     style={styles.imagePlaceholderGradient}
                                     locations={[0, 0.5, 1]}
                                 >
-                                    <View style={styles.imagePlaceholder}>
+                                    <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.cardBackground }]}>
                                         <View style={styles.imageContainer}>
                                             <Image source={{ uri: image.uri }} style={styles.image} />
                                             <TouchableOpacity
@@ -1299,19 +1301,19 @@ const ImageCapture: React.FC = () => {
                                                     }
                                                 }}
                                             >
-                                                <Ionicons name="close" size={16} color="#fff" />
+                                                <Ionicons name="close" size={16} color={theme.colors.text} />
                                             </TouchableOpacity>
                                         </View>
 
                                         {/* Gallery button */}
                                         <TouchableOpacity
-                                            style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
+                                            style={[styles.galleryButton, { backgroundColor: theme.colors.primary }]}
                                             onPress={() => {
                                                 const imageIndex = images.findIndex(img => img.uri === image.uri);
                                                 handlePickImage(imageIndex);
                                             }}
                                         >
-                                            <Ionicons name="images" size={16} color="#fff" />
+                                            <Ionicons name="images" size={16} color={theme.colors.text} />
                                         </TouchableOpacity>
                                     </View>
                                 </LinearGradient>
@@ -1327,13 +1329,13 @@ const ImageCapture: React.FC = () => {
                                 style={styles.imagePlaceholderGradient}
                                 locations={[0, 0.5, 1]}
                             >
-                                <View style={styles.imagePlaceholder}>
+                                <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.cardBackground }]}>
                                     <TouchableOpacity
                                         style={styles.placeholderContent}
                                         onPress={() => handleTakePhoto(0)}
                                     >
-                                        <Ionicons name="camera" size={50} color="#8A2BE2" />
-                                        <Text style={[styles.placeholderText, { color: "#8A2BE2" }]}>
+                                        <Ionicons name="camera" size={50} color={theme.colors.primary} />
+                                        <Text style={[styles.placeholderText, { color: theme.colors.primary }]}>
                                             Tap to capture your meal
                                         </Text>
                                         <Text style={styles.requiredText}>Required</Text>
@@ -1341,10 +1343,10 @@ const ImageCapture: React.FC = () => {
 
                                     {/* Gallery button */}
                                     <TouchableOpacity
-                                        style={[styles.galleryButton, { backgroundColor: "#8A2BE2" }]}
+                                        style={[styles.galleryButton, { backgroundColor: theme.colors.primary }]}
                                         onPress={() => handlePickImage(0)}
                                     >
-                                        <Ionicons name="images" size={16} color="#fff" />
+                                        <Ionicons name="images" size={16} color={theme.colors.text} />
                                     </TouchableOpacity>
                                 </View>
                             </LinearGradient>
@@ -1376,42 +1378,43 @@ const ImageCapture: React.FC = () => {
 
     const renderOptionalDetailsSection = () => {
         return (
-            <View style={styles.optionalDetailsWrapper}>
+            <View style={[styles.optionalDetailsWrapper, { backgroundColor: theme.colors.cardBackground }]}>
                 <TouchableOpacity
-                    style={styles.sectionHeader}
+                    style={[styles.sectionHeader, { backgroundColor: theme.colors.cardBackground }]}
                     onPress={() => setShowOptionalDetails(!showOptionalDetails)}
                 >
                     <View style={styles.sectionHeaderContent}>
-                        <Ionicons name="settings-outline" size={20} color="#8A2BE2" />
-                        <Text style={styles.sectionHeaderTitle}>Additional Details</Text>
-                        <Text style={styles.sectionHeaderSubtitle}>Optional</Text>
+                        <Ionicons name="settings-outline" size={20} color={theme.colors.primary} />
+                        <Text style={[styles.sectionHeaderTitle, { color: theme.colors.text }]}>Additional Details</Text>
+                        <Text style={[styles.sectionHeaderSubtitle, { color: theme.colors.primary }]}>Optional</Text>
                     </View>
                     <Ionicons
                         name={showOptionalDetails ? "chevron-up" : "chevron-down"}
                         size={24}
-                        color="#8A2BE2"
+                        color={theme.colors.primary}
                     />
                 </TouchableOpacity>
 
                 {showOptionalDetails && (
-                    <View style={styles.optionalDetailsContent}>
+                    <View style={[styles.optionalDetailsContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelRow}>
-                                <Text style={styles.inputLabel}>Food Name</Text>
-                                <Text style={styles.characterCount}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Food Name</Text>
+                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
                                     {foodName.length}/{getCharacterLimits().foodName}
                                 </Text>
                             </View>
                             <TextInput
                                 style={[
                                     styles.modernInput,
+                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
                                     inputErrors.foodName?.length > 0 && styles.inputError,
                                     inputWarnings.foodName && styles.inputWarning
                                 ]}
                                 value={foodName}
                                 onChangeText={validateAndSetFoodName}
                                 placeholder="e.g., Grilled Chicken Salad"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                             />
                             {inputErrors.foodName?.length > 0 && (
                                 <Text style={styles.errorText}>{inputErrors.foodName[0]}</Text>
@@ -1420,21 +1423,22 @@ const ImageCapture: React.FC = () => {
 
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelRow}>
-                                <Text style={styles.inputLabel}>Brand/Restaurant</Text>
-                                <Text style={styles.characterCount}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Brand/Restaurant</Text>
+                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
                                     {brandName.length}/{getCharacterLimits().brandName}
                                 </Text>
                             </View>
                             <TextInput
                                 style={[
                                     styles.modernInput,
+                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
                                     inputErrors.brandName?.length > 0 && styles.inputError,
                                     inputWarnings.brandName && styles.inputWarning
                                 ]}
                                 value={brandName}
                                 onChangeText={validateAndSetBrandName}
                                 placeholder="e.g., McDonald's, Homemade"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                             />
                             {inputErrors.brandName?.length > 0 && (
                                 <Text style={styles.errorText}>{inputErrors.brandName[0]}</Text>
@@ -1443,21 +1447,22 @@ const ImageCapture: React.FC = () => {
 
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelRow}>
-                                <Text style={styles.inputLabel}>Quantity</Text>
-                                <Text style={styles.characterCount}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Quantity</Text>
+                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
                                     {quantity.length}/{getCharacterLimits().quantity}
                                 </Text>
                             </View>
                             <TextInput
                                 style={[
                                     styles.modernInput,
+                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
                                     inputErrors.quantity?.length > 0 && styles.inputError,
                                     inputWarnings.quantity && styles.inputWarning
                                 ]}
                                 value={quantity}
                                 onChangeText={validateAndSetQuantity}
                                 placeholder="e.g., 1 serving, 200g, 1 cup"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                             />
                             {inputErrors.quantity?.length > 0 && (
                                 <Text style={styles.errorText}>{inputErrors.quantity[0]}</Text>
@@ -1466,8 +1471,8 @@ const ImageCapture: React.FC = () => {
 
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelRow}>
-                                <Text style={styles.inputLabel}>Notes</Text>
-                                <Text style={styles.characterCount}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Notes</Text>
+                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
                                     {notes.length}/{getCharacterLimits().notes}
                                 </Text>
                             </View>
@@ -1475,13 +1480,14 @@ const ImageCapture: React.FC = () => {
                                 style={[
                                     styles.modernInput,
                                     styles.textAreaInput,
+                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
                                     inputErrors.notes?.length > 0 && styles.inputError,
                                     inputWarnings.notes && styles.inputWarning
                                 ]}
                                 value={notes}
                                 onChangeText={validateAndSetNotes}
                                 placeholder="Any additional notes..."
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 multiline
                                 numberOfLines={3}
                             />
@@ -1498,7 +1504,7 @@ const ImageCapture: React.FC = () => {
     // Add a container style to ensure consistent background and proper spacing
     const containerStyle = {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: theme.colors.background,
         // Removed dynamic padding to avoid blank space at the top
     };
 
@@ -1515,14 +1521,14 @@ const ImageCapture: React.FC = () => {
 
     return (
         <SafeAreaView style={[styles.container, containerStyle]}>
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
-            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 12 : insets.top + 12 }]}>
+            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 12 : insets.top + 12, backgroundColor: theme.colors.background }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
                 >
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
 
                 <View style={styles.titleContainer}>
@@ -1543,8 +1549,8 @@ const ImageCapture: React.FC = () => {
                             />
                         </MaskedView>
 
-                        <View style={styles.dropdownIconContainer}>
-                            <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={22} color="#FFF" />
+                        <View style={[styles.dropdownIconContainer, { backgroundColor: theme.colors.cardBackground }]}>
+                            <Ionicons name={showMealTypeDropdown ? "chevron-up" : "chevron-down"} size={22} color={theme.colors.text} />
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -1564,12 +1570,13 @@ const ImageCapture: React.FC = () => {
                         activeOpacity={1}
                         onPress={toggleMealTypeDropdown}
                     >
-                        <View style={styles.dropdownContainer}>
+                        <View style={[styles.dropdownContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             {mealTypes.map((type) => (
                                 <TouchableOpacity
                                     key={type}
                                     style={[
                                         styles.dropdownItem,
+                                        { borderBottomColor: theme.colors.border },
                                         mealType === type && styles.selectedDropdownItem
                                     ]}
                                     onPress={() => selectMealType(type)}
@@ -1577,13 +1584,14 @@ const ImageCapture: React.FC = () => {
                                     <Text
                                         style={[
                                             styles.dropdownItemText,
-                                            mealType === type && styles.selectedDropdownItemText
+                                            { color: theme.colors.text },
+                                            mealType === type && { color: theme.colors.primary }
                                         ]}
                                     >
                                         {type}
                                     </Text>
                                     {mealType === type && (
-                                        <Ionicons name="checkmark" size={20} color="#8A2BE2" />
+                                        <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
                                     )}
                                 </TouchableOpacity>
                             ))}
@@ -1607,8 +1615,8 @@ const ImageCapture: React.FC = () => {
                 keyboardDismissMode="on-drag"
             >
                 <View style={styles.instructionsContainer}>
-                    <Text style={styles.instructionsTitle}>Capture Your Meal</Text>
-                    <Text style={styles.instructionsText}>
+                    <Text style={[styles.instructionsTitle, { color: theme.colors.text }]}>Capture Your Meal</Text>
+                    <Text style={[styles.instructionsText, { color: theme.colors.textSecondary }]}>
                         Angle your photo for best results. Use an optional side view for hidden parts, and add extra details if you like.
                     </Text>
                 </View>
@@ -1683,7 +1691,7 @@ const ImageCapture: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: '#000', // Will be overridden inline
     },
     header: {
         flexDirection: 'row',
@@ -1691,7 +1699,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: sidePadding,
         paddingBottom: 12,
-        backgroundColor: '#000',
+        backgroundColor: '#000', // Will be overridden inline
         zIndex: 10,
     },
     backButton: {
@@ -1704,7 +1712,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     dropdownIconContainer: {
-        backgroundColor: '#161618',
+        backgroundColor: '#161618', // Will be overridden inline
         borderRadius: 15,
         width: 30,
         height: 30,
@@ -1717,7 +1725,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
     },
     content: {
         paddingHorizontal: sidePadding,
@@ -1731,12 +1739,12 @@ const styles = StyleSheet.create({
     instructionsTitle: {
         fontSize: Platform.OS === 'ios' ? 20 : 22,
         fontWeight: 'bold',
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
         marginBottom: Platform.OS === 'ios' ? 4 : 6,
     },
     instructionsText: {
         fontSize: Platform.OS === 'ios' ? 12 : 13,
-        color: '#aaa',
+        color: '#aaa', // Will be overridden inline
         lineHeight: Platform.OS === 'ios' ? 16 : 18,
     },
     imagesContainer: {
@@ -1766,7 +1774,6 @@ const styles = StyleSheet.create({
         padding: 2,
     },
     addSideViewContent: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         paddingVertical: Platform.OS === 'ios' ? 12 : 16,
         paddingHorizontal: 20,
@@ -1776,13 +1783,13 @@ const styles = StyleSheet.create({
     },
     addSideViewText: {
         fontSize: Platform.OS === 'ios' ? 14 : 16,
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
         fontWeight: '600',
         marginTop: Platform.OS === 'ios' ? 6 : 8,
     },
     addSideViewSubtext: {
         fontSize: Platform.OS === 'ios' ? 11 : 13,
-        color: '#aaa',
+        color: '#aaa', // Will be overridden inline
         marginTop: 4,
     },
     swipeableContainer: {
@@ -1870,7 +1877,6 @@ const styles = StyleSheet.create({
     },
     imagePlaceholder: {
         flex: 1,
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         overflow: 'hidden',
         position: 'relative',
@@ -1929,7 +1935,6 @@ const styles = StyleSheet.create({
     optionalDetailsWrapper: {
         marginBottom: Platform.OS === 'ios' ? 6 : 12,
         borderRadius: 12,
-        backgroundColor: '#1a1a1a',
         overflow: 'hidden',
     },
     sectionHeader: {
@@ -1938,7 +1943,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingVertical: Platform.OS === 'ios' ? 8 : 12,
-        backgroundColor: '#1a1a1a',
     },
     sectionHeaderContent: {
         flexDirection: 'row',
@@ -1948,38 +1952,37 @@ const styles = StyleSheet.create({
     sectionHeaderTitle: {
         fontSize: Platform.OS === 'ios' ? 16 : 18,
         fontWeight: '600',
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
         marginLeft: 12,
     },
     sectionHeaderSubtitle: {
         fontSize: Platform.OS === 'ios' ? 12 : 14,
-        color: '#8A2BE2',
+        color: '#8A2BE2', // Will be overridden inline
         marginLeft: 8,
         fontWeight: '500',
     },
     optionalDetailsContent: {
         paddingHorizontal: 20,
         paddingBottom: Platform.OS === 'ios' ? 12 : 20,
-        backgroundColor: '#1a1a1a',
     },
     inputGroup: {
         marginBottom: Platform.OS === 'ios' ? 12 : 20,
     },
     inputLabel: {
         fontSize: Platform.OS === 'ios' ? 13 : 14,
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
         marginBottom: Platform.OS === 'ios' ? 6 : 8,
         fontWeight: '500',
     },
     modernInput: {
-        backgroundColor: '#2a2a2a',
+        backgroundColor: '#2a2a2a', // Will be overridden inline
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: Platform.OS === 'ios' ? 10 : 12,
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
         fontSize: Platform.OS === 'ios' ? 15 : 16,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: '#333', // Will be overridden inline
     },
     textAreaInput: {
         height: Platform.OS === 'ios' ? 60 : 80,
@@ -2006,7 +2009,7 @@ const styles = StyleSheet.create({
     submitText: {
         fontSize: Platform.OS === 'ios' ? 16 : 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: '#fff', // Always white on gradient button
     },
     loadingContainer: {
         flexDirection: 'row',
@@ -2027,18 +2030,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     dropdownContainer: {
-        backgroundColor: '#1e1e1e',
         borderRadius: 10,
         width: '80%',
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#333',
     },
     dropdownItem: {
         paddingVertical: 15,
         paddingHorizontal: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
+        borderBottomColor: '#333', // Will be overridden inline
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -2048,10 +2049,10 @@ const styles = StyleSheet.create({
     },
     dropdownItemText: {
         fontSize: 18,
-        color: '#fff',
+        color: '#fff', // Will be overridden inline
     },
     selectedDropdownItemText: {
-        color: '#8A2BE2',
+        color: '#8A2BE2', // Will be overridden inline
         fontWeight: 'bold',
     },
     headerBar: {
@@ -2082,10 +2083,8 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#1e1e1e',
         borderRadius: 8,
         padding: 12,
-        color: '#fff',
         fontSize: 16,
     },
     textArea: {
@@ -2155,7 +2154,6 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     gptAnalysisContainer: {
-        backgroundColor: '#1e1e1e',
         borderRadius: 6,
         padding: 15,
         width: '100%',

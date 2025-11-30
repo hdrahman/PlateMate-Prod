@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     FlatList, ActivityIndicator, TextInput, StatusBar, Platform, Linking
@@ -9,14 +9,7 @@ import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from '../components/RecipeCard';
 import { Recipe, searchRecipes } from '../api/recipes';
-
-// Define color constants for consistent theming
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
-const BLUE_ACCENT = '#0074dd';
+import { ThemeContext } from '../ThemeContext';
 
 // Define the route params type
 type SearchResultsParams = {
@@ -32,7 +25,7 @@ interface GradientBorderCardProps {
     style?: any;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps & { cardBackgroundColor: string }> = ({ children, style, cardBackgroundColor }) => {
     return (
         <View style={[styles.gradientBorderContainer, style]}>
             <LinearGradient
@@ -52,7 +45,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1,
                     borderRadius: 9,
-                    backgroundColor: '#121212',
+                    backgroundColor: cardBackgroundColor,
                     padding: 16,
                     flex: 1,
                 }}
@@ -66,6 +59,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 export default function SearchResults() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
     const route = useRoute<RouteProp<Record<string, SearchResultsParams>, string>>();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [searchQuery, setSearchQuery] = useState(route.params?.query || '');
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
@@ -123,25 +117,25 @@ export default function SearchResults() {
 
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
 
-                <GradientBorderCard style={styles.searchContainerWrapper}>
+                <GradientBorderCard style={styles.searchContainerWrapper} cardBackgroundColor={theme.colors.cardBackground}>
                     <View style={styles.searchContainer}>
-                        <Ionicons name="search" size={20} color={SUBDUED} />
+                        <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
                         <TextInput
                             ref={inputRef}
-                            style={styles.searchInput}
+                            style={[styles.searchInput, { color: theme.colors.text }]}
                             placeholder="Search recipes, ingredients..."
-                            placeholderTextColor={SUBDUED}
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                             onSubmitEditing={handleSearchSubmit}
@@ -152,7 +146,7 @@ export default function SearchResults() {
                                 onPress={() => setSearchQuery('')}
                                 style={styles.clearButton}
                             >
-                                <Ionicons name="close-circle" size={20} color={SUBDUED} />
+                                <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -162,12 +156,12 @@ export default function SearchResults() {
             <View style={styles.resultsContainer}>
                 {(loading || filtering) ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                        <Text style={styles.loadingText}>Searching for recipes...</Text>
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Searching for recipes...</Text>
                     </View>
                 ) : recipes.length > 0 ? (
                     <>
-                        <Text style={styles.resultCount}>
+                        <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>
                             {recipes.length} {recipes.length === 1 ? 'result' : 'results'} found
                         </Text>
                         <FlatList
@@ -183,7 +177,7 @@ export default function SearchResults() {
                             ListFooterComponent={() => (
                                 <View style={styles.attributionContainer}>
                                     <Text
-                                        style={styles.attributionText}
+                                        style={[styles.attributionText, { color: theme.colors.textSecondary }]}
                                         onPress={() => {
                                             Linking.openURL('https://www.fatsecret.com');
                                         }}
@@ -196,9 +190,9 @@ export default function SearchResults() {
                     </>
                 ) : (
                     <View style={styles.emptyContainer}>
-                        <Ionicons name="search-outline" size={60} color={SUBDUED} />
-                        <Text style={styles.emptyText}>No recipes found</Text>
-                        <Text style={styles.emptySubtext}>
+                        <Ionicons name="search-outline" size={60} color={theme.colors.textSecondary} />
+                        <Text style={[styles.emptyText, { color: theme.colors.text }]}>No recipes found</Text>
+                        <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                             Try different keywords or check your filters
                         </Text>
                         <TouchableOpacity
@@ -211,7 +205,7 @@ export default function SearchResults() {
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                             >
-                                <Text style={styles.retryButtonText}>Go Back</Text>
+                                <Text style={[styles.retryButtonText, { color: theme.colors.text }]}>Go Back</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -224,7 +218,6 @@ export default function SearchResults() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
@@ -257,7 +250,6 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         height: 36,
-        color: WHITE,
         fontSize: 16,
         marginLeft: 8,
     },
@@ -274,12 +266,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loadingText: {
-        color: WHITE,
         marginTop: 12,
         fontSize: 16,
     },
     resultCount: {
-        color: SUBDUED,
         fontSize: 14,
         marginBottom: 16,
     },
@@ -296,14 +286,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
     },
     emptyText: {
-        color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
         marginTop: 16,
         marginBottom: 8,
     },
     emptySubtext: {
-        color: SUBDUED,
         fontSize: 16,
         textAlign: 'center',
         marginBottom: 24,
@@ -322,7 +310,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     retryButtonText: {
-        color: WHITE,
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -339,7 +326,6 @@ const styles = StyleSheet.create({
     },
     attributionText: {
         fontSize: 12,
-        color: SUBDUED,
         textDecorationLine: 'underline',
         opacity: 0.8,
     },

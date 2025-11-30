@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { ThemeContext } from '../../ThemeContext';
 
 interface GoalsStepProps {
     profile: UserProfile;
@@ -17,6 +18,7 @@ interface GoalsStepProps {
 }
 
 const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [fitnessGoal, setFitnessGoal] = useState<string>(profile.fitnessGoal || 'fat_loss');
 
     useEffect(() => {
@@ -58,10 +60,10 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext })
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
-                <Text style={styles.title}>What's Your Goal?</Text>
-                <Text style={styles.subtitle}>Choose your primary fitness objective</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>What's Your Goal?</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Choose your primary fitness objective</Text>
             </View>
 
             <View style={styles.goalsContainer}>
@@ -70,6 +72,7 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext })
                         key={goal.id}
                         style={[
                             styles.goalCard,
+                            { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                             fitnessGoal === goal.id && styles.selectedGoal,
                             fitnessGoal === goal.id && { borderColor: goal.color }
                         ]}
@@ -84,19 +87,21 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ profile, updateProfile, onNext })
                                 <Ionicons
                                     name={goal.icon as any}
                                     size={32}
-                                    color={fitnessGoal === goal.id ? goal.color : '#666'}
+                                    color={fitnessGoal === goal.id ? goal.color : theme.colors.textSecondary}
                                 />
                             </View>
                         </View>
                         <View style={styles.goalContent}>
                             <Text style={[
                                 styles.goalLabel,
+                                { color: theme.colors.text },
                                 fitnessGoal === goal.id && { color: goal.color }
                             ]}>
                                 {goal.label}
                             </Text>
                             <Text style={[
                                 styles.goalDescription,
+                                { color: theme.colors.textSecondary },
                                 fitnessGoal === goal.id && styles.selectedGoalDescription
                             ]}>
                                 {goal.description}

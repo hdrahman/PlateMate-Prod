@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, SafeAreaView } from "react-native";
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { getYouTubersByCategory } from "../data/youtubers";
@@ -18,6 +19,7 @@ type TopicType = {
 };
 
 export default function Explore() {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [selectedTopic, setSelectedTopic] = useState<TopicType | null>(null);
 
     const topics: TopicType[] = [
@@ -67,11 +69,11 @@ export default function Explore() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.headerSection}>
-                <Text style={styles.headerText}>Explore</Text>
+                <Text style={[styles.headerText, { color: theme.colors.text }]}>Explore</Text>
                 {!selectedTopic && (
-                    <Text style={styles.subHeaderText}>Discover new content to improve your lifestyle</Text>
+                    <Text style={[styles.subHeaderText, { color: theme.colors.textSecondary }]}>Discover new content to improve your lifestyle</Text>
                 )}
             </View>
 
@@ -79,13 +81,13 @@ export default function Explore() {
                 <View style={styles.contentSection}>
                     <View style={styles.topicHeaderContainer}>
                         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color="white" />
+                            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text style={styles.selectedTopicText}>{selectedTopic.description}</Text>
+                        <Text style={[styles.selectedTopicText, { color: theme.colors.textSecondary }]}>{selectedTopic.description}</Text>
                     </View>
 
                     <View style={styles.categoryHeaderContainer}>
-                        <Text style={styles.categoryHeaderText}>{selectedTopic.title}</Text>
+                        <Text style={[styles.categoryHeaderText, { color: theme.colors.text }]}>{selectedTopic.title}</Text>
                     </View>
 
                     <View style={styles.categoryContainer}>

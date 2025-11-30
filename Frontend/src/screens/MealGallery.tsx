@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -19,6 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { getAllMealImages } from '../utils/database';
 import { getLocalStorageInfo } from '../utils/localFileStorage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../ThemeContext';
 
 const { width } = Dimensions.get('window');
 const PADDING = 16;
@@ -28,7 +29,6 @@ const IMAGE_SIZE = (width - (PADDING * 2) - (SPACING * (NUM_COLUMNS - 1))) / NUM
 
 // Theme colors
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const PURPLE_ACCENT = '#AA00FF';
@@ -67,6 +67,7 @@ interface MealStats {
 
 const MealGallery: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [mealImages, setMealImages] = useState<MealImage[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -177,7 +178,8 @@ const MealGallery: React.FC = () => {
             <TouchableOpacity
                 style={[
                     styles.imageContainer,
-                    isLeftColumn ? styles.leftColumn : styles.rightColumn
+                    isLeftColumn ? styles.leftColumn : styles.rightColumn,
+                    { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }
                 ]}
                 onPress={() => {
                     navigation.navigate('FoodDetail', { foodId: item.id });
@@ -193,13 +195,13 @@ const MealGallery: React.FC = () => {
                     style={styles.imageOverlay}
                 >
                     <View style={styles.overlayContent}>
-                        <Text style={styles.foodName} numberOfLines={2} ellipsizeMode="tail">
+                        <Text style={[styles.foodName, { color: theme.colors.text }]} numberOfLines={2} ellipsizeMode="tail">
                             {item.food_name}
                         </Text>
-                        <Text style={styles.mealInfo}>
+                        <Text style={[styles.mealInfo, { color: theme.colors.text }]}>
                             {item.meal_type} • {item.calories} cal
                         </Text>
-                        <Text style={styles.dateText}>
+                        <Text style={[styles.dateText, { color: theme.colors.text }]}>
                             {new Date(item.date).toLocaleDateString()}
                         </Text>
                     </View>
@@ -221,8 +223,8 @@ const MealGallery: React.FC = () => {
                 >
                     <View style={styles.summaryContent}>
                         <View style={styles.summaryHeader}>
-                            <Ionicons name="trophy" size={24} color={WHITE} />
-                            <Text style={styles.summaryTitle}>Your Food Journey</Text>
+                            <Ionicons name="trophy" size={24} color={theme.colors.text} />
+                            <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Your Food Journey</Text>
                         </View>
 
                         <View style={styles.statsGrid}>
@@ -267,9 +269,9 @@ const MealGallery: React.FC = () => {
 
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
-            <Ionicons name="camera-outline" size={64} color={SUBDUED} />
-            <Text style={styles.emptyTitle}>No Meal Images</Text>
-            <Text style={styles.emptySubtitle}>
+            <Ionicons name="camera-outline" size={64} color={theme.colors.textSecondary} />
+            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No Meal Images</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
                 Start logging your meals with photos to see them here!
             </Text>
         </View>
@@ -277,21 +279,21 @@ const MealGallery: React.FC = () => {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-                <View style={styles.header}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+                <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
+                <View style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color={WHITE} />
+                        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Meal Gallery</Text>
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Meal Gallery</Text>
                     <View style={styles.placeholder} />
                 </View>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                    <Text style={styles.loadingText}>Loading meal images...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading meal images...</Text>
                 </View>
             </SafeAreaView>
         );
@@ -299,24 +301,24 @@ const MealGallery: React.FC = () => {
 
     if (error) {
         return (
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-                <View style={styles.header}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+                <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
+                <View style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color={WHITE} />
+                        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Meal Gallery</Text>
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Meal Gallery</Text>
                     <View style={styles.placeholder} />
                 </View>
                 <View style={styles.errorContainer}>
-                    <Ionicons name="alert-circle-outline" size={64} color={SUBDUED} />
-                    <Text style={styles.errorTitle}>Something went wrong</Text>
-                    <Text style={styles.errorSubtitle}>{error}</Text>
-                    <TouchableOpacity style={styles.retryButton} onPress={loadMealImages}>
-                        <Text style={styles.retryButtonText}>Try Again</Text>
+                    <Ionicons name="alert-circle-outline" size={64} color={theme.colors.textSecondary} />
+                    <Text style={[styles.errorTitle, { color: theme.colors.text }]}>Something went wrong</Text>
+                    <Text style={[styles.errorSubtitle, { color: theme.colors.textSecondary }]}>{error}</Text>
+                    <TouchableOpacity style={[styles.retryButton, { backgroundColor: theme.colors.primary }]} onPress={loadMealImages}>
+                        <Text style={[styles.retryButtonText, { color: theme.colors.text }]}>Try Again</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -324,21 +326,21 @@ const MealGallery: React.FC = () => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
+            <View style={[styles.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Meal Gallery</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Meal Gallery</Text>
                 <TouchableOpacity
                     style={styles.summaryButton}
                     onPress={() => setShowSummary(!showSummary)}
                 >
-                    <Ionicons name={showSummary ? "stats-chart" : "stats-chart-outline"} size={24} color={WHITE} />
+                    <Ionicons name={showSummary ? "stats-chart" : "stats-chart-outline"} size={24} color={theme.colors.text} />
                 </TouchableOpacity>
             </View>
 
@@ -350,7 +352,7 @@ const MealGallery: React.FC = () => {
                         {showSummary && renderSummaryCard()}
 
                         <View style={styles.galleryHeader}>
-                            <Text style={styles.countText}>
+                            <Text style={[styles.countText, { color: theme.colors.textSecondary }]}>
                                 {mealImages.length} meal{mealImages.length !== 1 ? 's' : ''} with photos
                             </Text>
                         </View>
@@ -502,9 +504,7 @@ const styles = StyleSheet.create({
         height: IMAGE_SIZE + 80, // Increased height for better text display
         borderRadius: 12,
         overflow: 'hidden',
-        backgroundColor: CARD_BG,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,

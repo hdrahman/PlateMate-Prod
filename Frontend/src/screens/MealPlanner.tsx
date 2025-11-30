@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
     ScrollView, TextInput, Platform, Alert,
@@ -60,13 +60,9 @@ import { useFoodLog } from '../context/FoodLogContext';
 import SubscriptionManager from '../utils/SubscriptionManager';
 import SubscriptionService from '../services/SubscriptionService';
 import { BlurView } from 'expo-blur';
+import { ThemeContext } from '../ThemeContext';
 
-// Define color constants for consistent theming
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
+// Color constants removed - now using ThemeContext
 
 // Define types for the component props
 interface GradientBorderCardProps {
@@ -83,7 +79,8 @@ interface AutocompleteSuggestion {
 }
 
 // GradientBorderCard component moved outside to prevent re-creation
-const GradientBorderCard: React.FC<GradientBorderCardProps> = React.memo(({ children, style }) => {
+// Note: cardBackground should always be passed from theme.colors.cardBackground
+const GradientBorderCard: React.FC<GradientBorderCardProps & { cardBackground: string }> = React.memo(({ children, style, cardBackground }) => {
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
@@ -103,7 +100,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = React.memo(({ chil
                 style={{
                     margin: 1,
                     borderRadius: 9,
-                    backgroundColor: CARD_BG,
+                    backgroundColor: cardBackground,
                     padding: 16,
                     ...(style || {})
                 }}
@@ -121,7 +118,10 @@ const SearchInputComponent = React.memo(({
     onSubmitEditing,
     onFocus,
     onBlur,
-    isLoadingSuggestions
+    isLoadingSuggestions,
+    textColor,
+    textSecondaryColor,
+    primaryColor
 }: {
     searchQuery: string;
     onChangeText: (text: string) => void;
@@ -129,14 +129,17 @@ const SearchInputComponent = React.memo(({
     onFocus: () => void;
     onBlur: () => void;
     isLoadingSuggestions: boolean;
+    textColor: string;
+    textSecondaryColor: string;
+    primaryColor: string;
 }) => {
     return (
         <View style={styles.searchContainer}>
-            <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
+            <Ionicons name="search" size={22} color={textSecondaryColor} style={styles.searchIcon} />
             <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: textColor }]}
                 placeholder="Search recipes, ingredients..."
-                placeholderTextColor={SUBDUED}
+                placeholderTextColor={textSecondaryColor}
                 value={searchQuery}
                 onChangeText={onChangeText}
                 onSubmitEditing={onSubmitEditing}
@@ -150,7 +153,7 @@ const SearchInputComponent = React.memo(({
             {isLoadingSuggestions && (
                 <ActivityIndicator
                     size="small"
-                    color={PURPLE_ACCENT}
+                    color={primaryColor}
                     style={styles.searchLoadingIcon}
                 />
             )}
@@ -161,10 +164,16 @@ const SearchInputComponent = React.memo(({
 // Memoized suggestion item moved outside to prevent re-renders
 const SuggestionItem = React.memo(({
     item,
-    onPress
+    onPress,
+    textColor,
+    textSecondaryColor,
+    primaryColor
 }: {
     item: AutocompleteSuggestion;
     onPress: (item: AutocompleteSuggestion) => void;
+    textColor: string;
+    textSecondaryColor: string;
+    primaryColor: string;
 }) => (
     <TouchableOpacity
         style={styles.suggestionItem}
@@ -172,20 +181,20 @@ const SuggestionItem = React.memo(({
     >
         <View style={[
             styles.suggestionIconContainer,
-            { backgroundColor: item.type === 'recipe' ? '#AA00FF20' : '#00CFFF20' }
+            { backgroundColor: item.type === 'recipe' ? `${primaryColor}20` : '#00CFFF20' }
         ]}>
             <Ionicons
                 name={item.type === 'recipe' ? 'restaurant' : 'leaf'}
                 size={16}
-                color={item.type === 'recipe' ? '#AA00FF' : '#00CFFF'}
+                color={item.type === 'recipe' ? primaryColor : '#00CFFF'}
             />
         </View>
-        <Text style={styles.suggestionText}>
+        <Text style={[styles.suggestionText, { color: textColor }]}>
             {item.title || item.name || 'Unknown'}
         </Text>
         <Text style={[
             styles.suggestionType,
-            { color: item.type === 'recipe' ? '#AA00FF' : '#00CFFF' }
+            { color: item.type === 'recipe' ? primaryColor : '#00CFFF' }
         ]}>
             {item.type === 'recipe' ? 'Recipe' : 'Ingredient'}
         </Text>
@@ -194,6 +203,7 @@ const SuggestionItem = React.memo(({
 
 export default function MealPlanner() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { favorites } = useFavorites();
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -882,7 +892,7 @@ export default function MealPlanner() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             {renderErrorBanner()}
             <ScrollView
                 style={styles.scrollView}
@@ -892,14 +902,14 @@ export default function MealPlanner() {
             >
                 {/* Header Section */}
                 <View style={styles.headerInContent}>
-                    <Text style={styles.headerTitle}>Meal Planner</Text>
-                    <Text style={styles.headerSub}>
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Meal Planner</Text>
+                    <Text style={[styles.headerSub, { color: theme.colors.textSecondary }]}>
                         Get personalized meal plans and recipe ideas
                     </Text>
                 </View>
                 {/* Search Box */}
                 <View style={styles.searchWrapper}>
-                    <GradientBorderCard>
+                    <GradientBorderCard cardBackground={theme.colors.cardBackground}>
                         <SearchInputComponent
                             searchQuery={searchQuery}
                             onChangeText={handleSearchQueryChange}
@@ -907,12 +917,15 @@ export default function MealPlanner() {
                             onFocus={handleSearchFocus}
                             onBlur={handleSearchBlur}
                             isLoadingSuggestions={isLoadingSuggestions}
+                            textColor={theme.colors.text}
+                            textSecondaryColor={theme.colors.textSecondary}
+                            primaryColor={theme.colors.primary}
                         />
                     </GradientBorderCard>
 
                     {/* Autocomplete Suggestions */}
                     {showSuggestions && suggestions.length > 0 && (
-                        <View style={styles.suggestionsContainer}>
+                        <View style={[styles.suggestionsContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             <FlatList
                                 data={suggestions}
                                 keyExtractor={(item) => item.uniqueKey || `${item.type}-${item.id}-${Math.random()}`}
@@ -920,6 +933,9 @@ export default function MealPlanner() {
                                     <SuggestionItem
                                         item={item}
                                         onPress={handleSuggestionSelect}
+                                        textColor={theme.colors.text}
+                                        textSecondaryColor={theme.colors.textSecondary}
+                                        primaryColor={theme.colors.primary}
                                     />
                                 )}
                                 showsVerticalScrollIndicator={false}
@@ -939,21 +955,21 @@ export default function MealPlanner() {
                 </View>
 
                 {/* Scan Pantry Card */}
-                <GradientBorderCard>
+                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
                     <TouchableOpacity
                         style={styles.actionCardContent}
                         onPress={handleScanPantry}
                     >
-                        <View style={styles.actionIconContainer}>
-                            <Ionicons name="camera-outline" size={24} color={WHITE} />
+                        <View style={[styles.actionIconContainer, { backgroundColor: `${theme.colors.primary}33` }]}>
+                            <Ionicons name="camera-outline" size={24} color={theme.colors.text} />
                         </View>
                         <View style={styles.actionTextContainer}>
-                            <Text style={styles.actionTitle}>Scan Your Pantry</Text>
-                            <Text style={styles.actionSubtitle}>
+                            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Scan Your Pantry</Text>
+                            <Text style={[styles.actionSubtitle, { color: theme.colors.textSecondary }]}>
                                 Get recipe ideas based on what you have
                             </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={22} color={SUBDUED} />
+                        <Ionicons name="chevron-forward" size={22} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                 </GradientBorderCard>
 
@@ -961,7 +977,7 @@ export default function MealPlanner() {
                 {favorites.length > 0 && (
                     <>
                         <View style={styles.sectionHeaderContainer}>
-                            <Text style={styles.sectionTitle}>Favorite Recipes</Text>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Favorite Recipes</Text>
                             <TouchableOpacity
                                 onPress={() => setShowFavorites(!showFavorites)}
                                 style={styles.toggleButton}
@@ -969,7 +985,7 @@ export default function MealPlanner() {
                                 <Ionicons
                                     name={showFavorites ? "chevron-up" : "chevron-down"}
                                     size={24}
-                                    color={WHITE}
+                                    color={theme.colors.text}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -995,10 +1011,10 @@ export default function MealPlanner() {
                 )}
 
                 {/* Featured Recipes Section */}
-                <Text style={styles.sectionTitle}>Featured Recipes</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Featured Recipes</Text>
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
                     </View>
                 ) : (
                     featuredRecipes.map((recipe) => (
@@ -1022,39 +1038,39 @@ export default function MealPlanner() {
                 ))}
 
                 {/* Nutrition Summary Section */}
-                <GradientBorderCard>
-                    <Text style={styles.sectionTitle}>Today's Nutrition</Text>
-                    <View style={styles.dividerLine} />
+                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Today's Nutrition</Text>
+                    <View style={[styles.dividerLine, { backgroundColor: `${theme.colors.primary}4D` }]} />
                     <View style={styles.nutritionInfoContainer}>
                         <View style={styles.nutritionItem}>
-                            <Text style={styles.nutritionLabel}>Remaining Calories</Text>
-                            <Text style={styles.nutritionValue}>
+                            <Text style={[styles.nutritionLabel, { color: theme.colors.textSecondary }]}>Remaining Calories</Text>
+                            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
                                 {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.remainingCalories}
                             </Text>
                         </View>
                         <View style={styles.nutritionItem}>
-                            <Text style={styles.nutritionLabel}>Meals Left</Text>
-                            <Text style={styles.nutritionValue}>{!hasPremiumAccess ? '---' : dailyNutrition.mealsLeft}</Text>
+                            <Text style={[styles.nutritionLabel, { color: theme.colors.textSecondary }]}>Meals Left</Text>
+                            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>{!hasPremiumAccess ? '---' : dailyNutrition.mealsLeft}</Text>
                         </View>
                     </View>
                     <View style={styles.macrosContainer}>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>
+                            <Text style={[styles.macroValue, { color: theme.colors.text }]}>
                                 {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.carbs + 'g'}
                             </Text>
-                            <Text style={styles.macroLabel}>Carbs</Text>
+                            <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>
+                            <Text style={[styles.macroValue, { color: theme.colors.text }]}>
                                 {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.protein + 'g'}
                             </Text>
-                            <Text style={styles.macroLabel}>Protein</Text>
+                            <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <Text style={styles.macroValue}>
+                            <Text style={[styles.macroValue, { color: theme.colors.text }]}>
                                 {!hasPremiumAccess ? '---' : isDailyNutrientsLoading ? '...' : dailyNutrition.fat + 'g'}
                             </Text>
-                            <Text style={styles.macroLabel}>Fat</Text>
+                            <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Fat</Text>
                         </View>
                     </View>
                 </GradientBorderCard>
@@ -1062,7 +1078,7 @@ export default function MealPlanner() {
                 {/* FatSecret Attribution */}
                 <View style={styles.attributionContainer}>
                     <Text
-                        style={styles.attributionText}
+                        style={[styles.attributionText, { color: theme.colors.textSecondary }]}
                         onPress={() => {
                             Linking.openURL('https://www.fatsecret.com');
                         }}
@@ -1094,19 +1110,19 @@ export default function MealPlanner() {
                                     </Text>
                                     <View style={styles.paywallFeatures}>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Unlimited recipe access</Text>
                                         </View>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Personalized meal plans</Text>
                                         </View>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Pantry scanning</Text>
                                         </View>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
                                         </View>
                                     </View>
@@ -1139,19 +1155,19 @@ export default function MealPlanner() {
                                     </Text>
                                     <View style={styles.paywallFeatures}>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Unlimited recipe access</Text>
                                         </View>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Personalized meal plans</Text>
                                         </View>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Pantry scanning</Text>
                                         </View>
                                         <View style={styles.paywallFeature}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                                             <Text style={styles.paywallFeatureText}>Nutrition analysis</Text>
                                         </View>
                                     </View>
@@ -1180,7 +1196,6 @@ export default function MealPlanner() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         paddingHorizontal: 16,
@@ -1194,12 +1209,10 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 4,
     },
     headerSub: {
         fontSize: 14,
-        color: SUBDUED,
     },
     scrollView: {
         flex: 1,
@@ -1223,7 +1236,6 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         height: 40,
-        color: WHITE,
         fontSize: 16,
     },
     actionCardContent: {
@@ -1234,7 +1246,6 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(170, 0, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -1245,23 +1256,19 @@ const styles = StyleSheet.create({
     actionTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: WHITE,
         marginBottom: 2,
     },
     actionSubtitle: {
         fontSize: 12,
-        color: SUBDUED,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
         marginTop: 20,
         marginBottom: 12,
     },
     dividerLine: {
         height: 1,
-        backgroundColor: 'rgba(170, 0, 255, 0.3)',
         marginVertical: 12,
     },
     nutritionInfoContainer: {
@@ -1274,13 +1281,11 @@ const styles = StyleSheet.create({
     },
     nutritionLabel: {
         fontSize: 12,
-        color: SUBDUED,
         marginBottom: 4,
     },
     nutritionValue: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: WHITE,
     },
     macrosContainer: {
         flexDirection: 'row',
@@ -1294,11 +1299,9 @@ const styles = StyleSheet.create({
     macroValue: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: WHITE,
     },
     macroLabel: {
         fontSize: 12,
-        color: SUBDUED,
     },
     loadingContainer: {
         padding: 20,
@@ -1314,10 +1317,8 @@ const styles = StyleSheet.create({
     modalContent: {
         width: '90%',
         maxHeight: '80%',
-        backgroundColor: CARD_BG,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: PURPLE_ACCENT,
         overflow: 'hidden',
     },
     modalHeader: {
@@ -1331,7 +1332,6 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
     },
     closeButton: {
         padding: 4,
@@ -1342,15 +1342,12 @@ const styles = StyleSheet.create({
     preferenceLabel: {
         fontSize: 16,
         fontWeight: '600',
-        color: WHITE,
         marginTop: 12,
         marginBottom: 8,
     },
     preferenceInput: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 8,
         padding: 12,
-        color: WHITE,
         marginBottom: 16,
     },
     dietOption: {
@@ -1363,14 +1360,12 @@ const styles = StyleSheet.create({
     },
     dietOptionText: {
         fontSize: 16,
-        color: WHITE,
     },
     radioOuterCircle: {
         height: 20,
         width: 20,
         borderRadius: 10,
         borderWidth: 2,
-        borderColor: PURPLE_ACCENT,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1378,10 +1373,8 @@ const styles = StyleSheet.create({
         height: 10,
         width: 10,
         borderRadius: 5,
-        backgroundColor: PURPLE_ACCENT,
     },
     generateButton: {
-        backgroundColor: PURPLE_ACCENT,
         borderRadius: 8,
         padding: 16,
         alignItems: 'center',
@@ -1389,7 +1382,6 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     generateButtonText: {
-        color: WHITE,
         fontWeight: 'bold',
         fontSize: 16,
     },
@@ -1422,7 +1414,6 @@ const styles = StyleSheet.create({
     },
     switchOptionText: {
         fontSize: 16,
-        color: WHITE,
     },
     errorBanner: {
         flexDirection: 'row',
@@ -1451,10 +1442,8 @@ const styles = StyleSheet.create({
         top: 60, // Position below the search input
         left: 0,
         right: 0,
-        backgroundColor: CARD_BG,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: 'rgba(170, 0, 255, 0.3)',
         maxHeight: 200,
         zIndex: 1001,
         elevation: 5,
@@ -1475,7 +1464,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 15,
         borderBottomWidth: 1,
-        borderBottomColor: CARD_BG,
+        borderBottomColor: 'transparent',
         height: 48,
     },
     suggestionIconContainer: {
@@ -1488,12 +1477,10 @@ const styles = StyleSheet.create({
     },
     suggestionText: {
         flex: 1,
-        color: WHITE,
         fontSize: 14,
     },
     suggestionType: {
         fontSize: 12,
-        color: SUBDUED,
         marginLeft: 8,
     },
     attributionContainer: {
@@ -1505,7 +1492,6 @@ const styles = StyleSheet.create({
     },
     attributionText: {
         fontSize: 12,
-        color: SUBDUED,
         textDecorationLine: 'underline',
         opacity: 0.8,
     },

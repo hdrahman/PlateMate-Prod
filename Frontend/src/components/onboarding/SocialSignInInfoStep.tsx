@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -23,6 +24,7 @@ interface SocialSignInInfoStepProps {
 }
 
 const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [age, setAge] = useState(profile.age?.toString() || '');
     const [isLoading, setIsLoading] = useState(false);
@@ -100,7 +102,7 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
+            style={[styles.container, { backgroundColor: theme.colors.background }]}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <ScrollView
@@ -110,22 +112,22 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.header}>
-                    <Ionicons name="person-circle-outline" size={64} color="#0074dd" style={styles.headerIcon} />
-                    <Text style={styles.title}>Complete Your Profile</Text>
-                    <Text style={styles.subtitle}>
+                    <Ionicons name="person-circle-outline" size={64} color={theme.colors.primary} style={styles.headerIcon} />
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Complete Your Profile</Text>
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                         We need a bit more information to personalize your experience
                     </Text>
                 </View>
 
                 {/* First Name Input */}
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>First Name</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <Text style={[styles.label, { color: theme.colors.text }]}>First Name</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
+                        <Ionicons name="person-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { color: theme.colors.text }]}
                             placeholder="Enter your first name"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={firstName}
                             onChangeText={setFirstName}
                             autoCapitalize="words"
@@ -137,13 +139,13 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
 
                 {/* Age Input */}
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Age</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="calendar-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Age</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
+                        <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { color: theme.colors.text }]}
                             placeholder="Enter your age"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={age}
                             onChangeText={handleAgeInput}
                             keyboardType="number-pad"
@@ -151,7 +153,7 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
                             returnKeyType="done"
                             onSubmitEditing={handleContinue}
                         />
-                        <Text style={styles.inputSuffix}>years</Text>
+                        <Text style={[styles.inputSuffix, { color: theme.colors.textSecondary }]}>years</Text>
                     </View>
                 </View>
 
@@ -180,7 +182,7 @@ const SocialSignInInfoStep: React.FC<SocialSignInInfoStepProps> = ({ profile, up
                 </TouchableOpacity>
 
                 {/* Privacy Note */}
-                <Text style={styles.privacyNote}>
+                <Text style={[styles.privacyNote, { color: theme.colors.textSecondary }]}>
                     This information helps us customize your fitness and nutrition plan
                 </Text>
             </ScrollView>

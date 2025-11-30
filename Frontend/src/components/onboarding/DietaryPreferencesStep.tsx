@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { ThemeContext } from '../../ThemeContext';
 
 interface DietaryPreferencesStepProps {
     profile: UserProfile;
@@ -75,6 +76,7 @@ const commonAllergies = [
 ];
 
 const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [selectedDiet, setSelectedDiet] = useState<string>(profile.dietType || 'classic');
 
     useEffect(() => {
@@ -95,14 +97,14 @@ const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
-                <Text style={styles.title}>Dietary Preferences</Text>
-                <Text style={styles.subtitle}>Tell us about your eating habits</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Dietary Preferences</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Tell us about your eating habits</Text>
             </View>
 
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Do you follow a specific diet?</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Do you follow a specific diet?</Text>
 
                 <View style={styles.dietList}>
                     {dietTypes.map((diet) => (
@@ -110,28 +112,30 @@ const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile
                             key={diet.id}
                             style={[
                                 styles.dietCard,
-                                selectedDiet === diet.id && styles.selectedDiet
+                                { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
+                                selectedDiet === diet.id && [styles.selectedDiet, { borderColor: theme.colors.primary }]
                             ]}
                             onPress={() => setSelectedDiet(diet.id)}
                         >
-                            <View style={styles.dietIconContainer}>
+                            <View style={[styles.dietIconContainer, { backgroundColor: theme.colors.inputBackground }]}>
                                 <Ionicons
                                     name={diet.icon as any}
                                     size={24}
-                                    color={selectedDiet === diet.id ? '#0074dd' : '#777'}
+                                    color={selectedDiet === diet.id ? theme.colors.primary : theme.colors.textSecondary}
                                 />
                             </View>
                             <View style={styles.dietInfo}>
                                 <Text style={[
                                     styles.dietLabel,
-                                    selectedDiet === diet.id && styles.selectedDietText
+                                    { color: theme.colors.text },
+                                    selectedDiet === diet.id && { color: theme.colors.primary }
                                 ]}>
                                     {diet.label}
                                 </Text>
-                                <Text style={styles.dietDescription}>{diet.description}</Text>
+                                <Text style={[styles.dietDescription, { color: theme.colors.textSecondary }]}>{diet.description}</Text>
                             </View>
                             {selectedDiet === diet.id && (
-                                <Ionicons name="checkmark-circle" size={22} color="#0074dd" />
+                                <Ionicons name="checkmark-circle" size={22} color={theme.colors.primary} />
                             )}
                         </TouchableOpacity>
                     ))}
@@ -140,7 +144,7 @@ const DietaryPreferencesStep: React.FC<DietaryPreferencesStepProps> = ({ profile
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
                 <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    colors={[theme.colors.primary, "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.buttonGradient}

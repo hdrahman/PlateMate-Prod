@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -20,6 +20,7 @@ import { formatDateToString } from '../utils/dateUtils';
 import { addExercise, getCurrentUserIdAsync, getUserProfile } from '../utils/database';
 import { useSteps } from '../context/StepContext';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
+import { ThemeContext } from '../ThemeContext';
 
 // Define the Exercise interface
 interface Exercise {
@@ -45,11 +46,13 @@ interface ExerciseModalProps {
     currentDate: Date;
 }
 
-// Constants for colors
-const PRIMARY_BG = '#000000';
-const WHITE = '#FFFFFF';
+// Accent colors
 const PURPLE_ACCENT = '#AA00FF';
-const CARD_BG = '#1C1C1E';
+
+// Fallback colors (used in StyleSheet, overridden inline with theme where possible)
+const PRIMARY_BG = '#121212';
+const CARD_BG = '#1E1E1E';
+const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 
 const ExerciseModal: React.FC<ExerciseModalProps> = ({
@@ -58,6 +61,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
     onExerciseAdded,
     currentDate
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     // State variables for exercise modal
     const [selectedActivity, setSelectedActivity] = useState<METActivity | null>(null);
     const [exerciseDuration, setExerciseDuration] = useState('30');
@@ -763,7 +767,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             end={{ x: 1, y: 1 }}
                                         />
                                         <View style={styles.durationCard}>
-                                            <View style={styles.durationInputWrapper}>
+                                            <View style={[styles.durationInputWrapper, { backgroundColor: theme.colors.inputBackground }]}>
                                                 <TextInput
                                                     style={styles.durationInput}
                                                     keyboardType="number-pad"
@@ -780,6 +784,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                         key={index}
                                                         style={[
                                                             styles.durationPreset,
+                                                            { backgroundColor: theme.colors.inputBackground },
                                                             stepsCount === steps.toString() && styles.durationPresetSelected
                                                         ]}
                                                         onPress={() => setStepsCount(steps.toString())}
@@ -865,7 +870,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             end={{ x: 1, y: 1 }}
                                         />
                                         <View style={styles.durationCard}>
-                                            <View style={styles.durationInputWrapper}>
+                                            <View style={[styles.durationInputWrapper, { backgroundColor: theme.colors.inputBackground }]}>
                                                 <TextInput
                                                     style={styles.durationInput}
                                                     keyboardType="number-pad"
@@ -882,6 +887,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                         key={duration}
                                                         style={[
                                                             styles.durationPreset,
+                                                            { backgroundColor: theme.colors.inputBackground },
                                                             exerciseDuration === duration.toString() && styles.durationPresetSelected
                                                         ]}
                                                         onPress={() => setExerciseDuration(duration.toString())}
@@ -1351,7 +1357,7 @@ const styles = StyleSheet.create({
     durationInputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
+        // backgroundColor set dynamically via theme.colors.inputBackground
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -1375,7 +1381,7 @@ const styles = StyleSheet.create({
     },
     durationPreset: {
         flex: 1,
-        backgroundColor: '#1C1C1E',
+        // backgroundColor set dynamically via theme.colors.inputBackground
         borderRadius: 8,
         paddingVertical: 12,
         marginHorizontal: 2,

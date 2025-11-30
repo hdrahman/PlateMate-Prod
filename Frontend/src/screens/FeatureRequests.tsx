@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useContext } from 'react';
+import { ThemeContext } from '../ThemeContext';
 import {
     View,
     Text,
@@ -42,7 +43,8 @@ const FeatureRequestCard: React.FC<{
     isUpvoting: boolean;
     showRank?: boolean;
     rank?: number;
-}> = ({ request, onUpvote, isUpvoting, showRank = false, rank }) => {
+    theme: any;
+}> = ({ request, onUpvote, isUpvoting, showRank = false, rank, theme }) => {
     const statusConfig = STATUS_CONFIG[request.status as keyof typeof STATUS_CONFIG];
 
     const handleUpvote = useCallback(() => {
@@ -63,8 +65,8 @@ const FeatureRequestCard: React.FC<{
     return (
         <View style={styles.cardContainer}>
             <LinearGradient
-                colors={['#1E1E1E', '#2A2A2A']}
-                style={styles.card}
+                colors={[theme.colors.cardBackground, theme.colors.cardBackground]}
+                style={[styles.card, { borderColor: theme.colors.border }]}
             >
                 {/* Rank badge for leaderboard */}
                 {showRank && rank && (
@@ -83,43 +85,45 @@ const FeatureRequestCard: React.FC<{
                             {statusConfig.label}
                         </Text>
                     </View>
-                    <Text style={styles.dateText}>{formatDate(request.created_at)}</Text>
+                    <Text style={[styles.dateText, { color: theme.colors.textSecondary }]}>{formatDate(request.created_at)}</Text>
                 </View>
 
                 {/* Title and description */}
-                <Text style={styles.cardTitle} numberOfLines={2}>{request.title}</Text>
-                <Text style={styles.cardDescription} numberOfLines={3}>
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={2}>{request.title}</Text>
+                <Text style={[styles.cardDescription, { color: theme.colors.textSecondary }]} numberOfLines={3}>
                     {request.description}
                 </Text>
 
                 {/* Footer with author and prominent vote button */}
                 <View style={styles.cardFooter}>
                     <View style={styles.authorContainer}>
-                        <Ionicons name="person-outline" size={14} color="#888" />
-                        <Text style={styles.authorText}>{request.author_name}</Text>
+                        <Ionicons name="person-outline" size={14} color={theme.colors.textSecondary} />
+                        <Text style={[styles.authorText, { color: theme.colors.textSecondary }]}>{request.author_name}</Text>
                     </View>
 
                     <TouchableOpacity
                         style={[
                             styles.voteButton,
-                            request.user_upvoted && styles.voteButtonActive,
+                            { borderColor: theme.colors.primary },
+                            request.user_upvoted && [styles.voteButtonActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }],
                             isUpvoting && styles.voteButtonDisabled
                         ]}
                         onPress={handleUpvote}
                         disabled={isUpvoting}
                     >
                         {isUpvoting ? (
-                            <ActivityIndicator size="small" color="#FFF" />
+                            <ActivityIndicator size="small" color={theme.colors.text} />
                         ) : (
                             <>
                                 <Ionicons
                                     name={request.user_upvoted ? "arrow-up" : "arrow-up-outline"}
                                     size={20}
-                                    color={request.user_upvoted ? "#FFF" : "#9B00FF"}
+                                    color={request.user_upvoted ? theme.colors.text : theme.colors.primary}
                                 />
                                 <Text style={[
                                     styles.voteCount,
-                                    request.user_upvoted && styles.voteCountActive
+                                    { color: theme.colors.primary },
+                                    request.user_upvoted && [styles.voteCountActive, { color: theme.colors.text }]
                                 ]}>
                                     {request.upvotes}
                                 </Text>
@@ -150,22 +154,24 @@ const TabButton: React.FC<{
     isActive: boolean;
     onPress: () => void;
     count?: number;
-}> = ({ title, isActive, onPress, count }) => (
+    theme: any;
+}> = ({ title, isActive, onPress, count, theme }) => (
     <TouchableOpacity
-        style={[styles.tabButton, isActive && styles.tabButtonActive]}
+        style={[styles.tabButton, isActive && [styles.tabButtonActive, { backgroundColor: theme.colors.primary }]]}
         onPress={onPress}
     >
-        <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
+        <Text style={[styles.tabButtonText, { color: theme.colors.textSecondary }, isActive && [styles.tabButtonTextActive, { color: theme.colors.text }]]}>
             {title}
             {count !== undefined && ` (${count})`}
         </Text>
-        {isActive && <View style={styles.tabIndicator} />}
+        {isActive && <View style={[styles.tabIndicator, { backgroundColor: theme.colors.primary }]} />}
     </TouchableOpacity>
 );
 
 const FeatureRequestsScreen = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     // State
     const [activeTab, setActiveTab] = useState<TabType>('leaderboard');
@@ -280,8 +286,9 @@ const FeatureRequestsScreen = () => {
             isUpvoting={upvotingIds.has(item.id)}
             showRank={activeTab === 'leaderboard' && !searchQuery}
             rank={activeTab === 'leaderboard' && !searchQuery ? index + 1 : undefined}
+            theme={theme}
         />
-    ), [handleUpvote, upvotingIds, activeTab, searchQuery]);
+    ), [handleUpvote, upvotingIds, activeTab, searchQuery, theme]);
 
     // Render empty state
     const renderEmptyState = () => (
@@ -289,9 +296,9 @@ const FeatureRequestsScreen = () => {
             <Ionicons
                 name={activeTab === 'leaderboard' ? "trophy-outline" : "folder-outline"}
                 size={64}
-                color="#555"
+                color={theme.colors.textSecondary}
             />
-            <Text style={styles.emptyStateTitle}>
+            <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>
                 {searchQuery
                     ? 'No matching requests'
                     : activeTab === 'leaderboard'
@@ -299,7 +306,7 @@ const FeatureRequestsScreen = () => {
                         : 'No activity yet'
                 }
             </Text>
-            <Text style={styles.emptyStateSubtitle}>
+            <Text style={[styles.emptyStateSubtitle, { color: theme.colors.textSecondary }]}>
                 {searchQuery
                     ? 'Try adjusting your search terms'
                     : activeTab === 'leaderboard'
@@ -315,35 +322,37 @@ const FeatureRequestsScreen = () => {
     const renderHeader = () => (
         <View style={styles.headerContainer}>
             {/* Search bar */}
-            <View style={styles.searchContainer}>
-                <Ionicons name="search-outline" size={24} color="#888" />
+            <View style={[styles.searchContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                <Ionicons name="search-outline" size={24} color={theme.colors.textSecondary} />
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: theme.colors.text }]}
                     placeholder={`Search ${activeTab === 'leaderboard' ? 'leaderboard' : 'your activity'}...`}
-                    placeholderTextColor="#888"
+                    placeholderTextColor={theme.colors.textSecondary}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                 />
                 {searchQuery.length > 0 && (
                     <TouchableOpacity onPress={() => setSearchQuery('')}>
-                        <Ionicons name="close-outline" size={24} color="#888" />
+                        <Ionicons name="close-outline" size={24} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                 )}
             </View>
 
             {/* Tab navigation */}
-            <View style={styles.tabContainer}>
+            <View style={[styles.tabContainer, { backgroundColor: theme.colors.cardBackground }]}>
                 <TabButton
                     title="Leaderboard"
                     isActive={activeTab === 'leaderboard'}
                     onPress={() => setActiveTab('leaderboard')}
                     count={leaderboardRequests.length}
+                    theme={theme}
                 />
                 <TabButton
                     title="My Activity"
                     isActive={activeTab === 'my-activity'}
                     onPress={() => setActiveTab('my-activity')}
                     count={myRequests.length}
+                    theme={theme}
                 />
             </View>
 
@@ -359,23 +368,23 @@ const FeatureRequestsScreen = () => {
             {activeTab === 'leaderboard' && !searchQuery && leaderboardRequests.length > 0 && (
                 <View style={styles.leaderboardHeader}>
                     <Ionicons name="trophy" size={24} color="#FFD700" />
-                    <Text style={styles.leaderboardTitle}>Feature Request Leaderboard</Text>
-                    <Text style={styles.leaderboardSubtitle}>Most upvoted requests by the community</Text>
+                    <Text style={[styles.leaderboardTitle, { color: theme.colors.text }]}>Feature Request Leaderboard</Text>
+                    <Text style={[styles.leaderboardSubtitle, { color: theme.colors.textSecondary }]}>Most upvoted requests by the community</Text>
                 </View>
             )}
         </View>
     );
 
     return (
-        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Feature Requests</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Feature Requests</Text>
                 <View style={styles.headerRight} />
             </View>
 
@@ -400,8 +409,8 @@ const FeatureRequestsScreen = () => {
                     <RefreshControl
                         refreshing={isRefreshing}
                         onRefresh={handleRefresh}
-                        tintColor="#9B00FF"
-                        colors={["#9B00FF"]}
+                        tintColor={theme.colors.primary}
+                        colors={[theme.colors.primary]}
                     />
                 }
                 onEndReached={handleLoadMore}
@@ -414,7 +423,7 @@ const FeatureRequestsScreen = () => {
                 ListFooterComponent={
                     isLoading && currentRequests.length > 0 ? (
                         <View style={styles.loadingMore}>
-                            <ActivityIndicator size="small" color="#9B00FF" />
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
                         </View>
                     ) : null
                 }
@@ -422,23 +431,23 @@ const FeatureRequestsScreen = () => {
 
             {/* Floating Action Button */}
             <TouchableOpacity
-                style={styles.fab}
+                style={[styles.fab, { shadowColor: theme.colors.primary }]}
                 onPress={() => navigation.navigate('CreateFeatureRequest')}
                 activeOpacity={0.8}
             >
                 <LinearGradient
-                    colors={['#9B00FF', '#7B2CBF']}
+                    colors={[theme.colors.primary, theme.colors.primary]}
                     style={styles.fabGradient}
                 >
-                    <Ionicons name="add" size={32} color="#FFF" />
+                    <Ionicons name="add" size={32} color={theme.colors.text} />
                 </LinearGradient>
             </TouchableOpacity>
 
             {/* Loading overlay for initial load */}
             {isLoading && currentRequests.length === 0 && (
-                <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color="#9B00FF" />
-                    <Text style={styles.loadingText}>
+                <View style={[styles.loadingOverlay, { backgroundColor: theme.colors.background }]}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>
                         Loading {activeTab === 'leaderboard' ? 'leaderboard' : 'your activity'}...
                     </Text>
                 </View>
@@ -451,7 +460,7 @@ const FeatureRequestsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
+        backgroundColor: '#121212', // Overridden by theme.colors.background inline
     },
     header: {
         flexDirection: 'row',
@@ -484,13 +493,13 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1E1E1E',
+        backgroundColor: '#1E1E1E', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         paddingHorizontal: 20,
         paddingVertical: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#333',
+        borderColor: '#333', // Overridden by theme.colors.border inline
     },
     searchInput: {
         flex: 1,
@@ -500,7 +509,7 @@ const styles = StyleSheet.create({
     },
     tabContainer: {
         flexDirection: 'row',
-        backgroundColor: '#1E1E1E',
+        backgroundColor: '#1E1E1E', // Overridden by theme.colors.cardBackground inline
         borderRadius: 12,
         padding: 4,
         marginBottom: 16,
@@ -727,7 +736,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: '#121212',
+        backgroundColor: '#121212', // Overridden by theme.colors.background inline
         justifyContent: 'center',
         alignItems: 'center',
     },

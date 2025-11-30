@@ -37,6 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ExerciseModal from '../components/ExerciseModal';
 import WaterIntakeModal from '../components/WaterIntakeModal';
 import { useAuth } from '../context/AuthContext';
+import { ThemeContext } from '../ThemeContext';
 import { calculateNutritionGoals, getDefaultNutritionGoals } from '../utils/nutritionCalculator';
 import {
     getSuggestedUnitsForFood,
@@ -54,11 +55,7 @@ import FirstFoodLogPopup from '../components/FirstFoodLogPopup';
 const { width: screenWidth } = Dimensions.get('window');
 
 // Define theme colors at the top of the file, right after const { width: screenWidth } = Dimensions.get('window');
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
+// Constants removed as we are using ThemeContext
 
 // Helper function to format date as YYYY-MM-DD
 const formatDateToString = (date: Date): string => {
@@ -141,6 +138,7 @@ type FoodLogRouteParams = {
 };
 
 const DiaryScreen: React.FC = () => {
+    const { theme, isDarkTheme } = React.useContext(ThemeContext);
     const [mealData, setMealData] = useState<Meal[]>([]);
     const [breakfastEntries, setBreakfastEntries] = useState([]);
     const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
@@ -214,7 +212,7 @@ const DiaryScreen: React.FC = () => {
     // Additional style to ensure black background during transitions
     const containerStyle = {
         flex: 1,
-        backgroundColor: PRIMARY_BG, // PRIMARY_BG is '#000000'
+        backgroundColor: theme.colors.background,
     };
 
     // Initialize with default meal types on component mount
@@ -775,6 +773,7 @@ const DiaryScreen: React.FC = () => {
     }
 
     const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+        const { theme } = React.useContext(ThemeContext);
         return (
             <View style={styles.gradientBorderContainer}>
                 <LinearGradient
@@ -794,7 +793,7 @@ const DiaryScreen: React.FC = () => {
                     style={{
                         margin: 1,
                         borderRadius: 9,
-                        backgroundColor: style?.backgroundColor || '#121212',
+                        backgroundColor: style?.backgroundColor || theme.colors.cardBackground,
                         padding: 16,
                     }}
                 >
@@ -918,29 +917,29 @@ const DiaryScreen: React.FC = () => {
     const styles = StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: PRIMARY_BG,
+            backgroundColor: theme.colors.background,
         },
         header: {
             paddingVertical: 10,
             paddingHorizontal: 16,
-            backgroundColor: PRIMARY_BG,
+            backgroundColor: theme.colors.background,
         },
         headerTitle: {
             fontSize: 26,
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontWeight: '700',
             marginBottom: 4,
         },
         headerSub: {
             fontSize: 16,
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '400',
         },
         dayNavCard: {
             flexDirection: 'row' as const,
             alignItems: 'center' as const,
             justifyContent: 'space-between' as const,
-            backgroundColor: 'hsla(0, 0%, 100%, 0.07)',
+            backgroundColor: theme.dark ? 'hsla(0, 0%, 100%, 0.07)' : 'rgba(0,0,0,0.05)',
             borderRadius: 6,
             paddingVertical: 6,
             paddingHorizontal: 10,
@@ -955,7 +954,7 @@ const DiaryScreen: React.FC = () => {
         arrowSymbol: {
             fontSize: 18,
             fontWeight: 'bold',
-            color: '#FFF'
+            color: theme.colors.text
         },
 
         // Gradient border components
@@ -968,7 +967,7 @@ const DiaryScreen: React.FC = () => {
 
         // Calories Remaining Card
         summaryCard: {
-            backgroundColor: '#121212',
+            backgroundColor: theme.colors.cardBackground,
             marginTop: 3, // Reduced from 8 to 3 to minimize space
             marginBottom: 0, // Removed margin as it's handled by gradientBorderContainer
             borderRadius: 8,
@@ -977,7 +976,7 @@ const DiaryScreen: React.FC = () => {
         },
         summaryTitle: {
             fontSize: 16,
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '600',
             marginBottom: 8,
         },
@@ -998,7 +997,7 @@ const DiaryScreen: React.FC = () => {
             textAlign: 'center', // Center align text
         },
         equationSign: {
-            color: WHITE,
+            color: theme.colors.text,
             fontSize: 18, // Increase font size for better readability
             fontWeight: '300',
             marginRight: 10, // Shift slightly to the right
@@ -1006,7 +1005,7 @@ const DiaryScreen: React.FC = () => {
             textAlign: 'center', // Center align text
         },
         equationResult: {
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontSize: 20, // Increase font size for better readability
             fontWeight: '700',
             marginRight: 10, // Shift slightly to the right
@@ -1014,7 +1013,7 @@ const DiaryScreen: React.FC = () => {
             textAlign: 'center', // Center align text
         },
         equationLabel: {
-            color: SUBDUED,
+            color: theme.colors.textSecondary,
             fontSize: 12,
             marginTop: 4,
             marginRight: 10, // Shift slightly to the right
@@ -1023,7 +1022,7 @@ const DiaryScreen: React.FC = () => {
 
         // Meal/Exercise/Water Sections
         mealSection: {
-            backgroundColor: '#181818',
+            backgroundColor: theme.colors.cardBackground,
             marginHorizontal: 0,
             marginBottom: 0, // Removed margin as it's handled by gradientBorderContainer
             borderRadius: 8,
@@ -1038,31 +1037,31 @@ const DiaryScreen: React.FC = () => {
         },
         mealTitle: {
             fontSize: 16,
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '600',
         },
         mealCal: {
             fontSize: 16,
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '600',
         },
         macrosText: {
             fontSize: 13,
-            color: SUBDUED,
+            color: theme.colors.textSecondary,
             marginBottom: 8,
         },
 
         // Dividers
         dividerLine: {
             borderBottomWidth: 1,
-            borderBottomColor: '#333',
+            borderBottomColor: theme.colors.border,
             marginVertical: 5, // Reduced margin for tighter sections
             marginHorizontal: -20, // Extend beyond parent container padding
             width: '120%', // Ensure full width coverage
         },
         entryDividerLine: {
             borderBottomWidth: 1,
-            borderBottomColor: '#333',
+            borderBottomColor: theme.colors.border,
             marginTop: 6,
             marginBottom: 6,
             marginHorizontal: -20, // Extend beyond parent container padding
@@ -1077,17 +1076,17 @@ const DiaryScreen: React.FC = () => {
         },
         logItemText: {
             fontSize: 14,
-            color: WHITE,
+            color: theme.colors.text,
             lineHeight: 18,
             flexShrink: 1,
         },
         logItemDuration: {
             fontSize: 12,
-            color: SUBDUED,
+            color: theme.colors.textSecondary,
         },
         logCalText: {
             fontSize: 14,
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '500',
         },
 
@@ -1096,12 +1095,12 @@ const DiaryScreen: React.FC = () => {
             marginTop: 8,
             borderRadius: 6,
             borderWidth: 1,
-            borderColor: PURPLE_ACCENT,
+            borderColor: theme.colors.primary,
             paddingVertical: 6,
             alignItems: 'center' as const,
         },
         addBtnText: {
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontSize: 14,
             fontWeight: '600',
         },
@@ -1122,7 +1121,7 @@ const DiaryScreen: React.FC = () => {
         tabBtn: {
             flex: 1,
             borderWidth: 1,
-            borderColor: PURPLE_ACCENT,
+            borderColor: theme.colors.primary,
             borderRadius: 6,
             marginRight: 8,
             alignItems: 'center' as const,
@@ -1130,27 +1129,27 @@ const DiaryScreen: React.FC = () => {
             paddingVertical: 10,
         },
         tabBtnText: {
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontWeight: '600',
             fontSize: 14,
         },
         analyzeBtn: {
             flex: 1,
-            backgroundColor: PURPLE_ACCENT,
+            backgroundColor: theme.colors.primary,
             borderRadius: 6,
             alignItems: 'center' as const,
             justifyContent: 'center' as const,
             paddingVertical: 10,
             marginRight: 8,
             transform: [{ translateY: -2 }],
-            shadowColor: PURPLE_ACCENT,
+            shadowColor: theme.colors.primary,
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.6,
             shadowRadius: 10,
             elevation: 5,
         },
         analyzeBtnText: {
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '700',
             fontSize: 14,
         },
@@ -1177,12 +1176,14 @@ const DiaryScreen: React.FC = () => {
             top: 35,
             left: -150, // Shift to the left
             right: 10,
-            backgroundColor: '#333',
+            backgroundColor: theme.colors.cardBackground,
             padding: 20, // Increase padding for better readability
             borderRadius: 10,
             zIndex: 1,
             overflow: 'hidden',
             width: 250, // Make the dropdown text a lot wider
+            borderWidth: 1,
+            borderColor: theme.colors.border,
         },
         streakInfoArrow: {
             position: 'absolute',
@@ -1198,20 +1199,20 @@ const DiaryScreen: React.FC = () => {
             backgroundColor: 'transparent',
             borderLeftColor: 'transparent',
             borderRightColor: 'transparent',
-            borderBottomColor: '#333',
+            borderBottomColor: theme.colors.cardBackground,
         },
         streakInfoText: {
-            color: '#FFF',
+            color: theme.colors.text,
             fontSize: 12,
         },
         loadingContainer: {
             flex: 1,
             justifyContent: 'center' as const,
             alignItems: 'center' as const,
-            backgroundColor: '#121212',
+            backgroundColor: theme.colors.background,
         },
         loadingText: {
-            color: '#fff',
+            color: theme.colors.text,
             marginTop: 10,
             fontSize: 16,
         },
@@ -1252,40 +1253,42 @@ const DiaryScreen: React.FC = () => {
             paddingHorizontal: 16,
         },
         actionModalContent: {
-            backgroundColor: '#1C1C1E',
+            backgroundColor: theme.colors.cardBackground,
             padding: 20,
             borderRadius: 10,
             width: '80%',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
         },
         actionModalTitle: {
             fontSize: 18,
             fontWeight: 'bold',
-            color: WHITE,
+            color: theme.colors.text,
             marginBottom: 15,
             textAlign: 'center',
         },
         actionButton: {
             flexDirection: 'row' as const,
             alignItems: 'center' as const,
-            backgroundColor: '#252525',
+            backgroundColor: theme.colors.inputBackground,
             padding: 15,
             borderRadius: 8,
             marginBottom: 10,
             width: '100%',
         },
         actionButtonText: {
-            color: WHITE,
+            color: theme.colors.text,
             fontSize: 16,
             marginLeft: 10,
         },
         deleteButton: {
-            backgroundColor: '#3A0505',
+            backgroundColor: theme.dark ? '#3A0505' : '#FFEBEE',
         },
         deleteButtonText: {
             color: '#FF5252',
         },
         cancelButton: {
-            backgroundColor: '#333',
+            backgroundColor: theme.colors.border,
             padding: 15,
             borderRadius: 8,
             width: '100%',
@@ -1293,7 +1296,7 @@ const DiaryScreen: React.FC = () => {
             marginTop: 5,
         },
         cancelButtonText: {
-            color: '#AAA',
+            color: theme.colors.textSecondary,
             fontSize: 16,
         },
         exitButton: {
@@ -1309,11 +1312,13 @@ const DiaryScreen: React.FC = () => {
             zIndex: 10,
         },
         moveModalContent: {
-            backgroundColor: '#1C1C1E',
+            backgroundColor: theme.colors.cardBackground,
             borderRadius: 12,
             width: '85%',
             maxWidth: 350,
             padding: 20,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
         },
         moveModalHeader: {
             flexDirection: 'row',
@@ -1324,12 +1329,12 @@ const DiaryScreen: React.FC = () => {
         moveModalTitle: {
             fontSize: 18,
             fontWeight: '600',
-            color: '#8A7AFF',
+            color: theme.colors.primary,
             marginBottom: 2,
         },
         moveModalSubtitle: {
             fontSize: 14,
-            color: '#999',
+            color: theme.colors.textSecondary,
             fontWeight: '400',
         },
         modalCloseButton: {
@@ -1342,69 +1347,69 @@ const DiaryScreen: React.FC = () => {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            backgroundColor: '#2C2C2E',
+            backgroundColor: theme.colors.inputBackground,
             padding: 16,
             borderRadius: 8,
             marginBottom: 8,
         },
         disabledMealTypeButton: {
-            backgroundColor: '#1A1A1A',
+            backgroundColor: theme.colors.cardBackground,
             opacity: 0.6,
         },
         cleanMealTypeText: {
             fontSize: 16,
-            color: WHITE,
+            color: theme.colors.text,
             fontWeight: '500',
         },
         disabledMealTypeText: {
-            color: '#666',
+            color: theme.colors.textSecondary,
         },
         cleanCancelButton: {
-            backgroundColor: '#333',
+            backgroundColor: theme.colors.border,
             padding: 14,
             borderRadius: 8,
             alignItems: 'center',
             borderWidth: 1,
-            borderColor: '#444',
+            borderColor: theme.colors.border,
         },
         cleanCancelButtonText: {
-            color: '#AAA',
+            color: theme.colors.textSecondary,
             fontSize: 16,
             fontWeight: '500',
         },
         mealTypeButton: {
             padding: 15,
             borderWidth: 1,
-            borderColor: PURPLE_ACCENT,
+            borderColor: theme.colors.primary,
             borderRadius: 8,
             marginBottom: 10,
             width: '100%',
             alignItems: 'center',
         },
         currentMealType: {
-            backgroundColor: '#2D1640',
+            backgroundColor: theme.colors.primary + '20',
         },
         mealTypeButtonText: {
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontSize: 16,
         },
         buttonText: {
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontSize: 16,
         },
         weightText: {
             fontSize: 12,
-            color: '#999999',
+            color: theme.colors.textSecondary,
             marginTop: 2,
         },
         macroGoalsContainer: {
             marginTop: 15,
             paddingTop: 15,
             borderTopWidth: 1,
-            borderTopColor: 'rgba(255, 255, 255, 0.1)',
+            borderTopColor: theme.colors.border,
         },
         macroGoalsTitle: {
-            color: '#FFFFFF',
+            color: theme.colors.text,
             fontSize: 14,
             fontWeight: '600',
             marginBottom: 10,
@@ -1420,9 +1425,10 @@ const DiaryScreen: React.FC = () => {
         macroGoalValue: {
             fontSize: 16,
             fontWeight: '700',
+            color: theme.colors.text,
         },
         macroGoalLabel: {
-            color: '#AAAAAA',
+            color: theme.colors.textSecondary,
             fontSize: 12,
             marginTop: 2,
         },
@@ -1432,7 +1438,7 @@ const DiaryScreen: React.FC = () => {
             marginBottom: 10,
             borderRadius: 10,
             padding: 10,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            backgroundColor: theme.dark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
         },
         filterBannerGradient: {
             borderRadius: 10,
@@ -1444,7 +1450,7 @@ const DiaryScreen: React.FC = () => {
             alignItems: 'center',
         },
         filterBannerText: {
-            color: WHITE,
+            color: theme.colors.text,
             fontSize: 14,
             fontWeight: '600',
         },
@@ -1458,7 +1464,7 @@ const DiaryScreen: React.FC = () => {
         waterProgressBar: {
             flex: 1,
             height: 8,
-            backgroundColor: '#333',
+            backgroundColor: theme.colors.border,
             borderRadius: 4,
             overflow: 'hidden',
             marginRight: 12,
@@ -1466,10 +1472,10 @@ const DiaryScreen: React.FC = () => {
         waterProgressFill: {
             height: '100%',
             borderRadius: 4,
-            backgroundColor: PURPLE_ACCENT,
+            backgroundColor: theme.colors.primary,
         },
         waterProgressText: {
-            color: WHITE,
+            color: theme.colors.text,
             fontSize: 12,
             fontWeight: '600',
             minWidth: 35,
@@ -1479,12 +1485,12 @@ const DiaryScreen: React.FC = () => {
             alignItems: 'baseline',
         },
         waterCurrentAmount: {
-            color: PURPLE_ACCENT,
+            color: theme.colors.primary,
             fontSize: 14,
             fontWeight: '600',
         },
         waterGoalAmount: {
-            color: SUBDUED,
+            color: theme.colors.textSecondary,
             fontSize: 12,
             fontWeight: '400',
         },
@@ -1943,7 +1949,7 @@ const DiaryScreen: React.FC = () => {
         return exerciseList.map((exercise, index) => (
             <View key={index}>
                 <TouchableHighlight
-                    underlayColor="#333"
+                    underlayColor={theme.colors.border}
                     onLongPress={() => {
                         handleExerciseItemLongPress(exercise.id, exercise.exercise_name, index);
                     }}
@@ -2197,12 +2203,12 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                     style={styles.filterBannerGradient}
                 >
                     <View style={styles.filterBannerContent}>
-                        <Ionicons name="filter" size={20} color="#AA00FF" />
+                        <Ionicons name="filter" size={20} color={theme.colors.primary} />
                         <Text style={styles.filterBannerText}>
                             Viewing items from the same meal
                         </Text>
                         <TouchableOpacity>
-                            <Ionicons name="close-circle" size={20} color="#AA00FF" />
+                            <Ionicons name="close-circle" size={20} color={theme.colors.primary} />
                         </TouchableOpacity>
                     </View>
                 </LinearGradient>
@@ -2262,7 +2268,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                         </View>
                         <View style={styles.dayNavCard}>
                             <TouchableOpacity onPress={gotoPrevDay} style={styles.arrowButton}>
-                                <Ionicons name="chevron-back" size={16} color="#FFF" />
+                                <Ionicons name="chevron-back" size={16} color={theme.colors.text} />
                             </TouchableOpacity>
                             <Animated.View style={{ transform: [{ translateX: dateSlideInterpolation }] }}>
                                 <Text style={[styles.headerSub, { fontSize: 14 }]}>
@@ -2270,7 +2276,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                 </Text>
                             </Animated.View>
                             <TouchableOpacity onPress={gotoNextDay} style={styles.arrowButton}>
-                                <Ionicons name="chevron-forward" size={16} color="#FFF" />
+                                <Ionicons name="chevron-forward" size={16} color={theme.colors.text} />
                             </TouchableOpacity>
                         </View>
                         <View style={{ height: 5 }} /> {/* Reduced space below the Today bar */}
@@ -2389,7 +2395,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                                         return (
                                                             <TouchableHighlight
                                                                 key={i}
-                                                                underlayColor="#333"
+                                                                underlayColor={theme.colors.border}
                                                                 onPress={() => handleFoodItemTap(foodId)}
                                                                 onLongPress={() => {
                                                                     handleFoodItemLongPress(foodId, foodName, meal.title, i);
@@ -2470,7 +2476,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                                     styles.waterProgressFill,
                                                     {
                                                         width: `${Math.min(100, (totalWaterIntake / (userProfile?.water_goal || 2500)) * 100)}%`,
-                                                        backgroundColor: totalWaterIntake >= (userProfile?.water_goal || 2500) ? '#4CAF50' : '#AA00FF'
+                                                        backgroundColor: totalWaterIntake >= (userProfile?.water_goal || 2500) ? '#4CAF50' : theme.colors.primary
                                                     }
                                                 ]}
                                             />
@@ -2523,7 +2529,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
 
                                         // Enhanced message with deficit/surplus info
                                         let displayText = '';
-                                        let textColor = '#AAAAAA';
+                                        let textColor = theme.colors.textSecondary;
 
                                         // Check if user prefers imperial units
                                         const isImperial = !userProfile?.use_metric_system;
@@ -2576,7 +2582,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                                     onPress={() => (navigation as any).navigate('AboutCalculations')}
                                                     style={{ marginTop: 4 }}
                                                 >
-                                                    <Text style={{ color: '#AA00FF', fontSize: 11, textDecorationLine: 'underline' }}>
+                                                    <Text style={{ color: theme.colors.primary, fontSize: 11, textDecorationLine: 'underline' }}>
                                                         Learn about our calculations
                                                     </Text>
                                                 </TouchableOpacity>
@@ -2612,7 +2618,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                             setMoveModalVisible(true);
                                         }}
                                     >
-                                        <Ionicons name="arrow-forward-circle-outline" size={22} color="#8A2BE2" />
+                                        <Ionicons name="arrow-forward-circle-outline" size={22} color={theme.colors.primary} />
                                         <Text style={styles.actionButtonText}>Move to Different Meal</Text>
                                     </TouchableOpacity>
 
@@ -2628,7 +2634,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                         style={styles.exitButton}
                                         onPress={() => setActionModalVisible(false)}
                                     >
-                                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                                        <Ionicons name="close" size={28} color={theme.colors.primary} />
                                     </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
@@ -2659,7 +2665,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                             style={styles.modalCloseButton}
                                             onPress={() => setMoveModalVisible(false)}
                                         >
-                                            <Ionicons name="close" size={20} color="#999" />
+                                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                                         </TouchableOpacity>
                                     </View>
 
@@ -2800,7 +2806,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                         style={styles.exitButton}
                                         onPress={() => setExerciseActionModalVisible(false)}
                                     >
-                                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                                        <Ionicons name="close" size={28} color={theme.colors.primary} />
                                     </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
@@ -2844,8 +2850,8 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                 {/* Loading overlay */}
                 {loading && (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                        <Text style={styles.loadingText}>Processing...</Text>
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Processing...</Text>
                     </View>
                 )}
 

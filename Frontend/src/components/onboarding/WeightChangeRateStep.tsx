@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -17,6 +18,7 @@ interface WeightChangeRateStepProps {
 }
 
 const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, updateProfile, onNext, fitnessGoalOverride }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [weightGoal, setWeightGoal] = useState<string>(profile.weightGoal || 'maintain');
 
     // Determine the effective fitness goal (from override or profile)
@@ -80,10 +82,10 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
     }, [weightGoal]);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>Choose Your Rate</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Choose Your Rate</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                     Based on your goal of "{effectiveGoal === 'fat_loss' ? 'weight loss' :
                         effectiveGoal === 'muscle_gain' ? 'muscle gain' : 'balanced fitness'}",
                     choose a comfortable rate of progress
@@ -97,6 +99,7 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
                             key={option.id}
                             style={[
                                 styles.rateCard,
+                                { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                                 weightGoal === option.id && styles.selectedRate,
                                 weightGoal === option.id && { borderColor: option.color }
                             ]}
@@ -112,13 +115,15 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
                             <View style={styles.rateContent}>
                                 <Text style={[
                                     styles.rateLabel,
+                                    { color: theme.colors.text },
                                     weightGoal === option.id && { color: option.color }
                                 ]}>
                                     {option.label}
                                 </Text>
                                 <Text style={[
                                     styles.rateDescription,
-                                    weightGoal === option.id && styles.selectedRateDescription
+                                    { color: theme.colors.textSecondary },
+                                    weightGoal === option.id && { color: theme.colors.text }
                                 ]}>
                                     {option.description}
                                 </Text>
@@ -130,9 +135,9 @@ const WeightChangeRateStep: React.FC<WeightChangeRateStepProps> = ({ profile, up
                     ))}
                 </View>
 
-                <View style={styles.infoContainer}>
-                    <Ionicons name="information-circle-outline" size={20} color="#0074dd" />
-                    <Text style={styles.infoText}>
+                <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                    <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+                    <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                         Your pace determines how aggressive your calorie deficit or surplus will be.
                         Slower rates are more sustainable long-term.
                     </Text>

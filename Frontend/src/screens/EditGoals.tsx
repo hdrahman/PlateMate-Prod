@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
 import {
     View,
     Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +30,6 @@ import { getCheatDaySettings, updateCheatDaySettings, getCheatDayProgress, Cheat
 
 // Constants for colors - matching EditProfile
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
@@ -82,7 +82,7 @@ const FITNESS_GOALS = [
 ];
 
 // Create a GradientBorder component for form sections
-const GradientBorderBox = ({ children, style }: { children: React.ReactNode, style?: any }) => {
+const GradientBorderBox = ({ children, style, cardBackgroundColor }: { children: React.ReactNode, style?: any, cardBackgroundColor?: string }) => {
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
@@ -91,7 +91,7 @@ const GradientBorderBox = ({ children, style }: { children: React.ReactNode, sty
                 end={{ x: 1, y: 0 }}
                 style={styles.gradientBorder}
             />
-            <View style={[styles.gradientBorderInner, style]}>
+            <View style={[styles.gradientBorderInner, cardBackgroundColor ? { backgroundColor: cardBackgroundColor } : {}, style]}>
                 {children}
             </View>
         </View>
@@ -101,6 +101,7 @@ const GradientBorderBox = ({ children, style }: { children: React.ReactNode, sty
 export default function EditGoals() {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [activeTab, setActiveTab] = useState('nutrition');
     const [isLoading, setIsLoading] = useState(false);
     const [isFetchingData, setIsFetchingData] = useState(true);
@@ -739,8 +740,8 @@ export default function EditGoals() {
         if (isFetchingData) {
             return (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={BLUE_ACCENT} />
-                    <Text style={styles.loadingText}>Loading your goals...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading your goals...</Text>
                 </View>
             );
         }
@@ -762,52 +763,52 @@ export default function EditGoals() {
             >
                 {/* Summary Card */}
                 <LinearGradient
-                    colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                    colors={[theme.colors.primary, GRADIENT_MIDDLE, GRADIENT_END]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.summaryCard}
                 >
                     <View style={styles.summaryContent}>
-                        <Text style={styles.summaryTitle}>Nutrition Goals</Text>
+                        <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Nutrition Goals</Text>
                         <View style={styles.summaryStats}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>
+                                <Text style={[styles.statValue, { color: theme.colors.text }]}>
                                     {dbGoals.calorieGoal ? dbGoals.calorieGoal : "---"}
                                 </Text>
-                                <Text style={styles.statLabel}>Calories/day</Text>
+                                <Text style={[styles.statLabel, { color: theme.colors.text }]}>Calories/day</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>
+                                <Text style={[styles.statValue, { color: theme.colors.text }]}>
                                     {isImperialUnits && dbGoals.targetWeight
                                         ? `${Math.round(kgToLbs(dbGoals.targetWeight))} lbs`
                                         : dbGoals.targetWeight
                                             ? `${dbGoals.targetWeight} kg`
                                             : "---"}
                                 </Text>
-                                <Text style={styles.statLabel}>Target Weight</Text>
+                                <Text style={[styles.statLabel, { color: theme.colors.text }]}>Target Weight</Text>
                             </View>
                         </View>
                     </View>
                 </LinearGradient>
 
                 {/* Weight & Calorie Goals */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Weight & Calorie Goals</Text>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Weight & Calorie Goals</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
                             Target Weight {isImperialUnits ? '(lbs)' : '(kg)'}
                         </Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.targetWeight ? formValues.targetWeight.toString() : ''}
                             onChangeText={(text) => updateFormValue('targetWeight', text ? parseFloat(text) : '')}
                             placeholder={`${isImperialUnits ? 'Enter target weight in pounds' : 'Enter target weight in kilograms'} or leave empty`}
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="decimal-pad"
                         />
-                        <Text style={styles.inputHint}>
+                        <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                             {isImperialUnits
                                 ? 'Enter your target weight in pounds or leave empty'
                                 : 'Enter your target weight in kilograms or leave empty'}
@@ -815,57 +816,57 @@ export default function EditGoals() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Daily Calorie Goal</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Daily Calorie Goal</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.calorieGoal ? formValues.calorieGoal.toString() : ''}
                             onChangeText={(text) => updateFormValue('calorieGoal', text ? parseInt(text) : '')}
                             placeholder="Enter calorie goal or leave empty"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
-                        <Text style={styles.inputHint}>
+                        <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                             Enter your daily calorie goal or leave empty
                         </Text>
                     </View>
                 </GradientBorderBox>
 
                 {/* Macronutrient Goals */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Macronutrient Goals</Text>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Macronutrient Goals</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Protein (g)</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Protein (g)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.proteinGoal?.toString() || ''}
                             onChangeText={(text) => updateFormValue('proteinGoal', text ? parseInt(text) : undefined)}
                             placeholder="Enter protein goal"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Carbohydrates (g)</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Carbohydrates (g)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.carbGoal?.toString() || ''}
                             onChangeText={(text) => updateFormValue('carbGoal', text ? parseInt(text) : undefined)}
                             placeholder="Enter carb goal"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Fat (g)</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Fat (g)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.fatGoal?.toString() || ''}
                             onChangeText={(text) => updateFormValue('fatGoal', text ? parseInt(text) : undefined)}
                             placeholder="Enter fat goal"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
@@ -876,35 +877,35 @@ export default function EditGoals() {
                             onPress={handleReset}
                             disabled={isLoading}
                         >
-                            <Ionicons name="refresh-outline" size={14} color={GRADIENT_START} />
-                            <Text style={styles.resetButtonText}>Reset to Recommended Values</Text>
+                            <Ionicons name="refresh-outline" size={14} color={theme.colors.primary} />
+                            <Text style={[styles.resetButtonText, { color: theme.colors.primary }]}>Reset to Recommended Values</Text>
                         </TouchableOpacity>
                     </View>
                 </GradientBorderBox>
 
                 {/* Activity Profile */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Activity Profile</Text>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Activity Profile</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Fitness Goal</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Fitness Goal</Text>
                         <TouchableOpacity
-                            style={styles.wheelPickerButton}
+                            style={[styles.wheelPickerButton, { backgroundColor: theme.colors.inputBackground }]}
                             onPress={() => setShowFitnessGoalPicker(true)}
                         >
-                            <Text style={styles.wheelPickerButtonText}>
+                            <Text style={[styles.wheelPickerButtonText, { color: theme.colors.text }]}>
                                 {getFitnessGoalLabel(formValues.fitnessGoal)}
                             </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Activity Level</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Activity Level</Text>
                         <View style={styles.activitySliderContainer}>
                             <View style={styles.sliderLabels}>
-                                <Text style={styles.sliderLabel}>Less Active</Text>
-                                <Text style={styles.sliderLabel}>More Active</Text>
+                                <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>Less Active</Text>
+                                <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>More Active</Text>
                             </View>
                             <Slider
                                 style={{ width: '100%', height: 40 }}
@@ -916,15 +917,15 @@ export default function EditGoals() {
                                     setActivityLevelIndex(value);
                                     updateFormValue('activityLevel', getActivityLevelKey(value));
                                 }}
-                                minimumTrackTintColor={GRADIENT_START}
-                                maximumTrackTintColor={LIGHT_GRAY}
-                                thumbTintColor={GRADIENT_MIDDLE}
+                                minimumTrackTintColor={theme.colors.primary}
+                                maximumTrackTintColor={theme.colors.border}
+                                thumbTintColor={theme.colors.primary}
                             />
                             <View style={styles.activityLevelInfo}>
-                                <Text style={styles.activityLevelTitle}>
+                                <Text style={[styles.activityLevelTitle, { color: theme.colors.text }]}>
                                     {ACTIVITY_LEVELS[activityLevelIndex]?.label}
                                 </Text>
-                                <Text style={styles.activityLevelDescription}>
+                                <Text style={[styles.activityLevelDescription, { color: theme.colors.textSecondary }]}>
                                     {ACTIVITY_LEVELS[activityLevelIndex]?.description}
                                 </Text>
                             </View>
@@ -932,9 +933,9 @@ export default function EditGoals() {
 
                         {/* Step Tracking Mode Info */}
                         {stepTrackingMode !== 'disabled' && (
-                            <View style={styles.stepTrackingInfo}>
-                                <Ionicons name="information-circle-outline" size={18} color="#0074dd" />
-                                <Text style={styles.stepTrackingInfoText}>
+                            <View style={[styles.stepTrackingInfo, { borderColor: `${theme.colors.primary}4D` }]}>
+                                <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} />
+                                <Text style={[styles.stepTrackingInfoText, { color: theme.colors.primary }]}>
                                     {stepTrackingMode === 'with_calories'
                                         ? 'Step tracking is enabled with dynamic calories. Your base calories use a sedentary level, but protein and macros are calculated based on your selected activity level above.'
                                         : 'Step tracking is enabled without calorie adjustments. Your steps are tracked for motivation, and all calculations use your selected activity level.'}
@@ -945,29 +946,29 @@ export default function EditGoals() {
                 </GradientBorderBox>
 
                 {/* Motivation Settings */}
-                <GradientBorderBox>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
                     <View style={styles.sectionTitleContainer}>
-                        <Text style={styles.sectionTitle}>Motivation</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Motivation</Text>
                         <TouchableOpacity
                             style={styles.infoIconContainer}
                             onPress={() => setShowCheatDayInfoModal(true)}
                         >
-                            <Ionicons name="information-circle-outline" size={20} color={WHITE} />
+                            <Ionicons name="information-circle-outline" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
                         <View style={styles.cheatDayToggleContainer}>
                             <View style={styles.cheatDayToggleContent}>
-                                <Text style={styles.cheatDayToggleTitle}>Enable Cheat Days</Text>
-                                <Text style={styles.cheatDayToggleDescription}>
+                                <Text style={[styles.cheatDayToggleTitle, { color: theme.colors.text }]}>Enable Cheat Days</Text>
+                                <Text style={[styles.cheatDayToggleDescription, { color: theme.colors.textSecondary }]}>
                                     Track your progress towards scheduled cheat days
                                 </Text>
                             </View>
                             <TouchableOpacity
                                 style={[
                                     styles.toggleSwitch,
-                                    formValues.cheatDayEnabled && styles.toggleSwitchActive
+                                    formValues.cheatDayEnabled && [styles.toggleSwitchActive, { backgroundColor: theme.colors.primary }]
                                 ]}
                                 onPress={() => updateFormValue('cheatDayEnabled', !formValues.cheatDayEnabled)}
                             >
@@ -983,21 +984,22 @@ export default function EditGoals() {
 
                     {formValues.cheatDayEnabled && (
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Cheat Day Frequency</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Cheat Day Frequency</Text>
                             <View style={styles.frequencyOptionsContainer}>
                                 {frequencyOptions.map((option) => (
                                     <TouchableOpacity
                                         key={option.id}
                                         style={[
                                             styles.frequencyOption,
-                                            getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOption
+                                            getSelectedFrequencyOption() === option.id && [styles.selectedFrequencyOption, { backgroundColor: theme.colors.primary }]
                                         ]}
                                         onPress={() => handleFrequencyOptionSelect(option.id)}
                                     >
                                         <Text
                                             style={[
                                                 styles.frequencyOptionText,
-                                                getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOptionText
+                                                { color: theme.colors.textSecondary },
+                                                getSelectedFrequencyOption() === option.id && [styles.selectedFrequencyOptionText, { color: theme.colors.text }]
                                             ]}
                                         >
                                             {option.label}
@@ -1005,7 +1007,7 @@ export default function EditGoals() {
                                     </TouchableOpacity>
                                 ))}
                             </View>
-                            <Text style={styles.inputHint}>
+                            <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                                 {getFrequencyDescription()}
                             </Text>
                         </View>
@@ -1013,20 +1015,20 @@ export default function EditGoals() {
 
                     {formValues.cheatDayEnabled && (
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Preferred Cheat Day</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Preferred Cheat Day</Text>
                             <TouchableOpacity
-                                style={styles.daySelector}
+                                style={[styles.daySelector, { backgroundColor: theme.colors.inputBackground }]}
                                 onPress={() => setShowPreferredDayModal(true)}
                             >
-                                <Text style={styles.daySelectorText}>
+                                <Text style={[styles.daySelectorText, { color: theme.colors.text }]}>
                                     {formValues.preferredCheatDayOfWeek !== undefined
                                         ? dayNames[formValues.preferredCheatDayOfWeek]
                                         : 'From Today'
                                     }
                                 </Text>
-                                <Ionicons name="chevron-down" size={20} color={WHITE} />
+                                <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
                             </TouchableOpacity>
-                            <Text style={styles.inputHint}>
+                            <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                                 {formValues.preferredCheatDayOfWeek !== undefined
                                     ? `Your cheat days will always fall on ${dayNames[formValues.preferredCheatDayOfWeek]}s`
                                     : 'Choose a specific day of the week for your cheat days, or leave as "From Today" for flexible scheduling'
@@ -1057,110 +1059,110 @@ export default function EditGoals() {
             >
                 {/* Summary Card */}
                 <LinearGradient
-                    colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                    colors={[theme.colors.primary, GRADIENT_MIDDLE, GRADIENT_END]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.summaryCard}
                 >
                     <View style={styles.summaryContent}>
-                        <Text style={styles.summaryTitle}>Fitness Goals</Text>
+                        <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Fitness Goals</Text>
                         <View style={styles.summaryStats}>
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{dbGoals.weeklyWorkouts || "---"}</Text>
-                                <Text style={styles.statLabel}>Workouts/week</Text>
+                                <Text style={[styles.statValue, { color: theme.colors.text }]}>{dbGoals.weeklyWorkouts || "---"}</Text>
+                                <Text style={[styles.statLabel, { color: theme.colors.text }]}>Workouts/week</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{dbGoals.stepGoal || "---"}</Text>
-                                <Text style={styles.statLabel}>Daily Steps</Text>
+                                <Text style={[styles.statValue, { color: theme.colors.text }]}>{dbGoals.stepGoal || "---"}</Text>
+                                <Text style={[styles.statLabel, { color: theme.colors.text }]}>Daily Steps</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
-                                <Text style={styles.statValue}>
+                                <Text style={[styles.statValue, { color: theme.colors.text }]}>
                                     {cheatDayProgress.enabled
                                         ? `${cheatDayProgress.daysUntilNext}d`
                                         : "Disabled"}
                                 </Text>
-                                <Text style={styles.statLabel}>Cheat Day</Text>
+                                <Text style={[styles.statLabel, { color: theme.colors.text }]}>Cheat Day</Text>
                             </View>
                         </View>
                     </View>
                 </LinearGradient>
 
                 {/* Workout Goals */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Workout Goals</Text>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Workout Goals</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Weekly Workouts</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Weekly Workouts</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.weeklyWorkouts?.toString() || ''}
                             onChangeText={(text) => updateFormValue('weeklyWorkouts', text ? parseInt(text) : undefined)}
                             placeholder="Workouts per week"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Daily Step Goal</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Daily Step Goal</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.stepGoal?.toString() || ''}
                             onChangeText={(text) => updateFormValue('stepGoal', text ? parseInt(text) : undefined)}
                             placeholder="Target daily steps"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
                 </GradientBorderBox>
 
                 {/* Health Goals */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Health Goals</Text>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Health Goals</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Daily Water Intake (ml)</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Daily Water Intake (ml)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.waterGoal?.toString() || ''}
                             onChangeText={(text) => updateFormValue('waterGoal', text ? parseInt(text) : undefined)}
                             placeholder="Water intake goal"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Sleep Goal (hours)</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Sleep Goal (hours)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={formValues.sleepGoal?.toString() || ''}
                             onChangeText={(text) => updateFormValue('sleepGoal', text ? parseInt(text) : undefined)}
                             placeholder="Target sleep hours"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="number-pad"
                         />
                     </View>
                 </GradientBorderBox>
 
                 {/* Motivation Settings */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Motivation</Text>
+                <GradientBorderBox cardBackgroundColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Motivation</Text>
 
                     <View style={styles.inputGroup}>
                         <View style={styles.cheatDayToggleContainer}>
                             <View style={styles.cheatDayToggleContent}>
-                                <Text style={styles.cheatDayToggleTitle}>Enable Cheat Days</Text>
-                                <Text style={styles.cheatDayToggleDescription}>
+                                <Text style={[styles.cheatDayToggleTitle, { color: theme.colors.text }]}>Enable Cheat Days</Text>
+                                <Text style={[styles.cheatDayToggleDescription, { color: theme.colors.textSecondary }]}>
                                     Track your progress towards scheduled cheat days
                                 </Text>
                             </View>
                             <TouchableOpacity
                                 style={[
                                     styles.toggleSwitch,
-                                    formValues.cheatDayEnabled && styles.toggleSwitchActive
+                                    formValues.cheatDayEnabled && [styles.toggleSwitchActive, { backgroundColor: theme.colors.primary }]
                                 ]}
                                 onPress={() => updateFormValue('cheatDayEnabled', !formValues.cheatDayEnabled)}
                             >
@@ -1176,21 +1178,22 @@ export default function EditGoals() {
 
                     {formValues.cheatDayEnabled && (
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Cheat Day Frequency</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Cheat Day Frequency</Text>
                             <View style={styles.frequencyOptionsContainer}>
                                 {frequencyOptions.map((option) => (
                                     <TouchableOpacity
                                         key={option.id}
                                         style={[
                                             styles.frequencyOption,
-                                            getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOption
+                                            getSelectedFrequencyOption() === option.id && [styles.selectedFrequencyOption, { backgroundColor: theme.colors.primary }]
                                         ]}
                                         onPress={() => handleFrequencyOptionSelect(option.id)}
                                     >
                                         <Text
                                             style={[
                                                 styles.frequencyOptionText,
-                                                getSelectedFrequencyOption() === option.id && styles.selectedFrequencyOptionText
+                                                { color: theme.colors.textSecondary },
+                                                getSelectedFrequencyOption() === option.id && [styles.selectedFrequencyOptionText, { color: theme.colors.text }]
                                             ]}
                                         >
                                             {option.label}
@@ -1198,7 +1201,7 @@ export default function EditGoals() {
                                     </TouchableOpacity>
                                 ))}
                             </View>
-                            <Text style={styles.inputHint}>
+                            <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                                 {getFrequencyDescription()}
                             </Text>
                         </View>
@@ -1206,20 +1209,20 @@ export default function EditGoals() {
 
                     {formValues.cheatDayEnabled && (
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Preferred Cheat Day</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Preferred Cheat Day</Text>
                             <TouchableOpacity
-                                style={styles.daySelector}
+                                style={[styles.daySelector, { backgroundColor: theme.colors.inputBackground }]}
                                 onPress={() => setShowPreferredDayModal(true)}
                             >
-                                <Text style={styles.daySelectorText}>
+                                <Text style={[styles.daySelectorText, { color: theme.colors.text }]}>
                                     {formValues.preferredCheatDayOfWeek !== undefined
                                         ? dayNames[formValues.preferredCheatDayOfWeek]
                                         : 'From Today'
                                     }
                                 </Text>
-                                <Ionicons name="chevron-down" size={20} color={WHITE} />
+                                <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
                             </TouchableOpacity>
-                            <Text style={styles.inputHint}>
+                            <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                                 {formValues.preferredCheatDayOfWeek !== undefined
                                     ? `Your cheat days will always fall on ${dayNames[formValues.preferredCheatDayOfWeek]}s`
                                     : 'Choose a specific day of the week for your cheat days, or leave as "From Today" for flexible scheduling'
@@ -1354,54 +1357,56 @@ export default function EditGoals() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {/* Header */}
             <LinearGradient
-                colors={['rgba(92, 0, 221, 0.3)', 'transparent']}
-                style={styles.header}
+                colors={[`${theme.colors.primary}4D`, 'transparent']}
+                style={[styles.header, { borderBottomColor: theme.colors.border }]}
             >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color={WHITE} />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Edit Fitness Goals</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Edit Fitness Goals</Text>
                 <View style={{ width: 28 }}></View>
             </LinearGradient>
 
             {/* Tabs */}
-            <View style={styles.tabs}>
+            <View style={[styles.tabs, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'nutrition' && styles.activeTab]}
+                    style={[styles.tab, activeTab === 'nutrition' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
                     onPress={() => setActiveTab('nutrition')}
                 >
                     <Ionicons
                         name="nutrition"
                         size={24}
-                        color={activeTab === 'nutrition' ? GRADIENT_MIDDLE : GRAY}
+                        color={activeTab === 'nutrition' ? theme.colors.primary : theme.colors.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'nutrition' && styles.activeTabText
+                            { color: theme.colors.textSecondary },
+                            activeTab === 'nutrition' && [styles.activeTabText, { color: theme.colors.primary }]
                         ]}
                     >
                         Nutrition
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'fitness' && styles.activeTab]}
+                    style={[styles.tab, activeTab === 'fitness' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
                     onPress={() => setActiveTab('fitness')}
                 >
                     <Ionicons
                         name="barbell"
                         size={24}
-                        color={activeTab === 'fitness' ? GRADIENT_MIDDLE : GRAY}
+                        color={activeTab === 'fitness' ? theme.colors.primary : theme.colors.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'fitness' && styles.activeTabText
+                            { color: theme.colors.textSecondary },
+                            activeTab === 'fitness' && [styles.activeTabText, { color: theme.colors.primary }]
                         ]}
                     >
                         Fitness
@@ -1418,15 +1423,15 @@ export default function EditGoals() {
                     disabled={isLoading}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color={WHITE} />
+                        <ActivityIndicator color={theme.colors.text} />
                     ) : (
                         <LinearGradient
-                            colors={[GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END]}
+                            colors={[theme.colors.primary, GRADIENT_MIDDLE, GRADIENT_END]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.saveButtonGradient}
                         >
-                            <Text style={styles.saveButtonText}>Save Goals</Text>
+                            <Text style={[styles.saveButtonText, { color: theme.colors.text }]}>Save Goals</Text>
                         </LinearGradient>
                     )}
                 </TouchableOpacity>
@@ -1440,14 +1445,14 @@ export default function EditGoals() {
                 onRequestClose={() => setShowFitnessGoalPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Fitness Goal</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Fitness Goal</Text>
                             <TouchableOpacity
                                 style={styles.closeButton}
                                 onPress={() => setShowFitnessGoalPicker(false)}
                             >
-                                <Ionicons name="close" size={24} color={GRAY} />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
@@ -1465,17 +1470,17 @@ export default function EditGoals() {
                                 onValueChanged={({ item }) => {
                                     updateFormValue('fitnessGoal', item.value);
                                 }}
-                                itemTextStyle={{ color: WHITE, fontSize: 16 }}
+                                itemTextStyle={{ color: theme.colors.text, fontSize: 16 }}
                                 itemHeight={35}
                                 visibleItemCount={5}
                             />
                         </View>
 
                         <TouchableOpacity
-                            style={styles.doneButton}
+                            style={[styles.doneButton, { backgroundColor: theme.colors.primary }]}
                             onPress={() => setShowFitnessGoalPicker(false)}
                         >
-                            <Text style={styles.doneButtonText}>Done</Text>
+                            <Text style={[styles.doneButtonText, { color: theme.colors.text }]}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1489,26 +1494,26 @@ export default function EditGoals() {
                 onRequestClose={() => setShowCaloricWarning(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.warningModalContent}>
+                    <View style={[styles.warningModalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.warningHeader}>
                             <Ionicons name="warning" size={32} color={ORANGE} />
-                            <Text style={styles.warningTitle}>Calorie Goals Will Change</Text>
+                            <Text style={[styles.warningTitle, { color: theme.colors.text }]}>Calorie Goals Will Change</Text>
                         </View>
 
-                        <Text style={styles.warningMessage}>
+                        <Text style={[styles.warningMessage, { color: theme.colors.text }]}>
                             You've changed your target weight, fitness goal, or activity level. These changes will affect your daily calorie and macro requirements.
                         </Text>
 
-                        <Text style={styles.warningSubMessage}>
+                        <Text style={[styles.warningSubMessage, { color: theme.colors.textSecondary }]}>
                             Your nutrition goals will be automatically recalculated based on your new settings.
                         </Text>
 
                         <View style={styles.warningButtons}>
                             <TouchableOpacity
-                                style={styles.cancelWarningButton}
+                                style={[styles.cancelWarningButton, { backgroundColor: theme.colors.inputBackground }]}
                                 onPress={() => handleCaloricWarningResponse(false)}
                             >
-                                <Text style={styles.cancelWarningButtonText}>Cancel</Text>
+                                <Text style={[styles.cancelWarningButtonText, { color: theme.colors.text }]}>Cancel</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -1517,9 +1522,9 @@ export default function EditGoals() {
                                 disabled={isLoading}
                             >
                                 {isLoading ? (
-                                    <ActivityIndicator color={WHITE} size="small" />
+                                    <ActivityIndicator color={theme.colors.text} size="small" />
                                 ) : (
-                                    <Text style={styles.proceedWarningButtonText}>Update & Recalculate</Text>
+                                    <Text style={[styles.proceedWarningButtonText, { color: theme.colors.text }]}>Update & Recalculate</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -1535,44 +1540,44 @@ export default function EditGoals() {
                 onRequestClose={() => setShowCustomFrequencyModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Enter Custom Frequency</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Enter Custom Frequency</Text>
                             <TouchableOpacity
                                 style={styles.closeButton}
                                 onPress={() => setShowCustomFrequencyModal(false)}
                             >
-                                <Ionicons name="close" size={24} color={GRAY} />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Frequency (days)</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Frequency (days)</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                 value={customFrequencyInput}
                                 onChangeText={(text) => setCustomFrequencyInput(text)}
                                 placeholder="Enter days (7-365)"
-                                placeholderTextColor={GRAY}
+                                placeholderTextColor={theme.colors.textSecondary}
                                 keyboardType="number-pad"
                             />
-                            <Text style={styles.inputHint}>
+                            <Text style={[styles.inputHint, { color: theme.colors.textSecondary }]}>
                                 Enter how many days between each cheat day (minimum 7 days for optimal metabolic benefits)
                             </Text>
                         </View>
 
                         <View style={styles.buttonContainer}>
                             <TouchableOpacity
-                                style={[styles.submitButton, { backgroundColor: LIGHT_GRAY, marginRight: 8 }]}
+                                style={[styles.submitButton, { backgroundColor: theme.colors.inputBackground, marginRight: 8 }]}
                                 onPress={() => setShowCustomFrequencyModal(false)}
                             >
-                                <Text style={styles.submitButtonText}>Cancel</Text>
+                                <Text style={[styles.submitButtonText, { color: theme.colors.text }]}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={styles.submitButton}
+                                style={[styles.submitButton, { backgroundColor: theme.colors.primary }]}
                                 onPress={handleCustomFrequencySubmit}
                             >
-                                <Text style={styles.submitButtonText}>Submit</Text>
+                                <Text style={[styles.submitButtonText, { color: theme.colors.text }]}>Submit</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1587,14 +1592,14 @@ export default function EditGoals() {
                 onRequestClose={() => setShowPreferredDayModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Preferred Cheat Day</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Preferred Cheat Day</Text>
                             <TouchableOpacity
                                 style={styles.closeButton}
                                 onPress={() => setShowPreferredDayModal(false)}
                             >
-                                <Ionicons name="close" size={24} color={GRAY} />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
@@ -1605,17 +1610,17 @@ export default function EditGoals() {
                                 onValueChanged={({ item }) => {
                                     updateFormValue('preferredCheatDayOfWeek', item.value);
                                 }}
-                                itemTextStyle={{ color: WHITE, fontSize: 16 }}
+                                itemTextStyle={{ color: theme.colors.text, fontSize: 16 }}
                                 itemHeight={35}
                                 visibleItemCount={5}
                             />
                         </View>
 
                         <TouchableOpacity
-                            style={styles.doneButton}
+                            style={[styles.doneButton, { backgroundColor: theme.colors.primary }]}
                             onPress={() => setShowPreferredDayModal(false)}
                         >
-                            <Text style={styles.doneButtonText}>Done</Text>
+                            <Text style={[styles.doneButtonText, { color: theme.colors.text }]}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1629,80 +1634,80 @@ export default function EditGoals() {
                 onRequestClose={() => setShowCheatDayInfoModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.infoModalContent}>
+                    <View style={[styles.infoModalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Cheat Day Science</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Cheat Day Science</Text>
                             <TouchableOpacity
                                 style={styles.closeButton}
                                 onPress={() => setShowCheatDayInfoModal(false)}
                             >
-                                <Ionicons name="close" size={24} color={GRAY} />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.infoModalScroll} showsVerticalScrollIndicator={false}>
-                            <Text style={styles.infoModalSubtitle}>Extra Calories on Cheat Days</Text>
+                            <Text style={[styles.infoModalSubtitle, { color: theme.colors.text }]}>Extra Calories on Cheat Days</Text>
                             <View style={styles.infoCaloriesList}>
                                 <View style={styles.infoCalorieItem}>
-                                    <Text style={styles.infoCalorieLabel}>Weekly (7 days):</Text>
-                                    <Text style={styles.infoCalorieValue}>+300-500 calories</Text>
+                                    <Text style={[styles.infoCalorieLabel, { color: theme.colors.textSecondary }]}>Weekly (7 days):</Text>
+                                    <Text style={[styles.infoCalorieValue, { color: theme.colors.primary }]}>+300-500 calories</Text>
                                 </View>
                                 <View style={styles.infoCalorieItem}>
-                                    <Text style={styles.infoCalorieLabel}>Biweekly (14 days):</Text>
-                                    <Text style={styles.infoCalorieValue}>+400-600 calories</Text>
+                                    <Text style={[styles.infoCalorieLabel, { color: theme.colors.textSecondary }]}>Biweekly (14 days):</Text>
+                                    <Text style={[styles.infoCalorieValue, { color: theme.colors.primary }]}>+400-600 calories</Text>
                                 </View>
                                 <View style={styles.infoCalorieItem}>
-                                    <Text style={styles.infoCalorieLabel}>Monthly (30 days):</Text>
-                                    <Text style={styles.infoCalorieValue}>+500-700 calories</Text>
+                                    <Text style={[styles.infoCalorieLabel, { color: theme.colors.textSecondary }]}>Monthly (30 days):</Text>
+                                    <Text style={[styles.infoCalorieValue, { color: theme.colors.primary }]}>+500-700 calories</Text>
                                 </View>
                                 <View style={styles.infoCalorieItem}>
-                                    <Text style={styles.infoCalorieLabel}>Custom frequency:</Text>
-                                    <Text style={styles.infoCalorieValue}>Calculated based on duration</Text>
+                                    <Text style={[styles.infoCalorieLabel, { color: theme.colors.textSecondary }]}>Custom frequency:</Text>
+                                    <Text style={[styles.infoCalorieValue, { color: theme.colors.primary }]}>Calculated based on duration</Text>
                                 </View>
                             </View>
 
-                            <Text style={styles.infoModalSubtitle}>The Science Behind Cheat Days</Text>
-                            <Text style={styles.infoModalText}>
+                            <Text style={[styles.infoModalSubtitle, { color: theme.colors.text }]}>The Science Behind Cheat Days</Text>
+                            <Text style={[styles.infoModalText, { color: theme.colors.textSecondary }]}>
                                 Research shows that strategic refeed days can provide several benefits during weight loss:
                             </Text>
 
                             <View style={styles.infoBenefitsList}>
                                 <View style={styles.infoBenefitItem}>
-                                    <Text style={styles.infoBenefitBullet}>•</Text>
-                                    <Text style={styles.infoBenefitText}>
-                                        <Text style={styles.infoBenefitBold}>Leptin Boost:</Text> Increases the hunger-regulating hormone that controls metabolism and appetite
+                                    <Text style={[styles.infoBenefitBullet, { color: theme.colors.primary }]}>•</Text>
+                                    <Text style={[styles.infoBenefitText, { color: theme.colors.textSecondary }]}>
+                                        <Text style={[styles.infoBenefitBold, { color: theme.colors.text }]}>Leptin Boost:</Text> Increases the hunger-regulating hormone that controls metabolism and appetite
                                     </Text>
                                 </View>
                                 <View style={styles.infoBenefitItem}>
-                                    <Text style={styles.infoBenefitBullet}>•</Text>
-                                    <Text style={styles.infoBenefitText}>
-                                        <Text style={styles.infoBenefitBold}>Glycogen Replenishment:</Text> Restores muscle energy for better workout performance
+                                    <Text style={[styles.infoBenefitBullet, { color: theme.colors.primary }]}>•</Text>
+                                    <Text style={[styles.infoBenefitText, { color: theme.colors.textSecondary }]}>
+                                        <Text style={[styles.infoBenefitBold, { color: theme.colors.text }]}>Glycogen Replenishment:</Text> Restores muscle energy for better workout performance
                                     </Text>
                                 </View>
                                 <View style={styles.infoBenefitItem}>
-                                    <Text style={styles.infoBenefitBullet}>•</Text>
-                                    <Text style={styles.infoBenefitText}>
-                                        <Text style={styles.infoBenefitBold}>Psychological Relief:</Text> Improves long-term diet adherence and reduces binge eating risk
+                                    <Text style={[styles.infoBenefitBullet, { color: theme.colors.primary }]}>•</Text>
+                                    <Text style={[styles.infoBenefitText, { color: theme.colors.textSecondary }]}>
+                                        <Text style={[styles.infoBenefitBold, { color: theme.colors.text }]}>Psychological Relief:</Text> Improves long-term diet adherence and reduces binge eating risk
                                     </Text>
                                 </View>
                                 <View style={styles.infoBenefitItem}>
-                                    <Text style={styles.infoBenefitBullet}>•</Text>
-                                    <Text style={styles.infoBenefitText}>
-                                        <Text style={styles.infoBenefitBold}>Metabolic Support:</Text> Helps counteract adaptive thermogenesis during prolonged dieting
+                                    <Text style={[styles.infoBenefitBullet, { color: theme.colors.primary }]}>•</Text>
+                                    <Text style={[styles.infoBenefitText, { color: theme.colors.textSecondary }]}>
+                                        <Text style={[styles.infoBenefitBold, { color: theme.colors.text }]}>Metabolic Support:</Text> Helps counteract adaptive thermogenesis during prolonged dieting
                                     </Text>
                                 </View>
                             </View>
 
-                            <Text style={styles.infoModalNote}>
-                                <Text style={styles.infoModalNoteBold}>Best Practice:</Text> Focus on carbohydrate-rich foods during your cheat day for optimal leptin response and metabolic benefits.
+                            <Text style={[styles.infoModalNote, { color: theme.colors.textSecondary, borderLeftColor: theme.colors.primary }]}>
+                                <Text style={[styles.infoModalNoteBold, { color: theme.colors.primary }]}>Best Practice:</Text> Focus on carbohydrate-rich foods during your cheat day for optimal leptin response and metabolic benefits.
                             </Text>
                         </ScrollView>
 
                         <TouchableOpacity
-                            style={styles.doneButton}
+                            style={[styles.doneButton, { backgroundColor: theme.colors.primary }]}
                             onPress={() => setShowCheatDayInfoModal(false)}
                         >
-                            <Text style={styles.doneButtonText}>Got It!</Text>
+                            <Text style={[styles.doneButtonText, { color: theme.colors.text }]}>Got It!</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1819,12 +1824,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     gradientBorderInner: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 14,
         padding: 16,
     },
     formSection: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         padding: 16,
         marginBottom: 20,
@@ -1953,7 +1958,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalContent: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         padding: 20,
         width: width - 40,
@@ -2033,7 +2038,7 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     warningModalContent: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         padding: 24,
         width: width - 40,
@@ -2182,7 +2187,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     infoModalContent: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         padding: 20,
         width: width - 40,

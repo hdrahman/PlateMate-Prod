@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Animated, Platform, ActivityIndicator, Alert, TextInput, Dimensions } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
@@ -16,23 +17,14 @@ import tokenManager from '../utils/tokenManager';
 
 const { width } = Dimensions.get('window');
 
-// Modern color scheme
+// Accent colors (keeping as constants)
 const COLORS = {
-    PRIMARY_BG: '#000000',
-    SECONDARY_BG: '#111111',
-    CARD_BG: '#1a1a1a',
-    WHITE: '#FFFFFF',
-    GRAY_LIGHT: '#B0B0B0',
-    GRAY_MEDIUM: '#808080',
-    GRAY_DARK: '#333333',
     ACCENT_BLUE: '#0084ff',
     ACCENT_GREEN: '#32D74B',
     ACCENT_ORANGE: '#FF9500',
     ACCENT_RED: '#FF3B30',
     ACCENT_PURPLE: '#AF52DE',
     ACCENT_PINK: '#FF2D92',
-    GLASS: 'rgba(255, 255, 255, 0.1)',
-    GLASS_BORDER: 'rgba(255, 255, 255, 0.2)',
 };
 
 // Define navigation types
@@ -60,6 +52,7 @@ const prefetchAuthToken = () => {
 };
 
 export default function ScannerScreen() {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const route = useRoute<ScannerRouteProp>();
     const [mode, setMode] = useState<ScannerMode>(route.params?.mode || 'camera');
     const [permission, requestPermission] = useCameraPermissions();
@@ -380,29 +373,29 @@ export default function ScannerScreen() {
     const renderControlBar = () => (
         <View style={styles.controlBar}>
             <TouchableOpacity style={styles.controlButton} onPress={openGallery}>
-                <Ionicons name="images-outline" size={26} color={COLORS.WHITE} />
-                <Text style={styles.buttonLabel}>Gallery</Text>
+                <Ionicons name="images-outline" size={26} color={theme.colors.text} />
+                <Text style={[styles.buttonLabel, { color: theme.colors.text }]}>Gallery</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
                 style={[styles.controlButton, mode === 'camera' && styles.activeControlButton]}
                 onPress={() => handleModeChange('camera')}
             >
-                <Ionicons name="camera-outline" size={32} color={mode === 'camera' ? '#FF00F5' : COLORS.WHITE} />
-                <Text style={[styles.buttonLabel, mode === 'camera' && { color: '#FF00F5' }]}>Camera</Text>
+                <Ionicons name="camera-outline" size={32} color={mode === 'camera' ? '#FF00F5' : theme.colors.text} />
+                <Text style={[styles.buttonLabel, { color: mode === 'camera' ? '#FF00F5' : theme.colors.text }]}>Camera</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
                 style={[styles.controlButton, mode === 'barcode' && styles.activeControlButton]}
                 onPress={() => handleModeChange('barcode')}
             >
-                <MaterialCommunityIcons name="barcode-scan" size={26} color={mode === 'barcode' ? '#FF00F5' : COLORS.WHITE} />
-                <Text style={[styles.buttonLabel, mode === 'barcode' && { color: '#FF00F5' }]}>Barcode</Text>
+                <MaterialCommunityIcons name="barcode-scan" size={26} color={mode === 'barcode' ? '#FF00F5' : theme.colors.text} />
+                <Text style={[styles.buttonLabel, { color: mode === 'barcode' ? '#FF00F5' : theme.colors.text }]}>Barcode</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.controlButton} onPress={openFoodLog}>
-                <Ionicons name="document-text-outline" size={26} color={COLORS.WHITE} />
-                <Text style={styles.buttonLabel}>Manual</Text>
+                <Ionicons name="document-text-outline" size={26} color={theme.colors.text} />
+                <Text style={[styles.buttonLabel, { color: theme.colors.text }]}>Manual</Text>
             </TouchableOpacity>
         </View>
     );
@@ -410,18 +403,18 @@ export default function ScannerScreen() {
     // If user denies camera permission
     if (permission?.granted === false) {
         return (
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="light-content" />
-                <LinearGradient colors={[COLORS.PRIMARY_BG, COLORS.SECONDARY_BG]} style={styles.container}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+                <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
+                <LinearGradient colors={[theme.colors.background, theme.colors.cardBackground]} style={styles.container}>
                     <View style={styles.permissionContainer}>
-                        <MaterialIcons name="camera-alt" size={80} color={COLORS.GRAY_MEDIUM} />
-                        <Text style={styles.permissionTitle}>Camera Access Required</Text>
-                        <Text style={styles.permissionSubtitle}>
+                        <MaterialIcons name="camera-alt" size={80} color={theme.colors.textSecondary} />
+                        <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>Camera Access Required</Text>
+                        <Text style={[styles.permissionSubtitle, { color: theme.colors.textSecondary }]}>
                             Allow camera access to {mode === 'camera' ? 'capture food photos' : 'scan product barcodes'} and discover nutrition information
                         </Text>
                         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
                             <LinearGradient colors={[COLORS.ACCENT_PURPLE, COLORS.ACCENT_PINK]} style={styles.gradientButton}>
-                                <Text style={styles.permissionButtonText}>Enable Camera</Text>
+                                <Text style={[styles.permissionButtonText, { color: theme.colors.text }]}>Enable Camera</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -436,8 +429,8 @@ export default function ScannerScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             <View style={styles.cameraContainer}>
                 {isCameraReady && (
@@ -517,17 +510,17 @@ export default function ScannerScreen() {
                                 </View>
 
                                 <View style={styles.instructionContainer}>
-                                    <Text style={styles.instructionText}>Point camera at barcode</Text>
-                                    <Text style={styles.subInstructionText}>Keep barcode in frame for automatic scanning</Text>
+                                    <Text style={[styles.instructionText, { color: theme.colors.text }]}>Point camera at barcode</Text>
+                                    <Text style={[styles.subInstructionText, { color: theme.colors.textSecondary }]}>Keep barcode in frame for automatic scanning</Text>
                                 </View>
 
                                 {/* Manual barcode input */}
                                 <View style={styles.manualInputContainer}>
-                                    <BlurView intensity={30} style={styles.manualInputBlur}>
+                                    <BlurView intensity={30} style={[styles.manualInputBlur, { borderColor: theme.colors.border }]}>
                                         <TextInput
-                                            style={styles.manualInput}
+                                            style={[styles.manualInput, { color: theme.colors.text }]}
                                             placeholder="Enter barcode manually"
-                                            placeholderTextColor={COLORS.GRAY_MEDIUM}
+                                            placeholderTextColor={theme.colors.textSecondary}
                                             value={barcodeText}
                                             onChangeText={setBarcodeText}
                                             keyboardType="number-pad"
@@ -538,7 +531,7 @@ export default function ScannerScreen() {
                                             style={styles.manualSubmitButton}
                                             onPress={handleManualSubmit}
                                         >
-                                            <Ionicons name="search" size={20} color={COLORS.WHITE} />
+                                            <Ionicons name="search" size={20} color={theme.colors.text} />
                                         </TouchableOpacity>
                                     </BlurView>
                                 </View>
@@ -551,13 +544,13 @@ export default function ScannerScreen() {
                 )}
 
                 {!isCameraReady && (
-                    <LinearGradient colors={[COLORS.PRIMARY_BG, COLORS.SECONDARY_BG]} style={styles.loadingCamera}>
+                    <LinearGradient colors={[theme.colors.background, theme.colors.cardBackground]} style={styles.loadingCamera}>
                         <View style={styles.loadingContent}>
                             <View style={styles.loadingAnimation}>
                                 <ActivityIndicator size="large" color={COLORS.ACCENT_PINK} />
                             </View>
-                            <Text style={styles.loadingTitle}>Initializing Scanner</Text>
-                            <Text style={styles.loadingSubtitle}>Preparing camera for {mode === 'camera' ? 'photo capture' : 'barcode detection'}</Text>
+                            <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>Initializing Scanner</Text>
+                            <Text style={[styles.loadingSubtitle, { color: theme.colors.textSecondary }]}>Preparing camera for {mode === 'camera' ? 'photo capture' : 'barcode detection'}</Text>
                         </View>
                     </LinearGradient>
                 )}
@@ -569,8 +562,8 @@ export default function ScannerScreen() {
                     <BlurView intensity={50} style={styles.loadingBlur}>
                         <View style={styles.loadingContent}>
                             <ActivityIndicator size="large" color={COLORS.ACCENT_PINK} />
-                            <Text style={styles.loadingTitle}>Analyzing Product</Text>
-                            <Text style={styles.loadingSubtitle}>Fetching nutrition information...</Text>
+                            <Text style={[styles.loadingTitle, { color: theme.colors.text }]}>Analyzing Product</Text>
+                            <Text style={[styles.loadingSubtitle, { color: theme.colors.textSecondary }]}>Fetching nutrition information...</Text>
                         </View>
                     </BlurView>
                 </View>
@@ -587,8 +580,8 @@ export default function ScannerScreen() {
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                             >
-                                <Ionicons name="refresh" size={20} color={COLORS.WHITE} />
-                                <Text style={styles.scanAgainText}>Scan Another</Text>
+                                <Ionicons name="refresh" size={20} color={theme.colors.text} />
+                                <Text style={[styles.scanAgainText, { color: theme.colors.text }]}>Scan Another</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </BlurView>
@@ -601,7 +594,6 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.PRIMARY_BG,
     },
     cameraContainer: {
         flex: 1,
@@ -760,7 +752,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     instructionText: {
-        color: COLORS.WHITE,
         fontSize: 18,
         fontWeight: '600',
         textAlign: 'center',
@@ -769,7 +760,6 @@ const styles = StyleSheet.create({
         textShadowRadius: 3,
     },
     subInstructionText: {
-        color: COLORS.GRAY_LIGHT,
         fontSize: 14,
         textAlign: 'center',
         marginTop: 8,
@@ -798,7 +788,6 @@ const styles = StyleSheet.create({
     },
     manualInput: {
         flex: 1,
-        color: COLORS.WHITE,
         fontSize: 14,
         paddingVertical: 4,
     },
@@ -838,7 +827,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 0, 245, 0.5)',
     },
     buttonLabel: {
-        color: COLORS.WHITE,
         fontSize: 12,
         marginTop: 4,
         textAlign: 'center',
@@ -880,14 +868,12 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     loadingTitle: {
-        color: COLORS.WHITE,
         fontSize: 20,
         fontWeight: '600',
         marginBottom: 8,
         textAlign: 'center',
     },
     loadingSubtitle: {
-        color: COLORS.GRAY_LIGHT,
         fontSize: 14,
         textAlign: 'center',
         lineHeight: 20,
@@ -923,7 +909,6 @@ const styles = StyleSheet.create({
         minWidth: 160,
     },
     scanAgainText: {
-        color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 8,
@@ -938,7 +923,6 @@ const styles = StyleSheet.create({
         paddingBottom: 200,
     },
     permissionTitle: {
-        color: COLORS.WHITE,
         fontSize: 24,
         fontWeight: '700',
         textAlign: 'center',
@@ -946,7 +930,6 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     permissionSubtitle: {
-        color: COLORS.GRAY_LIGHT,
         fontSize: 16,
         textAlign: 'center',
         lineHeight: 24,
@@ -958,7 +941,6 @@ const styles = StyleSheet.create({
         minWidth: 200,
     },
     permissionButtonText: {
-        color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: '600',
     },

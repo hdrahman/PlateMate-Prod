@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ThemeContext } from '../ThemeContext';
 
 interface WelcomePremiumModalProps {
     visible: boolean;
@@ -19,6 +20,7 @@ interface WelcomePremiumModalProps {
 const { width, height } = Dimensions.get('window');
 
 const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onClose }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [isProcessing, setIsProcessing] = useState(false);
 
     // Reset processing state when modal becomes visible
@@ -45,6 +47,8 @@ const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onCl
             setIsProcessing(false); // Reset on error
         });
     };
+
+    const styles = getStyles(theme);
 
     return (
         <Modal
@@ -139,8 +143,8 @@ const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onCl
                             activeOpacity={isProcessing ? 1 : 0.7}
                         >
                             <LinearGradient
-                                colors={isProcessing 
-                                    ? ['#666', '#666', '#666'] 
+                                colors={isProcessing
+                                    ? ['#666', '#666', '#666']
                                     : ['#0074dd', '#5c00dd', '#dd0095']
                                 }
                                 style={styles.startButtonGradient}
@@ -150,11 +154,11 @@ const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onCl
                                 <Text style={styles.startButtonText}>
                                     {isProcessing ? 'Starting...' : 'Start My Journey'}
                                 </Text>
-                                <Ionicons 
-                                    name="arrow-forward" 
-                                    size={20} 
-                                    color={isProcessing ? '#999' : '#fff'} 
-                                    style={styles.startButtonIcon} 
+                                <Ionicons
+                                    name="arrow-forward"
+                                    size={20}
+                                    color={isProcessing ? '#999' : '#fff'}
+                                    style={styles.startButtonIcon}
                                 />
                             </LinearGradient>
                         </TouchableOpacity>
@@ -169,7 +173,7 @@ const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onCl
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -179,7 +183,7 @@ const styles = StyleSheet.create({
     modalContainer: {
         width: width * 0.9,
         maxHeight: height * 0.85,
-        backgroundColor: '#000',
+        backgroundColor: theme.colors.background,
         borderRadius: 20,
         overflow: 'hidden',
     },
@@ -201,23 +205,23 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.colors.text,
         textAlign: 'center',
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: '#888',
+        color: theme.colors.textSecondary,
         textAlign: 'center',
         lineHeight: 24,
     },
     trialCard: {
-        backgroundColor: '#111',
+        backgroundColor: theme.colors.cardBackground,
         borderRadius: 16,
         padding: 20,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#0074dd',
+        borderColor: theme.colors.primary,
     },
     trialHeader: {
         flexDirection: 'row',
@@ -236,11 +240,11 @@ const styles = StyleSheet.create({
     trialTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.colors.text,
     },
     trialDescription: {
         fontSize: 14,
-        color: '#ccc',
+        color: theme.colors.textSecondary,
         lineHeight: 20,
         marginBottom: 16,
     },
@@ -254,11 +258,11 @@ const styles = StyleSheet.create({
     },
     featureText: {
         fontSize: 14,
-        color: '#fff',
+        color: theme.colors.text,
         flex: 1,
     },
     trialBenefitsCard: {
-        backgroundColor: '#111',
+        backgroundColor: theme.colors.cardBackground,
         borderRadius: 16,
         padding: 20,
         marginBottom: 24,
@@ -266,7 +270,7 @@ const styles = StyleSheet.create({
     benefitsTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.colors.text,
         marginBottom: 16,
         textAlign: 'center',
     },
@@ -282,12 +286,12 @@ const styles = StyleSheet.create({
     benefitTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#fff',
+        color: theme.colors.text,
         marginBottom: 4,
     },
     benefitDescription: {
         fontSize: 14,
-        color: '#ccc',
+        color: theme.colors.textSecondary,
         lineHeight: 20,
     },
     startButton: {
@@ -308,14 +312,14 @@ const styles = StyleSheet.create({
     startButtonText: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: theme.colors.text,
     },
     startButtonIcon: {
         marginLeft: 4,
     },
     disclaimer: {
         fontSize: 12,
-        color: '#888',
+        color: theme.colors.textSecondary,
         textAlign: 'center',
         lineHeight: 16,
     },

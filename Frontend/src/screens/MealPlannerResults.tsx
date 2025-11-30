@@ -1,16 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { Recipe } from '../api/recipes';
-
-// Define color constants for consistent theming
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
+import { ThemeContext } from '../ThemeContext';
 
 // Define types for the component props
 interface GradientBorderCardProps {
@@ -35,6 +29,7 @@ interface MealPlannerResultsParams {
 // We no longer use fallback images
 
 export default function MealPlannerResults() {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
     const route = useRoute<RouteProp<Record<string, MealPlannerResultsParams>, string>>();
     const [loading, setLoading] = useState(true);
@@ -192,7 +187,7 @@ export default function MealPlannerResults() {
             <View style={styles.imageContainer}>
                 {isLoading && (
                     <View style={styles.imageLoadingContainer}>
-                        <ActivityIndicator size="small" color={PURPLE_ACCENT} />
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
                     </View>
                 )}
                 <Image
@@ -227,7 +222,7 @@ export default function MealPlannerResults() {
                     style={{
                         margin: 1,
                         borderRadius: 9,
-                        backgroundColor: CARD_BG,
+                        backgroundColor: theme.colors.cardBackground,
                         padding: 16,
                         ...(style || {})
                     }}
@@ -244,22 +239,22 @@ export default function MealPlannerResults() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.navigate('MealPlanner')}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Your Meal Plan</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Your Meal Plan</Text>
                 <View style={styles.placeholderButton} />
             </View>
 
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                    <Text style={styles.loadingText}>Generating your personalized meal plan...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Generating your personalized meal plan...</Text>
                 </View>
             ) : (
                 <ScrollView
@@ -267,78 +262,78 @@ export default function MealPlannerResults() {
                     contentContainerStyle={styles.scrollInner}
                 >
                     <GradientBorderCard>
-                        <Text style={styles.summaryTitle}>Daily Nutrition Summary</Text>
-                        <View style={styles.dividerLine} />
+                        <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Daily Nutrition Summary</Text>
+                        <View style={[styles.dividerLine, { backgroundColor: `${theme.colors.primary}4D` }]} />
                         <View style={styles.macrosContainer}>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{Math.round(nutrients.calories)}</Text>
-                                <Text style={styles.macroLabel}>Calories</Text>
+                                <Text style={[styles.macroValue, { color: theme.colors.text }]}>{Math.round(nutrients.calories)}</Text>
+                                <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Calories</Text>
                             </View>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{Math.round(nutrients.protein)}g</Text>
-                                <Text style={styles.macroLabel}>Protein</Text>
+                                <Text style={[styles.macroValue, { color: theme.colors.text }]}>{Math.round(nutrients.protein)}g</Text>
+                                <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
                             </View>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{Math.round(nutrients.carbohydrates)}g</Text>
-                                <Text style={styles.macroLabel}>Carbs</Text>
+                                <Text style={[styles.macroValue, { color: theme.colors.text }]}>{Math.round(nutrients.carbohydrates)}g</Text>
+                                <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
                             </View>
                             <View style={styles.macroItem}>
-                                <Text style={styles.macroValue}>{Math.round(nutrients.fat)}g</Text>
-                                <Text style={styles.macroLabel}>Fats</Text>
+                                <Text style={[styles.macroValue, { color: theme.colors.text }]}>{Math.round(nutrients.fat)}g</Text>
+                                <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Fats</Text>
                             </View>
                         </View>
                     </GradientBorderCard>
 
-                    <Text style={styles.mealsTitle}>Your Meals</Text>
+                    <Text style={[styles.mealsTitle, { color: theme.colors.text }]}>Your Meals</Text>
 
                     {mealPlan.length > 0 ? (
                         mealPlan.map((recipe, index) => (
                             <GradientBorderCard key={recipe.id || index}>
                                 {renderMealImage(recipe)}
                                 <View style={styles.mealInfo}>
-                                    <Text style={styles.mealName}>{recipe.title}</Text>
+                                    <Text style={[styles.mealName, { color: theme.colors.text }]}>{recipe.title}</Text>
 
-                                    <View style={styles.dividerLine} />
+                                    <View style={[styles.dividerLine, { backgroundColor: `${theme.colors.primary}4D` }]} />
 
                                     <View style={styles.mealMacros}>
-                                        <Text style={styles.mealMacro}>{recipe.readyInMinutes} min</Text>
-                                        <Text style={styles.mealMacro}>{recipe.servings} servings</Text>
-                                        <Text style={styles.mealMacro}>{recipe.healthScore}/100 health</Text>
+                                        <Text style={[styles.mealMacro, { color: theme.colors.textSecondary }]}>{recipe.readyInMinutes} min</Text>
+                                        <Text style={[styles.mealMacro, { color: theme.colors.textSecondary }]}>{recipe.servings} servings</Text>
+                                        <Text style={[styles.mealMacro, { color: theme.colors.textSecondary }]}>{recipe.healthScore}/100 health</Text>
                                     </View>
 
                                     {recipe.diets && recipe.diets.length > 0 && (
                                         <View style={styles.dietTags}>
                                             {recipe.diets.map((diet, i) => (
-                                                <View key={i} style={styles.dietTag}>
-                                                    <Text style={styles.dietTagText}>{diet}</Text>
+                                                <View key={i} style={[styles.dietTag, { backgroundColor: `${theme.colors.primary}33` }]}>
+                                                    <Text style={[styles.dietTagText, { color: theme.colors.primary }]}>{diet}</Text>
                                                 </View>
                                             ))}
                                         </View>
                                     )}
 
-                                    <Text style={styles.ingredientsTitle}>Ingredients:</Text>
-                                    <Text style={styles.ingredients}>
+                                    <Text style={[styles.ingredientsTitle, { color: theme.colors.text }]}>Ingredients:</Text>
+                                    <Text style={[styles.ingredients, { color: theme.colors.textSecondary }]}>
                                         {recipe.ingredients.join(", ")}
                                     </Text>
 
                                     <TouchableOpacity
-                                        style={styles.viewButton}
+                                        style={[styles.viewButton, { backgroundColor: theme.colors.primary }]}
                                         onPress={() => handleRecipePress(recipe)}
                                     >
-                                        <Text style={styles.viewButtonText}>View Full Recipe</Text>
+                                        <Text style={[styles.viewButtonText, { color: theme.colors.text }]}>View Full Recipe</Text>
                                     </TouchableOpacity>
                                 </View>
                             </GradientBorderCard>
                         ))
                     ) : (
                         <View style={styles.emptyState}>
-                            <Ionicons name="restaurant-outline" size={50} color={SUBDUED} />
-                            <Text style={styles.emptyStateText}>No meal plan generated yet</Text>
+                            <Ionicons name="restaurant-outline" size={50} color={theme.colors.textSecondary} />
+                            <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>No meal plan generated yet</Text>
                             <TouchableOpacity
-                                style={styles.generateButton}
+                                style={[styles.generateButton, { backgroundColor: theme.colors.primary }]}
                                 onPress={() => navigation.navigate('MealPlanner')}
                             >
-                                <Text style={styles.generateButtonText}>Create Meal Plan</Text>
+                                <Text style={[styles.generateButtonText, { color: theme.colors.text }]}>Create Meal Plan</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -351,7 +346,6 @@ export default function MealPlannerResults() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
@@ -367,7 +361,6 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: WHITE,
     },
     placeholderButton: {
         width: 32,
@@ -387,12 +380,10 @@ const styles = StyleSheet.create({
     summaryTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 4,
     },
     dividerLine: {
         height: 1,
-        backgroundColor: 'rgba(170, 0, 255, 0.3)',
         marginVertical: 12,
     },
     macrosContainer: {
@@ -406,17 +397,14 @@ const styles = StyleSheet.create({
     macroValue: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
     },
     macroLabel: {
         fontSize: 12,
-        color: SUBDUED,
         marginTop: 4,
     },
     mealsTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: WHITE,
         marginTop: 20,
         marginBottom: 8,
     },
@@ -432,7 +420,6 @@ const styles = StyleSheet.create({
     mealName: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 4,
     },
     mealMacros: {
@@ -442,7 +429,6 @@ const styles = StyleSheet.create({
     },
     mealMacro: {
         fontSize: 14,
-        color: SUBDUED,
         marginRight: 16,
     },
     dietTags: {
@@ -451,7 +437,6 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     dietTag: {
-        backgroundColor: 'rgba(170, 0, 255, 0.2)',
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 4,
@@ -459,31 +444,26 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     dietTagText: {
-        color: PURPLE_ACCENT,
         fontSize: 12,
         textTransform: 'capitalize',
     },
     ingredientsTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 8,
     },
     ingredients: {
         fontSize: 14,
-        color: SUBDUED,
         lineHeight: 20,
         marginBottom: 16,
     },
     viewButton: {
-        backgroundColor: PURPLE_ACCENT,
         borderRadius: 8,
         padding: 12,
         alignItems: 'center',
         marginTop: 8,
     },
     viewButtonText: {
-        color: WHITE,
         fontWeight: '600',
         fontSize: 14,
     },
@@ -494,7 +474,6 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     loadingText: {
-        color: WHITE,
         marginTop: 16,
         fontSize: 16,
         textAlign: 'center',
@@ -505,19 +484,16 @@ const styles = StyleSheet.create({
         paddingVertical: 40,
     },
     emptyStateText: {
-        color: SUBDUED,
         fontSize: 16,
         marginTop: 16,
         marginBottom: 24,
     },
     generateButton: {
-        backgroundColor: PURPLE_ACCENT,
         borderRadius: 8,
         paddingVertical: 12,
         paddingHorizontal: 20,
     },
     generateButtonText: {
-        color: WHITE,
         fontWeight: 'bold',
         fontSize: 14,
     },

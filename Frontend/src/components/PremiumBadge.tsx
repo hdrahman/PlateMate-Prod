@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ColorValue } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 
 interface PremiumBadgeProps {
     size?: 'small' | 'medium' | 'large';
@@ -18,6 +19,7 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({
     showIcon = true
 }) => {
     const navigation = useNavigation<any>();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const handlePress = () => {
         if (type === 'button') {
@@ -65,11 +67,11 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({
                     <Ionicons
                         name="star"
                         size={currentSize.iconSize}
-                        color="#FFF"
+                        color={theme.colors.text}
                         style={styles.icon}
                     />
                 )}
-                <Text style={[styles.text, { fontSize: currentSize.fontSize }]}>
+                <Text style={[styles.text, { fontSize: currentSize.fontSize, color: theme.colors.text }]}>
                     {text}
                 </Text>
             </LinearGradient>
@@ -100,11 +102,11 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({
                     <Ionicons
                         name="star"
                         size={currentSize.iconSize}
-                        color="#FFF"
+                        color={theme.colors.text}
                         style={styles.icon}
                     />
                 )}
-                <Text style={[styles.text, { fontSize: currentSize.fontSize }]}>
+                <Text style={[styles.text, { fontSize: currentSize.fontSize, color: theme.colors.text }]}>
                     {text}
                 </Text>
             </LinearGradient>
@@ -133,7 +135,6 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     text: {
-        color: '#FFF',
         fontWeight: 'bold',
     }
 });

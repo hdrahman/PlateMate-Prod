@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, Image } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -16,6 +17,7 @@ type RootStackParamList = {
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function MealPlannerCamera() {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [facing, setFacing] = useState<'back' | 'front'>('back');
     const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
     const [permission, requestPermission] = useCameraPermissions();
@@ -52,19 +54,19 @@ export default function MealPlannerCamera() {
 
     if (!permission) {
         // Camera permissions are still loading
-        return <View style={styles.container} />;
+        return <View style={[styles.container, { backgroundColor: theme.colors.background }]} />;
     }
 
     if (!permission.granted) {
         // Camera permissions are not granted yet
         return (
-            <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>We need your permission to show the camera</Text>
+            <View style={[styles.errorContainer, { backgroundColor: theme.colors.background }]}>
+                <Text style={[styles.errorText, { color: theme.colors.text }]}>We need your permission to show the camera</Text>
                 <TouchableOpacity
-                    style={styles.errorButton}
+                    style={[styles.errorButton, { backgroundColor: theme.colors.primary }]}
                     onPress={requestPermission}
                 >
-                    <Text style={styles.errorButtonText}>Grant Permission</Text>
+                    <Text style={[styles.errorButtonText, { color: theme.colors.text }]}>Grant Permission</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -141,28 +143,28 @@ export default function MealPlannerCamera() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {capturedImage && processingImage ? (
                 <View style={styles.previewContainer}>
                     <Image source={{ uri: capturedImage }} style={styles.previewImage} />
                     <View style={styles.loadingOverlay}>
-                        <Text style={styles.processingText}>Processing your pantry items...</Text>
+                        <Text style={[styles.processingText, { color: theme.colors.text }]}>Processing your pantry items...</Text>
                     </View>
                 </View>
             ) : (
                 <>
                     <View style={styles.header}>
                         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={28} color="#FFF" />
+                            <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Scan Your Pantry</Text>
+                        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Scan Your Pantry</Text>
                         <TouchableOpacity onPress={toggleFlashMode} style={styles.flashButton}>
                             <Ionicons
                                 name={flashMode === 'on' ? "flash" : "flash-off"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
@@ -183,8 +185,8 @@ export default function MealPlannerCamera() {
                                     style={styles.gradient}
                                 />
 
-                                <View style={styles.instructionsContainer}>
-                                    <Text style={styles.instructionsText}>
+                                <View style={[styles.instructionsContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                                    <Text style={[styles.instructionsText, { color: theme.colors.text }]}>
                                         Take a photo of your pantry items to generate personalized meal suggestions
                                     </Text>
                                 </View>
@@ -192,25 +194,25 @@ export default function MealPlannerCamera() {
                         )}
 
                         {!isCameraReady && (
-                            <View style={styles.loadingCamera}>
-                                <Text style={styles.loadingText}>Initializing Camera...</Text>
+                            <View style={[styles.loadingCamera, { backgroundColor: theme.colors.background }]}>
+                                <Text style={[styles.loadingText, { color: theme.colors.text }]}>Initializing Camera...</Text>
                             </View>
                         )}
                     </View>
 
-                    <View style={styles.controlBar}>
+                    <View style={[styles.controlBar, { backgroundColor: theme.colors.cardBackground }]}>
                         <TouchableOpacity style={styles.controlButton} onPress={toggleCameraFacing}>
-                            <Ionicons name="camera-reverse-outline" size={26} color="#FFFFFF" />
-                            <Text style={styles.buttonLabel}>Flip</Text>
+                            <Ionicons name="camera-reverse-outline" size={26} color={theme.colors.text} />
+                            <Text style={[styles.buttonLabel, { color: theme.colors.text }]}>Flip</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.captureButton} onPress={handleCapturePhoto}>
-                            <View style={styles.captureButtonInner} />
+                        <TouchableOpacity style={[styles.captureButton, { borderColor: theme.colors.text }]} onPress={handleCapturePhoto}>
+                            <View style={[styles.captureButtonInner, { backgroundColor: theme.colors.text }]} />
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.controlButton} onPress={openGallery}>
-                            <Ionicons name="images-outline" size={26} color="#FFFFFF" />
-                            <Text style={styles.buttonLabel}>Gallery</Text>
+                            <Ionicons name="images-outline" size={26} color={theme.colors.text} />
+                            <Text style={[styles.buttonLabel, { color: theme.colors.text }]}>Gallery</Text>
                         </TouchableOpacity>
                     </View>
                 </>

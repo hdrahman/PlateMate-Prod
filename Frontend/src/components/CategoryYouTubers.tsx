@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { YouTuber } from '../api/youtube';
 import { getYouTubersBySubcategory } from '../data/youtubers';
 import YouTuberTab from './YouTuberTab';
+import { ThemeContext } from '../ThemeContext';
 
 interface CategoryYouTubersProps {
     category: string;
@@ -17,6 +18,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
     youtubers: initialYoutubers,
     subcategories
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All');
     const [youtubers, setYoutubers] = useState<YouTuber[]>(initialYoutubers);
 
@@ -47,6 +49,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                     <TouchableOpacity
                         style={[
                             styles.subcategoryTab,
+                            { backgroundColor: theme.colors.cardBackground },
                             selectedSubcategory === 'All' && styles.selectedSubcategoryTab
                         ]}
                         onPress={() => handleSubcategoryPress('All')}
@@ -54,6 +57,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                         <Text
                             style={[
                                 styles.subcategoryText,
+                                { color: theme.colors.textSecondary },
                                 selectedSubcategory === 'All' && styles.selectedSubcategoryText
                             ]}
                         >
@@ -66,6 +70,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                             key={subcategory}
                             style={[
                                 styles.subcategoryTab,
+                                { backgroundColor: theme.colors.cardBackground },
                                 selectedSubcategory === subcategory && styles.selectedSubcategoryTab
                             ]}
                             onPress={() => handleSubcategoryPress(subcategory)}
@@ -73,6 +78,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                             <Text
                                 style={[
                                     styles.subcategoryText,
+                                    { color: theme.colors.textSecondary },
                                     selectedSubcategory === subcategory && styles.selectedSubcategoryText
                                 ]}
                             >
@@ -88,7 +94,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                 {/* Display no results message if no youtubers match the filter */}
                 {youtubers.length === 0 ? (
                     <View style={styles.noResultsContainer}>
-                        <Text style={styles.noResultsText}>No youtubers found in this subcategory</Text>
+                        <Text style={[styles.noResultsText, { color: theme.colors.textSecondary }]}>No youtubers found in this subcategory</Text>
                     </View>
                 ) : isFiltering ? (
                     /* When filtering (not 'All'), show horizontal paging view */
@@ -115,7 +121,7 @@ const CategoryYouTubers: React.FC<CategoryYouTubersProps> = ({
                         style={styles.verticalScrollView}
                     >
                         {youtubers.map((youtuber) => (
-                            <View key={youtuber.id} style={styles.youtuberVerticalItem}>
+                            <View key={youtuber.id} style={[styles.youtuberVerticalItem, { borderBottomColor: theme.colors.border }]}>
                                 <YouTuberTab youtuber={youtuber} />
                             </View>
                         ))}
@@ -150,7 +156,6 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 20,
         marginRight: 10,
-        backgroundColor: '#1E1E1E',
         height: 32,
         justifyContent: 'center',
     },
@@ -158,7 +163,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF9500',
     },
     subcategoryText: {
-        color: '#BBBBBB',
         fontSize: 14,
         fontWeight: '500',
     },
@@ -181,7 +185,6 @@ const styles = StyleSheet.create({
     youtuberVerticalItem: {
         marginBottom: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
         paddingBottom: 15,
     },
     noResultsContainer: {
@@ -190,7 +193,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     noResultsText: {
-        color: '#BBBBBB',
         fontSize: 16,
     },
 });

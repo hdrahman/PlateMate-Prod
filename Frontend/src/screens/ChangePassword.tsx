@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -15,10 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
+import { ThemeContext } from '../ThemeContext';
 
 export default function ChangePassword() {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const [isLoading, setIsLoading] = useState(false);
     const [currentPassword, setCurrentPassword] = useState('');
@@ -97,29 +99,29 @@ export default function ChangePassword() {
 
     return (
         <SafeAreaView
-            style={styles.container}
+            style={[styles.container, { backgroundColor: theme.colors.background }]}
             edges={['top']}
         >
-            <RNStatusBar barStyle="light-content" />
+            <RNStatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Change Password</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Change Password</Text>
             </View>
 
             <View style={styles.content}>
                 <View style={styles.formGroup}>
-                    <Text style={styles.label}>Current Password</Text>
-                    <View style={styles.passwordContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Current Password</Text>
+                    <View style={[styles.passwordContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={[styles.passwordInput, { color: theme.colors.text }]}
                             value={currentPassword}
                             onChangeText={setCurrentPassword}
                             secureTextEntry={!showCurrentPassword}
                             placeholder="Enter current password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.colors.textSecondary}
                         />
                         <TouchableOpacity
                             style={styles.eyeIcon}
@@ -128,22 +130,22 @@ export default function ChangePassword() {
                             <Ionicons
                                 name={showCurrentPassword ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <View style={styles.formGroup}>
-                    <Text style={styles.label}>New Password</Text>
-                    <View style={styles.passwordContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>New Password</Text>
+                    <View style={[styles.passwordContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={[styles.passwordInput, { color: theme.colors.text }]}
                             value={newPassword}
                             onChangeText={setNewPassword}
                             secureTextEntry={!showNewPassword}
                             placeholder="Enter new password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.colors.textSecondary}
                         />
                         <TouchableOpacity
                             style={styles.eyeIcon}
@@ -152,23 +154,23 @@ export default function ChangePassword() {
                             <Ionicons
                                 name={showNewPassword ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
-                    <Text style={styles.helperText}>Password must be at least 8 characters</Text>
+                    <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>Password must be at least 8 characters</Text>
                 </View>
 
                 <View style={styles.formGroup}>
-                    <Text style={styles.label}>Confirm New Password</Text>
-                    <View style={styles.passwordContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Confirm New Password</Text>
+                    <View style={[styles.passwordContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={[styles.passwordInput, { color: theme.colors.text }]}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
                             secureTextEntry={!showConfirmPassword}
                             placeholder="Confirm new password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.colors.textSecondary}
                         />
                         <TouchableOpacity
                             style={styles.eyeIcon}
@@ -177,21 +179,21 @@ export default function ChangePassword() {
                             <Ionicons
                                 name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <TouchableOpacity
-                    style={styles.changeButton}
+                    style={[styles.changeButton, { backgroundColor: theme.colors.primary }]}
                     onPress={handleChangePassword}
                     disabled={isLoading}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color="#fff" />
+                        <ActivityIndicator color={theme.colors.text} />
                     ) : (
-                        <Text style={styles.changeButtonText}>Update Password</Text>
+                        <Text style={[styles.changeButtonText, { color: theme.colors.text }]}>Update Password</Text>
                     )}
                 </TouchableOpacity>
             </View>
@@ -202,21 +204,18 @@ export default function ChangePassword() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         height: 60,
         borderBottomWidth: 1,
-        borderBottomColor: '#444',
         paddingHorizontal: 16,
     },
     backButton: {
         padding: 5,
     },
     headerTitle: {
-        color: '#FFF',
         fontSize: 22,
         fontWeight: 'bold',
         marginLeft: 10,
@@ -228,21 +227,17 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     label: {
-        color: '#FFF',
         fontSize: 16,
         marginBottom: 8,
     },
     passwordContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1A1A1A',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
     },
     passwordInput: {
         flex: 1,
-        color: '#FFF',
         height: 50,
         paddingHorizontal: 15,
         fontSize: 16,
@@ -251,12 +246,10 @@ const styles = StyleSheet.create({
         padding: 10,
     },
     helperText: {
-        color: '#888',
         fontSize: 12,
         marginTop: 4,
     },
     changeButton: {
-        backgroundColor: '#9B00FF',
         height: 50,
         borderRadius: 8,
         justifyContent: 'center',
@@ -264,7 +257,6 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     changeButtonText: {
-        color: '#FFF',
         fontSize: 18,
         fontWeight: 'bold',
     }

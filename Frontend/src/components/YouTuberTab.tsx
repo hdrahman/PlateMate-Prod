@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { YouTuber, YouTubeVideo, getChannelVideos } from '../api/youtube';
 import YouTubeVideoCard from './YouTubeVideoCard';
+import { ThemeContext } from '../ThemeContext';
 
 interface YouTuberTabProps {
     youtuber: YouTuber;
 }
 
 const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [videos, setVideos] = useState<YouTubeVideo[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,23 +48,23 @@ const YouTuberTab: React.FC<YouTuberTabProps> = ({ youtuber }) => {
         <View style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.titleRow}>
-                    <Text style={styles.youtuberName}>{youtuber?.name || 'Unknown YouTuber'}</Text>
+                    <Text style={[styles.youtuberName, { color: theme.colors.text }]}>{youtuber?.name || 'Unknown YouTuber'}</Text>
                     {youtuber?.subcategory && (
-                        <View style={styles.subcategoryBadge}>
-                            <Text style={styles.subcategoryText}>{youtuber.subcategory}</Text>
+                        <View style={[styles.subcategoryBadge, { backgroundColor: theme.colors.border }]}>
+                            <Text style={[styles.subcategoryText, { color: theme.colors.primary }]}>{youtuber.subcategory}</Text>
                         </View>
                     )}
                 </View>
-                <Text style={styles.youtuberDescription}>{youtuber?.description || 'No description available'}</Text>
+                <Text style={[styles.youtuberDescription, { color: theme.colors.textSecondary }]}>{youtuber?.description || 'No description available'}</Text>
             </View>
 
             <View style={styles.contentContainer}>
                 {loading ? (
-                    <ActivityIndicator size="large" color="#FF9500" style={styles.loader} />
+                    <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
                 ) : error ? (
                     <Text style={styles.errorText}>{error}</Text>
                 ) : videos.length === 0 ? (
-                    <Text style={styles.emptyText}>No videos available</Text>
+                    <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No videos available</Text>
                 ) : (
                     <ScrollView
                         horizontal
@@ -95,26 +97,22 @@ const styles = StyleSheet.create({
     youtuberName: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: 'white',
         marginRight: 10,
     },
     youtuberDescription: {
         fontSize: 14,
-        color: '#BBBBBB',
         marginBottom: 5,
     },
     contentContainer: {
         minHeight: 180,
     },
     subcategoryBadge: {
-        backgroundColor: '#333333',
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 20,
         marginBottom: 5,
     },
     subcategoryText: {
-        color: '#FF9500',
         fontSize: 12,
         fontWeight: '600',
     },
@@ -131,7 +129,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     emptyText: {
-        color: '#BBBBBB',
         textAlign: 'center',
         marginTop: 20,
         fontSize: 14,

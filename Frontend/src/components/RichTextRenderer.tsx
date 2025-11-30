@@ -1,6 +1,7 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useContext } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from "expo-linear-gradient";
+import { ThemeContext } from '../ThemeContext';
 
 interface RichTextRendererProps {
     text: string;
@@ -8,6 +9,8 @@ interface RichTextRendererProps {
 }
 
 const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {} }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     if (!text) return null;
 
     // Pre-process text to remove common issues
@@ -81,7 +84,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
 
                 // This is a section header
                 elements.push(
-                    <Text key={`section-${i}`} style={styles.sectionHeader}>
+                    <Text key={`section-${i}`} style={[styles.sectionHeader, { color: theme.colors.text }]}>
                         {line}
                     </Text>
                 );
@@ -106,7 +109,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                             end={{ x: 1, y: 0 }}
                             style={styles.headingGradient}
                         >
-                            <Text style={styles.heading1}>
+                            <Text style={[styles.heading1, { color: theme.colors.text }]}>
                                 {headingText}
                             </Text>
                         </LinearGradient>
@@ -123,7 +126,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                 headingText = headingText.replace(/^\*\*(.*)\*\*$/, '$1');
 
                 elements.push(
-                    <Text key={`h2-${i}`} style={styles.heading2}>
+                    <Text key={`h2-${i}`} style={[styles.heading2, { color: theme.colors.text }]}>
                         {headingText}
                     </Text>
                 );
@@ -138,7 +141,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                 headingText = headingText.replace(/^\*\*(.*)\*\*$/, '$1');
 
                 elements.push(
-                    <Text key={`h3-${i}`} style={styles.heading3}>
+                    <Text key={`h3-${i}`} style={[styles.heading3, { color: theme.colors.text }]}>
                         {headingText}
                     </Text>
                 );
@@ -159,8 +162,8 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
 
                 listItems.push(
                     <View key={`bullet-${i}`} style={styles.listItem}>
-                        <View style={styles.bulletPoint} />
-                        <Text style={[styles.listItemText, baseStyle]}>
+                        <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                        <Text style={[styles.listItemText, { color: theme.colors.text }, baseStyle]}>
                             {processInlineStyles(bulletMatch[1])}
                         </Text>
                     </View>
@@ -179,9 +182,9 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                 listItems.push(
                     <View key={`ordered-${i}`} style={styles.listItem}>
                         <View style={styles.numberContainer}>
-                            <Text style={styles.numberText}>{orderedMatch[1]}</Text>
+                            <Text style={[styles.numberText, { color: theme.colors.primary }]}>{orderedMatch[1]}</Text>
                         </View>
-                        <Text style={[styles.listItemText, baseStyle]}>
+                        <Text style={[styles.listItemText, { color: theme.colors.text }, baseStyle]}>
                             {processInlineStyles(orderedMatch[2])}
                         </Text>
                     </View>
@@ -197,7 +200,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
             const textStyle = inSection ? [styles.paragraph, styles.indentedParagraph, baseStyle] : [styles.paragraph, baseStyle];
 
             elements.push(
-                <Text key={`p-${i}`} style={textStyle}>
+                <Text key={`p-${i}`} style={[...textStyle, { color: theme.colors.text }]}>
                     {processInlineStyles(line)}
                 </Text>
             );
@@ -241,7 +244,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                     const boldContent = currentText.substring(openTagIndex + 2, nextTagIndex);
                     if (boldContent) { // Only add if there's actual content
                         result.push(
-                            <Text key={`bold-${openTagIndex}`} style={styles.bold}>
+                            <Text key={`bold-${openTagIndex}`} style={[styles.bold, { color: theme.colors.text }]}>
                                 {boldContent}
                             </Text>
                         );
@@ -290,7 +293,7 @@ const RichTextRenderer: React.FC<RichTextRendererProps> = ({ text, baseStyle = {
                     const italicContent = currentText.substring(openTagIndex + 1, nextTagIndex);
                     if (italicContent) { // Only add if there's actual content
                         result.push(
-                            <Text key={`italic-${openTagIndex}`} style={styles.italic}>
+                            <Text key={`italic-${openTagIndex}`} style={[styles.italic, { color: theme.colors.text }]}>
                                 {italicContent}
                             </Text>
                         );
@@ -339,33 +342,28 @@ const styles = StyleSheet.create({
     },
     heading1: {
         fontSize: 22,
-        color: 'white',
         fontWeight: 'bold',
     },
     heading2: {
         fontSize: 20,
-        color: 'white',
         fontWeight: 'bold',
         marginBottom: 8,
         marginTop: 12,
     },
     heading3: {
         fontSize: 18,
-        color: 'white',
         fontWeight: 'bold',
         marginBottom: 6,
         marginTop: 10,
     },
     sectionHeader: {
         fontSize: 18,
-        color: 'white',
         fontWeight: 'bold',
         marginTop: 16,
         marginBottom: 4,
     },
     paragraph: {
         fontSize: 16,
-        color: 'white',
         lineHeight: 22,
         marginBottom: 4,
     },
@@ -379,11 +377,9 @@ const styles = StyleSheet.create({
     },
     bold: {
         fontWeight: 'bold',
-        color: 'white',
     },
     italic: {
         fontStyle: 'italic',
-        color: 'white',
     },
     list: {
         marginBottom: 12,
@@ -399,7 +395,6 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#FF00F5',
         marginTop: 8,
         marginRight: 8,
     },
@@ -413,14 +408,12 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     numberText: {
-        color: '#5A60EA',
         fontSize: 12,
         fontWeight: 'bold',
     },
     listItemText: {
         flex: 1,
         fontSize: 16,
-        color: 'white',
         lineHeight: 22,
     },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Image,
     TouchableOpacity, ActivityIndicator, SafeAreaView,
@@ -8,19 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { getRecipeById, Recipe } from '../api/recipes';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../ThemeContext';
 
 // Get screen dimensions for responsive design
 const { width: screenWidth } = Dimensions.get('window');
-
-// Define color constants for consistent theming
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
-const SECONDARY_CARD_BG = '#1A1A1A';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const LIGHT_GRAY = '#666666';
-const PURPLE_ACCENT = '#AA00FF';
-const PURPLE_LIGHT = 'rgba(170, 0, 255, 0.1)';
 
 // Define the route params type
 type RecipeDetailsParams = {
@@ -33,6 +24,7 @@ export default function RecipeDetails() {
     const route = useRoute<RouteProp<Record<string, RecipeDetailsParams>, string>>();
     const [loading, setLoading] = useState(true);
     const [recipe, setRecipe] = useState<Recipe | null>(null);
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     // Get the recipe ID from route params
     const recipeId = route.params?.recipeId;
@@ -125,22 +117,22 @@ export default function RecipeDetails() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                <Text style={styles.loadingText}>Loading recipe details...</Text>
+            <SafeAreaView style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading recipe details...</Text>
             </SafeAreaView>
         );
     }
 
     if (!recipe) {
         return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <Text style={styles.errorText}>Recipe not found</Text>
+            <SafeAreaView style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+                <Text style={[styles.errorText, { color: theme.colors.text }]}>Recipe not found</Text>
                 <TouchableOpacity
-                    style={styles.backButton}
+                    style={[styles.backButton, { backgroundColor: theme.colors.primary }]}
                     onPress={() => navigation.goBack()}
                 >
-                    <Text style={styles.backButtonText}>Go Back</Text>
+                    <Text style={[styles.backButtonText, { color: theme.colors.text }]}>Go Back</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
@@ -149,7 +141,7 @@ export default function RecipeDetails() {
     const instructionSteps = parseInstructions(recipe.instructions);
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header with image and title */}
                 <View style={styles.header}>
@@ -162,18 +154,18 @@ export default function RecipeDetails() {
                         style={styles.backIconButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={24} color={WHITE} />
+                        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.shareIconButton}
                         onPress={handleShare}
                     >
-                        <Ionicons name="share-outline" size={24} color={WHITE} />
+                        <Ionicons name="share-outline" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleContainer}>
-                        <Text style={styles.headerTitle}>{recipe.title}</Text>
+                        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{recipe.title}</Text>
                         {recipe.summary && (
-                            <Text style={styles.headerSubtitle} numberOfLines={2}>
+                            <Text style={[styles.headerSubtitle, { color: theme.colors.text }]} numberOfLines={2}>
                                 {recipe.summary.replace(/<[^>]*>/g, '').substring(0, 100)}...
                             </Text>
                         )}
@@ -183,33 +175,33 @@ export default function RecipeDetails() {
                 <View style={styles.content}>
                     {/* Quick Info Cards */}
                     <View style={styles.quickInfoContainer}>
-                        <View style={styles.infoCard}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="time-outline" size={24} color={PURPLE_ACCENT} />
+                        <View style={[styles.infoCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                            <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
+                                <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
                             </View>
-                            <Text style={styles.infoLabel}>Cook Time</Text>
-                            <Text style={styles.infoValue}>{recipe.readyInMinutes} min</Text>
+                            <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>Cook Time</Text>
+                            <Text style={[styles.infoValue, { color: theme.colors.text }]}>{recipe.readyInMinutes} min</Text>
                         </View>
-                        <View style={styles.infoCard}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="people-outline" size={24} color={PURPLE_ACCENT} />
+                        <View style={[styles.infoCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                            <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
+                                <Ionicons name="people-outline" size={24} color={theme.colors.primary} />
                             </View>
-                            <Text style={styles.infoLabel}>Servings</Text>
-                            <Text style={styles.infoValue}>{recipe.servings}</Text>
+                            <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>Servings</Text>
+                            <Text style={[styles.infoValue, { color: theme.colors.text }]}>{recipe.servings}</Text>
                         </View>
                     </View>
 
                     {/* Dietary Tags */}
                     {recipe.diets && recipe.diets.length > 0 && (
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>
-                                <Ionicons name="leaf-outline" size={20} color={PURPLE_ACCENT} />
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                                <Ionicons name="leaf-outline" size={20} color={theme.colors.primary} />
                                 {' '}Dietary Information
                             </Text>
                             <View style={styles.tagsContainer}>
                                 {recipe.diets.map((diet, index) => (
-                                    <View key={index} style={styles.tag}>
-                                        <Text style={styles.tagText}>{diet}</Text>
+                                    <View key={index} style={[styles.tag, { backgroundColor: `${theme.colors.primary}20`, borderColor: theme.colors.border }]}>
+                                        <Text style={[styles.tagText, { color: theme.colors.primary }]}>{diet}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -218,15 +210,15 @@ export default function RecipeDetails() {
 
                     {/* Ingredients Section */}
                     <View style={styles.wideSection}>
-                        <Text style={styles.sectionTitle}>
-                            <Ionicons name="list-outline" size={20} color={PURPLE_ACCENT} />
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                            <Ionicons name="list-outline" size={20} color={theme.colors.primary} />
                             {' '}Ingredients ({recipe.ingredients.length})
                         </Text>
-                        <View style={styles.ingredientsContainer}>
+                        <View style={[styles.ingredientsContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             {recipe.ingredients.map((ingredient, index) => (
-                                <View key={index} style={styles.ingredientItem}>
-                                    <View style={styles.ingredientBullet} />
-                                    <Text style={styles.ingredientText}>{ingredient}</Text>
+                                <View key={index} style={[styles.ingredientItem, { borderBottomColor: theme.colors.border }]}>
+                                    <View style={[styles.ingredientBullet, { backgroundColor: theme.colors.primary }]} />
+                                    <Text style={[styles.ingredientText, { color: theme.colors.text }]}>{ingredient}</Text>
                                 </View>
                             ))}
                         </View>
@@ -234,17 +226,17 @@ export default function RecipeDetails() {
 
                     {/* Instructions Section */}
                     <View style={styles.wideSection}>
-                        <Text style={styles.sectionTitle}>
-                            <Ionicons name="book-outline" size={20} color={PURPLE_ACCENT} />
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                            <Ionicons name="book-outline" size={20} color={theme.colors.primary} />
                             {' '}Instructions
                         </Text>
-                        <View style={styles.instructionsContainer}>
+                        <View style={[styles.instructionsContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             {instructionSteps.map((step, index) => (
-                                <View key={index} style={styles.instructionStep}>
-                                    <View style={styles.stepNumber}>
-                                        <Text style={styles.stepNumberText}>{index + 1}</Text>
+                                <View key={index} style={[styles.instructionStep, { borderBottomColor: theme.colors.border }]}>
+                                    <View style={[styles.stepNumber, { backgroundColor: theme.colors.primary }]}>
+                                        <Text style={[styles.stepNumberText, { color: theme.colors.text }]}>{index + 1}</Text>
                                     </View>
-                                    <Text style={styles.stepText}>{step}</Text>
+                                    <Text style={[styles.stepText, { color: theme.colors.text }]}>{step}</Text>
                                 </View>
                             ))}
                         </View>
@@ -254,17 +246,17 @@ export default function RecipeDetails() {
                     <View style={styles.actionsContainer}>
                         {recipe.sourceUrl && (
                             <TouchableOpacity
-                                style={styles.sourceButton}
+                                style={[styles.sourceButton, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
                                 onPress={handleOpenSource}
                             >
-                                <Ionicons name="open-outline" size={18} color={PURPLE_ACCENT} />
-                                <Text style={styles.sourceButtonText}>View Original Recipe</Text>
+                                <Ionicons name="open-outline" size={18} color={theme.colors.primary} />
+                                <Text style={[styles.sourceButtonText, { color: theme.colors.primary }]}>View Original Recipe</Text>
                             </TouchableOpacity>
                         )}
 
-                        <TouchableOpacity style={styles.logButton}>
-                            <Ionicons name="add-circle-outline" size={20} color={WHITE} />
-                            <Text style={styles.logButtonText}>Add to My Meals</Text>
+                        <TouchableOpacity style={[styles.logButton, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary, shadowColor: theme.colors.primary }]}>
+                            <Ionicons name="add-circle-outline" size={20} color={theme.colors.text} />
+                            <Text style={[styles.logButtonText, { color: theme.colors.text }]}>Add to My Meals</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -276,34 +268,28 @@ export default function RecipeDetails() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: PRIMARY_BG,
         padding: 20,
     },
     loadingText: {
-        color: WHITE,
         marginTop: 16,
         fontSize: 16,
     },
     errorText: {
-        color: WHITE,
         fontSize: 16,
         marginBottom: 20,
         textAlign: 'center',
     },
     backButton: {
-        backgroundColor: PURPLE_ACCENT,
         paddingVertical: 12,
         paddingHorizontal: 24,
         borderRadius: 12,
     },
     backButtonText: {
-        color: WHITE,
         fontWeight: 'bold',
         fontSize: 16,
     },
@@ -330,7 +316,6 @@ const styles = StyleSheet.create({
         right: 20,
     },
     headerTitle: {
-        color: WHITE,
         fontSize: 28,
         fontWeight: 'bold',
         textShadowColor: 'rgba(0, 0, 0, 0.8)',
@@ -339,9 +324,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     headerSubtitle: {
-        color: 'rgba(255, 255, 255, 0.9)',
         fontSize: 14,
         lineHeight: 20,
+        opacity: 0.9,
         textShadowColor: 'rgba(0, 0, 0, 0.7)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 3,
@@ -379,30 +364,25 @@ const styles = StyleSheet.create({
     },
     infoCard: {
         flex: 1,
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         padding: 20,
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: 'rgba(170, 0, 255, 0.3)',
     },
     iconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: PURPLE_LIGHT,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 12,
     },
     infoLabel: {
-        color: SUBDUED,
         fontSize: 13,
         marginBottom: 4,
         textAlign: 'center',
     },
     infoValue: {
-        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
         textAlign: 'center',
@@ -411,7 +391,6 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     sectionTitle: {
-        color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 16,
@@ -424,26 +403,21 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     tag: {
-        backgroundColor: PURPLE_LIGHT,
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 20,
         borderWidth: 2,
-        borderColor: 'rgba(170, 0, 255, 0.4)',
     },
     tagText: {
-        color: PURPLE_ACCENT,
         fontSize: 13,
         fontWeight: '600',
         textTransform: 'capitalize',
     },
     ingredientsContainer: {
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         padding: 24,
         marginHorizontal: -10,
         borderWidth: 2,
-        borderColor: 'rgba(170, 0, 255, 0.3)',
     },
     ingredientItem: {
         flexDirection: 'row',
@@ -451,54 +425,45 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
     },
     ingredientBullet: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: PURPLE_ACCENT,
         marginTop: 6,
         marginRight: 16,
     },
     ingredientText: {
-        color: WHITE,
         fontSize: 15,
         lineHeight: 22,
         flex: 1,
     },
     instructionsContainer: {
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         padding: 24,
         marginHorizontal: -10,
         borderWidth: 2,
-        borderColor: 'rgba(170, 0, 255, 0.3)',
     },
     instructionStep: {
         flexDirection: 'row',
         marginBottom: 20,
         paddingBottom: 20,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
     },
     stepNumber: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: PURPLE_ACCENT,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
         marginTop: 2,
     },
     stepNumberText: {
-        color: WHITE,
         fontSize: 14,
         fontWeight: 'bold',
     },
     stepText: {
-        color: WHITE,
         fontSize: 15,
         lineHeight: 24,
         flex: 1,
@@ -511,20 +476,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: SECONDARY_CARD_BG,
         borderRadius: 16,
         paddingVertical: 16,
         borderWidth: 2,
-        borderColor: 'rgba(170, 0, 255, 0.4)',
         gap: 8,
     },
     sourceButtonText: {
-        color: PURPLE_ACCENT,
         fontWeight: '600',
         fontSize: 16,
     },
     logButton: {
-        backgroundColor: PURPLE_ACCENT,
         borderRadius: 16,
         paddingVertical: 18,
         alignItems: 'center',
@@ -532,15 +493,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 8,
         borderWidth: 2,
-        borderColor: 'rgba(170, 0, 255, 0.6)',
-        shadowColor: PURPLE_ACCENT,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.3,
         shadowRadius: 12,
         elevation: 8,
     },
     logButtonText: {
-        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
     },

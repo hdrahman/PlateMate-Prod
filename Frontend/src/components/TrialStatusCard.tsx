@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
     ActivityIndicator,
     ScrollView,
 } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +22,7 @@ interface TrialStatusCardProps {
 }
 
 const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubscribe }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { user } = useAuth();
     const [trialStatus, setTrialStatus] = useState<{
         isInTrial: boolean;
@@ -45,7 +47,7 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
                 SubscriptionManager.getSubscriptionStatus(),
                 SubscriptionService.getCustomerInfo(),
             ]);
-            
+
             // Convert SubscriptionStatus to trial status format
             const status = {
                 isInTrial: subscriptionStatus.isInTrial,
@@ -100,9 +102,9 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
 
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0074dd" />
-                <Text style={styles.loadingText}>Loading subscription status...</Text>
+            <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading subscription status...</Text>
             </View>
         );
     }
@@ -115,17 +117,17 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
     if (subscriptionDetails && ['premium_monthly', 'premium_annual'].includes(subscriptionDetails.status)) {
         return (
             <LinearGradient
-                colors={['#0074dd', '#5c00dd']}
-                style={styles.premiumCard}
+                colors={[theme.colors.primary, '#5c00dd']}
+                style={[styles.premiumCard, { backgroundColor: theme.colors.cardBackground }]}
             >
                 <View style={styles.premiumHeader}>
                     <MaterialCommunityIcons name="crown" size={24} color="#ffd700" />
-                    <Text style={styles.premiumTitle}>PlateMate Premium</Text>
+                    <Text style={[styles.premiumTitle, { color: theme.colors.text }]}>PlateMate Premium</Text>
                 </View>
-                <Text style={styles.premiumStatus}>
+                <Text style={[styles.premiumStatus, { color: theme.colors.text }]}>
                     {subscriptionDetails.status === 'premium_annual' ? 'Annual Plan' : 'Monthly Plan'}
                 </Text>
-                <Text style={styles.premiumExpiry}>
+                <Text style={[styles.premiumExpiry, { color: theme.colors.textSecondary }]}>
                     {subscriptionDetails.endDate
                         ? `Renews ${new Date(subscriptionDetails.endDate).toLocaleDateString()}`
                         : 'Active Subscription'
@@ -136,22 +138,22 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <LinearGradient
-                colors={trialStatus.isInTrial ? ['#0074dd', '#5c00dd'] : ['#ff4444', '#cc3333']}
-                style={styles.trialCard}
+                colors={trialStatus.isInTrial ? [theme.colors.primary, '#5c00dd'] : ['#ff4444', '#cc3333']}
+                style={[styles.trialCard, { backgroundColor: theme.colors.cardBackground }]}
             >
                 <View style={styles.trialHeader}>
                     <View style={styles.statusIndicator}>
                         <Ionicons
                             name={trialStatus.isInTrial ? "time-outline" : "alert-circle-outline"}
                             size={24}
-                            color="#fff"
+                            color={theme.colors.text}
                         />
                     </View>
                     <View style={styles.trialInfo}>
-                        <Text style={styles.trialTitle}>{getTrialStatusText()}</Text>
-                        <Text style={styles.trialSubtitle}>
+                        <Text style={[styles.trialTitle, { color: theme.colors.text }]}>{getTrialStatusText()}</Text>
+                        <Text style={[styles.trialSubtitle, { color: theme.colors.textSecondary }]}>
                             {trialStatus.isInTrial
                                 ? `Expires ${trialStatus.endDate.toLocaleDateString()}`
                                 : 'Subscribe to continue using premium features'
@@ -182,11 +184,11 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
                 <View style={styles.actionContainer}>
                     {trialStatus.canExtend && (
                         <TouchableOpacity
-                            style={styles.extendButton}
+                            style={[styles.extendButton, { backgroundColor: theme.colors.cardBackground }]}
                             onPress={handleExtendTrial}
                         >
-                            <Ionicons name="card-outline" size={20} color="#0074dd" />
-                            <Text style={styles.extendButtonText}>Get 10 More Days Free</Text>
+                            <Ionicons name="card-outline" size={20} color={theme.colors.primary} />
+                            <Text style={[styles.extendButtonText, { color: theme.colors.primary }]}>Get 10 More Days Free</Text>
                         </TouchableOpacity>
                     )}
 
@@ -197,8 +199,8 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
                         ]}
                         onPress={onSubscribe}
                     >
-                        <MaterialCommunityIcons name="crown" size={20} color="#fff" />
-                        <Text style={styles.subscribeButtonText}>
+                        <MaterialCommunityIcons name="crown" size={20} color={theme.colors.text} />
+                        <Text style={[styles.subscribeButtonText, { color: theme.colors.text }]}>
                             {trialStatus.isInTrial ? 'Subscribe Now' : 'Reactivate Premium'}
                         </Text>
                     </TouchableOpacity>
@@ -206,9 +208,9 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
             </LinearGradient>
 
             {trialStatus.isInTrial && trialStatus.daysRemaining <= 3 && (
-                <View style={styles.urgentBanner}>
+                <View style={[styles.urgentBanner, { backgroundColor: isDarkTheme ? theme.colors.cardBackground : '#fff3cd' }]}>
                     <Ionicons name="warning" size={20} color="#ff8800" />
-                    <Text style={styles.urgentText}>
+                    <Text style={[styles.urgentText, { color: isDarkTheme ? theme.colors.text : '#856404' }]}>
                         Your trial ends soon! Subscribe now to keep all your premium features.
                     </Text>
                 </View>
@@ -228,7 +230,6 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 16,
-        color: '#666',
     },
     trialCard: {
         borderRadius: 16,
@@ -259,27 +260,22 @@ const styles = StyleSheet.create({
     trialTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
         marginBottom: 4,
     },
     premiumTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
         marginLeft: 8,
     },
     trialSubtitle: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.8)',
     },
     premiumStatus: {
         fontSize: 16,
-        color: '#fff',
         marginBottom: 4,
     },
     premiumExpiry: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.8)',
     },
     progressContainer: {
         marginBottom: 16,
@@ -307,7 +303,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#fff',
         paddingVertical: 12,
         paddingHorizontal: 20,
         borderRadius: 12,
@@ -316,7 +311,6 @@ const styles = StyleSheet.create({
     extendButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#0074dd',
     },
     subscribeButton: {
         flexDirection: 'row',
@@ -327,7 +321,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#fff',
+        borderColor: 'rgba(255, 255, 255, 0.5)',
         gap: 8,
     },
     subscribeButtonUrgent: {
@@ -337,12 +331,10 @@ const styles = StyleSheet.create({
     subscribeButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#fff',
     },
     urgentBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff3cd',
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 12,
@@ -353,7 +345,6 @@ const styles = StyleSheet.create({
     urgentText: {
         flex: 1,
         fontSize: 14,
-        color: '#856404',
         fontWeight: '500',
     },
 });

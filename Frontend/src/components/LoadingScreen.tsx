@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import { View, Text, Image, Animated, Dimensions } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from "@react-native-masked-view/masked-view";
 import { Easing } from 'react-native';
@@ -28,6 +29,7 @@ interface LoadingScreenProps {
 }
 
 export default function LoadingScreen({ message = "Loading PlateMate..." }: LoadingScreenProps) {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -68,12 +70,12 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
 
     return (
         <LinearGradient
-            colors={['#000000', '#1a1a1a', '#000000']}
+            colors={isDarkTheme ? ['#000000', '#1a1a1a', '#000000'] : [theme.colors.background, theme.colors.background, theme.colors.background]}
             style={{
                 flex: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                backgroundColor: '#000',
+                backgroundColor: theme.colors.background,
             }}
         >
             <Animated.View
@@ -175,7 +177,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                 {/* Loading Message */}
                 <Text
                     style={{
-                        color: '#888',
+                        color: theme.colors.textSecondary,
                         fontSize: Math.min(16, width * 0.04),
                         textAlign: 'center',
                         letterSpacing: 1,

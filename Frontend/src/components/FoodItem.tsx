@@ -1,13 +1,10 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem as FoodItemType } from '../services/BarcodeService';
+import { ThemeContext } from '../ThemeContext';
 
-// Define theme colors - professional palette
-const WHITE = '#FFFFFF';
-const GRAY = '#8E8E93';
-const LIGHT_GRAY = '#48484A';
-const CARD_BG = '#1C1C1E';
+// Define macro colors - professional palette
 const GREEN = '#30D158';
 const BLUE = '#64D2FF';
 const ORANGE = '#FF9F0A';
@@ -18,6 +15,8 @@ interface FoodItemProps {
 }
 
 export default function FoodItem({ item, onPress }: FoodItemProps) {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     // Check if this food has a local camera image (from camera capture)
     // Only show images that are local file paths from camera, not external URLs
     const hasLocalImage = item.image &&
@@ -36,6 +35,7 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
         <TouchableOpacity
             style={[
                 styles.container,
+                { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                 hasLocalImage ? styles.containerWithImage : styles.containerNoImage
             ]}
             onPress={() => onPress(item)}
@@ -60,21 +60,21 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
                 {/* Main Row */}
                 <View style={styles.mainRow}>
                     <View style={styles.titleContainer}>
-                        <Text style={styles.foodName} numberOfLines={1}>{item.food_name}</Text>
+                        <Text style={[styles.foodName, { color: theme.colors.text }]} numberOfLines={1}>{item.food_name}</Text>
                         {item.brand_name && (
-                            <Text style={styles.brandName} numberOfLines={1}>{item.brand_name}</Text>
+                            <Text style={[styles.brandName, { color: theme.colors.textSecondary }]} numberOfLines={1}>{item.brand_name}</Text>
                         )}
                     </View>
 
                     <View style={styles.rightSection}>
-                        <Text style={styles.caloriesText}>{item.calories} cal</Text>
-                        <Ionicons name="chevron-forward" size={14} color={GRAY} />
+                        <Text style={[styles.caloriesText, { color: theme.colors.text }]}>{item.calories} cal</Text>
+                        <Ionicons name="chevron-forward" size={14} color={theme.colors.textSecondary} />
                     </View>
                 </View>
 
                 {/* Bottom Row */}
                 <View style={styles.bottomRow}>
-                    <Text style={styles.servingText}>
+                    <Text style={[styles.servingText, { color: theme.colors.textSecondary }]}>
                         {item.serving_qty} {item.serving_unit}
                         {item.serving_weight_grams > 0 ? ` (${item.serving_weight_grams}g)` : ''}
                     </Text>
@@ -82,15 +82,15 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
                     <View style={styles.macrosRow}>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, { backgroundColor: GREEN }]} />
-                            <Text style={styles.macroText}>{item.proteins}g Protein</Text>
+                            <Text style={[styles.macroText, { color: theme.colors.text }]}>{item.proteins}g Protein</Text>
                         </View>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, { backgroundColor: BLUE }]} />
-                            <Text style={styles.macroText}>{item.carbs}g Carbs</Text>
+                            <Text style={[styles.macroText, { color: theme.colors.text }]}>{item.carbs}g Carbs</Text>
                         </View>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, { backgroundColor: ORANGE }]} />
-                            <Text style={styles.macroText}>{item.fats}g Fats</Text>
+                            <Text style={[styles.macroText, { color: theme.colors.text }]}>{item.fats}g Fats</Text>
                         </View>
                     </View>
                 </View>
@@ -101,11 +101,9 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: CARD_BG,
         borderRadius: 8,
         marginBottom: 6,
         borderWidth: 0.5,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
     },
     containerNoImage: {
         padding: 12,
@@ -148,12 +146,10 @@ const styles = StyleSheet.create({
     foodName: {
         fontSize: 14,
         fontWeight: '600',
-        color: WHITE,
         marginBottom: 1,
     },
     brandName: {
         fontSize: 11,
-        color: GRAY,
         fontWeight: '500',
     },
     rightSection: {
@@ -164,7 +160,6 @@ const styles = StyleSheet.create({
     caloriesText: {
         fontSize: 13,
         fontWeight: '600',
-        color: WHITE,
     },
     bottomRow: {
         flexDirection: 'column',
@@ -172,7 +167,6 @@ const styles = StyleSheet.create({
     },
     servingText: {
         fontSize: 11,
-        color: GRAY,
         fontWeight: '500',
     },
     macrosRow: {
@@ -195,6 +189,5 @@ const styles = StyleSheet.create({
     macroText: {
         fontSize: 12,
         fontWeight: '600',
-        color: WHITE,
     },
 }); 

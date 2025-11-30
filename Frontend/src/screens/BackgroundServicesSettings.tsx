@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -8,12 +8,14 @@ import {
     Alert,
     TouchableOpacity,
     Platform,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import EnhancedPermanentNotificationService from '../services/EnhancedPermanentNotificationService';
+import { ThemeContext } from '../ThemeContext';
 
 interface SettingsSection {
     title: string;
@@ -34,6 +36,7 @@ interface SettingItem {
 }
 
 const BackgroundServicesSettings: React.FC = () => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [notificationSettings, setNotificationSettings] = useState<any>({});
     const [stepTrackerSettings, setStepTrackerSettings] = useState<any>({});
     const [syncSettings, setSyncSettings] = useState<any>({});
@@ -250,16 +253,16 @@ const BackgroundServicesSettings: React.FC = () => {
         switch (item.type) {
             case 'switch':
                 return (
-                    <View key={item.key} style={styles.settingItem}>
+                    <View key={item.key} style={[styles.settingItem, { borderBottomColor: theme.colors.border }]}>
                         <View style={styles.settingInfo}>
-                            <Text style={styles.settingTitle}>{item.title}</Text>
-                            <Text style={styles.settingDescription}>{item.description}</Text>
+                            <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{item.title}</Text>
+                            <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>{item.description}</Text>
                         </View>
                         <Switch
                             value={Boolean(item.value)}
                             onValueChange={item.onValueChange}
-                            trackColor={{ false: '#E5E5E5', true: '#4CAF50' }}
-                            thumbColor={item.value ? '#FFFFFF' : '#FFFFFF'}
+                            trackColor={{ false: theme.colors.border, true: theme.colors.success }}
+                            thumbColor={'#FFFFFF'}
                         />
                     </View>
                 );
@@ -268,14 +271,14 @@ const BackgroundServicesSettings: React.FC = () => {
                 return (
                     <TouchableOpacity
                         key={item.key}
-                        style={styles.buttonSetting}
+                        style={[styles.buttonSetting, { borderBottomColor: theme.colors.border }]}
                         onPress={item.onPress}
                     >
                         <View style={styles.settingInfo}>
-                            <Text style={styles.settingTitle}>{item.title}</Text>
-                            <Text style={styles.settingDescription}>{item.description}</Text>
+                            <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{item.title}</Text>
+                            <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>{item.description}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#666" />
+                        <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                 );
 
@@ -285,10 +288,10 @@ const BackgroundServicesSettings: React.FC = () => {
     };
 
     const renderSection = (section: SettingsSection) => (
-        <View key={section.title} style={styles.section}>
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                <Text style={styles.sectionDescription}>{section.description}</Text>
+        <View key={section.title} style={[styles.section, { backgroundColor: theme.colors.cardBackground }]}>
+            <View style={[styles.sectionHeader, { borderBottomColor: theme.colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{section.title}</Text>
+                <Text style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>{section.description}</Text>
             </View>
             {section.settings.map(renderSettingItem)}
         </View>
@@ -296,30 +299,32 @@ const BackgroundServicesSettings: React.FC = () => {
 
     if (isLoading) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+                <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} />
                 <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading settings...</Text>
+                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading settings...</Text>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Background Services</Text>
-                <Text style={styles.headerSubtitle}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} />
+            <View style={[styles.header, { backgroundColor: theme.colors.cardBackground, borderBottomColor: theme.colors.border }]}>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Background Services</Text>
+                <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
                     Optimize battery usage while maintaining functionality
                 </Text>
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Battery Optimization Info */}
-                <View style={styles.infoCard}>
-                    <Ionicons name="battery-charging" size={24} color="#4CAF50" />
+                <View style={[styles.infoCard, { backgroundColor: isDarkTheme ? 'rgba(76, 175, 80, 0.15)' : '#E8F5E8' }]}>
+                    <Ionicons name="battery-charging" size={24} color={theme.colors.success} />
                     <View style={styles.infoText}>
-                        <Text style={styles.infoTitle}>Battery Optimized</Text>
-                        <Text style={styles.infoDescription}>
+                        <Text style={[styles.infoTitle, { color: theme.colors.success }]}>Battery Optimized</Text>
+                        <Text style={[styles.infoDescription, { color: theme.colors.success }]}>
                             Settings automatically adjust based on app state and user activity to maximize battery life.
                         </Text>
                     </View>
@@ -328,23 +333,23 @@ const BackgroundServicesSettings: React.FC = () => {
                 {settingsSections.map(renderSection)}
 
                 {/* Performance Info */}
-                <View style={styles.performanceCard}>
-                    <Text style={styles.performanceTitle}>Performance Impact</Text>
+                <View style={[styles.performanceCard, { backgroundColor: theme.colors.cardBackground }]}>
+                    <Text style={[styles.performanceTitle, { color: theme.colors.text }]}>Performance Impact</Text>
                     <View style={styles.performanceItem}>
-                        <Text style={styles.performanceLabel}>Notifications:</Text>
-                        <Text style={styles.performanceValue}>
+                        <Text style={[styles.performanceLabel, { color: theme.colors.textSecondary }]}>Notifications:</Text>
+                        <Text style={[styles.performanceValue, { color: theme.colors.text }]}>
                             {notificationSettings.batteryOptimized ? 'Optimized' : 'Standard'}
                         </Text>
                     </View>
                     <View style={styles.performanceItem}>
-                        <Text style={styles.performanceLabel}>Step Tracking:</Text>
-                        <Text style={styles.performanceValue}>
+                        <Text style={[styles.performanceLabel, { color: theme.colors.textSecondary }]}>Step Tracking:</Text>
+                        <Text style={[styles.performanceValue, { color: theme.colors.text }]}>
                             {stepTrackerSettings.isTracking ? 'Active' : 'Disabled'}
                         </Text>
                     </View>
                     <View style={styles.performanceItem}>
-                        <Text style={styles.performanceLabel}>Sync Strategy:</Text>
-                        <Text style={styles.performanceValue}>Event-driven</Text>
+                        <Text style={[styles.performanceLabel, { color: theme.colors.textSecondary }]}>Sync Strategy:</Text>
+                        <Text style={[styles.performanceValue, { color: theme.colors.text }]}>Event-driven</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -355,23 +360,18 @@ const BackgroundServicesSettings: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5',
     },
     header: {
-        backgroundColor: '#FFFFFF',
         padding: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#333',
         marginBottom: 4,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#666',
     },
     content: {
         flex: 1,
@@ -384,10 +384,8 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 16,
-        color: '#666',
     },
     infoCard: {
-        backgroundColor: '#E8F5E8',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
@@ -401,16 +399,13 @@ const styles = StyleSheet.create({
     infoTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#2E7D32',
         marginBottom: 4,
     },
     infoDescription: {
         fontSize: 14,
-        color: '#2E7D32',
         lineHeight: 20,
     },
     section: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         marginBottom: 16,
         overflow: 'hidden',
@@ -418,17 +413,14 @@ const styles = StyleSheet.create({
     sectionHeader: {
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 4,
     },
     sectionDescription: {
         fontSize: 14,
-        color: '#666',
         lineHeight: 20,
     },
     settingItem: {
@@ -436,7 +428,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F5F5F5',
     },
     settingInfo: {
         flex: 1,
@@ -445,12 +436,10 @@ const styles = StyleSheet.create({
     settingTitle: {
         fontSize: 16,
         fontWeight: '500',
-        color: '#333',
         marginBottom: 4,
     },
     settingDescription: {
         fontSize: 14,
-        color: '#666',
         lineHeight: 18,
     },
     buttonSetting: {
@@ -458,10 +447,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#F5F5F5',
     },
     performanceCard: {
-        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 16,
         marginTop: 8,
@@ -469,7 +456,6 @@ const styles = StyleSheet.create({
     performanceTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 12,
     },
     performanceItem: {
@@ -479,12 +465,10 @@ const styles = StyleSheet.create({
     },
     performanceLabel: {
         fontSize: 14,
-        color: '#666',
     },
     performanceValue: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#333',
     },
 });
 

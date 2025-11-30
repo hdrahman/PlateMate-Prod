@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, GestureResponderEvent, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../api/recipes';
 import { useFavorites } from '../context/FavoritesContext';
 import { LinearGradient } from 'expo-linear-gradient';
-
-// Define color constants for consistent theming
-const CARD_BG = '#121212';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
+import { ThemeContext } from '../ThemeContext';
 
 interface RecipeCardProps {
     recipe: Recipe;
@@ -45,6 +40,7 @@ const formatLikes = (likes: number): string => {
 const MAX_RETRIES = 2; // Maximum number of retries for image loading
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = false }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
     const recipeId = recipe.id?.toString() || '';
     const isFav = isFavorite(recipeId);
@@ -152,23 +148,24 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
 
     return (
         <TouchableOpacity
-            style={[styles.card, compact && styles.compactCard]}
+            style={[styles.card, { backgroundColor: theme.colors.cardBackground }, compact && styles.compactCard]}
             onPress={() => onPress && onPress(recipe)}
             activeOpacity={0.7}
         >
-            <View style={styles.imageContainer}>
+            <View style={[styles.imageContainer, { backgroundColor: theme.colors.cardBackground }]}>
                 {imageLoading && (
                     <View style={[
                         styles.imageLoadingContainer,
                         compact && styles.compactImageLoadingContainer
                     ]}>
-                        <ActivityIndicator size="small" color={PURPLE_ACCENT} />
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
                     </View>
                 )}
                 <Image
                     source={{ uri: getImageSource() }}
                     style={[
                         styles.image,
+                        { backgroundColor: theme.colors.cardBackground },
                         compact && styles.compactImage,
                         { opacity: imageLoading ? 0 : 1 }
                     ]}
@@ -185,8 +182,8 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                         colors={[getHealthScoreColor(recipe.healthScore), getHealthScoreColor(recipe.healthScore) + '99']}
                         style={styles.healthScoreGradient}
                     >
-                        <Ionicons name="heart" size={compact ? 12 : 14} color={WHITE} />
-                        <Text style={styles.healthScoreText}>{recipe.healthScore}</Text>
+                        <Ionicons name="heart" size={compact ? 12 : 14} color={theme.colors.text} />
+                        <Text style={[styles.healthScoreText, { color: theme.colors.text }]}>{recipe.healthScore}</Text>
                     </LinearGradient>
                 </View>
 
@@ -196,33 +193,33 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                             colors={['#2196F3', '#03A9F4']}
                             style={styles.popularityGradient}
                         >
-                            <Ionicons name="thumbs-up" size={compact ? 12 : 14} color={WHITE} />
-                            <Text style={styles.popularityText}>{formatLikes(recipe.aggregateLikes)}</Text>
+                            <Ionicons name="thumbs-up" size={compact ? 12 : 14} color={theme.colors.text} />
+                            <Text style={[styles.popularityText, { color: theme.colors.text }]}>{formatLikes(recipe.aggregateLikes)}</Text>
                         </LinearGradient>
                     </View>
                 )}
             </View>
 
             <View style={styles.infoContainer}>
-                <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2} ellipsizeMode="tail">
                     {recipe.title}
                 </Text>
 
                 {!compact && (
-                    <Text style={styles.summary} numberOfLines={2} ellipsizeMode="tail">
+                    <Text style={[styles.summary, { color: theme.colors.textSecondary }]} numberOfLines={2} ellipsizeMode="tail">
                         {recipe.summary}
                     </Text>
                 )}
 
                 <View style={styles.metaContainer}>
                     <View style={styles.metaItem}>
-                        <Ionicons name="time-outline" size={compact ? 14 : 16} color={SUBDUED} />
-                        <Text style={styles.metaText}>{recipe.readyInMinutes} min</Text>
+                        <Ionicons name="time-outline" size={compact ? 14 : 16} color={theme.colors.textSecondary} />
+                        <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{recipe.readyInMinutes} min</Text>
                     </View>
 
                     <View style={styles.metaItem}>
-                        <Ionicons name="people-outline" size={compact ? 14 : 16} color={SUBDUED} />
-                        <Text style={styles.metaText}>{recipe.servings} serv</Text>
+                        <Ionicons name="people-outline" size={compact ? 14 : 16} color={theme.colors.textSecondary} />
+                        <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{recipe.servings} serv</Text>
                     </View>
 
                     {!compact && (
@@ -240,12 +237,12 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
                 {!compact && recipe.diets.length > 0 && (
                     <View style={styles.tagsContainer}>
                         {recipe.diets.slice(0, 3).map((diet, index) => (
-                            <View key={index} style={styles.tag}>
-                                <Text style={styles.tagText}>{diet}</Text>
+                            <View key={index} style={[styles.tag, { backgroundColor: theme.colors.primary + '33' }]}>
+                                <Text style={[styles.tagText, { color: theme.colors.primary }]}>{diet}</Text>
                             </View>
                         ))}
                         {recipe.diets.length > 3 && (
-                            <Text style={styles.moreTag}>+{recipe.diets.length - 3}</Text>
+                            <Text style={[styles.moreTag, { color: theme.colors.textSecondary }]}>+{recipe.diets.length - 3}</Text>
                         )}
                     </View>
                 )}
@@ -256,7 +253,6 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, compact = fals
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: CARD_BG,
         borderRadius: 10,
         overflow: 'hidden',
         marginBottom: 16,
@@ -274,20 +270,17 @@ const styles = StyleSheet.create({
     },
     imageContainer: {
         position: 'relative',
-        backgroundColor: '#1a1a1a', // Dark background for better contrast
         overflow: 'hidden',
         borderRadius: 8,
     },
     image: {
         width: '100%',
         height: 160,
-        backgroundColor: '#1a1a1a', // Background color for image loading
         borderRadius: 8,
     },
     compactImage: {
         width: 80,
         height: '100%',
-        backgroundColor: '#1a1a1a', // Background color for image loading
         borderRadius: 8,
     },
     imageLoadingContainer: {
@@ -345,7 +338,6 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     healthScoreText: {
-        color: WHITE,
         fontSize: 14,
         fontWeight: 'bold',
         marginLeft: 4,
@@ -364,7 +356,6 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     popularityText: {
-        color: WHITE,
         fontSize: 14,
         fontWeight: 'bold',
         marginLeft: 4,
@@ -376,12 +367,10 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 6,
     },
     summary: {
         fontSize: 14,
-        color: SUBDUED,
         marginBottom: 8,
     },
     metaContainer: {
@@ -396,7 +385,6 @@ const styles = StyleSheet.create({
     },
     metaText: {
         fontSize: 12,
-        color: SUBDUED,
         marginLeft: 4,
     },
     healthScoreLabel: {
@@ -411,7 +399,6 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
     },
     tag: {
-        backgroundColor: 'rgba(170, 0, 255, 0.2)',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 4,
@@ -419,13 +406,11 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     tagText: {
-        color: PURPLE_ACCENT,
         fontSize: 10,
         fontWeight: '500',
         textTransform: 'capitalize',
     },
     moreTag: {
-        color: SUBDUED,
         fontSize: 10,
         marginLeft: 4,
         alignSelf: 'center',

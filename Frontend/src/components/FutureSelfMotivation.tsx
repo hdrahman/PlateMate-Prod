@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { ThemeContext } from '../ThemeContext';
 import { getFutureSelfMessage, getMotivationalQuotesByType, FutureSelfMessage } from '../utils/futureSelfService';
 
 interface FutureSelfMotivationProps {
@@ -27,6 +28,7 @@ const FutureSelfMotivation: React.FC<FutureSelfMotivationProps> = ({
     motivationType = 'motivation'
 }) => {
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [futureSelfMessage, setFutureSelfMessage] = useState<FutureSelfMessage | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [showQuotes, setShowQuotes] = useState(false);
@@ -99,10 +101,10 @@ const FutureSelfMotivation: React.FC<FutureSelfMotivationProps> = ({
             transparent={true}
             onRequestClose={onClose}
         >
-            <View style={styles.overlay}>
-                <View style={styles.container}>
+            <View style={[styles.overlay, { backgroundColor: isDarkTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(0, 0, 0, 0.7)' }]}>
+                <View style={[styles.container, { backgroundColor: theme.colors.cardBackground }]}>
                     <LinearGradient
-                        colors={['#000000', '#1a1a1a']}
+                        colors={[theme.colors.background, theme.colors.cardBackground]}
                         style={styles.background}
                     />
 
@@ -113,9 +115,9 @@ const FutureSelfMotivation: React.FC<FutureSelfMotivationProps> = ({
                         {/* Header */}
                         <View style={styles.header}>
                             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                                <Ionicons name="close" size={24} color="#fff" />
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
                             </TouchableOpacity>
-                            <Text style={styles.title}>{getMotivationalTitle()}</Text>
+                            <Text style={[styles.title, { color: theme.colors.text }]}>{getMotivationalTitle()}</Text>
                         </View>
 
                         {/* Main Message Card */}
@@ -145,29 +147,29 @@ const FutureSelfMotivation: React.FC<FutureSelfMotivationProps> = ({
                         {/* Backup Motivational Quotes */}
                         <View style={styles.quotesSection}>
                             <TouchableOpacity
-                                style={styles.quotesToggle}
+                                style={[styles.quotesToggle, { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}15` }]}
                                 onPress={() => setShowQuotes(!showQuotes)}
                             >
                                 <Ionicons
                                     name={getMotivationalIcon() as any}
                                     size={20}
-                                    color="#FFD700"
+                                    color={theme.colors.primary}
                                 />
-                                <Text style={styles.quotesToggleText}>
+                                <Text style={[styles.quotesToggleText, { color: theme.colors.primary }]}>
                                     {showQuotes ? 'Hide' : 'Show'} Additional Motivation
                                 </Text>
                                 <Ionicons
                                     name={showQuotes ? "chevron-up" : "chevron-down"}
                                     size={20}
-                                    color="#FFD700"
+                                    color={theme.colors.primary}
                                 />
                             </TouchableOpacity>
 
                             {showQuotes && (
                                 <View style={styles.quotesContainer}>
                                     {quotes.map((quote, index) => (
-                                        <View key={index} style={styles.quoteCard}>
-                                            <Text style={styles.quoteText}>"{quote}"</Text>
+                                        <View key={index} style={[styles.quoteCard, { backgroundColor: `${theme.colors.text}15` }]}>
+                                            <Text style={[styles.quoteText, { color: theme.colors.text }]}>"{quote}"</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -191,9 +193,9 @@ const FutureSelfMotivation: React.FC<FutureSelfMotivationProps> = ({
 
                         {!futureSelfMessage && !isLoading && (
                             <View style={styles.noMessageContainer}>
-                                <Ionicons name="heart-outline" size={48} color="#666" />
-                                <Text style={styles.noMessageTitle}>No Personal Message Yet</Text>
-                                <Text style={styles.noMessageText}>
+                                <Ionicons name="heart-outline" size={48} color={theme.colors.textSecondary} />
+                                <Text style={[styles.noMessageTitle, { color: theme.colors.text }]}>No Personal Message Yet</Text>
+                                <Text style={[styles.noMessageText, { color: theme.colors.textSecondary }]}>
                                     You can create a personal motivation message in your profile settings
                                 </Text>
                             </View>
@@ -208,7 +210,6 @@ const FutureSelfMotivation: React.FC<FutureSelfMotivationProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -240,7 +241,6 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#fff',
         flex: 1,
     },
     messageCard: {
@@ -283,15 +283,12 @@ const styles = StyleSheet.create({
     quotesToggle: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 215, 0, 0.1)',
         borderRadius: 12,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#FFD700',
     },
     quotesToggleText: {
         flex: 1,
-        color: '#FFD700',
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 12,
@@ -300,13 +297,11 @@ const styles = StyleSheet.create({
         marginTop: 16,
     },
     quoteCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
     },
     quoteText: {
-        color: '#fff',
         fontSize: 14,
         lineHeight: 20,
         fontStyle: 'italic',
@@ -338,13 +333,11 @@ const styles = StyleSheet.create({
     noMessageTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#fff',
         marginTop: 16,
         marginBottom: 8,
     },
     noMessageText: {
         fontSize: 14,
-        color: '#aaa',
         textAlign: 'center',
         lineHeight: 20,
     },

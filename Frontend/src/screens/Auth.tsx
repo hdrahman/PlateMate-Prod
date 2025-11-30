@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     View,
     Text,
@@ -17,6 +17,7 @@ import {
     Easing,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { ThemeContext } from '../ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -92,6 +93,7 @@ const FloatingElement = ({ children, delay = 0, duration = 4000 }: any) => {
 };
 
 const Auth = ({ navigation, route }: any) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -305,25 +307,25 @@ const Auth = ({ navigation, route }: any) => {
     }
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor="transparent" translucent />
 
             {/* Simplified Background */}
             <LinearGradient
-                colors={['#121212', '#1a1a1a', '#121212']}
+                colors={isDarkTheme ? ['#121212', '#1a1a1a', '#121212'] : [theme.colors.background, theme.colors.cardBackground, theme.colors.background]}
                 style={styles.background}
             />
 
             {/* Subtle Floating Background Elements */}
             <View style={styles.floatingElementsContainer}>
                 <FloatingElement delay={0} duration={8000}>
-                    <View style={[styles.floatingShape, styles.shape1]} />
+                    <View style={[styles.floatingShape, styles.shape1, { backgroundColor: isDarkTheme ? 'rgba(155, 0, 255, 0.05)' : 'rgba(155, 0, 255, 0.1)' }]} />
                 </FloatingElement>
                 <FloatingElement delay={2000} duration={6000}>
-                    <View style={[styles.floatingShape, styles.shape2]} />
+                    <View style={[styles.floatingShape, styles.shape2, { backgroundColor: isDarkTheme ? 'rgba(0, 116, 221, 0.08)' : 'rgba(0, 116, 221, 0.12)' }]} />
                 </FloatingElement>
                 <FloatingElement delay={4000} duration={7000}>
-                    <View style={[styles.floatingShape, styles.shape3]} />
+                    <View style={[styles.floatingShape, styles.shape3, { backgroundColor: isDarkTheme ? 'rgba(221, 0, 149, 0.04)' : 'rgba(221, 0, 149, 0.08)' }]} />
                 </FloatingElement>
             </View>
 
@@ -350,7 +352,7 @@ const Auth = ({ navigation, route }: any) => {
                                 colors={["#0074dd", "#5c00dd", "#dd0095"]}
                                 style={styles.logoGradientRing}
                             />
-                            <View style={styles.logoCircle}>
+                            <View style={[styles.logoCircle, { backgroundColor: theme.colors.cardBackground }]}>
                                 <Image
                                     source={require('../../assets/icon2-edited.png')}
                                     style={styles.logoImage}
@@ -359,8 +361,8 @@ const Auth = ({ navigation, route }: any) => {
                             </View>
                         </View>
 
-                        <Text style={styles.title}>PlateMate</Text>
-                        <Text style={styles.subtitle}>
+                        <Text style={[styles.title, { color: theme.colors.text }]}>PlateMate</Text>
+                        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                             Your AI-Powered Nutrition Journey
                         </Text>
                     </Animated.View>
@@ -382,12 +384,12 @@ const Auth = ({ navigation, route }: any) => {
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                             />
-                            <View style={styles.card}>
+                            <View style={[styles.card, { backgroundColor: theme.colors.cardBackground }]}>
                                 <View style={styles.cardContent}>
-                                    <Text style={styles.formTitle}>
+                                    <Text style={[styles.formTitle, { color: theme.colors.text }]}>
                                         {showSignedInState ? 'Already Signed In' : (isLogin ? 'Welcome Back' : 'Create Account')}
                                     </Text>
-                                    <Text style={styles.formSubtitle}>
+                                    <Text style={[styles.formSubtitle, { color: theme.colors.textSecondary }]}>
                                         {showSignedInState
                                             ? 'You are currently signed in. Sign out to switch accounts or try onboarding again.'
                                             : (isLogin
@@ -398,12 +400,12 @@ const Auth = ({ navigation, route }: any) => {
                                     {!showSignedInState && (
                                         <>
                                             {/* Email Input */}
-                                            <View style={styles.inputContainer}>
-                                                <Ionicons name="mail-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
+                                            <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
+                                                <Ionicons name="mail-outline" size={20} color={theme.colors.primary} style={styles.inputIcon} />
                                                 <TextInput
-                                                    style={styles.input}
+                                                    style={[styles.input, { color: theme.colors.text }]}
                                                     placeholder="Email address"
-                                                    placeholderTextColor="#777"
+                                                    placeholderTextColor={theme.colors.textSecondary}
                                                     value={email}
                                                     onChangeText={setEmail}
                                                     keyboardType="email-address"
@@ -413,12 +415,12 @@ const Auth = ({ navigation, route }: any) => {
                                             </View>
 
                                             {/* Password Input */}
-                                            <View style={styles.inputContainer}>
-                                                <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
+                                            <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
+                                                <Ionicons name="lock-closed-outline" size={20} color={theme.colors.primary} style={styles.inputIcon} />
                                                 <TextInput
-                                                    style={styles.input}
+                                                    style={[styles.input, { color: theme.colors.text }]}
                                                     placeholder="Password"
-                                                    placeholderTextColor="#777"
+                                                    placeholderTextColor={theme.colors.textSecondary}
                                                     value={password}
                                                     onChangeText={setPassword}
                                                     secureTextEntry={!passwordVisible}
@@ -431,7 +433,7 @@ const Auth = ({ navigation, route }: any) => {
                                                     <Ionicons
                                                         name={passwordVisible ? "eye-outline" : "eye-off-outline"}
                                                         size={20}
-                                                        color="#777"
+                                                        color={theme.colors.textSecondary}
                                                     />
                                                 </TouchableOpacity>
                                             </View>
@@ -442,18 +444,18 @@ const Auth = ({ navigation, route }: any) => {
                                                     onPress={() => navigation.navigate('ForgotPassword')}
                                                     style={styles.forgotPasswordButton}
                                                 >
-                                                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                                                    <Text style={[styles.forgotPasswordText, { color: theme.colors.primary }]}>Forgot Password?</Text>
                                                 </TouchableOpacity>
                                             )}
 
                                             {/* Confirm Password Input (Sign Up only) */}
                                             {!isLogin && (
-                                                <View style={styles.inputContainer}>
-                                                    <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" style={styles.inputIcon} />
+                                                <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
+                                                    <Ionicons name="lock-closed-outline" size={20} color={theme.colors.primary} style={styles.inputIcon} />
                                                     <TextInput
-                                                        style={styles.input}
+                                                        style={[styles.input, { color: theme.colors.text }]}
                                                         placeholder="Confirm password"
-                                                        placeholderTextColor="#777"
+                                                        placeholderTextColor={theme.colors.textSecondary}
                                                         value={confirmPassword}
                                                         onChangeText={setConfirmPassword}
                                                         secureTextEntry={!confirmPasswordVisible}
@@ -466,7 +468,7 @@ const Auth = ({ navigation, route }: any) => {
                                                         <Ionicons
                                                             name={confirmPasswordVisible ? "eye-outline" : "eye-off-outline"}
                                                             size={20}
-                                                            color="#777"
+                                                            color={theme.colors.textSecondary}
                                                         />
                                                     </TouchableOpacity>
                                                 </View>
@@ -501,9 +503,9 @@ const Auth = ({ navigation, route }: any) => {
                                     {/* Toggle Auth Mode - only show if not in signed-in state */}
                                     {!showSignedInState && (
                                         <TouchableOpacity onPress={toggleAuthMode} style={styles.toggleContainer}>
-                                            <Text style={styles.toggleAuthText}>
+                                            <Text style={[styles.toggleAuthText, { color: theme.colors.textSecondary }]}>
                                                 {isLogin ? "Don't have an account? " : "Already have an account? "}
-                                                <Text style={styles.toggleAuthHighlight}>
+                                                <Text style={[styles.toggleAuthHighlight, { color: theme.colors.primary }]}>
                                                     {isLogin ? "Sign up" : "Sign in"}
                                                 </Text>
                                             </Text>
@@ -523,27 +525,27 @@ const Auth = ({ navigation, route }: any) => {
                             ]}
                         >
                             <View style={styles.dividerContainer}>
-                                <View style={styles.divider} />
-                                <Text style={styles.orText}>or continue with</Text>
-                                <View style={styles.divider} />
+                                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                                <Text style={[styles.orText, { color: theme.colors.textSecondary }]}>or continue with</Text>
+                                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
                             </View>
 
                             <TouchableOpacity
-                                style={styles.socialButton}
+                                style={[styles.socialButton, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
                                 onPress={handleGoogleSignIn}
                                 disabled={isLoading}
                                 activeOpacity={0.8}
                             >
                                 <View style={styles.socialButtonContent}>
-                                    <Ionicons name="logo-google" size={20} color="#FFF" style={styles.socialIcon} />
-                                    <Text style={styles.socialButtonText}>Continue with Google</Text>
+                                    <Ionicons name="logo-google" size={20} color={theme.colors.text} style={styles.socialIcon} />
+                                    <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Google</Text>
                                 </View>
                             </TouchableOpacity>
 
                             {/* Apple Sign-In (iOS only) */}
                             {isAppleAuthAvailable && (
                                 <TouchableOpacity
-                                    style={[styles.socialButton, styles.appleButton]}
+                                    style={[styles.socialButton, styles.appleButton, { borderColor: theme.colors.border }]}
                                     onPress={handleAppleSignIn}
                                     disabled={isLoading}
                                     activeOpacity={0.8}
@@ -565,7 +567,6 @@ const Auth = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#121212',
     },
     background: {
         position: 'absolute',
@@ -587,21 +588,18 @@ const styles = StyleSheet.create({
     shape1: {
         width: 80,
         height: 80,
-        backgroundColor: 'rgba(155, 0, 255, 0.05)',
         top: '15%',
         left: '10%',
     },
     shape2: {
         width: 60,
         height: 60,
-        backgroundColor: 'rgba(0, 116, 221, 0.08)',
         top: '25%',
         right: '15%',
     },
     shape3: {
         width: 100,
         height: 100,
-        backgroundColor: 'rgba(221, 0, 149, 0.04)',
         bottom: '20%',
         right: '10%',
     },
@@ -638,7 +636,6 @@ const styles = StyleSheet.create({
         height: 110,
         borderRadius: 55,
         overflow: 'hidden',
-        backgroundColor: '#1E1E1E',
         shadowColor: "#9B00FF",
         shadowOffset: {
             width: 0,
@@ -656,13 +653,11 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: 'bold',
-        color: 'white',
         marginBottom: 8,
         letterSpacing: 0.5,
     },
     subtitle: {
         fontSize: 16,
-        color: '#777',
         textAlign: 'center',
         lineHeight: 20,
     },
@@ -683,7 +678,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     card: {
-        backgroundColor: '#1E1E1E',
         borderRadius: 15,
         shadowColor: "#000",
         shadowOffset: {
@@ -702,11 +696,9 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 8,
         textAlign: 'center',
-        color: 'white',
     },
     formSubtitle: {
         fontSize: 15,
-        color: '#777',
         marginBottom: 28,
         textAlign: 'center',
         lineHeight: 20,
@@ -714,19 +706,16 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2A2A2A',
         borderRadius: 12,
         marginBottom: 16,
         paddingHorizontal: 16,
         borderWidth: 1,
-        borderColor: '#333',
     },
     inputIcon: {
         marginRight: 12,
     },
     input: {
         flex: 1,
-        color: 'white',
         paddingVertical: 16,
         fontSize: 16,
     },
@@ -740,7 +729,6 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     forgotPasswordText: {
-        color: '#9B00FF',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -778,11 +766,9 @@ const styles = StyleSheet.create({
     },
     toggleAuthText: {
         fontSize: 14,
-        color: '#777',
         textAlign: 'center',
     },
     toggleAuthHighlight: {
-        color: '#9B00FF',
         fontWeight: '600',
     },
     socialContainer: {
@@ -796,21 +782,17 @@ const styles = StyleSheet.create({
     divider: {
         flex: 1,
         height: 1,
-        backgroundColor: '#333',
     },
     orText: {
         fontSize: 12,
-        color: '#777',
         marginHorizontal: 16,
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
     socialButton: {
-        backgroundColor: '#1E1E1E',
         borderRadius: 12,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#333',
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
@@ -822,7 +804,6 @@ const styles = StyleSheet.create({
     },
     appleButton: {
         backgroundColor: '#000',
-        borderColor: '#444',
     },
     socialButtonContent: {
         flexDirection: 'row',
@@ -837,7 +818,6 @@ const styles = StyleSheet.create({
     socialButtonText: {
         fontSize: 15,
         fontWeight: '500',
-        color: '#FFF',
     },
 });
 

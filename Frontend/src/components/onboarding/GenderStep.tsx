@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { ThemeContext } from '../../ThemeContext';
 
 interface GenderStepProps {
     profile: UserProfile;
@@ -16,6 +17,7 @@ interface GenderStepProps {
 }
 
 const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [gender, setGender] = useState<string>(profile.gender || 'male');
 
     // Gender options
@@ -46,10 +48,10 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>Select Your Gender</Text>
-                <Text style={styles.subtitle}>This helps us calculate your nutrition needs accurately</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Select Your Gender</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>This helps us calculate your nutrition needs accurately</Text>
             </View>
 
             <View style={styles.gendersContainer}>
@@ -58,6 +60,7 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
                         key={option.id}
                         style={[
                             styles.genderCard,
+                            { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                             gender === option.id && styles.selectedGender,
                             gender === option.id && { borderColor: option.color }
                         ]}
@@ -68,16 +71,18 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
                     >
                         <View style={[
                             styles.genderIconContainer,
+                            { backgroundColor: theme.colors.inputBackground },
                             gender === option.id && { backgroundColor: `${option.color}20` }
                         ]}>
                             <Ionicons
                                 name={option.icon as any}
                                 size={40}
-                                color={gender === option.id ? option.color : '#777'}
+                                color={gender === option.id ? option.color : theme.colors.textSecondary}
                             />
                         </View>
                         <Text style={[
                             styles.genderLabel,
+                            { color: theme.colors.text },
                             gender === option.id && { color: option.color }
                         ]}
                             numberOfLines={1}
@@ -88,16 +93,16 @@ const GenderStep: React.FC<GenderStepProps> = ({ profile, updateProfile, onNext 
                 ))}
             </View>
 
-            <View style={styles.infoContainer}>
-                <Ionicons name="information-circle-outline" size={20} color="#888" />
-                <Text style={styles.infoText}>
+            <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
+                <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                     We use this information to calculate your basal metabolic rate (BMR) and nutritional needs
                 </Text>
             </View>
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
                 <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    colors={[theme.colors.primary, "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.buttonGradient}

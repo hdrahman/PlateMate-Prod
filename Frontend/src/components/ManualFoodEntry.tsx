@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import {
     View,
     Text,
@@ -24,10 +24,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { FoodItem } from '../services/BarcodeService';
 import apiService from '../utils/apiService';
+import { ThemeContext } from '../ThemeContext';
 
-// Define theme colors
+// Legacy color constants - these will be phased out as components migrate to ThemeContext
+// For new code, prefer using theme.colors.X from ThemeContext
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
@@ -38,9 +39,10 @@ const PURPLE_ACCENT = '#AA00FF';
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
+    cardBackgroundColor?: string;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style, cardBackgroundColor }) => {
     return (
         <View style={[styles.gradientBorderContainer, style]}>
             <LinearGradient
@@ -60,7 +62,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1,
                     borderRadius: 9,
-                    backgroundColor: '#121212',
+                    backgroundColor: cardBackgroundColor,
                     padding: 16,
                 }}
             >
@@ -74,9 +76,10 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 interface HealthRatingSliderProps {
     healthRating: number;
     onRatingChange: (rating: number) => void;
+    theme?: any;
 }
 
-const HealthRatingSlider = React.memo(({ healthRating, onRatingChange }: HealthRatingSliderProps) => {
+const HealthRatingSlider = React.memo(({ healthRating, onRatingChange, theme }: HealthRatingSliderProps) => {
     const sliderOffset = useSharedValue(0);
     const indicatorRadius = 8;
     const sliderWidth = 280 - (indicatorRadius * 2);
@@ -93,16 +96,16 @@ const HealthRatingSlider = React.memo(({ healthRating, onRatingChange }: HealthR
     }, [onRatingChange]);
 
     // Memoized pan gesture
-    const panGesture = React.useMemo(() => 
+    const panGesture = React.useMemo(() =>
         Gesture.Pan()
-            .onStart(() => {})
+            .onStart(() => { })
             .onUpdate((event) => {
                 const adjustedX = event.x - indicatorRadius;
                 const currentX = Math.max(0, Math.min(sliderWidth, adjustedX));
                 const percentage = currentX / sliderWidth;
                 const rawRating = 1 + (percentage * 9);
                 const newRating = Math.max(1, Math.min(10, Math.round(rawRating)));
-                
+
                 sliderOffset.value = currentX;
                 runOnJS(updateHealthRating)(newRating);
             })
@@ -115,7 +118,7 @@ const HealthRatingSlider = React.memo(({ healthRating, onRatingChange }: HealthR
                 const finalPosition = ((newRating - 1) / 9) * sliderWidth;
                 sliderOffset.value = finalPosition;
             })
-    , [sliderWidth, indicatorRadius, updateHealthRating]);
+        , [sliderWidth, indicatorRadius, updateHealthRating]);
 
     // Memoized animated style
     const sliderIndicatorStyle = useAnimatedStyle(() => ({
@@ -150,7 +153,7 @@ const HealthRatingSlider = React.memo(({ healthRating, onRatingChange }: HealthR
                     <Text style={[styles.healthRatingScore, { color: healthColor }]}>
                         {Math.round(healthRating)}
                     </Text>
-                    <Text style={styles.healthRatingMaxScore}>/10</Text>
+                    <Text style={[styles.healthRatingMaxScore, theme && { color: theme.colors.textSecondary }]}>/10</Text>
                 </View>
                 <View style={styles.healthRatingStatus}>
                     <View style={[styles.healthRatingIndicator, { backgroundColor: healthColor }]} />
@@ -177,27 +180,27 @@ const HealthRatingSlider = React.memo(({ healthRating, onRatingChange }: HealthR
                     </View>
                 </GestureDetector>
                 <View style={styles.healthRatingBarLabels}>
-                    <Text style={styles.healthRatingBarLabel}>Poor</Text>
-                    <Text style={styles.healthRatingBarLabel}>Good</Text>
-                    <Text style={styles.healthRatingBarLabel}>Excellent</Text>
+                    <Text style={[styles.healthRatingBarLabel, theme && { color: theme.colors.textSecondary }]}>Poor</Text>
+                    <Text style={[styles.healthRatingBarLabel, theme && { color: theme.colors.textSecondary }]}>Good</Text>
+                    <Text style={[styles.healthRatingBarLabel, theme && { color: theme.colors.textSecondary }]}>Excellent</Text>
                 </View>
             </View>
 
             {/* Rating Guidelines */}
-            <View style={styles.healthRatingGuidelines}>
-                <Text style={styles.healthRatingGuidelinesTitle}>Rating Guide</Text>
+            <View style={[styles.healthRatingGuidelines, theme && { borderTopColor: theme.colors.border }]}>
+                <Text style={[styles.healthRatingGuidelinesTitle, theme && { color: theme.colors.text }]}>Rating Guide</Text>
                 <View style={styles.healthRatingGuidelinesList}>
                     <View style={styles.healthRatingGuideline}>
                         <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FF5252' }]} />
-                        <Text style={styles.healthRatingGuidelineText}>1-4: Processed, high sugar/sodium</Text>
+                        <Text style={[styles.healthRatingGuidelineText, theme && { color: theme.colors.textSecondary }]}>1-4: Processed, high sugar/sodium</Text>
                     </View>
                     <View style={styles.healthRatingGuideline}>
                         <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#FFD740' }]} />
-                        <Text style={styles.healthRatingGuidelineText}>5-7: Moderate nutrition value</Text>
+                        <Text style={[styles.healthRatingGuidelineText, theme && { color: theme.colors.textSecondary }]}>5-7: Moderate nutrition value</Text>
                     </View>
                     <View style={styles.healthRatingGuideline}>
                         <View style={[styles.healthRatingGuidelineDot, { backgroundColor: '#4CAF50' }]} />
-                        <Text style={styles.healthRatingGuidelineText}>8-10: Whole foods, nutrient-dense</Text>
+                        <Text style={[styles.healthRatingGuidelineText, theme && { color: theme.colors.textSecondary }]}>8-10: Whole foods, nutrient-dense</Text>
                     </View>
                 </View>
             </View>
@@ -214,6 +217,7 @@ interface ManualFoodEntryProps {
 
 // Memoize the main component to prevent unnecessary re-renders
 const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealType }: ManualFoodEntryProps) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [foodName, setFoodName] = useState<string>('');
     const [calories, setCalories] = useState<string>('');
     const [proteins, setProteins] = useState<string>('0');
@@ -241,7 +245,7 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
     }, [defaultMealType]);
 
     // Memoized form validation
-    const isFormValid = React.useMemo(() => 
+    const isFormValid = React.useMemo(() =>
         foodName.trim() !== '' && calories.trim() !== '' && parseFloat(calories) > 0,
         [foodName, calories]
     );
@@ -401,15 +405,15 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
             onRequestClose={onClose}
         >
             <GestureHandlerRootView style={{ flex: 1 }}>
-                <SafeAreaView style={styles.container} edges={['top']}>
-                    <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+                <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+                    <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
                     {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={28} color={WHITE} />
+                    <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+                        <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                            <Ionicons name="close" size={28} color={theme.colors.text} />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Manual Food Entry</Text>
+                        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Manual Food Entry</Text>
                         <View style={{ width: 28 }} />
                     </View>
 
@@ -419,8 +423,8 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                         keyboardDismissMode="on-drag"
                     >
                         {/* Meal Type Selector - Moved to top */}
-                        <GradientBorderCard style={styles.section}>
-                            <Text style={styles.sectionTitle}>Add to Meal</Text>
+                        <GradientBorderCard style={styles.section} cardBackgroundColor={theme.colors.cardBackground}>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Add to Meal</Text>
                             <View style={styles.mealOptions}>
                                 {mealOptions.map((meal, index) => {
                                     const isBreakfast = meal === 'Breakfast';
@@ -429,7 +433,8 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                                             key={meal}
                                             style={[
                                                 styles.mealOption,
-                                                selectedMeal === meal && styles.selectedMealOption,
+                                                { backgroundColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)' },
+                                                selectedMeal === meal && { backgroundColor: theme.colors.primary },
                                                 index === mealOptions.length - 1 && { marginRight: 0 },
                                                 isBreakfast && { flex: 1.2 } // Give more space to "Breakfast"
                                             ]}
@@ -438,6 +443,7 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                                             <Text
                                                 style={[
                                                     styles.mealOptionText,
+                                                    { color: theme.colors.text },
                                                     selectedMeal === meal && styles.selectedMealOptionText
                                                 ]}
                                                 numberOfLines={1}
@@ -452,9 +458,9 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                         </GradientBorderCard>
 
                         {/* Basic Info */}
-                        <GradientBorderCard style={styles.section}>
+                        <GradientBorderCard style={styles.section} cardBackgroundColor={theme.colors.cardBackground}>
                             <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Basic Information</Text>
+                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Basic Information</Text>
                                 <TouchableOpacity
                                     style={[
                                         styles.aiButton,
@@ -464,8 +470,8 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                                     disabled={!foodName.trim() || isEstimating}
                                 >
                                     {isEstimating ? (
-                                        <View style={styles.aiButtonContent}>
-                                            <Text style={styles.aiButtonText}>...</Text>
+                                        <View style={[styles.aiButtonContent, { backgroundColor: theme.colors.border }]}>
+                                            <Text style={[styles.aiButtonText, { color: theme.colors.text }]}>...</Text>
                                         </View>
                                     ) : (
                                         <LinearGradient
@@ -482,11 +488,11 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
 
                             {/* Food Name */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Food Name*</Text>
+                                <Text style={[styles.label, { color: theme.colors.text }]}>Food Name*</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                     placeholder="Enter food name"
-                                    placeholderTextColor={GRAY}
+                                    placeholderTextColor={theme.colors.textSecondary}
                                     value={foodName}
                                     onChangeText={setFoodName}
                                 />
@@ -495,22 +501,22 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                             {/* Serving Info */}
                             <View style={styles.row}>
                                 <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                                    <Text style={styles.label}>Quantity</Text>
+                                    <Text style={[styles.label, { color: theme.colors.text }]}>Quantity</Text>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="1"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={quantity}
                                         onChangeText={setQuantity}
                                         keyboardType="numeric"
                                     />
                                 </View>
                                 <View style={[styles.inputGroup, { flex: 1.5 }]}>
-                                    <Text style={styles.label}>Unit</Text>
+                                    <Text style={[styles.label, { color: theme.colors.text }]}>Unit</Text>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="serving"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={servingUnit}
                                         onChangeText={setServingUnit}
                                     />
@@ -519,16 +525,16 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                         </GradientBorderCard>
 
                         {/* Nutrition Facts */}
-                        <GradientBorderCard style={styles.section}>
-                            <Text style={styles.sectionTitle}>Nutrition Facts</Text>
+                        <GradientBorderCard style={styles.section} cardBackgroundColor={theme.colors.cardBackground}>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Nutrition Facts</Text>
 
                             {/* Calories */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Calories*</Text>
+                                <Text style={[styles.label, { color: theme.colors.text }]}>Calories*</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                     placeholder="Enter calories"
-                                    placeholderTextColor={GRAY}
+                                    placeholderTextColor={theme.colors.textSecondary}
                                     value={calories}
                                     onChangeText={setCalories}
                                     keyboardType="numeric"
@@ -536,36 +542,36 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                             </View>
 
                             {/* Macronutrients Grid */}
-                            <Text style={styles.subSectionTitle}>Macronutrients (g)</Text>
+                            <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>Macronutrients (g)</Text>
                             <View style={styles.macroRow}>
                                 <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
-                                    <Text style={styles.macroLabel}>Protein</Text>
+                                    <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Protein</Text>
                                     <TextInput
-                                        style={styles.macroInput}
+                                        style={[styles.macroInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="0"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={proteins}
                                         onChangeText={setProteins}
                                         keyboardType="numeric"
                                     />
                                 </View>
                                 <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
-                                    <Text style={styles.macroLabel}>Carbs</Text>
+                                    <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Carbs</Text>
                                     <TextInput
-                                        style={styles.macroInput}
+                                        style={[styles.macroInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="0"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={carbs}
                                         onChangeText={setCarbs}
                                         keyboardType="numeric"
                                     />
                                 </View>
                                 <View style={styles.macroInputGroup}>
-                                    <Text style={styles.macroLabel}>Fat</Text>
+                                    <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Fat</Text>
                                     <TextInput
-                                        style={styles.macroInput}
+                                        style={[styles.macroInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="0"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={fats}
                                         onChangeText={setFats}
                                         keyboardType="numeric"
@@ -574,43 +580,44 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                             </View>
 
                             {/* Additional Nutrients */}
-                            <Text style={styles.subSectionTitle}>Additional (g)</Text>
+                            <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>Additional (g)</Text>
                             <View style={styles.macroRow}>
                                 <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
-                                    <Text style={styles.macroLabel}>Fiber</Text>
+                                    <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Fiber</Text>
                                     <TextInput
-                                        style={styles.macroInput}
+                                        style={[styles.macroInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="0"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={fiber}
                                         onChangeText={setFiber}
                                         keyboardType="numeric"
                                     />
                                 </View>
                                 <View style={[styles.macroInputGroup, { marginRight: 10 }]}>
-                                    <Text style={styles.macroLabel}>Sugar</Text>
+                                    <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Sugar</Text>
                                     <TextInput
-                                        style={styles.macroInput}
+                                        style={[styles.macroInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         placeholder="0"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={sugar}
                                         onChangeText={setSugar}
                                         keyboardType="numeric"
                                     />
                                 </View>
                                 <View style={styles.macroInputGroup}>
-                                    <Text style={styles.macroLabel}></Text>
+                                    <Text style={[styles.macroLabel, { color: theme.colors.text }]}></Text>
                                 </View>
                             </View>
                         </GradientBorderCard>
 
                         {/* Health Rating */}
-                        <GradientBorderCard style={styles.section}>
-                            <Text style={styles.sectionTitle}>Health Rating</Text>
-                            <Text style={styles.healthRatingSubtitle}>How nutritious is this food?</Text>
-                            <HealthRatingSlider 
+                        <GradientBorderCard style={styles.section} cardBackgroundColor={theme.colors.cardBackground}>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Health Rating</Text>
+                            <Text style={[styles.healthRatingSubtitle, { color: theme.colors.textSecondary }]}>How nutritious is this food?</Text>
+                            <HealthRatingSlider
                                 healthRating={healthRating}
                                 onRatingChange={handleHealthRatingChange}
+                                theme={theme}
                             />
                         </GradientBorderCard>
 
@@ -631,6 +638,7 @@ const ManualFoodEntry = React.memo(({ visible, onClose, onAddFood, defaultMealTy
                             >
                                 <Text style={[
                                     styles.saveButtonText,
+                                    { color: theme.colors.text },
                                     !isFormValid && styles.disabledButtonText
                                 ]}>Save Food</Text>
                             </LinearGradient>

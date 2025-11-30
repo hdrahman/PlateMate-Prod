@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useContext } from 'react';
 import { View, Text, StyleSheet, Dimensions, Animated, Easing, Image } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { ThemeContext } from '../ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -182,6 +183,8 @@ const ScannerAnimation: React.FC<ScannerAnimationProps> = ({
     progress,
     onComplete
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     // Animation references
     const scanLineAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -405,13 +408,14 @@ const ScannerAnimation: React.FC<ScannerAnimationProps> = ({
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             {/* Main scanner view */}
             <Animated.View style={styles.scannerContainer}>
                 <Animated.View
                     style={[
                         styles.scannerOutline,
                         {
+                            backgroundColor: isDarkTheme ? 'rgba(10, 10, 15, 0.7)' : 'rgba(255, 255, 255, 0.85)',
                             shadowOpacity: scannerGlowAnim,
                             borderColor: scannerGlowAnim.interpolate({
                                 inputRange: [0.3, 1],
@@ -512,7 +516,7 @@ const ScannerAnimation: React.FC<ScannerAnimationProps> = ({
 
             {/* Progress bar */}
             <View style={styles.progressContainer}>
-                <View style={styles.progressBackground}>
+                <View style={[styles.progressBackground, { backgroundColor: isDarkTheme ? 'rgba(50, 50, 50, 0.5)' : 'rgba(200, 200, 200, 0.5)' }]}>
                     <Animated.View
                         style={[
                             styles.progressFill,
@@ -561,7 +565,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 20,
         paddingBottom: 0,
-        backgroundColor: '#000',
         width: '100%',
         height: '100%', // Ensure full height
         position: 'absolute',
@@ -582,7 +585,6 @@ const styles = StyleSheet.create({
         height: BOX_SIZE,
         position: 'relative',
         borderRadius: 12,
-        backgroundColor: 'rgba(10, 10, 15, 0.7)',
         borderColor: '#9B00FF',
         borderWidth: 2.5,
         overflow: 'hidden',
@@ -657,7 +659,6 @@ const styles = StyleSheet.create({
     progressBackground: {
         width: '100%',
         height: 6,
-        backgroundColor: 'rgba(50, 50, 50, 0.5)',
         borderRadius: 3,
         overflow: 'hidden'
     },

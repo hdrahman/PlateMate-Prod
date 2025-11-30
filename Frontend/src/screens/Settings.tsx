@@ -11,7 +11,7 @@ import PersistentStepTracker from "../services/PersistentStepTracker";
 import StepTrackingModeModal from "../components/StepTrackingModeModal";
 
 const SettingsScreen = () => {
-    const { isDarkTheme, toggleTheme } = useContext(ThemeContext);
+    const { isDarkTheme, toggleTheme, theme } = useContext(ThemeContext);
     const navigation = useNavigation<any>();
     const { signOut, user } = useAuth();
     const [mealGalleryStats, setMealGalleryStats] = useState<{ totalMeals: number, storageUsedMB: number }>({ totalMeals: 0, storageUsedMB: 0 });
@@ -60,12 +60,12 @@ const SettingsScreen = () => {
                     UnifiedStepTracker.stopTracking(),
                     PersistentStepTracker.stopService()
                 ]);
-                
+
                 // Update database to set mode to disabled
                 if (user?.uid) {
                     await updateUserProfile(user.uid, { step_tracking_calorie_mode: 'disabled' });
                 }
-                
+
                 setIsPersistentTrackingEnabled(false);
                 Alert.alert(
                     'Step Tracking Disabled',
@@ -84,7 +84,7 @@ const SettingsScreen = () => {
     const handleStepModeSelection = async (mode: 'with_calories' | 'without_calories') => {
         setIsLoadingStepSettings(true);
         setPendingStepTrackingEnable(false);
-        
+
         try {
             // Save the selected mode to database
             if (user?.uid) {
@@ -178,34 +178,32 @@ const SettingsScreen = () => {
         }
     };
 
-
-
     return (
-        <SafeAreaView style={[styles.container, isDarkTheme ? styles.dark : styles.light]} edges={["top", "left", "right"]}>
-            <StatusBar barStyle="light-content" />
-            <View style={[styles.header, isDarkTheme ? styles.dark : styles.light]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Settings</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Settings</Text>
             </View>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Appearance</Text>
-                    <View style={styles.card}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Appearance</Text>
+                    <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <View style={styles.itemRow}>
                             <View style={styles.iconTextContainer}>
-                                <View style={[styles.iconBubble, { backgroundColor: '#9B00FF30' }]}>
-                                    <Ionicons name="moon-outline" size={20} color="#9B00FF" />
+                                <View style={[styles.iconBubble, { backgroundColor: theme.colors.primary + '30' }]}>
+                                    <Ionicons name="moon-outline" size={20} color={theme.colors.primary} />
                                 </View>
-                                <Text style={styles.itemText}>Dark Mode</Text>
+                                <Text style={[styles.itemText, { color: theme.colors.text }]}>Dark Mode</Text>
                             </View>
                             <View style={styles.switchContainer}>
                                 <Switch
                                     value={isDarkTheme}
                                     onValueChange={toggleTheme}
-                                    trackColor={{ false: "#3e3e3e", true: "#9B00FF40" }}
-                                    thumbColor={isDarkTheme ? "#9B00FF" : "#f4f3f4"}
+                                    trackColor={{ false: "#3e3e3e", true: theme.colors.primary + '40' }}
+                                    thumbColor={isDarkTheme ? theme.colors.primary : "#f4f3f4"}
                                     ios_backgroundColor="#3e3e3e"
                                 />
                             </View>
@@ -213,24 +211,22 @@ const SettingsScreen = () => {
                     </View>
                 </View>
 
-
-
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account</Text>
-                    <View style={styles.card}>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditProfile")}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Account</Text>
+                    <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("EditProfile")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#4A90E230' }]}>
                                 <Ionicons name="person-circle-outline" size={20} color="#4A90E2" />
                             </View>
-                            <Text style={styles.itemText}>Edit Profile</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Edit Profile</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("EditGoals")}>
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("EditGoals")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#50C87830' }]}>
                                 <Ionicons name="fitness-outline" size={20} color="#50C878" />
                             </View>
-                            <Text style={styles.itemText}>Edit Goals</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Edit Goals</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                         <View style={styles.itemRow}>
                             <View style={styles.iconTextContainer}>
@@ -238,8 +234,8 @@ const SettingsScreen = () => {
                                     <Ionicons name="footsteps-outline" size={20} color="#FF00F5" />
                                 </View>
                                 <View style={styles.stepTrackingTextContainer}>
-                                    <Text style={styles.itemText}>Always-On Step Tracking</Text>
-                                    <Text style={styles.itemSubtext}>
+                                    <Text style={[styles.itemText, { color: theme.colors.text }]}>Always-On Step Tracking</Text>
+                                    <Text style={[styles.itemSubtext, { color: theme.colors.textSecondary }]}>
                                         Keep counting steps even when app is closed
                                     </Text>
                                 </View>
@@ -256,34 +252,30 @@ const SettingsScreen = () => {
                             </View>
                         </View>
                         <TouchableOpacity
-                            style={styles.item}
+                            style={[styles.item, { borderBottomColor: theme.colors.border }]}
                             onPress={() => {
-                                // Navigate using full type and options to avoid navigation errors
                                 navigation.navigate('PremiumSubscription' as never);
                             }}
                         >
                             <View style={[styles.iconBubble, { backgroundColor: '#FFD70030' }]}>
                                 <Ionicons name="star-outline" size={20} color="#FFD700" />
                             </View>
-                            <Text style={styles.itemText}>Premium Subscription</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Premium Subscription</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("ChangePassword")}>
-                            <View style={[styles.iconBubble, { backgroundColor: '#9B00FF30' }]}>
-                                <Ionicons name="lock-closed-outline" size={20} color="#9B00FF" />
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("ChangePassword")}>
+                            <View style={[styles.iconBubble, { backgroundColor: theme.colors.primary + '30' }]}>
+                                <Ionicons name="lock-closed-outline" size={20} color={theme.colors.primary} />
                             </View>
-                            <Text style={styles.itemText}>Change Password</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Change Password</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.item, styles.lastItem]}
                             onPress={() => {
                                 console.log('🎬 Settings: Future Self Recording button pressed');
                                 try {
-                                    console.log('🚀 Testing navigation to FutureSelfRecordingSimple');
                                     (navigation as any).navigate('FutureSelfRecordingSimple');
-
-                                    console.log('✅ Navigation call completed');
                                 } catch (error) {
                                     console.error('❌ Navigation error:', error);
                                     Alert.alert('Navigation Error', `Failed to open recording screen: ${error}`);
@@ -293,15 +285,15 @@ const SettingsScreen = () => {
                             <View style={[styles.iconBubble, { backgroundColor: '#4CAF5030' }]}>
                                 <Ionicons name="videocam-outline" size={20} color="#4CAF50" />
                             </View>
-                            <Text style={styles.itemText}>Record Future Self Message</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Record Future Self Message</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Community</Text>
-                    <View style={styles.card}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Community</Text>
+                    <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TouchableOpacity
                             style={[styles.item, styles.lastItem]}
                             onPress={() => navigation.navigate("FeatureRequests")}
@@ -310,63 +302,63 @@ const SettingsScreen = () => {
                             <View style={[styles.iconBubble, { backgroundColor: '#32CD3230' }]}>
                                 <Ionicons name="bulb-outline" size={20} color="#32CD32" />
                             </View>
-                            <Text style={styles.itemText}>Feature Requests</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Feature Requests</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Privacy & Security</Text>
-                    <View style={styles.card}>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("Notifications")}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Privacy & Security</Text>
+                    <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("Notifications")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#FF700030' }]}>
                                 <Ionicons name="notifications-outline" size={20} color="#FF7000" />
                             </View>
-                            <Text style={styles.itemText}>Notifications</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Notifications</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("DataSharing")}>
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("DataSharing")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#00BFFF30' }]}>
                                 <Ionicons name="share-social-outline" size={20} color="#00BFFF" />
                             </View>
-                            <Text style={styles.itemText}>Data Sharing</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Data Sharing</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("PrivacyPolicy")}>
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("PrivacyPolicy")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#C0C0C030' }]}>
                                 <Ionicons name="document-text-outline" size={20} color="#C0C0C0" />
                             </View>
-                            <Text style={styles.itemText}>Privacy Policy</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Privacy Policy</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.item} onPress={() => navigation.navigate("LegalTerms")}>
+                        <TouchableOpacity style={[styles.item, { borderBottomColor: theme.colors.border }]} onPress={() => navigation.navigate("LegalTerms")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#E8A87C30' }]}>
                                 <Ionicons name="document-outline" size={20} color="#E8A87C" />
                             </View>
-                            <Text style={styles.itemText}>Legal</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Legal</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.item, styles.lastItem]} onPress={() => navigation.navigate("AboutCalculations")}>
                             <View style={[styles.iconBubble, { backgroundColor: '#FFB30030' }]}>
                                 <Ionicons name="calculator-outline" size={20} color="#FFB300" />
                             </View>
-                            <Text style={styles.itemText}>About Our Calculations</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>About Our Calculations</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Meal Gallery Management</Text>
-                    <View style={styles.card}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Meal Gallery Management</Text>
+                    <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <View style={styles.item}>
                             <View style={[styles.iconBubble, { backgroundColor: '#32CD3230' }]}>
                                 <Ionicons name="images-outline" size={20} color="#32CD32" />
                             </View>
                             <View style={styles.cacheStatsContainer}>
-                                <Text style={styles.itemText}>Gallery Statistics</Text>
-                                <Text style={styles.cacheStatsText}>
+                                <Text style={[styles.itemText, { color: theme.colors.text }]}>Gallery Statistics</Text>
+                                <Text style={[styles.cacheStatsText, { color: theme.colors.textSecondary }]}>
                                     Meals Saved: {mealGalleryStats.totalMeals} | Storage: {mealGalleryStats.storageUsedMB.toFixed(2)} MB
                                 </Text>
                             </View>
@@ -375,13 +367,11 @@ const SettingsScreen = () => {
                             <View style={[styles.iconBubble, { backgroundColor: '#FF453A30' }]}>
                                 <Ionicons name="trash-outline" size={20} color="#FF453A" />
                             </View>
-                            <Text style={styles.itemText}>Clear Meal Cache</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#777" style={styles.chevron} />
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Clear Meal Cache</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
                     </View>
                 </View>
-
-
 
                 <View style={[styles.section, styles.bottomSection]}>
                     <View style={styles.logoutContainer}>
@@ -406,20 +396,20 @@ const SettingsScreen = () => {
                 animationType="fade"
                 onRequestClose={() => setShowClearMealModal(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Clear Meal Cache</Text>
+                <View style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}>
+                    <View style={[styles.modalContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                        <View style={[styles.modalHeader, { backgroundColor: theme.colors.inputBackground, borderBottomColor: theme.colors.border }]}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Clear Meal Cache</Text>
                             <TouchableOpacity
                                 onPress={() => setShowClearMealModal(false)}
                                 style={styles.modalCloseButton}
                             >
-                                <Ionicons name="close" size={24} color="#FFF" />
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.modalContent}>
-                            <Text style={styles.modalDescription}>
+                            <Text style={[styles.modalDescription, { color: theme.colors.textSecondary }]}>
                                 Enter the number of meals you want to clear. The oldest meals will be deleted first.
                             </Text>
                             <Text style={styles.modalWarning}>
@@ -427,26 +417,26 @@ const SettingsScreen = () => {
                             </Text>
 
                             <View style={styles.inputContainer}>
-                                <Text style={styles.inputLabel}>
+                                <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
                                     Number of meals (max: {mealGalleryStats.totalMeals})
                                 </Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border, color: theme.colors.text }]}
                                     value={clearMealCount}
                                     onChangeText={setClearMealCount}
                                     keyboardType="numeric"
                                     placeholder="Enter number"
-                                    placeholderTextColor="#777"
+                                    placeholderTextColor={theme.colors.textSecondary}
                                     maxLength={6}
                                 />
                             </View>
 
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton]}
+                                    style={[styles.modalButton, styles.cancelButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
                                     onPress={() => setShowClearMealModal(false)}
                                 >
-                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                    <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.modalButton, styles.clearButton]}
@@ -473,27 +463,18 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#121212",
-    },
-    dark: {
-        backgroundColor: "#121212",
-    },
-    light: {
-        backgroundColor: "#1E1E1E",
     },
     header: {
         flexDirection: "row",
         alignItems: "center",
         height: 60,
         borderBottomWidth: 1,
-        borderBottomColor: "#333",
         paddingHorizontal: 16,
     },
     backButton: {
         padding: 5,
     },
     headerTitle: {
-        color: "#FFF",
         fontSize: 22,
         fontWeight: "bold",
         marginLeft: 10,
@@ -512,12 +493,10 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: "600",
-        color: "#9B00FF",
         marginBottom: 12,
         marginLeft: 4,
     },
     card: {
-        backgroundColor: "#1E1E1E",
         borderRadius: 16,
         overflow: "hidden",
         shadowColor: "#000",
@@ -526,7 +505,6 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
         borderWidth: 1,
-        borderColor: "#333",
     },
     iconTextContainer: {
         flexDirection: "row",
@@ -554,14 +532,12 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 16,
         borderBottomWidth: 1,
-        borderBottomColor: "#333",
     },
     lastItem: {
         borderBottomWidth: 0,
     },
     itemText: {
         fontSize: 16,
-        color: "#FFF",
         flex: 1,
     },
     iconBubble: {
@@ -610,7 +586,6 @@ const styles = StyleSheet.create({
     },
     cacheStatsText: {
         fontSize: 12,
-        color: '#777',
         marginTop: 2,
     },
     stepTrackingTextContainer: {
@@ -619,37 +594,30 @@ const styles = StyleSheet.create({
     },
     itemSubtext: {
         fontSize: 12,
-        color: '#777',
         marginTop: 2,
         lineHeight: 16,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     modalContainer: {
         width: '85%',
-        backgroundColor: '#1E1E1E',
         borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#333',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
-        backgroundColor: '#2A2A2A',
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
     },
     modalTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#FFF',
     },
     modalCloseButton: {
         padding: 4,
@@ -659,7 +627,6 @@ const styles = StyleSheet.create({
     },
     modalDescription: {
         fontSize: 14,
-        color: '#CCC',
         marginBottom: 12,
         lineHeight: 20,
     },
@@ -677,17 +644,13 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontSize: 14,
-        color: '#AAA',
         marginBottom: 8,
     },
     input: {
-        backgroundColor: '#2A2A2A',
         borderWidth: 1,
-        borderColor: '#444',
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        color: '#FFF',
     },
     modalButtons: {
         flexDirection: 'row',
@@ -700,15 +663,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cancelButton: {
-        backgroundColor: '#2A2A2A',
         borderWidth: 1,
-        borderColor: '#444',
     },
     clearButton: {
         backgroundColor: '#FF453A',
     },
     cancelButtonText: {
-        color: '#FFF',
         fontSize: 16,
         fontWeight: '600',
     },

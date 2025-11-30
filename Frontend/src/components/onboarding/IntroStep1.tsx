@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -26,6 +27,7 @@ interface IntroStep1Props {
 }
 
 const IntroStep1: React.FC<IntroStep1Props> = ({ onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const { width, height } = useWindowDimensions(); // Use hook for dynamic calculations

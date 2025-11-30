@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
     StyleSheet,
     Text,
@@ -15,21 +15,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ThemeContext } from '../ThemeContext';
 
-// Define theme colors
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
 const ACCENT_BLUE = '#2196F3';
 
 // Gradient border card wrapper component
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
+    cardBackground?: string;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style, cardBackground }) => {
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
@@ -49,7 +46,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1.5,
                     borderRadius: 15,
-                    backgroundColor: style?.backgroundColor || CARD_BG,
+                    backgroundColor: style?.backgroundColor || cardBackground,
                     padding: 16,
                     ...style
                 }}
@@ -63,6 +60,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 export default function LegalTerms() {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const openEULA = async () => {
         const url = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
@@ -84,18 +82,18 @@ export default function LegalTerms() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
             {/* Header */}
-            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top }]}>
+            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top, borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Legal Information</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Legal Information</Text>
                 <View style={{ width: 40 }} />
             </View>
 
@@ -105,7 +103,7 @@ export default function LegalTerms() {
                     <Ionicons name="medical" size={24} color="#FF9500" />
                     <View style={styles.medicalDisclaimerContent}>
                         <Text style={styles.medicalDisclaimerTitle}>Medical Disclaimer</Text>
-                        <Text style={styles.medicalDisclaimerText}>
+                        <Text style={[styles.medicalDisclaimerText, { color: theme.colors.text }]}>
                             PlateMate is a nutrition tracking and informational tool, not a medical device or diagnostic tool.
                             It does not provide medical advice, diagnosis, or treatment. Always consult with a qualified
                             healthcare professional, registered dietitian, or physician before making changes to your diet,
@@ -116,19 +114,19 @@ export default function LegalTerms() {
 
                 {/* Introduction */}
                 <View style={styles.introSection}>
-                    <Text style={styles.introText}>
+                    <Text style={[styles.introText, { color: theme.colors.textSecondary }]}>
                         Review our legal terms and privacy practices to understand your rights and how we handle your information.
                     </Text>
                 </View>
 
                 {/* Terms of Use Card */}
-                <GradientBorderCard>
+                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
                     <View style={styles.legalCard}>
                         <View style={styles.cardHeader}>
                             <Ionicons name="document-text" size={28} color={ACCENT_BLUE} />
-                            <Text style={styles.cardTitle}>Terms of Use (EULA)</Text>
+                            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Terms of Use (EULA)</Text>
                         </View>
-                        <Text style={styles.cardDescription}>
+                        <Text style={[styles.cardDescription, { color: theme.colors.textSecondary }]}>
                             PlateMate uses Apple's Standard End User License Agreement (EULA). This governs your use of the PlateMate app and any subscriptions you purchase.
                         </Text>
                         <TouchableOpacity
@@ -136,19 +134,19 @@ export default function LegalTerms() {
                             onPress={openEULA}
                         >
                             <Text style={styles.actionButtonText}>View Terms of Use</Text>
-                            <Ionicons name="open-outline" size={18} color={WHITE} />
+                            <Ionicons name="open-outline" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
                     </View>
                 </GradientBorderCard>
 
                 {/* Privacy Policy Card */}
-                <GradientBorderCard>
+                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
                     <View style={styles.legalCard}>
                         <View style={styles.cardHeader}>
                             <Ionicons name="shield-checkmark" size={28} color={ACCENT_BLUE} />
-                            <Text style={styles.cardTitle}>Privacy Policy</Text>
+                            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Privacy Policy</Text>
                         </View>
-                        <Text style={styles.cardDescription}>
+                        <Text style={[styles.cardDescription, { color: theme.colors.textSecondary }]}>
                             Learn how we collect, use, and protect your personal and health data. Your privacy is our priority.
                         </Text>
                         <TouchableOpacity
@@ -156,42 +154,42 @@ export default function LegalTerms() {
                             onPress={navigateToPrivacyPolicy}
                         >
                             <Text style={styles.actionButtonText}>View Privacy Policy</Text>
-                            <Ionicons name="chevron-forward" size={18} color={WHITE} />
+                            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
                         </TouchableOpacity>
                     </View>
                 </GradientBorderCard>
 
                 {/* Subscription Information */}
-                <GradientBorderCard>
+                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
                     <View style={styles.legalCard}>
                         <View style={styles.cardHeader}>
                             <Ionicons name="card" size={28} color={ACCENT_BLUE} />
-                            <Text style={styles.cardTitle}>Subscription Terms</Text>
+                            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Subscription Terms</Text>
                         </View>
                         <View style={styles.subscriptionInfo}>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • Auto-renewable subscriptions available
                             </Text>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • Subscription periods: Monthly or Annual
                             </Text>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • Free trial available for new users
                             </Text>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • Payment charged to Apple ID account at confirmation
                             </Text>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • Subscription auto-renews unless cancelled 24 hours before period ends
                             </Text>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • Manage subscriptions in App Store account settings
                             </Text>
-                            <Text style={styles.subscriptionText}>
+                            <Text style={[styles.subscriptionText, { color: theme.colors.textSecondary }]}>
                                 • 30-day money-back guarantee available
                             </Text>
                         </View>
-                        <Text style={styles.subscriptionNote}>
+                        <Text style={[styles.subscriptionNote, { color: theme.colors.textSecondary }]}>
                             Full terms are available in the Terms of Use above and in the Privacy Policy.
                         </Text>
                     </View>
@@ -199,8 +197,8 @@ export default function LegalTerms() {
 
                 {/* Contact Section */}
                 <View style={styles.contactSection}>
-                    <Text style={styles.contactTitle}>Questions or Concerns?</Text>
-                    <Text style={styles.contactText}>
+                    <Text style={[styles.contactTitle, { color: theme.colors.text }]}>Questions or Concerns?</Text>
+                    <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
                         If you have any questions about our legal terms or privacy practices, please contact us at:
                     </Text>
                     <TouchableOpacity
@@ -219,7 +217,6 @@ export default function LegalTerms() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
@@ -228,7 +225,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     },
     backButton: {
         padding: 8,
@@ -237,7 +233,6 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: WHITE,
     },
     scrollView: {
         flex: 1,
@@ -265,7 +260,6 @@ const styles = StyleSheet.create({
     },
     medicalDisclaimerText: {
         fontSize: 13,
-        color: WHITE,
         lineHeight: 19,
     },
     introSection: {
@@ -273,7 +267,6 @@ const styles = StyleSheet.create({
     },
     introText: {
         fontSize: 15,
-        color: SUBDUED,
         lineHeight: 22,
         textAlign: 'center',
     },
@@ -292,12 +285,10 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: WHITE,
         flex: 1,
     },
     cardDescription: {
         fontSize: 14,
-        color: SUBDUED,
         lineHeight: 20,
     },
     actionButton: {
@@ -314,19 +305,17 @@ const styles = StyleSheet.create({
     actionButtonText: {
         fontSize: 15,
         fontWeight: '600',
-        color: WHITE,
+        color: '#FFFFFF',
     },
     subscriptionInfo: {
         gap: 8,
     },
     subscriptionText: {
         fontSize: 13,
-        color: SUBDUED,
         lineHeight: 20,
     },
     subscriptionNote: {
         fontSize: 12,
-        color: SUBDUED,
         lineHeight: 18,
         marginTop: 8,
         fontStyle: 'italic',
@@ -340,11 +329,9 @@ const styles = StyleSheet.create({
     contactTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: WHITE,
     },
     contactText: {
         fontSize: 14,
-        color: SUBDUED,
         textAlign: 'center',
         lineHeight: 20,
     },

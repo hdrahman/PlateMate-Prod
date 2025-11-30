@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -25,6 +26,7 @@ interface PhysicalAttributesStepProps {
 }
 
 const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     // Use the helper to parse unit preference consistently
     const [useMetric, setUseMetric] = useState(parseUnitPreference(profile));
 
@@ -215,22 +217,22 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Physical Attributes</Text>
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Physical Attributes</Text>
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                         Help us personalize your experience
                     </Text>
                 </View>
 
                 {/* Metric/Imperial Toggle */}
-                <View style={styles.toggleContainer}>
+                <View style={[styles.toggleContainer, { backgroundColor: theme.colors.cardBackground }]}>
                     <TouchableOpacity
                         style={[styles.toggleButton, useMetric && styles.activeToggle]}
                         onPress={() => setUseMetric(true)}
                     >
-                        <Text style={[styles.toggleText, useMetric && styles.activeToggleText]}>
+                        <Text style={[styles.toggleText, { color: theme.colors.textSecondary }, useMetric && styles.activeToggleText]}>
                             Metric
                         </Text>
                     </TouchableOpacity>
@@ -238,7 +240,7 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                         style={[styles.toggleButton, !useMetric && styles.activeToggle]}
                         onPress={() => setUseMetric(false)}
                     >
-                        <Text style={[styles.toggleText, !useMetric && styles.activeToggleText]}>
+                        <Text style={[styles.toggleText, { color: theme.colors.textSecondary }, !useMetric && styles.activeToggleText]}>
                             Imperial
                         </Text>
                     </TouchableOpacity>
@@ -247,44 +249,44 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                 <View style={styles.attributesSection}>
                     {/* Weight Display */}
                     <View style={styles.attributeGroup}>
-                        <Text style={styles.attributeLabel}>Current Weight</Text>
+                        <Text style={[styles.attributeLabel, { color: theme.colors.textSecondary }]}>Current Weight</Text>
                         <TouchableOpacity
-                            style={styles.attributeSelector}
+                            style={[styles.attributeSelector, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
                             onPress={() => setShowWeightPicker(true)}
                         >
-                            <Text style={styles.attributeValue}>{getWeightDisplay()}</Text>
-                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                            <Text style={[styles.attributeValue, { color: theme.colors.text }]}>{getWeightDisplay()}</Text>
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Target Weight Display */}
                     <View style={styles.attributeGroup}>
-                        <Text style={styles.attributeLabel}>Target Weight</Text>
+                        <Text style={[styles.attributeLabel, { color: theme.colors.textSecondary }]}>Target Weight</Text>
                         <TouchableOpacity
-                            style={styles.attributeSelector}
+                            style={[styles.attributeSelector, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
                             onPress={() => setShowTargetWeightPicker(true)}
                         >
-                            <Text style={styles.attributeValue}>{getTargetWeightDisplay()}</Text>
-                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                            <Text style={[styles.attributeValue, { color: theme.colors.text }]}>{getTargetWeightDisplay()}</Text>
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Height Display */}
                     <View style={styles.attributeGroup}>
-                        <Text style={styles.attributeLabel}>Height</Text>
+                        <Text style={[styles.attributeLabel, { color: theme.colors.textSecondary }]}>Height</Text>
                         <TouchableOpacity
-                            style={styles.attributeSelector}
+                            style={[styles.attributeSelector, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
                             onPress={() => setShowHeightPicker(true)}
                         >
-                            <Text style={styles.attributeValue}>{getHeightDisplay()}</Text>
-                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                            <Text style={[styles.attributeValue, { color: theme.colors.text }]}>{getHeightDisplay()}</Text>
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <View style={styles.infoContainer}>
-                    <Ionicons name="information-circle-outline" size={20} color="#888" />
-                    <Text style={styles.infoText}>
+                <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                    <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                         Your measurements help us calculate accurate nutrition goals and recommendations
                     </Text>
                 </View>
@@ -308,14 +310,14 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                 onRequestClose={() => setShowWeightPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Current Weight</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Current Weight</Text>
                             <TouchableOpacity
                                 style={styles.modalCloseButton}
                                 onPress={() => setShowWeightPicker(false)}
                             >
-                                <Ionicons name="close" size={24} color="#999" />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                         <WheelPicker
@@ -351,14 +353,14 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                 onRequestClose={() => setShowTargetWeightPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Target Weight</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Target Weight</Text>
                             <TouchableOpacity
                                 style={styles.modalCloseButton}
                                 onPress={() => setShowTargetWeightPicker(false)}
                             >
-                                <Ionicons name="close" size={24} color="#999" />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                         <WheelPicker
@@ -394,14 +396,14 @@ const PhysicalAttributesStep: React.FC<PhysicalAttributesStepProps> = ({ profile
                 onRequestClose={() => setShowHeightPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Height</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Height</Text>
                             <TouchableOpacity
                                 style={styles.modalCloseButton}
                                 onPress={() => setShowHeightPicker(false)}
                             >
-                                <Ionicons name="close" size={24} color="#999" />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                         {useMetric ? (
@@ -579,7 +581,6 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalContent: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 16,
         width: '100%',
         maxHeight: '80%',

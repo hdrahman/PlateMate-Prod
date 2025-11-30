@@ -1,6 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Appearance } from 'react-native';
 
 interface Props {
   children: ReactNode;
@@ -11,6 +10,24 @@ interface State {
   error: Error | null;
   errorInfo: ErrorInfo | null;
 }
+
+// Generic fallback colors that work in both light and dark modes
+// Using system appearance to determine fallback colors since error boundaries can't use hooks
+const isDarkMode = Appearance.getColorScheme() === 'dark';
+const fallbackColors = {
+  // Use system appearance for background
+  background: isDarkMode ? '#1C1C1E' : '#F2F2F7',
+  backgroundSecondary: '#2C2C2E',
+  // High contrast text
+  textPrimary: '#FFFFFF',
+  textSecondary: '#A0A0A0',
+  // Universal accent colors
+  accent: '#FF453A', // Red for error indication
+  accentSecondary: '#FF6B6B',
+  // Button colors
+  buttonBackground: '#0A84FF',
+  buttonText: '#FFFFFF',
+};
 
 class GlobalErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -55,10 +72,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <LinearGradient
-          colors={['#000000', '#1a1a1a', '#000000']}
-          style={styles.container}
-        >
+        <View style={styles.container}>
           <View style={styles.content}>
             {/* Error Icon */}
             <View style={styles.iconContainer}>
@@ -90,15 +104,9 @@ class GlobalErrorBoundary extends Component<Props, State> {
             <TouchableOpacity
               style={styles.button}
               onPress={this.handleReload}
+              activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={['#5A60EA', '#FF00F5']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.buttonGradient}
-              >
-                <Text style={styles.buttonText}>Try Again</Text>
-              </LinearGradient>
+              <Text style={styles.buttonText}>Try Again</Text>
             </TouchableOpacity>
 
             {/* Help Text */}
@@ -106,7 +114,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
               If the problem persists, please restart the app
             </Text>
           </View>
-        </LinearGradient>
+        </View>
       );
     }
 
@@ -120,6 +128,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: fallbackColors.background,
   },
   content: {
     maxWidth: 400,
@@ -127,11 +136,6 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: 20,
-    shadowColor: '#FF00F5',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 10,
   },
   icon: {
     fontSize: 80,
@@ -139,20 +143,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FF00F5',
+    color: fallbackColors.accent,
     textAlign: 'center',
     marginBottom: 16,
     letterSpacing: 0.5,
   },
   message: {
     fontSize: 16,
-    color: '#CCCCCC',
+    color: fallbackColors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 24,
   },
   errorDetailsContainer: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: fallbackColors.backgroundSecondary,
     borderRadius: 8,
     padding: 12,
     marginBottom: 24,
@@ -162,38 +166,31 @@ const styles = StyleSheet.create({
   errorDetailsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FF6B6B',
+    color: fallbackColors.accentSecondary,
     marginBottom: 8,
   },
   errorDetails: {
     fontSize: 12,
-    color: '#999999',
+    color: fallbackColors.textSecondary,
     fontFamily: 'monospace',
   },
   button: {
     marginBottom: 16,
     borderRadius: 25,
     overflow: 'hidden',
-    shadowColor: '#FF00F5',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  buttonGradient: {
+    backgroundColor: fallbackColors.buttonBackground,
     paddingVertical: 14,
     paddingHorizontal: 32,
-    borderRadius: 25,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: fallbackColors.buttonText,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
   helpText: {
     fontSize: 14,
-    color: '#888888',
+    color: fallbackColors.textSecondary,
     textAlign: 'center',
     fontStyle: 'italic',
   },

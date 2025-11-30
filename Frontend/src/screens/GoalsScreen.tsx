@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -14,22 +14,18 @@ import { useAuth } from '../context/AuthContext';
 import { getUserGoals, getUserBMRData } from '../utils/database';
 import { getProfile } from '../api/profileApi';
 import { kgToLbs } from '../utils/unitConversion';
+import { ThemeContext } from '../ThemeContext';
 
-// Colors from ManualFoodEntry.tsx
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const GRAY = '#AAAAAA';
-const LIGHT_GRAY = '#333333';
 const BLUE_ACCENT = '#2196F3';
 const GOLD = '#FFD700';
 
 const GoalsScreen = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [isLoading, setIsLoading] = useState(true);
     const [isImperialUnits, setIsImperialUnits] = useState(false);
-    
+
     // Add state for BMR and calorie data
     const [bmrData, setBmrData] = useState<{
         bmr: number | null;
@@ -152,76 +148,76 @@ const GoalsScreen = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color={WHITE} />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Goals</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Goals</Text>
                 <TouchableOpacity style={styles.refreshButton}>
-                    <Ionicons name="refresh" size={28} color={WHITE} />
+                    <Ionicons name="refresh" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.content}>
                 {/* Weight Goals */}
-                <View style={styles.section}>
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Starting Weight</Text>
-                        <Text style={styles.goalValue}>
+                <View style={[styles.section, { borderBottomColor: theme.colors.border }]}>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Starting Weight</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>
                             {goals.startingWeight.value ? formatWeight(goals.startingWeight.value) + ` on ${goals.startingWeight.date}` : "---"}
                         </Text>
                     </View>
 
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Current Weight</Text>
-                        <Text style={styles.goalValue}>{formatWeight(goals.currentWeight)}</Text>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Current Weight</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{formatWeight(goals.currentWeight)}</Text>
                     </View>
 
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Goal Weight</Text>
-                        <Text style={styles.goalValue}>{formatWeight(goals.goalWeight)}</Text>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Goal Weight</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{formatWeight(goals.goalWeight)}</Text>
                     </View>
 
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Weekly Goal</Text>
-                        <Text style={styles.goalValue}>{goals.weeklyGoal}</Text>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Weekly Goal</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{goals.weeklyGoal}</Text>
                     </View>
 
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Activity Level</Text>
-                        <Text style={styles.goalValue}>{goals.activityLevel}</Text>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Activity Level</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{goals.activityLevel}</Text>
                     </View>
                 </View>
 
                 {/* BMR and Calorie Breakdown */}
                 {bmrData && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionHeader}>Calorie Breakdown</Text>
-                        
-                        <View style={styles.goalRow}>
-                            <Text style={styles.goalLabel}>BMR (Basal Metabolic Rate)</Text>
-                            <Text style={styles.goalValue}>{bmrData.bmr || '---'} cal</Text>
+                    <View style={[styles.section, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>Calorie Breakdown</Text>
+
+                        <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                            <Text style={[styles.goalLabel, { color: theme.colors.text }]}>BMR (Basal Metabolic Rate)</Text>
+                            <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{bmrData.bmr || '---'} cal</Text>
                         </View>
 
-                        <View style={styles.goalRow}>
-                            <Text style={styles.goalLabel}>Maintenance Calories (TDEE)</Text>
-                            <Text style={styles.goalValue}>{bmrData.maintenanceCalories || '---'} cal</Text>
+                        <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                            <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Maintenance Calories (TDEE)</Text>
+                            <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{bmrData.maintenanceCalories || '---'} cal</Text>
                         </View>
 
-                        <View style={styles.goalRow}>
-                            <Text style={styles.goalLabel}>Daily Target</Text>
-                            <Text style={styles.goalValue}>{bmrData.dailyTarget || '---'} cal</Text>
+                        <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                            <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Daily Target</Text>
+                            <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{bmrData.dailyTarget || '---'} cal</Text>
                         </View>
 
                         {bmrData.maintenanceCalories && bmrData.dailyTarget && (
-                            <View style={styles.goalRow}>
-                                <Text style={styles.goalLabel}>Goal Adjustment</Text>
+                            <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                                <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Goal Adjustment</Text>
                                 <Text style={[
-                                    styles.goalValue, 
+                                    styles.goalValue,
                                     { color: bmrData.dailyTarget - bmrData.maintenanceCalories >= 0 ? '#4CAF50' : '#F44336' }
                                 ]}>
                                     {bmrData.dailyTarget - bmrData.maintenanceCalories > 0 ? '+' : ''}
@@ -233,61 +229,61 @@ const GoalsScreen = () => {
                 )}
 
                 {/* Nutrition Goals */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>Nutrition Goals</Text>
+                <View style={[styles.section, { borderBottomColor: theme.colors.border }]}>
+                    <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>Nutrition Goals</Text>
 
-                    <TouchableOpacity style={styles.goalCard}>
+                    <TouchableOpacity style={[styles.goalCard, { borderBottomColor: theme.colors.border }]}>
                         <View style={styles.goalCardContent}>
-                            <Text style={styles.goalCardTitle}>Calorie, Carbs, Protein and Fat Goals</Text>
-                            <Text style={styles.goalCardSubtitle}>Customize your default or daily goals.</Text>
+                            <Text style={[styles.goalCardTitle, { color: theme.colors.text }]}>Calorie, Carbs, Protein and Fat Goals</Text>
+                            <Text style={[styles.goalCardSubtitle, { color: theme.colors.textSecondary }]}>Customize your default or daily goals.</Text>
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.goalCard}>
+                    <TouchableOpacity style={[styles.goalCard, { borderBottomColor: theme.colors.border }]}>
                         <View style={styles.goalCardContent}>
-                            <Text style={styles.goalCardTitle}>Calorie Goals by Meal</Text>
-                            <Text style={styles.goalCardSubtitle}>Stay on track with a calorie goal for each meal.</Text>
+                            <Text style={[styles.goalCardTitle, { color: theme.colors.text }]}>Calorie Goals by Meal</Text>
+                            <Text style={[styles.goalCardSubtitle, { color: theme.colors.textSecondary }]}>Stay on track with a calorie goal for each meal.</Text>
                         </View>
                         <View style={styles.premiumBadge}>
                             <Ionicons name="star" size={20} color={GOLD} />
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.goalCard}>
+                    <TouchableOpacity style={[styles.goalCard, { borderBottomColor: theme.colors.border }]}>
                         <View style={styles.goalCardContent}>
-                            <Text style={styles.goalCardTitle}>Show Carbs, Protein and Fat By Meal</Text>
-                            <Text style={styles.goalCardSubtitle}>View carbs, protein and fat by gram or percent.</Text>
+                            <Text style={[styles.goalCardTitle, { color: theme.colors.text }]}>Show Carbs, Protein and Fat By Meal</Text>
+                            <Text style={[styles.goalCardSubtitle, { color: theme.colors.textSecondary }]}>View carbs, protein and fat by gram or percent.</Text>
                         </View>
                         <View style={styles.premiumBadge}>
                             <Ionicons name="star" size={20} color={GOLD} />
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.goalCard}>
+                    <TouchableOpacity style={[styles.goalCard, { borderBottomColor: theme.colors.border }]}>
                         <View style={styles.goalCardContent}>
-                            <Text style={styles.goalCardTitle}>Additional Nutrient Goals</Text>
+                            <Text style={[styles.goalCardTitle, { color: theme.colors.text }]}>Additional Nutrient Goals</Text>
                         </View>
                     </TouchableOpacity>
                 </View>
 
                 {/* Fitness Goals */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>Fitness Goals</Text>
+                <View style={[styles.section, { borderBottomColor: theme.colors.border }]}>
+                    <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>Fitness Goals</Text>
 
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Workouts / Week</Text>
-                        <Text style={styles.goalValue}>{goals.fitness.workoutsPerWeek}</Text>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Workouts / Week</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{goals.fitness.workoutsPerWeek}</Text>
                     </View>
 
-                    <View style={styles.goalRow}>
-                        <Text style={styles.goalLabel}>Minutes / Workout</Text>
-                        <Text style={styles.goalValue}>{goals.fitness.minutesPerWorkout}</Text>
+                    <View style={[styles.goalRow, { borderBottomColor: theme.colors.border }]}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Minutes / Workout</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.primary }]}>{goals.fitness.minutesPerWorkout}</Text>
                     </View>
 
-                    <TouchableOpacity style={styles.goalCard}>
+                    <TouchableOpacity style={[styles.goalCard, { borderBottomColor: theme.colors.border }]}>
                         <View style={styles.goalCardContent}>
-                            <Text style={styles.goalCardTitle}>Exercise Calories</Text>
-                            <Text style={styles.goalCardSubtitle}>Decide whether to adjust daily goals when you exercise</Text>
+                            <Text style={[styles.goalCardTitle, { color: theme.colors.text }]}>Exercise Calories</Text>
+                            <Text style={[styles.goalCardSubtitle, { color: theme.colors.textSecondary }]}>Decide whether to adjust daily goals when you exercise</Text>
                         </View>
                         <View style={styles.premiumBadge}>
                             <Ionicons name="star" size={20} color={GOLD} />
@@ -302,7 +298,6 @@ const GoalsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
@@ -311,13 +306,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
     },
     backButton: {
         padding: 4,
     },
     headerTitle: {
-        color: WHITE,
         fontSize: 22,
         fontWeight: 'bold',
     },
@@ -330,10 +323,8 @@ const styles = StyleSheet.create({
     section: {
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
     },
     sectionHeader: {
-        color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
         paddingHorizontal: 16,
@@ -345,14 +336,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
     },
     goalLabel: {
-        color: WHITE,
         fontSize: 16,
     },
     goalValue: {
-        color: BLUE_ACCENT,
         fontSize: 16,
     },
     goalCard: {
@@ -362,18 +350,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
     },
     goalCardContent: {
         flex: 1,
     },
     goalCardTitle: {
-        color: WHITE,
         fontSize: 16,
         marginBottom: 4,
     },
     goalCardSubtitle: {
-        color: GRAY,
         fontSize: 14,
     },
     premiumBadge: {

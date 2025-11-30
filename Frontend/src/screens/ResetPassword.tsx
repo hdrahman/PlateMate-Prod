@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -13,10 +13,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { ThemeContext } from '../ThemeContext';
 
 export default function ResetPassword() {
     const navigation = useNavigation<any>();
     const { resetPassword } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -81,35 +83,35 @@ export default function ResetPassword() {
 
     return (
         <SafeAreaView
-            style={styles.container}
+            style={[styles.container, { backgroundColor: theme.colors.background }]}
             edges={['top']}
         >
-            <RNStatusBar barStyle="light-content" />
+            <RNStatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Create New Password</Text>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Create New Password</Text>
             </View>
 
             <View style={styles.content}>
                 <View style={styles.iconContainer}>
-                    <Ionicons name="lock-closed-outline" size={60} color="#9B00FF" />
+                    <Ionicons name="lock-closed-outline" size={60} color={theme.colors.primary} />
                 </View>
 
-                <Text style={styles.title}>Choose a New Password</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Choose a New Password</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                     Create a strong password to secure your account.
                 </Text>
 
                 <View style={styles.formGroup}>
-                    <Text style={styles.label}>New Password</Text>
-                    <View style={styles.passwordContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>New Password</Text>
+                    <View style={[styles.passwordContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={[styles.passwordInput, { color: theme.colors.text }]}
                             value={newPassword}
                             onChangeText={setNewPassword}
                             secureTextEntry={!showNewPassword}
                             placeholder="Enter new password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.colors.textSecondary}
                             autoCapitalize="none"
                             autoCorrect={false}
                         />
@@ -120,23 +122,23 @@ export default function ResetPassword() {
                             <Ionicons
                                 name={showNewPassword ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
-                    <Text style={styles.helperText}>Password must be at least 8 characters</Text>
+                    <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>Password must be at least 8 characters</Text>
                 </View>
 
                 <View style={styles.formGroup}>
-                    <Text style={styles.label}>Confirm New Password</Text>
-                    <View style={styles.passwordContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Confirm New Password</Text>
+                    <View style={[styles.passwordContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={[styles.passwordInput, { color: theme.colors.text }]}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
                             secureTextEntry={!showConfirmPassword}
                             placeholder="Confirm new password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.colors.textSecondary}
                             autoCapitalize="none"
                             autoCorrect={false}
                         />
@@ -147,30 +149,30 @@ export default function ResetPassword() {
                             <Ionicons
                                 name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <TouchableOpacity
-                    style={styles.resetButton}
+                    style={[styles.resetButton, { backgroundColor: theme.colors.primary }]}
                     onPress={handleResetPassword}
                     disabled={isLoading}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color="#fff" />
+                        <ActivityIndicator color={theme.colors.text} />
                     ) : (
                         <>
-                            <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" style={styles.buttonIcon} />
-                            <Text style={styles.resetButtonText}>Reset Password</Text>
+                            <Ionicons name="checkmark-circle-outline" size={20} color={theme.colors.text} style={styles.buttonIcon} />
+                            <Text style={[styles.resetButtonText, { color: theme.colors.text }]}>Reset Password</Text>
                         </>
                     )}
                 </TouchableOpacity>
 
-                <View style={styles.securityNote}>
-                    <Ionicons name="shield-checkmark-outline" size={20} color="#9B00FF" />
-                    <Text style={styles.securityNoteText}>
+                <View style={[styles.securityNote, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color={theme.colors.primary} />
+                    <Text style={[styles.securityNoteText, { color: theme.colors.textSecondary }]}>
                         Your password is encrypted and secure
                     </Text>
                 </View>
@@ -182,7 +184,6 @@ export default function ResetPassword() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
     },
     header: {
         flexDirection: 'row',
@@ -190,11 +191,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         height: 60,
         borderBottomWidth: 1,
-        borderBottomColor: '#444',
         paddingHorizontal: 16,
     },
     headerTitle: {
-        color: '#FFF',
         fontSize: 22,
         fontWeight: 'bold',
     },
@@ -208,14 +207,12 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     title: {
-        color: '#FFF',
         fontSize: 28,
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 12,
     },
     subtitle: {
-        color: '#AAA',
         fontSize: 16,
         textAlign: 'center',
         marginBottom: 32,
@@ -225,7 +222,6 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     label: {
-        color: '#FFF',
         fontSize: 16,
         marginBottom: 8,
         fontWeight: '500',
@@ -233,14 +229,11 @@ const styles = StyleSheet.create({
     passwordContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1A1A1A',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
     },
     passwordInput: {
         flex: 1,
-        color: '#FFF',
         height: 50,
         paddingHorizontal: 15,
         fontSize: 16,
@@ -249,12 +242,10 @@ const styles = StyleSheet.create({
         padding: 10,
     },
     helperText: {
-        color: '#888',
         fontSize: 12,
         marginTop: 4,
     },
     resetButton: {
-        backgroundColor: '#9B00FF',
         height: 50,
         borderRadius: 8,
         justifyContent: 'center',
@@ -266,7 +257,6 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     resetButtonText: {
-        color: '#FFF',
         fontSize: 18,
         fontWeight: 'bold',
     },
@@ -277,13 +267,10 @@ const styles = StyleSheet.create({
         marginTop: 24,
         paddingVertical: 12,
         paddingHorizontal: 16,
-        backgroundColor: '#1A1A1A',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
     },
     securityNoteText: {
-        color: '#AAA',
         fontSize: 14,
         marginLeft: 8,
     },

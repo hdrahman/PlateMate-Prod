@@ -15,14 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { DataSharingSettings } from '../types/notifications';
 import SettingsService from '../services/SettingsService';
-import { ThemeContext } from '../ThemeContext';
+import { ThemeContext, CustomTheme } from '../ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Define theme colors
-const PRIMARY_BG = '#121212';
-const CARD_BG = '#1E1E1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#B8C5D1';
+// Section accent colors are kept as constants since they represent semantic colors
 
 // Section accent colors
 const ESSENTIAL_COLOR = '#4CAF50';
@@ -32,7 +28,6 @@ const RESEARCH_COLOR = '#9C27B0';
 const RIGHTS_COLOR = '#607D8B';
 const DANGER_COLOR = '#F44336';
 const RESET_COLOR = '#FF6B6B';
-const PRIMARY_GRADIENT = ['#121212', '#1E1E1E'];
 
 interface DataSharingOption {
     id: string;
@@ -42,9 +37,9 @@ interface DataSharingOption {
 }
 
 // Gradient Border Card component for consistent styling
-const GradientCard = ({ children, accentColor }: { children: React.ReactNode, accentColor: string }) => {
+const GradientCard = ({ children, accentColor, theme }: { children: React.ReactNode, accentColor: string, theme: CustomTheme }) => {
     return (
-        <View style={styles.gradientCardContainer}>
+        <View style={[styles.gradientCardContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
             <LinearGradient
                 colors={[accentColor + '40', accentColor + '20', accentColor + '10']}
                 style={styles.gradientBorder}
@@ -62,7 +57,7 @@ export default function DataSharing() {
     const navigation = useNavigation<any>();
     const [settings, setSettings] = useState<DataSharingSettings | null>(null);
     const [loading, setLoading] = useState(true);
-    const { isDarkTheme } = useContext(ThemeContext);
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     useEffect(() => {
         loadSettings();
@@ -116,39 +111,39 @@ export default function DataSharing() {
 
     if (loading || !settings) {
         return (
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-                <StatusBar barStyle="light-content" />
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
+                <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#9B00FF" />
-                    <Text style={styles.loadingText}>Loading...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Text>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" />
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Data Sharing</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Data Sharing</Text>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 <View style={styles.content}>
                     {/* Privacy Notice */}
-                    <GradientCard accentColor={ESSENTIAL_COLOR}>
+                    <GradientCard accentColor={ESSENTIAL_COLOR} theme={theme}>
                         <View style={styles.privacyNotice}>
                             <Ionicons name="shield-checkmark" size={32} color={ESSENTIAL_COLOR} />
                             <View style={styles.privacyContent}>
-                                <Text style={styles.privacyTitle}>🔒 Your Privacy First</Text>
-                                <Text style={styles.privacyText}>
+                                <Text style={[styles.privacyTitle, { color: theme.colors.text }]}>🔒 Your Privacy First</Text>
+                                <Text style={[styles.privacyText, { color: theme.colors.text }]}>
                                     Currently, everything is being stored locally on your device. We see nothing.
                                     Your data stays completely private and secure on your phone.
                                 </Text>
-                                <Text style={styles.privacySubtext}>
+                                <Text style={[styles.privacySubtext, { color: theme.colors.textSecondary }]}>
                                     The settings below are for future features and your consent preferences.
                                 </Text>
                             </View>
@@ -156,12 +151,12 @@ export default function DataSharing() {
                     </GradientCard>
 
                     {/* Future Feature Notice */}
-                    <GradientCard accentColor={ENHANCEMENT_COLOR}>
+                    <GradientCard accentColor={ENHANCEMENT_COLOR} theme={theme}>
                         <View style={styles.disclaimerBanner}>
                             <Ionicons name="information-circle" size={28} color={ENHANCEMENT_COLOR} />
                             <View style={styles.disclaimerContent}>
-                                <Text style={styles.disclaimerTitle}>Coming Soon</Text>
-                                <Text style={styles.disclaimerText}>
+                                <Text style={[styles.disclaimerTitle, { color: theme.colors.text }]}>Coming Soon</Text>
+                                <Text style={[styles.disclaimerText, { color: theme.colors.text }]}>
                                     These settings are currently placeholders and don't activate any actual data sharing.
                                     They've been included to prepare for future updates and let you explore what options
                                     will be available. Your preferences will be saved for when these features are activated.
@@ -171,17 +166,17 @@ export default function DataSharing() {
                     </GradientCard>
 
                     {/* Essential Data Usage */}
-                    <Text style={styles.sectionTitle}>Essential Data Usage</Text>
-                    <GradientCard accentColor={ESSENTIAL_COLOR}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Essential Data Usage</Text>
+                    <GradientCard accentColor={ESSENTIAL_COLOR} theme={theme}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="shield" size={24} color={ESSENTIAL_COLOR} />
-                            <Text style={styles.sectionHeaderText}>Required for basic functionality</Text>
+                            <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>Required for basic functionality</Text>
                         </View>
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>App Functionality</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>App Functionality</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Core features like food logging and progress tracking
                                 </Text>
                             </View>
@@ -192,8 +187,8 @@ export default function DataSharing() {
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Security & Authentication</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Security & Authentication</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Account security and session management
                                 </Text>
                             </View>
@@ -204,8 +199,8 @@ export default function DataSharing() {
 
                         <View style={[styles.settingRow, styles.noBorder]}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Basic Analytics</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Basic Analytics</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Anonymous crash reports and performance data
                                 </Text>
                             </View>
@@ -220,17 +215,17 @@ export default function DataSharing() {
                     </GradientCard>
 
                     {/* Enhancement Features */}
-                    <Text style={styles.sectionTitle}>Enhancement Features</Text>
-                    <GradientCard accentColor={ENHANCEMENT_COLOR}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Enhancement Features</Text>
+                    <GradientCard accentColor={ENHANCEMENT_COLOR} theme={theme}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="trending-up" size={24} color={ENHANCEMENT_COLOR} />
-                            <Text style={styles.sectionHeaderText}>Improve your experience</Text>
+                            <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>Improve your experience</Text>
                         </View>
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Personalized Content</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Personalized Content</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Customized meal suggestions and workout recommendations
                                 </Text>
                             </View>
@@ -245,8 +240,8 @@ export default function DataSharing() {
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Improved Food Recognition</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Improved Food Recognition</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Better AI accuracy through usage patterns
                                 </Text>
                             </View>
@@ -261,8 +256,8 @@ export default function DataSharing() {
 
                         <View style={[styles.settingRow, styles.noBorder]}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Better Recommendations</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Better Recommendations</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Smarter health insights based on your progress
                                 </Text>
                             </View>
@@ -277,17 +272,17 @@ export default function DataSharing() {
                     </GradientCard>
 
                     {/* Marketing Communications */}
-                    <Text style={styles.sectionTitle}>Marketing Communications</Text>
-                    <GradientCard accentColor={MARKETING_COLOR}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Marketing Communications</Text>
+                    <GradientCard accentColor={MARKETING_COLOR} theme={theme}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="megaphone" size={24} color={MARKETING_COLOR} />
-                            <Text style={styles.sectionHeaderText}>Control communications</Text>
+                            <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>Control communications</Text>
                         </View>
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Personalized Ads</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Personalized Ads</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Relevant health and fitness advertisements
                                 </Text>
                             </View>
@@ -302,8 +297,8 @@ export default function DataSharing() {
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Email Marketing</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Email Marketing</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Health tips, success stories, and app updates via email
                                 </Text>
                             </View>
@@ -318,8 +313,8 @@ export default function DataSharing() {
 
                         <View style={[styles.settingRow, styles.noBorder]}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Partner Sharing</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Partner Sharing</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Share anonymized data with trusted health partners
                                 </Text>
                             </View>
@@ -334,17 +329,17 @@ export default function DataSharing() {
                     </GradientCard>
 
                     {/* Research & Development */}
-                    <Text style={styles.sectionTitle}>Research & Development</Text>
-                    <GradientCard accentColor={RESEARCH_COLOR}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Research & Development</Text>
+                    <GradientCard accentColor={RESEARCH_COLOR} theme={theme}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="flask" size={24} color={RESEARCH_COLOR} />
-                            <Text style={styles.sectionHeaderText}>Help improve health technology</Text>
+                            <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>Help improve health technology</Text>
                         </View>
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Anonymized Research</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Anonymized Research</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Contribute to health and nutrition research studies
                                 </Text>
                             </View>
@@ -359,8 +354,8 @@ export default function DataSharing() {
 
                         <View style={styles.settingRow}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Product Improvement</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Product Improvement</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Help us make the app better for everyone
                                 </Text>
                             </View>
@@ -375,8 +370,8 @@ export default function DataSharing() {
 
                         <View style={[styles.settingRow, styles.noBorder]}>
                             <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>Academic Partnership</Text>
-                                <Text style={styles.settingDescription}>
+                                <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Academic Partnership</Text>
+                                <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                     Support university research on digital health
                                 </Text>
                             </View>
@@ -391,18 +386,18 @@ export default function DataSharing() {
                     </GradientCard>
 
                     {/* Data Rights */}
-                    <Text style={styles.sectionTitle}>Your Data Rights</Text>
-                    <GradientCard accentColor={RIGHTS_COLOR}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Your Data Rights</Text>
+                    <GradientCard accentColor={RIGHTS_COLOR} theme={theme}>
                         <TouchableOpacity style={styles.actionButton}>
                             <Ionicons name="download" size={22} color={RIGHTS_COLOR} />
-                            <Text style={styles.actionButtonText}>Export My Data</Text>
-                            <Ionicons name="chevron-forward" size={18} color={SUBDUED} style={styles.chevron} />
+                            <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Export My Data</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.actionButton}>
                             <Ionicons name="eye" size={22} color={RIGHTS_COLOR} />
-                            <Text style={styles.actionButtonText}>View Data Usage</Text>
-                            <Ionicons name="chevron-forward" size={18} color={SUBDUED} style={styles.chevron} />
+                            <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>View Data Usage</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
 
                         <TouchableOpacity style={[styles.actionButton, styles.dangerButton]}>
@@ -414,8 +409,8 @@ export default function DataSharing() {
 
                     {/* Reset Button */}
                     <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
-                        <Ionicons name="refresh" size={20} color={WHITE} />
-                        <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+                        <Ionicons name="refresh" size={20} color={theme.colors.text} />
+                        <Text style={[styles.resetButtonText, { color: theme.colors.text }]}>Reset to Defaults</Text>
                     </TouchableOpacity>
 
                     <View style={styles.bottomSpacer} />
@@ -428,21 +423,18 @@ export default function DataSharing() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: "row",
         alignItems: "center",
         height: 60,
         borderBottomWidth: 1,
-        borderBottomColor: "#333",
         paddingHorizontal: 16,
     },
     backButton: {
         padding: 5,
     },
     headerTitle: {
-        color: WHITE,
         fontSize: 22,
         fontWeight: "bold",
         marginLeft: 10,
@@ -454,7 +446,6 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 18,
-        color: WHITE,
         fontWeight: '600',
         marginTop: 12,
     },
@@ -468,14 +459,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         overflow: 'hidden',
         marginBottom: 20,
-        backgroundColor: CARD_BG,
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
         borderWidth: 1,
-        borderColor: '#333',
     },
     gradientBorder: {
         position: 'absolute',
@@ -498,18 +487,15 @@ const styles = StyleSheet.create({
     privacyTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 8,
     },
     privacyText: {
         fontSize: 16,
-        color: WHITE,
         lineHeight: 22,
         marginBottom: 8,
     },
     privacySubtext: {
         fontSize: 14,
-        color: SUBDUED,
         lineHeight: 20,
         fontStyle: 'italic',
     },
@@ -524,18 +510,15 @@ const styles = StyleSheet.create({
     disclaimerTitle: {
         fontSize: 17,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 6,
     },
     disclaimerText: {
         fontSize: 15,
-        color: WHITE,
         lineHeight: 21,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#9B00FF',
         marginBottom: 12,
         marginLeft: 4,
     },
@@ -546,7 +529,6 @@ const styles = StyleSheet.create({
     },
     sectionHeaderText: {
         fontSize: 16,
-        color: WHITE,
         fontWeight: '500',
         marginLeft: 12,
     },
@@ -568,12 +550,10 @@ const styles = StyleSheet.create({
     settingLabel: {
         fontSize: 16,
         fontWeight: '500',
-        color: WHITE,
         marginBottom: 4,
     },
     settingDescription: {
         fontSize: 14,
-        color: SUBDUED,
         lineHeight: 18,
     },
     requiredBadge: {
@@ -597,7 +577,6 @@ const styles = StyleSheet.create({
     },
     actionButtonText: {
         fontSize: 16,
-        color: WHITE,
         fontWeight: '500',
         marginLeft: 12,
         flex: 1,
@@ -617,7 +596,6 @@ const styles = StyleSheet.create({
     resetButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: WHITE,
         marginLeft: 8,
     },
     bottomSpacer: {

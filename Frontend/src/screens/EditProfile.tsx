@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -54,7 +55,6 @@ interface ExtendedUser extends Auth.User {
 
 // Colors from ManualFoodEntry.tsx
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
@@ -70,7 +70,7 @@ const PINK = '#FF00F5';
 const { width, height } = Dimensions.get('window');
 
 // Create a GradientBorder component for form sections
-const GradientBorderBox = ({ children, style }: { children: React.ReactNode, style?: any }) => {
+const GradientBorderBox = ({ children, style, cardBgColor }: { children: React.ReactNode, style?: any, cardBgColor?: string }) => {
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
@@ -79,7 +79,7 @@ const GradientBorderBox = ({ children, style }: { children: React.ReactNode, sty
                 end={{ x: 1, y: 0 }}
                 style={styles.gradientBorder}
             />
-            <View style={[styles.gradientBorderInner, style]}>
+            <View style={[styles.gradientBorderInner, cardBgColor && { backgroundColor: cardBgColor }, style]}>
                 {children}
             </View>
         </View>
@@ -89,6 +89,7 @@ const GradientBorderBox = ({ children, style }: { children: React.ReactNode, sty
 const EditProfile = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [activeTab, setActiveTab] = useState('profile');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -689,8 +690,8 @@ const EditProfile = () => {
         if (isLoading) {
             return (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={BLUE_ACCENT} />
-                    <Text style={styles.loadingText}>Loading profile data...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading profile data...</Text>
                 </View>
             );
         }
@@ -751,151 +752,151 @@ const EditProfile = () => {
                 </LinearGradient>
 
                 {/* Form Fields - These will be editable */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Personal Information</Text>
+                <GradientBorderBox cardBgColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Personal Information</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Username</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Username</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                             value={editedUsername}
                             onChangeText={handleUsernameChange}
                             placeholder="Your username"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Email</Text>
-                        <Text style={[styles.displayValue, styles.disabledInput]}>{email || '---'}</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Email</Text>
+                        <Text style={[styles.displayValue, styles.disabledInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}>{email || '---'}</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Sex</Text>
-                        <View style={styles.segmentedControl}>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Sex</Text>
+                        <View style={[styles.segmentedControl, { backgroundColor: theme.colors.inputBackground }]}>
                             <TouchableOpacity
-                                style={[styles.segmentOption, editedSex.toLowerCase() === 'male' && styles.segmentActive]}
+                                style={[styles.segmentOption, editedSex.toLowerCase() === 'male' && [styles.segmentActive, { backgroundColor: theme.colors.primary }]]}
                                 onPress={() => handleSexChange('male')}
                             >
-                                <Text style={[styles.segmentText, editedSex.toLowerCase() === 'male' && styles.segmentTextActive]}>Male</Text>
+                                <Text style={[styles.segmentText, { color: theme.colors.textSecondary }, editedSex.toLowerCase() === 'male' && [styles.segmentTextActive, { color: theme.colors.text }]]}>Male</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.segmentOption, editedSex.toLowerCase() === 'female' && styles.segmentActive]}
+                                style={[styles.segmentOption, editedSex.toLowerCase() === 'female' && [styles.segmentActive, { backgroundColor: theme.colors.primary }]]}
                                 onPress={() => handleSexChange('female')}
                             >
-                                <Text style={[styles.segmentText, editedSex.toLowerCase() === 'female' && styles.segmentTextActive]}>Female</Text>
+                                <Text style={[styles.segmentText, { color: theme.colors.textSecondary }, editedSex.toLowerCase() === 'female' && [styles.segmentTextActive, { color: theme.colors.text }]]}>Female</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.segmentOption, editedSex.toLowerCase() === 'other' && styles.segmentActive]}
+                                style={[styles.segmentOption, editedSex.toLowerCase() === 'other' && [styles.segmentActive, { backgroundColor: theme.colors.primary }]]}
                                 onPress={() => handleSexChange('other')}
                             >
-                                <Text style={[styles.segmentText, editedSex.toLowerCase() === 'other' && styles.segmentTextActive]}>Other</Text>
+                                <Text style={[styles.segmentText, { color: theme.colors.textSecondary }, editedSex.toLowerCase() === 'other' && [styles.segmentTextActive, { color: theme.colors.text }]]}>Other</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     <View style={styles.inputRow}>
                         <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.inputLabel}>Height</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Height</Text>
                             {editedIsImperialUnits ? (
                                 <View style={styles.heightInputContainer}>
                                     <View style={styles.heightInputGroup}>
                                         <TextInput
-                                            style={styles.heightInput}
+                                            style={[styles.heightInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                             value={editedHeightFeet}
                                             onChangeText={handleHeightFeetChange}
                                             keyboardType="numeric"
-                                            placeholderTextColor={GRAY}
+                                            placeholderTextColor={theme.colors.textSecondary}
                                             placeholder="5"
                                         />
-                                        <Text style={styles.heightUnitText}>ft</Text>
+                                        <Text style={[styles.heightUnitText, { color: theme.colors.text }]}>ft</Text>
                                     </View>
                                     <View style={styles.heightInputGroup}>
                                         <TextInput
-                                            style={styles.heightInput}
+                                            style={[styles.heightInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                             value={editedHeightInches}
                                             onChangeText={handleHeightInchesChange}
                                             keyboardType="numeric"
-                                            placeholderTextColor={GRAY}
+                                            placeholderTextColor={theme.colors.textSecondary}
                                             placeholder="11"
                                         />
-                                        <Text style={styles.heightUnitText}>in</Text>
+                                        <Text style={[styles.heightUnitText, { color: theme.colors.text }]}>in</Text>
                                     </View>
                                 </View>
                             ) : (
                                 <View style={styles.heightInputContainer}>
                                     <View style={[styles.heightInputGroup, { flex: 1 }]}>
                                         <TextInput
-                                            style={styles.heightInput}
+                                            style={[styles.heightInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                             value={height.includes('cm') ? height.replace(/cm/g, '').trim() : ''}
                                             onChangeText={handleHeightCmChange}
                                             keyboardType="numeric"
-                                            placeholderTextColor={GRAY}
+                                            placeholderTextColor={theme.colors.textSecondary}
                                             placeholder="180"
                                         />
-                                        <Text style={styles.heightUnitText}>cm</Text>
+                                        <Text style={[styles.heightUnitText, { color: theme.colors.text }]}>cm</Text>
                                     </View>
                                 </View>
                             )}
                         </View>
                         <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                            <Text style={styles.inputLabel}>Weight</Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Weight</Text>
                             <View style={styles.heightInputContainer}>
                                 <View style={[styles.heightInputGroup, { flex: 1 }]}>
                                     <TextInput
-                                        style={styles.heightInput}
+                                        style={[styles.heightInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                                         value={editedWeight}
                                         onChangeText={handleWeightChange}
                                         keyboardType="numeric"
-                                        placeholderTextColor={GRAY}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         placeholder="75"
                                     />
-                                    <Text style={styles.heightUnitText}>{editedIsImperialUnits ? "lbs" : "kg"}</Text>
+                                    <Text style={[styles.heightUnitText, { color: theme.colors.text }]}>in{editedIsImperialUnits ? "lbs" : "kg"}</Text>
                                 </View>
                             </View>
                         </View>
                     </View>
                 </GradientBorderBox>
 
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Location & Preferences</Text>
+                <GradientBorderBox cardBgColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Location & Preferences</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Location</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Location</Text>
                         <TouchableOpacity
-                            style={styles.dropdownField}
+                            style={[styles.dropdownField, { backgroundColor: theme.colors.inputBackground }]}
                             onPress={() => setShowLocationPicker(true)}
                         >
-                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                            <Text style={[styles.dropdownText, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
                                 {editedLocation || 'Select location'}
                             </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Time Zone</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Time Zone</Text>
                         <TouchableOpacity
-                            style={styles.dropdownField}
+                            style={[styles.dropdownField, { backgroundColor: theme.colors.inputBackground }]}
                             onPress={() => setShowTimeZonePicker(true)}
                         >
-                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                            <Text style={[styles.dropdownText, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
                                 {editedTimeZone || timeZone || 'Select time zone'}
                             </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Measurement Units</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Measurement Units</Text>
                         <TouchableOpacity
-                            style={styles.dropdownField}
+                            style={[styles.dropdownField, { backgroundColor: theme.colors.inputBackground }]}
                             onPress={() => setShowUnitPicker(true)}
                         >
-                            <Text style={styles.dropdownText} numberOfLines={1} ellipsizeMode="tail">
+                            <Text style={[styles.dropdownText, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
                                 {editedIsImperialUnits ? 'Imperial (lbs, feet/inches)' : 'Metric (kg, cm)'}
                             </Text>
-                            <Ionicons name="chevron-down" size={20} color={GRADIENT_MIDDLE} />
+                            <Ionicons name="chevron-down" size={20} color={theme.colors.primary} />
                         </TouchableOpacity>
                     </View>
                 </GradientBorderBox>
@@ -926,8 +927,8 @@ const EditProfile = () => {
         if (isLoading) {
             return (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={BLUE_ACCENT} />
-                    <Text style={styles.loadingText}>Loading achievements data...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading achievements data...</Text>
                 </View>
             );
         }
@@ -979,37 +980,37 @@ const EditProfile = () => {
                 </LinearGradient>
 
                 {/* Achievements */}
-                <GradientBorderBox>
-                    <Text style={styles.sectionTitle}>Achievements</Text>
+                <GradientBorderBox cardBgColor={theme.colors.cardBackground}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Achievements</Text>
 
                     {achievements.length > 0 ? (
                         achievements.map((achievement, index) => (
-                            <View key={index} style={styles.achievementItem}>
+                            <View key={index} style={[styles.achievementItem, { backgroundColor: isDarkTheme ? 'rgba(28, 28, 30, 0.6)' : 'rgba(240, 240, 240, 0.6)' }]}>
                                 <LinearGradient
                                     colors={achievement.completed ?
                                         [GRADIENT_START, GRADIENT_MIDDLE, GRADIENT_END] :
-                                        ['#333', '#444', '#555']}
+                                        [theme.colors.border, theme.colors.inputBackground, theme.colors.border]}
                                     style={styles.achievementIcon}
                                 >
                                     <Ionicons
                                         name={achievement.icon as any}
                                         size={24}
-                                        color={achievement.completed ? WHITE : GRAY}
+                                        color={achievement.completed ? theme.colors.text : theme.colors.textSecondary}
                                     />
                                 </LinearGradient>
                                 <View style={styles.achievementInfo}>
-                                    <Text style={styles.achievementName}>{achievement.name}</Text>
-                                    <Text style={styles.achievementDesc}>{achievement.description}</Text>
+                                    <Text style={[styles.achievementName, { color: theme.colors.text }]}>{achievement.name}</Text>
+                                    <Text style={[styles.achievementDesc, { color: theme.colors.textSecondary }]}>{achievement.description}</Text>
                                 </View>
                                 {achievement.completed ? (
-                                    <Ionicons name="checkmark-circle" size={24} color={GREEN} />
+                                    <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
                                 ) : (
-                                    <Ionicons name="lock-closed" size={24} color={PINK} />
+                                    <Ionicons name="lock-closed" size={24} color={theme.colors.primary} />
                                 )}
                             </View>
                         ))
                     ) : (
-                        <Text style={styles.noDataText}>No achievements available</Text>
+                        <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No achievements available</Text>
                     )}
                 </GradientBorderBox>
 
@@ -1031,54 +1032,56 @@ const EditProfile = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {/* Header */}
             <LinearGradient
                 colors={['rgba(92, 0, 221, 0.3)', 'transparent']}
-                style={styles.header}
+                style={[styles.header, { borderBottomColor: theme.colors.border }]}
             >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color={WHITE} />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>My Profile</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>My Profile</Text>
                 <View style={{ width: 28 }}></View>
             </LinearGradient>
 
             {/* Tabs */}
-            <View style={styles.tabs}>
+            <View style={[styles.tabs, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'profile' && styles.activeTab]}
+                    style={[styles.tab, activeTab === 'profile' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
                     onPress={() => setActiveTab('profile')}
                 >
                     <Ionicons
                         name="person"
                         size={24}
-                        color={activeTab === 'profile' ? GRADIENT_MIDDLE : GRAY}
+                        color={activeTab === 'profile' ? theme.colors.primary : theme.colors.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'profile' && styles.activeTabText
+                            { color: theme.colors.textSecondary },
+                            activeTab === 'profile' && [styles.activeTabText, { color: theme.colors.primary }]
                         ]}
                     >
                         Profile
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'achievements' && styles.activeTab]}
+                    style={[styles.tab, activeTab === 'achievements' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
                     onPress={() => setActiveTab('achievements')}
                 >
                     <Ionicons
                         name="trophy"
                         size={24}
-                        color={activeTab === 'achievements' ? GRADIENT_MIDDLE : GRAY}
+                        color={activeTab === 'achievements' ? theme.colors.primary : theme.colors.textSecondary}
                     />
                     <Text
                         style={[
                             styles.tabText,
-                            activeTab === 'achievements' && styles.activeTabText
+                            { color: theme.colors.textSecondary },
+                            activeTab === 'achievements' && [styles.activeTabText, { color: theme.colors.primary }]
                         ]}
                     >
                         Achievements
@@ -1102,27 +1105,27 @@ const EditProfile = () => {
                     activeOpacity={1}
                     onPress={() => setShowUnitPicker(false)}
                 >
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Measurement Units</Text>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Measurement Units</Text>
 
                         <TouchableOpacity
-                            style={[styles.modalOption, editedIsImperialUnits && styles.modalOptionSelected]}
+                            style={[styles.modalOption, { borderColor: theme.colors.border }, editedIsImperialUnits && [styles.modalOptionSelected, { borderColor: theme.colors.primary }]]}
                             onPress={() => handleUnitSystemChange(true)}
                         >
-                            <Text style={[styles.modalOptionText, editedIsImperialUnits && styles.modalOptionTextSelected]}>
+                            <Text style={[styles.modalOptionText, { color: theme.colors.textSecondary }, editedIsImperialUnits && [styles.modalOptionTextSelected, { color: theme.colors.text }]]}>
                                 Imperial (lbs, feet/inches)
                             </Text>
-                            {editedIsImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
+                            {editedIsImperialUnits && <Ionicons name="checkmark" size={20} color={theme.colors.text} />}
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.modalOption, !editedIsImperialUnits && styles.modalOptionSelected]}
+                            style={[styles.modalOption, { borderColor: theme.colors.border }, !editedIsImperialUnits && [styles.modalOptionSelected, { borderColor: theme.colors.primary }]]}
                             onPress={() => handleUnitSystemChange(false)}
                         >
-                            <Text style={[styles.modalOptionText, !editedIsImperialUnits && styles.modalOptionTextSelected]}>
+                            <Text style={[styles.modalOptionText, { color: theme.colors.textSecondary }, !editedIsImperialUnits && [styles.modalOptionTextSelected, { color: theme.colors.text }]]}>
                                 Metric (kg, cm)
                             </Text>
-                            {!editedIsImperialUnits && <Ionicons name="checkmark" size={20} color={WHITE} />}
+                            {!editedIsImperialUnits && <Ionicons name="checkmark" size={20} color={theme.colors.text} />}
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
@@ -1136,14 +1139,14 @@ const EditProfile = () => {
                 onRequestClose={() => setShowLocationPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.pickerModalContent]}>
+                    <View style={[styles.pickerModalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <LinearGradient
                             colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
-                            style={styles.pickerHeader}
+                            style={[styles.pickerHeader, { borderBottomColor: theme.colors.border }]}
                         >
-                            <Text style={styles.pickerTitle}>Select Country</Text>
+                            <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>Select Country</Text>
                             <TouchableOpacity
                                 onPress={() => {
                                     setShowLocationPicker(false);
@@ -1152,16 +1155,16 @@ const EditProfile = () => {
                                 }}
                                 style={styles.pickerCloseIcon}
                             >
-                                <Ionicons name="close" size={24} color={WHITE} />
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
                             </TouchableOpacity>
                         </LinearGradient>
 
-                        <View style={styles.searchContainer}>
-                            <Ionicons name="search" size={20} color={GRAY} style={styles.searchIcon} />
+                        <View style={[styles.searchContainer, { backgroundColor: theme.colors.inputBackground }]}>
+                            <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
                             <TextInput
-                                style={[styles.searchInput, { color: WHITE }]}
+                                style={[styles.searchInput, { color: theme.colors.text }]}
                                 placeholder="Search countries..."
-                                placeholderTextColor={GRAY}
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={searchQuery}
                                 onChangeText={(text) => {
                                     setSearchQuery(text);
@@ -1185,7 +1188,7 @@ const EditProfile = () => {
                                     }}
                                     style={styles.clearSearchButton}
                                 >
-                                    <Ionicons name="close-circle" size={20} color={GRAY} />
+                                    <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -1195,7 +1198,7 @@ const EditProfile = () => {
                                 {filteredLocations.map((loc, index) => (
                                     <TouchableOpacity
                                         key={index}
-                                        style={[styles.pickerOption, editedLocation === loc && styles.pickerOptionSelected]}
+                                        style={[styles.pickerOption, { borderBottomColor: theme.colors.border }, editedLocation === loc && styles.pickerOptionSelected]}
                                         onPress={() => {
                                             handleLocationChange(loc);
                                             setShowLocationPicker(false);
@@ -1203,18 +1206,18 @@ const EditProfile = () => {
                                             setFilteredLocations([...locationOptions]);
                                         }}
                                     >
-                                        <Text style={[styles.pickerOptionText, editedLocation === loc && styles.pickerOptionTextSelected]}>
+                                        <Text style={[styles.pickerOptionText, { color: theme.colors.text }, editedLocation === loc && [styles.pickerOptionTextSelected, { color: theme.colors.primary }]]}>
                                             {loc}
                                         </Text>
-                                        {editedLocation === loc && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
+                                        {editedLocation === loc && <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />}
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
                         ) : (
                             <View style={styles.noResultsContainer}>
-                                <Ionicons name="search-outline" size={50} color={GRAY} />
-                                <Text style={styles.noResultsText}>No countries found</Text>
-                                <Text style={styles.noResultsSubText}>Try a different search term</Text>
+                                <Ionicons name="search-outline" size={50} color={theme.colors.textSecondary} />
+                                <Text style={[styles.noResultsText, { color: theme.colors.text }]}>No countries found</Text>
+                                <Text style={[styles.noResultsSubText, { color: theme.colors.textSecondary }]}>Try a different search term</Text>
                             </View>
                         )}
                     </View>
@@ -1229,19 +1232,19 @@ const EditProfile = () => {
                 onRequestClose={() => setShowTimeZonePicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.pickerModalContent]}>
+                    <View style={[styles.pickerModalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <LinearGradient
                             colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
-                            style={styles.pickerHeader}
+                            style={[styles.pickerHeader, { borderBottomColor: theme.colors.border }]}
                         >
-                            <Text style={styles.pickerTitle}>Select Time Zone</Text>
+                            <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>Select Time Zone</Text>
                             <TouchableOpacity
                                 onPress={() => setShowTimeZonePicker(false)}
                                 style={styles.pickerCloseIcon}
                             >
-                                <Ionicons name="close" size={24} color={WHITE} />
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
                             </TouchableOpacity>
                         </LinearGradient>
 
@@ -1249,16 +1252,16 @@ const EditProfile = () => {
                             {timeZoneOptions.map((tz, index) => (
                                 <TouchableOpacity
                                     key={index}
-                                    style={[styles.pickerOption, editedTimeZone === tz && styles.pickerOptionSelected]}
+                                    style={[styles.pickerOption, { borderBottomColor: theme.colors.border }, editedTimeZone === tz && styles.pickerOptionSelected]}
                                     onPress={() => {
                                         handleTimeZoneChange(tz);
                                         setShowTimeZonePicker(false);
                                     }}
                                 >
-                                    <Text style={[styles.pickerOptionText, editedTimeZone === tz && styles.pickerOptionTextSelected]}>
+                                    <Text style={[styles.pickerOptionText, { color: theme.colors.text }, editedTimeZone === tz && [styles.pickerOptionTextSelected, { color: theme.colors.primary }]]}>
                                         {tz}
                                     </Text>
-                                    {editedTimeZone === tz && <Ionicons name="checkmark-circle" size={20} color={GRADIENT_MIDDLE} />}
+                                    {editedTimeZone === tz && <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -1411,12 +1414,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     gradientBorderInner: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 14,
         padding: 16,
     },
     formSection: {
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         padding: 16,
         marginBottom: 20,
@@ -1636,7 +1639,7 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         width: width * 0.85,
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         padding: 20,
     },
@@ -1673,7 +1676,7 @@ const styles = StyleSheet.create({
     pickerModalContent: {
         width: width * 0.95,
         maxHeight: height * 0.8,
-        backgroundColor: CARD_BG,
+        backgroundColor: '#121212', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         overflow: 'hidden',
         elevation: 5,

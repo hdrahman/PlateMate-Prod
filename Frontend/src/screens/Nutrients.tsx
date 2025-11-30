@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { initDatabase, isDatabaseReady, getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
@@ -27,7 +28,6 @@ const { width: screenWidth } = Dimensions.get('window');
 const PURPLE_ACCENT = '#AA00FF';
 const BLUE_ACCENT = '#2196F3';
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 
@@ -108,6 +108,7 @@ const formatDateForDisplay = (date: Date): string => {
 const NutrientsScreen: React.FC = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const scrollRef = useRef<ScrollView>(null);
     const { width: screenWidth } = Dimensions.get('window');
 
@@ -191,7 +192,7 @@ const NutrientsScreen: React.FC = () => {
     // Add this to ensure consistent black background during transitions
     const containerStyle = {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
+        backgroundColor: theme.colors.background,
     };
 
     // Load user profile and calculate nutrition goals
@@ -633,13 +634,13 @@ const NutrientsScreen: React.FC = () => {
         };
 
         return (
-            <View key={label} style={styles.nutrientRow}>
+            <View key={label} style={[styles.nutrientRow, { borderBottomColor: theme.colors.border }]}>
                 <View style={styles.nutrientValues}>
                     <View style={styles.leftValues}>
-                        <Text style={styles.remainingValue}>{formatRemainingValue(remaining, displayUnit)}</Text>
+                        <Text style={[styles.remainingValue, { color: theme.colors.textSecondary }]}>{formatRemainingValue(remaining, displayUnit)}</Text>
                     </View>
-                    <Text style={styles.nutrientLabel}>{label}</Text>
-                    <Text style={styles.rightValue}>{Math.round(current)}/{Math.round(goal)}</Text>
+                    <Text style={[styles.nutrientLabel, { color: theme.colors.text }]}>{label}</Text>
+                    <Text style={[styles.rightValue, { color: theme.colors.text }]}>{Math.round(current)}/{Math.round(goal)}</Text>
                 </View>
                 <View style={[styles.progressBarContainer, { backgroundColor: backgroundBarColor }]}>
                     <LinearGradient
@@ -674,7 +675,7 @@ const NutrientsScreen: React.FC = () => {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={[styles.container, containerStyle]}>
-                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+                <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
                 <SafeAreaView style={{ flex: 1 }}>
                     {renderErrorBanner()}
                     {/* Header */}
@@ -683,7 +684,7 @@ const NutrientsScreen: React.FC = () => {
                             onPress={() => navigation.goBack()}
                             style={styles.backButton}
                         >
-                            <Ionicons name="chevron-back" size={28} color={WHITE} />
+                            <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
                         </TouchableOpacity>
                         <View style={styles.titleContainer}>
                             <GradientText
@@ -696,17 +697,18 @@ const NutrientsScreen: React.FC = () => {
                     </View>
 
                     {/* Day Navigation Bar */}
-                    <View style={styles.dayNavContainer}>
+                    <View style={[styles.dayNavContainer, { backgroundColor: isDarkTheme ? 'hsla(0, 0%, 100%, 0.07)' : 'hsla(0, 0%, 0%, 0.07)' }]}>
                         <TouchableOpacity
                             style={styles.dayNavButton}
                             onPress={gotoPrevDay}
                             disabled={isTransitioning}
                         >
-                            <Ionicons name="chevron-back" size={20} color={WHITE} />
+                            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                         <View style={styles.dateContainer}>
                             <Animated.Text style={[styles.todayText, {
-                                transform: [{ translateX: dateTextTranslate }]
+                                transform: [{ translateX: dateTextTranslate }],
+                                color: theme.colors.text
                             }]}>
                                 {formatDate(currentDate)}
                             </Animated.Text>
@@ -716,7 +718,7 @@ const NutrientsScreen: React.FC = () => {
                             onPress={gotoNextDay}
                             disabled={isTransitioning}
                         >
-                            <Ionicons name="chevron-forward" size={20} color={WHITE} />
+                            <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
 
@@ -743,25 +745,25 @@ const NutrientsScreen: React.FC = () => {
                             ]}
                         >
                             {/* Column Headers */}
-                            <View style={styles.columnHeadersContainer}>
+                            <View style={[styles.columnHeadersContainer, { backgroundColor: theme.colors.cardBackground }]}>
                                 <View style={styles.columnHeaders}>
-                                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left' }]}>Remaining</Text>
+                                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'left', color: theme.colors.text }]}>Remaining</Text>
                                     <View style={{ flex: 2 }} />
-                                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right' }]}>Total/Goal</Text>
+                                    <Text style={[styles.columnHeader, { flex: 1, textAlign: 'right', color: theme.colors.text }]}>Total/Goal</Text>
                                 </View>
-                                <View style={styles.headerDivider} />
+                                <View style={[styles.headerDivider, { backgroundColor: theme.colors.border }]} />
                             </View>
 
                             {/* Nutrients List */}
                             <ScrollView
                                 ref={scrollRef}
-                                style={styles.scrollView}
+                                style={[styles.scrollView, { backgroundColor: theme.colors.cardBackground }]}
                                 showsVerticalScrollIndicator={false}
                                 scrollEventThrottle={16}
                             >
                                 {!dbReady || loading ? (
                                     <View style={styles.loadingContainer}>
-                                        <Text style={styles.loadingText}>{!dbReady ? 'Initializing database...' : 'Loading nutrients...'}</Text>
+                                        <Text style={[styles.loadingText, { color: theme.colors.text }]}>{!dbReady ? 'Initializing database...' : 'Loading nutrients...'}</Text>
                                     </View>
                                 ) : (
                                     Object.entries(nutrientData)
@@ -833,7 +835,6 @@ const styles = StyleSheet.create({
     columnHeadersContainer: {
         marginTop: 14,
         marginHorizontal: 10,
-        backgroundColor: CARD_BG,
         borderTopLeftRadius: 8,
         borderTopRightRadius: 8,
     },
@@ -855,7 +856,6 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
         marginHorizontal: 10,
-        backgroundColor: CARD_BG,
     },
     nutrientRow: {
         flexDirection: 'column',

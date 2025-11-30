@@ -1,16 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, NavigationProp, ParamListBase, useFocusEffect } from '@react-navigation/native';
 import RecipeCard from '../components/RecipeCard';
 import { Recipe, searchRecipes } from '../api/recipes';
+import { ThemeContext } from '../ThemeContext';
 
-// Define color constants for consistent theming
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const PURPLE_ACCENT = '#AA00FF';
+
 
 // Define route params interface
 interface RecipeResultsParams {
@@ -23,6 +19,7 @@ interface RecipeResultsParams {
 export default function RecipeResults() {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
     const route = useRoute<RouteProp<Record<string, RecipeResultsParams>, string>>();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -127,24 +124,24 @@ export default function RecipeResults() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Recipe Results</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Recipe Results</Text>
                 <View style={styles.placeholderButton} />
             </View>
 
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={22} color={SUBDUED} style={styles.searchIcon} />
+            <View style={[styles.searchContainer, { backgroundColor: theme.colors.cardBackground }]}>
+                <Ionicons name="search" size={22} color={theme.colors.textSecondary} style={styles.searchIcon} />
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: theme.colors.text }]}
                     placeholder="Search recipes, ingredients..."
-                    placeholderTextColor={SUBDUED}
+                    placeholderTextColor={theme.colors.textSecondary}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     onSubmitEditing={handleSearch}
@@ -154,14 +151,14 @@ export default function RecipeResults() {
 
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                    <Text style={styles.loadingText}>Searching for recipes...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Searching for recipes...</Text>
                 </View>
             ) : noResults ? (
                 <View style={styles.emptyState}>
-                    <Ionicons name="search-outline" size={50} color={SUBDUED} />
-                    <Text style={styles.emptyStateText}>No results found for "{searchQuery}"</Text>
-                    <Text style={styles.emptyStateSubtext}>Try another search term</Text>
+                    <Ionicons name="search-outline" size={50} color={theme.colors.textSecondary} />
+                    <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No results found for "{searchQuery}"</Text>
+                    <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>Try another search term</Text>
                 </View>
             ) : (
                 <ScrollView
@@ -169,7 +166,7 @@ export default function RecipeResults() {
                     contentContainerStyle={styles.scrollInner}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.resultsText}>
+                    <Text style={[styles.resultsText, { color: theme.colors.textSecondary }]}>
                         {recipes?.length || 0} {(recipes?.length || 0) === 1 ? 'result' : 'results'} for "{searchQuery}"
                     </Text>
 
@@ -184,7 +181,7 @@ export default function RecipeResults() {
                     {/* FatSecret Attribution */}
                     <View style={styles.attributionContainer}>
                         <Text
-                            style={styles.attributionText}
+                            style={[styles.attributionText, { color: theme.colors.textSecondary }]}
                             onPress={() => {
                                 Linking.openURL('https://www.fatsecret.com');
                             }}
@@ -201,7 +198,6 @@ export default function RecipeResults() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
@@ -214,7 +210,6 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: WHITE,
     },
     backButton: {
         padding: 4,
@@ -226,7 +221,6 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: CARD_BG,
         borderRadius: 8,
         marginHorizontal: 16,
         marginVertical: 8,
@@ -238,7 +232,6 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         height: 40,
-        color: WHITE,
         fontSize: 16,
     },
     scrollView: {
@@ -250,7 +243,6 @@ const styles = StyleSheet.create({
     },
     resultsText: {
         fontSize: 14,
-        color: SUBDUED,
         marginBottom: 12,
     },
     loadingContainer: {
@@ -260,7 +252,6 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     loadingText: {
-        color: WHITE,
         marginTop: 16,
         fontSize: 16,
         textAlign: 'center',
@@ -272,14 +263,12 @@ const styles = StyleSheet.create({
         padding: 40,
     },
     emptyStateText: {
-        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
         textAlign: 'center',
         marginTop: 16,
     },
     emptyStateSubtext: {
-        color: SUBDUED,
         fontSize: 14,
         textAlign: 'center',
         marginTop: 8,
@@ -293,7 +282,6 @@ const styles = StyleSheet.create({
     },
     attributionText: {
         fontSize: 12,
-        color: SUBDUED,
         textDecorationLine: 'underline',
         opacity: 0.8,
     },

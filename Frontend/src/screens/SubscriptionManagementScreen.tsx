@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import SubscriptionService, { PRODUCT_IDS } from '../services/SubscriptionService';
 import TrialStatusCard from '../components/TrialStatusCard';
@@ -33,6 +34,7 @@ interface SubscriptionPlan {
 const SubscriptionManagementScreen: React.FC = () => {
     const navigation = useNavigation();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [isLoading, setIsLoading] = useState(false);
     const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
     const [products, setProducts] = useState<any[]>([]);
@@ -174,7 +176,7 @@ const SubscriptionManagementScreen: React.FC = () => {
                             try {
                                 // Set loading state when user actually confirms purchase
                                 setIsLoading(true);
-                                
+
                                 // Attempt purchase through RevenueCat
                                 const { customerInfo } = await SubscriptionService.purchaseProduct(plan.productId);
 
@@ -281,45 +283,45 @@ const SubscriptionManagementScreen: React.FC = () => {
     };
 
     const renderPlanCard = (plan: SubscriptionPlan) => (
-        <View key={plan.id} style={[styles.planCard, plan.isPopular && styles.popularPlan]}>
+        <View key={plan.id} style={[styles.planCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }, plan.isPopular && [styles.popularPlan, { borderColor: theme.colors.primary }]]}>
             {plan.isPopular && (
-                <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
+                <View style={[styles.popularBadge, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={[styles.popularBadgeText, { color: theme.colors.text }]}>MOST POPULAR</Text>
                 </View>
             )}
 
             <View style={styles.planHeader}>
-                <Text style={styles.planTitle}>{plan.title}</Text>
+                <Text style={[styles.planTitle, { color: theme.colors.text }]}>{plan.title}</Text>
                 {plan.discount && (
-                    <View style={styles.discountBadge}>
-                        <Text style={styles.discountText}>{plan.discount}</Text>
+                    <View style={[styles.discountBadge, { backgroundColor: theme.colors.success }]}>
+                        <Text style={[styles.discountText, { color: theme.colors.text }]}>{plan.discount}</Text>
                     </View>
                 )}
             </View>
 
             <View style={styles.priceContainer}>
-                <Text style={styles.price}>{plan.price}</Text>
+                <Text style={[styles.price, { color: theme.colors.primary }]}>{plan.price}</Text>
                 {plan.originalPrice && (
-                    <Text style={styles.originalPrice}>{plan.originalPrice}</Text>
+                    <Text style={[styles.originalPrice, { color: theme.colors.textSecondary }]}>{plan.originalPrice}</Text>
                 )}
-                <Text style={styles.period}>{plan.period}</Text>
+                <Text style={[styles.period, { color: theme.colors.textSecondary }]}>{plan.period}</Text>
             </View>
 
             <View style={styles.featuresContainer}>
                 {plan.features.map((feature, index) => (
                     <View key={index} style={styles.featureRow}>
-                        <Ionicons name="checkmark-circle" size={16} color="#00aa44" />
-                        <Text style={styles.featureText}>{feature}</Text>
+                        <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                        <Text style={[styles.featureText, { color: theme.colors.textSecondary }]}>{feature}</Text>
                     </View>
                 ))}
             </View>
 
             <TouchableOpacity
-                style={[styles.subscribeButton, plan.isPopular && styles.popularButton]}
+                style={[styles.subscribeButton, { backgroundColor: theme.colors.border, borderColor: theme.colors.border }, plan.isPopular && [styles.popularButton, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]]}
                 onPress={() => handleSubscribe(plan)}
                 disabled={isLoading}
             >
-                <Text style={[styles.subscribeButtonText, plan.isPopular && styles.popularButtonText]}>
+                <Text style={[styles.subscribeButtonText, { color: theme.colors.text }, plan.isPopular && styles.popularButtonText]}>
                     Choose {plan.title}
                 </Text>
             </TouchableOpacity>
@@ -327,15 +329,15 @@ const SubscriptionManagementScreen: React.FC = () => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Premium Subscription</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Premium Subscription</Text>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -350,11 +352,11 @@ const SubscriptionManagementScreen: React.FC = () => {
                 {/* Premium Features Overview */}
                 <View style={styles.featuresOverview}>
                     <LinearGradient
-                        colors={['#0074dd', '#5c00dd']}
+                        colors={[theme.colors.primary, '#5c00dd']}
                         style={styles.featuresHeader}
                     >
                         <MaterialCommunityIcons name="crown" size={32} color="#ffd700" />
-                        <Text style={styles.featuresTitle}>Premium Features</Text>
+                        <Text style={[styles.featuresTitle, { color: theme.colors.text }]}>Premium Features</Text>
                         <Text style={styles.featuresSubtitle}>
                             Unlock the full potential of PlateMate
                         </Text>
@@ -363,7 +365,7 @@ const SubscriptionManagementScreen: React.FC = () => {
 
                 {/* Subscription Plans */}
                 <View style={styles.plansContainer}>
-                    <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Choose Your Plan</Text>
                     {subscriptionPlans.map(renderPlanCard)}
                 </View>
 
@@ -373,45 +375,45 @@ const SubscriptionManagementScreen: React.FC = () => {
                     onPress={handleRestorePurchases}
                     disabled={isLoading}
                 >
-                    <Ionicons name="refresh-outline" size={20} color="#0074dd" />
-                    <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+                    <Ionicons name="refresh-outline" size={20} color={theme.colors.primary} />
+                    <Text style={[styles.restoreButtonText, { color: theme.colors.primary }]}>Restore Purchases</Text>
                 </TouchableOpacity>
 
                 {/* Current Subscription Management */}
                 {subscriptionDetails && ['premium_monthly', 'premium_annual'].includes(subscriptionDetails.status) && (
                     <View style={styles.managementContainer}>
-                        <Text style={styles.sectionTitle}>Manage Subscription</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Manage Subscription</Text>
                         <TouchableOpacity
-                            style={styles.cancelButton}
+                            style={[styles.cancelButton, { borderColor: theme.colors.error }]}
                             onPress={handleCancelSubscription}
                         >
-                            <Ionicons name="close-circle-outline" size={20} color="#ff4444" />
-                            <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+                            <Ionicons name="close-circle-outline" size={20} color={theme.colors.error} />
+                            <Text style={[styles.cancelButtonText, { color: theme.colors.error }]}>Cancel Subscription</Text>
                         </TouchableOpacity>
                     </View>
                 )}
 
                 {/* FAQ Section */}
                 <View style={styles.faqContainer}>
-                    <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Frequently Asked Questions</Text>
 
-                    <View style={styles.faqItem}>
-                        <Text style={styles.faqQuestion}>How does the free trial work?</Text>
-                        <Text style={styles.faqAnswer}>
+                    <View style={[styles.faqItem, { backgroundColor: theme.colors.cardBackground }]}>
+                        <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>How does the free trial work?</Text>
+                        <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
                             Get 20 days free to try all premium features. Add a payment method to extend to 30 days total. You won't be charged until after your trial ends.
                         </Text>
                     </View>
 
-                    <View style={styles.faqItem}>
-                        <Text style={styles.faqQuestion}>Can I cancel anytime?</Text>
-                        <Text style={styles.faqAnswer}>
+                    <View style={[styles.faqItem, { backgroundColor: theme.colors.cardBackground }]}>
+                        <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>Can I cancel anytime?</Text>
+                        <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
                             Yes! Cancel anytime through your device settings. You'll keep access until the end of your billing period.
                         </Text>
                     </View>
 
-                    <View style={styles.faqItem}>
-                        <Text style={styles.faqQuestion}>What happens to my data if I cancel?</Text>
-                        <Text style={styles.faqAnswer}>
+                    <View style={[styles.faqItem, { backgroundColor: theme.colors.cardBackground }]}>
+                        <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>What happens to my data if I cancel?</Text>
+                        <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
                             Your data is always safe with us. You'll lose access to premium features but can still use the free version of the app.
                         </Text>
                     </View>
@@ -419,17 +421,17 @@ const SubscriptionManagementScreen: React.FC = () => {
 
                 {/* Legal links */}
                 <View style={styles.legalLinksContainer}>
-                    <Text style={styles.legalLinksText}>
+                    <Text style={[styles.legalLinksText, { color: theme.colors.textSecondary }]}>
                         By subscribing, you agree to our{' '}
                         <Text
-                            style={styles.legalLink}
+                            style={[styles.legalLink, { color: theme.colors.primary }]}
                             onPress={() => navigation.navigate('LegalTerms' as never)}
                         >
                             Terms of Use
                         </Text>
                         {' '}and{' '}
                         <Text
-                            style={styles.legalLink}
+                            style={[styles.legalLink, { color: theme.colors.primary }]}
                             onPress={() => navigation.navigate('PrivacyPolicy' as never)}
                         >
                             Privacy Policy
@@ -443,7 +445,7 @@ const SubscriptionManagementScreen: React.FC = () => {
 
             {isLoading && (
                 <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color="#0074dd" />
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
             )}
         </SafeAreaView>
@@ -507,7 +509,6 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     planCard: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 16,
         padding: 20,
         marginBottom: 16,
@@ -650,7 +651,6 @@ const styles = StyleSheet.create({
     },
     faqItem: {
         marginBottom: 16,
-        backgroundColor: '#1a1a1a',
         padding: 16,
         borderRadius: 12,
     },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { ThemeContext } from '../../ThemeContext';
 
 interface MotivationStepProps {
     profile: UserProfile;
@@ -16,6 +17,7 @@ interface MotivationStepProps {
 }
 
 const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [selectedMotivations, setSelectedMotivations] = useState<string[]>(
         profile.motivations || []
     );
@@ -99,10 +101,10 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>What Motivates You?</Text>
-                <Text style={styles.subtitle}>Choose up to 3 reasons why you want to achieve your goal</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>What Motivates You?</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Choose up to 3 reasons why you want to achieve your goal</Text>
             </View>
 
             <View style={styles.motivationsContainer}>
@@ -111,6 +113,7 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
                         key={motivation.id}
                         style={[
                             styles.motivationCard,
+                            { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                             selectedMotivations.includes(motivation.id) && styles.selectedMotivation,
                         ]}
                         onPress={() => toggleMotivation(motivation.id)}
@@ -119,12 +122,13 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
                             <Ionicons
                                 name={motivation.icon as any}
                                 size={24}
-                                color={selectedMotivations.includes(motivation.id) ? motivation.color : '#777'}
+                                color={selectedMotivations.includes(motivation.id) ? motivation.color : theme.colors.textSecondary}
                             />
                         </View>
                         <Text style={[
                             styles.motivationLabel,
-                            selectedMotivations.includes(motivation.id) && styles.selectedMotivationLabel
+                            { color: theme.colors.textSecondary },
+                            selectedMotivations.includes(motivation.id) && { color: theme.colors.text }
                         ]}>
                             {motivation.label}
                         </Text>
@@ -138,8 +142,8 @@ const MotivationStep: React.FC<MotivationStepProps> = ({ profile, updateProfile,
             </View>
 
             <View style={styles.selectionInfo}>
-                <Ionicons name="information-circle-outline" size={18} color="#888" />
-                <Text style={styles.selectionInfoText}>
+                <Ionicons name="information-circle-outline" size={18} color={theme.colors.textSecondary} />
+                <Text style={[styles.selectionInfoText, { color: theme.colors.textSecondary }]}>
                     {selectedMotivations.length === 0
                         ? "Select at least one motivation to continue"
                         : `${selectedMotivations.length}/3 selected`}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -13,20 +13,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../ThemeContext';
 import { getUserProfileBySupabaseUid, getUserGoals } from '../utils/database';
 import { formatWeight, parseUnitPreference, kgToLbs } from '../utils/unitConversion';
 
-// Colors from ManualFoodEntry.tsx
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const GRAY = '#AAAAAA';
-const LIGHT_GRAY = '#333333';
-const BLUE_ACCENT = '#2196F3';
+// Colors are now provided via ThemeContext
 
 const ProfileScreen = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     // Unit preference state
     const [isImperialUnits, setIsImperialUnits] = useState(false);
@@ -101,13 +97,13 @@ const ProfileScreen = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={28} color={WHITE} />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
                 <View style={styles.profileHeaderContainer}>
                     <Image
@@ -116,93 +112,93 @@ const ProfileScreen = () => {
                         defaultSource={require('../../assets/default-avatar.png')}
                     />
                     <View style={styles.profileInfo}>
-                        <Text style={styles.username}>{profileData.username}</Text>
-                        <Text style={styles.location}>{profileData.location}</Text>
+                        <Text style={[styles.username, { color: theme.colors.text }]}>{profileData.username}</Text>
+                        <Text style={[styles.location, { color: theme.colors.textSecondary }]}>{profileData.location}</Text>
                     </View>
                 </View>
                 <TouchableOpacity onPress={goToSettings}>
-                    <Ionicons name="settings-outline" size={28} color={WHITE} />
+                    <Ionicons name="settings-outline" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
             </View>
 
             {/* Tabs */}
-            <View style={styles.tabs}>
-                <TouchableOpacity style={[styles.tab, styles.activeTab]}>
-                    <Text style={[styles.tabText, styles.activeTabText]}>MY INFO</Text>
+            <View style={[styles.tabs, { borderBottomColor: theme.colors.border }]}>
+                <TouchableOpacity style={[styles.tab, styles.activeTab, { borderBottomColor: theme.colors.primary }]}>
+                    <Text style={[styles.tabText, styles.activeTabText, { color: theme.colors.text }]}>MY INFO</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.tab}>
-                    <Text style={styles.tabText}>MY ITEMS</Text>
+                    <Text style={[styles.tabText, { color: theme.colors.textSecondary }]}>MY ITEMS</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.content}>
                 {/* Progress Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Progress</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Progress</Text>
                     <View style={styles.progressContainer}>
-                        <View style={styles.progressCircle}>
+                        <View style={[styles.progressCircle, { borderColor: theme.colors.border, borderLeftColor: theme.colors.primary }]}>
                             <View style={styles.progressCircleInner}>
-                                <Ionicons name="scale-outline" size={32} color={WHITE} />
-                                <Text style={styles.weightLostText}>
+                                <Ionicons name="scale-outline" size={32} color={theme.colors.text} />
+                                <Text style={[styles.weightLostText, { color: theme.colors.text }]}>
                                     {isImperialUnits
                                         ? `${Math.round(kgToLbs(profileData.weightLost) * 10) / 10} lbs lost`
                                         : `${profileData.weightLost} kg lost`}
                                 </Text>
-                                <Text style={styles.currentWeightText}>
+                                <Text style={[styles.currentWeightText, { color: theme.colors.textSecondary }]}>
                                     Current: {formatWeight(profileData.currentWeight, isImperialUnits)}
                                 </Text>
                             </View>
                         </View>
                         <View style={styles.progressLimits}>
-                            <Text style={styles.limitText}>
+                            <Text style={[styles.limitText, { color: theme.colors.textSecondary }]}>
                                 {formatWeight(profileData.startingWeight, isImperialUnits)}
                             </Text>
-                            <Text style={styles.limitText}>
+                            <Text style={[styles.limitText, { color: theme.colors.textSecondary }]}>
                                 {formatWeight(profileData.goalWeight, isImperialUnits)}
                             </Text>
                         </View>
                     </View>
 
-                    <TouchableOpacity style={styles.actionButton}>
-                        <Text style={styles.actionButtonText}>ADD WEIGHT</Text>
+                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.colors.cardBackground }]}>
+                        <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>ADD WEIGHT</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Goals Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Goals</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Goals</Text>
 
                     <View style={styles.goalItem}>
-                        <Text style={styles.goalLabel}>Weight</Text>
-                        <Text style={styles.goalValue}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Weight</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.text }]}>
                             {formatWeight(profileData.goalWeight, isImperialUnits)}
                         </Text>
                     </View>
                     <View style={styles.goalSubItem}>
-                        <Text style={styles.goalSubtext}>{profileData.weeklyGoal}</Text>
+                        <Text style={[styles.goalSubtext, { color: theme.colors.textSecondary }]}>{profileData.weeklyGoal}</Text>
                     </View>
 
                     <View style={styles.goalItem}>
-                        <Text style={styles.goalLabel}>Daily Calories</Text>
-                        <Text style={styles.goalValue}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>Daily Calories</Text>
+                        <Text style={[styles.goalValue, { color: theme.colors.text }]}>
                             {profileData.dailyCalories ? `${profileData.dailyCalories} cal` : "---"}
                         </Text>
                     </View>
                     <View style={styles.goalSubItem}>
-                        <Text style={styles.goalSubtext}>Carbs {profileData.macros.carbs}g / Fat {profileData.macros.fat}g / Protein {profileData.macros.protein}g</Text>
+                        <Text style={[styles.goalSubtext, { color: theme.colors.textSecondary }]}>Carbs {profileData.macros.carbs}g / Fat {profileData.macros.fat}g / Protein {profileData.macros.protein}g</Text>
                     </View>
 
-                    <TouchableOpacity style={styles.actionButton} onPress={goToGoals}>
-                        <Text style={styles.actionButtonText}>UPDATE GOALS</Text>
+                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.colors.cardBackground }]} onPress={goToGoals}>
+                        <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>UPDATE GOALS</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Friends Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Friends</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Friends</Text>
                     {/* We would add friends list here */}
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateText}>Add friends to share progress</Text>
+                        <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>Add friends to share progress</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -215,7 +211,7 @@ const ProfileScreen = () => {
                     end={{ x: 1, y: 0 }}
                     style={styles.premiumBannerGradient}
                 >
-                    <Text style={styles.premiumBannerText}>Go Premium</Text>
+                    <Text style={[styles.premiumBannerText, { color: theme.colors.text }]}>Go Premium</Text>
                 </LinearGradient>
             </TouchableOpacity>
         </SafeAreaView>
@@ -225,7 +221,6 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     header: {
         flexDirection: 'row',
@@ -250,18 +245,15 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     username: {
-        color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
     },
     location: {
-        color: GRAY,
         fontSize: 16,
     },
     tabs: {
         flexDirection: 'row',
         borderBottomWidth: 1,
-        borderBottomColor: LIGHT_GRAY,
     },
     tab: {
         flex: 1,
@@ -270,16 +262,12 @@ const styles = StyleSheet.create({
     },
     activeTab: {
         borderBottomWidth: 2,
-        borderBottomColor: BLUE_ACCENT,
     },
     tabText: {
-        color: GRAY,
         fontSize: 16,
         fontWeight: 'bold',
     },
-    activeTabText: {
-        color: WHITE,
-    },
+    activeTabText: {},
     content: {
         flex: 1,
         padding: 16,
@@ -288,7 +276,6 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     sectionTitle: {
-        color: WHITE,
         fontSize: 20,
         fontWeight: 'bold',
         marginBottom: 16,
@@ -304,21 +291,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 15,
-        borderColor: '#333',
-        borderLeftColor: BLUE_ACCENT,
     },
     progressCircleInner: {
         justifyContent: 'center',
         alignItems: 'center',
     },
     weightLostText: {
-        color: WHITE,
         fontSize: 24,
         fontWeight: 'bold',
         marginTop: 8,
     },
     currentWeightText: {
-        color: GRAY,
         fontSize: 16,
         marginTop: 4,
     },
@@ -330,18 +313,15 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     limitText: {
-        color: GRAY,
         fontSize: 16,
     },
     actionButton: {
-        backgroundColor: LIGHT_GRAY,
         borderRadius: 4,
         paddingVertical: 12,
         alignItems: 'center',
         marginTop: 8,
     },
     actionButtonText: {
-        color: BLUE_ACCENT,
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -351,11 +331,9 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     goalLabel: {
-        color: WHITE,
         fontSize: 18,
     },
     goalValue: {
-        color: WHITE,
         fontSize: 18,
         fontWeight: 'bold',
     },
@@ -363,7 +341,6 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     goalSubtext: {
-        color: GRAY,
         fontSize: 16,
     },
     emptyState: {
@@ -371,7 +348,6 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     emptyStateText: {
-        color: GRAY,
         fontSize: 16,
     },
     premiumBanner: {
@@ -384,7 +360,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     premiumBannerText: {
-        color: WHITE,
         fontSize: 16,
         fontWeight: 'bold',
     },

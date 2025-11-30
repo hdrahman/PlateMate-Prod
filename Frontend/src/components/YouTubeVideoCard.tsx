@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Linking, Dimensions } from 'react-native';
 import { YouTubeVideo } from '../api/youtube';
+import { ThemeContext } from '../ThemeContext';
 
 interface YouTubeVideoCardProps {
     video: YouTubeVideo;
@@ -10,6 +11,8 @@ const { width } = Dimensions.get('window');
 const VIDEO_CARD_WIDTH = width * 0.75;  // Slightly narrower for better fit
 
 const YouTubeVideoCard: React.FC<YouTubeVideoCardProps> = ({ video }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     if (!video || !video.id) {
         return null; // Don't render invalid videos
     }
@@ -42,7 +45,11 @@ const YouTubeVideoCard: React.FC<YouTubeVideoCardProps> = ({ video }) => {
     };
 
     return (
-        <TouchableOpacity style={styles.container} onPress={openYouTubeVideo} activeOpacity={0.8}>
+        <TouchableOpacity
+            style={[styles.container, { backgroundColor: theme.colors.cardBackground }]}
+            onPress={openYouTubeVideo}
+            activeOpacity={0.8}
+        >
             <Image
                 source={{ uri: video.thumbnailUrl || 'https://via.placeholder.com/480x360?text=No+Thumbnail' }}
                 style={styles.thumbnail}
@@ -50,9 +57,9 @@ const YouTubeVideoCard: React.FC<YouTubeVideoCardProps> = ({ video }) => {
                 defaultSource={{ uri: 'https://via.placeholder.com/480x360?text=Loading...' }}
             />
             <View style={styles.infoContainer}>
-                <Text style={styles.title}>{truncateText(video.title || 'Untitled Video', 40)}</Text>
-                <Text style={styles.channelTitle}>{video.channelTitle || 'Unknown Channel'}</Text>
-                <Text style={styles.publishedDate}>Published: {formatDate(video.publishedAt)}</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>{truncateText(video.title || 'Untitled Video', 40)}</Text>
+                <Text style={[styles.channelTitle, { color: theme.colors.textSecondary }]}>{video.channelTitle || 'Unknown Channel'}</Text>
+                <Text style={[styles.publishedDate, { color: theme.colors.textSecondary }]}>Published: {formatDate(video.publishedAt)}</Text>
             </View>
         </TouchableOpacity>
     );
@@ -61,7 +68,6 @@ const YouTubeVideoCard: React.FC<YouTubeVideoCardProps> = ({ video }) => {
 const styles = StyleSheet.create({
     container: {
         width: VIDEO_CARD_WIDTH,
-        backgroundColor: '#222222',
         borderRadius: 10,
         marginRight: 12,
         overflow: 'hidden',
@@ -83,17 +89,14 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: 'white',
         marginBottom: 6,
     },
     channelTitle: {
         fontSize: 14,
-        color: '#BBBBBB',
         marginBottom: 4,
     },
     publishedDate: {
         fontSize: 12,
-        color: '#888888',
     },
 });
 

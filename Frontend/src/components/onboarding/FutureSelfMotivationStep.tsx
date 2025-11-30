@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -26,6 +27,7 @@ interface FutureSelfMotivationStepProps {
 }
 
 const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [messageType, setMessageType] = useState<'text' | 'voice' | 'video'>(
         (profile.futureSelfMessageType as 'text' | 'voice' | 'video') || 'text'
     );
@@ -520,16 +522,16 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
     }
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
-                <Text style={styles.title}>Message to Future You</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Message to Future You</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                     Create a personal motivation message to help you through tough moments
                 </Text>
             </View>
 
             <View style={styles.messageTypeContainer}>
-                <Text style={styles.sectionTitle}>Choose Message Type</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Choose Message Type</Text>
 
                 <View style={styles.optionsContainer}>
                     {messageTypeOptions.map((option) => (
@@ -537,6 +539,7 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
                             key={option.id}
                             style={[
                                 styles.optionCard,
+                                { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                                 messageType === option.id && styles.selectedOption,
                                 messageType === option.id && { borderColor: option.color }
                             ]}
@@ -550,16 +553,17 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
                                 <Ionicons
                                     name={option.icon as any}
                                     size={32}
-                                    color={messageType === option.id ? option.color : '#777'}
+                                    color={messageType === option.id ? option.color : theme.colors.textSecondary}
                                 />
                             </View>
                             <Text style={[
                                 styles.optionLabel,
+                                { color: theme.colors.text },
                                 messageType === option.id && { color: option.color }
                             ]}>
                                 {option.label}
                             </Text>
-                            <Text style={styles.optionDescription}>
+                            <Text style={[styles.optionDescription, { color: theme.colors.textSecondary }]}>
                                 {option.description}
                             </Text>
                         </TouchableOpacity>
@@ -568,15 +572,15 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
             </View>
 
             <View style={styles.messageContentContainer}>
-                <Text style={styles.sectionTitle}>Your message to your future self</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Your message to your future self</Text>
 
                 {messageType === 'text' && (
                     <View style={styles.textInputContainer}>
-                        <Text style={styles.inputLabel}>Write a motivational message</Text>
+                        <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Write a motivational message</Text>
                         <TextInput
-                            style={styles.textInput}
+                            style={[styles.textInput, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             placeholder="e.g., Remember why you started this journey..."
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             multiline
                             value={textMessage}
                             onChangeText={setTextMessage}
@@ -586,14 +590,14 @@ const FutureSelfMotivationStep: React.FC<FutureSelfMotivationStepProps> = ({ pro
 
                 {messageType === 'voice' && (
                     <View style={styles.recordingContainer}>
-                        <Text style={styles.recordingTitle}>
+                        <Text style={[styles.recordingTitle, { color: theme.colors.text }]}>
                             {recordingUri ? 'Voice message recorded!' : 'Record your voice message (max 30 seconds)'}
                         </Text>
 
                         {isRecording && (
                             <View style={styles.recordingStatusContainer}>
                                 <View style={[styles.recordingIndicator, styles.recordingActive]} />
-                                <Text style={styles.recordingStatusText}>
+                                <Text style={[styles.recordingStatusText, { color: theme.colors.textSecondary }]}>
                                     Recording... {recordingTimeLeft}s left
                                 </Text>
                             </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../ThemeContext';
 import { formatDateToString } from '../utils/dateUtils';
 import { addWaterIntake, WATER_CONTAINER_TYPES, getUserProfile, getCurrentUserIdAsync } from '../utils/database';
 
@@ -24,19 +25,14 @@ interface WaterIntakeModalProps {
     currentDate: Date;
 }
 
-// Constants for colors
-const PRIMARY_BG = '#000000';
-const WHITE = '#FFFFFF';
-const PURPLE_ACCENT = '#AA00FF';
-const CARD_BG = '#1C1C1E';
-const SUBDUED = '#AAAAAA';
-
 const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
     visible,
     onClose,
     onWaterAdded,
     currentDate
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     // State variables
     const [selectedContainer, setSelectedContainer] = useState<string | null>(null);
     const [customAmount, setCustomAmount] = useState('250');
@@ -138,7 +134,8 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                 key={type}
                 style={[
                     styles.containerButton,
-                    isSelected && styles.selectedContainer
+                    { backgroundColor: theme.colors.cardBackground, borderColor: 'transparent' },
+                    isSelected && { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}1A` }
                 ]}
                 onPress={() => {
                     setSelectedContainer(type);
@@ -146,9 +143,9 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                     setCustomAmount('');
                 }}
             >
-                <Ionicons name={getContainerIcon(type)} size={32} color={isSelected ? PURPLE_ACCENT : WHITE} />
-                <Text style={styles.containerName}>{container.name}</Text>
-                <Text style={styles.containerAmount}>{container.ml}ml</Text>
+                <Ionicons name={getContainerIcon(type)} size={32} color={isSelected ? theme.colors.primary : theme.colors.text} />
+                <Text style={[styles.containerName, { color: theme.colors.text }]}>{container.name}</Text>
+                <Text style={[styles.containerAmount, { color: theme.colors.textSecondary }]}>{container.ml}ml</Text>
             </TouchableOpacity>
         );
     };
@@ -172,24 +169,24 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                     <View style={styles.backdrop} />
                 </TouchableWithoutFeedback>
 
-                <View style={styles.modalContent}>
+                <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerContent}>
-                            <Text style={styles.headerTitle}>Add Water Intake</Text>
-                            <Text style={styles.headerSubtitle}>
+                            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Add Water Intake</Text>
+                            <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
                                 {formatDateToString(currentDate)}
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color={WHITE} />
+                            <Ionicons name="close" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Daily Goal Info */}
-                    <View style={styles.goalInfo}>
-                        <Ionicons name="water" size={20} color={PURPLE_ACCENT} />
-                        <Text style={styles.goalText}>
+                    <View style={[styles.goalInfo, { backgroundColor: `${theme.colors.primary}1A` }]}>
+                        <Ionicons name="water" size={20} color={theme.colors.primary} />
+                        <Text style={[styles.goalText, { color: theme.colors.text }]}>
                             Daily Goal: {getDailyRecommendation()}ml ({(getDailyRecommendation() / 1000).toFixed(1)}L)
                         </Text>
                     </View>
@@ -197,7 +194,7 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                         {/* Quick Add Containers */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Quick Add</Text>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Add</Text>
                             <View style={styles.containerGrid}>
                                 {/* Cup (top left), Glass (top right), Bottle (bottom left), Large Bottle (bottom right) */}
                                 <View style={styles.gridRow}>
@@ -213,21 +210,22 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
 
                         {/* Custom Amount - Integrated with Quick Add */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Custom Amount</Text>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Custom Amount</Text>
                             <View style={styles.customSection}>
                                 <View style={[
                                     styles.customInputWrapper,
-                                    isCustomEntry && styles.selectedContainer
+                                    { backgroundColor: theme.colors.cardBackground, borderColor: 'transparent' },
+                                    isCustomEntry && { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}1A` }
                                 ]}>
                                     <TextInput
-                                        style={styles.customInput}
+                                        style={[styles.customInput, { color: theme.colors.text }]}
                                         value={customAmount}
                                         onChangeText={(text) => {
                                             console.log('Custom input changed:', text);
                                             setCustomAmount(text);
                                         }}
                                         placeholder="Enter amount"
-                                        placeholderTextColor={SUBDUED}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         keyboardType="numeric"
                                         onFocus={() => {
                                             console.log('Custom input focused');
@@ -235,18 +233,18 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                                             setSelectedContainer(null);
                                         }}
                                     />
-                                    <Text style={styles.unitText}>ml</Text>
+                                    <Text style={[styles.unitText, { color: theme.colors.textSecondary }]}>ml</Text>
                                 </View>
                             </View>
                         </View>
 
                         {/* Hydration Tips - Compact */}
-                        <View style={styles.tipsSection}>
+                        <View style={[styles.tipsSection, { backgroundColor: theme.colors.cardBackground }]}>
                             <View style={styles.tipsTitleContainer}>
-                                <Ionicons name="bulb-outline" size={16} color={PURPLE_ACCENT} />
-                                <Text style={styles.tipsTitle}>Quick Tips</Text>
+                                <Ionicons name="bulb-outline" size={16} color={theme.colors.primary} />
+                                <Text style={[styles.tipsTitle, { color: theme.colors.text }]}>Quick Tips</Text>
                             </View>
-                            <Text style={styles.compactTips}>
+                            <Text style={[styles.compactTips, { color: theme.colors.textSecondary }]}>
                                 Drink before meals • Start your day with water • Keep hydrated during exercise
                             </Text>
                         </View>
@@ -262,12 +260,12 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                         disabled={loading}
                     >
                         <LinearGradient
-                            colors={['#AA00FF', '#6200FF']}
+                            colors={[theme.colors.primary, '#6200FF']}
                             style={styles.gradientButton}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                         >
-                            <Text style={styles.addButtonText}>
+                            <Text style={[styles.addButtonText, { color: theme.colors.text }]}>
                                 {loading ? 'Adding...' : 'Add Water Intake'}
                             </Text>
                         </LinearGradient>
@@ -294,7 +292,6 @@ const styles = StyleSheet.create({
         bottom: 0,
     },
     modalContent: {
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         width: '100%',
         maxWidth: 400,
@@ -314,12 +311,10 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: WHITE,
         marginBottom: 2,
     },
     headerSubtitle: {
         fontSize: 13,
-        color: SUBDUED,
     },
     closeButton: {
         padding: 4,
@@ -327,13 +322,11 @@ const styles = StyleSheet.create({
     goalInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(170, 0, 255, 0.1)',
         padding: 10,
         borderRadius: 8,
         marginBottom: 16,
     },
     goalText: {
-        color: WHITE,
         fontSize: 13,
         marginLeft: 8,
         fontWeight: '500',
@@ -347,7 +340,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: WHITE,
         marginBottom: 10,
     },
     containerGrid: {
@@ -359,7 +351,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     containerButton: {
-        backgroundColor: '#2C2C2E',
         borderRadius: 12,
         padding: 12,
         alignItems: 'center',
@@ -368,21 +359,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         marginHorizontal: 2,
         borderWidth: 2,
-        borderColor: 'transparent',
     },
     selectedContainer: {
-        borderColor: PURPLE_ACCENT,
-        backgroundColor: 'rgba(170, 0, 255, 0.1)',
     },
     containerName: {
-        color: WHITE,
         fontSize: 14,
         fontWeight: '600',
         marginBottom: 2,
         marginTop: 8,
     },
     containerAmount: {
-        color: SUBDUED,
         fontSize: 12,
     },
     customSection: {
@@ -391,29 +377,23 @@ const styles = StyleSheet.create({
     customInputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#2C2C2E',
         borderRadius: 12,
         padding: 16,
         width: '100%',
         borderWidth: 2,
-        borderColor: 'transparent',
     },
     customInput: {
-        color: WHITE,
         fontSize: 16,
         flex: 1,
         textAlign: 'center',
     },
     selectedCustomInput: {
-        borderColor: PURPLE_ACCENT,
     },
     unitText: {
-        color: SUBDUED,
         fontSize: 16,
         marginLeft: 8,
     },
     tipsSection: {
-        backgroundColor: '#2C2C2E',
         borderRadius: 12,
         padding: 12,
         marginBottom: 8,
@@ -424,13 +404,11 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     tipsTitle: {
-        color: WHITE,
         fontSize: 14,
         fontWeight: '600',
         marginLeft: 6,
     },
     compactTips: {
-        color: SUBDUED,
         fontSize: 12,
         lineHeight: 16,
     },
@@ -448,7 +426,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     addButtonText: {
-        color: WHITE,
         fontSize: 16,
         fontWeight: '600',
     },

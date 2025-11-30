@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     SafeAreaView,
     Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,6 +49,7 @@ const PremiumSubscription = () => {
     const { user } = useAuth();
     const { subscription, refreshSubscription } = useSubscription();
     const insets = useSafeAreaInsets();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionDetails | null>(null);
@@ -456,17 +458,17 @@ const PremiumSubscription = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
-            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : insets.top + 10 }]}>
+            <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : insets.top + 10, borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#FFF" />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Premium Subscription</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Premium Subscription</Text>
             </View>
 
             <ScrollView
@@ -497,24 +499,24 @@ const PremiumSubscription = () => {
 
                     {/* Current Plan Status Card - IMPROVED UX */}
                     {currentPlanInfo && (
-                        <View style={styles.currentPlanCard}>
-                            <View style={[styles.currentPlanHeader, { backgroundColor: currentPlanInfo.statusColor + '20' }]}>
+                        <View style={[styles.currentPlanCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                            <View style={[styles.currentPlanHeader, { backgroundColor: currentPlanInfo.statusColor + '20', borderBottomColor: theme.colors.border }]}>
                                 <Ionicons
                                     name={currentPlanInfo.planName.includes('VIP') ? "shield-checkmark" : currentPlanInfo.isActive ? "checkmark-circle" : "information-circle"}
                                     size={20}
                                     color={currentPlanInfo.statusColor}
                                 />
-                                <Text style={styles.currentPlanLabel}>
+                                <Text style={[styles.currentPlanLabel, { color: theme.colors.textSecondary }]}>
                                     {currentPlanInfo.planName.includes('VIP') ? "VIP Status" : currentPlanInfo.isActive ? "Current Plan" : "Plan Status"}
                                 </Text>
                             </View>
                             <View style={styles.currentPlanBody}>
-                                <Text style={styles.currentPlanName}>{currentPlanInfo.planName}</Text>
+                                <Text style={[styles.currentPlanName, { color: theme.colors.text }]}>{currentPlanInfo.planName}</Text>
                                 <Text style={[styles.currentPlanStatus, { color: currentPlanInfo.statusColor }]}>
                                     {currentPlanInfo.statusText}
                                 </Text>
                                 {currentPlanInfo.showUpgradePrompt && (
-                                    <Text style={styles.upgradePrompt}>
+                                    <Text style={[styles.upgradePrompt, { color: theme.colors.primary }]}>
                                         Upgrade for unlimited features
                                     </Text>
                                 )}
@@ -536,34 +538,34 @@ const PremiumSubscription = () => {
 
                             {/* Restore Purchases Button - Required for App Review */}
                             <TouchableOpacity
-                                style={styles.restorePurchasesButton}
+                                style={[styles.restorePurchasesButton, { backgroundColor: `${theme.colors.primary}15`, borderColor: `${theme.colors.primary}4D` }]}
                                 onPress={handleRestorePurchases}
                                 disabled={isLoading}
                             >
-                                <Ionicons name="refresh-outline" size={20} color="#5A60EA" />
-                                <Text style={styles.restorePurchasesText}>Restore Purchases</Text>
+                                <Ionicons name="refresh-outline" size={20} color={theme.colors.primary} />
+                                <Text style={[styles.restorePurchasesText, { color: theme.colors.primary }]}>Restore Purchases</Text>
                             </TouchableOpacity>
 
                             {/* Store-compliant trial disclaimer */}
-                            <View style={styles.trialDisclaimerSection}>
-                                <Text style={styles.trialDisclaimerText}>
+                            <View style={[styles.trialDisclaimerSection, { backgroundColor: `${theme.colors.primary}0D`, borderColor: `${theme.colors.primary}26` }]}>
+                                <Text style={[styles.trialDisclaimerText, { color: theme.colors.textSecondary }]}>
                                     New users get 20 days free automatically. Start a subscription to unlock an additional 10 days (30 days total). Cancel anytime during the trial period. No charges until trial ends.
                                 </Text>
                             </View>
 
                             {/* Legal links */}
                             <View style={styles.legalLinksContainer}>
-                                <Text style={styles.legalLinksText}>
+                                <Text style={[styles.legalLinksText, { color: theme.colors.textSecondary }]}>
                                     By subscribing, you agree to our{' '}
                                     <Text
-                                        style={styles.legalLink}
+                                        style={[styles.legalLink, { color: theme.colors.primary }]}
                                         onPress={() => navigation.navigate('LegalTerms' as never)}
                                     >
                                         Terms of Use
                                     </Text>
                                     {' '}and{' '}
                                     <Text
-                                        style={styles.legalLink}
+                                        style={[styles.legalLink, { color: theme.colors.primary }]}
                                         onPress={() => navigation.navigate('PrivacyPolicy' as never)}
                                     >
                                         Privacy Policy
@@ -574,13 +576,13 @@ const PremiumSubscription = () => {
                         </>
                     )}
 
-                    <View style={styles.featuresSection}>
-                        <Text style={styles.featuresTitle}>Premium Features</Text>
+                    <View style={[styles.featuresSection, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                        <Text style={[styles.featuresTitle, { color: theme.colors.text }]}>Premium Features</Text>
                         <View style={styles.featuresGrid}>
                             {premiumFeatures.map((feature, index) => (
                                 <View key={index} style={styles.featureItem}>
-                                    <Ionicons name="checkmark-circle" size={20} color="#5A60EA" style={styles.featureIcon} />
-                                    <Text style={styles.featureText}>{feature}</Text>
+                                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} style={styles.featureIcon} />
+                                    <Text style={[styles.featureText, { color: theme.colors.text }]}>{feature}</Text>
                                 </View>
                             ))}
                         </View>
@@ -593,39 +595,39 @@ const PremiumSubscription = () => {
                                 onPress={handleCancelSubscription}
                                 disabled={isLoading}
                             >
-                                <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+                                <Text style={[styles.cancelButtonText, { color: theme.colors.primary }]}>Cancel Subscription</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
 
-                    <View style={styles.guaranteeSection}>
-                        <Ionicons name="shield-checkmark" size={24} color="#5A60EA" />
-                        <Text style={styles.guaranteeText}>
+                    <View style={[styles.guaranteeSection, { backgroundColor: `${theme.colors.primary}15` }]}>
+                        <Ionicons name="shield-checkmark" size={24} color={theme.colors.primary} />
+                        <Text style={[styles.guaranteeText, { color: theme.colors.primary }]}>
                             30-Day Money-Back Guarantee
                         </Text>
                     </View>
 
                     <View style={styles.faqSection}>
-                        <Text style={styles.faqTitle}>Frequently Asked Questions</Text>
+                        <Text style={[styles.faqTitle, { color: theme.colors.text }]}>Frequently Asked Questions</Text>
 
                         <View style={styles.faqItem}>
-                            <Text style={styles.faqQuestion}>What happens when I reach my daily image upload limit?</Text>
-                            <Text style={styles.faqAnswer}>
+                            <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>What happens when I reach my daily image upload limit?</Text>
+                            <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
                                 You can still use all other features of the app, including manual food logging and barcode scanning. Your upload limit resets every 24 hours.
                             </Text>
                         </View>
 
                         <View style={styles.faqItem}>
-                            <Text style={styles.faqQuestion}>How do I cancel my subscription?</Text>
-                            <Text style={styles.faqAnswer}>
+                            <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>How do I cancel my subscription?</Text>
+                            <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
                                 You can cancel anytime from this screen. You'll continue to have access until the end of your billing period.
                             </Text>
                         </View>
 
                         <View style={styles.faqItem}>
-                            <Text style={styles.faqQuestion}>Will I lose my data if I downgrade?</Text>
-                            <Text style={styles.faqAnswer}>
+                            <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>Will I lose my data if I downgrade?</Text>
+                            <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
                                 No, your data will be preserved. However, you may lose access to premium features and AI-powered analysis.
                             </Text>
                         </View>
@@ -695,7 +697,6 @@ const styles = StyleSheet.create({
     },
     featuresSection: {
         marginBottom: 30,
-        backgroundColor: '#1A1A1A',
         borderRadius: 16,
         padding: 20,
         borderWidth: 1,
@@ -922,7 +923,6 @@ const styles = StyleSheet.create({
     },
     // Current Plan Status Card Styles - IMPROVED UX
     currentPlanCard: {
-        backgroundColor: '#1A1A1A',
         borderRadius: 16,
         marginHorizontal: 20,
         marginBottom: 20,

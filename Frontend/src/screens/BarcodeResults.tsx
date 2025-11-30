@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
     View,
     Text,
@@ -33,6 +33,7 @@ import {
 import { getUserGoals, UserGoals } from '../utils/database';
 import * as Haptics from 'expo-haptics';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
+import { ThemeContext } from '../ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,14 +47,7 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'BarcodeResults'>;
 
-// Modern color scheme inspired by MyFitnessPal and Calai
-const PRIMARY_BG = '#000000';
-const SECONDARY_BG = '#111111';
-const CARD_BG = '#1a1a1a';
-const WHITE = '#FFFFFF';
-const GRAY_LIGHT = '#B0B0B0';
-const GRAY_MEDIUM = '#808080';
-const GRAY_DARK = '#333333';
+// Accent colors that stay constant
 const ACCENT_BLUE = '#0084ff';
 const ACCENT_GREEN = '#32D74B';
 const ACCENT_ORANGE = '#FF9500';
@@ -61,10 +55,21 @@ const ACCENT_RED = '#FF3B30';
 const ACCENT_PURPLE = '#AF52DE';
 const ACCENT_PINK = '#FF2D92';
 
+// Fallback colors (used in StyleSheet, overridden inline with theme where possible)
+const PRIMARY_BG = '#121212';
+const SECONDARY_BG = '#111111';
+const CARD_BG = '#1E1E1E';
+const WHITE = '#FFFFFF';
+const SUBDUED = '#AAAAAA';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#808080';
+const GRAY_LIGHT = '#B0B0B0';
+
 const BarcodeResults: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { foodData, mealType: initialMealType } = route.params as { foodData: any; mealType?: string };
 
     // State management

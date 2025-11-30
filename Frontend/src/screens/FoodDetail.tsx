@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -22,12 +22,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getFoodLogById, updateFoodLog, getFoodLogsByMealId, addFoodLog, addMultipleFoodLogs } from '../utils/database';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 import { navigateToFoodLog } from '../navigation/RootNavigation';
+import { ThemeContext } from '../ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Theme colors matching the app
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const GRAY = '#8E8E93';
@@ -104,6 +104,7 @@ interface FoodLogEntry {
 }
 
 const FoodDetailScreen: React.FC = () => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
     const params = route.params as any;
@@ -230,9 +231,9 @@ const FoodDetailScreen: React.FC = () => {
 
     // Helper function to get color based on healthiness rating
     const getHealthinessColor = (rating: number): string => {
-        if (rating <= 4) return '#FF5252'; // Red for unhealthy (0-4)
-        if (rating <= 7) return '#FFD740'; // Yellow for moderate (5-7)
-        return '#4CAF50'; // Green for healthy (8-10)
+        if (rating <= 4) return theme.colors.error; // Red for unhealthy (0-4)
+        if (rating <= 7) return theme.colors.warning; // Yellow for moderate (5-7)
+        return theme.colors.success; // Green for healthy (8-10)
     };
 
     // Helper function to format macro percentages
@@ -574,21 +575,21 @@ const FoodDetailScreen: React.FC = () => {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-                <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                <Text style={styles.loadingText}>Loading food details...</Text>
+            <SafeAreaView style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+                <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} backgroundColor={theme.colors.background} />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading food details...</Text>
             </SafeAreaView>
         );
     }
 
     if (!foodData) {
         return (
-            <SafeAreaView style={styles.errorContainer}>
-                <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
-                <Text style={styles.errorText}>Food not found</Text>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Text style={styles.backButtonText}>Go Back</Text>
+            <SafeAreaView style={[styles.errorContainer, { backgroundColor: theme.colors.background }]}>
+                <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} backgroundColor={theme.colors.background} />
+                <Text style={[styles.errorText, { color: theme.colors.text }]}>Food not found</Text>
+                <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.goBack()}>
+                    <Text style={[styles.backButtonText, { color: theme.colors.text }]}>Go Back</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
@@ -614,8 +615,8 @@ const FoodDetailScreen: React.FC = () => {
     })();
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
             <ScrollView
                 style={styles.scrollView}
@@ -638,7 +639,7 @@ const FoodDetailScreen: React.FC = () => {
                         />
 
                         <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', PRIMARY_BG]}
+                            colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', theme.colors.background]}
                             style={styles.bottomGradient}
                         />
 
@@ -650,13 +651,13 @@ const FoodDetailScreen: React.FC = () => {
                                     style={styles.headerButton}
                                 >
                                     <View style={styles.headerButtonBackground}>
-                                        <Ionicons name="chevron-back" size={24} color={WHITE} />
+                                        <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                                     </View>
                                 </TouchableOpacity>
-                                <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Facts</Text>
                                 <TouchableOpacity style={styles.headerButton}>
                                     <View style={styles.headerButtonBackground}>
-                                        <Ionicons name="heart-outline" size={22} color={WHITE} />
+                                        <Ionicons name="heart-outline" size={22} color={theme.colors.text} />
                                     </View>
                                 </TouchableOpacity>
                             </View>
@@ -664,7 +665,7 @@ const FoodDetailScreen: React.FC = () => {
 
                         {/* Food Details Overlay */}
                         <View style={styles.foodInfoOverlay}>
-                            <Text style={styles.foodName}>{foodData?.food_name}</Text>
+                            <Text style={[styles.foodName, { color: theme.colors.text }]}>{foodData?.food_name}</Text>
 
                             {/* Row container for health score and meal info */}
                             <View style={styles.infoRow}>
@@ -687,15 +688,15 @@ const FoodDetailScreen: React.FC = () => {
                                 {/* Meal type and date with edit button on the right - only for existing food */}
                                 {!isNewFoodMode && (
                                     <View style={styles.metaContainer}>
-                                        <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                        <Text style={[styles.foodMeta, styles.foodMetaRight, { color: theme.colors.text }]}>
                                             {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
                                         </Text>
                                         <TouchableOpacity
                                             style={styles.editButton}
                                             onPress={handleEditPress}
                                         >
-                                            <Ionicons name="pencil" size={18} color={WHITE} />
-                                            <Text style={styles.editButtonText}>Edit</Text>
+                                            <Ionicons name="pencil" size={18} color={theme.colors.text} />
+                                            <Text style={[styles.editButtonText, { color: theme.colors.text }]}>Edit</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
@@ -703,7 +704,7 @@ const FoodDetailScreen: React.FC = () => {
                         </View>
                     </View>
                 ) : (
-                    <View style={styles.noImageHeader}>
+                    <View style={[styles.noImageHeader, { backgroundColor: theme.colors.background }]}>
                         <SafeAreaView edges={['top']}>
                             <View style={styles.header}>
                                 <TouchableOpacity
@@ -711,20 +712,20 @@ const FoodDetailScreen: React.FC = () => {
                                     style={styles.headerButton}
                                 >
                                     <View style={styles.headerButtonBackground}>
-                                        <Ionicons name="chevron-back" size={24} color={WHITE} />
+                                        <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                                     </View>
                                 </TouchableOpacity>
-                                <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Facts</Text>
                                 <TouchableOpacity style={styles.headerButton}>
                                     <View style={styles.headerButtonBackground}>
-                                        <Ionicons name="heart-outline" size={22} color={WHITE} />
+                                        <Ionicons name="heart-outline" size={22} color={theme.colors.text} />
                                     </View>
                                 </TouchableOpacity>
                             </View>
 
                             {/* Basic food info without image */}
                             <View style={styles.noImageFoodInfo}>
-                                <Text style={styles.foodName}>{foodData?.food_name}</Text>
+                                <Text style={[styles.foodName, { color: theme.colors.text }]}>{foodData?.food_name}</Text>
 
                                 <View style={styles.infoRow}>
                                     {/* Health Score on the left */}
@@ -746,15 +747,15 @@ const FoodDetailScreen: React.FC = () => {
                                     {/* Meal type and date with edit button on the right - only for existing food */}
                                     {!isNewFoodMode && (
                                         <View style={styles.metaContainer}>
-                                            <Text style={[styles.foodMeta, styles.foodMetaRight]}>
+                                            <Text style={[styles.foodMeta, styles.foodMetaRight, { color: theme.colors.text }]}>
                                                 {foodData?.meal_type} • {foodData && formatLocalDate(foodData.date)}
                                             </Text>
                                             <TouchableOpacity
                                                 style={styles.editButton}
                                                 onPress={handleEditPress}
                                             >
-                                                <Ionicons name="pencil" size={18} color={WHITE} />
-                                                <Text style={styles.editButtonText}>Edit</Text>
+                                                <Ionicons name="pencil" size={18} color={theme.colors.text} />
+                                                <Text style={[styles.editButtonText, { color: theme.colors.text }]}>Edit</Text>
                                             </TouchableOpacity>
                                         </View>
                                     )}
@@ -767,6 +768,7 @@ const FoodDetailScreen: React.FC = () => {
                 {/* Main Content Container */}
                 <View style={[
                     styles.contentContainer,
+                    { backgroundColor: theme.colors.background },
                     (!foodData?.image_url || imageError) && styles.contentContainerNoImage
                 ]}>
                     {/* Calories Section */}
@@ -788,6 +790,7 @@ const FoodDetailScreen: React.FC = () => {
                                             >
                                                 <Text style={[
                                                     styles.mealTypeButtonTextSmall,
+                                                    { color: theme.colors.text },
                                                     selectedMealType === meal && styles.mealTypeButtonTextSmallActive
                                                 ]}>
                                                     {meal}
@@ -800,21 +803,21 @@ const FoodDetailScreen: React.FC = () => {
                                 {/* Edit and Add buttons on the right */}
                                 <View style={styles.actionButtonsContainer}>
                                     <TouchableOpacity
-                                        style={styles.quickEditButtonTop}
+                                        style={[styles.quickEditButtonTop, { borderColor: theme.colors.primary }]}
                                         onPress={handleEditPress}
                                     >
                                         <View style={styles.quickAddButtonContent}>
-                                            <Ionicons name="pencil" size={14} color="#AA00FF" />
-                                            <Text style={styles.quickEditButtonText}>Edit</Text>
+                                            <Ionicons name="pencil" size={14} color={theme.colors.primary} />
+                                            <Text style={[styles.quickEditButtonText, { color: theme.colors.primary }]}>Edit</Text>
                                         </View>
                                     </TouchableOpacity>
                                     <TouchableOpacity
-                                        style={styles.quickAddButtonTop}
+                                        style={[styles.quickAddButtonTop, { borderColor: theme.colors.success }]}
                                         onPress={handleQuickAdd}
                                     >
                                         <View style={styles.quickAddButtonContent}>
-                                            <Ionicons name="add" size={14} color="#4CAF50" />
-                                            <Text style={styles.quickAddButtonText}>Add</Text>
+                                            <Ionicons name="add" size={14} color={theme.colors.success} />
+                                            <Text style={[styles.quickAddButtonText, { color: theme.colors.success }]}>Add</Text>
                                         </View>
                                     </TouchableOpacity>
                                 </View>
@@ -824,20 +827,20 @@ const FoodDetailScreen: React.FC = () => {
                         {/* Just the Add button for existing food mode */}
                         {!isNewFoodMode && (
                             <TouchableOpacity
-                                style={styles.quickAddButtonTopAbsolute}
+                                style={[styles.quickAddButtonTopAbsolute, { borderColor: theme.colors.success }]}
                                 onPress={handleQuickAdd}
                             >
                                 <View style={styles.quickAddButtonContent}>
-                                    <Ionicons name="add" size={14} color="#4CAF50" />
-                                    <Text style={styles.quickAddButtonText}>Add</Text>
+                                    <Ionicons name="add" size={14} color={theme.colors.success} />
+                                    <Text style={[styles.quickAddButtonText, { color: theme.colors.success }]}>Add</Text>
                                 </View>
                             </TouchableOpacity>
                         )}
 
                         <View style={styles.calorieAlignmentContainer}>
                             <View style={styles.calorieRow}>
-                                <Text style={styles.calorieNumber}>{foodData?.calories}</Text>
-                                <Text style={styles.calorieLabel}>calories</Text>
+                                <Text style={[styles.calorieNumber, { color: theme.colors.text }]}>{foodData?.calories}</Text>
+                                <Text style={[styles.calorieLabel, { color: theme.colors.textSecondary }]}>calories</Text>
                             </View>
 
                             {/* Health score has been moved to the overlay */}
@@ -847,8 +850,8 @@ const FoodDetailScreen: React.FC = () => {
                     {/* Macros Visual Section */}
                     <View style={styles.macrosSection}>
                         <View style={styles.sectionHeader}>
-                            <Ionicons name="fitness" size={20} color={PURPLE_ACCENT} />
-                            <Text style={styles.sectionTitle}>Macronutrients</Text>
+                            <Ionicons name="fitness" size={20} color={theme.colors.primary} />
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Macronutrients</Text>
                         </View>
                         <View style={styles.macrosRow}>
                             {renderMacroCircle('Carbs', foodData.carbs, 'g', macroPercentages.carbs, MACRO_COLORS.carbs)}
@@ -860,7 +863,7 @@ const FoodDetailScreen: React.FC = () => {
                     {/* Enhanced Nutrition Facts */}
                     <View style={styles.detailsSection}>
                         {/* Main Macros with Progress */}
-                        <View style={styles.nutrientGroup}>
+                        <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             {renderNutrientRowWithProgress('leaf', 'Total Carbohydrates', foodData.carbs, 'g', MACRO_COLORS.carbs)}
                             {renderNutrientRowWithProgress('git-branch', 'Dietary Fiber', foodData.fiber, 'g', '#8BC34A', true, 'fiber')}
                             {renderNutrientRowWithProgress('cafe', 'Total Sugars', foodData.sugar, 'g', '#FF7043', true, 'sugar')}
@@ -869,10 +872,10 @@ const FoodDetailScreen: React.FC = () => {
                         </View>
 
                         {/* Fat Breakdown */}
-                        <View style={styles.nutrientGroup}>
+                        <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             <View style={styles.subSectionHeader}>
                                 <Ionicons name="ellipse" size={16} color={MACRO_COLORS.fat} />
-                                <Text style={styles.subSectionTitle}>Fat Breakdown</Text>
+                                <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Fat Breakdown</Text>
                             </View>
                             {renderNutrientRowWithProgress('warning', 'Saturated Fat', foodData.saturated_fat, 'g', '#FF5722', true, 'saturated_fat')}
                             {renderNutrientRowWithProgress('close', 'Trans Fat', foodData.trans_fat, 'g', '#F44336')}
@@ -881,10 +884,10 @@ const FoodDetailScreen: React.FC = () => {
                         </View>
 
                         {/* Vitamins & Minerals with Progress */}
-                        <View style={styles.nutrientGroup}>
+                        <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             <View style={styles.subSectionHeader}>
                                 <Ionicons name="sparkles" size={16} color={VITAMIN_COLORS.vitaminC} />
-                                <Text style={styles.subSectionTitle}>Vitamins & Minerals</Text>
+                                <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Vitamins & Minerals</Text>
                             </View>
                             {renderNutrientRowWithProgress('heart', 'Cholesterol', foodData.cholesterol, 'mg', '#E91E63', true, 'cholesterol')}
                             {renderNutrientRowWithProgress('water', 'Sodium', foodData.sodium, 'mg', '#2196F3', true, 'sodium')}
@@ -897,36 +900,36 @@ const FoodDetailScreen: React.FC = () => {
 
                         {/* Additional Information */}
                         {(foodData.brand_name || foodData.weight || foodData.notes) && (
-                            <View style={styles.additionalInfo}>
+                            <View style={[styles.additionalInfo, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                                 <View style={styles.subSectionHeader}>
-                                    <Ionicons name="information-circle" size={16} color={PURPLE_ACCENT} />
-                                    <Text style={styles.subSectionTitle}>Additional Information</Text>
+                                    <Ionicons name="information-circle" size={16} color={theme.colors.primary} />
+                                    <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Additional Information</Text>
                                 </View>
                                 {foodData.brand_name && (
                                     <View style={styles.infoRow}>
                                         <View style={styles.infoRowLeft}>
-                                            <Ionicons name="business" size={14} color={SUBDUED} />
-                                            <Text style={styles.infoLabel}>Brand</Text>
+                                            <Ionicons name="business" size={14} color={theme.colors.textSecondary} />
+                                            <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>Brand</Text>
                                         </View>
-                                        <Text style={styles.infoValue}>{foodData.brand_name}</Text>
+                                        <Text style={[styles.infoValue, { color: theme.colors.text }]}>{foodData.brand_name}</Text>
                                     </View>
                                 )}
                                 {foodData.weight && (
                                     <View style={styles.infoRow}>
                                         <View style={styles.infoRowLeft}>
-                                            <Ionicons name="scale" size={14} color={SUBDUED} />
-                                            <Text style={styles.infoLabel}>Weight</Text>
+                                            <Ionicons name="scale" size={14} color={theme.colors.textSecondary} />
+                                            <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>Weight</Text>
                                         </View>
-                                        <Text style={styles.infoValue}>{foodData.weight}{foodData.weight_unit || 'g'}</Text>
+                                        <Text style={[styles.infoValue, { color: theme.colors.text }]}>{foodData.weight}{foodData.weight_unit || 'g'}</Text>
                                     </View>
                                 )}
                                 {foodData.notes && (
                                     <View style={styles.notesContainer}>
                                         <View style={styles.infoRowLeft}>
-                                            <Ionicons name="document-text" size={14} color={SUBDUED} />
-                                            <Text style={styles.infoLabel}>Notes</Text>
+                                            <Ionicons name="document-text" size={14} color={theme.colors.textSecondary} />
+                                            <Text style={[styles.infoLabel, { color: theme.colors.textSecondary }]}>Notes</Text>
                                         </View>
-                                        <Text style={styles.notesText}>{foodData.notes}</Text>
+                                        <Text style={[styles.notesText, { color: theme.colors.text }]}>{foodData.notes}</Text>
                                     </View>
                                 )}
                             </View>
@@ -935,17 +938,17 @@ const FoodDetailScreen: React.FC = () => {
 
                     {/* Notes Section for New Food Mode */}
                     {isNewFoodMode && (
-                        <View style={styles.notesInputSection}>
+                        <View style={[styles.notesInputSection, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             <View style={styles.sectionHeader}>
-                                <Ionicons name="create" size={20} color={PURPLE_ACCENT} />
-                                <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+                                <Ionicons name="create" size={20} color={theme.colors.primary} />
+                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notes (Optional)</Text>
                             </View>
                             <TextInput
-                                style={styles.notesTextInput}
+                                style={[styles.notesTextInput, { color: theme.colors.text }]}
                                 value={userNotes}
                                 onChangeText={setUserNotes}
                                 placeholder="Add any notes about this food..."
-                                placeholderTextColor={SUBDUED}
+                                placeholderTextColor={theme.colors.textSecondary}
                                 multiline
                                 numberOfLines={3}
                             />
@@ -954,17 +957,17 @@ const FoodDetailScreen: React.FC = () => {
 
                     {/* Quick Add Button - Bottom */}
                     <TouchableOpacity
-                        style={styles.quickAddButtonBottom}
+                        style={[styles.quickAddButtonBottom, { borderColor: theme.colors.success }]}
                         onPress={handleQuickAdd}
                         disabled={addingFood}
                     >
                         <View style={styles.quickAddButtonContent}>
                             {addingFood ? (
-                                <ActivityIndicator size="small" color="#4CAF50" />
+                                <ActivityIndicator size="small" color={theme.colors.success} />
                             ) : (
                                 <>
-                                    <Ionicons name="add" size={18} color="#4CAF50" />
-                                    <Text style={styles.quickAddButtonTextBottom}>Add</Text>
+                                    <Ionicons name="add" size={18} color={theme.colors.success} />
+                                    <Text style={[styles.quickAddButtonTextBottom, { color: theme.colors.success }]}>Add</Text>
                                 </>
                             )}
                         </View>
@@ -974,7 +977,7 @@ const FoodDetailScreen: React.FC = () => {
                     {shouldShowAttribution && (
                         <View style={styles.attributionContainer}>
                             <Text
-                                style={styles.attributionText}
+                                style={[styles.attributionText, { color: theme.colors.textSecondary }]}
                                 onPress={() => {
                                     Linking.openURL('https://www.fatsecret.com');
                                 }}
@@ -997,40 +1000,40 @@ const FoodDetailScreen: React.FC = () => {
                 onRequestClose={() => setEditModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Edit Food Log</Text>
+                    <View style={[styles.modalContainer, { backgroundColor: theme.colors.cardBackground }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Edit Food Log</Text>
                             <TouchableOpacity
                                 onPress={() => setEditModalVisible(false)}
                                 style={styles.modalCloseButton}
                             >
-                                <Ionicons name="close" size={24} color={WHITE} />
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.modalContent}>
                             {/* Food Name */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Food Name</Text>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Food Name</Text>
                                 <TextInput
-                                    style={styles.textInput}
+                                    style={[styles.textInput, { color: theme.colors.text }]}
                                     value={editedFoodData.food_name}
                                     onChangeText={(text) => setEditedFoodData({ ...editedFoodData, food_name: text })}
                                     placeholder="Food name"
-                                    placeholderTextColor={SUBDUED}
+                                    placeholderTextColor={theme.colors.textSecondary}
                                 />
                             </View>
 
                             {/* Calories */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Calories</Text>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Calories</Text>
                                 <TextInput
-                                    style={styles.textInput}
+                                    style={[styles.textInput, { color: theme.colors.text }]}
                                     value={String(editedFoodData.calories || '')}
                                     onChangeText={(text) => setEditedFoodData({ ...editedFoodData, calories: Number(text) || 0 })}
                                     keyboardType="numeric"
                                     placeholder="Calories"
-                                    placeholderTextColor={SUBDUED}
+                                    placeholderTextColor={theme.colors.textSecondary}
                                 />
                             </View>
 
@@ -1038,72 +1041,73 @@ const FoodDetailScreen: React.FC = () => {
                             <View style={styles.macrosInputRow}>
                                 {/* Protein */}
                                 <View style={styles.macroInputGroup}>
-                                    <Text style={styles.inputLabel}>Protein (g)</Text>
+                                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Protein (g)</Text>
                                     <TextInput
-                                        style={styles.textInput}
+                                        style={[styles.textInput, { color: theme.colors.text }]}
                                         value={String(editedFoodData.proteins || '')}
                                         onChangeText={(text) => setEditedFoodData({ ...editedFoodData, proteins: Number(text) || 0 })}
                                         keyboardType="numeric"
                                         placeholder="Protein"
-                                        placeholderTextColor={SUBDUED}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                     />
                                 </View>
 
                                 {/* Carbs */}
                                 <View style={styles.macroInputGroup}>
-                                    <Text style={styles.inputLabel}>Carbs (g)</Text>
+                                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Carbs (g)</Text>
                                     <TextInput
-                                        style={styles.textInput}
+                                        style={[styles.textInput, { color: theme.colors.text }]}
                                         value={String(editedFoodData.carbs || '')}
                                         onChangeText={(text) => setEditedFoodData({ ...editedFoodData, carbs: Number(text) || 0 })}
                                         keyboardType="numeric"
                                         placeholder="Carbs"
-                                        placeholderTextColor={SUBDUED}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                     />
                                 </View>
 
                                 {/* Fat */}
                                 <View style={styles.macroInputGroup}>
-                                    <Text style={styles.inputLabel}>Fat (g)</Text>
+                                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Fat (g)</Text>
                                     <TextInput
-                                        style={styles.textInput}
+                                        style={[styles.textInput, { color: theme.colors.text }]}
                                         value={String(editedFoodData.fats || '')}
                                         onChangeText={(text) => setEditedFoodData({ ...editedFoodData, fats: Number(text) || 0 })}
                                         keyboardType="numeric"
                                         placeholder="Fat"
-                                        placeholderTextColor={SUBDUED}
+                                        placeholderTextColor={theme.colors.textSecondary}
                                     />
                                 </View>
                             </View>
 
                             {/* Quantity */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Quantity</Text>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Quantity</Text>
                                 <TextInput
-                                    style={styles.textInput}
+                                    style={[styles.textInput, { color: theme.colors.text }]}
                                     value={editedFoodData.quantity}
                                     onChangeText={(text) => setEditedFoodData({ ...editedFoodData, quantity: text })}
                                     placeholder="e.g., 1 serving"
-                                    placeholderTextColor={SUBDUED}
+                                    placeholderTextColor={theme.colors.textSecondary}
                                 />
                             </View>
 
                             {/* Meal Type Picker */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Meal</Text>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Meal</Text>
                                 <View style={styles.mealTypeContainer}>
                                     {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map((meal) => (
                                         <TouchableOpacity
                                             key={meal}
                                             style={[
                                                 styles.mealTypeButton,
-                                                editedFoodData.meal_type === meal && styles.mealTypeButtonActive
+                                                editedFoodData.meal_type === meal && [styles.mealTypeButtonActive, { backgroundColor: theme.colors.primary }]
                                             ]}
                                             onPress={() => setEditedFoodData({ ...editedFoodData, meal_type: meal })}
                                         >
                                             <Text style={[
                                                 styles.mealTypeButtonText,
-                                                editedFoodData.meal_type === meal && styles.mealTypeButtonTextActive
+                                                { color: theme.colors.textSecondary },
+                                                editedFoodData.meal_type === meal && [styles.mealTypeButtonTextActive, { color: theme.colors.text }]
                                             ]}>
                                                 {meal}
                                             </Text>
@@ -1114,13 +1118,13 @@ const FoodDetailScreen: React.FC = () => {
 
                             {/* Notes */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Notes</Text>
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Notes</Text>
                                 <TextInput
-                                    style={[styles.textInput, styles.textAreaInput]}
+                                    style={[styles.textInput, styles.textAreaInput, { color: theme.colors.text }]}
                                     value={editedFoodData.notes}
                                     onChangeText={(text) => setEditedFoodData({ ...editedFoodData, notes: text })}
                                     placeholder="Add any notes about this food"
-                                    placeholderTextColor={SUBDUED}
+                                    placeholderTextColor={theme.colors.textSecondary}
                                     multiline
                                     numberOfLines={4}
                                     textAlignVertical="top"
@@ -1139,7 +1143,7 @@ const FoodDetailScreen: React.FC = () => {
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                             >
-                                <Text style={styles.saveButtonText}>Save Changes</Text>
+                                <Text style={[styles.saveButtonText, { color: theme.colors.text }]}>Save Changes</Text>
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -1149,7 +1153,7 @@ const FoodDetailScreen: React.FC = () => {
             {/* Loading Overlay */}
             {loading && (
                 <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
             )}
         </View>
@@ -1226,7 +1230,7 @@ const styles = StyleSheet.create({
     placeholderImage: {
         width: screenWidth,
         height: 450, // Increased height to match
-        backgroundColor: CARD_BG,
+        backgroundColor: '#1C1C1E', // Will be overridden by theme.colors.cardBackground
     },
     headerGradient: {
         position: 'absolute',
@@ -1562,7 +1566,7 @@ const styles = StyleSheet.create({
     modalContainer: {
         width: '100%',
         maxHeight: '80%',
-        backgroundColor: CARD_BG,
+        backgroundColor: '#1C1C1E', // Overridden by theme.colors.cardBackground inline
         borderRadius: 16,
         overflow: 'hidden',
     },

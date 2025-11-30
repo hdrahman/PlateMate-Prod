@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import {
     View,
     Text,
@@ -12,21 +12,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { ThemeContext } from '../ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Design system colors
-const COLORS = {
-    background: '#000000',
-    cardBackground: '#1A1A1A',
-    white: '#FFFFFF',
-    subdued: '#AAAAAA',
-    purpleAccent: '#AA00FF',
-    success: '#4CAF50',
-    warning: '#FF9800',
-    error: '#F44336',
-    info: '#2196F3',
-};
 
 interface ElegantAlertProps {
     visible: boolean;
@@ -57,6 +45,7 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
     showCloseButton = true,
     autoClose,
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
@@ -137,42 +126,42 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
             case 'premium':
                 return {
                     icon: icon || 'diamond-outline',
-                    iconColor: COLORS.purpleAccent,
-                    gradient: ['#5A60EA', '#AA00FF'],
+                    iconColor: theme.colors.primary,
+                    gradient: ['#5A60EA', theme.colors.primary],
                     primaryButton: primaryButtonText || 'Upgrade Now',
                 };
             case 'rate_limit':
                 return {
                     icon: icon || 'time-outline',
-                    iconColor: COLORS.warning,
-                    gradient: ['#FF9800', '#FF5722'],
+                    iconColor: theme.colors.warning,
+                    gradient: [theme.colors.warning, '#FF5722'],
                     primaryButton: primaryButtonText || 'Upgrade for More',
                 };
             case 'success':
                 return {
                     icon: icon || 'checkmark-circle-outline',
-                    iconColor: COLORS.success,
-                    gradient: ['#4CAF50', '#2E7D32'],
+                    iconColor: theme.colors.success,
+                    gradient: [theme.colors.success, '#2E7D32'],
                     primaryButton: primaryButtonText || 'Continue',
                 };
             case 'warning':
                 return {
                     icon: icon || 'warning-outline',
-                    iconColor: COLORS.warning,
-                    gradient: ['#FF9800', '#F57C00'],
+                    iconColor: theme.colors.warning,
+                    gradient: [theme.colors.warning, '#F57C00'],
                     primaryButton: primaryButtonText || 'Understand',
                 };
             case 'error':
                 return {
                     icon: icon || 'alert-circle-outline',
-                    iconColor: COLORS.error,
-                    gradient: ['#F44336', '#D32F2F'],
+                    iconColor: theme.colors.error,
+                    gradient: [theme.colors.error, '#D32F2F'],
                     primaryButton: primaryButtonText || 'Try Again',
                 };
             default:
                 return {
                     icon: icon || 'information-circle-outline',
-                    iconColor: COLORS.info,
+                    iconColor: '#2196F3',
                     gradient: ['#2196F3', '#1976D2'],
                     primaryButton: primaryButtonText || 'OK',
                 };
@@ -219,18 +208,18 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
                     {/* Close button */}
                     {showCloseButton && (
                         <TouchableOpacity
-                            style={styles.closeButton}
+                            style={[styles.closeButton, { backgroundColor: theme.colors.cardBackground }]}
                             onPress={handleClose}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Ionicons name="close" size={20} color={COLORS.subdued} />
+                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                         </TouchableOpacity>
                     )}
 
                     {/* Content Card */}
                     <LinearGradient
                         colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
-                        style={styles.contentCard}
+                        style={[styles.contentCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
                     >
                         {/* Icon */}
                         <View style={[styles.iconContainer, { backgroundColor: typeConfig.iconColor + '20' }]}>
@@ -242,10 +231,10 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
                         </View>
 
                         {/* Title */}
-                        <Text style={styles.title}>{title}</Text>
+                        <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
 
                         {/* Message */}
-                        <Text style={styles.message}>{message}</Text>
+                        <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{message}</Text>
 
                         {/* Buttons */}
                         <View style={styles.buttonContainer}>
@@ -261,7 +250,7 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                 >
-                                    <Text style={styles.primaryButtonText}>
+                                    <Text style={[styles.primaryButtonText, { color: theme.colors.text }]}>
                                         {typeConfig.primaryButton}
                                     </Text>
                                 </LinearGradient>
@@ -270,11 +259,11 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
                             {/* Secondary Button */}
                             {(onSecondaryPress || secondaryButtonText !== 'Not Now') && (
                                 <TouchableOpacity
-                                    style={styles.secondaryButton}
+                                    style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
                                     onPress={handleSecondaryPress}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={styles.secondaryButtonText}>
+                                    <Text style={[styles.secondaryButtonText, { color: theme.colors.textSecondary }]}>
                                         {secondaryButtonText}
                                     </Text>
                                 </TouchableOpacity>
@@ -283,8 +272,8 @@ const ElegantAlert: React.FC<ElegantAlertProps> = ({
                     </LinearGradient>
 
                     {/* Subtle decorative elements */}
-                    <View style={[styles.decorativeCircle, styles.decorativeCircle1]} />
-                    <View style={[styles.decorativeCircle, styles.decorativeCircle2]} />
+                    <View style={[styles.decorativeCircle, styles.decorativeCircle1, { backgroundColor: theme.colors.primary + '1A' }]} />
+                    <View style={[styles.decorativeCircle, styles.decorativeCircle2, { backgroundColor: theme.colors.primary + '0D' }]} />
                 </Animated.View>
             </Animated.View>
         </Modal>
@@ -314,7 +303,6 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: COLORS.cardBackground,
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 10,
@@ -331,9 +319,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         padding: 28,
         alignItems: 'center',
-        backgroundColor: COLORS.cardBackground,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -362,14 +348,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: COLORS.white,
         textAlign: 'center',
         marginBottom: 12,
         lineHeight: 28,
     },
     message: {
         fontSize: 16,
-        color: COLORS.subdued,
         textAlign: 'center',
         lineHeight: 22,
         marginBottom: 28,
@@ -399,7 +383,6 @@ const styles = StyleSheet.create({
         minHeight: 56,
     },
     primaryButtonText: {
-        color: COLORS.white,
         fontSize: 16,
         fontWeight: 'bold',
         textAlign: 'center',
@@ -412,11 +395,9 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         minHeight: 52,
     },
     secondaryButtonText: {
-        color: COLORS.subdued,
         fontSize: 15,
         fontWeight: '500',
         textAlign: 'center',
@@ -424,7 +405,6 @@ const styles = StyleSheet.create({
     decorativeCircle: {
         position: 'absolute',
         borderRadius: 50,
-        backgroundColor: 'rgba(170, 0, 255, 0.1)',
     },
     decorativeCircle1: {
         width: 100,
@@ -438,7 +418,6 @@ const styles = StyleSheet.create({
         height: 60,
         bottom: -20,
         right: -20,
-        backgroundColor: 'rgba(170, 0, 255, 0.05)',
         zIndex: -1,
     },
 });

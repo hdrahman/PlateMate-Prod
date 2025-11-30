@@ -1,47 +1,50 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import WeightLossComparisonChart from '../components/WeightLossComparisonChart';
+import { ThemeContext } from '../ThemeContext';
 
 const WeightLossChartDemo: React.FC = () => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 <View style={styles.content}>
-                    <Text style={styles.headerTitle}>Weight Loss Success</Text>
-                    <Text style={styles.headerSubtitle}>
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Weight Loss Success</Text>
+                    <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
                         See how PlateMate delivers sustainable results compared to traditional dieting
                     </Text>
 
                     <WeightLossComparisonChart successPercentage={78} />
 
                     <View style={styles.insightsContainer}>
-                        <Text style={styles.insightsTitle}>Why PlateMate Works Better</Text>
+                        <Text style={[styles.insightsTitle, { color: theme.colors.text }]}>Why PlateMate Works Better</Text>
 
-                        <View style={styles.insightItem}>
+                        <View style={[styles.insightItem, { backgroundColor: theme.colors.cardBackground, shadowColor: theme.colors.shadow }]}>
                             <Text style={styles.insightEmoji}>🎯</Text>
                             <View style={styles.insightText}>
-                                <Text style={styles.insightTitle}>Sustainable Approach</Text>
-                                <Text style={styles.insightDescription}>
+                                <Text style={[styles.insightTitle, { color: theme.colors.text }]}>Sustainable Approach</Text>
+                                <Text style={[styles.insightDescription, { color: theme.colors.textSecondary }]}>
                                     Unlike crash diets, PlateMate focuses on gradual, healthy changes that you can maintain long-term.
                                 </Text>
                             </View>
                         </View>
 
-                        <View style={styles.insightItem}>
+                        <View style={[styles.insightItem, { backgroundColor: theme.colors.cardBackground, shadowColor: theme.colors.shadow }]}>
                             <Text style={styles.insightEmoji}>🧠</Text>
                             <View style={styles.insightText}>
-                                <Text style={styles.insightTitle}>AI-Powered Guidance</Text>
-                                <Text style={styles.insightDescription}>
+                                <Text style={[styles.insightTitle, { color: theme.colors.text }]}>AI-Powered Guidance</Text>
+                                <Text style={[styles.insightDescription, { color: theme.colors.textSecondary }]}>
                                     Smart recommendations adapt to your progress, preventing plateaus and maintaining motivation.
                                 </Text>
                             </View>
                         </View>
 
-                        <View style={styles.insightItem}>
+                        <View style={[styles.insightItem, { backgroundColor: theme.colors.cardBackground, shadowColor: theme.colors.shadow }]}>
                             <Text style={styles.insightEmoji}>📊</Text>
                             <View style={styles.insightText}>
-                                <Text style={styles.insightTitle}>Data-Driven Results</Text>
-                                <Text style={styles.insightDescription}>
+                                <Text style={[styles.insightTitle, { color: theme.colors.text }]}>Data-Driven Results</Text>
+                                <Text style={[styles.insightDescription, { color: theme.colors.textSecondary }]}>
                                     Track real progress beyond just weight - including nutrition, habits, and overall wellness.
                                 </Text>
                             </View>
@@ -56,7 +59,6 @@ const WeightLossChartDemo: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
     },
     scrollView: {
         flex: 1,
@@ -67,13 +69,11 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#1A1A1A',
         textAlign: 'center',
         marginBottom: 8,
     },
     headerSubtitle: {
         fontSize: 16,
-        color: '#666666',
         textAlign: 'center',
         marginBottom: 30,
         paddingHorizontal: 20,
@@ -86,17 +86,14 @@ const styles = StyleSheet.create({
     insightsTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: '#1A1A1A',
         marginBottom: 20,
         textAlign: 'center',
     },
     insightItem: {
         flexDirection: 'row',
-        backgroundColor: 'white',
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
-        shadowColor: '#000',
         shadowOffset: {
             width: 0,
             height: 1,
@@ -116,12 +113,10 @@ const styles = StyleSheet.create({
     insightTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1A1A1A',
         marginBottom: 4,
     },
     insightDescription: {
         fontSize: 14,
-        color: '#666666',
         lineHeight: 20,
     },
 });

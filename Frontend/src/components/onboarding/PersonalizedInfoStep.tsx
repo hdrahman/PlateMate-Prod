@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -19,6 +20,7 @@ interface PersonalizedInfoStepProps {
 }
 
 const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [location, setLocation] = useState(profile.location || '');
     // Parse unit preference consistently from profile
     const initialUseMetric = parseUnitPreference(profile);
@@ -80,7 +82,7 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
         // Sync both unit preference fields to prevent desynchronization
         const useMetric = unitPreference === 'metric';
         const unitFields = syncUnitPreferenceFields(useMetric);
-        
+
         await updateProfile({
             location: location.trim() || null,
             weightGoal,
@@ -90,34 +92,34 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>Preferences</Text>
-                <Text style={styles.subtitle}>Customize your experience</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Preferences</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Customize your experience</Text>
             </View>
 
             <View style={styles.form}>
                 {/* Location Selection */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Location</Text>
-                    <Text style={styles.sectionSubtitle}>Help us recommend local foods and seasonal options</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Location</Text>
+                    <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>Help us recommend local foods and seasonal options</Text>
 
                     <TouchableOpacity
-                        style={styles.locationButton}
+                        style={[styles.locationButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
                         onPress={() => setShowLocationPicker(true)}
                     >
-                        <Ionicons name="location-outline" size={20} color="#666" />
-                        <Text style={[styles.locationText, !location && styles.placeholderText]}>
+                        <Ionicons name="location-outline" size={20} color={theme.colors.textSecondary} />
+                        <Text style={[styles.locationText, { color: theme.colors.text }, !location && { color: theme.colors.textSecondary }]}>
                             {location || 'Select your country'}
                         </Text>
-                        <Ionicons name="chevron-down" size={20} color="#666" />
+                        <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Unit Preference */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Unit System</Text>
-                    <Text style={styles.sectionSubtitle}>Choose your preferred measurement system</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Unit System</Text>
+                    <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>Choose your preferred measurement system</Text>
 
                     <View style={styles.optionsContainer}>
                         {unitOptions.map((option) => (
@@ -125,6 +127,7 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
                                 key={option.id}
                                 style={[
                                     styles.optionCard,
+                                    { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                                     unitPreference === option.id && styles.selectedOption
                                 ]}
                                 onPress={() => setUnitPreference(option.id)}
@@ -132,19 +135,21 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
                                 <View style={styles.optionContent}>
                                     <Text style={[
                                         styles.optionLabel,
-                                        unitPreference === option.id && styles.selectedOptionText
+                                        { color: theme.colors.text },
+                                        unitPreference === option.id && { color: theme.colors.primary }
                                     ]}>
                                         {option.label}
                                     </Text>
                                     <Text style={[
                                         styles.optionDescription,
-                                        unitPreference === option.id && styles.selectedOptionDescription
+                                        { color: theme.colors.textSecondary },
+                                        unitPreference === option.id && { color: theme.colors.text }
                                     ]}>
                                         {option.description}
                                     </Text>
                                 </View>
                                 {unitPreference === option.id && (
-                                    <Ionicons name="checkmark-circle" size={20} color="#0074dd" />
+                                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
                                 )}
                             </TouchableOpacity>
                         ))}
@@ -153,8 +158,8 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
 
                 {/* Weight Goal */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Weight Goal</Text>
-                    <Text style={styles.sectionSubtitle}>What's your primary objective?</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Weight Goal</Text>
+                    <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>What's your primary objective?</Text>
 
                     <View style={styles.goalsContainer}>
                         {weightGoals.map((goal) => (
@@ -162,6 +167,7 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
                                 key={goal.id}
                                 style={[
                                     styles.goalCard,
+                                    { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
                                     weightGoal === goal.id && styles.selectedGoal
                                 ]}
                                 onPress={() => setWeightGoal(goal.id)}
@@ -170,19 +176,21 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
                                     <Ionicons
                                         name={goal.icon as any}
                                         size={24}
-                                        color={weightGoal === goal.id ? '#0074dd' : '#666'}
+                                        color={weightGoal === goal.id ? theme.colors.primary : theme.colors.textSecondary}
                                     />
                                 </View>
                                 <View style={styles.goalContent}>
                                     <Text style={[
                                         styles.goalLabel,
-                                        weightGoal === goal.id && styles.selectedGoalText
+                                        { color: theme.colors.text },
+                                        weightGoal === goal.id && { color: theme.colors.primary }
                                     ]}>
                                         {goal.label}
                                     </Text>
                                     <Text style={[
                                         styles.goalDescription,
-                                        weightGoal === goal.id && styles.selectedGoalDescription
+                                        { color: theme.colors.textSecondary },
+                                        weightGoal === goal.id && { color: theme.colors.text }
                                     ]}>
                                         {goal.description}
                                     </Text>
@@ -213,30 +221,30 @@ const PersonalizedInfoStep: React.FC<PersonalizedInfoStepProps> = ({ profile, up
                 onRequestClose={() => setShowLocationPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select Country</Text>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Country</Text>
                             <TouchableOpacity
                                 style={styles.closeButton}
                                 onPress={() => setShowLocationPicker(false)}
                             >
-                                <Ionicons name="close" size={24} color="#666" />
+                                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
                         <ScrollView style={styles.countryList}>
                             {countries.map((country, index) => (
                                 <TouchableOpacity
                                     key={index}
-                                    style={[styles.countryOption, location === country && styles.selectedCountry]}
+                                    style={[styles.countryOption, { borderColor: theme.colors.border }, location === country && styles.selectedCountry]}
                                     onPress={() => {
                                         setLocation(country);
                                         setShowLocationPicker(false);
                                     }}
                                 >
-                                    <Text style={[styles.countryText, location === country && styles.selectedCountryText]}>
+                                    <Text style={[styles.countryText, { color: theme.colors.text }, location === country && { color: theme.colors.primary }]}>
                                         {country}
                                     </Text>
-                                    {location === country && <Ionicons name="checkmark" size={20} color="#0074dd" />}
+                                    {location === country && <Ionicons name="checkmark" size={20} color={theme.colors.primary} />}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -401,7 +409,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#1a1a1a',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         maxHeight: '80%',

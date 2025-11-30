@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +26,8 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
     onEnableTracking,
     onSkip,
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     const handleRequestClose = () => {
         Promise.resolve(onSkip()).catch((error) => {
             console.error('Error in onSkip callback (back button):', error);
@@ -38,30 +41,30 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
             animationType="fade"
             onRequestClose={handleRequestClose}
         >
-            <View style={styles.overlay}>
-                <View style={styles.modalContainer}>
+            <View style={[styles.overlay, { backgroundColor: isDarkTheme ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.5)' }]}>
+                <View style={[styles.modalContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.title}>Enable Step Tracking</Text>
+                        <Text style={[styles.title, { color: theme.colors.text }]}>Enable Step Tracking</Text>
                     </View>
 
                     {/* Motion & Fitness Badge */}
                     <View style={styles.badgeContainer}>
-                        <View style={styles.badge}>
-                            <Ionicons name="fitness" size={16} color="#00D9FF" />
-                            <Text style={styles.badgeText}>Motion & Fitness</Text>
+                        <View style={[styles.badge, { borderColor: `${theme.colors.primary}66` }]}>
+                            <Ionicons name="fitness" size={16} color={theme.colors.primary} />
+                            <Text style={[styles.badgeText, { color: theme.colors.primary }]}>Motion & Fitness</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.subtitle}>
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                         Track your daily steps automatically to stay motivated.
                     </Text>
 
                     <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                         {/* Info Section - Privacy/Data Usage */}
-                        <View style={styles.infoBox}>
-                            <Ionicons name="shield-checkmark-outline" size={20} color="#00D9FF" />
-                            <Text style={styles.infoText}>
+                        <View style={[styles.infoBox, { borderColor: `${theme.colors.primary}4D` }]}>
+                            <Ionicons name="shield-checkmark-outline" size={20} color={theme.colors.primary} />
+                            <Text style={[styles.infoText, { color: theme.colors.primary }]}>
                                 PlateMate uses your device's Motion & Fitness sensors to track steps.
                                 {'\n\n'}
                                 This data is used solely for your fitness goals. It is stored securely and never shared with third parties.
@@ -69,14 +72,14 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
                         </View>
 
                         {/* Feature Card 1: How it works */}
-                        <View style={styles.featureCard}>
+                        <View style={[styles.featureCard, { borderColor: theme.colors.border }]}>
                             <View style={styles.featureHeader}>
                                 <View style={styles.featureIconContainer}>
-                                    <Ionicons name="walk" size={24} color="#FF00F5" />
+                                    <Ionicons name="walk" size={24} color={theme.colors.primary} />
                                 </View>
-                                <Text style={styles.featureTitle}>Automatic Tracking</Text>
+                                <Text style={[styles.featureTitle, { color: theme.colors.text }]}>Automatic Tracking</Text>
                             </View>
-                            <Text style={styles.featureDescription}>
+                            <Text style={[styles.featureDescription, { color: theme.colors.textSecondary }]}>
                                 • Counts steps in the background{'\n'}
                                 • Works while phone is in your pocket{'\n'}
                                 • Low battery usage
@@ -84,14 +87,14 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
                         </View>
 
                         {/* Feature Card 2: Technical */}
-                        <View style={styles.featureCard}>
+                        <View style={[styles.featureCard, { borderColor: theme.colors.border }]}>
                             <View style={styles.featureHeader}>
                                 <View style={styles.featureIconContainer}>
-                                    <Ionicons name="hardware-chip-outline" size={24} color="#00D9FF" />
+                                    <Ionicons name="hardware-chip-outline" size={24} color={theme.colors.primary} />
                                 </View>
-                                <Text style={styles.featureTitle}>Device Sensors</Text>
+                                <Text style={[styles.featureTitle, { color: theme.colors.text }]}>Device Sensors</Text>
                             </View>
-                            <Text style={styles.featureDescription}>
+                            <Text style={[styles.featureDescription, { color: theme.colors.textSecondary }]}>
                                 {Platform.OS === 'ios'
                                     ? '• Uses Core Motion (CMPedometer)\n• No HealthKit access required'
                                     : '• Uses built-in step counter\n• No extra permissions needed'}
@@ -110,7 +113,7 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
                                 });
                             }}
                         >
-                            <Text style={styles.cancelButtonText}>Don't track my steps</Text>
+                            <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Don't track my steps</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.confirmButton}
@@ -126,8 +129,8 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
                                 end={{ x: 1, y: 0 }}
                                 style={styles.confirmButtonGradient}
                             >
-                                <Text style={styles.confirmButtonText}>Enable Step Tracking</Text>
-                                <Ionicons name="arrow-forward" size={20} color="#fff" />
+                                <Text style={[styles.confirmButtonText, { color: theme.colors.text }]}>Enable Step Tracking</Text>
+                                <Ionicons name="arrow-forward" size={20} color={theme.colors.text} />
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -140,19 +143,16 @@ const StepTrackingPermissionModal: React.FC<StepTrackingPermissionModalProps> = 
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
     },
     modalContainer: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 20,
         width: Math.min(width - 40, 500),
         maxHeight: '85%',
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     header: {
         flexDirection: 'row',
@@ -165,7 +165,6 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#fff',
         flex: 1,
     },
     badgeContainer: {
@@ -176,22 +175,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
-        backgroundColor: 'rgba(0, 217, 255, 0.15)',
+        backgroundColor: 'rgba(155, 0, 255, 0.15)',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(0, 217, 255, 0.4)',
         gap: 6,
     },
     badgeText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#00D9FF',
     },
     subtitle: {
         fontSize: 16,
-        color: '#aaa',
         paddingHorizontal: 24,
         marginBottom: 20,
     },
@@ -201,17 +197,15 @@ const styles = StyleSheet.create({
     },
     infoBox: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(0, 217, 255, 0.1)',
+        backgroundColor: 'rgba(155, 0, 255, 0.1)',
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: 'rgba(0, 217, 255, 0.3)',
     },
     infoText: {
         flex: 1,
         fontSize: 14,
-        color: '#00D9FF',
         marginLeft: 12,
         lineHeight: 20,
     },
@@ -221,7 +215,6 @@ const styles = StyleSheet.create({
         padding: 20,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     featureHeader: {
         flexDirection: 'row',
@@ -240,11 +233,9 @@ const styles = StyleSheet.create({
     featureTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#fff',
     },
     featureDescription: {
         fontSize: 14,
-        color: '#bbb',
         lineHeight: 22,
     },
     buttonContainer: {
@@ -262,7 +253,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     cancelButtonText: {
-        color: '#aaa',
         fontSize: 16,
         fontWeight: '600',
     },
@@ -279,7 +269,6 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     confirmButtonText: {
-        color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
     },

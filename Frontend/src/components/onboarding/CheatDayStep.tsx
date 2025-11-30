@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import WheelPicker from '../WheelPicker';
+import { ThemeContext } from '../../ThemeContext';
 
 interface CheatDayStepProps {
     profile: UserProfile;
@@ -20,6 +21,7 @@ interface CheatDayStepProps {
 }
 
 const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [cheatDayEnabled, setCheatDayEnabled] = useState<boolean>(profile.cheatDayEnabled !== false);
     const [cheatDayFrequency, setCheatDayFrequency] = useState<number>(profile.cheatDayFrequency || 7);
     const [preferredCheatDay, setPreferredCheatDay] = useState<number | undefined>(profile.preferredCheatDayOfWeek);
@@ -107,10 +109,10 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
     }, [cheatDayEnabled, cheatDayFrequency, preferredCheatDay]);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>Motivation</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Motivation</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                     Stay motivated with scheduled cheat days to balance your diet and enjoy occasional treats
                 </Text>
             </View>
@@ -118,8 +120,8 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
             <View style={styles.content}>
                 <View style={styles.cheatDayToggleContainer}>
                     <View style={styles.cheatDayToggleContent}>
-                        <Text style={styles.cheatDayToggleTitle}>Enable Cheat Days</Text>
-                        <Text style={styles.cheatDayToggleDescription}>
+                        <Text style={[styles.cheatDayToggleTitle, { color: theme.colors.text }]}>Enable Cheat Days</Text>
+                        <Text style={[styles.cheatDayToggleDescription, { color: theme.colors.textSecondary }]}>
                             Track your progress towards scheduled cheat days
                         </Text>
                     </View>
@@ -142,7 +144,7 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                 {cheatDayEnabled && (
                     <>
                         <View style={styles.frequencyContainer}>
-                            <Text style={styles.frequencyTitle}>Cheat Day Frequency</Text>
+                            <Text style={[styles.frequencyTitle, { color: theme.colors.text }]}>Cheat Day Frequency</Text>
                             <View style={styles.frequencyOptionsContainer}>
                                 {frequencyOptions.map((option) => {
                                     const isSelected = getSelectedFrequencyOption() === option.id;
@@ -155,6 +157,7 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                                             key={option.id}
                                             style={[
                                                 styles.frequencyOption,
+                                                { backgroundColor: theme.colors.cardBackground },
                                                 isSelected && styles.selectedFrequencyOption
                                             ]}
                                             onPress={() => handleFrequencyOptionSelect(option.id)}
@@ -162,6 +165,7 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                                             <Text
                                                 style={[
                                                     styles.frequencyOptionText,
+                                                    { color: theme.colors.textSecondary },
                                                     isSelected && styles.selectedFrequencyOptionText
                                                 ]}
                                             >
@@ -171,20 +175,20 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                                     );
                                 })}
                             </View>
-                            <Text style={styles.frequencyDescription}>
+                            <Text style={[styles.frequencyDescription, { color: theme.colors.textSecondary }]}>
                                 {getFrequencyDescription()}
                             </Text>
                         </View>
 
                         <View style={styles.preferredDayContainer}>
-                            <Text style={styles.frequencyTitle}>Preferred Cheat Day</Text>
-                            <TouchableOpacity style={styles.daySelector} onPress={() => setShowDayPicker(true)}>
-                                <Text style={styles.daySelectorText}>
+                            <Text style={[styles.frequencyTitle, { color: theme.colors.text }]}>Preferred Cheat Day</Text>
+                            <TouchableOpacity style={[styles.daySelector, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]} onPress={() => setShowDayPicker(true)}>
+                                <Text style={[styles.daySelectorText, { color: theme.colors.text }]}>
                                     {preferredCheatDay !== undefined ? dayNames[preferredCheatDay] : 'From Today (Flexible)'}
                                 </Text>
-                                <Ionicons name="chevron-down" size={20} color="#fff" />
+                                <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
                             </TouchableOpacity>
-                            <Text style={styles.dayHintText}>
+                            <Text style={[styles.dayHintText, { color: theme.colors.textSecondary }]}>
                                 {preferredCheatDay !== undefined
                                     ? `Your cheat days will always fall on ${dayNames[preferredCheatDay]}s`
                                     : 'Choose a specific day of the week for your cheat days, or leave flexible'
@@ -195,16 +199,16 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                 )}
             </View>
 
-            <View style={styles.infoContainer}>
-                <Ionicons name="information-circle-outline" size={20} color="#888" />
-                <Text style={styles.infoText}>
+            <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
+                <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                     You can always adjust these settings later in your profile
                 </Text>
             </View>
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
                 <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    colors={[theme.colors.primary, "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.buttonGradient}
@@ -222,7 +226,7 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                 onRequestClose={() => setShowCustomFrequencyModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Custom Frequency</Text>
                             <TouchableOpacity
@@ -273,7 +277,7 @@ const CheatDayStep: React.FC<CheatDayStepProps> = ({ profile, updateProfile, onN
                 onRequestClose={() => setShowDayPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Preferred Cheat Day</Text>
                             <TouchableOpacity
@@ -486,7 +490,6 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalContent: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 16,
         width: '100%',
         maxHeight: '80%',

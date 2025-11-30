@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     StyleSheet,
     Text,
@@ -14,12 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ThemeContext } from '../ThemeContext';
 
-// Define theme colors
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
+// Accent colors that remain constant
 const ACCENT_BLUE = '#2196F3';
 const ACCENT_GREEN = '#4CAF50';
 
@@ -27,11 +24,12 @@ const ACCENT_GREEN = '#4CAF50';
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
+    cardBackground?: string;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style, cardBackground }) => {
     return (
-        <View style={styles.gradientBorderContainer}>
+        <View style={staticStyles.gradientBorderContainer}>
             <LinearGradient
                 colors={["#0074dd", "#5c00dd", "#dd0095"]}
                 style={{
@@ -49,7 +47,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1.5,
                     borderRadius: 15,
-                    backgroundColor: style?.backgroundColor || CARD_BG,
+                    backgroundColor: style?.backgroundColor || cardBackground,
                     padding: 16,
                     ...style
                 }}
@@ -76,7 +74,9 @@ interface Citation {
 export default function AboutCalculations() {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const { theme } = useContext(ThemeContext);
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+    const styles = createStyles(theme);
 
     const toggleSection = (id: string) => {
         const newExpanded = new Set(expandedSections);
@@ -228,15 +228,15 @@ export default function AboutCalculations() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+            <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
             {/* Header */}
             <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top }]}>
                 <TouchableOpacity
-                    style={styles.backButton}
+                    style={staticStyles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Our Calculations</Text>
                 <View style={{ width: 40 }} />
@@ -244,10 +244,10 @@ export default function AboutCalculations() {
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Medical Disclaimer */}
-                <View style={styles.medicalDisclaimerBanner}>
+                <View style={staticStyles.medicalDisclaimerBanner}>
                     <Ionicons name="medical" size={24} color="#FF9500" />
-                    <View style={styles.medicalDisclaimerContent}>
-                        <Text style={styles.medicalDisclaimerTitle}>Important Medical Notice</Text>
+                    <View style={staticStyles.medicalDisclaimerContent}>
+                        <Text style={staticStyles.medicalDisclaimerTitle}>Important Medical Notice</Text>
                         <Text style={styles.medicalDisclaimerText}>
                             PlateMate is a nutrition tracking tool, not a medical device or diagnostic tool.
                             Always consult with a qualified healthcare professional, registered dietitian, or
@@ -258,7 +258,7 @@ export default function AboutCalculations() {
                 </View>
 
                 {/* Introduction */}
-                <View style={styles.introSection}>
+                <View style={staticStyles.introSection}>
                     <Ionicons name="calculator" size={40} color={ACCENT_BLUE} />
                     <Text style={styles.introTitle}>Evidence-Based Nutrition Science</Text>
                     <Text style={styles.introText}>
@@ -270,13 +270,13 @@ export default function AboutCalculations() {
                 {calculations.map((calc) => {
                     const isExpanded = expandedSections.has(calc.id);
                     return (
-                        <GradientBorderCard key={calc.id}>
+                        <GradientBorderCard key={calc.id} cardBackground={theme.colors.cardBackground}>
                             <TouchableOpacity
                                 onPress={() => toggleSection(calc.id)}
                                 activeOpacity={0.7}
                             >
-                                <View style={styles.sectionHeader}>
-                                    <View style={styles.sectionTitleRow}>
+                                <View style={staticStyles.sectionHeader}>
+                                    <View style={staticStyles.sectionTitleRow}>
                                         <Ionicons
                                             name="flask"
                                             size={22}
@@ -288,33 +288,33 @@ export default function AboutCalculations() {
                                     <Ionicons
                                         name={isExpanded ? "chevron-up" : "chevron-down"}
                                         size={20}
-                                        color={SUBDUED}
+                                        color={theme.colors.textSecondary}
                                     />
                                 </View>
                             </TouchableOpacity>
 
                             {isExpanded && (
-                                <View style={styles.sectionContent}>
+                                <View style={staticStyles.sectionContent}>
                                     <Text style={styles.descriptionText}>{calc.description}</Text>
 
-                                    <View style={styles.formulaContainer}>
-                                        <Text style={styles.formulaLabel}>Formula:</Text>
+                                    <View style={staticStyles.formulaContainer}>
+                                        <Text style={staticStyles.formulaLabel}>Formula:</Text>
                                         <Text style={styles.formulaText}>{calc.formula}</Text>
                                     </View>
 
-                                    <View style={styles.citationsContainer}>
+                                    <View style={staticStyles.citationsContainer}>
                                         <Text style={styles.citationsLabel}>Scientific Sources:</Text>
                                         {calc.citations.map((citation, index) => (
-                                            <View key={index} style={styles.citationItem}>
-                                                <Text style={styles.citationNumber}>{index + 1}.</Text>
-                                                <View style={styles.citationTextContainer}>
+                                            <View key={index} style={staticStyles.citationItem}>
+                                                <Text style={staticStyles.citationNumber}>{index + 1}.</Text>
+                                                <View style={staticStyles.citationTextContainer}>
                                                     <Text style={styles.citationText}>{citation.text}</Text>
                                                     {citation.url && (
                                                         <TouchableOpacity
-                                                            style={styles.linkButton}
+                                                            style={staticStyles.linkButton}
                                                             onPress={() => openLink(citation.url!)}
                                                         >
-                                                            <Text style={styles.linkButtonText}>View Source</Text>
+                                                            <Text style={staticStyles.linkButtonText}>View Source</Text>
                                                             <Ionicons name="open-outline" size={14} color={ACCENT_BLUE} />
                                                         </TouchableOpacity>
                                                     )}
@@ -329,7 +329,7 @@ export default function AboutCalculations() {
                 })}
 
                 {/* Disclaimer */}
-                <View style={styles.disclaimerSection}>
+                <View style={staticStyles.disclaimerSection}>
                     <Ionicons name="information-circle" size={24} color={ACCENT_BLUE} />
                     <Text style={styles.disclaimerText}>
                         These calculations provide general guidance based on population averages and scientific research. Individual needs may vary. Always consult with a healthcare professional or registered dietitian for personalized medical or nutrition advice.
@@ -342,10 +342,11 @@ export default function AboutCalculations() {
     );
 }
 
-const styles = StyleSheet.create({
+// Dynamic styles that depend on theme
+const createStyles = (theme: any) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
+        backgroundColor: theme.colors.background,
     },
     header: {
         flexDirection: 'row',
@@ -354,20 +355,74 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    backButton: {
-        padding: 8,
-        borderRadius: 8,
+        borderBottomColor: theme.colors.border,
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: WHITE,
+        color: theme.colors.text,
     },
     scrollView: {
         flex: 1,
         paddingHorizontal: 16,
+    },
+    medicalDisclaimerText: {
+        fontSize: 13,
+        color: theme.colors.text,
+        lineHeight: 19,
+    },
+    introTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: theme.colors.text,
+        textAlign: 'center',
+    },
+    introText: {
+        fontSize: 15,
+        color: theme.colors.textSecondary,
+        lineHeight: 22,
+        textAlign: 'center',
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: theme.colors.text,
+        flex: 1,
+    },
+    descriptionText: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        lineHeight: 20,
+    },
+    formulaText: {
+        fontSize: 13,
+        color: theme.colors.text,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        lineHeight: 18,
+    },
+    citationsLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: theme.colors.text,
+    },
+    citationText: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        lineHeight: 18,
+    },
+    disclaimerText: {
+        flex: 1,
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        lineHeight: 19,
+    },
+});
+
+// Static styles that don't depend on theme
+const staticStyles = StyleSheet.create({
+    backButton: {
+        padding: 8,
+        borderRadius: 8,
     },
     medicalDisclaimerBanner: {
         marginTop: 16,
@@ -389,27 +444,10 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#FF9500',
     },
-    medicalDisclaimerText: {
-        fontSize: 13,
-        color: WHITE,
-        lineHeight: 19,
-    },
     introSection: {
         paddingVertical: 24,
         alignItems: 'center',
         gap: 12,
-    },
-    introTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: WHITE,
-        textAlign: 'center',
-    },
-    introText: {
-        fontSize: 15,
-        color: SUBDUED,
-        lineHeight: 22,
-        textAlign: 'center',
     },
     gradientBorderContainer: {
         position: 'relative',
@@ -425,20 +463,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: WHITE,
-        flex: 1,
-    },
     sectionContent: {
         marginTop: 16,
         gap: 16,
-    },
-    descriptionText: {
-        fontSize: 14,
-        color: SUBDUED,
-        lineHeight: 20,
     },
     formulaContainer: {
         backgroundColor: 'rgba(33, 150, 243, 0.1)',
@@ -453,19 +480,8 @@ const styles = StyleSheet.create({
         color: ACCENT_BLUE,
         marginBottom: 6,
     },
-    formulaText: {
-        fontSize: 13,
-        color: WHITE,
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-        lineHeight: 18,
-    },
     citationsContainer: {
         gap: 12,
-    },
-    citationsLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: WHITE,
     },
     citationItem: {
         flexDirection: 'row',
@@ -480,11 +496,6 @@ const styles = StyleSheet.create({
     citationTextContainer: {
         flex: 1,
         gap: 8,
-    },
-    citationText: {
-        fontSize: 12,
-        color: SUBDUED,
-        lineHeight: 18,
     },
     linkButton: {
         flexDirection: 'row',
@@ -508,11 +519,5 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
         alignItems: 'flex-start',
-    },
-    disclaimerText: {
-        flex: 1,
-        fontSize: 13,
-        color: SUBDUED,
-        lineHeight: 19,
     },
 });

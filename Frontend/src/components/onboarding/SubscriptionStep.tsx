@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -74,6 +75,7 @@ const subscriptionPlans = [
 ];
 
 const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const insets = useSafeAreaInsets();
     const [isLoading, setIsLoading] = useState(false);
     const [showTrialPopup, setShowTrialPopup] = useState(true);
@@ -190,7 +192,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
     return (
         <>
             <ScrollView
-                contentContainerStyle={[styles.container, { paddingTop: insets.top + 40 }]}
+                contentContainerStyle={[styles.container, { paddingTop: insets.top + 40, backgroundColor: theme.colors.background }]}
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.welcomeHeader}>
@@ -200,18 +202,18 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                     >
                         <MaterialCommunityIcons name="crown" size={32} color="#fff" />
                     </LinearGradient>
-                    <Text style={styles.title}>Welcome to PlateMate Premium!</Text>
-                    <Text style={styles.subtitle}>We've automatically started your 20-day free trial</Text>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Welcome to PlateMate Premium!</Text>
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>We've automatically started your 20-day free trial</Text>
                 </View>
 
-                <View style={styles.trialCard}>
+                <View style={[styles.trialCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     <View style={styles.trialHeader}>
                         <View style={styles.trialIconContainer}>
-                            <Ionicons name="time-outline" size={24} color="#0074dd" />
+                            <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
                         </View>
-                        <Text style={styles.trialTitle}>20-Day Premium Trial</Text>
+                        <Text style={[styles.trialTitle, { color: theme.colors.text }]}>20-Day Premium Trial</Text>
                     </View>
-                    <Text style={styles.trialDescription}>
+                    <Text style={[styles.trialDescription, { color: theme.colors.textSecondary }]}>
                         You now have full access to all premium features for 20 days, completely free!
                     </Text>
 
@@ -224,19 +226,19 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                             'Priority support'
                         ].map((feature, index) => (
                             <View key={index} style={styles.featureRow}>
-                                <Ionicons name="checkmark-circle" size={16} color="#0074dd" style={styles.featureIcon} />
-                                <Text style={styles.featureText}>{feature}</Text>
+                                <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} style={styles.featureIcon} />
+                                <Text style={[styles.featureText, { color: theme.colors.text }]}>{feature}</Text>
                             </View>
                         ))}
                     </View>
                 </View>
 
-                <View style={styles.extendTrialCard}>
+                <View style={[styles.extendTrialCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     <View style={styles.extendHeader}>
                         <Ionicons name="card-outline" size={20} color="#ff6b35" />
-                        <Text style={styles.extendTitle}>Want another 10 days?</Text>
+                        <Text style={[styles.extendTitle, { color: theme.colors.text }]}>Want another 10 days?</Text>
                     </View>
-                    <Text style={styles.extendDescription}>
+                    <Text style={[styles.extendDescription, { color: theme.colors.textSecondary }]}>
                         Add your credit card to extend your trial to 30 days total. No charge until after the trial ends.
                     </Text>
                 </View>
@@ -264,15 +266,15 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                 </TouchableOpacity>
 
                 {/* Show collected user info */}
-                <View style={styles.userInfoContainer}>
+                <View style={[styles.userInfoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     <View style={styles.profileIconContainer}>
-                        <Ionicons name="person-circle" size={40} color="#0074dd" />
+                        <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
                     </View>
                     <View style={styles.userInfoTextContainer}>
-                        <Text style={styles.userInfoText}>
+                        <Text style={[styles.userInfoText, { color: theme.colors.text }]}>
                             {profile.firstName}
                         </Text>
-                        <Text style={styles.userInfoEmail}>{profile.email}</Text>
+                        <Text style={[styles.userInfoEmail, { color: theme.colors.textSecondary }]}>{profile.email}</Text>
                     </View>
                     <View style={styles.checkmarkContainer}>
                         <Ionicons name="checkmark-circle" size={24} color="#00dd74" />
@@ -280,17 +282,17 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                 </View>
 
                 <View style={styles.termsContainer}>
-                    <Text style={styles.termsText}>
+                    <Text style={[styles.termsText, { color: theme.colors.textSecondary }]}>
                         By continuing, you agree to our{' '}
                         <Text
-                            style={styles.termsLink}
+                            style={[styles.termsLink, { color: theme.colors.primary }]}
                             onPress={() => (navigation as any).navigate('LegalTerms')}
                         >
                             Terms of Service
                         </Text>
                         {' '}and{' '}
                         <Text
-                            style={styles.termsLink}
+                            style={[styles.termsLink, { color: theme.colors.primary }]}
                             onPress={() => (navigation as any).navigate('PrivacyPolicy')}
                         >
                             Privacy Policy
@@ -303,7 +305,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
             {/* Trial Notification Popup */}
             {showTrialPopup && (
                 <View style={styles.popupOverlay}>
-                    <View style={styles.popupContainer}>
+                    <View style={[styles.popupContainer, { backgroundColor: theme.colors.cardBackground }]}>
                         <LinearGradient
                             colors={['#0074dd', '#5c00dd']}
                             style={styles.popupHeader}
@@ -685,7 +687,6 @@ const styles = StyleSheet.create({
         zIndex: 1000,
     },
     popupContainer: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 20,
         overflow: 'hidden',
         marginHorizontal: 20,

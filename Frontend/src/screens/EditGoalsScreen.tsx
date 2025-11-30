@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -15,16 +15,12 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { getUserGoals, updateUserGoals, getUserProfileBySupabaseUid, getUserProfileByFirebaseUid } from '../utils/database';
 import { calculateAndStoreBMR } from '../utils/nutritionCalculator';
-
-const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
-const WHITE = '#FFFFFF';
-const GRAY = '#AAAAAA';
-const BLUE_ACCENT = '#2196F3';
+import { ThemeContext } from '../ThemeContext';
 
 const EditGoalsScreen = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [isLoading, setIsLoading] = useState(true);
 
     const [goals, setGoals] = useState({
@@ -102,17 +98,17 @@ const EditGoalsScreen = () => {
                 try {
                     console.log('🔄 Recalculating BMR after activity level change...');
                     const fullProfile = await getUserProfileByFirebaseUid(user.uid);
-                    
-                    if (fullProfile && fullProfile.height && fullProfile.weight && fullProfile.age && 
+
+                    if (fullProfile && fullProfile.height && fullProfile.weight && fullProfile.age &&
                         fullProfile.gender && goals.activityLevel) {
-                        
+
                         const profileForBMR = {
                             ...fullProfile,
                             activityLevel: goals.activityLevel,
                             // Use new fitness goal if it was updated
                             weightGoal: goals.fitnessGoal || fullProfile.weight_goal || fullProfile.fitness_goal
                         };
-                        
+
                         await calculateAndStoreBMR(profileForBMR, user.uid);
                         console.log('✅ BMR recalculated after activity level update');
                     } else {
@@ -136,54 +132,54 @@ const EditGoalsScreen = () => {
 
     if (isLoading) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
                 <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading...</Text>
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Text>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={28} color={WHITE} />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Edit Goals</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Edit Goals</Text>
                 <TouchableOpacity onPress={handleSave}>
-                    <Text style={styles.saveButton}>Save</Text>
+                    <Text style={[styles.saveButton, { color: theme.colors.primary }]}>Save</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.content}>
                 {/* Weight Goals */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Weight & Fitness</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Weight & Fitness</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Target Weight (kg)</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Target Weight (kg)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.targetWeight}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, targetWeight: text }))}
                             placeholder="Enter target weight"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Weekly Workouts</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Weekly Workouts</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.weeklyWorkouts}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, weeklyWorkouts: text }))}
                             placeholder="Number of workouts per week"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
@@ -191,52 +187,52 @@ const EditGoalsScreen = () => {
 
                 {/* Nutrition Goals */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Nutrition</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Nutrition</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Daily Calories</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Daily Calories</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.calorieGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, calorieGoal: text }))}
                             placeholder="Daily calorie target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Protein (g)</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Protein (g)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.proteinGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, proteinGoal: text }))}
                             placeholder="Daily protein target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Carbs (g)</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Carbs (g)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.carbGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, carbGoal: text }))}
                             placeholder="Daily carbs target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Fat (g)</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Fat (g)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.fatGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, fatGoal: text }))}
                             placeholder="Daily fat target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
@@ -244,40 +240,40 @@ const EditGoalsScreen = () => {
 
                 {/* Lifestyle Goals */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Lifestyle</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Lifestyle</Text>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Daily Steps</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Daily Steps</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.stepGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, stepGoal: text }))}
                             placeholder="Daily step target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Water (glasses)</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Water (glasses)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.waterGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, waterGoal: text }))}
                             placeholder="Daily water target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Sleep (hours)</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Sleep (hours)</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
                             value={goals.sleepGoal}
                             onChangeText={(text) => setGoals(prev => ({ ...prev, sleepGoal: text }))}
                             placeholder="Daily sleep target"
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             keyboardType="numeric"
                         />
                     </View>
@@ -290,7 +286,6 @@ const EditGoalsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: PRIMARY_BG,
     },
     loadingContainer: {
         flex: 1,
@@ -298,7 +293,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loadingText: {
-        color: WHITE,
         fontSize: 16,
     },
     header: {
@@ -308,17 +302,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: WHITE,
     },
     saveButton: {
         fontSize: 16,
         fontWeight: '600',
-        color: BLUE_ACCENT,
     },
     content: {
         flex: 1,
@@ -330,7 +321,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 20,
         fontWeight: '600',
-        color: WHITE,
         marginBottom: 16,
     },
     inputGroup: {
@@ -339,18 +329,14 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: '500',
-        color: WHITE,
         marginBottom: 8,
     },
     input: {
-        backgroundColor: CARD_BG,
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 16,
-        color: WHITE,
         borderWidth: 1,
-        borderColor: '#333',
     },
 });
 

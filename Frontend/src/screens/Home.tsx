@@ -44,7 +44,8 @@ import {
   Modal,
   Alert,
   useWindowDimensions,
-  Platform
+  Platform,
+  RefreshControl
 } from 'react-native';
 import Svg, {
   Circle,
@@ -89,6 +90,7 @@ interface GradientBorderCardProps {
 }
 
 const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+  const { theme } = useContext(ThemeContext);
   return (
     <View style={styles.gradientBorderContainer}>
       <LinearGradient
@@ -108,7 +110,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
         style={{
           margin: 1,
           borderRadius: 9,
-          backgroundColor: '#121212', // Fixed dark background for all cards
+          backgroundColor: theme.colors.cardBackground,
           padding: 16,
         }}
       >
@@ -136,6 +138,7 @@ const WeightModal = React.memo<WeightModalProps>(({
   onSave,
   isImperialUnits
 }) => {
+  const { theme } = useContext(ThemeContext);
   const inputRef = useRef<TextInput>(null);
 
   // Focus input when modal becomes visible
@@ -157,30 +160,32 @@ const WeightModal = React.memo<WeightModalProps>(({
   }), []);
 
   const inputDynamicStyle = useMemo(() => ({
-    borderColor: newWeight ? 'rgba(155, 0, 255, 0.6)' : '#555',
+    borderColor: newWeight ? theme.colors.primary + '99' : theme.colors.border,
     paddingRight: 40,
-  }), [newWeight]);
+    color: theme.colors.text,
+    backgroundColor: theme.colors.inputBackground,
+  }), [newWeight, theme]);
 
   const unitLabelStyle = useMemo(() => ({
     position: 'absolute' as const,
     right: 15,
     top: 15,
-    color: 'rgba(170, 170, 170, 0.8)',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     fontWeight: '400' as const,
-  }), []);
+  }), [theme]);
 
   const cancelButtonStyle = useMemo(() => ({
-    backgroundColor: 'rgba(60, 60, 60, 0.8)',
+    backgroundColor: theme.dark ? 'rgba(60, 60, 60, 0.8)' : '#E5E5EA',
     borderWidth: 1,
-    borderColor: '#555',
-  }), []);
+    borderColor: theme.colors.border,
+  }), [theme]);
 
   const saveButtonStyle = useMemo(() => ({
-    backgroundColor: 'rgba(55, 0, 110, 0.6)',
+    backgroundColor: theme.colors.primary + '20',
     borderWidth: 1,
-    borderColor: '#9B00FF',
-  }), []);
+    borderColor: theme.colors.primary,
+  }), [theme]);
 
   return (
     <Modal
@@ -190,8 +195,8 @@ const WeightModal = React.memo<WeightModalProps>(({
       onRequestClose={onCancel}
     >
       <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <Text style={styles.modalTitle}>Update Weight</Text>
+        <View style={[styles.modalView, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+          <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Update Weight</Text>
           <View style={inputContainerStyle}>
             <TextInput
               ref={inputRef}
@@ -200,7 +205,7 @@ const WeightModal = React.memo<WeightModalProps>(({
               onChangeText={onChangeText}
               placeholder={`Enter weight in ${isImperialUnits ? 'lbs' : 'kg'}`}
               keyboardType="numeric"
-              placeholderTextColor="rgba(150, 150, 150, 0.6)"
+              placeholderTextColor={theme.colors.textSecondary}
             />
             <Text style={unitLabelStyle}>{isImperialUnits ? 'lbs' : 'kg'}</Text>
           </View>
@@ -209,13 +214,13 @@ const WeightModal = React.memo<WeightModalProps>(({
               style={[styles.modalButton, cancelButtonStyle]}
               onPress={onCancel}
             >
-              <Text style={styles.buttonText}>Cancel</Text>
+              <Text style={[styles.buttonText, { color: theme.colors.text }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalButton, saveButtonStyle]}
               onPress={onSave}
             >
-              <Text style={styles.buttonText}>Save</Text>
+              <Text style={[styles.buttonText, { color: theme.colors.primary }]}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -226,7 +231,7 @@ const WeightModal = React.memo<WeightModalProps>(({
 
 export default function Home() {
   const navigation = useNavigation();
-  const { isDarkTheme } = useContext(ThemeContext);
+  const { isDarkTheme, theme } = useContext(ThemeContext);
   const { user } = useAuth();
   const { onboardingComplete, justCompletedOnboarding, markWelcomeModalShown } = useOnboarding();
   const { nutrientTotals, refreshLogs, isLoading: foodLogLoading, startWatchingFoodLogs, stopWatchingFoodLogs, lastUpdated, hasError, forceSingleRefresh } = useFoodLog();
@@ -375,6 +380,34 @@ export default function Home() {
 
   // Ref to track setTimeout for showing step permission modal
   const stepPermissionModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add refreshing state
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Refresh all data
+      await refreshLogs();
+      const todayExerciseCals = await getTodayExerciseCalories();
+      setExerciseCalories(todayExerciseCals);
+      if (refreshStepData) await refreshStepData();
+      if (user?.uid) {
+        const newStreak = await getUserStreak(user.uid);
+        setCurrentStreak(newStreak);
+        // We need to make sure loadCheatDayData is available here
+        // If it's defined inside useEffect, we might need to move it out or use a ref
+        // For now, assuming it's available or we can just skip it if not
+      }
+      // Re-fetch weight history
+      const history = await getWeightHistoryLocal();
+      setWeightHistory(history);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshLogs, refreshStepData, user?.uid]);
 
   // Cleanup timeout on unmount to prevent setState on unmounted component
   useEffect(() => {
@@ -960,8 +993,8 @@ export default function Home() {
     const isAlignedWithGoal = (isGainGoal && weightLost < 0) || (!isGainGoal && weightLost >= 0);
 
     // Set background colors based on goal
-    const lossBackgroundColor = isGainGoal ? 'rgba(139, 0, 0, 0.2)' : 'rgba(0, 100, 0, 0.2)';
-    const gainBackgroundColor = isGainGoal ? 'rgba(0, 100, 0, 0.2)' : 'rgba(139, 0, 0, 0.2)';
+    const lossBackgroundColor = isGainGoal ? theme.colors.error + '33' : theme.colors.success + '33';
+    const gainBackgroundColor = isGainGoal ? theme.colors.success + '33' : theme.colors.error + '33';
 
     // Set gradient colors based on goal
     const lossGradientColors = isGainGoal
@@ -975,7 +1008,7 @@ export default function Home() {
     return (
       <GradientBorderCard>
         <View style={styles.burnContainer}>
-          <Text style={styles.burnTitle}>
+          <Text style={[styles.burnTitle, { color: theme.colors.text }]}>
             {weightLost >= 0 ? 'Weight Lost' : 'Weight Gained'}
           </Text>
           <View style={[
@@ -1023,7 +1056,7 @@ export default function Home() {
             )}
           </View>
           <View style={styles.weightLabelsContainer}>
-            <Text style={styles.weightLabel}>
+            <Text style={[styles.weightLabel, { color: theme.colors.text }]}>
               {startingWeight
                 ? formatWeight(startingWeight, isImperialUnits)
                 : (weightHistory.length > 0
@@ -1032,13 +1065,14 @@ export default function Home() {
             </Text>
             <Text style={[
               styles.burnDetails,
-              !isAlignedWithGoal && styles.burnDetailsGain // Apply red style if not aligned with goal
+              { color: theme.colors.text },
+              !isAlignedWithGoal && { color: theme.colors.error } // Apply red style if not aligned with goal
             ]}>
               {weightLost >= 0
                 ? `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Lost!`
                 : `${isImperialUnits ? Math.round(kgToLbs(Math.abs(weightLost)) * 10) / 10 : (Math.abs(weightLost)).toFixed(1)} ${isImperialUnits ? 'Pounds' : 'Kilograms'} Gained!`}
             </Text>
-            <Text style={styles.weightLabel}>
+            <Text style={[styles.weightLabel, { color: theme.colors.text }]}>
               {targetWeight ? formatWeight(targetWeight, isImperialUnits) : '---'}
             </Text>
           </View>
@@ -1344,16 +1378,18 @@ export default function Home() {
 
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {renderErrorBanner()}
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
+      }>
         {/* CHEAT DAY CARD */}
         <GradientBorderCard>
           <View style={styles.cheatDayContainer}>
             {/* STREAK INDICATOR - Top Right Corner */}
             <View style={styles.streakContainer}>
               <MaskedView
-                maskElement={<Text style={[styles.streakText, { opacity: 1 }]}>{currentStreak}</Text>}
+                maskElement={<Text style={[styles.streakText, { opacity: 1, color: theme.colors.text }]}>{currentStreak}</Text>}
               >
                 <LinearGradient
                   colors={["#0080FF", "#FF1493"]}
@@ -1378,7 +1414,7 @@ export default function Home() {
               </MaskedView>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={styles.cheatDayLabel}>
+              <Text style={[styles.cheatDayLabel, { color: theme.colors.text }]}>
                 {!cheatDayData.enabled
                   ? 'Cheat day disabled'
                   : cheatDayData.daysUntilNext === 0
@@ -1388,7 +1424,7 @@ export default function Home() {
             </View>
             <View style={[
               styles.cheatDayBarBackground,
-              { backgroundColor: 'rgba(0, 207, 255, 0.2)' } // subdued light blue background matching the cheat day gradient
+              { backgroundColor: theme.dark ? 'rgba(0, 207, 255, 0.2)' : 'rgba(0, 207, 255, 0.1)' } // subdued light blue background matching the cheat day gradient
             ]}>
               <LinearGradient
                 start={{ x: 0, y: 0 }}
@@ -1397,7 +1433,7 @@ export default function Home() {
                 style={[styles.cheatDayBarFill, { width: `${cheatDayProgress}%` }]}
               />
             </View>
-            <Text style={styles.cheatDayStatus}>
+            <Text style={[styles.cheatDayStatus, { color: theme.colors.textSecondary }]}>
               {cheatDayLoading
                 ? '---'
                 : !cheatDayData.enabled
@@ -1406,6 +1442,9 @@ export default function Home() {
             </Text>
           </View>
         </GradientBorderCard>
+
+        {/* Add space between the cards */}
+        <View style={{ height: 4 }} />
 
         {/* Add space between the cards */}
         <View style={{ height: 4 }} />
@@ -1461,7 +1500,7 @@ export default function Home() {
                   cx={SVG_SIZE / 2}
                   cy={SVG_SIZE / 2}
                   r={radius + STROKE_WIDTH / 2 + OUTLINE_WIDTH / 2}
-                  stroke="#444444"
+                  stroke={theme.colors.border}
                   strokeWidth={0}
                   fill="none"
                 />
@@ -1470,7 +1509,7 @@ export default function Home() {
                   cx={SVG_SIZE / 2}
                   cy={SVG_SIZE / 2}
                   r={radius - STROKE_WIDTH / 2 - OUTLINE_WIDTH / 2}
-                  stroke="#444444"
+                  stroke={theme.colors.border}
                   strokeWidth={0}
                   fill="none"
                 />
@@ -1478,7 +1517,7 @@ export default function Home() {
                   cx={SVG_SIZE / 2}
                   cy={SVG_SIZE / 2}
                   r={radius}
-                  stroke="rgba(155, 0, 255, 0.15)"
+                  stroke={theme.dark ? "rgba(155, 0, 255, 0.15)" : "rgba(155, 0, 255, 0.05)"}
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                 />
@@ -1561,12 +1600,13 @@ export default function Home() {
               }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                   <Text style={[styles.remainingValue, {
-                    fontSize: Math.min(30 * scaleFactor, 60) // Scale font, max 60px
+                    fontSize: Math.min(30 * scaleFactor, 60), // Scale font, max 60px
+                    color: theme.colors.text
                   }]}>
                     {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
                   </Text>
                   <Text style={{
-                    color: '#FFF',
+                    color: theme.colors.textSecondary,
                     fontSize: Math.min(16 * scaleFactor, 28),
                     fontWeight: '500',
                     opacity: 0.7,
@@ -1576,7 +1616,8 @@ export default function Home() {
                   </Text>
                 </View>
                 <Text style={[styles.remainingLabel, {
-                  fontSize: Math.min(14 * scaleFactor, 24) // Scale font, max 24px
+                  fontSize: Math.min(14 * scaleFactor, 24), // Scale font, max 24px
+                  color: theme.colors.textSecondary
                 }]}>
                   {remainingCals < 0 ? 'OVER' : 'REMAINING'}
                 </Text>
@@ -1597,16 +1638,16 @@ export default function Home() {
                         {item.label}
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                        <Text style={styles.statValue}>
+                        <Text style={[styles.statValue, { color: theme.colors.text }]}>
                           {item.label === 'Steps' && stepsLoading ? (
-                            <ActivityIndicator size="small" color="#E040FB" />
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
                           ) : (
                             item.value
                           )}
                         </Text>
                         {item.label !== 'Steps' && item.value !== '---' && item.value !== '-' && (
                           <Text style={{
-                            color: '#FFF',
+                            color: theme.colors.textSecondary,
                             fontSize: 10,
                             fontWeight: '500',
                             opacity: 0.7,
@@ -1617,7 +1658,7 @@ export default function Home() {
                         )}
                         {item.label === 'Steps' && item.value !== '---' && item.value !== '-' && !stepsLoading && (
                           <Text style={{
-                            color: '#FFF',
+                            color: theme.colors.textSecondary,
                             fontSize: 10,
                             fontWeight: '500',
                             opacity: 0.7,
@@ -1709,8 +1750,8 @@ export default function Home() {
               <View style={styles.trendContainer}>
                 {stepsLoading ? (
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#E040FB" />
-                    <Text style={styles.loadingText}>Loading step data...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading step data...</Text>
                   </View>
                 ) : (
                   <StepsGraph data={formattedStepHistory.length > 0 ? formattedStepHistory : stepsHistory} />
@@ -1722,8 +1763,8 @@ export default function Home() {
 
         {/* PAGINATION DOTS */}
         <View style={styles.dotsContainer}>
-          <View style={[styles.dot, activeIndex === 0 && styles.dotActive]} />
-          <View style={[styles.dot, activeIndex === 1 && styles.dotActive]} />
+          <View style={[styles.dot, { backgroundColor: theme.colors.textSecondary + '50' }, activeIndex === 0 && styles.dotActive]} />
+          <View style={[styles.dot, { backgroundColor: theme.colors.textSecondary + '50' }, activeIndex === 1 && styles.dotActive]} />
         </View>
       </ScrollView>
       <WeightModal
@@ -1819,6 +1860,7 @@ export default function Home() {
  *  WEIGHT GRAPH COMPONENT
  ************************************/
 function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWeight }: { data: { date: string; weight: number }[]; onAddPress: () => void; weightLoading: boolean; showTodayWeight: boolean; todayWeight: number | null }) {
+  const { theme } = useContext(ThemeContext);
   // Get responsive dimensions
   const { width } = useWindowDimensions();
 
@@ -1937,7 +1979,7 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
           marginBottom: -10
         }}
       >
-        <Text style={styles.weightGraphTitle}>Weight Trend:</Text>
+        <Text style={[styles.weightGraphTitle, { color: theme.colors.text }]}>Weight Trend:</Text>
         <TouchableOpacity
           onPress={onAddPress}
           style={{
@@ -1946,7 +1988,7 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
             borderRadius: 18,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            backgroundColor: theme.dark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)',
             borderWidth: 1,
             borderColor: 'rgba(156, 39, 176, 0.4)',
             shadowColor: '#9B00FF',
@@ -1963,13 +2005,13 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
       {/* SCROLLABLE CHART */}
       {weightLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#E040FB" />
-          <Text style={styles.loadingText}>Loading weight data...</Text>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading weight data...</Text>
         </View>
       ) : combinedData.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No weight data available yet.</Text>
-          <Text style={styles.emptySubtext}>Tap the + button to add your weight.</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.text }]}>No weight data available yet.</Text>
+          <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Tap the + button to add your weight.</Text>
         </View>
       ) : (
         <ScrollView
@@ -1995,13 +2037,13 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
                       x2={GRAPH_WIDTH - MARGIN_RIGHT}
                       y1={yCoord}
                       y2={yCoord}
-                      stroke="rgba(255,255,255,0.2)"
+                      stroke={theme.colors.border}
                       strokeWidth={1}
                     />
                     <SvgText
                       x={MARGIN_LEFT - 5}
                       y={yCoord}
-                      fill="#FFF"
+                      fill={theme.colors.text}
                       fontSize={10}
                       textAnchor="end"
                       alignmentBaseline="middle"
@@ -2024,14 +2066,14 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
                       x2={xCoord}
                       y1={GRAPH_HEIGHT - MARGIN_BOTTOM}
                       y2={MARGIN_TOP}
-                      stroke="rgba(255,255,255,0.1)"
+                      stroke={theme.colors.border}
                       strokeWidth={1}
                     />
                     {shouldShowLabel(i) && (
                       <SvgText
                         x={xCoord}
                         y={GRAPH_HEIGHT - MARGIN_BOTTOM / 2}
-                        fill={isLastLabel ? "#FFA500" : "#FFF"}
+                        fill={isLastLabel ? theme.colors.warning : theme.colors.text}
                         fontSize={isLastLabel ? 13 : 10} // Increased font size for last label from 12 to 13
                         fontWeight={isLastLabel ? "bold" : "normal"}
                         textAnchor="middle"
@@ -2092,7 +2134,7 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
                       cy={cy}
                       r={3}
                       fill="rgba(255,69,0,0.6)"
-                      stroke="rgba(255,255,255,0.4)"
+                      stroke={theme.colors.textSecondary}
                       strokeWidth={0.5}
                     />
                   );
@@ -2111,6 +2153,7 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
  *  STEPS GRAPH COMPONENT (Second Card)
  ************************************/
 function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
+  const { theme } = useContext(ThemeContext);
   // Get responsive dimensions
   const { width } = useWindowDimensions();
 
@@ -2207,7 +2250,7 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
         }}
       >
         <View style={{ flexDirection: 'column' }}>
-          <Text style={styles.weightGraphTitle}>Steps Trend:</Text>
+          <Text style={[styles.weightGraphTitle, { color: theme.colors.text }]}>Steps Trend:</Text>
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -2234,7 +2277,7 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
             borderRadius: 18,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            backgroundColor: theme.dark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)',
             borderWidth: 1,
             borderColor: 'rgba(30, 144, 255, 0.4)',
             shadowColor: '#1E90FF',
@@ -2270,13 +2313,13 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
                     x2={GRAPH_WIDTH - MARGIN_RIGHT}
                     y1={yCoord}
                     y2={yCoord}
-                    stroke="rgba(255,255,255,0.2)"
+                    stroke={theme.colors.border}
                     strokeWidth={1}
                   />
                   <SvgText
                     x={MARGIN_LEFT - 5}
                     y={yCoord}
-                    fill="#FFF"
+                    fill={theme.colors.text}
                     fontSize={10}
                     textAnchor="end"
                     alignmentBaseline="middle"
@@ -2298,14 +2341,14 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
                     x2={xCoord}
                     y1={GRAPH_HEIGHT - MARGIN_BOTTOM}
                     y2={MARGIN_TOP}
-                    stroke="rgba(255,255,255,0.1)"
+                    stroke={theme.colors.border}
                     strokeWidth={1}
                   />
                   {shouldShowLabel(i) && (
                     <SvgText
                       x={xCoord}
                       y={GRAPH_HEIGHT - MARGIN_BOTTOM / 2}
-                      fill={isLastLabel ? "#FFA500" : "#FFF"} // Highlight the last label
+                      fill={isLastLabel ? theme.colors.warning : theme.colors.text} // Highlight the last label
                       fontSize={isLastLabel ? 13 : 10} // Increased font size for last label from 12 to 13
                       fontWeight={isLastLabel ? "bold" : "normal"} // Bold for the last label
                       textAnchor="middle"
@@ -2365,7 +2408,7 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
                     cy={cy}
                     r={2}
                     fill="rgba(65,105,225,0.4)"
-                    stroke="rgba(255,255,255,0.4)"
+                    stroke={theme.colors.textSecondary}
                     strokeWidth={0.3}
                   />
                 );
@@ -2392,6 +2435,7 @@ interface MacroRingProps {
 }
 
 const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroRingProps) => {
+  const { theme } = useContext(ThemeContext);
   const MACRO_STROKE_WIDTH = 6;
   const isOther = label.toUpperCase() === 'OTHER';
 
@@ -2404,16 +2448,16 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
   if (!isOther) {
     if (diff > 0) {
       subText = `${Math.round(diff)}g Left`;
-      subTextColor = '#9E9E9E';
+      subTextColor = theme.colors.textSecondary;
     } else if (diff < 0) {
       subText = `${Math.round(Math.abs(diff))}g over`;
-      subTextColor = '#FF8A80';
+      subTextColor = theme.colors.error;
     } else {
       subText = 'Goal met';
-      subTextColor = '#4CAF50';
+      subTextColor = theme.colors.success;
     }
   } else {
-    subTextColor = '#9E9E9E'; // "Nutrients"
+    subTextColor = theme.colors.textSecondary; // "Nutrients"
   }
 
   // Debug logging AFTER calculating subText
@@ -2434,22 +2478,22 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
 
   // Custom solid colors for each macro ring
   let solidColor = '#FF00F5'; // default
-  let backgroundStrokeColor = 'rgba(80, 0, 133, 0.2)'; // default subdued background
+  let backgroundStrokeColor = theme.dark ? 'rgba(80, 0, 133, 0.2)' : 'rgba(80, 0, 133, 0.1)'; // default subdued background
   switch (label.toUpperCase()) {
     case 'PROTEIN':
       solidColor = '#DE0707'; // Custom red: rgb(222, 7, 7)
-      backgroundStrokeColor = 'rgba(222, 7, 7, 0.2)'; // subdued custom red
+      backgroundStrokeColor = theme.dark ? 'rgba(222, 7, 7, 0.2)' : 'rgba(222, 7, 7, 0.1)'; // subdued custom red
       break;
     case 'CARBS':
       solidColor = '#0052CC'; // Richer blue: rgb(0, 82, 204)
-      backgroundStrokeColor = 'rgba(0, 82, 204, 0.2)'; // subdued richer blue
+      backgroundStrokeColor = theme.dark ? 'rgba(0, 82, 204, 0.2)' : 'rgba(0, 82, 204, 0.1)'; // subdued richer blue
       break;
     case 'FATS':
       solidColor = '#19BF32'; // Custom green: rgb(25, 191, 50)
-      backgroundStrokeColor = 'rgba(25, 191, 50, 0.2)'; // subdued custom green
+      backgroundStrokeColor = theme.dark ? 'rgba(25, 191, 50, 0.2)' : 'rgba(25, 191, 50, 0.1)'; // subdued custom green
       break;
     case 'OTHER':
-      backgroundStrokeColor = 'rgba(80, 0, 133, 0.2)'; // subdued purple for OTHER
+      backgroundStrokeColor = theme.dark ? 'rgba(80, 0, 133, 0.2)' : 'rgba(80, 0, 133, 0.1)'; // subdued purple for OTHER
       break;
     default:
       break;
@@ -2464,7 +2508,7 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
 
   return (
     <Container style={styles.macroRingWrapper} onPress={onPress}>
-      <Text style={styles.macroRingLabelTop}>{label}</Text>
+      <Text style={[styles.macroRingLabelTop, { color: theme.colors.textSecondary }]}>{label}</Text>
       <View style={{ position: 'relative' }}>
         <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE}>
           {isOther && (
@@ -2565,7 +2609,7 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
               </View>
             </>
           ) : (
-            <Text style={styles.macroRingText}>{Math.round(percent)}%</Text>
+            <Text style={[styles.macroRingText, { color: theme.colors.text }]}>{Math.round(percent)}%</Text>
           )}
         </View>
       </View>
@@ -2582,7 +2626,6 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000'
   },
   scrollContainer: {
     alignItems: 'center',
@@ -2591,12 +2634,9 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '95%',
-    backgroundColor: 'hsla(0, 0%, 100%, 0.1)',
     borderRadius: 10,
     padding: 10,
-    marginVertical: 4, // Slightly reduced margin for uniform spacing
-    // Shadows
-    shadowColor: '#000',
+    marginVertical: 4,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 3,
@@ -2605,11 +2645,10 @@ const styles = StyleSheet.create({
   /* Cheat Day */
   cheatDayContainer: {},
   cheatDayLabel: {
-    color: '#FFF',
     fontSize: 14,
     textTransform: 'uppercase',
-    fontStyle: 'italic', // added italic
-    fontWeight: 'bold',   // added bold
+    fontStyle: 'italic',
+    fontWeight: 'bold',
   },
   cheatDayBarBackground: {
     marginTop: 8,
@@ -2622,7 +2661,6 @@ const styles = StyleSheet.create({
     borderRadius: 5
   },
   cheatDayStatus: {
-    color: '#FFF',
     fontSize: 12,
     marginTop: 4,
     textTransform: 'uppercase'
@@ -2653,21 +2691,18 @@ const styles = StyleSheet.create({
     top: 0
   },
   remainingValue: {
-    color: '#FFF',
     fontSize: 30,
     fontWeight: 'bold',
-    textShadowColor: '#9B00FF', // added soft purple shadow
+    textShadowColor: '#9B00FF',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 4,
   },
   remainingLabel: {
-    color: '#FFF',
     fontSize: 14,
     marginTop: 4,
     textTransform: 'uppercase'
   },
   rightCard: {
-    backgroundColor: 'rgba(255,255,255,0.11)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 12,
@@ -2679,13 +2714,11 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   statLabel: {
-    color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     textTransform: 'uppercase',
     marginBottom: 2
   },
   statValue: {
-    color: '#FFF',
     fontSize: 14,
     fontWeight: '700'
   },
@@ -2700,7 +2733,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 10
   },
   macroRingLabelTop: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 11,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -2713,7 +2745,6 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   macroRingText: {
-    color: '#FFF',
     fontSize: 14,
     fontWeight: '700'
   },
@@ -2724,7 +2755,6 @@ const styles = StyleSheet.create({
   /* Weight Lost */
   burnContainer: {},
   burnTitle: {
-    color: '#FFF',
     fontSize: 14,
     marginBottom: 6,
     textTransform: 'uppercase'
@@ -2739,7 +2769,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   burnDetails: {
-    color: '#FFF',
     fontSize: 12,
     fontStyle: 'italic',
     fontWeight: 'bold',
@@ -2751,13 +2780,12 @@ const styles = StyleSheet.create({
   },
   /* Weight Trend */
   weightGraphTitle: {
-    color: '#FFF',
     fontSize: 14,
     marginBottom: 8,
     textTransform: 'uppercase',
-    fontStyle: 'italic',      // added italic
-    fontWeight: 'bold',       // added bold
-    textDecorationLine: 'underline', // added underline
+    fontStyle: 'italic',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
   /* Pagination Dots */
   dotsContainer: {
@@ -2770,7 +2798,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
     marginHorizontal: 5
   },
   dotActive: {
@@ -2783,15 +2810,14 @@ const styles = StyleSheet.create({
   },
   goalCard: {
     width: '95%',
-    backgroundColor: 'rgba(255,255,255,0.09)',
     borderRadius: 10,
     padding: 10,
-    marginBottom: 4, // Slightly reduced margin for uniform spacing
+    marginBottom: 4,
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start', // Ensure the stack is next to the circle
-    height: 235 // Slightly taller card to prevent overflow
+    justifyContent: 'flex-start',
+    height: 235
   },
   rightCardVertical: {
     flex: 1,
@@ -2812,7 +2838,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   weightLabel: {
-    color: '#FFF',
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -2838,7 +2863,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    color: '#FFF',
     marginTop: 10,
     fontSize: 16,
   },
@@ -2866,7 +2890,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   exploreButtonText: {
-    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -2893,7 +2916,7 @@ const styles = StyleSheet.create({
   },
   modalView: {
     width: '80%',
-    backgroundColor: '#1e1e1e',
+    backgroundColor: 'transparent',
     borderRadius: 15,
     padding: 20,
     alignItems: 'center',
@@ -2911,7 +2934,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#fff',
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -2919,13 +2941,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 50,
     borderWidth: 1,
-    borderColor: '#555',
     borderRadius: 10,
     padding: 15,
     fontSize: 18,
-    color: '#fff',
     textAlign: 'center',
-    backgroundColor: 'rgba(30, 30, 30, 0.6)',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -2939,7 +2958,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
     fontWeight: '500',
     fontSize: 16,
   },
@@ -2950,13 +2968,11 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
   emptyText: {
-    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   emptySubtext: {
-    color: '#CCC',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
@@ -2974,7 +2990,6 @@ const styles = StyleSheet.create({
     zIndex: 10, // Ensure it appears above other elements
   },
   streakText: {
-    color: '#FFF', // Changed to white since gradient will handle color
     fontSize: 18,
     fontWeight: 'bold'
   },

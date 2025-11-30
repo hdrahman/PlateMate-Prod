@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -61,6 +62,7 @@ const activityLevels = [
 ];
 
 const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { user } = useAuth();
     const [mainGoal, setMainGoal] = useState<'lose' | 'maintain' | 'gain'>(
         profile.weightGoal?.startsWith('lose') ? 'lose' :
@@ -218,7 +220,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                     onRequestClose={() => setShowFitnessGoalPicker(false)}
                 >
                     <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
+                        <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>Select your target rate</Text>
                                 <TouchableOpacity
@@ -253,27 +255,27 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
 
     return (
         <ScrollView
-            contentContainerStyle={styles.container}
+            contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
         >
-            <Text style={styles.title}>Health & Fitness Goals</Text>
-            <Text style={styles.subtitle}>Let's personalize your nutrition plan</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>Health & Fitness Goals</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Let's personalize your nutrition plan</Text>
 
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Activity Level</Text>
-                <View style={styles.activitySummary}>
-                    <Text style={styles.activitySummaryLabel}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Activity Level</Text>
+                <View style={[styles.activitySummary, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                    <Text style={[styles.activitySummaryLabel, { color: theme.colors.text }]}>
                         {activityLevels.find(level => level.id === profile.activityLevel)?.label || 'Moderately Active'}
                     </Text>
-                    <Text style={styles.activitySummaryDesc}>
+                    <Text style={[styles.activitySummaryDesc, { color: theme.colors.textSecondary }]}>
                         {activityLevels.find(level => level.id === profile.activityLevel)?.description || '3-5 days/week'}
                     </Text>
                 </View>
             </View>
 
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What's your goal?</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>What's your goal?</Text>
                 <View style={styles.mainGoalsContainer}>
                     <TouchableOpacity
                         style={[
@@ -283,11 +285,11 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                         onPress={() => handleMainGoalSelect('lose')}
                     >
                         <LinearGradient
-                            colors={mainGoal === 'lose' ? ["#0074dd", "#5c00dd"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
+                            colors={mainGoal === 'lose' ? ["#0074dd", "#5c00dd"] : [theme.colors.cardBackground, theme.colors.cardBackground]}
                             style={styles.mainGoalGradient}
                         >
-                            <Ionicons name="trending-down" size={24} color={mainGoal === 'lose' ? "#fff" : "#888"} />
-                            <Text style={[styles.mainGoalText, mainGoal === 'lose' && styles.selectedMainGoalText]}>
+                            <Ionicons name="trending-down" size={24} color={mainGoal === 'lose' ? "#fff" : theme.colors.textSecondary} />
+                            <Text style={[styles.mainGoalText, { color: theme.colors.text }, mainGoal === 'lose' && styles.selectedMainGoalText]}>
                                 Lose Weight
                             </Text>
                         </LinearGradient>
@@ -301,11 +303,11 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                         onPress={() => handleMainGoalSelect('maintain')}
                     >
                         <LinearGradient
-                            colors={mainGoal === 'maintain' ? ["#0074dd", "#5c00dd"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
+                            colors={mainGoal === 'maintain' ? ["#0074dd", "#5c00dd"] : [theme.colors.cardBackground, theme.colors.cardBackground]}
                             style={styles.mainGoalGradient}
                         >
-                            <Ionicons name="remove" size={24} color={mainGoal === 'maintain' ? "#fff" : "#888"} />
-                            <Text style={[styles.mainGoalText, mainGoal === 'maintain' && styles.selectedMainGoalText]}>
+                            <Ionicons name="remove" size={24} color={mainGoal === 'maintain' ? "#fff" : theme.colors.textSecondary} />
+                            <Text style={[styles.mainGoalText, { color: theme.colors.text }, mainGoal === 'maintain' && styles.selectedMainGoalText]}>
                                 Maintain
                             </Text>
                         </LinearGradient>
@@ -319,11 +321,11 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                         onPress={() => handleMainGoalSelect('gain')}
                     >
                         <LinearGradient
-                            colors={mainGoal === 'gain' ? ["#0074dd", "#5c00dd"] : ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]}
+                            colors={mainGoal === 'gain' ? ["#0074dd", "#5c00dd"] : [theme.colors.cardBackground, theme.colors.cardBackground]}
                             style={styles.mainGoalGradient}
                         >
-                            <Ionicons name="trending-up" size={24} color={mainGoal === 'gain' ? "#fff" : "#888"} />
-                            <Text style={[styles.mainGoalText, mainGoal === 'gain' && styles.selectedMainGoalText]}>
+                            <Ionicons name="trending-up" size={24} color={mainGoal === 'gain' ? "#fff" : theme.colors.textSecondary} />
+                            <Text style={[styles.mainGoalText, { color: theme.colors.text }, mainGoal === 'gain' && styles.selectedMainGoalText]}>
                                 Gain Weight
                             </Text>
                         </LinearGradient>
@@ -332,16 +334,16 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
             </View>
 
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Choose your target rate</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Choose your target rate</Text>
                 {renderDetailedGoals()}
             </View>
 
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Calculated daily targets</Text>
-                <View style={styles.calculatedContainer}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Calculated daily targets</Text>
+                <View style={[styles.calculatedContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     <View style={styles.calorieCard}>
-                        <Text style={styles.calorieValue}>{calculatedCalories}</Text>
-                        <Text style={styles.calorieLabel}>Calories</Text>
+                        <Text style={[styles.calorieValue, { color: theme.colors.text }]}>{calculatedCalories}</Text>
+                        <Text style={[styles.calorieLabel, { color: theme.colors.textSecondary }]}>Calories</Text>
                     </View>
 
                     <View style={styles.macrosContainer}>
@@ -349,25 +351,25 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                             <View style={[styles.macroCircle, { backgroundColor: '#FF6B6B' }]}>
                                 <Text style={styles.macroValue}>{calculatedNutrients.protein || '-'}</Text>
                             </View>
-                            <Text style={styles.macroLabel}>Protein (g)</Text>
+                            <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Protein (g)</Text>
                         </View>
 
                         <View style={styles.macroItem}>
                             <View style={[styles.macroCircle, { backgroundColor: '#4ECDC4' }]}>
                                 <Text style={styles.macroValue}>{calculatedNutrients.carbs || '-'}</Text>
                             </View>
-                            <Text style={styles.macroLabel}>Carbs (g)</Text>
+                            <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Carbs (g)</Text>
                         </View>
 
                         <View style={styles.macroItem}>
                             <View style={[styles.macroCircle, { backgroundColor: '#FFD166' }]}>
                                 <Text style={styles.macroValue}>{calculatedNutrients.fats || '-'}</Text>
                             </View>
-                            <Text style={styles.macroLabel}>Fats (g)</Text>
+                            <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Fats (g)</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.nutrientNote}>
+                    <Text style={[styles.nutrientNote, { color: theme.colors.textSecondary }]}>
                         These values are calculated based on your profile and goals.
                         You can adjust them later in your settings.
                     </Text>
@@ -485,7 +487,7 @@ const HealthGoalsStep: React.FC<HealthGoalsStepProps> = ({ profile, updateProfil
                 onRequestClose={() => setShowPreferredDayPicker(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Preferred Cheat Day</Text>
                             <TouchableOpacity
@@ -619,7 +621,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#121212',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: 20,

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ImageBackground } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RecipeCard from './RecipeCard';
@@ -10,7 +11,6 @@ import { getCachedRecipeCategory, cacheRecipeCategory, cleanupExpiredCache } fro
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const PURPLE_ACCENT = '#AA00FF';
-const CARD_BG = '#121212';
 
 // Function to determine the color based on health score
 const getHealthScoreColor = (score: number): string => {
@@ -49,6 +49,7 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
     icon,
     onRecipePress
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [recipes, setRecipes] = useState<RecipeWithRetries[]>([]);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
@@ -235,13 +236,13 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
         return (
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name={icon as any} size={20} color={WHITE} />
+                    <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary }]}>
+                        <Ionicons name={icon as any} size={20} color={theme.colors.text} />
                     </View>
-                    <Text style={styles.title}>{title}</Text>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
             </View>
         );
@@ -254,10 +255,10 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <View style={styles.iconContainer}>
-                    <Ionicons name={icon as any} size={20} color={WHITE} />
+                <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary }]}>
+                    <Ionicons name={icon as any} size={20} color={theme.colors.text} />
                 </View>
-                <Text style={styles.title}>{title}</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
 
             </View>
 
@@ -282,8 +283,8 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                             >
                                 <ImageBackground
                                     source={{ uri: getImageSource(recipe) }}
-                                    style={styles.recipeImage}
-                                    imageStyle={styles.recipeImageStyle}
+                                    style={[styles.recipeImage, { backgroundColor: theme.colors.cardBackground }]}
+                                    imageStyle={[styles.recipeImageStyle, { backgroundColor: theme.colors.cardBackground }]}
                                     resizeMode="cover"
                                     onLoad={() => handleImageLoad(recipe.id?.toString() || '')}
                                     onError={() => handleImageError(recipe.id?.toString() || '')}
@@ -294,13 +295,13 @@ const RecipeCategory: React.FC<RecipeCategoryProps> = ({
                                         style={styles.imageFadeGradient}
                                     >
                                         <View style={styles.recipeInfo}>
-                                            <Text style={styles.recipeTitle} numberOfLines={1}>
+                                            <Text style={[styles.recipeTitle, { color: theme.colors.text }]} numberOfLines={1}>
                                                 {recipe.title}
                                             </Text>
                                             <View style={styles.recipeMetaInfo}>
                                                 <View style={styles.metaItem}>
-                                                    <Ionicons name="time-outline" size={14} color={WHITE} />
-                                                    <Text style={styles.metaText}>{recipe.readyInMinutes}m</Text>
+                                                    <Ionicons name="time-outline" size={14} color={theme.colors.text} />
+                                                    <Text style={[styles.metaText, { color: theme.colors.text }]}>{recipe.readyInMinutes}m</Text>
                                                 </View>
                                                 <View style={styles.iconsContainer}>
                                                     <View style={styles.healthScoreContainer}>
@@ -397,11 +398,9 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         borderRadius: 10,
         overflow: 'hidden',
-        backgroundColor: '#1a1a1a',
     },
     recipeImageStyle: {
         borderRadius: 10,
-        backgroundColor: '#1a1a1a',
     },
     imageFadeGradient: {
         flex: 1,

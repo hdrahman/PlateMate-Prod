@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback, useContext } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
     ViewStyle,
     ListRenderItemInfo,
 } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 
 interface WheelPickerProps {
     /**
@@ -48,6 +49,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
     itemHeight = 48,
     defaultValue,
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const listRef = useRef<FlatList>(null);
     const ITEM_HEIGHT = itemHeight;
     const CONTAINER_HEIGHT = ITEM_HEIGHT * VISIBLE_ROWS;
@@ -130,7 +132,8 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                 <Text
                     style={[
                         styles.itemText,
-                        isSelected && styles.selectedText,
+                        { color: theme.colors.textSecondary },
+                        isSelected && [styles.selectedText, { color: theme.colors.text }],
                     ]}
                     numberOfLines={1}
                 >
@@ -138,7 +141,7 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                 </Text>
             </View>
         );
-    }, [ITEM_HEIGHT, selectedValue]);
+    }, [ITEM_HEIGHT, selectedValue, theme.colors.text, theme.colors.textSecondary]);
 
     const keyExtractor = useCallback((item: { id: string; label: string }) => item.id, []);
 
@@ -146,7 +149,11 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
         <View
             style={[
                 styles.container,
-                { height: CONTAINER_HEIGHT },
+                {
+                    height: CONTAINER_HEIGHT,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderColor: theme.colors.border,
+                },
                 containerStyle,
             ]}
         >
@@ -158,6 +165,8 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
                     {
                         top: (CONTAINER_HEIGHT - ITEM_HEIGHT) / 2,
                         height: ITEM_HEIGHT,
+                        backgroundColor: `${theme.colors.primary}26`,
+                        borderColor: `${theme.colors.primary}66`,
                     },
                 ]}
             />
@@ -180,11 +189,9 @@ const WheelPicker: React.FC<WheelPickerProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#333',
     },
     itemContainer: {
         justifyContent: 'center',
@@ -193,27 +200,22 @@ const styles = StyleSheet.create({
     },
     itemText: {
         fontSize: 16,
-        color: '#666',
         fontWeight: '400',
     },
     selectedText: {
         fontSize: 20,
-        color: '#fff',
         fontWeight: '700',
     },
     adjacentText: {
         fontSize: 17,
-        color: '#bbb',
         fontWeight: '500',
     },
     selectionIndicator: {
         position: 'absolute',
         left: 12,
         right: 12,
-        backgroundColor: 'rgba(138, 43, 226, 0.15)',
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: 'rgba(138, 43, 226, 0.4)',
         zIndex: 1,
     },
 });

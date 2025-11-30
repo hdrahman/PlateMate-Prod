@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
     View,
     Text,
@@ -19,6 +19,7 @@ import { Audio } from 'expo-av';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { getUserProfileBySupabaseUid, updateUserProfile } from '../utils/database';
+import { ThemeContext } from '../ThemeContext';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Video, ResizeMode } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -27,7 +28,6 @@ const { width } = Dimensions.get('window');
 
 const COLORS = {
     PRIMARY_BG: '#000000',
-    CARD_BG: '#1C1C1E',
     WHITE: '#FFFFFF',
     SUBDUED: '#AAAAAA',
     PURPLE_ACCENT: '#AA00FF',
@@ -40,6 +40,7 @@ type MessageKind = 'text' | 'voice' | 'video';
 const FutureSelfRecordingSimple: React.FC = () => {
     const { user } = useAuth();
     const navigation = useNavigation();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     // State
     const [loading, setLoading] = useState<boolean>(true);
@@ -455,8 +456,8 @@ const FutureSelfRecordingSimple: React.FC = () => {
 
     if (loading) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator color={COLORS.PURPLE_ACCENT} size="large" />
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }]}>
+                <ActivityIndicator color={theme.colors.primary} size="large" />
             </View>
         );
     }
@@ -464,8 +465,8 @@ const FutureSelfRecordingSimple: React.FC = () => {
     // Camera overlay screen
     if (showCamera) {
         return (
-            <View style={styles.cameraContainer}>
-                <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY_BG} />
+            <View style={[styles.cameraContainer, { backgroundColor: theme.colors.background }]}>
+                <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
                 <CameraView
                     ref={cameraRef}
                     style={styles.camera}
@@ -481,12 +482,12 @@ const FutureSelfRecordingSimple: React.FC = () => {
                             style={styles.flipButton}
                             onPress={() => setCameraFacing(cameraFacing === 'back' ? 'front' : 'back')}
                         >
-                            <Ionicons name="camera-reverse" size={24} color={COLORS.WHITE} />
+                            <Ionicons name="camera-reverse" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
 
                         {isRecording && (
                             <View style={styles.timerContainer}>
-                                <Text style={styles.timerText}>{recordingTimeLeft}s</Text>
+                                <Text style={[styles.timerText, { color: theme.colors.text }]}>{recordingTimeLeft}s</Text>
                             </View>
                         )}
 
@@ -501,15 +502,15 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                 }
                             }}
                         >
-                            <Ionicons name="close" size={24} color={COLORS.WHITE} />
+                            <Ionicons name="close" size={24} color={theme.colors.text} />
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.cameraFooter}>
                         {!cameraReady ? (
                             <View style={styles.cameraLoadingContainer}>
-                                <ActivityIndicator color={COLORS.WHITE} size="large" />
-                                <Text style={styles.cameraLoadingText}>Camera loading...</Text>
+                                <ActivityIndicator color={theme.colors.text} size="large" />
+                                <Text style={[styles.cameraLoadingText, { color: theme.colors.text }]}>Camera loading...</Text>
                             </View>
                         ) : (
                             <TouchableOpacity
@@ -527,31 +528,31 @@ const FutureSelfRecordingSimple: React.FC = () => {
 
     // Main UI
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY_BG} />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Future Self Message</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Future Self Message</Text>
                 <TouchableOpacity onPress={handleSave}>
-                    <Text style={styles.saveButton}>Save</Text>
+                    <Text style={[styles.saveButton, { color: theme.colors.primary }]}>Save</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Record a Message to Your Future Self</Text>
-                    <Text style={styles.sectionSubtitle}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Record a Message to Your Future Self</Text>
+                    <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
                         Create a motivational message to help you stay on track when things get tough.
                     </Text>
                 </View>
 
                 {/* Message Type Selection */}
                 <View style={styles.section}>
-                    <Text style={styles.label}>Choose your message type:</Text>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Choose your message type:</Text>
                     <View style={styles.messageTypeContainer}>
                         {[
                             { type: 'text', icon: 'document-text', label: 'Text' },
@@ -562,19 +563,21 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                 key={option.type}
                                 style={[
                                     styles.messageTypeButton,
-                                    messageType === option.type && styles.messageTypeButtonActive,
+                                    { backgroundColor: theme.colors.cardBackground },
+                                    messageType === option.type && { backgroundColor: theme.colors.primary },
                                 ]}
                                 onPress={() => handleMessageTypeChange(option.type as MessageKind)}
                             >
                                 <Ionicons
                                     name={option.icon as any}
                                     size={24}
-                                    color={messageType === option.type ? COLORS.WHITE : COLORS.SUBDUED}
+                                    color={messageType === option.type ? theme.colors.text : theme.colors.textSecondary}
                                 />
                                 <Text
                                     style={[
                                         styles.messageTypeLabel,
-                                        messageType === option.type && styles.messageTypeLabelActive,
+                                        { color: theme.colors.textSecondary },
+                                        messageType === option.type && { color: theme.colors.text },
                                     ]}
                                 >
                                     {option.label}
@@ -587,13 +590,13 @@ const FutureSelfRecordingSimple: React.FC = () => {
                 {/* Text Message Input */}
                 {messageType === 'text' && (
                     <View style={styles.section}>
-                        <Text style={styles.label}>Your message:</Text>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Your message:</Text>
                         <TextInput
-                            style={styles.textInput}
+                            style={[styles.textInput, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text }]}
                             value={textMessage}
                             onChangeText={setTextMessage}
                             placeholder="Write a message to remind yourself why this journey matters..."
-                            placeholderTextColor={COLORS.SUBDUED}
+                            placeholderTextColor={theme.colors.textSecondary}
                             multiline
                             numberOfLines={6}
                             textAlignVertical="top"
@@ -618,9 +621,9 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                         <Ionicons
                                             name={messageType === 'video' ? 'videocam' : 'mic'}
                                             size={24}
-                                            color={COLORS.WHITE}
+                                            color={theme.colors.text}
                                         />
-                                        <Text style={styles.recordButtonText}>
+                                        <Text style={[styles.recordButtonText, { color: theme.colors.text }]}>
                                             {isRecording ? `Recording... ${recordingTimeLeft}s` : `Record ${messageType}`}
                                         </Text>
                                     </LinearGradient>
@@ -631,49 +634,49 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                         style={styles.stopButton}
                                         onPress={stopAudioRecording}
                                     >
-                                        <Ionicons name="stop" size={24} color={COLORS.WHITE} />
-                                        <Text style={styles.stopButtonText}>Stop Recording</Text>
+                                        <Ionicons name="stop" size={24} color={theme.colors.text} />
+                                        <Text style={[styles.stopButtonText, { color: theme.colors.text }]}>Stop Recording</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
                         ) : (
                             <View style={styles.playbackSection}>
-                                <Text style={styles.label}>Your {messageType} message:</Text>
+                                <Text style={[styles.label, { color: theme.colors.text }]}>Your {messageType} message:</Text>
 
                                 {messageType === 'voice' ? (
                                     <View style={styles.audioPlayerContainer}>
-                                        <View style={styles.audioPlayer}>
+                                        <View style={[styles.audioPlayer, { backgroundColor: theme.colors.cardBackground }]}>
                                             <TouchableOpacity
                                                 style={styles.audioPlayButton}
                                                 onPress={isPlaying ? stopAudio : playAudio}
                                             >
                                                 <LinearGradient
-                                                    colors={[COLORS.PURPLE_ACCENT, '#8A00E0']}
+                                                    colors={[theme.colors.primary, '#8A00E0']}
                                                     style={styles.audioPlayButtonGradient}
                                                 >
                                                     <Ionicons
                                                         name={isPlaying ? 'pause' : 'play'}
                                                         size={28}
-                                                        color={COLORS.WHITE}
+                                                        color={theme.colors.text}
                                                     />
                                                 </LinearGradient>
                                             </TouchableOpacity>
 
                                             <View style={styles.audioInfo}>
-                                                <Text style={styles.audioTitle}>Voice Message</Text>
-                                                <Text style={styles.audioLabel}>
+                                                <Text style={[styles.audioTitle, { color: theme.colors.text }]}>Voice Message</Text>
+                                                <Text style={[styles.audioLabel, { color: theme.colors.text }]}>
                                                     {isPlaying ? 'Playing...' : 'Tap to play'}
                                                 </Text>
                                             </View>
 
                                             <View style={styles.audioWaveform}>
-                                                <Ionicons name="pulse" size={24} color={COLORS.PURPLE_ACCENT} />
+                                                <Ionicons name="pulse" size={24} color={theme.colors.primary} />
                                             </View>
                                         </View>
                                     </View>
                                 ) : (
                                     <View style={styles.videoPlayer}>
-                                        <View style={styles.videoContainer}>
+                                        <View style={[styles.videoContainer, { backgroundColor: theme.colors.cardBackground }]}>
                                             <Video
                                                 ref={videoRef}
                                                 style={styles.video}
@@ -693,11 +696,11 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                                     style={styles.videoPlayButton}
                                                     onPress={isVideoPlaying ? pauseVideo : playVideo}
                                                 >
-                                                    <View style={styles.videoPlayButtonInner}>
+                                                    <View style={[styles.videoPlayButtonInner, { backgroundColor: `${theme.colors.primary}E6` }]}>
                                                         <Ionicons
                                                             name={isVideoPlaying ? 'pause' : 'play'}
                                                             size={32}
-                                                            color={COLORS.WHITE}
+                                                            color={theme.colors.text}
                                                         />
                                                     </View>
                                                 </TouchableOpacity>
@@ -708,13 +711,13 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                                 style={styles.fullscreenButton}
                                                 onPress={toggleVideoFullscreen}
                                             >
-                                                <Ionicons name="expand" size={20} color={COLORS.WHITE} />
+                                                <Ionicons name="expand" size={20} color={theme.colors.text} />
                                             </TouchableOpacity>
 
                                             {/* Video status indicator */}
                                             <View style={styles.videoStatusContainer}>
-                                                <View style={styles.videoStatusDot} />
-                                                <Text style={styles.videoStatusText}>
+                                                <View style={[styles.videoStatusDot, { backgroundColor: theme.colors.primary }]} />
+                                                <Text style={[styles.videoStatusText, { color: theme.colors.text }]}>
                                                     {isVideoPlaying ? 'Playing video message' : 'Tap to play video message'}
                                                 </Text>
                                             </View>
@@ -744,8 +747,8 @@ const FutureSelfRecordingSimple: React.FC = () => {
                 supportedOrientations={['portrait', 'landscape']}
                 onRequestClose={() => setIsVideoFullscreen(false)}
             >
-                <View style={styles.fullscreenContainer}>
-                    <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY_BG} />
+                <View style={[styles.fullscreenContainer, { backgroundColor: theme.colors.background }]}>
+                    <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
                     {/* Fullscreen video */}
                     <Video
@@ -767,7 +770,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                             style={styles.fullscreenCloseButton}
                             onPress={() => setIsVideoFullscreen(false)}
                         >
-                            <Ionicons name="close" size={28} color={COLORS.WHITE} />
+                            <Ionicons name="close" size={28} color={theme.colors.text} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -778,7 +781,7 @@ const FutureSelfRecordingSimple: React.FC = () => {
                                 <Ionicons
                                     name={isVideoPlaying ? 'pause' : 'play'}
                                     size={40}
-                                    color={COLORS.WHITE}
+                                    color={theme.colors.text}
                                 />
                             </View>
                         </TouchableOpacity>
@@ -801,7 +804,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 15,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.CARD_BG,
     },
     headerTitle: {
         fontSize: 18,
@@ -845,7 +847,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         borderRadius: 12,
-        backgroundColor: COLORS.CARD_BG,
         minWidth: 80,
     },
     messageTypeButtonActive: {
@@ -860,10 +861,8 @@ const styles = StyleSheet.create({
         color: COLORS.WHITE,
     },
     textInput: {
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: 12,
         padding: 16,
-        color: COLORS.WHITE,
         fontSize: 16,
         minHeight: 120,
     },
@@ -912,7 +911,6 @@ const styles = StyleSheet.create({
     audioPlayer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: 16,
         padding: 20,
         elevation: 4,
@@ -970,7 +968,6 @@ const styles = StyleSheet.create({
     },
     videoContainer: {
         position: 'relative',
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: 16,
         overflow: 'hidden',
         elevation: 4,
@@ -1037,7 +1034,6 @@ const styles = StyleSheet.create({
     videoControls: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: 12,
         padding: 16,
         marginTop: 12,

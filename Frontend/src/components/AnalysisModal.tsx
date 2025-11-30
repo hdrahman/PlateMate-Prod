@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Modal, View, StyleSheet, Dimensions } from 'react-native';
 import ScannerAnimation from './ScannerAnimation';
+import { ThemeContext } from '../ThemeContext';
 
 const { height } = Dimensions.get('window');
 
@@ -17,6 +18,8 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({
     stage = 'analyzing',
     imageUri
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     return (
         <Modal
             transparent={true}
@@ -25,7 +28,7 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({
             onRequestClose={onCancel}
             statusBarTranslucent={true}
         >
-            <View style={styles.modalContainer}>
+            <View style={[styles.modalContainer, { backgroundColor: `${theme.colors.background}E6` }]}>
                 <ScannerAnimation
                     stage={stage}
                     imageUri={imageUri}
@@ -38,7 +41,6 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
         width: '100%',
         height: height,
         position: 'absolute',

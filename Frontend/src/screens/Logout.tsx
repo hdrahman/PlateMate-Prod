@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { SafeAreaView, Text, StyleSheet } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 
-const Logout = () => (
-    <SafeAreaView style={styles.container}>
-        <Text>Logout Screen</Text>
-    </SafeAreaView>
-);
+const Logout = () => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
+    return (
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <Text style={{ color: theme.colors.text }}>Logout Screen</Text>
+        </SafeAreaView>
+    );
+};
 
 const styles = StyleSheet.create({ container: { flex: 1, justifyContent: 'center', alignItems: 'center' } });
 export default Logout;

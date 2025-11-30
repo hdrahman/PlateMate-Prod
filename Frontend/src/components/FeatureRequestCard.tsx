@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { FeatureRequest, toggleFeatureUpvote } from '../api/features';
 
@@ -19,6 +20,7 @@ const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
     const [isUpvoting, setIsUpvoting] = useState(false);
     const [userUpvoted, setUserUpvoted] = useState(request.user_upvoted);
     const [upvoteCount, setUpvoteCount] = useState(request.upvotes);
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const handleUpvote = async () => {
         if (isOffline) {
@@ -119,7 +121,7 @@ const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
 
     return (
         <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
             onPress={onPress}
             activeOpacity={0.8}
         >
@@ -134,16 +136,16 @@ const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
                         {getStatusText(request.status)}
                     </Text>
                 </View>
-                <Text style={styles.dateText}>{formatDate(request.created_at)}</Text>
+                <Text style={[styles.dateText, { color: theme.colors.textSecondary }]}>{formatDate(request.created_at)}</Text>
             </View>
 
-            <Text style={styles.title} numberOfLines={2}>{request.title}</Text>
-            <Text style={styles.description} numberOfLines={3}>{request.description}</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>{request.title}</Text>Lines={2}>{request.title}</Text>
+            <Text style={[styles.description, { color: theme.colors.textSecondary }]} numberOfLines={3}>{request.description}</Text>
 
             <View style={styles.cardFooter}>
                 <View style={styles.authorContainer}>
-                    <Ionicons name="person-outline" size={14} color="#777" />
-                    <Text style={styles.authorText}>{request.author_name}</Text>
+                    <Ionicons name="person-outline" size={14} color={theme.colors.textSecondary} />
+                    <Text style={[styles.authorText, { color: theme.colors.textSecondary }]}>{request.author_name}</Text>
                 </View>
 
                 <View style={styles.rightSection}>
@@ -157,6 +159,7 @@ const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
                     <TouchableOpacity
                         style={[
                             styles.upvoteButton,
+                            { backgroundColor: theme.colors.border },
                             userUpvoted && styles.upvotedButton,
                             (isOffline || isUpvoting) && styles.disabledButton
                         ]}
@@ -167,10 +170,11 @@ const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
                         <Ionicons
                             name={userUpvoted ? "heart" : "heart-outline"}
                             size={18}
-                            color={userUpvoted ? "#FF6B6B" : "#777"}
+                            color={userUpvoted ? "#FF6B6B" : theme.colors.textSecondary}
                         />
                         <Text style={[
                             styles.upvoteText,
+                            { color: theme.colors.textSecondary },
                             userUpvoted && styles.upvotedText
                         ]}>
                             {upvoteCount}
@@ -179,19 +183,20 @@ const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
                 </View>
             </View>
 
-            {isOffline && (
-                <View style={styles.offlineIndicator}>
-                    <Ionicons name="wifi-outline" size={12} color="#FF6B6B" />
-                    <Text style={styles.offlineText}>Offline</Text>
-                </View>
-            )}
-        </TouchableOpacity>
+            {
+        isOffline && (
+            <View style={styles.offlineIndicator}>
+                <Ionicons name="wifi-outline" size={12} color="#FF6B6B" />
+                <Text style={styles.offlineText}>Offline</Text>
+            </View>
+        )
+    }
+        </TouchableOpacity >
     );
 };
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#1E1E1E',
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
@@ -202,7 +207,6 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
         borderWidth: 1,
-        borderColor: '#333',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -225,18 +229,15 @@ const styles = StyleSheet.create({
     },
     dateText: {
         fontSize: 12,
-        color: '#777',
     },
     title: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#FFF',
         marginBottom: 8,
         lineHeight: 20,
     },
     description: {
         fontSize: 14,
-        color: '#CCC',
         marginBottom: 16,
         lineHeight: 18,
     },
@@ -253,7 +254,6 @@ const styles = StyleSheet.create({
     },
     authorText: {
         fontSize: 12,
-        color: '#777',
     },
     rightSection: {
         flexDirection: 'row',
@@ -281,7 +281,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#333',
         minWidth: 60,
         justifyContent: 'center',
     },
@@ -295,7 +294,6 @@ const styles = StyleSheet.create({
     },
     upvoteText: {
         fontSize: 14,
-        color: '#777',
         fontWeight: '600',
     },
     upvotedText: {

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -54,6 +55,7 @@ const fitnessGoals = [
 ];
 
 const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [sleepQuality, setSleepQuality] = useState(profile.sleepQuality || '');
     const [stressLevel, setStressLevel] = useState(profile.stressLevel || '');
     const [eatingPattern, setEatingPattern] = useState(profile.eatingPattern || '');
@@ -91,21 +93,22 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
 
     return (
         <ScrollView
-            contentContainerStyle={styles.container}
+            contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}
             showsVerticalScrollIndicator={false}
         >
-            <Text style={styles.title}>Lifestyle & Motivation</Text>
-            <Text style={styles.subtitle}>Help us understand your habits and what drives you</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>Lifestyle & Motivation</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Help us understand your habits and what drives you</Text>
 
             {/* Sleep Quality */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Sleep Quality</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Sleep Quality</Text>
                 <View style={styles.optionsGrid}>
                     {sleepOptions.map((option) => (
                         <TouchableOpacity
                             key={option.id}
                             style={[
                                 styles.optionCard,
+                                { backgroundColor: theme.colors.cardBackground },
                                 sleepQuality === option.id && styles.selectedOption
                             ]}
                             onPress={() => setSleepQuality(option.id)}
@@ -113,11 +116,12 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
                             <Ionicons
                                 name={option.icon as any}
                                 size={24}
-                                color={sleepQuality === option.id ? '#0074dd' : '#999'}
+                                color={sleepQuality === option.id ? theme.colors.primary : theme.colors.textSecondary}
                             />
                             <Text style={[
                                 styles.optionText,
-                                sleepQuality === option.id && styles.selectedOptionText
+                                { color: theme.colors.text },
+                                sleepQuality === option.id && { color: theme.colors.primary }
                             ]}>
                                 {option.label}
                             </Text>
@@ -128,13 +132,14 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
 
             {/* Stress Level */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Stress Level</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Stress Level</Text>
                 <View style={styles.optionsRow}>
                     {stressLevels.map((level) => (
                         <TouchableOpacity
                             key={level.id}
                             style={[
                                 styles.stressOption,
+                                { backgroundColor: theme.colors.cardBackground },
                                 stressLevel === level.id && { borderColor: level.color }
                             ]}
                             onPress={() => setStressLevel(level.id)}
@@ -146,6 +151,7 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
                             ]} />
                             <Text style={[
                                 styles.optionText,
+                                { color: theme.colors.text },
                                 stressLevel === level.id && { color: level.color }
                             ]}>
                                 {level.label}
@@ -157,13 +163,14 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
 
             {/* Eating Patterns */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Eating Pattern</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Eating Pattern</Text>
                 <View style={styles.optionsGrid}>
                     {eatingHabits.map((habit) => (
                         <TouchableOpacity
                             key={habit.id}
                             style={[
                                 styles.optionCard,
+                                { backgroundColor: theme.colors.cardBackground },
                                 eatingPattern === habit.id && styles.selectedOption
                             ]}
                             onPress={() => setEatingPattern(habit.id)}
@@ -171,11 +178,12 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
                             <Ionicons
                                 name={habit.icon as any}
                                 size={24}
-                                color={eatingPattern === habit.id ? '#0074dd' : '#999'}
+                                color={eatingPattern === habit.id ? theme.colors.primary : theme.colors.textSecondary}
                             />
                             <Text style={[
                                 styles.optionText,
-                                eatingPattern === habit.id && styles.selectedOptionText
+                                { color: theme.colors.text },
+                                eatingPattern === habit.id && { color: theme.colors.primary }
                             ]}>
                                 {habit.label}
                             </Text>
@@ -186,13 +194,14 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
 
             {/* Motivation Reasons */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What motivates you? (Select all that apply)</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>What motivates you? (Select all that apply)</Text>
                 <View style={styles.motivationGrid}>
                     {motivationReasons.map((reason) => (
                         <TouchableOpacity
                             key={reason.id}
                             style={[
                                 styles.motivationCard,
+                                { backgroundColor: theme.colors.cardBackground },
                                 motivations.includes(reason.id) && styles.selectedMotivation
                             ]}
                             onPress={() => toggleMotivation(reason.id)}
@@ -200,11 +209,12 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
                             <Ionicons
                                 name={reason.icon as any}
                                 size={20}
-                                color={motivations.includes(reason.id) ? '#0074dd' : '#999'}
+                                color={motivations.includes(reason.id) ? theme.colors.primary : theme.colors.textSecondary}
                             />
                             <Text style={[
                                 styles.motivationText,
-                                motivations.includes(reason.id) && styles.selectedMotivationText
+                                { color: theme.colors.text },
+                                motivations.includes(reason.id) && { color: theme.colors.primary }
                             ]}>
                                 {reason.label}
                             </Text>
@@ -215,12 +225,12 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
 
             {/* Why Question */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What's your deeper "why"?</Text>
-                <Text style={styles.sectionSubtitle}>This will help us motivate you during tough moments</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>What's your deeper "why"?</Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>This will help us motivate you during tough moments</Text>
                 <TextInput
-                    style={styles.textArea}
+                    style={[styles.textArea, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text }]}
                     placeholder="Example: I want to be healthy and energetic for my kids..."
-                    placeholderTextColor="#666"
+                    placeholderTextColor={theme.colors.textSecondary}
                     value={whyMotivation}
                     onChangeText={setWhyMotivation}
                     multiline
@@ -231,17 +241,17 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
 
             {/* Fitness Goals */}
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Fitness Goals</Text>
-                <Text style={styles.sectionSubtitle}>Set specific targets to track your progress</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Fitness Goals</Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>Set specific targets to track your progress</Text>
 
                 {fitnessGoals.map((goal) => (
                     <View key={goal.id} style={styles.goalItem}>
-                        <Text style={styles.goalLabel}>{goal.label}</Text>
-                        <View style={styles.goalInputContainer}>
+                        <Text style={[styles.goalLabel, { color: theme.colors.text }]}>{goal.label}</Text>
+                        <View style={[styles.goalInputContainer, { backgroundColor: theme.colors.inputBackground }]}>
                             <TextInput
-                                style={styles.goalInput}
+                                style={[styles.goalInput, { color: theme.colors.text }]}
                                 placeholder={goal.placeholder}
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={
                                     goal.id === 'step_goal' ? stepGoal :
                                         goal.id === 'water_goal' ? waterGoal :
@@ -256,7 +266,7 @@ const LifestyleHabitsStep: React.FC<LifestyleHabitsStepProps> = ({ profile, upda
                                 }}
                                 keyboardType="numeric"
                             />
-                            <Text style={styles.goalUnit}>{goal.unit}</Text>
+                            <Text style={[styles.goalUnit, { color: theme.colors.textSecondary }]}>{goal.unit}</Text>
                         </View>
                     </View>
                 ))}

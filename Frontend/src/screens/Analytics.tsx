@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import {
     View,
     Text,
@@ -8,7 +8,8 @@ import {
     Dimensions,
     ActivityIndicator,
     Platform,
-    Alert
+    Alert,
+    StatusBar
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { ThemeContext } from '../ThemeContext';
 import {
     getFoodLogsByDate,
     getTodayCalories,
@@ -46,18 +48,13 @@ const getResponsiveDimensions = () => {
 const responsiveDimensions = getResponsiveDimensions();
 const { horizontalPadding, cardSpacing, cardRadius } = responsiveDimensions;
 
-// Theme colors
-const COLORS = {
-    PRIMARY_BG: '#000000',
-    CARD_BG: '#1C1C1E',
+// Accent colors (semantic, kept as constants)
+const ACCENT_COLORS = {
     ACCENT_PURPLE: '#AA00FF',
     ACCENT_BLUE: '#2196F3',
     ACCENT_GREEN: '#4CAF50',
     ACCENT_ORANGE: '#FF9800',
     ACCENT_RED: '#F44336',
-    WHITE: '#FFFFFF',
-    SUBDUED: '#AAAAAA',
-    LIGHT_GRAY: '#333333'
 };
 
 interface NutritionInsight {
@@ -83,13 +80,13 @@ interface NutritionScore {
     nutrition: number;
 }
 
-const GradientCard: React.FC<{ children: React.ReactNode; style?: any }> = ({ children, style }) => (
+const GradientCard: React.FC<{ children: React.ReactNode; style?: any; cardBackground: string }> = ({ children, style, cardBackground }) => (
     <View style={[styles.cardContainer, style]}>
         <LinearGradient
             colors={['rgba(170, 0, 255, 0.1)', 'rgba(33, 150, 243, 0.1)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.gradientCard}
+            style={[styles.gradientCard, { backgroundColor: cardBackground }]}
         >
             {children}
         </LinearGradient>
@@ -99,7 +96,7 @@ const GradientCard: React.FC<{ children: React.ReactNode; style?: any }> = ({ ch
 const GradientText: React.FC<{ text: string; style?: any; colors?: readonly [string, string, ...string[]] }> = ({
     text,
     style,
-    colors = [COLORS.ACCENT_PURPLE, COLORS.ACCENT_BLUE] as const
+    colors = [ACCENT_COLORS.ACCENT_PURPLE, ACCENT_COLORS.ACCENT_BLUE] as const
 }) => (
     <MaskedView
         maskElement={<Text style={[style, { opacity: 1 }]}>{text}</Text>}
@@ -114,6 +111,7 @@ const Analytics: React.FC = () => {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const [loading, setLoading] = useState(true);
     const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d');
@@ -462,9 +460,9 @@ const Analytics: React.FC = () => {
         const excellentThreshold = isNewbie ? 75 : 85; // Lower bar for beginners
         const goodThreshold = isNewbie ? 55 : 65; // More encouraging for beginners
 
-        if (score >= excellentThreshold) return COLORS.ACCENT_GREEN;
-        if (score >= goodThreshold) return COLORS.ACCENT_ORANGE;
-        return COLORS.ACCENT_RED;
+        if (score >= excellentThreshold) return ACCENT_COLORS.ACCENT_GREEN;
+        if (score >= goodThreshold) return ACCENT_COLORS.ACCENT_ORANGE;
+        return ACCENT_COLORS.ACCENT_RED;
     };
 
     const getInsightIcon = (type: string) => {
@@ -478,10 +476,10 @@ const Analytics: React.FC = () => {
 
     const getInsightColor = (type: string) => {
         switch (type) {
-            case 'warning': return COLORS.ACCENT_RED;
-            case 'success': return COLORS.ACCENT_GREEN;
-            case 'info': return COLORS.ACCENT_BLUE;
-            default: return COLORS.ACCENT_BLUE;
+            case 'warning': return ACCENT_COLORS.ACCENT_RED;
+            case 'success': return ACCENT_COLORS.ACCENT_GREEN;
+            case 'info': return ACCENT_COLORS.ACCENT_BLUE;
+            default: return ACCENT_COLORS.ACCENT_BLUE;
         }
     };
 
@@ -494,10 +492,11 @@ const Analytics: React.FC = () => {
     };
 
     const renderHeader = () => (
-        <View style={[styles.headerSafeArea, { paddingTop: insets.top }]}>
+        <View style={[styles.headerSafeArea, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={theme.dark ? "light-content" : "dark-content"} />
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color={COLORS.WHITE} />
+                    <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
                 <GradientText text="Advanced Analytics" style={styles.headerTitle} />
                 <View style={styles.placeholder} />
@@ -506,7 +505,7 @@ const Analytics: React.FC = () => {
     );
 
     const renderPeriodSelector = () => (
-        <View style={styles.periodSelector}>
+        <View style={[styles.periodSelector, { backgroundColor: theme.colors.cardBackground }]}>
             {(['7d', '30d', '90d'] as const).map((period) => (
                 <TouchableOpacity
                     key={period}
@@ -515,6 +514,7 @@ const Analytics: React.FC = () => {
                 >
                     <Text style={[
                         styles.periodButtonText,
+                        { color: theme.colors.textSecondary },
                         selectedPeriod === period && styles.periodButtonTextActive
                     ]}>
                         {formatPeriodLabel(period)}
@@ -525,27 +525,27 @@ const Analytics: React.FC = () => {
     );
 
     const renderNutritionScore = () => (
-        <GradientCard style={styles.scoreCard}>
-            <Text style={styles.cardTitle}>Nutrition Score</Text>
+        <GradientCard style={styles.scoreCard} cardBackground={theme.colors.cardBackground}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Nutrition Score</Text>
             <View style={styles.scoreContainer}>
                 <View style={styles.overallScoreContainer}>
                     <Text style={[styles.overallScore, { color: getScoreColor(nutritionScore.overall) }]}>
                         {nutritionScore.overall}
                     </Text>
-                    <Text style={styles.scoreLabel}>Overall</Text>
+                    <Text style={[styles.scoreLabel, { color: theme.colors.textSecondary }]}>Overall</Text>
                 </View>
                 <View style={styles.scoreBreakdown}>
                     <View style={styles.scoreItem}>
-                        <Text style={styles.scoreItemLabel}>Consistency</Text>
-                        <Text style={styles.scoreValue}>{nutritionScore.consistency}</Text>
+                        <Text style={[styles.scoreItemLabel, { color: theme.colors.textSecondary }]}>Consistency</Text>
+                        <Text style={[styles.scoreValue, { color: theme.colors.text }]}>{nutritionScore.consistency}</Text>
                     </View>
                     <View style={styles.scoreItem}>
-                        <Text style={styles.scoreItemLabel}>Recovery</Text>
-                        <Text style={styles.scoreValue}>{nutritionScore.recovery}</Text>
+                        <Text style={[styles.scoreItemLabel, { color: theme.colors.textSecondary }]}>Recovery</Text>
+                        <Text style={[styles.scoreValue, { color: theme.colors.text }]}>{nutritionScore.recovery}</Text>
                     </View>
                     <View style={styles.scoreItem}>
-                        <Text style={styles.scoreItemLabel}>Nutrition</Text>
-                        <Text style={styles.scoreValue}>{nutritionScore.nutrition}</Text>
+                        <Text style={[styles.scoreItemLabel, { color: theme.colors.textSecondary }]}>Nutrition</Text>
+                        <Text style={[styles.scoreValue, { color: theme.colors.text }]}>{nutritionScore.nutrition}</Text>
                     </View>
                 </View>
             </View>
@@ -553,24 +553,24 @@ const Analytics: React.FC = () => {
     );
 
     const renderMacroBreakdown = () => (
-        <GradientCard style={styles.macroCard}>
-            <Text style={styles.cardTitle}>Daily Average Breakdown</Text>
+        <GradientCard style={styles.macroCard} cardBackground={theme.colors.cardBackground}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Daily Average Breakdown</Text>
             <View style={styles.macroStats}>
                 <View style={styles.macroStat}>
-                    <Text style={styles.macroStatValue}>{avgDailyNutrition.calories}</Text>
-                    <Text style={styles.macroStatLabel}>Calories</Text>
+                    <Text style={[styles.macroStatValue, { color: theme.colors.text }]}>{avgDailyNutrition.calories}</Text>
+                    <Text style={[styles.macroStatLabel, { color: theme.colors.textSecondary }]}>Calories</Text>
                 </View>
                 <View style={styles.macroStat}>
-                    <Text style={styles.macroStatValue}>{avgDailyNutrition.protein}g</Text>
-                    <Text style={styles.macroStatLabel}>Protein</Text>
+                    <Text style={[styles.macroStatValue, { color: theme.colors.text }]}>{avgDailyNutrition.protein}g</Text>
+                    <Text style={[styles.macroStatLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
                 </View>
                 <View style={styles.macroStat}>
-                    <Text style={styles.macroStatValue}>{avgDailyNutrition.carbs}g</Text>
-                    <Text style={styles.macroStatLabel}>Carbs</Text>
+                    <Text style={[styles.macroStatValue, { color: theme.colors.text }]}>{avgDailyNutrition.carbs}g</Text>
+                    <Text style={[styles.macroStatLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
                 </View>
                 <View style={styles.macroStat}>
-                    <Text style={styles.macroStatValue}>{avgDailyNutrition.fat}g</Text>
-                    <Text style={styles.macroStatLabel}>Fat</Text>
+                    <Text style={[styles.macroStatValue, { color: theme.colors.text }]}>{avgDailyNutrition.fat}g</Text>
+                    <Text style={[styles.macroStatLabel, { color: theme.colors.textSecondary }]}>Fat</Text>
                 </View>
             </View>
         </GradientCard>
@@ -704,25 +704,25 @@ const Analytics: React.FC = () => {
         const chartHeight = 150;
 
         return (
-            <GradientCard style={styles.cardContainer}>
-                <Text style={styles.cardTitle}>Nutrition Trends</Text>
-                <Text style={styles.chartSubtitle}>
+            <GradientCard style={styles.cardContainer} cardBackground={theme.colors.cardBackground}>
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Nutrition Trends</Text>
+                <Text style={[styles.chartSubtitle, { color: theme.colors.textSecondary }]}>
                     {selectedPeriod === '7d' ? 'Daily averages' :
                         selectedPeriod === '30d' ? 'Weekly averages' : 'Monthly averages'}
                 </Text>
 
                 <View style={styles.chartLegend}>
                     <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
-                        <Text style={styles.legendText}>Calories</Text>
+                        <View style={[styles.legendDot, { backgroundColor: ACCENT_COLORS.ACCENT_PURPLE }]} />
+                        <Text style={[styles.legendText, { color: theme.colors.textSecondary }]}>Calories</Text>
                     </View>
                     <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
-                        <Text style={styles.legendText}>Protein</Text>
+                        <View style={[styles.legendDot, { backgroundColor: ACCENT_COLORS.ACCENT_GREEN }]} />
+                        <Text style={[styles.legendText, { color: theme.colors.textSecondary }]}>Protein</Text>
                     </View>
                     <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
-                        <Text style={styles.legendText}>Carbs</Text>
+                        <View style={[styles.legendDot, { backgroundColor: ACCENT_COLORS.ACCENT_BLUE }]} />
+                        <Text style={[styles.legendText, { color: theme.colors.textSecondary }]}>Carbs</Text>
                     </View>
                 </View>
 
@@ -743,7 +743,7 @@ const Analytics: React.FC = () => {
                                                 styles.bar,
                                                 {
                                                     height: Math.max(calorieHeight, 1), // Minimum height of 1
-                                                    backgroundColor: COLORS.ACCENT_PURPLE
+                                                    backgroundColor: ACCENT_COLORS.ACCENT_PURPLE
                                                 }
                                             ]}
                                         />
@@ -753,7 +753,7 @@ const Analytics: React.FC = () => {
                                                 styles.bar,
                                                 {
                                                     height: Math.max(proteinHeight, 1), // Minimum height of 1
-                                                    backgroundColor: COLORS.ACCENT_GREEN,
+                                                    backgroundColor: ACCENT_COLORS.ACCENT_GREEN,
                                                     width: 4,
                                                     marginLeft: 2
                                                 }
@@ -765,14 +765,14 @@ const Analytics: React.FC = () => {
                                                 styles.bar,
                                                 {
                                                     height: Math.max(carbsHeight, 1), // Minimum height of 1
-                                                    backgroundColor: COLORS.ACCENT_BLUE,
+                                                    backgroundColor: ACCENT_COLORS.ACCENT_BLUE,
                                                     width: 4,
                                                     marginLeft: 1
                                                 }
                                             ]}
                                         />
                                     </View>
-                                    <Text style={styles.barLabel}>
+                                    <Text style={[styles.barLabel, { color: theme.colors.textSecondary }]}>
                                         {typeof labelFormat === 'function' ?
                                             (selectedPeriod === '30d' ? labelFormat(day.date, index) : labelFormat(day.date)) :
                                             `W${index + 1}`}
@@ -806,29 +806,29 @@ const Analytics: React.FC = () => {
         const avgProtein = periodData.reduce((sum, day) => sum + day.protein, 0) / periodData.length;
 
         return (
-            <GradientCard style={styles.progressCard}>
-                <Text style={styles.cardTitle}>{getProgressTitle(selectedPeriod)}</Text>
+            <GradientCard style={styles.progressCard} cardBackground={theme.colors.cardBackground}>
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{getProgressTitle(selectedPeriod)}</Text>
 
                 <View style={styles.weeklyStats}>
                     <View style={styles.weeklyStat}>
-                        <Text style={styles.weeklyStatNumber}>{daysOnTrack}/{periodLength}</Text>
-                        <Text style={styles.weeklyStatLabel}>Days on track</Text>
+                        <Text style={[styles.weeklyStatNumber, { color: theme.colors.text }]}>{daysOnTrack}/{periodLength}</Text>
+                        <Text style={[styles.weeklyStatLabel, { color: theme.colors.textSecondary }]}>Days on track</Text>
                     </View>
                     <View style={styles.weeklyStat}>
                         <Text style={[styles.weeklyStatNumber, {
-                            color: avgCalories <= targetCalories ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: avgCalories <= targetCalories ? ACCENT_COLORS.ACCENT_GREEN : ACCENT_COLORS.ACCENT_ORANGE
                         }]}>
                             {Math.round(avgCalories)}
                         </Text>
-                        <Text style={styles.weeklyStatLabel}>Avg calories</Text>
+                        <Text style={[styles.weeklyStatLabel, { color: theme.colors.textSecondary }]}>Avg calories</Text>
                     </View>
                     <View style={styles.weeklyStat}>
                         <Text style={[styles.weeklyStatNumber, {
-                            color: Math.round(avgProtein) >= (userGoals?.proteinGoal || calculateGoalsFromProfile(userProfile).proteinGoal) ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: Math.round(avgProtein) >= (userGoals?.proteinGoal || calculateGoalsFromProfile(userProfile).proteinGoal) ? ACCENT_COLORS.ACCENT_GREEN : ACCENT_COLORS.ACCENT_ORANGE
                         }]}>
                             {Math.round(avgProtein)}g
                         </Text>
-                        <Text style={styles.weeklyStatLabel}>Avg protein</Text>
+                        <Text style={[styles.weeklyStatLabel, { color: theme.colors.textSecondary }]}>Avg protein</Text>
                     </View>
                 </View>
 
@@ -843,10 +843,10 @@ const Analytics: React.FC = () => {
                             return (
                                 <View key={index} style={styles.dayIndicator}>
                                     <View style={[styles.dayDot, {
-                                        backgroundColor: !isLogged ? COLORS.LIGHT_GRAY :
-                                            isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                        backgroundColor: !isLogged ? theme.colors.border :
+                                            isOnTrack ? ACCENT_COLORS.ACCENT_GREEN : ACCENT_COLORS.ACCENT_ORANGE
                                     }]} />
-                                    <Text style={styles.dayAbbrev}>
+                                    <Text style={[styles.dayAbbrev, { color: theme.colors.textSecondary }]}>
                                         {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })[0]}
                                     </Text>
                                 </View>
@@ -877,10 +877,10 @@ const Analytics: React.FC = () => {
                             return (
                                 <View key={i} style={styles.dayIndicator}>
                                     <View style={[styles.dayDot, {
-                                        backgroundColor: !hasLoggedDays ? COLORS.LIGHT_GRAY :
-                                            isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                        backgroundColor: !hasLoggedDays ? theme.colors.border :
+                                            isOnTrack ? ACCENT_COLORS.ACCENT_GREEN : ACCENT_COLORS.ACCENT_ORANGE
                                     }]} />
-                                    <Text style={styles.dayAbbrev}>
+                                    <Text style={[styles.dayAbbrev, { color: theme.colors.textSecondary }]}>
                                         W{i + 1}
                                     </Text>
                                 </View>
@@ -912,10 +912,10 @@ const Analytics: React.FC = () => {
                             return (
                                 <View key={i} style={styles.dayIndicator}>
                                     <View style={[styles.dayDot, {
-                                        backgroundColor: !hasLoggedDays ? COLORS.LIGHT_GRAY :
-                                            isOnTrack ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                                        backgroundColor: !hasLoggedDays ? theme.colors.border :
+                                            isOnTrack ? ACCENT_COLORS.ACCENT_GREEN : ACCENT_COLORS.ACCENT_ORANGE
                                     }]} />
-                                    <Text style={styles.dayAbbrev}>
+                                    <Text style={[styles.dayAbbrev, { color: theme.colors.textSecondary }]}>
                                         W{i + 1}
                                     </Text>
                                 </View>
@@ -977,16 +977,16 @@ const Analytics: React.FC = () => {
         }
 
         return (
-            <GradientCard style={styles.quickWinsCard}>
-                <Text style={styles.cardTitle}>Quick Wins</Text>
-                <Text style={styles.quickWinsSubtitle}>Simple changes for better results</Text>
+            <GradientCard style={styles.quickWinsCard} cardBackground={theme.colors.cardBackground}>
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Quick Wins</Text>
+                <Text style={[styles.quickWinsSubtitle, { color: theme.colors.textSecondary }]}>Simple changes for better results</Text>
 
                 {tips.slice(0, 3).map((tip, index) => (
                     <View key={index} style={styles.tipRow}>
                         <Text style={styles.tipIcon}>{tip.icon}</Text>
                         <View style={styles.tipContent}>
-                            <Text style={styles.tipTitle}>{tip.title}</Text>
-                            <Text style={styles.tipSubtitle}>{tip.subtitle}</Text>
+                            <Text style={[styles.tipTitle, { color: theme.colors.text }]}>{tip.title}</Text>
+                            <Text style={[styles.tipSubtitle, { color: theme.colors.textSecondary }]}>{tip.subtitle}</Text>
                         </View>
                     </View>
                 ))}
@@ -1003,24 +1003,24 @@ const Analytics: React.FC = () => {
             return (
                 <>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_GREEN }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 1-4</Text>
-                            <Text style={styles.timelineDescription}>Water weight loss (1-3kg)</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 1-4</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Water weight loss (1-3kg)</Text>
                         </View>
                     </View>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_BLUE }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 5-12</Text>
-                            <Text style={styles.timelineDescription}>Steady fat loss (0.5-1kg/week)</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 5-12</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Steady fat loss (0.5-1kg/week)</Text>
                         </View>
                     </View>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_PURPLE }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 13+</Text>
-                            <Text style={styles.timelineDescription}>Body recomposition</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 13+</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Body recomposition</Text>
                         </View>
                     </View>
                 </>
@@ -1029,24 +1029,24 @@ const Analytics: React.FC = () => {
             return (
                 <>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_GREEN }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 1-4</Text>
-                            <Text style={styles.timelineDescription}>{isNewbie ? 'Strength gains' : 'Muscle pumps'}</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 1-4</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>{isNewbie ? 'Strength gains' : 'Muscle pumps'}</Text>
                         </View>
                     </View>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_BLUE }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 5-12</Text>
-                            <Text style={styles.timelineDescription}>Muscle growth phase</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 5-12</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Muscle growth phase</Text>
                         </View>
                     </View>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_PURPLE }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 13+</Text>
-                            <Text style={styles.timelineDescription}>Strength & definition</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 13+</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Strength & definition</Text>
                         </View>
                     </View>
                 </>
@@ -1056,24 +1056,24 @@ const Analytics: React.FC = () => {
             return (
                 <>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_GREEN }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_GREEN }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 1-4</Text>
-                            <Text style={styles.timelineDescription}>Habit formation</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 1-4</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Habit formation</Text>
                         </View>
                     </View>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_BLUE }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_BLUE }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 5-12</Text>
-                            <Text style={styles.timelineDescription}>Energy & vitality</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 5-12</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Energy & vitality</Text>
                         </View>
                     </View>
                     <View style={styles.timelineItem}>
-                        <View style={[styles.timelineDot, { backgroundColor: COLORS.ACCENT_PURPLE }]} />
+                        <View style={[styles.timelineDot, { backgroundColor: ACCENT_COLORS.ACCENT_PURPLE }]} />
                         <View style={styles.timelineContent}>
-                            <Text style={styles.timelineDate}>Week 13+</Text>
-                            <Text style={styles.timelineDescription}>Long-term wellness</Text>
+                            <Text style={[styles.timelineDate, { color: theme.colors.text }]}>Week 13+</Text>
+                            <Text style={[styles.timelineDescription, { color: theme.colors.textSecondary }]}>Long-term wellness</Text>
                         </View>
                     </View>
                 </>
@@ -1107,19 +1107,19 @@ const Analytics: React.FC = () => {
         const metabolicAge = Math.max(18, userAge + Object.values(metabolicAgeModifiers).reduce((sum, mod) => sum + mod, 0));
 
         return (
-            <GradientCard style={styles.predictiveCard}>
-                <Text style={styles.cardTitle}>🔮 Predictive Insights</Text>
+            <GradientCard style={styles.predictiveCard} cardBackground={theme.colors.cardBackground}>
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]}>🔮 Predictive Insights</Text>
 
                 {/* Goal Projection */}
                 <View style={styles.predictionSection}>
                     <View style={styles.predictionHeader}>
-                        <MaterialCommunityIcons name="target" size={20} color={COLORS.ACCENT_GREEN} />
-                        <Text style={styles.predictionTitle}>Goal Projection</Text>
+                        <MaterialCommunityIcons name="target" size={20} color={ACCENT_COLORS.ACCENT_GREEN} />
+                        <Text style={[styles.predictionTitle, { color: theme.colors.text }]}>Goal Projection</Text>
                     </View>
                     {weeksToGoal && weeksToGoal <= 52 ? (
-                        <Text style={styles.predictionText}>
+                        <Text style={[styles.predictionText, { color: theme.colors.textSecondary }]}>
                             📅 You should reach {goalWeight}kg by{'\n'}
-                            <Text style={styles.highlightText}>
+                            <Text style={[styles.highlightText, { color: ACCENT_COLORS.ACCENT_GREEN }]}>
                                 {new Date(Date.now() + weeksToGoal * 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
                                     month: 'long',
                                     day: 'numeric'
@@ -1127,7 +1127,7 @@ const Analytics: React.FC = () => {
                             </Text>
                         </Text>
                     ) : (
-                        <Text style={styles.predictionText}>
+                        <Text style={[styles.predictionText, { color: theme.colors.textSecondary }]}>
                             📈 Adjust your calorie surplus to see goal completion date
                         </Text>
                     )}
@@ -1136,17 +1136,17 @@ const Analytics: React.FC = () => {
                 {/* Metabolic Age */}
                 <View style={styles.predictionSection}>
                     <View style={styles.predictionHeader}>
-                        <MaterialCommunityIcons name="dna" size={20} color={COLORS.ACCENT_BLUE} />
-                        <Text style={styles.predictionTitle}>Metabolic Age</Text>
+                        <MaterialCommunityIcons name="dna" size={20} color={ACCENT_COLORS.ACCENT_BLUE} />
+                        <Text style={[styles.predictionTitle, { color: theme.colors.text }]}>Metabolic Age</Text>
                     </View>
-                    <Text style={styles.predictionText}>
+                    <Text style={[styles.predictionText, { color: theme.colors.textSecondary }]}>
                         🧬 Your nutrition patterns suggest a{'\n'}metabolic age of{' '}
                         <Text style={[styles.highlightText, {
-                            color: metabolicAge <= userAge ? COLORS.ACCENT_GREEN : COLORS.ACCENT_ORANGE
+                            color: metabolicAge <= userAge ? ACCENT_COLORS.ACCENT_GREEN : ACCENT_COLORS.ACCENT_ORANGE
                         }]}>{metabolicAge} years</Text>
                     </Text>
                     {metabolicAge > userAge && (
-                        <Text style={styles.improvementTip}>
+                        <Text style={[styles.improvementTip, { color: ACCENT_COLORS.ACCENT_BLUE }]}>
                             💡 Increase protein and meal consistency to improve
                         </Text>
                     )}
@@ -1155,8 +1155,8 @@ const Analytics: React.FC = () => {
                 {/* Transformation Timeline */}
                 <View style={styles.predictionSection}>
                     <View style={styles.predictionHeader}>
-                        <MaterialCommunityIcons name="timeline-text" size={20} color={COLORS.ACCENT_PURPLE} />
-                        <Text style={styles.predictionTitle}>Transformation Timeline</Text>
+                        <MaterialCommunityIcons name="timeline-text" size={20} color={ACCENT_COLORS.ACCENT_PURPLE} />
+                        <Text style={[styles.predictionTitle, { color: theme.colors.text }]}>Transformation Timeline</Text>
                     </View>
                     <View style={styles.timelineContainer}>
                         {renderDynamicTimeline(userProfile)}
@@ -1167,10 +1167,10 @@ const Analytics: React.FC = () => {
     };
 
     const renderInsights = () => (
-        <GradientCard style={styles.insightsCard}>
-            <Text style={styles.cardTitle}>Personalized Insights</Text>
+        <GradientCard style={styles.insightsCard} cardBackground={theme.colors.cardBackground}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Personalized Insights</Text>
             {insights.length === 0 ? (
-                <Text style={styles.noInsightsText}>
+                <Text style={[styles.noInsightsText, { color: theme.colors.textSecondary }]}>
                     Continue logging meals to receive personalized insights and recommendations.
                 </Text>
             ) : (
@@ -1182,11 +1182,11 @@ const Analytics: React.FC = () => {
                                 size={20}
                                 color={getInsightColor(insight.type)}
                             />
-                            <Text style={styles.insightTitle}>{insight.title}</Text>
+                            <Text style={[styles.insightTitle, { color: theme.colors.text }]}>{insight.title}</Text>
                         </View>
-                        <Text style={styles.insightDescription}>{insight.description}</Text>
+                        <Text style={[styles.insightDescription, { color: theme.colors.textSecondary }]}>{insight.description}</Text>
                         {insight.recommendation && (
-                            <Text style={styles.insightRecommendation}>
+                            <Text style={[styles.insightRecommendation, { color: ACCENT_COLORS.ACCENT_BLUE }]}>
                                 💡 {insight.recommendation}
                             </Text>
                         )}
@@ -1198,18 +1198,18 @@ const Analytics: React.FC = () => {
 
     if (loading) {
         return (
-            <View style={styles.container}>
+            <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
                 {renderHeader()}
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.ACCENT_PURPLE} />
-                    <Text style={styles.loadingText}>Analyzing your nutrition data...</Text>
+                    <ActivityIndicator size="large" color={ACCENT_COLORS.ACCENT_PURPLE} />
+                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Analyzing your nutrition data...</Text>
                 </View>
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             {renderHeader()}
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {renderPeriodSelector()}
@@ -1230,10 +1230,9 @@ const Analytics: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.PRIMARY_BG,
     },
     headerSafeArea: {
-        backgroundColor: COLORS.PRIMARY_BG,
+        // backgroundColor applied dynamically
     },
     header: {
         flexDirection: 'row',
@@ -1259,7 +1258,6 @@ const styles = StyleSheet.create({
     },
     periodSelector: {
         flexDirection: 'row',
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: cardRadius,
         padding: 4,
         marginBottom: cardSpacing,
@@ -1271,15 +1269,14 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     periodButtonActive: {
-        backgroundColor: COLORS.ACCENT_PURPLE,
+        backgroundColor: ACCENT_COLORS.ACCENT_PURPLE,
     },
     periodButtonText: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         fontWeight: '500',
     },
     periodButtonTextActive: {
-        color: COLORS.WHITE,
+        color: '#FFFFFF',
         fontWeight: '600',
     },
     cardContainer: {
@@ -1288,14 +1285,12 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     gradientCard: {
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: cardRadius,
         padding: horizontalPadding,
     },
     cardTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: COLORS.WHITE,
         marginBottom: 15,
     },
     scoreCard: {},
@@ -1312,7 +1307,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     scoreLabel: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         marginTop: 5,
     },
@@ -1326,12 +1320,10 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     scoreValue: {
-        color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: '600',
     },
     scoreItemLabel: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
     },
     macroCard: {},
@@ -1343,18 +1335,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     macroStatValue: {
-        color: COLORS.WHITE,
         fontSize: 18,
         fontWeight: 'bold',
     },
     macroStatLabel: {
-        color: COLORS.SUBDUED,
         fontSize: 12,
         marginTop: 2,
     },
     insightsCard: {},
     noInsightsText: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         textAlign: 'center',
         fontStyle: 'italic',
@@ -1371,19 +1360,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     insightTitle: {
-        color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 10,
     },
     insightDescription: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         lineHeight: 20,
         marginBottom: 8,
     },
     insightRecommendation: {
-        color: COLORS.ACCENT_BLUE,
         fontSize: 14,
         lineHeight: 20,
         fontStyle: 'italic',
@@ -1395,7 +1381,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loadingText: {
-        color: COLORS.SUBDUED,
         fontSize: 16,
         marginTop: 15,
     },
@@ -1414,13 +1399,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     weeklyStatNumber: {
-        color: COLORS.WHITE,
         fontSize: 24,
         fontWeight: 'bold',
         marginBottom: 4,
     },
     weeklyStatLabel: {
-        color: COLORS.SUBDUED,
         fontSize: 12,
         textAlign: 'center',
     },
@@ -1442,13 +1425,11 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     dayAbbrev: {
-        color: COLORS.SUBDUED,
         fontSize: 10,
     },
     // Quick wins styles
     quickWinsCard: {},
     quickWinsSubtitle: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         marginBottom: 15,
         fontStyle: 'italic',
@@ -1469,13 +1450,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     tipTitle: {
-        color: COLORS.WHITE,
         fontSize: 14,
         fontWeight: '600',
         marginBottom: 2,
     },
     tipSubtitle: {
-        color: COLORS.SUBDUED,
         fontSize: 12,
     },
     predictiveCard: {},
@@ -1491,24 +1470,20 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     predictionTitle: {
-        color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 8,
     },
     predictionText: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         lineHeight: 22,
         marginBottom: 8,
     },
     highlightText: {
-        color: COLORS.ACCENT_GREEN,
         fontWeight: '600',
         fontSize: 16,
     },
     improvementTip: {
-        color: COLORS.ACCENT_BLUE,
         fontSize: 13,
         fontStyle: 'italic',
         marginTop: 8,
@@ -1536,19 +1511,16 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     timelineDate: {
-        color: COLORS.WHITE,
         fontSize: 13,
         fontWeight: '600',
         marginBottom: 2,
     },
     timelineDescription: {
-        color: COLORS.SUBDUED,
         fontSize: 12,
         lineHeight: 16,
     },
     // Chart styles
     chartSubtitle: {
-        color: COLORS.SUBDUED,
         fontSize: 14,
         marginTop: -10,
         marginBottom: 15,
@@ -1575,10 +1547,9 @@ const styles = StyleSheet.create({
     bar: {
         width: 6,
         borderRadius: 3,
-        backgroundColor: COLORS.ACCENT_PURPLE,
+        backgroundColor: ACCENT_COLORS.ACCENT_PURPLE,
     },
     barLabel: {
-        color: COLORS.SUBDUED,
         fontSize: 10,
         marginTop: 4,
     },
@@ -1598,14 +1569,12 @@ const styles = StyleSheet.create({
         marginRight: 5,
     },
     legendText: {
-        color: COLORS.SUBDUED,
         fontSize: 12,
     },
 
     // Progress styles
     progressBar: {
         height: 20,
-        backgroundColor: COLORS.CARD_BG,
         borderRadius: 10,
         marginVertical: 10,
         overflow: 'hidden',
@@ -1615,7 +1584,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
     },
     progressSummary: {
-        color: COLORS.SUBDUED,
         fontSize: 12,
         textAlign: 'center',
         marginTop: 5,

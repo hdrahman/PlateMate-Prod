@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -33,6 +34,7 @@ interface ViewableItemsChangedInfo {
 }
 
 const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollX = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<FlatList>(null);
@@ -96,7 +98,7 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <FlatList
                 ref={flatListRef}
                 data={[0, 1, 2]}

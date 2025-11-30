@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../utils/supabaseClient';
+import { ThemeContext } from '../../ThemeContext';
 
 interface BasicInfoStepProps {
     profile: UserProfile;
@@ -35,6 +36,7 @@ const PasswordRequirement: React.FC<{ text: string; met: boolean }> = ({ text, m
 );
 
 const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState(profile.password || '');
@@ -177,20 +179,20 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
     }, [firstName, email, password, age]);
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
-                <Text style={styles.title}>Let's Get Started</Text>
-                <Text style={styles.subtitle}>Tell us a bit about yourself</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Let's Get Started</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Tell us a bit about yourself</Text>
             </View>
 
             <View style={styles.form}>
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>First Name</Text>
-                    <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>First Name</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { color: theme.colors.text }]}
                             placeholder="Enter your first name"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={firstName}
                             onChangeText={setFirstName}
                             autoCapitalize="words"
@@ -201,12 +203,12 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
 
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Email</Text>
-                    <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Email</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { color: theme.colors.text }]}
                             placeholder="Enter your email"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={email}
                             onChangeText={setEmail}
                             keyboardType="email-address"
@@ -216,12 +218,12 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                 </View>
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Password</Text>
-                    <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Password</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={[styles.input, styles.passwordInput]}
+                            style={[styles.input, styles.passwordInput, { color: theme.colors.text }]}
                             placeholder="Enter your password"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={password}
                             onChangeText={setPassword}
                             onFocus={() => setPasswordTouched(true)}
@@ -235,12 +237,12 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                             <Ionicons
                                 name={showPassword ? "eye-off" : "eye"}
                                 size={20}
-                                color="#666"
+                                color={theme.colors.textSecondary}
                             />
                         </TouchableOpacity>
                     </View>
                     {passwordTouched && (
-                        <View style={styles.passwordRequirements}>
+                        <View style={[styles.passwordRequirements, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                             <PasswordRequirement
                                 text="At least 8 characters"
                                 met={validatePassword(password).checks.minLength}
@@ -266,24 +268,24 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                 </View>
 
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Age</Text>
-                    <View style={styles.inputContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Age</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { color: theme.colors.text }]}
                             placeholder="Enter your age"
-                            placeholderTextColor="#666"
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={age}
                             onChangeText={handleAgeInput}
                             keyboardType="numeric"
                         />
                     </View>
-                    <Text style={styles.hint}>You must be at least 13 years old</Text>
+                    <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>You must be at least 13 years old</Text>
                 </View>
             </View>
 
-            <View style={styles.infoContainer}>
-                <Ionicons name="shield-checkmark-outline" size={20} color="#888" />
-                <Text style={styles.infoText}>
+            <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={theme.colors.textSecondary} />
+                <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                     Your information is securely stored and never shared with third parties
                 </Text>
             </View>
@@ -294,7 +296,7 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ profile, updateProfile, o
                 disabled={isLoading}
             >
                 <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    colors={[theme.colors.primary, "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.buttonGradient}

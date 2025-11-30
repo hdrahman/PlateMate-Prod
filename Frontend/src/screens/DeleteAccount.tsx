@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -14,10 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
+import { ThemeContext } from '../ThemeContext';
 
 export default function DeleteAccount() {
     const navigation = useNavigation<any>();
     const { user, signOut } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -103,36 +105,36 @@ export default function DeleteAccount() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={28} color="#FFF" />
+                    <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Delete Account</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Delete Account</Text>
             </View>
 
             <View style={styles.content}>
                 <View style={styles.warningContainer}>
-                    <Ionicons name="warning-outline" size={60} color="#FF4C4C" />
-                    <Text style={styles.warningTitle}>Delete Your Account</Text>
-                    <Text style={styles.warningText}>
+                    <Ionicons name="warning-outline" size={60} color={theme.colors.error} />
+                    <Text style={[styles.warningTitle, { color: theme.colors.error }]}>Delete Your Account</Text>
+                    <Text style={[styles.warningText, { color: theme.colors.textSecondary }]}>
                         This action is permanent and cannot be undone. All your data, including
                         saved meals, nutrition logs, and preferences will be permanently deleted.
                     </Text>
                 </View>
 
                 <View style={styles.formGroup}>
-                    <Text style={styles.label}>Confirm with your password</Text>
-                    <View style={styles.passwordContainer}>
+                    <Text style={[styles.label, { color: theme.colors.text }]}>Confirm with your password</Text>
+                    <View style={[styles.passwordContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                         <TextInput
-                            style={styles.passwordInput}
+                            style={[styles.passwordInput, { color: theme.colors.text }]}
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry={!showPassword}
                             placeholder="Enter your password"
-                            placeholderTextColor="#888"
+                            placeholderTextColor={theme.colors.textSecondary}
                         />
                         <TouchableOpacity
                             style={styles.eyeIcon}
@@ -141,7 +143,7 @@ export default function DeleteAccount() {
                             <Ionicons
                                 name={showPassword ? "eye-off-outline" : "eye-outline"}
                                 size={24}
-                                color="#FFF"
+                                color={theme.colors.text}
                             />
                         </TouchableOpacity>
                     </View>
@@ -149,14 +151,14 @@ export default function DeleteAccount() {
 
                 <View style={styles.checkboxContainer}>
                     <TouchableOpacity
-                        style={styles.checkbox}
+                        style={[styles.checkbox, { borderColor: theme.colors.error }]}
                         onPress={() => setConfirmed(!confirmed)}
                     >
                         {confirmed && (
-                            <Ionicons name="checkmark" size={20} color="#FFF" />
+                            <Ionicons name="checkmark" size={20} color={theme.colors.text} />
                         )}
                     </TouchableOpacity>
-                    <Text style={styles.checkboxLabel}>
+                    <Text style={[styles.checkboxLabel, { color: theme.colors.text }]}>
                         I understand this action is permanent and cannot be undone
                     </Text>
                 </View>
@@ -164,13 +166,14 @@ export default function DeleteAccount() {
                 <TouchableOpacity
                     style={[
                         styles.deleteButton,
+                        { backgroundColor: theme.colors.error },
                         (!confirmed || !password || isLoading) && styles.disabledButton
                     ]}
                     onPress={handleConfirmDelete}
                     disabled={!confirmed || !password || isLoading}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color="#FFF" />
+                        <ActivityIndicator color={theme.colors.text} />
                     ) : (
                         <Text style={styles.deleteButtonText}>
                             Delete My Account
@@ -185,21 +188,18 @@ export default function DeleteAccount() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         height: 60,
         borderBottomWidth: 1,
-        borderBottomColor: '#444',
         paddingHorizontal: 16,
     },
     backButton: {
         padding: 5,
     },
     headerTitle: {
-        color: '#FFF',
         fontSize: 22,
         fontWeight: 'bold',
         marginLeft: 10,
@@ -215,13 +215,11 @@ const styles = StyleSheet.create({
     warningTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: '#FF4C4C',
         marginTop: 10,
         marginBottom: 10,
     },
     warningText: {
         fontSize: 15,
-        color: '#CCC',
         textAlign: 'center',
         lineHeight: 22,
     },
@@ -229,21 +227,17 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     label: {
-        color: '#FFF',
         fontSize: 16,
         marginBottom: 8,
     },
     passwordContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1A1A1A',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#333',
     },
     passwordInput: {
         flex: 1,
-        color: '#FFF',
         height: 50,
         paddingHorizontal: 15,
         fontSize: 16,
@@ -261,25 +255,21 @@ const styles = StyleSheet.create({
         height: 24,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#FF4C4C',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 10,
     },
     checkboxLabel: {
-        color: '#FFF',
         fontSize: 14,
         flex: 1,
     },
     deleteButton: {
-        backgroundColor: '#FF4C4C',
         height: 50,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },
     disabledButton: {
-        backgroundColor: '#661A1A',
         opacity: 0.7,
     },
     deleteButtonText: {

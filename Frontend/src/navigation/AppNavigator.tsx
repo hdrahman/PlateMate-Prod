@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { ThemeContext } from '../ThemeContext';
 
 // Import screens
 import ProfileScreen from '../screens/ProfileScreen';
@@ -77,6 +78,8 @@ const Tab = createBottomTabNavigator();
 
 // Bottom tab navigator
 const MainTabNavigator = () => {
+    const { theme } = useContext(ThemeContext);
+
     return (
         <Tab.Navigator
             id={undefined}
@@ -97,11 +100,11 @@ const MainTabNavigator = () => {
                     // You can return any component here
                     return <Ionicons name={iconName as any} size={size} color={color} />;
                 },
-                tabBarActiveTintColor: '#2196F3',
-                tabBarInactiveTintColor: 'gray',
+                tabBarActiveTintColor: theme.colors.tabBarActive,
+                tabBarInactiveTintColor: theme.colors.tabBarInactive,
                 tabBarStyle: {
-                    backgroundColor: '#1C1C1E',
-                    borderTopColor: '#333',
+                    backgroundColor: theme.colors.tabBarBackground,
+                    borderTopColor: theme.colors.border,
                 },
                 tabBarHideOnKeyboard: true,
                 headerShown: false,
@@ -116,13 +119,15 @@ const MainTabNavigator = () => {
 
 // Main stack navigator
 const AppNavigator = () => {
+    const { theme } = useContext(ThemeContext);
+
     return (
         <NavigationContainer>
             <Stack.Navigator
                 id={undefined}
                 screenOptions={{
                     headerShown: false,
-                    cardStyle: { backgroundColor: '#000' },
+                    cardStyle: { backgroundColor: theme.colors.background },
                 }}
             >
                 <Stack.Screen name="Main" component={MainTabNavigator} />

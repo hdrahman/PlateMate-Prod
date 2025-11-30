@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { ThemeContext } from '../../ThemeContext';
 
 interface Achievement {
     id: number;
@@ -27,23 +28,26 @@ interface AchievementPopupProps {
 
 const { width, height } = Dimensions.get('window');
 
-const COLORS = {
-    WHITE: '#FFFFFF',
-    BLACK: '#000000',
-    GRAY: '#8E8E93',
-    GRADIENT_START: '#FF6B6B',
-    GRADIENT_MIDDLE: '#4ECDC4',
-    GRADIENT_END: '#45B7D1',
-    GOLD: '#FFD700',
-    DARK_GRAY: '#2C2C2E',
-    LIGHT_GRAY: '#F2F2F7',
-};
-
 const AchievementPopup: React.FC<AchievementPopupProps> = ({
     achievement,
     visible,
     onClose,
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
+    const COLORS = {
+        WHITE: theme.colors.text,
+        BLACK: theme.colors.shadow,
+        GRAY: theme.colors.textSecondary,
+        GRADIENT_START: '#FF6B6B',
+        GRADIENT_MIDDLE: '#4ECDC4',
+        GRADIENT_END: '#45B7D1',
+        GOLD: '#FFD700',
+        DARK_GRAY: theme.colors.cardBackground,
+        LIGHT_GRAY: theme.colors.background,
+        OVERLAY: theme.colors.overlay,
+    };
+
     const [scaleAnim] = useState(new Animated.Value(0));
     const [rotateAnim] = useState(new Animated.Value(0));
     const [opacityAnim] = useState(new Animated.Value(0));
@@ -107,6 +111,8 @@ const AchievementPopup: React.FC<AchievementPopupProps> = ({
         inputRange: [0, 1],
         outputRange: ['0deg', '360deg'],
     });
+
+    const styles = createStyles(theme, isDarkTheme);
 
     if (!achievement) return null;
 
@@ -207,10 +213,10 @@ const AchievementPopup: React.FC<AchievementPopupProps> = ({
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any, isDarkTheme: boolean) => StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: theme.colors.overlay,
         justifyContent: 'center',
         alignItems: 'center',
     },

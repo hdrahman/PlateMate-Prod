@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
     Platform,
     Dimensions
 } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +36,8 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
     icon,
     trialText = "10 days free • Cancel anytime"
 }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
+
     return (
         <Modal
             visible={visible}
@@ -44,18 +47,18 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
         >
             <View style={styles.overlay}>
                 {Platform.OS === 'ios' ? (
-                    <BlurView 
-                        intensity={15} 
+                    <BlurView
+                        intensity={15}
                         tint="dark"
                         style={styles.blurOverlay}
                     >
-                        <View style={styles.blurBackdrop} />
+                        <View style={[styles.blurBackdrop, { backgroundColor: isDarkTheme ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.3)' }]} />
                         <View style={styles.cardContent}>
                             <LinearGradient
                                 colors={['#5A60EA', '#FF00F5']}
                                 style={styles.cardGradient}
                             >
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.closeButton}
                                     onPress={onClose}
                                 >
@@ -75,7 +78,7 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
                                     ))}
                                 </View>
 
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.upgradeButton}
                                     onPress={onUpgrade}
                                 >
@@ -87,13 +90,13 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
                         </View>
                     </BlurView>
                 ) : (
-                    <View style={[styles.blurOverlay, styles.androidBlurOverlay]}>
+                    <View style={[styles.blurOverlay, styles.androidBlurOverlay, { backgroundColor: isDarkTheme ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.7)' }]}>
                         <View style={styles.cardContent}>
                             <LinearGradient
                                 colors={['#5A60EA', '#FF00F5']}
                                 style={styles.cardGradient}
                             >
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.closeButton}
                                     onPress={onClose}
                                 >
@@ -113,7 +116,7 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
                                     ))}
                                 </View>
 
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.upgradeButton}
                                     onPress={onUpgrade}
                                 >
@@ -149,10 +152,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
     },
     androidBlurOverlay: {
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
     },
     cardContent: {
         width: '100%',

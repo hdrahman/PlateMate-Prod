@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
+import { ThemeContext } from '../../ThemeContext';
 
 interface ActivityLevelStepProps {
     profile: UserProfile;
@@ -16,6 +17,7 @@ interface ActivityLevelStepProps {
 }
 
 const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [activityLevel, setActivityLevel] = useState<string>(profile.activityLevel || 'sedentary');
 
     // Activity levels with concise descriptions
@@ -69,10 +71,10 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
-                <Text style={styles.title}>Activity Level</Text>
-                <Text style={styles.subtitle}>How active are you in your daily life?</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Activity Level</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>How active are you in your daily life?</Text>
             </View>
 
             <View style={styles.content}>
@@ -82,7 +84,8 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
                             key={level.id}
                             style={[
                                 styles.activityCard,
-                                activityLevel === level.id && styles.selectedActivity
+                                { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border },
+                                activityLevel === level.id && [styles.selectedActivity, { borderColor: theme.colors.primary }]
                             ]}
                             onPress={() => {
                                 setActivityLevel(level.id);
@@ -93,17 +96,18 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
                                 <Ionicons
                                     name={level.icon as any}
                                     size={24}
-                                    color={activityLevel === level.id ? level.color : '#777'}
+                                    color={activityLevel === level.id ? level.color : theme.colors.textSecondary}
                                 />
                             </View>
                             <View style={styles.activityContent}>
                                 <Text style={[
                                     styles.activityLabel,
+                                    { color: theme.colors.text },
                                     activityLevel === level.id && { color: level.color }
                                 ]}>
                                     {level.label}
                                 </Text>
-                                <Text style={styles.activityDescription}>
+                                <Text style={[styles.activityDescription, { color: theme.colors.textSecondary }]}>
                                     {level.description}
                                 </Text>
                             </View>
@@ -114,9 +118,9 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
                     ))}
                 </View>
 
-                <View style={styles.infoContainer}>
-                    <Ionicons name="information-circle-outline" size={20} color="#888" />
-                    <Text style={styles.infoText}>
+                <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                    <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                         Your activity level helps us calculate your daily calorie needs. You can leave it at sedentary and the app will track your steps for accurate calorie targets.
                     </Text>
                 </View>
@@ -124,7 +128,7 @@ const ActivityLevelStep: React.FC<ActivityLevelStepProps> = ({ profile, updatePr
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
                 <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    colors={[theme.colors.primary, "#5c00dd", "#dd0095"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.buttonGradient}

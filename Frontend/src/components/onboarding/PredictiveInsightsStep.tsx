@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { ThemeContext } from '../../ThemeContext';
 import {
     View,
     Text,
@@ -75,6 +76,7 @@ interface SuccessMetric {
 const { width, height } = Dimensions.get('window');
 
 const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile, updateProfile, onComplete }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { user, signUp } = useAuth(); // Get current user and signUp function
     const [targetDate, setTargetDate] = useState<string>('');
     const [dailyCalories, setDailyCalories] = useState<number>(0);
@@ -674,7 +676,7 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
                 {/* Header handled at screen level – removed duplicate back/progress bar */}
 
@@ -705,10 +707,10 @@ const PredictiveInsightsStep: React.FC<PredictiveInsightsStepProps> = ({ profile
             {/* Loading Overlay */}
             {isLoading && loadingMessage && (
                 <View style={styles.loadingOverlay}>
-                    <View style={styles.loadingCard}>
+                    <View style={[styles.loadingCard, { backgroundColor: theme.colors.cardBackground }]}>
                         <ActivityIndicator size="large" color="#9D4EDD" />
-                        <Text style={styles.loadingMessage}>{loadingMessage}</Text>
-                        <Text style={styles.loadingSubtext}>This may take a few seconds...</Text>
+                        <Text style={[styles.loadingMessage, { color: theme.colors.text }]}>{loadingMessage}</Text>
+                        <Text style={[styles.loadingSubtext, { color: theme.colors.textSecondary }]}>This may take a few seconds...</Text>
                     </View>
                 </View>
             )}

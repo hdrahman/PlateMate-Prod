@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -33,10 +33,23 @@ import {
 } from '../utils/foodUnitConversion';
 import { useAuth } from '../context/AuthContext';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
+import { ThemeContext } from '../ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
-// Modern color scheme
+// Accent colors that stay constant
+const ACCENT_COLORS = {
+    ACCENT_BLUE: '#0084ff',
+    ACCENT_GREEN: '#32D74B',
+    ACCENT_ORANGE: '#FF9500',
+    ACCENT_RED: '#FF3B30',
+    ACCENT_PURPLE: '#AF52DE',
+    ACCENT_PINK: '#FF2D92',
+    GLASS: 'rgba(255, 255, 255, 0.1)',
+    GLASS_BORDER: 'rgba(255, 255, 255, 0.2)',
+};
+
+// Modern color scheme (full COLORS object)
 const COLORS = {
     PRIMARY_BG: '#000000',
     SECONDARY_BG: '#111111',
@@ -69,6 +82,7 @@ const ScannedProduct: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { foodData, mealType: initialMealType } = route.params as { foodData: any; mealType?: string };
 
     // State management
@@ -83,10 +97,10 @@ const ScannedProduct: React.FC = () => {
     const [dailyGoals, setDailyGoals] = useState<UserGoals | null>(null);
 
     const mealTypes = [
-        { name: 'Breakfast', icon: 'sunny-outline', color: COLORS.ACCENT_ORANGE },
-        { name: 'Lunch', icon: 'restaurant-outline', color: COLORS.ACCENT_GREEN },
-        { name: 'Dinner', icon: 'moon-outline', color: COLORS.ACCENT_BLUE },
-        { name: 'Snacks', icon: 'cafe-outline', color: COLORS.ACCENT_PINK }
+        { name: 'Breakfast', icon: 'sunny-outline', color: ACCENT_COLORS.ACCENT_ORANGE },
+        { name: 'Lunch', icon: 'restaurant-outline', color: ACCENT_COLORS.ACCENT_GREEN },
+        { name: 'Dinner', icon: 'moon-outline', color: ACCENT_COLORS.ACCENT_BLUE },
+        { name: 'Snacks', icon: 'cafe-outline', color: ACCENT_COLORS.ACCENT_PINK }
     ];
 
     // Fetch user's daily goals

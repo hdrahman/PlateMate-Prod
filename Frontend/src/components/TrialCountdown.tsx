@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
@@ -25,7 +26,8 @@ interface TrialCountdownProps {
 export default function TrialCountdown({ visible = true, style, compact = false }: TrialCountdownProps) {
   const navigation = useNavigation<NavigationProp<any>>();
   const { user } = useAuth();
-  
+  const { theme, isDarkTheme } = useContext(ThemeContext);
+
   const [trialStatus, setTrialStatus] = useState<{
     isInTrial: boolean;
     trialType: 'promotional' | 'store' | 'none';
@@ -33,17 +35,17 @@ export default function TrialCountdown({ visible = true, style, compact = false 
     trialEndDate: string | null;
     canUpgrade: boolean;
   } | null>(null);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [isExtending, setIsExtending] = useState(false);
 
   useEffect(() => {
     loadTrialStatus();
-    
+
     // Refresh trial status every minute
     const interval = setInterval(loadTrialStatus, 60000);
-    
+
     return () => clearInterval(interval);
   }, [user]);
 
@@ -52,13 +54,13 @@ export default function TrialCountdown({ visible = true, style, compact = false 
 
     try {
       setIsLoading(true);
-      
+
       // Get promotional trial status first
       const promoTrialStatus = await SubscriptionService.getPromotionalTrialStatus();
       const subscriptionStatus = await SubscriptionManager.getSubscriptionStatus();
-      
+
       let status;
-      
+
       if (promoTrialStatus.isActive) {
         // User is in 20-day promotional trial
         status = {
@@ -87,9 +89,9 @@ export default function TrialCountdown({ visible = true, style, compact = false 
           canUpgrade: false,
         };
       }
-      
+
       setTrialStatus(status);
-      
+
       // Show upgrade prompts for promotional trial
       if (status.trialType === 'promotional' && status.canUpgrade && status.daysRemaining <= 15) {
         // Show upgrade prompt for promotional trial users
@@ -100,7 +102,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
           }, 2000); // Show after 2 seconds
         }
       }
-      
+
     } catch (error) {
       console.error('❌ Error loading trial status:', error);
     } finally {
@@ -132,7 +134,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
   const handleUpgradeToSubscription = () => {
     // Navigate to subscription screen for promotional trial users
     setShowExtensionModal(false);
-    
+
     // Use the navigation to go to Premium Subscription screen
     navigation.navigate('PremiumSubscription' as never);
   };
@@ -156,10 +158,10 @@ export default function TrialCountdown({ visible = true, style, compact = false 
   }
 
   const { daysRemaining, trialType, canUpgrade } = trialStatus;
-  
+
   const isUrgent = daysRemaining <= 3;
   const isLastDay = daysRemaining <= 1;
-  
+
   const getStatusColor = () => {
     if (isLastDay) return '#FF4444';
     if (isUrgent) return '#FF9500';
@@ -168,7 +170,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
 
   const getStatusText = () => {
     const trialTypeName = trialType === 'promotional' ? 'free access' : 'subscription trial';
-    
+
     if (isLastDay) {
       return `${trialTypeName} expires ${daysRemaining === 0 ? 'today' : 'tomorrow'}`;
     }
@@ -187,7 +189,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
             {getStatusText()}
           </Text>
           {canUpgrade && trialType === 'promotional' && (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleUpgradeToSubscription}
               style={styles.extendButton}
             >
@@ -200,23 +202,23 @@ export default function TrialCountdown({ visible = true, style, compact = false 
   );
 
   const renderFullView = () => (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.cardBackground }, style]}>
       <LinearGradient
         colors={[`${getStatusColor()}15`, `${getStatusColor()}08`]}
         style={styles.gradient}
       >
         <View style={styles.content}>
           <View style={styles.iconContainer}>
-            <Ionicons 
-              name={isUrgent ? "alert-circle" : "time-outline"} 
-              size={24} 
-              color={getStatusColor()} 
+            <Ionicons
+              name={isUrgent ? "alert-circle" : "time-outline"}
+              size={24}
+              color={getStatusColor()}
             />
           </View>
-          
+
           <View style={styles.textContainer}>
-            <Text style={styles.statusText}>{getStatusText()}</Text>
-            <Text style={styles.subtitleText}>
+            <Text style={[styles.statusText, { color: theme.colors.text }]}>{getStatusText()}</Text>
+            <Text style={[styles.subtitleText, { color: theme.colors.textSecondary }]}>
               {trialType === 'promotional' && canUpgrade
                 ? 'Subscribe now to get 10 more days free!'
                 : trialType === 'promotional'
@@ -225,21 +227,21 @@ export default function TrialCountdown({ visible = true, style, compact = false 
               }
             </Text>
           </View>
-          
+
           <View style={styles.actionContainer}>
             {trialType === 'promotional' && canUpgrade ? (
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleUpgradeToSubscription}
-                style={[styles.actionButton, { backgroundColor: getStatusColor() }]}
+                style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
               >
-                <Text style={styles.actionButtonText}>Get 10 More Days</Text>
+                <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Get 10 More Days</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleUpgradeToSubscription}
-                style={[styles.actionButton, { backgroundColor: getStatusColor() }]}
+                style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
               >
-                <Text style={styles.actionButtonText}>Subscribe Now</Text>
+                <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Subscribe Now</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -251,7 +253,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
   return (
     <>
       {compact ? renderCompactView() : renderFullView()}
-      
+
       {/* Extension Modal */}
       <Modal
         visible={showExtensionModal}
@@ -259,57 +261,57 @@ export default function TrialCountdown({ visible = true, style, compact = false 
         transparent={true}
         onRequestClose={handleDismissModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.colors.cardBackground }]}>
             <LinearGradient
               colors={['#5A60EA', '#FF00F5']}
               style={styles.modalGradient}
             >
               <View style={styles.modalContent}>
-                <Ionicons name="gift-outline" size={48} color="#FFF" />
-                
-                <Text style={styles.modalTitle}>
+                <Ionicons name="gift-outline" size={48} color={theme.colors.text} />
+
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                   {trialType === 'promotional' ? 'Get 10 More Days Free! 🎉' : 'Upgrade to Premium! 🎉'}
                 </Text>
-                
-                <Text style={styles.modalText}>
-                  {trialType === 'promotional' 
+
+                <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
+                  {trialType === 'promotional'
                     ? 'Subscribe now and get an additional 10-day free trial before your first payment!'
                     : 'Subscribe to continue enjoying all premium features without interruption.'
                   }
                 </Text>
-                
-                <Text style={styles.modalSubtext}>
+
+                <Text style={[styles.modalSubtext, { color: theme.colors.textSecondary }]}>
                   {trialType === 'promotional'
                     ? 'Auto-renew required to start. Cancel anytime during trial to avoid charges.'
                     : 'Manage your subscription anytime in your account settings.'
                   }
                 </Text>
-                
+
                 <View style={styles.modalActions}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={handleUpgradeToSubscription}
-                    style={styles.primaryModalButton}
+                    style={[styles.primaryModalButton, { backgroundColor: theme.colors.primary }]}
                   >
-                    <Text style={styles.primaryModalButtonText}>
+                    <Text style={[styles.primaryModalButtonText, { color: theme.colors.text }]}>
                       {trialType === 'promotional' ? 'Get 10 More Days' : 'Subscribe Now'}
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     onPress={handleDismissModal}
-                    style={styles.secondaryModalButton}
+                    style={[styles.secondaryModalButton, { backgroundColor: theme.colors.cardBackground }]}
                   >
-                    <Text style={styles.secondaryModalButtonText}>
+                    <Text style={[styles.secondaryModalButtonText, { color: theme.colors.text }]}>
                       Maybe Later
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     onPress={handleDismissModal}
                     style={styles.dismissButton}
                   >
-                    <Text style={styles.dismissButtonText}>Maybe Later</Text>
+                    <Text style={[styles.dismissButtonText, { color: theme.colors.textSecondary }]}>Maybe Later</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -344,12 +346,10 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
     marginBottom: 2,
   },
   subtitleText: {
     fontSize: 14,
-    color: '#FFFFFF90',
   },
   actionContainer: {
     marginLeft: 12,
@@ -360,11 +360,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionButtonText: {
-    color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   // Compact styles
   compactContainer: {
     marginHorizontal: 16,
@@ -393,15 +392,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   extendButtonText: {
-    color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -421,21 +418,18 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFF',
     marginTop: 16,
     marginBottom: 12,
     textAlign: 'center',
   },
   modalText: {
     fontSize: 16,
-    color: '#FFFFFF90',
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: 22,
   },
   modalSubtext: {
     fontSize: 14,
-    color: '#FFFFFF70',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
@@ -444,26 +438,22 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   primaryModalButton: {
-    backgroundColor: '#FFF',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
   primaryModalButtonText: {
-    color: '#5A60EA',
     fontSize: 16,
     fontWeight: 'bold',
   },
   secondaryModalButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
   secondaryModalButtonText: {
-    color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -472,7 +462,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dismissButtonText: {
-    color: '#FFFFFF60',
     fontSize: 14,
   },
 });

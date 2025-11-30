@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -9,12 +9,12 @@ import {
     ActivityIndicator,
     Switch
 } from 'react-native';
-import { useTheme } from '../ThemeContext';
+import { ThemeContext } from '../ThemeContext';
 import { postgreSQLSyncService, SyncResult, RestoreResult } from '../utils/postgreSQLSyncService';
 import { useAuth } from '../context/AuthContext';
 
 const SyncSettings: React.FC = () => {
-    const { colors } = useTheme();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { user } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
     const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null);
@@ -143,7 +143,7 @@ const SyncSettings: React.FC = () => {
     const styles = StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: colors.background,
+            backgroundColor: theme.colors.background,
         },
         scrollView: {
             flex: 1,
@@ -152,16 +152,16 @@ const SyncSettings: React.FC = () => {
         header: {
             fontSize: 24,
             fontWeight: 'bold',
-            color: colors.text,
+            color: theme.colors.text,
             marginBottom: 20,
             textAlign: 'center',
         },
         section: {
-            backgroundColor: colors.surface,
+            backgroundColor: theme.colors.cardBackground,
             borderRadius: 12,
             padding: 16,
             marginBottom: 16,
-            shadowColor: colors.text,
+            shadowColor: theme.colors.text,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 4,
@@ -170,7 +170,7 @@ const SyncSettings: React.FC = () => {
         sectionTitle: {
             fontSize: 18,
             fontWeight: '600',
-            color: colors.text,
+            color: theme.colors.text,
             marginBottom: 12,
         },
         statusRow: {
@@ -181,63 +181,63 @@ const SyncSettings: React.FC = () => {
         },
         statusLabel: {
             fontSize: 14,
-            color: colors.textSecondary,
+            color: theme.colors.textSecondary,
             flex: 1,
         },
         statusValue: {
             fontSize: 14,
-            color: colors.text,
+            color: theme.colors.text,
             fontWeight: '500',
             flex: 2,
             textAlign: 'right',
         },
         button: {
-            backgroundColor: colors.primary,
+            backgroundColor: theme.colors.primary,
             borderRadius: 12,
             padding: 16,
             alignItems: 'center',
             marginBottom: 12,
         },
         buttonSecondary: {
-            backgroundColor: colors.surface,
+            backgroundColor: theme.colors.cardBackground,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: theme.colors.border,
         },
         buttonDisabled: {
-            backgroundColor: colors.disabled,
+            backgroundColor: theme.colors.border,
         },
         buttonText: {
-            color: colors.background,
+            color: theme.colors.background,
             fontSize: 16,
             fontWeight: '600',
         },
         buttonTextSecondary: {
-            color: colors.text,
+            color: theme.colors.text,
         },
         buttonTextDisabled: {
-            color: colors.textSecondary,
+            color: theme.colors.textSecondary,
         },
         resultSection: {
             marginTop: 8,
             padding: 12,
-            backgroundColor: colors.background,
+            backgroundColor: theme.colors.background,
             borderRadius: 8,
         },
         resultSuccess: {
-            backgroundColor: '#e7f5e7',
+            backgroundColor: isDarkTheme ? 'rgba(76, 175, 80, 0.2)' : '#e7f5e7',
         },
         resultError: {
-            backgroundColor: '#fce7e7',
+            backgroundColor: isDarkTheme ? 'rgba(255, 69, 58, 0.2)' : '#fce7e7',
         },
         resultText: {
             fontSize: 12,
-            color: colors.textSecondary,
+            color: theme.colors.textSecondary,
         },
         resultTextSuccess: {
-            color: '#2d5a2d',
+            color: theme.colors.success,
         },
         resultTextError: {
-            color: '#5a2d2d',
+            color: theme.colors.error,
         },
         switchRow: {
             flexDirection: 'row',
@@ -247,7 +247,7 @@ const SyncSettings: React.FC = () => {
         },
         switchLabel: {
             fontSize: 16,
-            color: colors.text,
+            color: theme.colors.text,
             flex: 1,
         },
         loadingOverlay: {
@@ -256,13 +256,13 @@ const SyncSettings: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: theme.colors.overlay,
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 1000,
         },
         loadingText: {
-            color: '#fff',
+            color: theme.colors.text,
             marginTop: 10,
             fontSize: 16,
         },
@@ -296,8 +296,8 @@ const SyncSettings: React.FC = () => {
                         <Switch
                             value={syncStatus.syncEnabled}
                             onValueChange={handleToggleAutoSync}
-                            thumbColor={colors.primary}
-                            trackColor={{ false: colors.disabled, true: colors.primaryLight }}
+                            thumbColor={theme.colors.primary}
+                            trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                         />
                     </View>
                 </View>
@@ -412,7 +412,7 @@ const SyncSettings: React.FC = () => {
                 {/* Info Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>How It Works</Text>
-                    <Text style={[styles.resultText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.resultText, { color: theme.colors.textSecondary }]}>
                         • Your data is stored locally in SQLite for offline access{'\n'}
                         • Automatic sync backs up changes to PostgreSQL every 24 hours{'\n'}
                         • If you log in on a new device, data is restored from PostgreSQL{'\n'}
@@ -424,7 +424,7 @@ const SyncSettings: React.FC = () => {
 
             {isLoading && (
                 <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color="#fff" />
+                    <ActivityIndicator size="large" color={theme.colors.text} />
                     <Text style={styles.loadingText}>
                         {syncStatus.isSyncing ? 'Syncing data...' : 'Processing...'}
                     </Text>

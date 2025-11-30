@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ThemeContext } from '../ThemeContext';
 
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import PersistentStepTracker from '../services/PersistentStepTracker';
@@ -124,6 +125,7 @@ const showBatteryOptimizationDialog = () => {
 export default function StepTrackingSettings() {
     const navigation = useNavigation();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [permissions, setPermissions] = useState<PermissionStatus>({
         notifications: false,
         activityRecognition: false,
@@ -381,18 +383,18 @@ export default function StepTrackingSettings() {
     };
 
     const renderPermissionItem = (title: string, granted: boolean, description: string) => (
-        <View style={styles.permissionItem}>
+        <View style={[styles.permissionItem, { backgroundColor: theme.colors.cardBackground }]}>
             <View style={styles.permissionInfo}>
-                <Text style={styles.permissionTitle}>{title}</Text>
-                <Text style={styles.permissionDescription}>{description}</Text>
+                <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>{title}</Text>
+                <Text style={[styles.permissionDescription, { color: theme.colors.textSecondary }]}>{description}</Text>
             </View>
             <View style={styles.permissionStatus}>
                 <Ionicons
                     name={granted ? 'checkmark-circle' : 'close-circle'}
                     size={24}
-                    color={granted ? '#4CAF50' : '#F44336'}
+                    color={granted ? theme.colors.success : theme.colors.error}
                 />
-                <Text style={[styles.statusText, { color: granted ? '#4CAF50' : '#F44336' }]}>
+                <Text style={[styles.statusText, { color: granted ? theme.colors.success : theme.colors.error }]}>
                     {granted ? 'Granted' : 'Denied'}
                 </Text>
             </View>
@@ -400,14 +402,14 @@ export default function StepTrackingSettings() {
     );
 
     const renderServiceItem = (title: string, running: boolean, description: string) => (
-        <View style={styles.serviceItem}>
+        <View style={[styles.serviceItem, { backgroundColor: theme.colors.cardBackground }]}>
             <View style={styles.serviceInfo}>
-                <Text style={styles.serviceTitle}>{title}</Text>
-                <Text style={styles.serviceDescription}>{description}</Text>
+                <Text style={[styles.serviceTitle, { color: theme.colors.text }]}>{title}</Text>
+                <Text style={[styles.serviceDescription, { color: theme.colors.textSecondary }]}>{description}</Text>
             </View>
             <View style={styles.serviceStatus}>
-                <View style={[styles.statusDot, { backgroundColor: running ? '#4CAF50' : '#F44336' }]} />
-                <Text style={[styles.statusText, { color: running ? '#4CAF50' : '#F44336' }]}>
+                <View style={[styles.statusDot, { backgroundColor: running ? theme.colors.success : theme.colors.error }]} />
+                <Text style={[styles.statusText, { color: running ? theme.colors.success : theme.colors.error }]}>
                     {running ? 'Running' : 'Stopped'}
                 </Text>
             </View>
@@ -416,66 +418,66 @@ export default function StepTrackingSettings() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
+            <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+                <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#FF00F5" />
+                        <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Step Tracking Settings</Text>
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Step Tracking Settings</Text>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#FF00F5" />
-                    <Text style={styles.loadingText}>Loading status...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading status...</Text>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FF00F5" />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Step Tracking Settings</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Step Tracking Settings</Text>
             </View>
 
             {/* Motion & Fitness Badge */}
-            <View style={styles.badgeContainer}>
+            <View style={[styles.badgeContainer, { borderBottomColor: theme.colors.border }]}>
                 <View style={styles.badge}>
                     <Ionicons name="fitness" size={14} color="#00D9FF" />
                     <Text style={styles.badgeText}>Motion & Fitness</Text>
                 </View>
-                <Text style={styles.badgeSubtext}>Uses {Platform.OS === 'ios' ? 'Core Motion' : 'device sensors'}, not HealthKit</Text>
+                <Text style={[styles.badgeSubtext, { color: theme.colors.textSecondary }]}>Uses {Platform.OS === 'ios' ? 'Core Motion' : 'device sensors'}, not HealthKit</Text>
             </View>
 
             <ScrollView style={styles.content}>
                 {/* Status Overview */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📊 Current Status</Text>
-                    <View style={styles.statusCard}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>📊 Current Status</Text>
+                    <View style={[styles.statusCard, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.stepCount}>
-                            <Text style={styles.stepNumber}>{currentSteps.toLocaleString()}</Text>
-                            <Text style={styles.stepLabel}>Steps Today</Text>
+                            <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>{currentSteps.toLocaleString()}</Text>
+                            <Text style={[styles.stepLabel, { color: theme.colors.textSecondary }]}>Steps Today</Text>
                         </View>
-                        <Text style={styles.statusMessage}>{statusMessage}</Text>
+                        <Text style={[styles.statusMessage, { color: theme.colors.text }]}>{statusMessage}</Text>
                     </View>
                 </View>
 
                 {/* Step Tracking Toggle */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>⚙️ Step Tracking</Text>
-                    <View style={styles.toggleCard}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>⚙️ Step Tracking</Text>
+                    <View style={[styles.toggleCard, { backgroundColor: theme.colors.cardBackground }]}>
                         <View style={styles.toggleInfo}>
-                            <Text style={styles.toggleTitle}>Enable Step Tracking</Text>
-                            <Text style={styles.toggleDescription}>
+                            <Text style={[styles.toggleTitle, { color: theme.colors.text }]}>Enable Step Tracking</Text>
+                            <Text style={[styles.toggleDescription, { color: theme.colors.textSecondary }]}>
                                 Track your steps throughout the day, even when the app is closed
                             </Text>
                         </View>
                         <Switch
                             value={services.combinedTracking}
                             onValueChange={handleToggleStepTracking}
-                            trackColor={{ false: '#767577', true: '#FF00F5' }}
+                            trackColor={{ false: '#767577', true: theme.colors.primary }}
                             thumbColor={'#f4f3f4'}
                         />
                     </View>
@@ -484,16 +486,16 @@ export default function StepTrackingSettings() {
                 {/* Step Tracking Mode Section */}
                 {services.combinedTracking && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>📊 Tracking Mode</Text>
-                        <View style={styles.modeCard}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>📊 Tracking Mode</Text>
+                        <View style={[styles.modeCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.primary }]}>
                             <View style={styles.modeInfo}>
-                                <Text style={styles.modeTitle}>Current Mode</Text>
-                                <Text style={styles.modeValue}>
+                                <Text style={[styles.modeTitle, { color: theme.colors.textSecondary }]}>Current Mode</Text>
+                                <Text style={[styles.modeValue, { color: theme.colors.text }]}>
                                     {stepTrackingMode === 'with_calories' ? '🏃 Steps + Calories' :
                                         stepTrackingMode === 'without_calories' ? '👟 Steps Only' :
                                             '❌ Not Set'}
                                 </Text>
-                                <Text style={styles.modeDescription}>
+                                <Text style={[styles.modeDescription, { color: theme.colors.textSecondary }]}>
                                     {stepTrackingMode === 'with_calories'
                                         ? 'Steps add bonus calories. Base calories use sedentary level, macros match your activity level.'
                                         : stepTrackingMode === 'without_calories'
@@ -502,11 +504,11 @@ export default function StepTrackingSettings() {
                                 </Text>
                             </View>
                             <TouchableOpacity
-                                style={styles.changeModeButton}
+                                style={[styles.changeModeButton, { backgroundColor: `${theme.colors.primary}1A`, borderColor: `${theme.colors.primary}4D` }]}
                                 onPress={handleChangeModePress}
                             >
-                                <Text style={styles.changeModeText}>Change Mode</Text>
-                                <Ionicons name="chevron-forward" size={20} color="#FF00F5" />
+                                <Text style={[styles.changeModeText, { color: theme.colors.primary }]}>Change Mode</Text>
+                                <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -515,9 +517,9 @@ export default function StepTrackingSettings() {
                 {/* Permissions Section */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>🔐 Permissions</Text>
-                        <TouchableOpacity onPress={handleRequestPermissions} style={styles.requestButton}>
-                            <Text style={styles.requestButtonText}>Request All</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>🔐 Permissions</Text>
+                        <TouchableOpacity onPress={handleRequestPermissions} style={[styles.requestButton, { backgroundColor: theme.colors.primary }]}>
+                            <Text style={[styles.requestButtonText, { color: theme.colors.text }]}>Request All</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -542,7 +544,7 @@ export default function StepTrackingSettings() {
 
                 {/* Services Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🔧 Service Status</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>🔧 Service Status</Text>
 
                     {renderServiceItem(
                         'Unified Step Tracker',
@@ -565,16 +567,16 @@ export default function StepTrackingSettings() {
 
                 {/* Actions Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🛠️ Actions</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>🛠️ Actions</Text>
 
-                    <TouchableOpacity onPress={handleForceSync} style={styles.actionButton}>
-                        <Ionicons name="refresh" size={20} color="#FF00F5" />
-                        <Text style={styles.actionButtonText}>Force Sync Steps</Text>
+                    <TouchableOpacity onPress={handleForceSync} style={[styles.actionButton, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.primary }]}>
+                        <Ionicons name="refresh" size={20} color={theme.colors.primary} />
+                        <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Force Sync Steps</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleShowBatteryOptimization} style={styles.actionButton}>
-                        <Ionicons name="battery-charging-outline" size={20} color="#FF00F5" />
-                        <Text style={styles.actionButtonText}>Battery Optimization</Text>
+                    <TouchableOpacity onPress={handleShowBatteryOptimization} style={[styles.actionButton, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.primary }]}>
+                        <Ionicons name="battery-charging-outline" size={20} color={theme.colors.primary} />
+                        <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Battery Optimization</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -600,7 +602,6 @@ export default function StepTrackingSettings() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
     },
     header: {
         flexDirection: 'row',
@@ -608,7 +609,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
     },
     backButton: {
         marginRight: 15,
@@ -616,13 +616,11 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#fff',
     },
     badgeContainer: {
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#333',
     },
     badge: {
         flexDirection: 'row',
@@ -644,7 +642,6 @@ const styles = StyleSheet.create({
     },
     badgeSubtext: {
         fontSize: 11,
-        color: '#888',
         marginTop: 4,
     },
     content: {
@@ -657,7 +654,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loadingText: {
-        color: '#fff',
         fontSize: 16,
         marginTop: 10,
     },
@@ -673,11 +669,9 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
         marginBottom: 10,
     },
     statusCard: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         padding: 20,
         alignItems: 'center',
@@ -689,19 +683,15 @@ const styles = StyleSheet.create({
     stepNumber: {
         fontSize: 32,
         fontWeight: 'bold',
-        color: '#FF00F5',
     },
     stepLabel: {
         fontSize: 14,
-        color: '#999',
     },
     statusMessage: {
         fontSize: 14,
-        color: '#fff',
         textAlign: 'center',
     },
     toggleCard: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         padding: 20,
         flexDirection: 'row',
@@ -715,26 +705,21 @@ const styles = StyleSheet.create({
     toggleTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#fff',
         marginBottom: 5,
     },
     toggleDescription: {
         fontSize: 14,
-        color: '#999',
     },
     requestButton: {
-        backgroundColor: '#FF00F5',
         paddingHorizontal: 15,
         paddingVertical: 8,
         borderRadius: 5,
     },
     requestButtonText: {
-        color: '#fff',
         fontSize: 14,
         fontWeight: 'bold',
     },
     permissionItem: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         padding: 15,
         marginBottom: 10,
@@ -749,18 +734,15 @@ const styles = StyleSheet.create({
     permissionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#fff',
         marginBottom: 5,
     },
     permissionDescription: {
         fontSize: 12,
-        color: '#999',
     },
     permissionStatus: {
         alignItems: 'center',
     },
     serviceItem: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         padding: 15,
         marginBottom: 10,
@@ -775,12 +757,10 @@ const styles = StyleSheet.create({
     serviceTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#fff',
         marginBottom: 5,
     },
     serviceDescription: {
         fontSize: 12,
-        color: '#999',
     },
     serviceStatus: {
         flexDirection: 'row',
@@ -797,34 +777,28 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     actionButton: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         padding: 15,
         marginBottom: 10,
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#FF00F5',
     },
     actionButtonText: {
-        color: '#FF00F5',
         fontSize: 16,
         fontWeight: 'bold',
         marginLeft: 10,
     },
     modeCard: {
-        backgroundColor: '#1a1a1a',
         borderRadius: 10,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#FF00F5',
     },
     modeInfo: {
         marginBottom: 12,
     },
     modeTitle: {
         fontSize: 14,
-        color: '#999',
         marginBottom: 4,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
@@ -832,26 +806,21 @@ const styles = StyleSheet.create({
     modeValue: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
         marginBottom: 8,
     },
     modeDescription: {
         fontSize: 13,
-        color: '#bbb',
         lineHeight: 18,
     },
     changeModeButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(255, 0, 245, 0.1)',
         borderRadius: 8,
         padding: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255, 0, 245, 0.3)',
     },
     changeModeText: {
-        color: '#FF00F5',
         fontSize: 14,
         fontWeight: '600',
     },

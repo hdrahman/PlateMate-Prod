@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,7 @@ import {
     Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,6 +56,7 @@ const Onboarding = () => {
         goToPreviousStep,
         completeOnboarding,
     } = useOnboarding();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
 
     // Track selected fitness goal from GoalsStep
     const [selectedFitnessGoal, setSelectedFitnessGoal] = useState<string | null>(null);
@@ -159,10 +161,10 @@ const Onboarding = () => {
     ];
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} />
             <LinearGradient
-                colors={(currentStep === 6) ? ['#000000', '#000000'] : ['#000000', '#121212']}
+                colors={(currentStep === 6) ? [theme.colors.background, theme.colors.background] : [theme.colors.background, theme.colors.cardBackground]}
                 style={styles.background}
             />
             <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 20 : Math.max(insets.top, 20) }]}>
@@ -198,8 +200,8 @@ const Onboarding = () => {
                         activeOpacity={0.7}
                     >
                         <View style={styles.backButtonContent}>
-                            <Ionicons name="chevron-back" size={24} color="#fff" />
-                            <Text style={styles.backButtonText}>Back</Text>
+                            <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+                            <Text style={[styles.backButtonText, { color: theme.colors.text }]}>Back</Text>
                         </View>
                     </TouchableOpacity>
                 )}
@@ -225,13 +227,13 @@ const Onboarding = () => {
             </KeyboardAvoidingView>
             {error && (
                 <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
+                    <Text style={[styles.errorText, { color: theme.colors.text }]}>{error}</Text>
                 </View>
             )}
             {isLoading && (
-                <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color="#0074DD" />
-                    <Text style={styles.loadingText}>Saving your profile...</Text>
+                <View style={[styles.loadingOverlay, { backgroundColor: isDarkTheme ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>Saving your profile...</Text>
                 </View>
             )}
         </SafeAreaView>
@@ -241,7 +243,6 @@ const Onboarding = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
     },
     background: {
         position: 'absolute',
@@ -280,7 +281,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#5c00dd',
     },
     inactiveDot: {
-        backgroundColor: '#444',
+        backgroundColor: '#666',
     },
     backButton: {
         position: 'absolute',
@@ -296,7 +297,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     backButtonText: {
-        color: '#fff',
         fontSize: 16,
         marginLeft: 2,
     },
@@ -325,17 +325,14 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     errorText: {
-        color: '#fff',
         textAlign: 'center',
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.8)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
-        color: '#fff',
         marginTop: 10,
         fontSize: 16,
     },

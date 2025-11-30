@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
     StyleSheet,
     Text,
@@ -18,10 +18,11 @@ import { PrivacyPolicySection } from '../types/notifications';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ThemeContext } from '../ThemeContext';
 
 // Define theme colors
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#1C1C1E';
+// CARD_BG removed - use theme.colors.cardBackground instead
 const WHITE = '#FFFFFF';
 const SUBDUED = '#AAAAAA';
 const ACCENT_BLUE = '#2196F3';
@@ -34,9 +35,11 @@ const ACCENT_PURPLE = '#8E44AD';
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
+    theme?: any;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style, theme }) => {
+    const cardBg = theme?.colors?.cardBackground || '#1E1E1E';
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
@@ -56,7 +59,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1.5,
                     borderRadius: 15,
-                    backgroundColor: style?.backgroundColor || CARD_BG,
+                    backgroundColor: style?.backgroundColor || cardBg,
                     padding: 16,
                     ...style
                 }}
@@ -70,6 +73,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 export default function PrivacyPolicy() {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
     const [lastUpdated] = useState(new Date('2024-01-15'));
 
@@ -274,8 +278,8 @@ We're here to help you understand and control your privacy.`,
     };
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
@@ -291,16 +295,16 @@ We're here to help you understand and control your privacy.`,
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="chevron-back" size={24} color={WHITE} />
+                        <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                     </TouchableOpacity>
                     <View style={styles.header}>
                         <GradientText text="Privacy Policy" />
-                        <Text style={styles.subtitle}>
+                        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                             Transparent about how we handle your data
                         </Text>
-                        <View style={styles.lastUpdatedContainer}>
-                            <Ionicons name="calendar" size={16} color={SUBDUED} />
-                            <Text style={styles.lastUpdatedText}>
+                        <View style={[styles.lastUpdatedContainer, { backgroundColor: theme.colors.border }]}>
+                            <Ionicons name="calendar" size={16} color={theme.colors.textSecondary} />
+                            <Text style={[styles.lastUpdatedText, { color: theme.colors.textSecondary }]}>
                                 Last updated: {lastUpdated.toLocaleDateString()}
                             </Text>
                         </View>
@@ -308,7 +312,7 @@ We're here to help you understand and control your privacy.`,
                 </View>
 
                 {/* New Privacy Emphasis Card */}
-                <GradientBorderCard>
+                <GradientBorderCard theme={theme}>
                     <View style={styles.privacyEmphasisCard}>
                         <LinearGradient
                             colors={['#0074dd', '#5c00dd', '#dd0095']}
@@ -319,9 +323,9 @@ We're here to help you understand and control your privacy.`,
                             <Ionicons name="shield-checkmark-outline" size={32} color={WHITE} />
                         </LinearGradient>
                         <View style={styles.emphasisContent}>
-                            <Text style={styles.emphasisTitle}>Your Data Stays on Your Device</Text>
-                            <Text style={styles.emphasisText}>
-                                <Text style={styles.emphasisBold}>PlateMate stores all your nutrition, fitness, and health data locally.</Text> We
+                            <Text style={[styles.emphasisTitle, { color: theme.colors.text }]}>Your Data Stays on Your Device</Text>
+                            <Text style={[styles.emphasisText, { color: theme.colors.textSecondary }]}>
+                                <Text style={[styles.emphasisBold, { color: theme.colors.text }]}>PlateMate stores all your nutrition, fitness, and health data locally.</Text> We
                                 only store basic profile information from settings. Everything else never leaves your
                                 device — we have no access to your personal data.
                             </Text>
@@ -330,7 +334,7 @@ We're here to help you understand and control your privacy.`,
                 </GradientBorderCard>
 
                 {/* Quick Summary */}
-                <GradientBorderCard>
+                <GradientBorderCard theme={theme}>
                     <View style={styles.summaryCard}>
                         <LinearGradient
                             colors={['#4ECDC4', '#26A69A']}
@@ -341,8 +345,8 @@ We're here to help you understand and control your privacy.`,
                             <Ionicons name="shield-checkmark" size={32} color={WHITE} />
                         </LinearGradient>
                         <View style={styles.summaryContent}>
-                            <Text style={styles.summaryTitle}>Privacy At a Glance</Text>
-                            <Text style={styles.summaryText}>
+                            <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Privacy At a Glance</Text>
+                            <Text style={[styles.summaryText, { color: theme.colors.textSecondary }]}>
                                 Your data stays on your device. We don't collect, share, or sell your personal information.
                                 You have complete control over your health and fitness data.
                             </Text>
@@ -352,65 +356,65 @@ We're here to help you understand and control your privacy.`,
 
                 {/* Quick Navigation */}
                 <View style={styles.quickNavSection}>
-                    <Text style={styles.sectionHeaderText}>Quick Access</Text>
+                    <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>Quick Access</Text>
                     <View style={styles.quickNavGrid}>
                         <TouchableOpacity
-                            style={styles.quickNavItem}
+                            style={[styles.quickNavItem, { backgroundColor: theme.colors.cardBackground }]}
                             onPress={() => handleUserAction('data_settings', 'DataSharing')}
                         >
                             <LinearGradient
                                 colors={['#2196F3', '#1976D2']}
                                 style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="settings" size={24} color={WHITE} />
+                                <Ionicons name="settings" size={24} color="#FFFFFF" />
                             </LinearGradient>
-                            <Text style={styles.quickNavText}>Data Settings</Text>
+                            <Text style={[styles.quickNavText, { color: theme.colors.text }]}>Data Settings</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.quickNavItem}
+                            style={[styles.quickNavItem, { backgroundColor: theme.colors.cardBackground }]}
                             onPress={() => handleUserAction('export_data')}
                         >
                             <LinearGradient
                                 colors={['#4ECDC4', '#26A69A']}
                                 style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="download" size={24} color={WHITE} />
+                                <Ionicons name="download" size={24} color="#FFFFFF" />
                             </LinearGradient>
-                            <Text style={styles.quickNavText}>Export Data</Text>
+                            <Text style={[styles.quickNavText, { color: theme.colors.text }]}>Export Data</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.quickNavItem}
+                            style={[styles.quickNavItem, { backgroundColor: theme.colors.cardBackground }]}
                             onPress={() => handleUserAction('contact_support')}
                         >
                             <LinearGradient
                                 colors={['#8E44AD', '#9B59B6']}
                                 style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="mail" size={24} color={WHITE} />
+                                <Ionicons name="mail" size={24} color="#FFFFFF" />
                             </LinearGradient>
-                            <Text style={styles.quickNavText}>Contact Us</Text>
+                            <Text style={[styles.quickNavText, { color: theme.colors.text }]}>Contact Us</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.quickNavItem}
+                            style={[styles.quickNavItem, { backgroundColor: theme.colors.cardBackground }]}
                             onPress={() => handleUserAction('delete_data')}
                         >
                             <LinearGradient
                                 colors={['#FF6B6B', '#E74C3C']}
                                 style={styles.quickNavIconContainer}
                             >
-                                <Ionicons name="trash" size={24} color={WHITE} />
+                                <Ionicons name="trash" size={24} color="#FFFFFF" />
                             </LinearGradient>
-                            <Text style={styles.quickNavText}>Delete Data</Text>
+                            <Text style={[styles.quickNavText, { color: theme.colors.text }]}>Delete Data</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 {/* Privacy Policy Sections */}
                 <View style={styles.sectionsContainer}>
-                    <Text style={styles.sectionHeaderText}>Full Privacy Policy</Text>
+                    <Text style={[styles.sectionHeaderText, { color: theme.colors.text }]}>Full Privacy Policy</Text>
 
                     {privacyPolicySections.map((section) => (
                         <GradientBorderCard key={section.id} style={styles.sectionCardInner}>
@@ -430,24 +434,24 @@ We're here to help you understand and control your privacy.`,
                                             color={getImportanceColor(section.importance)}
                                         />
                                     </View>
-                                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{section.title}</Text>
                                 </View>
-                                <View style={styles.chevronContainer}>
+                                <View style={[styles.chevronContainer, { backgroundColor: theme.colors.border }]}>
                                     <Ionicons
                                         name={expandedSections.has(section.id) ? 'chevron-up' : 'chevron-down'}
                                         size={20}
-                                        color={SUBDUED}
+                                        color={theme.colors.textSecondary}
                                     />
                                 </View>
                             </TouchableOpacity>
 
                             {expandedSections.has(section.id) && (
-                                <View style={styles.sectionContent}>
-                                    <Text style={styles.sectionText}>{section.content}</Text>
+                                <View style={[styles.sectionContent, { borderTopColor: theme.colors.border }]}>
+                                    <Text style={[styles.sectionText, { color: theme.colors.textSecondary }]}>{section.content}</Text>
 
                                     {section.userActions && section.userActions.length > 0 && (
                                         <View style={styles.userActionsContainer}>
-                                            <Text style={styles.userActionsTitle}>Available Actions:</Text>
+                                            <Text style={[styles.userActionsTitle, { color: theme.colors.text }]}>Available Actions:</Text>
                                             {section.userActions.map((userAction, index) => (
                                                 <TouchableOpacity
                                                     key={index}
@@ -642,7 +646,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     quickNavItem: {
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         padding: 16,
         alignItems: 'center',
@@ -675,7 +678,6 @@ const styles = StyleSheet.create({
         padding: 0,
     },
     section: {
-        backgroundColor: CARD_BG,
         borderRadius: 16,
         marginBottom: 15,
         overflow: 'hidden',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     View,
     Text,
@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { UserProfile } from '../../types/user';
 import { useAuth } from '../../context/AuthContext';
+import { ThemeContext } from '../../ThemeContext';
 
 // Safe import AppleAuthentication module at top level (like Auth.tsx)
 let AppleAuthentication: any = null;
@@ -48,6 +49,7 @@ const PasswordRequirement: React.FC<{ text: string; met: boolean }> = ({ text, m
 );
 
 const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, updateProfile, onNext }) => {
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const [firstName, setFirstName] = useState(profile.firstName || '');
     const [email, setEmail] = useState(profile.email || '');
     const [age, setAge] = useState(profile.age?.toString() || '');
@@ -240,7 +242,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
+            style={[styles.container, { backgroundColor: theme.colors.background }]}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <ScrollView
@@ -249,19 +251,19 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.header}>
-                    <Text style={styles.title}>Create Your Account</Text>
-                    <Text style={styles.subtitle}>Join thousands transforming their health</Text>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Create Your Account</Text>
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Join thousands transforming their health</Text>
                 </View>
 
                 {/* Form Fields */}
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Name</Text>
-                        <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Name</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: theme.colors.text }]}
                                 placeholder="Enter your name"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={firstName}
                                 onChangeText={setFirstName}
                                 autoCapitalize="words"
@@ -271,12 +273,12 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email</Text>
-                        <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Email</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: theme.colors.text }]}
                                 placeholder="Enter your email"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={email}
                                 onChangeText={setEmail}
                                 keyboardType="email-address"
@@ -287,28 +289,28 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Age</Text>
-                        <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Age</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: theme.colors.text }]}
                                 placeholder="Enter your age"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={age}
                                 onChangeText={handleAgeInput}
                                 keyboardType="numeric"
                                 editable={!isLoading}
                             />
                         </View>
-                        <Text style={styles.hint}>You must be at least 13 years old</Text>
+                        <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>You must be at least 13 years old</Text>
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password</Text>
-                        <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Password</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                             <TextInput
-                                style={[styles.input, styles.passwordInput]}
+                                style={[styles.input, styles.passwordInput, { color: theme.colors.text }]}
                                 placeholder="Create a password"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={password}
                                 onChangeText={setPassword}
                                 onFocus={() => setPasswordTouched(true)}
@@ -323,12 +325,12 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                                 <Ionicons
                                     name={showPassword ? "eye-off" : "eye"}
                                     size={20}
-                                    color="#666"
+                                    color={theme.colors.textSecondary}
                                 />
                             </TouchableOpacity>
                         </View>
                         {passwordTouched && (
-                            <View style={styles.passwordRequirements}>
+                            <View style={[styles.passwordRequirements, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                                 <PasswordRequirement
                                     text="At least 8 characters"
                                     met={validatePassword(password).checks.minLength}
@@ -354,12 +356,12 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Confirm Password</Text>
-                        <View style={styles.inputContainer}>
+                        <Text style={[styles.label, { color: theme.colors.text }]}>Confirm Password</Text>
+                        <View style={[styles.inputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
                             <TextInput
-                                style={[styles.input, styles.passwordInput]}
+                                style={[styles.input, styles.passwordInput, { color: theme.colors.text }]}
                                 placeholder="Confirm your password"
-                                placeholderTextColor="#666"
+                                placeholderTextColor={theme.colors.textSecondary}
                                 value={confirmPassword}
                                 onChangeText={setConfirmPassword}
                                 secureTextEntry={!showConfirmPassword}
@@ -373,7 +375,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                                 <Ionicons
                                     name={showConfirmPassword ? "eye-off" : "eye"}
                                     size={20}
-                                    color="#666"
+                                    color={theme.colors.textSecondary}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -381,9 +383,9 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                 </View>
 
                 {/* Security Info */}
-                <View style={styles.infoContainer}>
-                    <Ionicons name="shield-checkmark-outline" size={20} color="#888" />
-                    <Text style={styles.infoText}>
+                <View style={[styles.infoContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.infoText, { color: theme.colors.textSecondary }]}>
                         Your information is securely stored and never shared with third parties
                     </Text>
                 </View>
@@ -395,7 +397,7 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                     disabled={isLoading}
                 >
                     <LinearGradient
-                        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                        colors={[theme.colors.primary, "#5c00dd", "#dd0095"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.buttonGradient}
@@ -413,32 +415,32 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
 
                 {/* Divider */}
                 <View style={styles.dividerContainer}>
-                    <View style={styles.divider} />
-                    <Text style={styles.orText}>or continue with</Text>
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                    <Text style={[styles.orText, { color: theme.colors.textSecondary }]}>or continue with</Text>
+                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
                 </View>
 
                 {/* Social Sign-In Buttons */}
                 <View style={styles.socialSection}>
                     <TouchableOpacity
-                        style={styles.socialButton}
+                        style={[styles.socialButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
                         onPress={handleGoogleSignIn}
                         disabled={isLoading}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="logo-google" size={20} color="#FFF" style={styles.socialIcon} />
-                        <Text style={styles.socialButtonText}>Continue with Google</Text>
+                        <Ionicons name="logo-google" size={20} color={theme.colors.text} style={styles.socialIcon} />
+                        <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Google</Text>
                     </TouchableOpacity>
 
                     {isAppleAuthAvailable && (
                         <TouchableOpacity
-                            style={[styles.socialButton, styles.appleButton]}
+                            style={[styles.socialButton, styles.appleButton, { borderColor: theme.colors.border }]}
                             onPress={handleAppleSignIn}
                             disabled={isLoading}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="logo-apple" size={22} color="#FFF" style={styles.socialIcon} />
-                            <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                            <Ionicons name="logo-apple" size={22} color={theme.colors.text} style={styles.socialIcon} />
+                            <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Apple</Text>
                         </TouchableOpacity>
                     )}
                 </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
     View,
     Text,
@@ -15,6 +15,7 @@ import {
     Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemeContext } from '../ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -138,7 +139,6 @@ const getFoodDetails = async (query: string): Promise<FoodItemType | null> => {
 
 // Define theme colors
 const PRIMARY_BG = '#000000';
-const CARD_BG = '#121212';
 const WHITE = '#FFFFFF';
 const GRAY = '#AAAAAA';
 const LIGHT_GRAY = '#333333';
@@ -149,9 +149,11 @@ const BLUE_ACCENT = '#0074dd';
 interface GradientBorderCardProps {
     children: React.ReactNode;
     style?: any;
+    theme?: any;
 }
 
-const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
+const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style, theme }) => {
+    const cardBgColor = theme?.colors?.cardBackground || theme?.colors?.background || '#121212';
     return (
         <View style={[styles.gradientBorderContainer, style]}>
             <LinearGradient
@@ -171,7 +173,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
                 style={{
                     margin: 1,
                     borderRadius: 9,
-                    backgroundColor: '#121212',
+                    backgroundColor: cardBgColor,
                     padding: 16,
                     flex: 1,
                 }}
@@ -221,6 +223,7 @@ export default function Manual() {
     const defaultMealType = params?.mealType || 'Breakfast';
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
+    const { theme, isDarkTheme } = useContext(ThemeContext);
     const { addFoodLog } = useFoodLog();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItemType[]>([]);
@@ -417,9 +420,9 @@ export default function Manual() {
             <MaterialCommunityIcons
                 name={option.icon as any}
                 size={26}
-                color={option.isActive ? "#FF00F5" : WHITE}
+                color={option.isActive ? theme.colors.primary : theme.colors.text}
             />
-            <Text style={[styles.uploadOptionText, option.isActive && styles.activeUploadOptionText]}>
+            <Text style={[styles.uploadOptionText, { color: theme.colors.text }, option.isActive && { color: theme.colors.primary }]}>
                 {option.name}
             </Text>
         </TouchableOpacity>
@@ -439,39 +442,40 @@ export default function Manual() {
         <SafeAreaView
             style={[
                 styles.container,
+                { backgroundColor: theme.colors.background }
             ]}
             edges={['top']}
         >
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+            <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
 
             {/* Header with back button and title */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
                 <TouchableOpacity
-                    style={styles.backButton}
+                    style={[styles.backButton, { backgroundColor: theme.colors.cardBackground }]}
                     onPress={() => navigation.goBack()}
                 >
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Add Food</Text>
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Add Food</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             {/* Search Bar */}
             <View style={styles.searchContainer}>
-                <GradientBorderCard style={styles.searchInputWrapper}>
+                <GradientBorderCard style={styles.searchInputWrapper} theme={theme}>
                     <View style={styles.searchInputContainer}>
-                        <Ionicons name="search" size={20} color={GRAY} />
+                        <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
                         <TextInput
-                            style={styles.searchInput}
+                            style={[styles.searchInput, { color: theme.colors.text }]}
                             placeholder="Search foods..."
-                            placeholderTextColor={GRAY}
+                            placeholderTextColor={theme.colors.textSecondary}
                             value={searchQuery}
                             onChangeText={handleSearchChange}
                             returnKeyType="search"
                         />
                         {searchQuery.length > 0 && (
                             <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={20} color={GRAY} />
+                                <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -487,7 +491,7 @@ export default function Manual() {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                     >
-                        <Ionicons name="add" size={24} color={WHITE} />
+                        <Ionicons name="add" size={24} color={theme.colors.text} />
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
@@ -521,8 +525,8 @@ export default function Manual() {
             <View style={styles.content}>
                 {isSearching ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={PURPLE_ACCENT} />
-                        <Text style={styles.loadingText}>Searching...</Text>
+                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Searching...</Text>
                     </View>
                 ) : searchQuery.length > 2 ? (
                     searchResults.length > 0 ? (
@@ -536,16 +540,16 @@ export default function Manual() {
                                 <RefreshControl
                                     refreshing={refreshing}
                                     onRefresh={onRefresh}
-                                    tintColor={PURPLE_ACCENT}
-                                    colors={[PURPLE_ACCENT]}
+                                    tintColor={theme.colors.primary}
+                                    colors={[theme.colors.primary]}
                                 />
                             }
                         />
                     ) : (
                         <View style={styles.emptyContainer}>
-                            <Ionicons name="search-outline" size={60} color={GRAY} />
-                            <Text style={styles.emptyText}>No results found</Text>
-                            <Text style={styles.emptySubtext}>Try different keywords or add manually</Text>
+                            <Ionicons name="search-outline" size={60} color={theme.colors.textSecondary} />
+                            <Text style={[styles.emptyText, { color: theme.colors.text }]}>No results found</Text>
+                            <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Try different keywords or add manually</Text>
                             <TouchableOpacity
                                 style={styles.manualEntryButton}
                                 onPress={() => setShowManualEntry(true)}
@@ -556,7 +560,7 @@ export default function Manual() {
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                 >
-                                    <Text style={styles.manualEntryText}>Add Manually</Text>
+                                    <Text style={[styles.manualEntryText, { color: theme.colors.text }]}>Add Manually</Text>
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
@@ -564,11 +568,11 @@ export default function Manual() {
                 ) : (
                     <>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recent Foods</Text>
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Foods</Text>
                         </View>
                         {isLoading ? (
                             <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                                <ActivityIndicator size="large" color={theme.colors.primary} />
                             </View>
                         ) : recentEntries.length > 0 ? (
                             <FlatList
@@ -581,16 +585,16 @@ export default function Manual() {
                                     <RefreshControl
                                         refreshing={refreshing}
                                         onRefresh={onRefresh}
-                                        tintColor={PURPLE_ACCENT}
-                                        colors={[PURPLE_ACCENT]}
+                                        tintColor={theme.colors.primary}
+                                        colors={[theme.colors.primary]}
                                     />
                                 }
                             />
                         ) : (
                             <View style={styles.emptyContainer}>
-                                <Ionicons name="nutrition-outline" size={60} color={GRAY} />
-                                <Text style={styles.emptyText}>No recent foods</Text>
-                                <Text style={styles.emptySubtext}>Search for foods or add manually</Text>
+                                <Ionicons name="nutrition-outline" size={60} color={theme.colors.textSecondary} />
+                                <Text style={[styles.emptyText, { color: theme.colors.text }]}>No recent foods</Text>
+                                <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Search for foods or add manually</Text>
                             </View>
                         )}
                     </>
@@ -617,8 +621,8 @@ export default function Manual() {
 
             {/* Loading Overlay */}
             {isLoading && (
-                <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color={PURPLE_ACCENT} />
+                <View style={[styles.loadingOverlay, { backgroundColor: isDarkTheme ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)' }]}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                 </View>
             )}
         </SafeAreaView>

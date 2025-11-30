@@ -84,7 +84,7 @@ interface UserContext {
 }
 
 export default function Chatbot() {
-  const { isDarkTheme } = useContext(ThemeContext);
+  const { theme, isDarkTheme } = useContext(ThemeContext);
   const { user } = useAuth();
   const navigation = useNavigation<ChatbotNavigationProp>();
   const route = useRoute();
@@ -756,11 +756,11 @@ export default function Chatbot() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDarkTheme ? "#000" : "#1E1E1E" }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={28} color="#FFF" />
+          <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <MaskedView
@@ -770,7 +770,7 @@ export default function Chatbot() {
             }
           >
             <LinearGradient
-              colors={["#5A60EA", "#FF00F5"]}
+              colors={[theme.colors.primary, "#FF00F5"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{
@@ -780,20 +780,20 @@ export default function Chatbot() {
             />
           </MaskedView>
           <View style={styles.onlineStatusContainer}>
-            <Text style={styles.headerSubtitle}>AI Health Coach</Text>
-            <Text style={styles.dot}>•</Text>
+            <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>AI Health Coach</Text>
+            <Text style={[styles.dot, { color: theme.colors.textSecondary }]}>•</Text>
             <View style={styles.onlineIndicator} />
-            <Text style={styles.onlineText}>Online</Text>
+            <Text style={[styles.onlineText, { color: theme.colors.textSecondary }]}>Online</Text>
           </View>
         </View>
         <View style={styles.avatarContainer}>
           <LinearGradient
-            colors={["#5A60EA", "#FF00F5"]}
+            colors={[theme.colors.primary, "#FF00F5"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.avatarGradient}
           >
-            <Text style={styles.avatarText}>CM</Text>
+            <Text style={[styles.avatarText, { color: theme.colors.text }]}>CM</Text>
           </LinearGradient>
         </View>
       </View>
@@ -844,41 +844,41 @@ export default function Chatbot() {
               style={[
                 styles.messageBubble,
                 message.sender === "user"
-                  ? styles.userBubble
+                  ? [styles.userBubble, { backgroundColor: theme.colors.border }]
                   : styles.botBubble
               ]}
             >
               {message.sender === "bot" && message.isTyping ? (
                 <View style={styles.botBubbleContent}>
                   <LinearGradient
-                    colors={["#5A60EA", "#9B00FF", "#FF00F5"]}
+                    colors={[theme.colors.primary, "#9B00FF", "#FF00F5"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.botBubbleGradient}
                   >
                     <View style={styles.typingIndicator}>
-                      <Animated.View style={[styles.typingDot, { opacity: dot1Opacity }]} />
-                      <Animated.View style={[styles.typingDot, { opacity: dot2Opacity }]} />
-                      <Animated.View style={[styles.typingDot, { opacity: dot3Opacity }]} />
+                      <Animated.View style={[styles.typingDot, { opacity: dot1Opacity, backgroundColor: theme.colors.text }]} />
+                      <Animated.View style={[styles.typingDot, { opacity: dot2Opacity, backgroundColor: theme.colors.text }]} />
+                      <Animated.View style={[styles.typingDot, { opacity: dot3Opacity, backgroundColor: theme.colors.text }]} />
                     </View>
                   </LinearGradient>
                 </View>
               ) : message.sender === "bot" ? (
                 <View style={styles.botBubbleContent}>
                   <LinearGradient
-                    colors={["#5A60EA", "#9B00FF", "#FF00F5"]}
+                    colors={[theme.colors.primary, "#9B00FF", "#FF00F5"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.botBubbleGradient}
                   >
-                    <Text style={styles.messageText}>{message.text}</Text>
+                    <Text style={[styles.messageText, { color: theme.colors.text }]}>{message.text}</Text>
                   </LinearGradient>
                 </View>
               ) : (
-                <Text style={styles.messageText}>{message.text}</Text>
+                <Text style={[styles.messageText, { color: theme.colors.text }]}>{message.text}</Text>
               )}
               {!message.isTyping && (
-                <Text style={styles.messageTime}>{formatTime(message.timestamp)}</Text>
+                <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>{formatTime(message.timestamp)}</Text>
               )}
             </View>
           ))}
@@ -893,12 +893,12 @@ export default function Chatbot() {
               end={{ x: 1, y: 0 }}
               style={styles.contextBannerGradient}
             >
-              <View style={styles.contextBannerContent}>
+              <View style={[styles.contextBannerContent, { backgroundColor: theme.colors.cardBackground }]}>
                 <View style={styles.contextBannerLeft}>
-                  <Ionicons name="analytics" size={20} color="#5A60EA" />
+                  <Ionicons name="analytics" size={20} color={theme.colors.primary} />
                   <View style={styles.contextBannerText}>
-                    <Text style={styles.contextBannerTitle}>Get Context-Aware Advice</Text>
-                    <Text style={styles.contextBannerSubtitle}>
+                    <Text style={[styles.contextBannerTitle, { color: theme.colors.text }]}>Get Context-Aware Advice</Text>
+                    <Text style={[styles.contextBannerSubtitle, { color: theme.colors.textSecondary }]}>
                       Let Coach Max access your activity data for specific recommendations
                     </Text>
                   </View>
@@ -909,15 +909,15 @@ export default function Chatbot() {
                   disabled={isLoadingContext}
                 >
                   <LinearGradient
-                    colors={["#5A60EA", "#FF00F5"]}
+                    colors={[theme.colors.primary, "#FF00F5"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.contextBannerButtonGradient}
                   >
                     {isLoadingContext ? (
-                      <ActivityIndicator size="small" color="white" />
+                      <ActivityIndicator size="small" color={theme.colors.text} />
                     ) : (
-                      <Text style={styles.contextBannerButtonText}>Enable</Text>
+                      <Text style={[styles.contextBannerButtonText, { color: theme.colors.text }]}>Enable</Text>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -927,13 +927,13 @@ export default function Chatbot() {
         )}
 
         {/* Input Area */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { borderTopColor: theme.colors.border }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.colors.cardBackground, color: theme.colors.text }]}
             value={input}
             onChangeText={setInput}
             placeholder="Ask Coach Max about your health and fitness goals..."
-            placeholderTextColor="#777"
+            placeholderTextColor={theme.colors.textSecondary}
             multiline
             onFocus={() => {
               setTimeout(() => {
@@ -948,7 +948,7 @@ export default function Chatbot() {
             disabled={input.trim() === "" || isLoading}
           >
             <LinearGradient
-              colors={["#5A60EA", "#FF00F5"]}
+              colors={[theme.colors.primary, "#FF00F5"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[
@@ -956,7 +956,7 @@ export default function Chatbot() {
                 (input.trim() === "" || isLoading) && styles.disabledButton
               ]}
             >
-              <Ionicons name="send" size={20} color="white" />
+              <Ionicons name="send" size={20} color={theme.colors.text} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -990,7 +990,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#444",
     paddingHorizontal: 16,
     paddingBottom: 10,
   },
@@ -1013,7 +1012,6 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: "#CCC",
     marginTop: 0,
     marginBottom: 0,
   },
@@ -1024,7 +1022,6 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   dot: {
-    color: '#CCC',
     fontSize: 12,
     marginHorizontal: 4,
   },
@@ -1037,7 +1034,6 @@ const styles = StyleSheet.create({
   },
   onlineText: {
     fontSize: 12,
-    color: '#CCC',
   },
   avatarContainer: {
     width: 40,
@@ -1052,7 +1048,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarText: {
-    color: "white",
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -1071,7 +1066,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   userBubble: {
-    backgroundColor: "#333",
     alignSelf: "flex-end",
     borderTopRightRadius: 4,
     marginLeft: "20%",
@@ -1093,12 +1087,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 4,
   },
   messageText: {
-    color: "white",
     fontSize: 16,
     lineHeight: 22,
   },
   messageTime: {
-    color: "#999",
     fontSize: 12,
     marginTop: 5,
     alignSelf: "flex-end",
@@ -1109,14 +1101,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#333",
   },
   input: {
     flex: 1,
-    backgroundColor: "#1A1A1A",
     borderRadius: 20,
     padding: 12,
-    color: "white",
     maxHeight: 100,
   },
   sendButton: {
@@ -1168,7 +1157,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "white",
     margin: 2,
   },
   contextBanner: {
@@ -1181,7 +1169,6 @@ const styles = StyleSheet.create({
     padding: 1,
   },
   contextBannerContent: {
-    backgroundColor: "#1A1A1A",
     borderRadius: 11,
     padding: 12,
     flexDirection: "row",
@@ -1198,13 +1185,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contextBannerTitle: {
-    color: "#FFF",
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 2,
   },
   contextBannerSubtitle: {
-    color: "#AAA",
     fontSize: 12,
     lineHeight: 16,
   },
@@ -1220,7 +1205,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   contextBannerButtonText: {
-    color: "#FFF",
     fontSize: 13,
     fontWeight: "600",
   },
