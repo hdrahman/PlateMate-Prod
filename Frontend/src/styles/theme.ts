@@ -146,11 +146,11 @@ export const darkTheme: Theme = {
 export const lightTheme: Theme = {
     dark: false,
     colors: {
-        // Backgrounds & Surfaces - Warm neutral for premium feel
-        background: '#F8F8FA',         // Slightly warmer neutral
-        surface: '#FFFFFF',
-        cardBackground: '#FFFFFF',
-        inputBackground: '#F0F0F5',
+        // Backgrounds & Surfaces - Purple-tinted for softer, brand-connected feel
+        background: '#F7F6FB',         // Subtle purple tint - easier on eyes
+        surface: '#FDFCFF',            // Off-white with lavender undertone
+        cardBackground: '#FDFCFF',     // Matches surface for consistency
+        inputBackground: '#F3F2F8',    // Purple-tinted input fields
         
         // Text hierarchy - Strong contrast on light
         text: '#1A1A1C',               // Near black for maximum contrast
@@ -167,23 +167,23 @@ export const lightTheme: Theme = {
         iconPrimary: '#2E2E33',
         iconSecondary: '#7A7A85',
         
-        // Borders & Dividers - Subtle but visible
-        border: '#E8E8ED',
-        borderStrong: '#D0D0D8',
+        // Borders & Dividers - Purple-tinted for cohesion
+        border: '#E5E3EE',             // Subtle purple tint
+        borderStrong: '#D0CEE0',       // Stronger purple-tinted border
         
         // Status colors - Balanced saturation for light mode
         success: '#2D9F4A',            // Slightly deeper green
         error: '#E53935',
         warning: '#F5A623',
         
-        // Navigation - Clean and consistent
-        tabBarBackground: '#FFFFFF',
+        // Navigation - Purple-tinted for consistency
+        tabBarBackground: '#FDFCFF',   // Matches cards/surface
         tabBarActive: '#6B00B8',
         tabBarInactive: '#9A9AA3',
-        headerBackground: '#FFFFFF',
+        headerBackground: '#FDFCFF',   // Matches cards/surface
         
         // Chart/Ring colors - Bold and readable on light
-        ringBackground: '#EEEEEF',
+        ringBackground: '#ECEAF2',     // Purple-tinted ring background
         chartCarbs: '#2979FF',         // Deeper blue
         chartProtein: '#2D9F4A',       // Match success
         chartFat: '#F5A623',           // Match warning
