@@ -1161,10 +1161,10 @@ export default function MealPlanner() {
                                             feature: 'meal_planning'
                                         })}
                                     >
-                                        <Text style={styles.paywallButtonText}>Start Free Trial</Text>
+                                        <Text style={styles.paywallButtonText}>Upgrade to Premium</Text>
                                     </TouchableOpacity>
                                     <Text style={styles.paywallTrialText}>
-                                        10 days free • Cancel anytime
+                                        +14 days free trial • Up to 28 days total
                                     </Text>
                                 </LinearGradient>
                             </View>
@@ -1206,10 +1206,10 @@ export default function MealPlanner() {
                                             feature: 'meal_planning'
                                         })}
                                     >
-                                        <Text style={styles.paywallButtonText}>Start Free Trial</Text>
+                                        <Text style={styles.paywallButtonText}>Upgrade to Premium</Text>
                                     </TouchableOpacity>
                                     <Text style={styles.paywallTrialText}>
-                                        10 days free • Cancel anytime
+                                        +14 days free trial • Up to 28 days total
                                     </Text>
                                 </LinearGradient>
                             </View>

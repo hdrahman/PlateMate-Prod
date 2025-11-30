@@ -97,7 +97,7 @@ const TrialStatusCard: React.FC<TrialStatusCardProps> = ({ onExtendTrial, onSubs
     const getTrialStatusText = () => {
         if (!trialStatus?.isInTrial) return 'Trial Expired';
         if (trialStatus.isExtended) return `Extended Trial: ${trialStatus.daysRemaining} days left`;
-        return `Free Trial: ${trialStatus.daysRemaining} days left`;
+        return `Trial: ${trialStatus.daysRemaining} days left`;
     };
 
     if (isLoading) {

@@ -220,7 +220,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
             <Text style={[styles.statusText, { color: theme.colors.text }]}>{getStatusText()}</Text>
             <Text style={[styles.subtitleText, { color: theme.colors.textSecondary }]}>
               {trialType === 'promotional' && canUpgrade
-                ? 'Subscribe now to get 10 more days free!'
+                ? 'Subscribe to get +14 days free (28 total)!'
                 : trialType === 'promotional'
                   ? 'Enjoying your free access to premium features?'
                   : 'How are you liking the premium experience?'
@@ -234,7 +234,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
                 onPress={handleUpgradeToSubscription}
                 style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
               >
-                <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Get 10 More Days</Text>
+                <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Subscribe Now</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -271,21 +271,15 @@ export default function TrialCountdown({ visible = true, style, compact = false 
                 <Ionicons name="gift-outline" size={48} color={theme.colors.text} />
 
                 <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                  {trialType === 'promotional' ? 'Get 10 More Days Free! 🎉' : 'Upgrade to Premium! 🎉'}
+                  Upgrade to Premium! 🎉
                 </Text>
 
                 <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
-                  {trialType === 'promotional'
-                    ? 'Subscribe now and get an additional 10-day free trial before your first payment!'
-                    : 'Subscribe to continue enjoying all premium features without interruption.'
-                  }
+                  Subscribe now to continue enjoying all premium features without interruption.
                 </Text>
 
                 <Text style={[styles.modalSubtext, { color: theme.colors.textSecondary }]}>
-                  {trialType === 'promotional'
-                    ? 'Auto-renew required to start. Cancel anytime during trial to avoid charges.'
-                    : 'Manage your subscription anytime in your account settings.'
-                  }
+                  +14 days free trial when you subscribe (up to 28 days total). Cancel anytime.
                 </Text>
 
                 <View style={styles.modalActions}>
@@ -294,7 +288,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
                     style={[styles.primaryModalButton, { backgroundColor: theme.colors.primary }]}
                   >
                     <Text style={[styles.primaryModalButtonText, { color: theme.colors.text }]}>
-                      {trialType === 'promotional' ? 'Get 10 More Days' : 'Subscribe Now'}
+                      Subscribe Now
                     </Text>
                   </TouchableOpacity>
 

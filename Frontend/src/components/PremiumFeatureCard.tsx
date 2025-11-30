@@ -34,7 +34,7 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
     subtitle,
     features,
     icon,
-    trialText = "10 days free • Cancel anytime"
+    trialText = "+14 days free trial when you subscribe • Cancel anytime"
 }) => {
     const { theme, isDarkTheme } = useContext(ThemeContext);
 
@@ -82,7 +82,7 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
                                     style={styles.upgradeButton}
                                     onPress={onUpgrade}
                                 >
-                                    <Text style={styles.upgradeButtonText}>Start Free Trial</Text>
+                                    <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
                                 </TouchableOpacity>
 
                                 <Text style={styles.trialText}>{trialText}</Text>
@@ -120,7 +120,7 @@ const PremiumFeatureCard: React.FC<PremiumFeatureCardProps> = ({
                                     style={styles.upgradeButton}
                                     onPress={onUpgrade}
                                 >
-                                    <Text style={styles.upgradeButtonText}>Start Free Trial</Text>
+                                    <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
                                 </TouchableOpacity>
 
                                 <Text style={styles.trialText}>{trialText}</Text>

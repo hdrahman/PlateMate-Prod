@@ -71,18 +71,18 @@ const WelcomePremiumModal: React.FC<WelcomePremiumModalProps> = ({ visible, onCl
                                 <MaterialCommunityIcons name="crown" size={32} color="#fff" />
                             </LinearGradient>
                             <Text style={styles.title}>Welcome to PlateMate Premium!</Text>
-                            <Text style={styles.subtitle}>We've automatically started your 20-day free trial</Text>
+                            <Text style={styles.subtitle}>Up to 28 days free when you subscribe!</Text>
                         </View>
 
                         <View style={styles.trialCard}>
                             <View style={styles.trialHeader}>
                                 <View style={styles.trialIconContainer}>
-                                    <Ionicons name="time-outline" size={24} color="#0074dd" />
+                                    <Ionicons name="gift-outline" size={24} color="#0074dd" />
                                 </View>
-                                <Text style={styles.trialTitle}>15-Day Premium Trial</Text>
+                                <Text style={styles.trialTitle}>Up to 28 Days Free!</Text>
                             </View>
                             <Text style={styles.trialDescription}>
-                                You now have full access to all premium features for 20 days, completely free!
+                                You get 14 days free automatically. Subscribe to unlock an additional 14-day trial (28 days total)!
                             </Text>
 
                             <View style={styles.featuresContainer}>

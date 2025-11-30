@@ -131,8 +131,8 @@ const SubscriptionManagementScreen: React.FC = () => {
                                 }
 
                                 Alert.alert(
-                                    'Trial Extended!',
-                                    'Your trial has been extended by 10 days. You now have 30 days total to try all premium features.',
+                                    'Subscription Started!',
+                                    'Your premium subscription is now active. Enjoy all premium features!',
                                     [{ text: 'Great!', onPress: loadSubscriptionData }]
                                 );
                             } catch (error) {
@@ -400,7 +400,7 @@ const SubscriptionManagementScreen: React.FC = () => {
                     <View style={[styles.faqItem, { backgroundColor: theme.colors.cardBackground }]}>
                         <Text style={[styles.faqQuestion, { color: theme.colors.text }]}>How does the free trial work?</Text>
                         <Text style={[styles.faqAnswer, { color: theme.colors.textSecondary }]}>
-                            Get 20 days free to try all premium features. Add a payment method to extend to 30 days total. You won't be charged until after your trial ends.
+                            New users get 14 days free automatically. When you subscribe, you get an additional 14-day trial (up to 28 days total free). You won't be charged until after your trial ends. Cancel anytime.
                         </Text>
                     </View>
 

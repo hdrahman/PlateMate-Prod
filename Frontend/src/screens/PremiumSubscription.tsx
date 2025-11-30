@@ -80,7 +80,7 @@ const PremiumSubscription = () => {
             gradient: ['#5856D6', '#007AFF'],
             subscriptionType: 'premium_monthly',
             imageUploads: 'Monthly billing',
-            features: ['Up to 30 days free trial']
+            features: ['Unlimited AI uploads', 'Cancel anytime']
         },
         {
             id: 'premium_annual',
@@ -91,7 +91,7 @@ const PremiumSubscription = () => {
             subscriptionType: 'premium_annual',
             bestValue: true,
             imageUploads: 'Annual billing',
-            features: ['Up to 30 days free trial', 'Save 30% vs monthly plan']
+            features: ['Save 30% vs monthly', 'Best value']
         }
     ];
 
@@ -112,8 +112,8 @@ const PremiumSubscription = () => {
         return {
             planName: tier === 'premium_monthly' ? 'Premium Monthly' :
                 tier === 'premium_annual' ? 'Premium Annual' :
-                    tier === 'promotional_trial' ? 'Free Trial (20 days)' :
-                        tier === 'extended_trial' ? 'Extended Trial (30 days)' : 'Free Plan',
+                    tier === 'promotional_trial' ? 'Free Trial' :
+                        tier === 'extended_trial' ? 'Extended Trial' : 'Free Plan',
             isActive: ['premium_monthly', 'premium_annual', 'promotional_trial', 'extended_trial'].includes(tier),
             statusText: tier === 'premium_monthly' ? 'Renews monthly' :
                 tier === 'premium_annual' ? 'Renews annually - Save 30%' :
@@ -415,6 +415,12 @@ const PremiumSubscription = () => {
                             <Text style={styles.planPeriod}>{period}</Text>
                         </View>
 
+                        {/* Trial bonus - visible but subordinate to price */}
+                        <View style={styles.trialBonusContainer}>
+                            <Ionicons name="gift-outline" size={14} color="#4CAF50" />
+                            <Text style={styles.trialBonusText}>+14 days free trial</Text>
+                        </View>
+
                         {monthlyEquivalent && (
                             <Text style={styles.monthlyEquivalent}>
                                 {monthlyEquivalent}
@@ -442,7 +448,7 @@ const PremiumSubscription = () => {
                                 styles.planStatusText,
                                 isPlanActive && styles.planStatusTextActive
                             ]}>
-                                {isPlanActive ? 'Current Plan' : 'Tap to Start Trial'}
+                                {isPlanActive ? 'Current Plan' : `Subscribe ${priceText}${period}`}
                             </Text>
                         )}
                     </View>
@@ -491,7 +497,7 @@ const PremiumSubscription = () => {
                                 <Ionicons name="nutrition" size={40} color="#FFD700" />
                                 <Text style={styles.heroTitle}>Unlock Premium Features</Text>
                                 <Text style={styles.heroText}>
-                                    Experience AI-powered nutrition tracking with up to 30 days free trial
+                                    AI-powered nutrition tracking with unlimited photo analysis
                                 </Text>
                             </View>
                         </LinearGradient>
@@ -546,10 +552,21 @@ const PremiumSubscription = () => {
                                 <Text style={[styles.restorePurchasesText, { color: theme.colors.primary }]}>Restore Purchases</Text>
                             </TouchableOpacity>
 
-                            {/* Store-compliant trial disclaimer */}
+                            {/* Trial bonus highlight */}
+                            <View style={[styles.trialHighlightSection, { backgroundColor: 'rgba(76, 175, 80, 0.1)', borderColor: 'rgba(76, 175, 80, 0.3)' }]}>
+                                <View style={styles.trialHighlightHeader}>
+                                    <Ionicons name="gift" size={20} color="#4CAF50" />
+                                    <Text style={[styles.trialHighlightTitle, { color: '#4CAF50' }]}>Up to 28 Days Free!</Text>
+                                </View>
+                                <Text style={[styles.trialHighlightText, { color: theme.colors.textSecondary }]}>
+                                    New users get 14 days free automatically. Subscribe to unlock an additional 14-day trial (28 days total free).
+                                </Text>
+                            </View>
+
+                            {/* Store-compliant pricing disclaimer */}
                             <View style={[styles.trialDisclaimerSection, { backgroundColor: `${theme.colors.primary}0D`, borderColor: `${theme.colors.primary}26` }]}>
                                 <Text style={[styles.trialDisclaimerText, { color: theme.colors.textSecondary }]}>
-                                    New users get 20 days free automatically. Start a subscription to unlock an additional 10 days (30 days total). Cancel anytime during the trial period. No charges until trial ends.
+                                    Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the current period. Cancel anytime in Settings.
                                 </Text>
                             </View>
 
@@ -775,20 +792,37 @@ const styles = StyleSheet.create({
     },
     planPrice: {
         color: '#FFF',
-        fontSize: 24,
+        fontSize: 34,
         fontWeight: 'bold',
     },
     planPeriod: {
         color: '#FFF',
-        opacity: 0.8,
-        fontSize: 14,
+        opacity: 0.9,
+        fontSize: 16,
         marginLeft: 2,
+        fontWeight: '600',
+    },
+    trialBonusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginTop: 6,
+        alignSelf: 'flex-start',
+    },
+    trialBonusText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
     },
     monthlyEquivalent: {
         color: '#FFD700',
         fontSize: 12,
         fontWeight: '600',
-        marginTop: 4,
+        marginTop: 2,
     },
     planFeatures: {
         marginTop: 8,
@@ -969,7 +1003,30 @@ const styles = StyleSheet.create({
         marginTop: 8,
         fontStyle: 'italic',
     },
-    // Store-compliant trial disclaimer styles
+    // Trial highlight section styles
+    trialHighlightSection: {
+        marginBottom: 16,
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    trialHighlightHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    trialHighlightTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
+    trialHighlightText: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+    // Store-compliant pricing disclaimer styles
     trialDisclaimerSection: {
         marginBottom: 20,
         padding: 16,
@@ -980,8 +1037,8 @@ const styles = StyleSheet.create({
     },
     trialDisclaimerText: {
         color: '#AAA',
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 12,
+        lineHeight: 16,
         textAlign: 'center',
     },
     // Legal links styles

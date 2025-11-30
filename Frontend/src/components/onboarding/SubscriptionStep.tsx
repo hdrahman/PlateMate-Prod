@@ -203,18 +203,18 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                         <MaterialCommunityIcons name="crown" size={32} color="#fff" />
                     </LinearGradient>
                     <Text style={[styles.title, { color: theme.colors.text }]}>Welcome to PlateMate Premium!</Text>
-                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>We've automatically started your 20-day free trial</Text>
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Up to 28 days free when you subscribe!</Text>
                 </View>
 
                 <View style={[styles.trialCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     <View style={styles.trialHeader}>
                         <View style={styles.trialIconContainer}>
-                            <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
+                            <Ionicons name="gift-outline" size={24} color={theme.colors.primary} />
                         </View>
-                        <Text style={[styles.trialTitle, { color: theme.colors.text }]}>20-Day Premium Trial</Text>
+                        <Text style={[styles.trialTitle, { color: theme.colors.text }]}>Up to 28 Days Free!</Text>
                     </View>
                     <Text style={[styles.trialDescription, { color: theme.colors.textSecondary }]}>
-                        You now have full access to all premium features for 20 days, completely free!
+                        You get 14 days free automatically. Subscribe to unlock an additional 14-day trial (28 days total free)!
                     </Text>
 
                     <View style={styles.featuresContainer}>
@@ -235,11 +235,11 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
 
                 <View style={[styles.extendTrialCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                     <View style={styles.extendHeader}>
-                        <Ionicons name="card-outline" size={20} color="#ff6b35" />
-                        <Text style={[styles.extendTitle, { color: theme.colors.text }]}>Want another 10 days?</Text>
+                        <Ionicons name="shield-checkmark-outline" size={20} color="#ff6b35" />
+                        <Text style={[styles.extendTitle, { color: theme.colors.text }]}>Cancel anytime</Text>
                     </View>
                     <Text style={[styles.extendDescription, { color: theme.colors.textSecondary }]}>
-                        Add your credit card to extend your trial to 30 days total. No charge until after the trial ends.
+                        No charges during the trial period. Cancel anytime before the trial ends.
                     </Text>
                 </View>
 
@@ -258,7 +258,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                             <ActivityIndicator size="small" color="#fff" />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Text style={styles.buttonText}>Get Started with Free Trial</Text>
+                                <Text style={styles.buttonText}>Continue to Premium</Text>
                                 <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
                             </View>
                         )}
@@ -315,10 +315,10 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                         </LinearGradient>
                         <View style={styles.popupContent}>
                             <Text style={styles.popupText}>
-                                🎉 Congratulations! We've automatically activated your 20-day Premium trial.
+                                🎉 Welcome! You now have 14 days free to try Premium!
                             </Text>
                             <Text style={styles.popupSubtext}>
-                                Enjoy all premium features free for 20 days. If you want to extend it to 30 days total, just add your credit card anytime.
+                                Subscribe to get an additional 14-day trial (up to 28 days total free). Cancel anytime.
                             </Text>
                             <TouchableOpacity
                                 style={styles.popupButton}
