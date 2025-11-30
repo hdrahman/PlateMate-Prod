@@ -78,20 +78,48 @@ interface AutocompleteSuggestion {
     uniqueKey?: string;
 }
 
-// GradientBorderCard component moved outside to prevent re-creation
-// Note: cardBackground should always be passed from theme.colors.cardBackground
-const GradientBorderCard: React.FC<GradientBorderCardProps & { cardBackground: string }> = React.memo(({ children, style, cardBackground }) => {
+// Card component - Uses gradient border in dark mode, shadow/border in light mode
+const GradientBorderCard: React.FC<GradientBorderCardProps & { cardBackground: string; gradientColors: string[]; isDarkTheme: boolean; borderColor: string }> = React.memo(({ children, style, cardBackground, gradientColors, isDarkTheme, borderColor }) => {
+    // Light mode: Clean elevated card with shadow
+    if (!isDarkTheme) {
+        return (
+            <View
+                style={[
+                    styles.gradientBorderContainer,
+                    {
+                        backgroundColor: cardBackground,
+                        borderRadius: 12,
+                        padding: 16,
+                        // Elevation shadow for depth
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.06,
+                        shadowRadius: 8,
+                        elevation: 3,
+                        // Subtle border for definition
+                        borderWidth: 1,
+                        borderColor: borderColor,
+                    },
+                    style,
+                ]}
+            >
+                {children}
+            </View>
+        );
+    }
+    
+    // Dark mode: Keep the neon gradient border
     return (
         <View style={styles.gradientBorderContainer}>
             <LinearGradient
-                colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                colors={gradientColors as any}
                 style={{
                     position: 'absolute',
                     left: 0,
                     right: 0,
                     top: 0,
                     bottom: 0,
-                    borderRadius: 10,
+                    borderRadius: 12,
                 }}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -99,7 +127,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps & { cardBackground: s
             <View
                 style={{
                     margin: 1,
-                    borderRadius: 9,
+                    borderRadius: 11,
                     backgroundColor: cardBackground,
                     padding: 16,
                     ...(style || {})
@@ -181,12 +209,12 @@ const SuggestionItem = React.memo(({
     >
         <View style={[
             styles.suggestionIconContainer,
-            { backgroundColor: item.type === 'recipe' ? `${primaryColor}20` : '#00CFFF20' }
+            { backgroundColor: item.type === 'recipe' ? `${primaryColor}20` : `${primaryColor}15` }
         ]}>
             <Ionicons
                 name={item.type === 'recipe' ? 'restaurant' : 'leaf'}
                 size={16}
-                color={item.type === 'recipe' ? primaryColor : '#00CFFF'}
+                color={primaryColor}
             />
         </View>
         <Text style={[styles.suggestionText, { color: textColor }]}>
@@ -194,7 +222,7 @@ const SuggestionItem = React.memo(({
         </Text>
         <Text style={[
             styles.suggestionType,
-            { color: item.type === 'recipe' ? primaryColor : '#00CFFF' }
+            { color: primaryColor }
         ]}>
             {item.type === 'recipe' ? 'Recipe' : 'Ingredient'}
         </Text>
@@ -883,7 +911,7 @@ export default function MealPlanner() {
                 style={styles.errorBanner}
                 onPress={forceSingleRefresh}
             >
-                <Ionicons name="warning-outline" size={20} color="#FFD700" />
+                <Ionicons name="warning-outline" size={20} color={theme.colors.warning} />
                 <Text style={styles.errorText}>
                     Database connection issue. Tap to retry.
                 </Text>
@@ -909,7 +937,7 @@ export default function MealPlanner() {
                 </View>
                 {/* Search Box */}
                 <View style={styles.searchWrapper}>
-                    <GradientBorderCard cardBackground={theme.colors.cardBackground}>
+                    <GradientBorderCard cardBackground={theme.colors.cardBackground} gradientColors={theme.colors.gradientNeonBlue} isDarkTheme={isDarkTheme} borderColor={theme.colors.border}>
                         <SearchInputComponent
                             searchQuery={searchQuery}
                             onChangeText={handleSearchQueryChange}
@@ -955,7 +983,7 @@ export default function MealPlanner() {
                 </View>
 
                 {/* Scan Pantry Card */}
-                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
+                <GradientBorderCard cardBackground={theme.colors.cardBackground} gradientColors={theme.colors.gradientNeonBlue} isDarkTheme={isDarkTheme} borderColor={theme.colors.border}>
                     <TouchableOpacity
                         style={styles.actionCardContent}
                         onPress={handleScanPantry}
@@ -1038,7 +1066,7 @@ export default function MealPlanner() {
                 ))}
 
                 {/* Nutrition Summary Section */}
-                <GradientBorderCard cardBackground={theme.colors.cardBackground}>
+                <GradientBorderCard cardBackground={theme.colors.cardBackground} gradientColors={theme.colors.gradientNeonBlue} isDarkTheme={isDarkTheme} borderColor={theme.colors.border}>
                     <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Today's Nutrition</Text>
                     <View style={[styles.dividerLine, { backgroundColor: `${theme.colors.primary}4D` }]} />
                     <View style={styles.nutritionInfoContainer}>

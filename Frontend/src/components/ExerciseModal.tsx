@@ -46,10 +46,8 @@ interface ExerciseModalProps {
     currentDate: Date;
 }
 
-// Accent colors
-const PURPLE_ACCENT = '#AA00FF';
-
-// Fallback colors (used in StyleSheet, overridden inline with theme where possible)
+// Colors are now derived from theme - these are only fallbacks for static StyleSheet
+const PURPLE_ACCENT = '#9B00FF';
 const PRIMARY_BG = '#121212';
 const CARD_BG = '#1E1E1E';
 const WHITE = '#FFFFFF';
@@ -408,14 +406,14 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                 </TouchableWithoutFeedback>
 
                 {/* Actual modal card */}
-                <View style={styles.exerciseModalContent}>
+                <View style={[styles.exerciseModalContent, { backgroundColor: theme.colors.cardBackground }]}>
                     <MaskedView
                         maskElement={
                             <Text style={styles.exerciseModalTitle}>Add Exercise</Text>
                         }
                     >
                         <LinearGradient
-                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                            colors={theme.colors.gradientNeonPink}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={{ height: 30, width: '100%' }}
@@ -436,7 +434,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 }
                             }}
                         >
-                            <Ionicons name="arrow-back" size={28} color="#8A2BE2" />
+                            <Ionicons name="arrow-back" size={28} color={theme.colors.primary} />
                         </TouchableOpacity>
                     )}
 
@@ -445,7 +443,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                         style={styles.exitButton}
                         onPress={handleClose}
                     >
-                        <Ionicons name="close" size={28} color="#8A2BE2" />
+                        <Ionicons name="close" size={28} color={theme.colors.primary} />
                     </TouchableOpacity>
 
                     <View style={{ height: 15 }} />
@@ -464,7 +462,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     onPress={() => setIsStepsEntry(true)}
                                 >
                                     <LinearGradient
-                                        colors={["#66BB6A", "#4CAF50", "#388E3C"]}
+                                        colors={theme.colors.gradientNeonGreen}
                                         style={{
                                             position: 'absolute',
                                             left: 0,
@@ -478,8 +476,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     />
                                     <View style={[styles.popularActivitiesContainer, { padding: 16 }]}>
                                         <View style={[styles.popularActivitiesHeader, { marginBottom: 0 }]}>
-                                            <Ionicons name="walk" size={24} color="#4CAF50" />
-                                            <Text style={[styles.popularActivitiesTitle, { color: '#4CAF50', fontWeight: 'bold' }]}>Add Steps</Text>
+                                            <Ionicons name="walk" size={24} color={theme.colors.success} />
+                                            <Text style={[styles.popularActivitiesTitle, { color: theme.colors.success, fontWeight: 'bold' }]}>Add Steps</Text>
                                         </View>
                                     </View>
                                 </TouchableOpacity>
@@ -490,7 +488,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     onPress={() => setIsManualEntry(true)}
                                 >
                                     <LinearGradient
-                                        colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                        colors={theme.colors.gradientNeonPink}
                                         style={{
                                             position: 'absolute',
                                             left: 0,
@@ -502,12 +500,12 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
                                     />
-                                    <View style={styles.popularActivitiesContainer}>
+                                    <View style={[styles.popularActivitiesContainer, { backgroundColor: theme.colors.cardBackground }]}>
                                         <View style={styles.popularActivitiesHeader}>
-                                            <Ionicons name="create-outline" size={20} color={PURPLE_ACCENT} />
-                                            <Text style={styles.popularActivitiesTitle}>Manual Entry</Text>
+                                            <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+                                            <Text style={[styles.popularActivitiesTitle, { color: theme.colors.text }]}>Manual Entry</Text>
                                         </View>
-                                        <Text style={[styles.activityMet, { marginBottom: 5 }]}>
+                                        <Text style={[styles.activityMet, { marginBottom: 5, color: theme.colors.textSecondary }]}>
                                             Enter your own activity name and MET value
                                         </Text>
                                         <TouchableOpacity
@@ -516,11 +514,11 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                 width: '100%',
                                                 marginTop: 10,
                                                 borderWidth: 1,
-                                                borderColor: PURPLE_ACCENT
+                                                borderColor: theme.colors.primary
                                             }]}
                                             onPress={() => setIsManualEntry(true)}
                                         >
-                                            <Text style={[styles.intensityButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>Enter Manually</Text>
+                                            <Text style={[styles.intensityButtonText, { color: theme.colors.primary, fontWeight: 'bold' }]}>Enter Manually</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </TouchableOpacity>
@@ -534,11 +532,11 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
 
                                 {/* Search Input */}
                                 <View style={styles.searchInputContainer}>
-                                    <Ionicons name="search" size={20} color="#999" />
+                                    <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
                                     <TextInput
-                                        style={styles.searchInput}
+                                        style={[styles.searchInput, { color: theme.colors.text }]}
                                         placeholder="Search activities..."
-                                        placeholderTextColor="#999"
+                                        placeholderTextColor={theme.colors.textSecondary}
                                         value={searchQuery}
                                         onChangeText={setSearchQuery}
                                     />
@@ -549,7 +547,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     {searchQuery === '' ? (
                                         <View style={styles.popularActivitiesWrapper}>
                                             <LinearGradient
-                                                colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                                colors={theme.colors.gradientNeonPink}
                                                 style={{
                                                     position: 'absolute',
                                                     left: 0,
@@ -561,7 +559,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 0 }}
                                             />
-                                            <View style={styles.popularActivitiesContainer}>
+                                            <View style={[styles.popularActivitiesContainer, { backgroundColor: theme.colors.cardBackground }]}>
                                                 <ScrollView
                                                     nestedScrollEnabled={true}
                                                     style={styles.popularActivitiesScroll}
@@ -733,13 +731,13 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                         <Ionicons
                                             name="walk"
                                             size={32}
-                                            color="#4CAF50"
+                                            color={theme.colors.success}
                                         />
                                     </View>
                                     <View style={styles.exerciseHeaderInfo}>
                                         <Text style={styles.exerciseHeaderTitle}>Log Steps</Text>
-                                        <View style={[styles.exerciseMetBadge, { backgroundColor: 'rgba(76, 175, 80, 0.2)' }]}>
-                                            <Text style={[styles.exerciseMetText, { color: '#4CAF50' }]}>
+                                        <View style={[styles.exerciseMetBadge, { backgroundColor: theme.colors.success + '33' }]}>
+                                            <Text style={[styles.exerciseMetText, { color: theme.colors.success }]}>
                                                 WALKING • MODERATE
                                             </Text>
                                         </View>
@@ -749,8 +747,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 {/* Current Steps Display */}
                                 <View style={styles.configSection}>
                                     <Text style={styles.configSectionTitle}>Current Steps Today</Text>
-                                    <View style={[styles.caloriesResult, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
-                                        <Text style={[styles.caloriesResultText, { color: '#4CAF50' }]}>
+                                    <View style={[styles.caloriesResult, { backgroundColor: theme.colors.success + '1A' }]}>
+                                        <Text style={[styles.caloriesResultText, { color: theme.colors.success }]}>
                                             {todaySteps} steps
                                         </Text>
                                     </View>
@@ -761,7 +759,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     <Text style={styles.configSectionTitle}>Steps to Add</Text>
                                     <View style={styles.durationCardWrapper}>
                                         <LinearGradient
-                                            colors={["#66BB6A", "#4CAF50", "#388E3C"]}
+                                            colors={theme.colors.gradientNeonGreen}
                                             style={styles.durationCardGradient}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 1 }}
@@ -806,7 +804,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 <View style={styles.configSection}>
                                     <View style={styles.caloriesCalculationCard}>
                                         <View style={styles.caloriesHeader}>
-                                            <Ionicons name="flame" size={20} color={PURPLE_ACCENT} />
+                                                <Ionicons name="flame" size={20} color={theme.colors.primary} />
                                             <Text style={styles.caloriesHeaderTitle}>Estimated Calories</Text>
                                         </View>
                                         <View style={styles.caloriesMainResult}>
@@ -827,8 +825,8 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 {/* New Total Display */}
                                 <View style={styles.configSection}>
                                     <Text style={styles.configSectionTitle}>New Total</Text>
-                                    <View style={[styles.caloriesResult, { backgroundColor: 'rgba(76, 175, 80, 0.1)' }]}>
-                                        <Text style={[styles.caloriesResultText, { color: '#4CAF50' }]}>
+                                    <View style={[styles.caloriesResult, { backgroundColor: theme.colors.success + '1A' }]}>
+                                        <Text style={[styles.caloriesResultText, { color: theme.colors.success }]}>
                                             {todaySteps + (parseInt(stepsCount) || 0)} steps
                                         </Text>
                                     </View>
@@ -846,7 +844,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             name={selectedActivity.category === 'light' ? 'walk' :
                                                 selectedActivity.category === 'moderate' ? 'fitness' : 'flash'}
                                             size={32}
-                                            color={PURPLE_ACCENT}
+                                            color={theme.colors.primary}
                                         />
                                     </View>
                                     <View style={styles.exerciseHeaderInfo}>
@@ -864,7 +862,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     <Text style={styles.configSectionTitle}>Duration</Text>
                                     <View style={styles.durationCardWrapper}>
                                         <LinearGradient
-                                            colors={["#FF00F5", "#9B00FF", "#00CFFF"]}
+                                            colors={theme.colors.gradientNeonPink}
                                             style={styles.durationCardGradient}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 1 }}
@@ -919,7 +917,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             <Ionicons
                                                 name="leaf-outline"
                                                 size={24}
-                                                color={exerciseIntensity === 'light' ? PURPLE_ACCENT : SUBDUED}
+                                                color={exerciseIntensity === 'light' ? theme.colors.primary : theme.colors.textSecondary}
                                             />
                                             <Text style={[
                                                 styles.intensityCardTitle,
@@ -938,7 +936,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             <Ionicons
                                                 name="fitness-outline"
                                                 size={24}
-                                                color={exerciseIntensity === 'moderate' ? PURPLE_ACCENT : SUBDUED}
+                                                color={exerciseIntensity === 'moderate' ? theme.colors.primary : theme.colors.textSecondary}
                                             />
                                             <Text style={[
                                                 styles.intensityCardTitle,
@@ -957,7 +955,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                             <Ionicons
                                                 name="flash-outline"
                                                 size={24}
-                                                color={exerciseIntensity === 'vigorous' ? PURPLE_ACCENT : SUBDUED}
+                                                color={exerciseIntensity === 'vigorous' ? theme.colors.primary : theme.colors.textSecondary}
                                             />
                                             <Text style={[
                                                 styles.intensityCardTitle,
@@ -971,7 +969,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 {/* Calories Calculation Card */}
                                 <View style={styles.caloriesCalculationCard}>
                                     <View style={styles.caloriesHeader}>
-                                        <Ionicons name="calculator-outline" size={24} color={PURPLE_ACCENT} />
+                                        <Ionicons name="calculator-outline" size={24} color={theme.colors.primary} />
                                         <Text style={styles.caloriesHeaderTitle}>Estimated Calories Burned</Text>
                                     </View>
 
@@ -1016,7 +1014,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                     backgroundColor: 'transparent',
                                     width: '100%',
                                     borderWidth: 1,
-                                    borderColor: PURPLE_ACCENT,
+                                    borderColor: theme.colors.primary,
                                     shadowColor: 'transparent',
                                     shadowOffset: { width: 0, height: 0 },
                                     shadowOpacity: 0,
@@ -1032,7 +1030,7 @@ const ExerciseModal: React.FC<ExerciseModalProps> = ({
                                 (isManualEntry && !manualActivityName.trim()) ||
                                 (isStepsEntry && (!stepsCount.trim() || parseInt(stepsCount) <= 0))}
                         >
-                            <Text style={[styles.modalButtonText, { color: PURPLE_ACCENT, fontWeight: 'bold' }]}>
+                            <Text style={[styles.modalButtonText, { color: theme.colors.primary, fontWeight: 'bold' }]}>
                                 {isStepsEntry ? 'ADD STEPS' : 'ADD EXERCISE'}
                             </Text>
                         </TouchableOpacity>

@@ -83,25 +83,55 @@ const cheatDaysTotal = 7;
 const cheatDaysCompleted = 3;
 const cheatProgress = (cheatDaysCompleted / cheatDaysTotal) * 100;
 
-// GradientBorderCard component for consistent card styling
+// Card component - Uses gradient border in dark mode, shadow/border in light mode
 interface GradientBorderCardProps {
   children: React.ReactNode;
   style?: any;
 }
 
 const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
-  const { theme } = useContext(ThemeContext);
+  const { theme, isDarkTheme } = useContext(ThemeContext);
+  
+  // Light mode: Clean elevated card with shadow
+  if (!isDarkTheme) {
+    return (
+      <View
+        style={[
+          styles.gradientBorderContainer,
+          {
+            backgroundColor: theme.colors.cardBackground,
+            borderRadius: 12,
+            padding: 16,
+            // Elevation shadow for depth
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            elevation: 3,
+            // Subtle border for definition
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          },
+          style,
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
+  
+  // Dark mode: Keep the neon gradient border
   return (
     <View style={styles.gradientBorderContainer}>
       <LinearGradient
-        colors={["#0074dd", "#5c00dd", "#dd0095"]}
+        colors={theme.colors.gradient.cardBorder as unknown as [string, string, ...string[]]}
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           top: 0,
           bottom: 0,
-          borderRadius: 10,
+          borderRadius: 12,
         }}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
@@ -109,7 +139,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
       <View
         style={{
           margin: 1,
-          borderRadius: 9,
+          borderRadius: 11,
           backgroundColor: theme.colors.cardBackground,
           padding: 16,
         }}
@@ -176,7 +206,7 @@ const WeightModal = React.memo<WeightModalProps>(({
   }), [theme]);
 
   const cancelButtonStyle = useMemo(() => ({
-    backgroundColor: theme.dark ? 'rgba(60, 60, 60, 0.8)' : '#E5E5EA',
+    backgroundColor: theme.dark ? 'rgba(60, 60, 60, 0.8)' : theme.colors.ringBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
   }), [theme]);
@@ -932,32 +962,32 @@ export default function Home() {
   // Don't allow progress to exceed 100% of the circle circumference
   const consumedStroke = Math.min(circumference, circumference * (Math.min(100, adjustedPercentCons) / 100));
 
-  // Data for the right card with updated colors.
+  // Data for the right card with theme-aware colors.
   const rightStats = [
     {
       label: 'Goal',
       value: adjustedGoal || '---',
       icon: 'flag-outline',
-      color: '#FFB74D'
+      color: theme.colors.warning
     },
     {
       label: 'Food',
       value: foodLoading ? '-' : consumedCalories,
       icon: 'restaurant-outline',
-      color: '#FF8A65'
-    }, // soft red hue
+      color: theme.colors.chartCalories
+    },
     {
       label: 'Exercise',
       value: exerciseLoading ? '-' : exerciseCalories,
       icon: 'barbell-outline',
-      color: '#66BB6A'
-    }, // updated green
+      color: theme.colors.success
+    },
     {
       label: 'Steps',
       value: stepsLoading ? '-' : todaySteps,
       icon: 'walk',
       iconSet: 'MaterialCommunityIcons',
-      color: '#E040FB' // updated purple
+      color: theme.colors.chartSteps
     }
   ];
 
@@ -973,11 +1003,11 @@ export default function Home() {
 
     return (
       <TouchableOpacity
-        style={styles.errorBanner}
+        style={[styles.errorBanner, { backgroundColor: theme.colors.error + '33', borderBottomColor: theme.colors.error }]}
         onPress={forceSingleRefresh}
       >
-        <Ionicons name="warning-outline" size={20} color="#FFD700" />
-        <Text style={styles.errorText}>
+        <Ionicons name="warning-outline" size={20} color={theme.colors.warning} />
+        <Text style={[styles.errorText, { color: theme.colors.warning }]}>
           Database connection issue. Tap to retry.
         </Text>
       </TouchableOpacity>
@@ -1388,30 +1418,28 @@ export default function Home() {
           <View style={styles.cheatDayContainer}>
             {/* STREAK INDICATOR - Top Right Corner */}
             <View style={styles.streakContainer}>
-              <MaskedView
-                maskElement={<Text style={[styles.streakText, { opacity: 1, color: theme.colors.text }]}>{currentStreak}</Text>}
+            <MaskedView
+              maskElement={<Text style={[styles.streakText, { opacity: 1, color: theme.colors.text }]}>{currentStreak}</Text>}
+            >
+              <LinearGradient
+                colors={theme.colors.gradient.neon as unknown as [string, string, ...string[]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                <LinearGradient
-                  colors={["#0080FF", "#FF1493"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0.33, 0.8]}
-                >
-                  <Text style={[styles.streakText, { opacity: 0 }]}>{currentStreak}</Text>
-                </LinearGradient>
-              </MaskedView>
-              <MaskedView
-                maskElement={<MaterialCommunityIcons name="fire" size={28} color="#FFF" />}
-                style={{ marginLeft: 0 }}
-              >
-                <LinearGradient
-                  colors={["#0080FF", "#FF1493"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  locations={[0.33, 0.8]}
-                  style={{ width: 28, height: 28 }}
-                />
-              </MaskedView>
+                <Text style={[styles.streakText, { opacity: 0 }]}>{currentStreak}</Text>
+              </LinearGradient>
+            </MaskedView>
+            <MaskedView
+              maskElement={<MaterialCommunityIcons name="fire" size={28} color="#FFF" />}
+              style={{ marginLeft: 0 }}
+            >
+              <LinearGradient
+                colors={theme.colors.gradient.neon as unknown as [string, string, ...string[]]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 28, height: 28 }}
+              />
+            </MaskedView>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={[styles.cheatDayLabel, { color: theme.colors.text }]}>
@@ -1424,12 +1452,12 @@ export default function Home() {
             </View>
             <View style={[
               styles.cheatDayBarBackground,
-              { backgroundColor: theme.dark ? 'rgba(0, 207, 255, 0.2)' : 'rgba(0, 207, 255, 0.1)' } // subdued light blue background matching the cheat day gradient
+              { backgroundColor: theme.dark ? 'rgba(0, 207, 255, 0.2)' : 'rgba(0, 168, 255, 0.15)' }
             ]}>
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                colors={theme.colors.gradient.neon as unknown as [string, string, ...string[]]}
                 style={[styles.cheatDayBarFill, { width: `${cheatDayProgress}%` }]}
               />
             </View>
@@ -1453,7 +1481,14 @@ export default function Home() {
         <GradientBorderCard>
           {/* Analytics Button - Top Left Corner */}
           <TouchableOpacity
-            style={styles.goalCardAnalyticsButton}
+            style={[
+              styles.goalCardAnalyticsButton,
+              {
+                backgroundColor: theme.colors.primary + '26',
+                borderWidth: 1.5,
+                borderColor: theme.colors.primary + '4D',
+              }
+            ]}
             onPress={() => navigation.navigate('Analytics' as never)}
           >
             <MaskedView
@@ -1465,7 +1500,7 @@ export default function Home() {
               <LinearGradient
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                colors={['#FF00F5', '#9B00FF', '#00CFFF']}
+                colors={theme.colors.gradient.neon as unknown as [string, string, ...string[]]}
                 style={styles.goalCardAnalyticsGradient}
               />
             </MaskedView>
@@ -1482,17 +1517,17 @@ export default function Home() {
               <Svg width={SVG_SIZE} height={SVG_SIZE}>
                 <Defs>
                   <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor="#2E0854" />
-                    <Stop offset="50%" stopColor="#9B00FF" />
-                    <Stop offset="100%" stopColor="#00CFFF" />
+                    <Stop offset="0%" stopColor={theme.dark ? "#2E0854" : "#6B00B8"} />
+                    <Stop offset="50%" stopColor={theme.dark ? "#9B00FF" : "#8B00E6"} />
+                    <Stop offset="100%" stopColor={theme.dark ? "#00CFFF" : "#00B4D8"} />
                   </SvgLinearGradient>
                   <SvgLinearGradient id="exerciseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor="#8B6914" />
-                    <Stop offset="100%" stopColor="#FFD700" />
+                    <Stop offset="0%" stopColor={theme.dark ? "#8B6914" : "#D4A017"} />
+                    <Stop offset="100%" stopColor={theme.dark ? "#FFD700" : "#F5A623"} />
                   </SvgLinearGradient>
                   <SvgLinearGradient id="eatenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor="#4B0082" />
-                    <Stop offset="100%" stopColor="#8A2BE2" />
+                    <Stop offset="0%" stopColor={theme.dark ? "#4B0082" : "#6B00B8"} />
+                    <Stop offset="100%" stopColor={theme.dark ? "#8A2BE2" : "#8B00E6"} />
                   </SvgLinearGradient>
                 </Defs>
                 {/* Outer dark grey outline */}
@@ -1517,7 +1552,7 @@ export default function Home() {
                   cx={SVG_SIZE / 2}
                   cy={SVG_SIZE / 2}
                   r={radius}
-                  stroke={theme.dark ? "rgba(155, 0, 255, 0.15)" : "rgba(155, 0, 255, 0.05)"}
+                  stroke={theme.dark ? "rgba(155, 0, 255, 0.15)" : "rgba(107, 0, 184, 0.18)"}
                   strokeWidth={STROKE_WIDTH}
                   fill="none"
                 />
@@ -1600,8 +1635,11 @@ export default function Home() {
               }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                   <Text style={[styles.remainingValue, {
-                    fontSize: Math.min(30 * scaleFactor, 60), // Scale font, max 60px
-                    color: theme.colors.text
+                    fontSize: Math.min(30 * scaleFactor, 60),
+                    color: theme.colors.text,
+                    textShadowColor: theme.dark ? theme.colors.primary : 'transparent',
+                    textShadowOffset: { width: 2, height: 2 },
+                    textShadowRadius: theme.dark ? 4 : 0,
                   }]}>
                     {remainingCals < 0 ? Math.abs(remainingCals) : remainingCals}
                   </Text>
@@ -1988,17 +2026,17 @@ function WeightGraph({ data, onAddPress, weightLoading, showTodayWeight, todayWe
             borderRadius: 18,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: theme.dark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: theme.dark ? 'rgba(0, 0, 0, 0.2)' : theme.colors.ringBackground,
             borderWidth: 1,
-            borderColor: 'rgba(156, 39, 176, 0.4)',
-            shadowColor: '#9B00FF',
+            borderColor: theme.colors.primary + '66',
+            shadowColor: theme.colors.primary,
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.3,
             shadowRadius: 2,
             elevation: 2,
           }}
         >
-          <MaterialCommunityIcons name="pencil" size={18} color="#9B00FF" />
+          <MaterialCommunityIcons name="pencil" size={18} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -2254,17 +2292,17 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: 'rgba(0, 217, 255, 0.1)',
+            backgroundColor: theme.colors.chartSteps + '1A',
             paddingHorizontal: 8,
             paddingVertical: 3,
             borderRadius: 12,
             borderWidth: 0.5,
-            borderColor: 'rgba(0, 217, 255, 0.3)',
+            borderColor: theme.colors.chartSteps + '4D',
             alignSelf: 'flex-start',
             marginTop: 4,
           }}>
-            <Ionicons name="fitness" size={11} color="#00D9FF" />
-            <Text style={{ fontSize: 10, fontWeight: '600', color: '#00D9FF', marginLeft: 4 }}>
+            <Ionicons name="fitness" size={11} color={theme.colors.chartSteps} />
+            <Text style={{ fontSize: 10, fontWeight: '600', color: theme.colors.chartSteps, marginLeft: 4 }}>
               Motion & Fitness
             </Text>
           </View>
@@ -2277,17 +2315,17 @@ function StepsGraph({ data }: { data: { date: string; steps: number }[] }) {
             borderRadius: 18,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: theme.dark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: theme.dark ? 'rgba(0, 0, 0, 0.2)' : theme.colors.ringBackground,
             borderWidth: 1,
-            borderColor: 'rgba(30, 144, 255, 0.4)',
-            shadowColor: '#1E90FF',
+            borderColor: theme.colors.chartSteps + '66',
+            shadowColor: theme.colors.chartSteps,
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.3,
             shadowRadius: 2,
             elevation: 2,
           }}
         >
-          <MaterialCommunityIcons name="walk" size={18} color="#1E90FF" />
+          <MaterialCommunityIcons name="walk" size={18} color={theme.colors.chartSteps} />
         </TouchableOpacity>
       </View>
 
@@ -2476,24 +2514,25 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
   const cappedPercent = percent;
   const fillStroke = Math.min(circumference, (percent / 100) * circumference);
 
-  // Custom solid colors for each macro ring
-  let solidColor = '#FF00F5'; // default
-  let backgroundStrokeColor = theme.dark ? 'rgba(80, 0, 133, 0.2)' : 'rgba(80, 0, 133, 0.1)'; // default subdued background
+  // Theme-aware solid colors for each macro ring
+  // Light mode: Higher contrast backgrounds (0.18-0.22) for visibility
+  let solidColor = theme.colors.chartCalories; // default pink/accent
+  let backgroundStrokeColor = theme.dark ? 'rgba(80, 0, 133, 0.2)' : 'rgba(107, 0, 184, 0.18)';
   switch (label.toUpperCase()) {
     case 'PROTEIN':
-      solidColor = '#DE0707'; // Custom red: rgb(222, 7, 7)
-      backgroundStrokeColor = theme.dark ? 'rgba(222, 7, 7, 0.2)' : 'rgba(222, 7, 7, 0.1)'; // subdued custom red
+      solidColor = theme.dark ? '#DE0707' : '#C62828'; // Deeper red for light mode contrast
+      backgroundStrokeColor = theme.dark ? 'rgba(222, 7, 7, 0.2)' : 'rgba(198, 40, 40, 0.22)';
       break;
     case 'CARBS':
-      solidColor = '#0052CC'; // Richer blue: rgb(0, 82, 204)
-      backgroundStrokeColor = theme.dark ? 'rgba(0, 82, 204, 0.2)' : 'rgba(0, 82, 204, 0.1)'; // subdued richer blue
+      solidColor = theme.colors.chartCarbs;
+      backgroundStrokeColor = theme.dark ? 'rgba(0, 132, 255, 0.2)' : 'rgba(41, 121, 255, 0.22)';
       break;
     case 'FATS':
-      solidColor = '#19BF32'; // Custom green: rgb(25, 191, 50)
-      backgroundStrokeColor = theme.dark ? 'rgba(25, 191, 50, 0.2)' : 'rgba(25, 191, 50, 0.1)'; // subdued custom green
+      solidColor = theme.colors.chartProtein; // Green for fats
+      backgroundStrokeColor = theme.dark ? 'rgba(50, 215, 75, 0.2)' : 'rgba(45, 159, 74, 0.22)';
       break;
     case 'OTHER':
-      backgroundStrokeColor = theme.dark ? 'rgba(80, 0, 133, 0.2)' : 'rgba(80, 0, 133, 0.1)'; // subdued purple for OTHER
+      backgroundStrokeColor = theme.dark ? 'rgba(80, 0, 133, 0.2)' : 'rgba(107, 0, 184, 0.18)';
       break;
     default:
       break;
@@ -2560,10 +2599,10 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
               <Svg width={MACRO_RING_SIZE} height={MACRO_RING_SIZE} style={{ position: 'absolute', top: 0, left: 0 }}>
                 <Defs>
                   <SvgLinearGradient id="appleRingGradient" {...gradientDirection}>
-                    <Stop offset="0%" stopColor="#00A8FF" />
-                    <Stop offset="10%" stopColor="#00A8FF" />
-                    <Stop offset="60%" stopColor="#9B00FF" />
-                    <Stop offset="100%" stopColor="#FF00F5" />
+                    <Stop offset="0%" stopColor={theme.colors.chartSteps} />
+                    <Stop offset="10%" stopColor={theme.colors.chartSteps} />
+                    <Stop offset="60%" stopColor={theme.colors.primary} />
+                    <Stop offset="100%" stopColor={theme.colors.accent} />
                   </SvgLinearGradient>
                 </Defs>
                 <Circle
@@ -2577,9 +2616,9 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
               </Svg>
               <View
                 style={{
-                  shadowColor: "#00A8FF",
+                  shadowColor: theme.colors.chartSteps,
                   shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.6,
+                  shadowOpacity: theme.dark ? 0.6 : 0.3,
                   shadowRadius: 10,
                   elevation: 6,
                 }}
@@ -2601,8 +2640,7 @@ const MacroRing = React.memo(({ label, percent, current, goal, onPress }: MacroR
                   <LinearGradient
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    colors={["#00A8FF", "#00A8FF", "#9B00FF", "#FF00F5", "#FF00F5"]}
-                    locations={[0, 0.15, 0.80, 0.85, 1]}
+                    colors={theme.colors.gradient.neon as unknown as [string, string, ...string[]]}
                     style={{ flex: 1 }}
                   />
                 </MaskedView>
@@ -2693,9 +2731,7 @@ const styles = StyleSheet.create({
   remainingValue: {
     fontSize: 30,
     fontWeight: 'bold',
-    textShadowColor: '#9B00FF',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    // Note: textShadow is applied dynamically based on theme in component
   },
   remainingLabel: {
     fontSize: 14,
@@ -2776,7 +2812,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   burnDetailsGain: {
-    color: '#FF9999',
+    // color now set dynamically via theme.colors.error
   },
   /* Weight Trend */
   weightGraphTitle: {
@@ -2801,7 +2837,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 5
   },
   dotActive: {
-    backgroundColor: '#9B00FF'
+    // backgroundColor now set dynamically via theme.colors.primary
   },
   // New style for positioning the trend elements (StepsTrend and WeightTrend)
   trendContainer: {
@@ -2895,18 +2931,17 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 0, 0, 0.2)',
     padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#FF6347',
+    // backgroundColor and borderBottomColor set dynamically via theme
   },
   errorText: {
-    color: '#FFD700',
     marginLeft: 8,
     fontSize: 14,
     fontWeight: 'bold',
+    // color set dynamically via theme
   },
   centeredView: {
     flex: 1,
@@ -3003,9 +3038,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(155, 0, 255, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(155, 0, 255, 0.3)',
+    // backgroundColor and borderColor set dynamically based on theme
     zIndex: 10,
   },
   goalCardAnalyticsMask: {

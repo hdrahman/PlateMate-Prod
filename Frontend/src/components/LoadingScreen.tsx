@@ -92,9 +92,9 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                         marginBottom: height * 0.05,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        shadowColor: "#FF00F5",
+                        shadowColor: theme.colors.primary,
                         shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.6,
+                        shadowOpacity: isDarkTheme ? 0.6 : 0.3,
                         shadowRadius: 20,
                         elevation: 10,
                     }}
@@ -113,9 +113,9 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                 <View
                     style={{
                         marginBottom: height * 0.06,
-                        shadowColor: "#FF00F5",
+                        shadowColor: theme.colors.primary,
                         shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.8,
+                        shadowOpacity: isDarkTheme ? 0.8 : 0.4,
                         shadowRadius: 15,
                         elevation: 8,
                         alignItems: 'center',
@@ -143,7 +143,7 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                         }
                     >
                         <LinearGradient
-                            colors={["#5A60EA", "#FF00F5", "#5A60EA"]}
+                            colors={theme.colors.gradientNeonPurple}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={{
@@ -168,8 +168,8 @@ export default function LoadingScreen({ message = "Loading PlateMate..." }: Load
                             borderRadius: spinnerSize / 2,
                             borderWidth: 3,
                             borderColor: 'transparent',
-                            borderTopColor: '#FF00F5',
-                            borderRightColor: '#5A60EA',
+                            borderTopColor: theme.colors.gradientNeonPink[0],
+                            borderRightColor: theme.colors.primary,
                         }}
                     />
                 </Animated.View>

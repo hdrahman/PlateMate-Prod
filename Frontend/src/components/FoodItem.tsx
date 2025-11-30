@@ -4,10 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FoodItem as FoodItemType } from '../services/BarcodeService';
 import { ThemeContext } from '../ThemeContext';
 
-// Define macro colors - professional palette
-const GREEN = '#30D158';
-const BLUE = '#64D2FF';
-const ORANGE = '#FF9F0A';
+// Macro colors are now derived from theme
 
 interface FoodItemProps {
     item: FoodItemType;
@@ -81,15 +78,15 @@ export default function FoodItem({ item, onPress }: FoodItemProps) {
 
                     <View style={styles.macrosRow}>
                         <View style={styles.macroItem}>
-                            <View style={[styles.macroDot, { backgroundColor: GREEN }]} />
+                            <View style={[styles.macroDot, { backgroundColor: theme.colors.success }]} />
                             <Text style={[styles.macroText, { color: theme.colors.text }]}>{item.proteins}g Protein</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <View style={[styles.macroDot, { backgroundColor: BLUE }]} />
+                            <View style={[styles.macroDot, { backgroundColor: theme.colors.gradientNeonBlue[0] }]} />
                             <Text style={[styles.macroText, { color: theme.colors.text }]}>{item.carbs}g Carbs</Text>
                         </View>
                         <View style={styles.macroItem}>
-                            <View style={[styles.macroDot, { backgroundColor: ORANGE }]} />
+                            <View style={[styles.macroDot, { backgroundColor: theme.colors.warning }]} />
                             <Text style={[styles.macroText, { color: theme.colors.text }]}>{item.fats}g Fats</Text>
                         </View>
                     </View>

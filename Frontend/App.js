@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { NavigationContainer, DefaultTheme, useNavigation } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,7 +12,7 @@ import LoadingScreen from './src/components/LoadingScreen';
 import GlobalErrorBoundary from './src/components/GlobalErrorBoundary';
 import { getDatabase, processFailedWrites } from './src/utils/database';
 import { StepProvider } from './src/context/StepContext';
-import { ThemeProvider } from './src/ThemeContext';
+import { ThemeProvider, ThemeContext } from './src/ThemeContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { OnboardingProvider, useOnboarding } from './src/context/OnboardingContext';
@@ -110,8 +110,11 @@ const { buttonSize, buttonRadius, offset, headerFontSize, headerWidth, iconSize 
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// Theme-aware custom tab bar button for scanner
 function CustomTabBarButton({ children }) {
   const navigation = useNavigation();
+  const { theme, isDarkTheme } = useContext(ThemeContext);
 
   return (
     <View
@@ -131,14 +134,17 @@ function CustomTabBarButton({ children }) {
           width: buttonSize,
           height: buttonSize,
           borderRadius: buttonRadius,
-          backgroundColor: "#000",
-          shadowColor: "#FF00F5",
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.6,
-          shadowRadius: 10,
+          // Light mode: white background with subtle shadow
+          // Dark mode: black background with neon glow
+          backgroundColor: isDarkTheme ? "#000" : theme.colors.cardBackground,
+          shadowColor: isDarkTheme ? theme.colors.accent : '#000',
+          shadowOffset: { width: 0, height: isDarkTheme ? 0 : 2 },
+          shadowOpacity: isDarkTheme ? 0.6 : 0.15,
+          shadowRadius: isDarkTheme ? 10 : 8,
           elevation: 4,
-          borderWidth: 0.7,          // reduced from 1 to 0.5
-          borderColor: '#FF00F520', // semi-transparent pink border
+          // Border: neon accent in dark mode, subtle border in light mode
+          borderWidth: isDarkTheme ? 0.7 : 1,
+          borderColor: isDarkTheme ? theme.colors.accent + '40' : theme.colors.border,
         }}
         onPress={() => navigation.navigate('Scanner', { mode: 'camera' })}
       >
@@ -148,22 +154,25 @@ function CustomTabBarButton({ children }) {
   );
 }
 
+// Theme-aware Main Tabs Navigator
 function MainTabs() {
+  const { theme, isDarkTheme } = useContext(ThemeContext);
+  
   return (
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={({ navigation }) => ({
-        // Keep the header slightly lighter and add a downward curve
+        // Header styling - theme-aware
         headerStyle: {
-          backgroundColor: "#000", // Back to black background
-          borderBottomLeftRadius: 20, // Curved bottom
-          borderBottomRightRadius: 20, // Curved bottom
+          backgroundColor: theme.colors.headerBackground,
+          borderBottomLeftRadius: 20,
+          borderBottomRightRadius: 20,
           borderBottomWidth: 2,
           borderBottomColor: 'transparent',
           overflow: 'hidden',
         },
         headerBackground: () => (
-          <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{ flex: 1, backgroundColor: theme.colors.headerBackground }}>
             <Svg
               height="100%"
               width="100%"
@@ -171,7 +180,7 @@ function MainTabs() {
               style={{ position: 'absolute', bottom: 0 }}
             >
               <Path
-                fill="#000"
+                fill={theme.colors.headerBackground}
                 d="M0,224L48,213.3C96,203,192,181,288,160C384,139,480,117,576,128C672,139,768,181,864,186.7C960,192,1056,160,1152,138.7C1248,117,1344,107,1392,101.3L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
               />
             </Svg>
@@ -180,17 +189,15 @@ function MainTabs() {
         headerTitleAlign: "center",
 
         /**
-         * 1) Header Title (Gradient + Glow)
+         * Header Title (Gradient + Glow)
          */
         headerTitle: () => (
           <View
             style={{
-              // iOS shadow props for glow:
-              shadowColor: "#FF00F5",
+              shadowColor: theme.colors.accent,
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.6,
+              shadowOpacity: isDarkTheme ? 0.6 : 0.3,
               shadowRadius: 6,
-              // Android fallback:
               elevation: 6,
             }}
           >
@@ -210,11 +217,10 @@ function MainTabs() {
               }
             >
               <LinearGradient
-                colors={["#5A60EA", "#FF00F5"]}
+                colors={theme.colors.gradient.neon}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={{
-                  // Must be at least as big as the text
                   width: headerWidth,
                   height: 35,
                 }}
@@ -224,14 +230,16 @@ function MainTabs() {
         ),
 
         /**
-         * 2) Header Icons (Gradient + Glow)
+         * Header Icons (Gradient + Glow)
          */
         headerLeft: () => (
           <TouchableOpacity style={{ marginLeft: 15 }} onPress={() => navigation.navigate('EditProfile', { slideFrom: 'left' })}>
             <GlowIcon
               name="person-circle-outline"
               size={iconSize}
-              gradientColors={["#5A60EA", "#FF00F5"]}
+              gradientColors={theme.colors.gradient.neon}
+              glowColor={theme.colors.accent}
+              isDarkTheme={isDarkTheme}
             />
           </TouchableOpacity>
         ),
@@ -243,26 +251,36 @@ function MainTabs() {
             <GlowIcon
               name="settings-outline"
               size={25}
-              gradientColors={["#5A60EA", "#FF00F5"]}
+              gradientColors={theme.colors.gradient.neon}
+              glowColor={theme.colors.accent}
+              isDarkTheme={isDarkTheme}
             />
           </TouchableOpacity>
         ),
 
         /**
-         * 3) Tab bar styling
+         * Tab bar styling - theme-aware
          */
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: 'bold',
-          fontStyle: 'italic' // add creative font styling to tab labels
+          fontWeight: '600',
+          fontStyle: 'italic'
         },
         tabBarStyle: {
-          backgroundColor: "#000",
-          borderTopColor: "transparent",
-          borderTopWidth: 0, // Remove the white line above the bottom navigation bar
+          backgroundColor: theme.colors.tabBarBackground,
+          borderTopColor: isDarkTheme ? "transparent" : theme.colors.border,
+          borderTopWidth: isDarkTheme ? 0 : 0.5,
+          // Add subtle shadow in light mode for elevation
+          ...(isDarkTheme ? {} : {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 8,
+          }),
         },
-        tabBarActiveTintColor: "#FF00F5",
-        tabBarInactiveTintColor: "#7B1FA2",
+        tabBarActiveTintColor: theme.colors.tabBarActive,
+        tabBarInactiveTintColor: theme.colors.tabBarInactive,
       })}
     >
       <Tab.Screen
@@ -291,14 +309,15 @@ function MainTabs() {
         component={ScannerScreen}
         options={{
           headerShown: false,
-          tabBarStyle: { display: 'none' }, // Hide the tab bar
+          tabBarStyle: { display: 'none' },
           tabBarButton: (props) => (
             <CustomTabBarButton {...props}>
               <GlowIcon
                 name="camera-outline"
                 size={30}
-                gradientColors={["#FF00F5", "#9B00FF", "#00CFFF"]}
-                // Diagonal gradient for camera: from top left to bottom right.
+                gradientColors={theme.colors.gradient.neon}
+                glowColor={theme.colors.accent}
+                isDarkTheme={isDarkTheme}
                 gradientStart={{ x: 0, y: 0 }}
                 gradientEnd={{ x: 1, y: 1 }}
               />
@@ -353,6 +372,18 @@ function AuthenticatedApp({ children }) {
         </StepErrorBoundary>
       </ThemeProvider>
     </SubscriptionProvider>
+  );
+}
+
+// Theme-aware StatusBar component - must be inside ThemeProvider
+function ThemedStatusBar() {
+  const { theme, isDarkTheme } = useContext(ThemeContext);
+  return (
+    <StatusBar 
+      barStyle={isDarkTheme ? "light-content" : "dark-content"} 
+      backgroundColor={theme.colors.background}
+      translucent={false}
+    />
   );
 }
 
@@ -417,39 +448,42 @@ function AuthenticatedContent() {
 
   // Main app navigation for authenticated users
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main" component={MainTabs} />
-      <Stack.Screen name="Scanner" component={ScannerScreen} />
-      <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
-      <Stack.Screen name="Nutrients" component={Nutrients} />
-      <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
-      <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
-      <Stack.Screen name="Manual" component={Manual} />
-      <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
-      <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
-      <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
-      <Stack.Screen name="RecipeResults" component={RecipeResults} />
-      <Stack.Screen name="SearchResults" component={SearchResults} />
-      <Stack.Screen name="MealGallery" component={MealGallery} />
-      <Stack.Screen name="FoodDetail" component={FoodDetail} />
-      <Stack.Screen name="EditProfile" component={EditProfile} />
-      <Stack.Screen name="EditGoals" component={EditGoals} />
-      <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
-      <Stack.Screen name="ChangePassword" component={ChangePassword} />
-      <Stack.Screen name="AboutUs" component={AboutUs} />
-      <Stack.Screen name="Settings" component={Settings} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="DataSharing" component={DataSharing} />
-      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
-      <Stack.Screen name="LegalTerms" component={LegalTerms} />
-      <Stack.Screen name="AboutCalculations" component={AboutCalculations} />
-      <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
-      <Stack.Screen name="Analytics" component={Analytics} />
-      <Stack.Screen name="FeatureRequests" component={FeatureRequests} />
-      <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequest} />
-      <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />
-      <Stack.Screen name="StepTrackingSettings" component={StepTrackingSettings} />
-    </Stack.Navigator>
+    <>
+      <ThemedStatusBar />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen name="Scanner" component={ScannerScreen} />
+        <Stack.Screen name="ImageCapture" component={ImageCaptureScreen} />
+        <Stack.Screen name="Nutrients" component={Nutrients} />
+        <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
+        <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
+        <Stack.Screen name="Manual" component={Manual} />
+        <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
+        <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
+        <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
+        <Stack.Screen name="RecipeResults" component={RecipeResults} />
+        <Stack.Screen name="SearchResults" component={SearchResults} />
+        <Stack.Screen name="MealGallery" component={MealGallery} />
+        <Stack.Screen name="FoodDetail" component={FoodDetail} />
+        <Stack.Screen name="EditProfile" component={EditProfile} />
+        <Stack.Screen name="EditGoals" component={EditGoals} />
+        <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
+        <Stack.Screen name="ChangePassword" component={ChangePassword} />
+        <Stack.Screen name="AboutUs" component={AboutUs} />
+        <Stack.Screen name="Settings" component={Settings} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="DataSharing" component={DataSharing} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+        <Stack.Screen name="LegalTerms" component={LegalTerms} />
+        <Stack.Screen name="AboutCalculations" component={AboutCalculations} />
+        <Stack.Screen name="PremiumSubscription" component={PremiumSubscription} />
+        <Stack.Screen name="Analytics" component={Analytics} />
+        <Stack.Screen name="FeatureRequests" component={FeatureRequests} />
+        <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequest} />
+        <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />
+        <Stack.Screen name="StepTrackingSettings" component={StepTrackingSettings} />
+      </Stack.Navigator>
+    </>
   );
 }
 
@@ -701,8 +735,6 @@ export default function App() {
           }
         }
 
-        // Debug utilities removed - using clean implementation
-
         // App is ready
         setAppIsReady(true);
       } catch (e) {
@@ -727,6 +759,7 @@ export default function App() {
     <GlobalErrorBoundary>
       <SafeAreaProvider>
         <AuthProvider>
+          {/* Default StatusBar for unauthenticated screens - will be overridden by ThemedStatusBar */}
           <StatusBar barStyle="light-content" backgroundColor="black" />
           <AppNavigator />
         </AuthProvider>
@@ -737,17 +770,17 @@ export default function App() {
 
 /**
  * A reusable component that masks an Ionicon with a linear gradient,
- * and also adds a surrounding glow.
+ * and also adds a surrounding glow. Now theme-aware.
  */
-function GlowIcon({ name, size, gradientColors, gradientStart, gradientEnd }) {
+function GlowIcon({ name, size, gradientColors, gradientStart, gradientEnd, glowColor, isDarkTheme }) {
   return (
     <View
       style={{
-        // Glow effect on iOS
-        shadowColor: "#FF00F5",
+        // Glow effect on iOS - now uses passed color
+        shadowColor: glowColor || "#FF00F5",
         shadowOffset: { width: 0, height: 0 },
-        shadowRadius: 10,
-        shadowOpacity: 0.6,
+        shadowRadius: isDarkTheme ? 10 : 6,
+        shadowOpacity: isDarkTheme ? 0.6 : 0.3,
         // Minimal fallback for Android
         elevation: 6,
       }}

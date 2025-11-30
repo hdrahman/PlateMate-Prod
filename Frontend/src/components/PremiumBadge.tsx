@@ -50,7 +50,7 @@ const PremiumBadge: React.FC<PremiumBadgeProps> = ({
     };
 
     const currentSize = sizeStyles[size];
-    const colors = ['#9B00FF', '#7500DF'] as [ColorValue, ColorValue];
+    const colors = [theme.colors.primary, theme.colors.secondary] as [ColorValue, ColorValue];
 
     if (type === 'tag') {
         return (

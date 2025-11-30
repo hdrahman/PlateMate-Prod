@@ -3,22 +3,20 @@ import { View, Text, Dimensions, StyleSheet } from 'react-native';
 import { ProgressChart, PieChart } from 'react-native-chart-kit';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeContext } from '../../ThemeContext';
+import { Theme } from '../../styles/theme';
 
 const { width } = Dimensions.get('window');
 
-// Color scheme for consistency across charts
-export const NUTRITION_COLORS = {
-    CARBS: '#0084ff',
-    PROTEIN: '#32D74B',
-    FAT: '#FF9500',
-    FIBER: '#32D74B',
-    SUGAR: '#FF2D92',
-    SODIUM: '#FF3B30',
+// Helper function to get theme-aware nutrition colors
+const getNutritionColors = (theme: Theme) => ({
+    CARBS: theme.colors.chartCarbs,
+    PROTEIN: theme.colors.chartProtein,
+    FAT: theme.colors.chartFat,
+    FIBER: theme.colors.success,       // Green for fiber
+    SUGAR: theme.colors.chartCalories, // Pink for sugar
+    SODIUM: theme.colors.error,        // Red for sodium
     BACKGROUND: 'transparent',
-    TEXT_PRIMARY: '#FFFFFF',
-    TEXT_SECONDARY: '#B0B0B0',
-    TEXT_TERTIARY: '#808080'
-};
+});
 
 interface NutritionData {
     calories: number;
@@ -56,37 +54,40 @@ export const MacronutrientPieChart: React.FC<MacronutrientPieChartProps> = ({
     showLegend = false
 }) => {
     const { theme, isDarkTheme } = useContext(ThemeContext);
+    const colors = getNutritionColors(theme);
     const { carbs, proteins, fats } = data;
 
     const chartData = [
         {
             name: 'Carbs',
             population: carbs * 4, // 4 cal per gram
-            color: NUTRITION_COLORS.CARBS,
+            color: colors.CARBS,
             legendFontColor: theme.colors.textSecondary,
             legendFontSize: 12,
         },
         {
             name: 'Protein',
             population: proteins * 4, // 4 cal per gram
-            color: NUTRITION_COLORS.PROTEIN,
+            color: colors.PROTEIN,
             legendFontColor: theme.colors.textSecondary,
             legendFontSize: 12,
         },
         {
             name: 'Fat',
             population: fats * 9, // 9 cal per gram
-            color: NUTRITION_COLORS.FAT,
+            color: colors.FAT,
             legendFontColor: theme.colors.textSecondary,
             legendFontSize: 12,
         },
     ].filter(item => item.population > 0);
 
     const chartConfig = {
-        backgroundColor: NUTRITION_COLORS.BACKGROUND,
-        backgroundGradientFrom: NUTRITION_COLORS.BACKGROUND,
-        backgroundGradientTo: NUTRITION_COLORS.BACKGROUND,
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+        backgroundColor: colors.BACKGROUND,
+        backgroundGradientFrom: colors.BACKGROUND,
+        backgroundGradientTo: colors.BACKGROUND,
+        color: (opacity = 1) => isDarkTheme 
+            ? `rgba(255, 255, 255, ${opacity})` 
+            : `rgba(28, 28, 30, ${opacity})`,
         strokeWidth: 3,
         barPercentage: 0.5,
         useShadowColorFromDataset: false,
@@ -95,7 +96,9 @@ export const MacronutrientPieChart: React.FC<MacronutrientPieChartProps> = ({
     if (chartData.length === 0) {
         return (
             <View style={styles.emptyChartContainer}>
-                <Text style={[styles.emptyChartText, { color: theme.colors.textSecondary }]}>No macronutrient data available</Text>
+                <Text style={[styles.emptyChartText, { color: theme.colors.textMuted }]}>
+                    No macronutrient data available
+                </Text>
             </View>
         );
     }
@@ -108,7 +111,7 @@ export const MacronutrientPieChart: React.FC<MacronutrientPieChartProps> = ({
                 height={180}
                 chartConfig={chartConfig}
                 accessor="population"
-                backgroundColor={NUTRITION_COLORS.BACKGROUND}
+                backgroundColor={colors.BACKGROUND}
                 paddingLeft="15"
                 center={[10, 0]}
                 hasLegend={showLegend}
@@ -125,6 +128,7 @@ export const MacronutrientProgress: React.FC<MacronutrientProgressProps> = ({
     maxValues = { carbs: 50, proteins: 50, fats: 50 }
 }) => {
     const { theme, isDarkTheme } = useContext(ThemeContext);
+    const colors = getNutritionColors(theme);
     const { carbs, proteins, fats } = data;
 
     const progressData = {
@@ -136,19 +140,21 @@ export const MacronutrientProgress: React.FC<MacronutrientProgressProps> = ({
     };
 
     const chartConfig = {
-        backgroundColor: NUTRITION_COLORS.BACKGROUND,
-        backgroundGradientFrom: NUTRITION_COLORS.BACKGROUND,
-        backgroundGradientTo: NUTRITION_COLORS.BACKGROUND,
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+        backgroundColor: colors.BACKGROUND,
+        backgroundGradientFrom: colors.BACKGROUND,
+        backgroundGradientTo: colors.BACKGROUND,
+        color: (opacity = 1) => isDarkTheme 
+            ? `rgba(255, 255, 255, ${opacity})` 
+            : `rgba(28, 28, 30, ${opacity})`,
         strokeWidth: 3,
         barPercentage: 0.5,
         useShadowColorFromDataset: false,
     };
 
     const macroItems = [
-        { name: 'Carbs', value: carbs, color: NUTRITION_COLORS.CARBS, index: 0 },
-        { name: 'Protein', value: proteins, color: NUTRITION_COLORS.PROTEIN, index: 1 },
-        { name: 'Fat', value: fats, color: NUTRITION_COLORS.FAT, index: 2 },
+        { name: 'Carbs', value: carbs, color: colors.CARBS, index: 0 },
+        { name: 'Protein', value: proteins, color: colors.PROTEIN, index: 1 },
+        { name: 'Fat', value: fats, color: colors.FAT, index: 2 },
     ];
 
     return (
@@ -169,10 +175,14 @@ export const MacronutrientProgress: React.FC<MacronutrientProgressProps> = ({
                             hideLegend={true}
                         />
                         <View style={styles.macroValueOverlay}>
-                            <Text style={[styles.macroValueText, { color: theme.colors.text }]}>{item.value}g</Text>
+                            <Text style={[styles.macroValueText, { color: theme.colors.text }]}>
+                                {item.value}g
+                            </Text>
                         </View>
                     </View>
-                    <Text style={[styles.macroLabelText, { color: theme.colors.textSecondary }]}>{item.name}</Text>
+                    <Text style={[styles.macroLabelText, { color: theme.colors.textSecondary }]}>
+                        {item.name}
+                    </Text>
                 </View>
             ))}
         </View>
@@ -183,13 +193,14 @@ export const MacronutrientProgress: React.FC<MacronutrientProgressProps> = ({
  * Nutrition Legend Component
  */
 export const NutritionLegend: React.FC<NutritionLegendProps> = ({ data }) => {
-    const { theme, isDarkTheme } = useContext(ThemeContext);
+    const { theme } = useContext(ThemeContext);
+    const colors = getNutritionColors(theme);
     const { carbs, proteins, fats } = data;
 
     const legendItems = [
-        { name: 'Carbohydrates', value: carbs, color: NUTRITION_COLORS.CARBS, unit: 'g' },
-        { name: 'Protein', value: proteins, color: NUTRITION_COLORS.PROTEIN, unit: 'g' },
-        { name: 'Fat', value: fats, color: NUTRITION_COLORS.FAT, unit: 'g' },
+        { name: 'Carbohydrates', value: carbs, color: colors.CARBS, unit: 'g' },
+        { name: 'Protein', value: proteins, color: colors.PROTEIN, unit: 'g' },
+        { name: 'Fat', value: fats, color: colors.FAT, unit: 'g' },
     ];
 
     return (
@@ -197,8 +208,12 @@ export const NutritionLegend: React.FC<NutritionLegendProps> = ({ data }) => {
             {legendItems.map((item) => (
                 <View key={item.name} style={styles.legendItem}>
                     <View style={[styles.legendColor, { backgroundColor: item.color }]} />
-                    <Text style={[styles.legendText, { color: theme.colors.textSecondary }]}>{item.name}</Text>
-                    <Text style={[styles.legendValue, { color: theme.colors.text }]}>{item.value}{item.unit}</Text>
+                    <Text style={[styles.legendText, { color: theme.colors.textSecondary }]}>
+                        {item.name}
+                    </Text>
+                    <Text style={[styles.legendValue, { color: theme.colors.text }]}>
+                        {item.value}{item.unit}
+                    </Text>
                 </View>
             ))}
         </View>
@@ -223,13 +238,15 @@ export const AdditionalNutrients: React.FC<AdditionalNutrientsProps> = ({
     quantity,
     calculateNutrition
 }) => {
-    const { theme, isDarkTheme } = useContext(ThemeContext);
+    const { theme } = useContext(ThemeContext);
+    const colors = getNutritionColors(theme);
+    
     const nutrients = [
         {
             key: 'fiber',
             name: 'Dietary Fiber',
             value: data.fiber,
-            color: NUTRITION_COLORS.FIBER,
+            color: colors.FIBER,
             icon: 'eco',
             unit: 'g'
         },
@@ -237,7 +254,7 @@ export const AdditionalNutrients: React.FC<AdditionalNutrientsProps> = ({
             key: 'sugar',
             name: 'Sugar',
             value: data.sugar,
-            color: NUTRITION_COLORS.SUGAR,
+            color: colors.SUGAR,
             icon: 'grain',
             unit: 'g'
         },
@@ -245,7 +262,7 @@ export const AdditionalNutrients: React.FC<AdditionalNutrientsProps> = ({
             key: 'sodium',
             name: 'Sodium',
             value: data.sodium,
-            color: NUTRITION_COLORS.SODIUM,
+            color: colors.SODIUM,
             icon: 'opacity',
             unit: 'mg'
         },
@@ -257,18 +274,25 @@ export const AdditionalNutrients: React.FC<AdditionalNutrientsProps> = ({
 
     return (
         <View style={styles.additionalNutrientsContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Additional Nutrients</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                Additional Nutrients
+            </Text>
             <View style={styles.nutrientsList}>
                 {nutrients.map((nutrient) => (
                     <View key={nutrient.key} style={styles.nutrientItem}>
-                        <View style={[styles.nutrientIconContainer, { backgroundColor: theme.colors.border }]}>
+                        <View style={[
+                            styles.nutrientIconContainer, 
+                            { backgroundColor: theme.colors.ringBackground }
+                        ]}>
                             <MaterialIcons
                                 name={nutrient.icon as any}
                                 size={16}
                                 color={nutrient.color}
                             />
                         </View>
-                        <Text style={[styles.nutrientName, { color: theme.colors.textSecondary }]}>{nutrient.name}</Text>
+                        <Text style={[styles.nutrientName, { color: theme.colors.textSecondary }]}>
+                            {nutrient.name}
+                        </Text>
                         <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>
                             {calculateNutrition(nutrient.value!, quantity)}{nutrient.unit}
                         </Text>
@@ -291,7 +315,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyChartText: {
-        color: NUTRITION_COLORS.TEXT_TERTIARY,
         fontSize: 14,
         fontStyle: 'italic',
     },
@@ -320,12 +343,10 @@ const styles = StyleSheet.create({
     macroValueText: {
         fontSize: 14,
         fontWeight: '700',
-        color: NUTRITION_COLORS.TEXT_PRIMARY,
     },
     macroLabelText: {
         fontSize: 12,
         fontWeight: '600',
-        color: NUTRITION_COLORS.TEXT_SECONDARY,
         marginTop: 8,
         textAlign: 'center',
     },
@@ -334,7 +355,6 @@ const styles = StyleSheet.create({
     legendContainer: {
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#333333', // Overridden by inline style
     },
     legendItem: {
         flexDirection: 'row',
@@ -350,12 +370,10 @@ const styles = StyleSheet.create({
     legendText: {
         flex: 1,
         fontSize: 14,
-        color: NUTRITION_COLORS.TEXT_SECONDARY,
         fontWeight: '500',
     },
     legendValue: {
         fontSize: 14,
-        color: NUTRITION_COLORS.TEXT_PRIMARY,
         fontWeight: '600',
     },
 
@@ -366,7 +384,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: NUTRITION_COLORS.TEXT_PRIMARY,
         marginBottom: 16,
     },
     nutrientsList: {
@@ -381,7 +398,6 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#333333', // Overridden by inline style
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -389,12 +405,10 @@ const styles = StyleSheet.create({
     nutrientName: {
         flex: 1,
         fontSize: 14,
-        color: NUTRITION_COLORS.TEXT_SECONDARY,
         fontWeight: '500',
     },
     nutrientValue: {
         fontSize: 14,
-        color: NUTRITION_COLORS.TEXT_PRIMARY,
         fontWeight: '600',
     },
-}); 
+});

@@ -177,11 +177,11 @@ const DiaryScreen: React.FC = () => {
     // Define valid meal types
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
-    // Helper function to get color based on healthiness rating
+    // Helper function to get color based on healthiness rating - theme-aware
     const getHealthinessColor = (rating: number): string => {
-        if (rating <= 4) return '#FF5252'; // Red for unhealthy (0-4)
-        if (rating <= 7) return '#FFD740'; // Yellow for moderate (5-7)
-        return '#4CAF50'; // Green for healthy (8-10)
+        if (rating <= 4) return theme.colors.error; // Red for unhealthy (0-4)
+        if (rating <= 7) return theme.colors.warning; // Yellow/orange for moderate (5-7)
+        return theme.colors.success; // Green for healthy (8-10)
     };
 
     // Update the route.params effect to properly refresh the data
@@ -766,25 +766,54 @@ const DiaryScreen: React.FC = () => {
         ));
     };
 
-    // Gradient border card wrapper component
+    // Card component - Uses gradient border in dark mode, shadow/border in light mode
     interface GradientBorderCardProps {
         children: React.ReactNode;
         style?: any;
     }
 
     const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style }) => {
-        const { theme } = React.useContext(ThemeContext);
+        const { theme, isDarkTheme } = React.useContext(ThemeContext);
+        
+        // Light mode: Clean elevated card with shadow
+        if (!isDarkTheme) {
+            return (
+                <View
+                    style={[
+                        styles.gradientBorderContainer,
+                        {
+                            backgroundColor: style?.backgroundColor || theme.colors.cardBackground,
+                            borderRadius: 12,
+                            padding: 16,
+                            // Elevation shadow for depth
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.06,
+                            shadowRadius: 8,
+                            elevation: 3,
+                            // Subtle border for definition
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                        },
+                    ]}
+                >
+                    {children}
+                </View>
+            );
+        }
+        
+        // Dark mode: Keep the neon gradient border
         return (
             <View style={styles.gradientBorderContainer}>
                 <LinearGradient
-                    colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                    colors={theme.colors.gradient.cardBorder as unknown as [string, string, ...string[]]}
                     style={{
                         position: 'absolute',
                         left: 0,
                         right: 0,
                         top: 0,
                         bottom: 0,
-                        borderRadius: 10,
+                        borderRadius: 12,
                     }}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
@@ -792,7 +821,7 @@ const DiaryScreen: React.FC = () => {
                 <View
                     style={{
                         margin: 1,
-                        borderRadius: 9,
+                        borderRadius: 11,
                         backgroundColor: style?.backgroundColor || theme.colors.cardBackground,
                         padding: 16,
                     }}
@@ -1282,10 +1311,10 @@ const DiaryScreen: React.FC = () => {
             marginLeft: 10,
         },
         deleteButton: {
-            backgroundColor: theme.dark ? '#3A0505' : '#FFEBEE',
+            backgroundColor: theme.dark ? 'rgba(255, 82, 82, 0.15)' : 'rgba(255, 59, 48, 0.08)',
         },
         deleteButtonText: {
-            color: '#FF5252',
+            color: theme.colors.error,
         },
         cancelButton: {
             backgroundColor: theme.colors.border,
@@ -2230,7 +2259,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                         maskElement={<Text style={styles.streakNumber}>{userStreak}</Text>}
                                     >
                                         <LinearGradient
-                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                            colors={theme.colors.gradient.cardBorder as unknown as [string, string, ...string[]]}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
                                             style={{ width: userStreak >= 10 ? 40 : 27, height: 27 }}
@@ -2240,7 +2269,7 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                         maskElement={<MaterialCommunityIcons name="fire" size={27} color="#FFF" />}
                                     >
                                         <LinearGradient
-                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
+                                            colors={theme.colors.gradient.cardBorder as unknown as [string, string, ...string[]]}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
                                             style={{ width: 27, height: 27 }}
@@ -2255,14 +2284,14 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                 )}
                                 {/* New icon button */}
                                 <TouchableOpacity onPress={() => navigation.navigate('MealGallery' as never)} style={styles.iconButton}>
-                                    <Ionicons name="image" size={22} color="#00BFFF" />
+                                    <Ionicons name="image" size={22} color={theme.colors.chartSteps} />
                                 </TouchableOpacity>
                                 {/* Updated pie chart icon color */}
                                 <TouchableOpacity
                                     onPress={() => navigation.navigate('Nutrients' as never)}
                                     style={styles.iconButton}
                                 >
-                                    <Ionicons name="pie-chart-outline" size={22} color="#FFA500" />
+                                    <Ionicons name="pie-chart-outline" size={22} color={theme.colors.warning} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -2314,21 +2343,21 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                     <Text style={styles.summaryTitle}>Calories Remaining</Text>
                                     <View style={styles.equationRow}>
                                         <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#FFB74D' }]}>
+                                            <Text style={[styles.equationValue, { color: theme.colors.warning }]}>
                                                 {goal}
                                             </Text>
                                             <Text style={styles.equationLabel}>Base</Text>
                                         </View>
                                         <Text style={[styles.equationSign, { marginTop: -10 }]}>-</Text>
                                         <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#FF8A65' }]}>
+                                            <Text style={[styles.equationValue, { color: theme.colors.chartCalories }]}>
                                                 {foodTotal}
                                             </Text>
                                             <Text style={styles.equationLabel}>Food</Text>
                                         </View>
                                         <Text style={[styles.equationSign, { marginTop: -10 }]}>+</Text>
                                         <View style={styles.equationColumn}>
-                                            <Text style={[styles.equationValue, { color: '#66BB6A' }]}>
+                                            <Text style={[styles.equationValue, { color: theme.colors.success }]}>
                                                 {totalExerciseCalories}
                                             </Text>
                                             <Text style={styles.equationLabel}>Exercise</Text>
@@ -2674,14 +2703,14 @@ Be conversational but thorough, as if we're having an in-person session. Focus o
                                         {mealTypes.map((type) => {
                                             const isCurrentMeal = selectedFoodItem?.meal === type;
 
-                                            const mealColors = {
-                                                'Breakfast': '#FF8F4A',
-                                                'Lunch': '#4ECDC4',
-                                                'Dinner': '#6C7CE0',
-                                                'Snacks': '#FF6B9D'
+                                            const mealColors: Record<string, string> = {
+                                                'Breakfast': theme.colors.warning,
+                                                'Lunch': theme.colors.chartProtein,
+                                                'Dinner': theme.colors.chartCarbs,
+                                                'Snacks': theme.colors.chartCalories
                                             };
 
-                                            const currentColor = mealColors[type] || '#666';
+                                            const currentColor = mealColors[type] || theme.colors.textMuted;
 
                                             return (
                                                 <TouchableOpacity

@@ -77,7 +77,7 @@ const PremiumSubscription = () => {
             title: 'Premium Monthly',
             monthlyPrice: 6.99,
             annualPrice: 0,
-            gradient: ['#5A60EA', '#4A90E2'],
+            gradient: ['#5856D6', '#007AFF'],
             subscriptionType: 'premium_monthly',
             imageUploads: 'Monthly billing',
             features: ['Up to 30 days free trial']
@@ -87,7 +87,7 @@ const PremiumSubscription = () => {
             title: 'Premium Annual',
             monthlyPrice: 0,
             annualPrice: 59.99,
-            gradient: ['#FF00F5', '#5A60EA'],
+            gradient: ['#FF2D92', '#9B00FF'],
             subscriptionType: 'premium_annual',
             bestValue: true,
             imageUploads: 'Annual billing',
@@ -104,7 +104,7 @@ const PremiumSubscription = () => {
                 planName: 'VIP Lifetime Access',
                 isActive: true,
                 statusText: 'VIP Member • Lifetime Access',
-                statusColor: '#FFD700',
+                statusColor: theme.colors.warning,
                 showUpgradePrompt: false
             };
         }
@@ -120,11 +120,11 @@ const PremiumSubscription = () => {
                     tier === 'promotional_trial' ? `${subscription.daysRemaining || 0} days remaining` :
                         tier === 'extended_trial' ? `${subscription.daysRemaining || 0} days remaining` :
                             'Limited to 1 image upload per day',
-            statusColor: ['premium_monthly', 'premium_annual'].includes(tier) ? '#00aa44' :
-                ['promotional_trial', 'extended_trial'].includes(tier) ? '#ff8800' : '#ff4444',
+            statusColor: ['premium_monthly', 'premium_annual'].includes(tier) ? theme.colors.success :
+                ['promotional_trial', 'extended_trial'].includes(tier) ? theme.colors.warning : theme.colors.error,
             showUpgradePrompt: !['premium_monthly', 'premium_annual', 'vip_lifetime'].includes(tier)
         };
-    }, [subscription.tier, subscription.daysRemaining]);
+    }, [subscription.tier, subscription.daysRemaining, theme]);
 
     useEffect(() => {
         // Load RevenueCat offerings in background for purchase flow

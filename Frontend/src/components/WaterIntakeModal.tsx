@@ -260,7 +260,7 @@ const WaterIntakeModal: React.FC<WaterIntakeModalProps> = ({
                         disabled={loading}
                     >
                         <LinearGradient
-                            colors={[theme.colors.primary, '#6200FF']}
+                            colors={[theme.colors.primary, theme.colors.secondary]}
                             style={styles.gradientButton}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
