@@ -12,6 +12,7 @@ import {
     addFoodLog,
     addWeightEntryLocal,
     checkAndUpdateStreak,
+    restoreStreakFromCloud,
     initializeCheatDaySettings,
     updateSubscriptionStatus,
     getUnsyncedUserProfiles,
@@ -1241,18 +1242,13 @@ class PostgreSQLSyncService {
                 last_activity_date: streak.last_activity_date
             });
 
-            // Restore to AsyncStorage
-            const streakData = [{
-                currentStreak: streak.current_streak || 0,
-                longestStreak: streak.longest_streak || 0,
-                lastActivityDate: streak.last_activity_date || new Date().toISOString().split('T')[0]
-            }];
-            await AsyncStorage.setItem('user_streaks', JSON.stringify(streakData));
-            console.log('✅ Restored streak data to AsyncStorage');
-
-            // Also update SQLite database
-            await checkAndUpdateStreak(firebaseUid);
-            console.log('✅ Restored streak data to SQLite');
+            // Restore directly to SQLite with proper continuity validation
+            // This does NOT sync back to cloud (prevents overwriting good data)
+            await restoreStreakFromCloud(firebaseUid, {
+                current_streak: streak.current_streak || 0,
+                longest_streak: streak.longest_streak || 0,
+                last_activity_date: streak.last_activity_date || null
+            });
 
             stats.streaksRestored++;
 

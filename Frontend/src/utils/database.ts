@@ -2716,14 +2716,18 @@ export const checkAndUpdateStreak = async (firebaseUid: string): Promise<number>
                 firebase_uid: firebaseUid,
                 current_streak: currentStreak,
                 longest_streak: longestStreak,
-                last_activity_date: todayStr,
-                updated_at: now
+                last_activity_date: todayStr
             };
 
-            // Use upsert to handle both insert and update cases
-            writeToSupabase('user_streaks', 'upsert', supabaseData)
-                .then(result => {
-                    if (result.success) {
+            // Use direct upsert with onConflict to properly update existing records
+            supabase.from('user_streaks')
+                .upsert(supabaseData, { onConflict: 'firebase_uid' })
+                .then(({ error }) => {
+                    if (error) {
+                        console.warn('⚠️ Failed to sync streak to cloud:', error.message);
+                        // Queue for retry
+                        queueFailedWrite('user_streaks', 'upsert', supabaseData);
+                    } else {
                         console.log('✅ Streak synced to cloud');
                     }
                 });
@@ -2735,6 +2739,114 @@ export const checkAndUpdateStreak = async (firebaseUid: string): Promise<number>
     } catch (error) {
         console.error('❌ Error updating streak:', error);
         return 0;
+    }
+};
+
+// Restore streak from cloud backup (used during app reinstall/device switch)
+// This function validates streak continuity and does NOT sync back to cloud
+export const restoreStreakFromCloud = async (
+    firebaseUid: string,
+    cloudStreak: { current_streak: number; longest_streak: number; last_activity_date: string | null }
+): Promise<void> => {
+    if (!db || !global.dbInitialized) {
+        console.error('⚠️ Attempting to restore streak before database initialization');
+        return;
+    }
+
+    try {
+        // Ensure user_streaks table exists
+        const tableExists = await db.getFirstAsync(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='user_streaks'`
+        );
+
+        if (!tableExists) {
+            console.log('⚠️ Creating user_streaks table for restore...');
+            await db.execAsync(`
+                CREATE TABLE IF NOT EXISTS user_streaks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    firebase_uid TEXT UNIQUE NOT NULL,
+                    current_streak INTEGER DEFAULT 0,
+                    longest_streak INTEGER DEFAULT 0,
+                    last_activity_date TEXT,
+                    synced INTEGER DEFAULT 0,
+                    sync_action TEXT DEFAULT 'create',
+                    last_modified TEXT NOT NULL
+                )
+            `);
+        }
+
+        // Validate streak continuity based on last_activity_date
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = formatDateToString(today);
+
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = formatDateToString(yesterday);
+
+        let validatedCurrentStreak = cloudStreak.current_streak || 0;
+        const longestStreak = cloudStreak.longest_streak || 0;
+        const lastActivityDate = cloudStreak.last_activity_date;
+
+        // Validate streak continuity with grace period:
+        // - If last activity was today or yesterday, preserve current streak (active)
+        // - If last activity was 2+ days ago, reset to 0 (streak definitely broken)
+        // 
+        // NOTE: This provides a 1-day grace period for restoration scenarios:
+        // - User with activity on Monday can restore on Tuesday and maintain streak
+        // - User who misses Tuesday won't be able to restore streak on Wednesday
+        // 
+        // This is correct because:
+        // 1. Dual-write ensures cloud data is always current with last activity
+        // 2. If last_activity_date is 2+ days old, user definitely missed a day
+        // 3. Grace period accounts for timezone differences and edge cases
+        if (lastActivityDate && lastActivityDate !== todayStr && lastActivityDate !== yesterdayStr) {
+            console.log(`⚠️ Streak broken: last activity was ${lastActivityDate}, resetting current streak to 0`);
+            validatedCurrentStreak = 0;
+        }
+
+        const now = new Date().toISOString();
+
+        // Check if user already has a streak record locally
+        const existingRecord = await db.getFirstAsync(
+            `SELECT * FROM user_streaks WHERE firebase_uid = ?`,
+            [firebaseUid]
+        );
+
+        if (existingRecord) {
+            // Update existing record (don't overwrite if local is better)
+            const localLongestStreak = existingRecord.longest_streak || 0;
+            const finalLongestStreak = Math.max(longestStreak, localLongestStreak);
+
+            await db.runAsync(
+                `UPDATE user_streaks
+                SET current_streak = ?, longest_streak = ?, last_activity_date = ?,
+                synced = 1, sync_action = NULL, last_modified = ?
+                WHERE firebase_uid = ?`,
+                [validatedCurrentStreak, finalLongestStreak, lastActivityDate || null, now, firebaseUid]
+            );
+            console.log('✅ Streak restored (updated existing record)', {
+                currentStreak: validatedCurrentStreak,
+                longestStreak: finalLongestStreak,
+                lastActivityDate
+            });
+        } else {
+            // Insert new record
+            await db.runAsync(
+                `INSERT INTO user_streaks
+                (firebase_uid, current_streak, longest_streak, last_activity_date, synced, sync_action, last_modified)
+                VALUES (?, ?, ?, ?, 1, NULL, ?)`,
+                [firebaseUid, validatedCurrentStreak, longestStreak, lastActivityDate || null, now]
+            );
+            console.log('✅ Streak restored (created new record)', {
+                currentStreak: validatedCurrentStreak,
+                longestStreak,
+                lastActivityDate
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error restoring streak from cloud:', error);
+        throw error;
     }
 };
 
