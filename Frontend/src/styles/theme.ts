@@ -146,11 +146,11 @@ export const darkTheme: Theme = {
 export const lightTheme: Theme = {
     dark: false,
     colors: {
-        // Backgrounds & Surfaces - Purple-tinted for softer, brand-connected feel
+        // Backgrounds & Surfaces - Purple-tinted background with warm cream cards
         background: '#F7F6FB',         // Subtle purple tint - easier on eyes
-        surface: '#FDFCFF',            // Off-white with lavender undertone
-        cardBackground: '#FDFCFF',     // Matches surface for consistency
-        inputBackground: '#F3F2F8',    // Purple-tinted input fields
+        surface: '#FAF9F7',            // Warm cream/ivory - neutral, no ring overlap
+        cardBackground: '#FAF9F7',     // Warm cream cards for cozy feel
+        inputBackground: '#F5F4F2',    // Warm-tinted input fields
         
         // Text hierarchy - Strong contrast on light
         text: '#1A1A1C',               // Near black for maximum contrast
@@ -167,20 +167,20 @@ export const lightTheme: Theme = {
         iconPrimary: '#2E2E33',
         iconSecondary: '#7A7A85',
         
-        // Borders & Dividers - Purple-tinted for cohesion
-        border: '#E5E3EE',             // Subtle purple tint
-        borderStrong: '#D0CEE0',       // Stronger purple-tinted border
+        // Borders & Dividers - Warm neutral to complement cream cards
+        border: '#E8E6E2',             // Warm grey border
+        borderStrong: '#D5D3CF',       // Stronger warm border
         
         // Status colors - Balanced saturation for light mode
         success: '#2D9F4A',            // Slightly deeper green
         error: '#E53935',
         warning: '#F5A623',
         
-        // Navigation - Purple-tinted for consistency
-        tabBarBackground: '#FDFCFF',   // Matches cards/surface
+        // Navigation - Warm cream for consistency with cards
+        tabBarBackground: '#FAF9F7',   // Matches cards/surface
         tabBarActive: '#6B00B8',
         tabBarInactive: '#9A9AA3',
-        headerBackground: '#FDFCFF',   // Matches cards/surface
+        headerBackground: '#FAF9F7',   // Matches cards/surface
         
         // Chart/Ring colors - Bold and readable on light
         ringBackground: '#ECEAF2',     // Purple-tinted ring background
