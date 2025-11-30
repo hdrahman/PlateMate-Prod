@@ -80,7 +80,7 @@ async def migrate_subscription_schema():
 
 async def initialize_trials_for_existing_users():
     """
-    Initialize 20-day trials for existing users who don't have subscriptions
+    Initialize 14-day trials for existing users who don't have subscriptions
     """
     try:
         conn = await get_db_connection()
@@ -94,7 +94,7 @@ async def initialize_trials_for_existing_users():
         """)
         
         now = datetime.utcnow()
-        trial_end = now + timedelta(days=20)
+        trial_end = now + timedelta(days=14)
         
         for user in users_without_subs:
             await conn.execute("""

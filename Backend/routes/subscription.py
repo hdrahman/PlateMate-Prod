@@ -558,7 +558,7 @@ async def update_subscription_from_webhook(
 
 @router.post("/start-trial")
 async def start_trial(current_user: dict = Depends(get_current_user)):
-    """Start the initial 20-day free trial for new users"""
+    """Start the initial 14-day free trial for new users"""
     try:
         firebase_uid = current_user["supabase_uid"]
         
@@ -578,7 +578,7 @@ async def start_trial(current_user: dict = Depends(get_current_user)):
             
             # Create trial subscription
             now = datetime.utcnow()
-            trial_end = now + timedelta(days=20)
+            trial_end = now + timedelta(days=14)
             
             await conn.execute("""
                 INSERT INTO user_subscriptions (
@@ -588,13 +588,13 @@ async def start_trial(current_user: dict = Depends(get_current_user)):
             """, firebase_uid, 'free_trial', now.isoformat(), now.isoformat(),
                 trial_end.isoformat(), False, False, now, now)
             
-            logger.info(f"Started 20-day trial for user {firebase_uid}")
+            logger.info(f"Started 14-day trial for user {firebase_uid}")
             
             return {
                 "status": "success",
-                "message": "20-day free trial started",
+                "message": "14-day free trial started",
                 "trial_end_date": trial_end.isoformat(),
-                "days_remaining": 20
+                "days_remaining": 14
             }
             
     except Exception as e:
@@ -1093,7 +1093,7 @@ async def validate_upload_limit(current_user: dict = Depends(get_current_user)):
 @router.post("/grant-promotional-trial")
 async def grant_promotional_trial(current_user: dict = Depends(get_current_user)):
     """
-    Grant 20-day promotional trial to new users - Backend managed (automatic for new accounts)
+    Grant 14-day promotional trial to new users - Backend managed (automatic for new accounts)
     FAILS IMMEDIATELY if RevenueCat API is unavailable or returns an error.
     NO FALLBACKS - this is core subscription functionality.
     
@@ -1103,7 +1103,7 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
     try:
         firebase_uid = current_user["supabase_uid"]
 
-        logger.info(f"🎆 Attempting to grant 20-day promotional trial to user: {firebase_uid}")
+        logger.info(f"🎆 Attempting to grant 14-day promotional trial to user: {firebase_uid}")
 
         # CRITICAL: Verify user exists in database before granting trial
         # This prevents race condition where webhook fires before profile sync completes
@@ -1148,7 +1148,7 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
                     logger.warning(f"User {firebase_uid} already has active promotional trial")
                     return {
                         "success": False,
-                        "message": "User already has active 20-day promotional trial",
+                        "message": "User already has active 14-day promotional trial",
                         "trial_granted": False
                     }
 
@@ -1174,11 +1174,11 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             else:
                 raise  # Re-raise other HTTP errors
 
-        # Step 2: Grant 20-day promotional trial via RevenueCat API
+        # Step 2: Grant 14-day promotional trial via RevenueCat API
         # Use RevenueCat's promotional entitlement grant API
         # Endpoint: POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_id}/promotional
-        # Calculate end time in milliseconds (now + 20 days)
-        trial_end = datetime.now(timezone.utc) + timedelta(days=20)
+        # Calculate end time in milliseconds (now + 14 days)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
         end_time_ms = int(trial_end.timestamp() * 1000)
 
         grant_data = {
@@ -1197,14 +1197,14 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
             idempotency_headers
         )
 
-        logger.info(f"✅ Successfully granted 20-day promotional trial to user {firebase_uid}")
+        logger.info(f"✅ Successfully granted 14-day promotional trial to user {firebase_uid}")
 
         return {
             "success": True,
-            "message": "20-day promotional trial granted automatically for new user",
+            "message": "14-day promotional trial granted automatically for new user",
             "trial_granted": True,
             "trial_end_date": trial_end.isoformat(),
-            "trial_days": 20,
+            "trial_days": 14,
             "revenuecat_response": result
         }
 
@@ -1219,7 +1219,8 @@ async def grant_promotional_trial(current_user: dict = Depends(get_current_user)
 @router.post("/grant-extended-trial")
 async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
     """
-    Grant additional 10-day extended trial when user starts a subscription (after 20-day promo trial)
+    Grant additional 14-day extended trial when user starts a subscription (after 14-day promo trial)
+    This is handled by Apple's Introductory Offer in App Store Connect.
     FAILS IMMEDIATELY if RevenueCat API is unavailable or returns an error.
     NO FALLBACKS - this is core subscription functionality.
     """
@@ -1257,14 +1258,14 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
                     "trial_granted": False
                 }
 
-        # Verify user has an ACTIVE 20-day promotional trial (not expired)
+        # Verify user has an ACTIVE 14-day promotional trial (not expired)
         # Extended trial can only be granted while promo trial is still active
         promo_trial = entitlements.get('promotional_trial', {})
         if not promo_trial or not promo_trial.get('expires_date'):
             logger.warning(f"User {firebase_uid} does not have promotional trial - cannot grant extended trial")
             return {
                 "success": False,
-                "message": "User must have used 20-day promotional trial first",
+                "message": "User must have used 14-day promotional trial first",
                 "trial_granted": False
             }
         

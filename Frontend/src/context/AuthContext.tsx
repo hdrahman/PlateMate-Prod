@@ -384,7 +384,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.warn('⚠️ Background: SubscriptionManager initialization failed:', error);
             }
 
-            // Grant promotional trial to new users (20 days free)
+            // Grant promotional trial to new users (14 days free)
             try {
                 await grantPromotionalTrialToNewUser(userId);
                 console.log('✅ Background: Promotional trial processed');

@@ -84,7 +84,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
     const { signUp } = useAuth();
 
     const handleStartTrial = async () => {
-        // Automatically create account and grant 20-day promotional trial via backend
+        // Automatically create account and grant 14-day promotional trial via backend
         if (profile.email && profile.password) {
             setIsLoading(true);
             try {
@@ -103,8 +103,8 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                 console.log('⏳ Waiting for auth state to propagate...');
                 await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
 
-                // Grant 20-day promotional trial via backend (RevenueCat integration)
-                console.log('🎆 Granting 20-day promotional trial via backend...');
+                // Grant 14-day promotional trial via backend (RevenueCat integration)
+                console.log('🎆 Granting 14-day promotional trial via backend...');
                 try {
                     const token = await tokenManager.getToken(ServiceTokenType.SUPABASE_AUTH);
 
@@ -119,7 +119,7 @@ const SubscriptionStep: React.FC<SubscriptionStepProps> = ({ profile, onComplete
                     const result = await response.json();
 
                     if (response.ok && result.success) {
-                        console.log('✅ 20-day promotional trial granted successfully');
+                        console.log('✅ 14-day promotional trial granted successfully');
                     } else {
                         console.warn('⚠️ Promotional trial grant failed (non-critical):', result.message || result.detail);
                         // Don't block onboarding if trial grant fails - user can still use free tier

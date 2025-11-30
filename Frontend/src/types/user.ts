@@ -115,7 +115,7 @@ export interface AuthState {
 
 // User subscription types
 export type SubscriptionStatus =
-    | 'free_trial'           // Initial 20-day trial
+    | 'free_trial'           // Initial 14-day trial
     | 'free_trial_extended'  // Extended 30-day trial (with payment method)
     | 'premium_monthly'      // Paid monthly subscription
     | 'premium_annual'       // Paid annual subscription

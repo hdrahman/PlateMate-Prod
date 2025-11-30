@@ -62,7 +62,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
       let status;
 
       if (promoTrialStatus.isActive) {
-        // User is in 20-day promotional trial
+        // User is in 14-day promotional trial
         status = {
           isInTrial: true,
           trialType: 'promotional' as const,

@@ -173,7 +173,7 @@ export const PRODUCT_IDS = {
 // Entitlement identifiers for features
 export const ENTITLEMENTS = {
   PREMIUM: 'Premium',           // Full premium access from paid subscription (capital P - matches RevenueCat)
-  PROMOTIONAL_TRIAL: 'promotional_trial', // 20-day backend-granted trial (automatic for new users)
+  PROMOTIONAL_TRIAL: 'promotional_trial', // 14-day backend-granted trial (automatic for new users)
   EXTENDED_TRIAL: 'extended_trial', // Additional 10-day trial when user starts subscription trial
 } as const;
 
@@ -624,7 +624,7 @@ class SubscriptionService {
     const entitlements = customerInfo.entitlements.active;
     const allEntitlements = customerInfo.entitlements.all;
 
-    // Check for promotional trial (20-day backend-granted trial)
+    // Check for promotional trial (14-day backend-granted trial)
     const promoTrial = entitlements[ENTITLEMENTS.PROMOTIONAL_TRIAL];
     if (promoTrial && promoTrial.isActive) {
       return {
@@ -735,7 +735,7 @@ class SubscriptionService {
       const activeEntitlements = customerInfo.entitlements.active;
       const allEntitlements = customerInfo.entitlements.all;
 
-      // PRIORITY 1: Check for promotional trial (20-day backend-granted trial)
+      // PRIORITY 1: Check for promotional trial (14-day backend-granted trial)
       const promoTrial = activeEntitlements[ENTITLEMENTS.PROMOTIONAL_TRIAL];
       if (promoTrial && promoTrial.isActive) {
         const trialEndDate = promoTrial.expirationDate ? new Date(promoTrial.expirationDate) : new Date();
@@ -910,7 +910,7 @@ class SubscriptionService {
       // Check for active premium subscription
       const hasPremiumSub = this.hasActiveSubscription(customerInfo);
 
-      // Check for active promotional trial (20-day backend-granted, automatic for new users)
+      // Check for active promotional trial (14-day backend-granted, automatic for new users)
       const hasPromotionalTrial = customerInfo.entitlements.active[ENTITLEMENTS.PROMOTIONAL_TRIAL]?.isActive || false;
 
       // Check for active extended trial (additional 10-day when user starts subscription trial)
@@ -936,7 +936,7 @@ class SubscriptionService {
     }
   }
 
-  // Get promotional trial status (20-day backend trial)
+  // Get promotional trial status (14-day backend trial)
   async getPromotionalTrialStatus(): Promise<{
     isActive: boolean;
     daysRemaining: number;
@@ -1030,7 +1030,7 @@ class SubscriptionService {
 
       let tier: 'free' | 'promotional_trial' | 'extended_trial' | 'premium_monthly' | 'premium_annual' | 'vip_lifetime';
 
-      // Check promotional trial (20-day backend-granted)
+      // Check promotional trial (14-day backend-granted)
       const promoTrial = entitlements[ENTITLEMENTS.PROMOTIONAL_TRIAL];
       if (promoTrial && promoTrial.isActive) {
         tier = 'promotional_trial';
@@ -1068,7 +1068,7 @@ class SubscriptionService {
     }
   }
 
-  // Start free trial for new users (20 days) - THIS IS THE AUTOMATIC PART
+  // Start free trial for new users (14 days) - THIS IS THE AUTOMATIC PART
   async startFreeTrial(): Promise<boolean> {
     try {
       const customerInfo = await this.getCustomerInfo();
