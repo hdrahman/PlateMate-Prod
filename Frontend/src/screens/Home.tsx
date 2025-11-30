@@ -992,9 +992,9 @@ export default function Home() {
     // Determine if the weight change aligns with the goal
     const isAlignedWithGoal = (isGainGoal && weightLost < 0) || (!isGainGoal && weightLost >= 0);
 
-    // Set background colors based on goal
-    const lossBackgroundColor = isGainGoal ? theme.colors.error + '33' : theme.colors.success + '33';
-    const gainBackgroundColor = isGainGoal ? theme.colors.success + '33' : theme.colors.error + '33';
+    // Set background colors based on goal - using same green as fat chart background
+    const lossBackgroundColor = isGainGoal ? theme.colors.error + '33' : (theme.dark ? 'rgba(25, 191, 50, 0.2)' : 'rgba(25, 191, 50, 0.1)');
+    const gainBackgroundColor = isGainGoal ? (theme.dark ? 'rgba(25, 191, 50, 0.2)' : 'rgba(25, 191, 50, 0.1)') : theme.colors.error + '33';
 
     // Set gradient colors based on goal
     const lossGradientColors = isGainGoal
