@@ -375,19 +375,44 @@ const FoodDetailScreen: React.FC = () => {
         try {
             setLoading(true);
 
-            // Update the food log entry in the database
-            await updateFoodLog(foodId, {
-                ...foodData,
-                ...editedFoodData,
-                sync_action: 'UPDATE',
-            });
+            if (isNewFoodMode) {
+                // For new scanned food (not yet saved to database), update in-memory state only
+                const updatedFoodData: FoodLogEntry = {
+                    ...foodData,
+                    food_name: editedFoodData.food_name ?? foodData.food_name,
+                    calories: editedFoodData.calories ?? foodData.calories,
+                    proteins: editedFoodData.proteins ?? foodData.proteins,
+                    carbs: editedFoodData.carbs ?? foodData.carbs,
+                    fats: editedFoodData.fats ?? foodData.fats,
+                    quantity: editedFoodData.quantity ?? foodData.quantity,
+                    meal_type: editedFoodData.meal_type ?? foodData.meal_type,
+                    notes: editedFoodData.notes ?? foodData.notes,
+                };
 
-            // Reload the food data to show updated values
-            const updatedData = await getFoodLogById(foodId);
-            setFoodData(updatedData);
+                setFoodData(updatedFoodData);
 
-            setEditModalVisible(false);
-            Alert.alert('Success', 'Food log entry updated successfully');
+                // Also update the meal type selector if it was changed
+                if (editedFoodData.meal_type) {
+                    setSelectedMealType(editedFoodData.meal_type);
+                }
+
+                setEditModalVisible(false);
+                // No success alert needed for in-memory edits - changes are immediately visible
+            } else {
+                // For existing food (already in database), update via database
+                await updateFoodLog(foodId, {
+                    ...foodData,
+                    ...editedFoodData,
+                    sync_action: 'UPDATE',
+                });
+
+                // Reload the food data to show updated values
+                const updatedData = await getFoodLogById(foodId);
+                setFoodData(updatedData);
+
+                setEditModalVisible(false);
+                Alert.alert('Success', 'Food log entry updated successfully');
+            }
         } catch (error) {
             console.error('Error updating food log:', error);
             Alert.alert('Error', 'Failed to update food log entry');
