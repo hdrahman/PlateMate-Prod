@@ -15,6 +15,7 @@ import {
     SafeAreaView,
     StatusBar
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { ThemeContext } from '../ThemeContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, StackActions } from '@react-navigation/native';
@@ -34,7 +35,7 @@ import { saveImageLocally, saveMultipleImagesLocally } from '../utils/localFileS
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { navigateToFoodLog } from '../navigation/RootNavigation';
-import { validateUserContext, createLLMContextPayload, UserContextData, validateFoodName, validateBrandName, validateQuantity, validateNotes, getCharacterLimits, isApproachingLimit } from '../utils/inputValidation';
+import { validateUserContext, createLLMContextPayload, UserContextData, validateNotes, getCharacterLimits, isApproachingLimit } from '../utils/inputValidation';
 import SubscriptionManager from '../utils/SubscriptionManager';
 import PremiumFeatureCard from '../components/PremiumFeatureCard';
 
@@ -125,11 +126,14 @@ const ImageCapture: React.FC = () => {
         ];
     });
 
-    const [brandName, setBrandName] = useState(foodData?.brand_name || '');
-    const [quantity, setQuantity] = useState(foodData?.serving_qty ? `${foodData.serving_qty} ${foodData.serving_unit || ''}` : '');
     const [notes, setNotes] = useState('');
-    const [foodName, setFoodName] = useState(foodData?.food_name || '');
     const [loading, setLoading] = useState(false);
+
+    // New state for meal percentage slider (0-100, how much of the meal is shown in photo)
+    const [mealPercentage, setMealPercentage] = useState(100);
+
+    // New state for fat preference toggle: 'regular' | 'low-fat' | 'fat-free'
+    const [fatPreference, setFatPreference] = useState<'regular' | 'low-fat' | 'fat-free'>('regular');
 
     // New state for UI improvements
     const [showSideView, setShowSideView] = useState(false);
@@ -174,68 +178,7 @@ const ImageCapture: React.FC = () => {
         }
     }, [initialPhotoUri]);
 
-    // Validation handlers for real-time input validation
-    // Using React.startTransition to batch state updates and prevent keyboard flickering
-    const validateAndSetFoodName = React.useCallback((text: string) => {
-        setFoodName(text);
-
-        // Use startTransition to mark validation updates as non-urgent
-        // This batches them with other updates and prevents re-renders during typing
-        React.startTransition(() => {
-            const result = validateFoodName(text);
-            const isApproaching = isApproachingLimit(text, 'foodName', 0.8);
-
-            // Batch error and warning updates together
-            setInputErrors(prev => ({
-                ...prev,
-                foodName: result.errors
-            }));
-
-            setInputWarnings(prev => ({
-                ...prev,
-                foodName: isApproaching
-            }));
-        });
-    }, []);
-
-    const validateAndSetBrandName = React.useCallback((text: string) => {
-        setBrandName(text);
-
-        React.startTransition(() => {
-            const result = validateBrandName(text);
-            const isApproaching = isApproachingLimit(text, 'brandName', 0.8);
-
-            setInputErrors(prev => ({
-                ...prev,
-                brandName: result.errors
-            }));
-
-            setInputWarnings(prev => ({
-                ...prev,
-                brandName: isApproaching
-            }));
-        });
-    }, []);
-
-    const validateAndSetQuantity = React.useCallback((text: string) => {
-        setQuantity(text);
-
-        React.startTransition(() => {
-            const result = validateQuantity(text);
-            const isApproaching = isApproachingLimit(text, 'quantity', 0.8);
-
-            setInputErrors(prev => ({
-                ...prev,
-                quantity: result.errors
-            }));
-
-            setInputWarnings(prev => ({
-                ...prev,
-                quantity: isApproaching
-            }));
-        });
-    }, []);
-
+    // Validation handler for notes field
     const validateAndSetNotes = React.useCallback((text: string) => {
         setNotes(text);
 
@@ -657,17 +600,16 @@ const ImageCapture: React.FC = () => {
 
             // Add additional context for LLM analysis
             formData.append('meal_type', mealType);
-            if (sanitizedContext.foodName) {
-                formData.append('food_name', sanitizedContext.foodName);
-            }
-            if (sanitizedContext.brandName) {
-                formData.append('brand_name', sanitizedContext.brandName);
-            }
-            if (sanitizedContext.quantity) {
-                formData.append('quantity', sanitizedContext.quantity);
-            }
             if (sanitizedContext.notes) {
                 formData.append('additional_notes', sanitizedContext.notes);
+            }
+            // Add meal percentage (how much of the meal is shown in photo)
+            if (sanitizedContext.mealPercentage !== undefined && sanitizedContext.mealPercentage < 100) {
+                formData.append('meal_percentage', sanitizedContext.mealPercentage.toString());
+            }
+            // Add fat preference indicator
+            if (sanitizedContext.fatPreference && sanitizedContext.fatPreference !== 'regular') {
+                formData.append('fat_preference', sanitizedContext.fatPreference);
             }
             // Add context label to help backend understand this is user-provided additional info
             formData.append('context_label', 'USER_PROVIDED_ADDITIONAL_INFO');
@@ -853,7 +795,7 @@ const ImageCapture: React.FC = () => {
             // For local-only mode, we'll create mock nutrition data
             // In a real app, you could integrate with an offline AI model or nutrition database
             const mockNutritionData = imageUris.map((_, index) => ({
-                food_name: foodName || `Food Item ${index + 1}`,
+                food_name: `Food Item ${index + 1}`,
                 calories: Math.floor(Math.random() * 400) + 100, // Random calories 100-500
                 proteins: Math.floor(Math.random() * 30) + 5,    // Random protein 5-35g
                 carbs: Math.floor(Math.random() * 50) + 10,      // Random carbs 10-60g
@@ -908,7 +850,7 @@ const ImageCapture: React.FC = () => {
                 // Create a food log entry from barcode data
                 const foodLog = {
                     meal_id: Date.now().toString(), // Generate a unique meal ID
-                    food_name: foodName || foodData.food_name || 'Unknown Food',
+                    food_name: foodData.food_name || 'Unknown Food',
                     calories: foodData.calories || 0,
                     proteins: foodData.proteins || 0,
                     carbs: foodData.carbs || 0,
@@ -931,8 +873,6 @@ const ImageCapture: React.FC = () => {
                     healthiness_rating: foodData.healthiness_rating || 5,
                     date: formattedDate,
                     meal_type: mealType,
-                    brand_name: brandName,
-                    quantity: quantity,
                     notes: notes
                 };
 
@@ -983,10 +923,9 @@ const ImageCapture: React.FC = () => {
 
             // Prepare user context data
             const userContextData: UserContextData = {
-                foodName,
-                brandName,
-                quantity,
-                notes
+                notes,
+                mealPercentage,
+                fatPreference
             };
 
             // Use backend ChatGPT integration instead of local processing
@@ -1008,10 +947,7 @@ const ImageCapture: React.FC = () => {
                 nutritionData: result.nutrition_data,
                 mealId: (result.meal_id || Date.now()).toString(),
                 mealType: mealType,
-                brandName: brandName,
-                quantity: quantity,
                 notes: notes,
-                foodName: foodName,
                 localImagePaths: result.localImagePaths || []
             });
         } catch (error) {
@@ -1377,6 +1313,12 @@ const ImageCapture: React.FC = () => {
 
 
     const renderOptionalDetailsSection = () => {
+        const fatOptions: Array<{ value: 'regular' | 'low-fat' | 'fat-free'; label: string }> = [
+            { value: 'regular', label: 'Regular' },
+            { value: 'low-fat', label: 'Low-Fat' },
+            { value: 'fat-free', label: 'Fat-Free' }
+        ];
+
         return (
             <View style={[styles.optionalDetailsWrapper, { backgroundColor: theme.colors.cardBackground }]}>
                 <TouchableOpacity
@@ -1384,9 +1326,9 @@ const ImageCapture: React.FC = () => {
                     onPress={() => setShowOptionalDetails(!showOptionalDetails)}
                 >
                     <View style={styles.sectionHeaderContent}>
-                        <Ionicons name="settings-outline" size={20} color={theme.colors.primary} />
+                        <Ionicons name="options-outline" size={20} color={theme.colors.primary} />
                         <Text style={[styles.sectionHeaderTitle, { color: theme.colors.text }]}>Additional Details</Text>
-                        <Text style={[styles.sectionHeaderSubtitle, { color: theme.colors.primary }]}>Optional</Text>
+                        <Text style={[styles.sectionHeaderSubtitle, { color: theme.colors.primary }]}>For AI</Text>
                     </View>
                     <Ionicons
                         name={showOptionalDetails ? "chevron-up" : "chevron-down"}
@@ -1397,78 +1339,69 @@ const ImageCapture: React.FC = () => {
 
                 {showOptionalDetails && (
                     <View style={[styles.optionalDetailsContent, { backgroundColor: theme.colors.cardBackground }]}>
+                        {/* Meal Percentage Slider */}
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelRow}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Food Name</Text>
-                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
-                                    {foodName.length}/{getCharacterLimits().foodName}
+                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Portion Shown</Text>
+                                <Text style={[styles.sliderValue, { color: theme.colors.primary }]}>
+                                    {mealPercentage}%
                                 </Text>
                             </View>
-                            <TextInput
-                                style={[
-                                    styles.modernInput,
-                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
-                                    inputErrors.foodName?.length > 0 && styles.inputError,
-                                    inputWarnings.foodName && styles.inputWarning
-                                ]}
-                                value={foodName}
-                                onChangeText={validateAndSetFoodName}
-                                placeholder="e.g., Grilled Chicken Salad"
-                                placeholderTextColor={theme.colors.textSecondary}
-                            />
-                            {inputErrors.foodName?.length > 0 && (
-                                <Text style={styles.errorText}>{inputErrors.foodName[0]}</Text>
-                            )}
+                            <Text style={[styles.inputHelperText, { color: theme.colors.textSecondary }]}>
+                                How much of the meal is visible? (Started eating before photo)
+                            </Text>
+                            <View style={styles.sliderContainer}>
+                                <Slider
+                                    style={styles.slider}
+                                    minimumValue={10}
+                                    maximumValue={100}
+                                    step={5}
+                                    value={mealPercentage}
+                                    onValueChange={setMealPercentage}
+                                    minimumTrackTintColor={theme.colors.primary}
+                                    maximumTrackTintColor={theme.colors.border}
+                                    thumbTintColor={theme.colors.primary}
+                                />
+                                <View style={styles.sliderLabels}>
+                                    <Text style={[styles.sliderLabelText, { color: theme.colors.textSecondary }]}>10%</Text>
+                                    <Text style={[styles.sliderLabelText, { color: theme.colors.textSecondary }]}>100%</Text>
+                                </View>
+                            </View>
                         </View>
 
+                        {/* Fat Preference Toggle */}
                         <View style={styles.inputGroup}>
-                            <View style={styles.inputLabelRow}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Brand/Restaurant</Text>
-                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
-                                    {brandName.length}/{getCharacterLimits().brandName}
-                                </Text>
+                            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Fat Content</Text>
+                            <Text style={[styles.inputHelperText, { color: theme.colors.textSecondary }]}>
+                                Is this a low-fat or fat-free version?
+                            </Text>
+                            <View style={styles.fatToggleContainer}>
+                                {fatOptions.map((option) => (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        style={[
+                                            styles.fatToggleButton,
+                                            { borderColor: theme.colors.border },
+                                            fatPreference === option.value && [
+                                                styles.fatToggleButtonActive,
+                                                { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '20' }
+                                            ]
+                                        ]}
+                                        onPress={() => setFatPreference(option.value)}
+                                    >
+                                        <Text style={[
+                                            styles.fatToggleText,
+                                            { color: theme.colors.textSecondary },
+                                            fatPreference === option.value && { color: theme.colors.primary, fontWeight: '600' }
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
                             </View>
-                            <TextInput
-                                style={[
-                                    styles.modernInput,
-                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
-                                    inputErrors.brandName?.length > 0 && styles.inputError,
-                                    inputWarnings.brandName && styles.inputWarning
-                                ]}
-                                value={brandName}
-                                onChangeText={validateAndSetBrandName}
-                                placeholder="e.g., McDonald's, Homemade"
-                                placeholderTextColor={theme.colors.textSecondary}
-                            />
-                            {inputErrors.brandName?.length > 0 && (
-                                <Text style={styles.errorText}>{inputErrors.brandName[0]}</Text>
-                            )}
                         </View>
 
-                        <View style={styles.inputGroup}>
-                            <View style={styles.inputLabelRow}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Quantity</Text>
-                                <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
-                                    {quantity.length}/{getCharacterLimits().quantity}
-                                </Text>
-                            </View>
-                            <TextInput
-                                style={[
-                                    styles.modernInput,
-                                    { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border },
-                                    inputErrors.quantity?.length > 0 && styles.inputError,
-                                    inputWarnings.quantity && styles.inputWarning
-                                ]}
-                                value={quantity}
-                                onChangeText={validateAndSetQuantity}
-                                placeholder="e.g., 1 serving, 200g, 1 cup"
-                                placeholderTextColor={theme.colors.textSecondary}
-                            />
-                            {inputErrors.quantity?.length > 0 && (
-                                <Text style={styles.errorText}>{inputErrors.quantity[0]}</Text>
-                            )}
-                        </View>
-
+                        {/* Notes Field */}
                         <View style={styles.inputGroup}>
                             <View style={styles.inputLabelRow}>
                                 <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Notes</Text>
@@ -1486,7 +1419,7 @@ const ImageCapture: React.FC = () => {
                                 ]}
                                 value={notes}
                                 onChangeText={validateAndSetNotes}
-                                placeholder="Any additional notes..."
+                                placeholder="Any additional context for the AI..."
                                 placeholderTextColor={theme.colors.textSecondary}
                                 multiline
                                 numberOfLines={3}
@@ -2194,6 +2127,55 @@ const styles = StyleSheet.create({
         color: '#ff6b6b',
         marginTop: 4,
         marginLeft: 2,
+    },
+    // Slider styles
+    sliderContainer: {
+        marginTop: 8,
+    },
+    slider: {
+        width: '100%',
+        height: 40,
+    },
+    sliderLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 4,
+        marginTop: -8,
+    },
+    sliderLabelText: {
+        fontSize: 11,
+        color: '#666',
+    },
+    sliderValue: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    inputHelperText: {
+        fontSize: 12,
+        marginBottom: 8,
+        lineHeight: 16,
+    },
+    // Fat toggle styles
+    fatToggleContainer: {
+        flexDirection: 'row',
+        marginTop: 8,
+        gap: 8,
+    },
+    fatToggleButton: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fatToggleButtonActive: {
+        borderWidth: 2,
+    },
+    fatToggleText: {
+        fontSize: 13,
+        fontWeight: '500',
     },
 });
 

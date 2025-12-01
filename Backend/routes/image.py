@@ -46,6 +46,32 @@ except Exception as e:
 router = APIRouter()
 
 
+def get_fat_preference_instruction(fat_preference: str) -> str:
+    """
+    Generate smart instructions for the AI based on fat preference.
+    The AI should interpret 'fat-free' or 'low-fat' contextually based on food type.
+    """
+    if fat_preference == 'fat-free':
+        return """IMPORTANT - FAT-FREE VERSION: The user indicates this is a fat-free version of the food. Apply intelligent interpretation:
+• For burgers/sandwiches/wraps: Use fat-free condiments, sauces, and dressings (mayo, cheese, etc.)
+• For dairy products (milk, yogurt, cheese, cream): Use fat-free dairy versions
+• For salad dressings and sauces: Use fat-free versions
+• For meats: Assume extra-lean cuts with all visible fat removed
+• For baked goods: Assume fat-free or reduced-fat recipe variations
+• For fried foods: Assume air-fried or baked alternative
+Reduce fat content significantly (typically 80-100% reduction in added fats) in your nutritional estimates."""
+    elif fat_preference == 'low-fat':
+        return """IMPORTANT - LOW-FAT VERSION: The user indicates this is a low-fat version of the food. Apply intelligent interpretation:
+• For burgers/sandwiches/wraps: Use reduced-fat condiments and light sauces
+• For dairy products (milk, yogurt, cheese, cream): Use low-fat (1-2%) dairy versions
+• For salad dressings and sauces: Use light/reduced-fat versions
+• For meats: Assume lean cuts with minimal marbling
+• For baked goods: Assume reduced-fat recipe variations
+• For fried foods: Assume light oil or reduced oil cooking
+Reduce fat content moderately (typically 30-50% reduction) in your nutritional estimates."""
+    return ""
+
+
 def detect_image_format(image_data: bytes) -> str:
     """
     Detect image format from magic bytes (file signature) and return MIME type.
@@ -563,10 +589,9 @@ async def upload_multiple_images(
     user_id: int = Form(...), 
     images: List[UploadFile] = File(...),
     meal_type: Optional[str] = Form(None),
-    food_name: Optional[str] = Form(None),
-    brand_name: Optional[str] = Form(None),
-    quantity: Optional[str] = Form(None),
     additional_notes: Optional[str] = Form(None),
+    meal_percentage: Optional[int] = Form(None),
+    fat_preference: Optional[str] = Form(None),
     context_label: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
@@ -574,6 +599,10 @@ async def upload_multiple_images(
     Processes multiple images in-memory and sends to OpenAI for analysis.
     NO disk storage - images are processed and discarded immediately.
     Frontend handles all persistent storage in SQLite.
+    
+    Parameters:
+    - meal_percentage: 0-100, how much of the meal is visible in the photo (user started eating)
+    - fat_preference: 'regular', 'low-fat', or 'fat-free' - indicates reduced fat version
     """
     
     try:
@@ -605,14 +634,12 @@ async def upload_multiple_images(
         context_provided = []
         if meal_type:
             context_provided.append(f"meal_type='{meal_type}'")
-        if food_name:
-            context_provided.append(f"food_name='{food_name}'")
-        if brand_name:
-            context_provided.append(f"brand_name='{brand_name}'")
-        if quantity:
-            context_provided.append(f"quantity='{quantity}'")
         if additional_notes:
             context_provided.append(f"additional_notes='{additional_notes[:50]}...' (truncated for log)")
+        if meal_percentage is not None and meal_percentage < 100:
+            context_provided.append(f"meal_percentage={meal_percentage}%")
+        if fat_preference and fat_preference != 'regular':
+            context_provided.append(f"fat_preference='{fat_preference}'")
         
         if context_provided:
             print(f"📝 User provided additional context: {', '.join(context_provided)}")
@@ -642,12 +669,11 @@ async def upload_multiple_images(
         context_additions = []
         if meal_type:
             context_additions.append(f"This is a {meal_type.lower()} meal.")
-        if food_name:
-            context_additions.append(f"The user indicates this is '{food_name}'.")
-        if brand_name:
-            context_additions.append(f"The brand/restaurant is '{brand_name}'.")
-        if quantity:
-            context_additions.append(f"The user estimates the quantity as '{quantity}'.")
+        if meal_percentage is not None and meal_percentage < 100:
+            context_additions.append(f"IMPORTANT: The user has already eaten some of this meal before taking the photo. Only {meal_percentage}% of the original portion is shown. Scale up your nutritional estimates accordingly (multiply by {100/meal_percentage:.2f}x) to reflect the full meal.")
+        if fat_preference and fat_preference != 'regular':
+            fat_instruction = get_fat_preference_instruction(fat_preference)
+            context_additions.append(fat_instruction)
         if additional_notes:
             context_additions.append(f"Additional context from user: '{additional_notes}'.")
             
@@ -692,7 +718,7 @@ async def upload_multiple_images(
 USER PROVIDED CONTEXT:
 {chr(10).join([f"• {addition}" for addition in context_additions])}
 
-Use this context to guide identification and portion estimation. If the user provided a food name, quantity, or brand, factor that into your analysis.
+Use this context to guide identification and portion estimation. Pay special attention to meal percentage (scale nutritional values if user ate some before photo) and fat preference (adjust fat calculations for low-fat/fat-free versions).
 """
             
             # Real API call with retry logic for reliability

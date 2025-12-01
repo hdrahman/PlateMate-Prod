@@ -9,18 +9,16 @@ export interface ValidationResult {
     errors: string[];
 }
 
+export type FatPreference = 'regular' | 'low-fat' | 'fat-free';
+
 export interface UserContextData {
-    foodName: string;
-    brandName: string;
-    quantity: string;
     notes: string;
+    mealPercentage: number;
+    fatPreference: FatPreference;
 }
 
 // Character limits for different fields
 const FIELD_LIMITS = {
-    foodName: 200,
-    brandName: 100,
-    quantity: 50,
     notes: 500
 } as const;
 
@@ -34,81 +32,21 @@ export const sanitizeInput = (input: string): string => {
 
     // Remove HTML tags and script content
     let sanitized = input.replace(/<[^>]*>/g, '');
-    
+
     // Remove potential script injection patterns
     sanitized = sanitized.replace(/javascript:/gi, '');
     sanitized = sanitized.replace(/vbscript:/gi, '');
     sanitized = sanitized.replace(/onload/gi, '');
     sanitized = sanitized.replace(/onerror/gi, '');
     sanitized = sanitized.replace(/onclick/gi, '');
-    
+
     // Remove excessive whitespace but preserve single spaces and newlines for notes
     sanitized = sanitized.replace(/\s{3,}/g, ' ');
-    
+
     // Trim whitespace
     sanitized = sanitized.trim();
-    
+
     return sanitized;
-};
-
-/**
- * Validates and sanitizes food name input
- */
-export const validateFoodName = (foodName: string): ValidationResult => {
-    const sanitized = sanitizeInput(foodName);
-    const errors: string[] = [];
-    
-    if (sanitized.length > FIELD_LIMITS.foodName) {
-        errors.push(`Food name must be less than ${FIELD_LIMITS.foodName} characters`);
-    }
-    
-    // Food name can be empty, LLM will use image analysis
-    return {
-        isValid: errors.length === 0,
-        sanitizedValue: sanitized.slice(0, FIELD_LIMITS.foodName),
-        errors
-    };
-};
-
-/**
- * Validates and sanitizes brand name input
- */
-export const validateBrandName = (brandName: string): ValidationResult => {
-    const sanitized = sanitizeInput(brandName);
-    const errors: string[] = [];
-    
-    if (sanitized.length > FIELD_LIMITS.brandName) {
-        errors.push(`Brand name must be less than ${FIELD_LIMITS.brandName} characters`);
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        sanitizedValue: sanitized.slice(0, FIELD_LIMITS.brandName),
-        errors
-    };
-};
-
-/**
- * Validates and sanitizes quantity input
- */
-export const validateQuantity = (quantity: string): ValidationResult => {
-    const sanitized = sanitizeInput(quantity);
-    const errors: string[] = [];
-    
-    if (sanitized.length > FIELD_LIMITS.quantity) {
-        errors.push(`Quantity must be less than ${FIELD_LIMITS.quantity} characters`);
-    }
-    
-    // Basic format validation for quantity (optional)
-    if (sanitized && !/^[\d\s\w\/\-\.(),]+$/i.test(sanitized)) {
-        errors.push('Quantity contains invalid characters');
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        sanitizedValue: sanitized.slice(0, FIELD_LIMITS.quantity),
-        errors
-    };
 };
 
 /**
@@ -117,16 +55,53 @@ export const validateQuantity = (quantity: string): ValidationResult => {
 export const validateNotes = (notes: string): ValidationResult => {
     const sanitized = sanitizeInput(notes);
     const errors: string[] = [];
-    
+
     if (sanitized.length > FIELD_LIMITS.notes) {
         errors.push(`Notes must be less than ${FIELD_LIMITS.notes} characters`);
     }
-    
+
     return {
         isValid: errors.length === 0,
         sanitizedValue: sanitized.slice(0, FIELD_LIMITS.notes),
         errors
     };
+};
+
+/**
+ * Validates meal percentage (0-100)
+ */
+export const validateMealPercentage = (percentage: number): { isValid: boolean; value: number; errors: string[] } => {
+    const errors: string[] = [];
+    let value = percentage;
+
+    if (typeof percentage !== 'number' || isNaN(percentage)) {
+        errors.push('Meal percentage must be a number');
+        value = 100;
+    } else if (percentage < 0 || percentage > 100) {
+        errors.push('Meal percentage must be between 0 and 100');
+        value = Math.max(0, Math.min(100, percentage));
+    }
+
+    return {
+        isValid: errors.length === 0,
+        value,
+        errors
+    };
+};
+
+/**
+ * Validates fat preference
+ */
+export const validateFatPreference = (preference: FatPreference): { isValid: boolean; value: FatPreference; errors: string[] } => {
+    const validOptions: FatPreference[] = ['regular', 'low-fat', 'fat-free'];
+    const errors: string[] = [];
+
+    if (!validOptions.includes(preference)) {
+        errors.push('Invalid fat preference');
+        return { isValid: false, value: 'regular', errors };
+    }
+
+    return { isValid: true, value: preference, errors: [] };
 };
 
 /**
@@ -137,30 +112,26 @@ export const validateUserContext = (context: UserContextData): {
     sanitizedData: UserContextData;
     errors: { [key: string]: string[] };
 } => {
-    const foodNameResult = validateFoodName(context.foodName);
-    const brandNameResult = validateBrandName(context.brandName);
-    const quantityResult = validateQuantity(context.quantity);
     const notesResult = validateNotes(context.notes);
-    
+    const mealPercentageResult = validateMealPercentage(context.mealPercentage);
+    const fatPreferenceResult = validateFatPreference(context.fatPreference);
+
     const allErrors = {
-        foodName: foodNameResult.errors,
-        brandName: brandNameResult.errors,
-        quantity: quantityResult.errors,
-        notes: notesResult.errors
+        notes: notesResult.errors,
+        mealPercentage: mealPercentageResult.errors,
+        fatPreference: fatPreferenceResult.errors
     };
-    
-    const isValid = foodNameResult.isValid && 
-                   brandNameResult.isValid && 
-                   quantityResult.isValid && 
-                   notesResult.isValid;
-    
+
+    const isValid = notesResult.isValid &&
+        mealPercentageResult.isValid &&
+        fatPreferenceResult.isValid;
+
     const sanitizedData: UserContextData = {
-        foodName: foodNameResult.sanitizedValue,
-        brandName: brandNameResult.sanitizedValue,
-        quantity: quantityResult.sanitizedValue,
-        notes: notesResult.sanitizedValue
+        notes: notesResult.sanitizedValue,
+        mealPercentage: mealPercentageResult.value,
+        fatPreference: fatPreferenceResult.value
     };
-    
+
     return {
         isValid,
         sanitizedData,
@@ -172,23 +143,20 @@ export const validateUserContext = (context: UserContextData): {
  * Creates a structured context object for LLM requests
  */
 export const createLLMContextPayload = (sanitizedData: UserContextData) => {
-    const hasAdditionalInfo = sanitizedData.brandName || 
-                             sanitizedData.quantity || 
-                             sanitizedData.notes;
-    
+    const hasAdditionalInfo = sanitizedData.notes ||
+        sanitizedData.mealPercentage < 100 ||
+        sanitizedData.fatPreference !== 'regular';
+
     if (!hasAdditionalInfo) {
-        // Return minimal context if no additional details provided
-        return {
-            food_name: sanitizedData.foodName || 'Unknown Food'
-        };
+        // Return empty context if no additional details provided
+        return {};
     }
-    
+
     return {
-        food_name: sanitizedData.foodName || 'Unknown Food',
         user_context: {
-            brand_name: sanitizedData.brandName || null,
-            quantity: sanitizedData.quantity || null,
             additional_notes: sanitizedData.notes || null,
+            meal_percentage: sanitizedData.mealPercentage < 100 ? sanitizedData.mealPercentage : null,
+            fat_preference: sanitizedData.fatPreference !== 'regular' ? sanitizedData.fatPreference : null,
             context_label: 'USER_PROVIDED_ADDITIONAL_INFO'
         }
     };
