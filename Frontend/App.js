@@ -157,7 +157,7 @@ function CustomTabBarButton({ children }) {
 // Theme-aware Main Tabs Navigator
 function MainTabs() {
   const { theme, isDarkTheme } = useContext(ThemeContext);
-  
+
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -379,11 +379,21 @@ function AuthenticatedApp({ children }) {
 function ThemedStatusBar() {
   const { theme, isDarkTheme } = useContext(ThemeContext);
   return (
-    <StatusBar 
-      barStyle={isDarkTheme ? "light-content" : "dark-content"} 
+    <StatusBar
+      barStyle={isDarkTheme ? "light-content" : "dark-content"}
       backgroundColor={theme.colors.background}
       translucent={false}
     />
+  );
+}
+
+// Wrapper component for authenticated app - prevents remounting from inline render functions
+// This MUST be defined outside of the navigation component to maintain stable reference
+function AuthenticatedAppScreen() {
+  return (
+    <AuthenticatedApp>
+      <AuthenticatedContent />
+    </AuthenticatedApp>
   );
 }
 
@@ -612,13 +622,12 @@ function AppNavigator() {
             </>
           ) : (
             // Authenticated user content wrapped with remaining context providers
-            <Stack.Screen name="AuthenticatedApp" options={{ headerShown: false }}>
-              {() => (
-                <AuthenticatedApp>
-                  <AuthenticatedContent />
-                </AuthenticatedApp>
-              )}
-            </Stack.Screen>
+            // Using a stable component reference to prevent remounting on parent re-renders
+            <Stack.Screen
+              name="AuthenticatedApp"
+              component={AuthenticatedAppScreen}
+              options={{ headerShown: false }}
+            />
           )}
         </Stack.Navigator>
       </OnboardingProvider>

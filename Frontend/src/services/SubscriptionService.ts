@@ -55,6 +55,9 @@ interface RevenueCatError extends Error {
 // Helper function to parse RevenueCat errors and provide user-friendly messages
 function parseRevenueCatError(error: any): { userMessage: string; technicalMessage: string; shouldRetry: boolean } {
   const revenueCatError = error as RevenueCatError;
+  const errorMessage = (revenueCatError.message || '').toLowerCase();
+  const underlyingMessage = (revenueCatError.underlyingErrorMessage || '').toLowerCase();
+  const combinedMessage = `${errorMessage} ${underlyingMessage}`;
 
   // User cancelled the purchase
   if (revenueCatError.userCancelled || revenueCatError.code === 'PURCHASE_CANCELLED_ERROR') {
@@ -65,8 +68,24 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
     };
   }
 
+  // CRITICAL: Handle "already subscribed" error from Apple (AMSServerErrorCode=3532)
+  // This happens when user already has an active subscription and tries to purchase again
+  // Apple returns error code 305 with message "You're currently subscribed to this"
+  // We should treat this as a SUCCESS case - user already has what they're trying to buy!
+  if (combinedMessage.includes('already subscribed') ||
+    combinedMessage.includes('currently subscribed') ||
+    combinedMessage.includes('3532') ||
+    revenueCatError.code === 'PRODUCT_ALREADY_PURCHASED_ERROR') {
+    console.log('ℹ️ User is already subscribed - treating as success');
+    return {
+      userMessage: 'ALREADY_SUBSCRIBED', // Special marker to handle differently
+      technicalMessage: 'User already has an active subscription',
+      shouldRetry: false,
+    };
+  }
+
   // Network errors
-  if (revenueCatError.code === 'NETWORK_ERROR' || (revenueCatError.message || '').toLowerCase().includes('network')) {
+  if (revenueCatError.code === 'NETWORK_ERROR' || combinedMessage.includes('network')) {
     return {
       userMessage: 'No internet connection. Please check your network and try again.',
       technicalMessage: `Network error: ${revenueCatError.message}`,
@@ -76,7 +95,7 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
 
   // Product not available (common in sandbox testing)
   if (revenueCatError.code === 'PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR' ||
-    (revenueCatError.message || '').toLowerCase().includes('product not found')) {
+    combinedMessage.includes('product not found')) {
     return {
       userMessage: 'This subscription is currently unavailable. Please try again later or contact support.',
       technicalMessage: `Product not available: ${revenueCatError.message}`,
@@ -86,8 +105,8 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
 
   // Payment declined
   if (revenueCatError.code === 'PAYMENT_PENDING_ERROR' ||
-    (revenueCatError.message || '').toLowerCase().includes('payment') ||
-    (revenueCatError.message || '').toLowerCase().includes('declined')) {
+    combinedMessage.includes('payment') ||
+    combinedMessage.includes('declined')) {
     return {
       userMessage: 'Payment could not be processed. Please check your payment method and try again.',
       technicalMessage: `Payment error: ${revenueCatError.message}`,
@@ -97,11 +116,26 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
 
   // StoreKit configuration issues (common during App Review)
   if (revenueCatError.code === 'CONFIGURATION_ERROR' ||
-    (revenueCatError.message || '').toLowerCase().includes('configuration') ||
-    (revenueCatError.message || '').toLowerCase().includes('storekit')) {
+    combinedMessage.includes('configuration') ||
+    combinedMessage.includes('storekit')) {
     return {
       userMessage: 'There was a problem with the App Store connection. Please try again in a few moments.',
       technicalMessage: `StoreKit configuration error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // CRITICAL: Handle Apple error 21007 - "Sandbox receipt used in production"
+  // This happens when App Store reviewers test with sandbox accounts
+  // RevenueCat should handle this automatically if configured correctly with App Store Shared Secret
+  if (combinedMessage.includes('21007') ||
+    combinedMessage.includes('sandbox receipt') ||
+    combinedMessage.includes('receipt is from the test environment')) {
+    console.error('🚨 CRITICAL: Apple error 21007 detected - RevenueCat App Store Shared Secret may not be configured');
+    console.error('🚨 Go to RevenueCat Dashboard → Apps → iOS → App Settings → Add your App Store Shared Secret');
+    return {
+      userMessage: 'Purchase verification is being processed. Please wait a moment and try again.',
+      technicalMessage: `Apple 21007 error (sandbox receipt in production): ${revenueCatError.message}. Check RevenueCat App Store Shared Secret configuration.`,
       shouldRetry: true,
     };
   }
@@ -117,20 +151,17 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
 
   // Sandbox/test environment issues (common during App Review)
   // Apple reviewers test with sandbox accounts on production builds
-  // Note: Check this AFTER code-based receipt errors to avoid masking specific error types
-  if ((revenueCatError.message || '').toLowerCase().includes('sandbox') ||
-    (revenueCatError.message || '').toLowerCase().includes('test')) {
-    // During App Review, sandbox errors are expected - provide friendly message
+  if (combinedMessage.includes('sandbox') || combinedMessage.includes('test environment')) {
     console.log('🧪 Sandbox/test environment detected - this is normal during App Review');
     return {
-      userMessage: 'Purchase processing is taking longer than usual. Your subscription will be activated shortly. If this persists, please try again.',
+      userMessage: 'Purchase is being processed. Please wait a moment and try again if needed.',
       technicalMessage: `Sandbox/test processing: ${revenueCatError.message}`,
       shouldRetry: true,
     };
   }
 
   // Generic receipt-related errors (message-based, after more specific checks)
-  if ((revenueCatError.message || '').toLowerCase().includes('receipt')) {
+  if (combinedMessage.includes('receipt')) {
     return {
       userMessage: 'Purchase receipt validation failed. Please try again or contact support if this persists.',
       technicalMessage: `Receipt validation error: ${revenueCatError.message}`,
@@ -347,7 +378,7 @@ class SubscriptionService {
       await Purchases.configure({
         apiKey,
         appUserID: userId,
-        usesStoreKit2IfAvailable: false, // Disabled - StoreKit 2 can cause sandbox receipt validation issues during App Review
+        usesStoreKit2IfAvailable: true, // Enabled - StoreKit 2 handles sandbox/production automatically and matches RevenueCat p8 key configuration
       });
 
       // Enable debug logging in development
@@ -483,21 +514,60 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
+      console.log('🛒 Starting purchase for package:', packageToPurchase.identifier);
+      console.log('📦 Package details:', JSON.stringify({
+        identifier: packageToPurchase.identifier,
+        packageType: packageToPurchase.packageType,
+        product: packageToPurchase.product?.identifier,
+      }));
+
       const { customerInfo, productIdentifier } = await Purchases.purchasePackage(packageToPurchase);
+
+      console.log('✅ Purchase completed successfully:', productIdentifier);
 
       // Clear cache immediately to reflect new subscription status
       this.clearCache();
 
       return { customerInfo, productIdentifier };
-    } catch (error) {
+    } catch (error: any) {
+      // Enhanced error logging for debugging App Review issues
+      console.error('❌ Purchase failed - Full error details:');
+      console.error('  Error code:', error.code);
+      console.error('  Error message:', error.message);
+      console.error('  User cancelled:', error.userCancelled);
+      console.error('  Underlying error:', error.underlyingErrorMessage);
+      console.error('  Full error object:', JSON.stringify(error, null, 2));
+
       const parsedError = parseRevenueCatError(error);
-      console.error('Purchase failed:', parsedError.userMessage);
+      console.error('  Parsed user message:', parsedError.userMessage);
+      console.error('  Parsed technical message:', parsedError.technicalMessage);
+
+      // CRITICAL: Handle "already subscribed" as a success case
+      // This happens when Apple returns error 3532 "You're currently subscribed to this"
+      // We should fetch the current customer info and return it as a successful purchase
+      if (parsedError.userMessage === 'ALREADY_SUBSCRIBED') {
+        console.log('✅ User is already subscribed - fetching current subscription status');
+        try {
+          const customerInfo = await Purchases.getCustomerInfo();
+          console.log('✅ Retrieved customer info for already-subscribed user');
+          // Clear cache to ensure we have fresh subscription data
+          this.clearCache();
+          return {
+            customerInfo,
+            productIdentifier: packageToPurchase.product?.identifier || packageToPurchase.identifier
+          };
+        } catch (fetchError) {
+          console.error('❌ Failed to fetch customer info for already-subscribed user:', fetchError);
+          // Fall through to throw the enhanced error
+        }
+      }
 
       // Re-throw with parsed error information
       const enhancedError = new Error(parsedError.userMessage) as any;
       enhancedError.originalError = error;
       enhancedError.technicalMessage = parsedError.technicalMessage;
       enhancedError.shouldRetry = parsedError.shouldRetry;
+      enhancedError.code = error.code; // Preserve original error code
       throw enhancedError;
     }
   }
