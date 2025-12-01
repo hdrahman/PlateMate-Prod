@@ -9,6 +9,7 @@ node_modules/
 # ✅ Cursor
 # =======================
 .cursor/rules/
+.cursor/mcp.json
 
 # =======================
 # ✅ Expo
