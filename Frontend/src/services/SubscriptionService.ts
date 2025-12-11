@@ -169,10 +169,64 @@ function parseRevenueCatError(error: any): { userMessage: string; technicalMessa
     };
   }
 
-  // Generic unknown error
+  // StoreKit 2 specific errors (iOS 15+)
+  if (combinedMessage.includes('skerror') ||
+    combinedMessage.includes('skpaymentqueue') ||
+    combinedMessage.includes('skproduct') ||
+    combinedMessage.includes('storefront') ||
+    combinedMessage.includes('purchase not allowed')) {
+    console.warn('⚠️ StoreKit error detected:', revenueCatError.message);
+    return {
+      userMessage: 'There was an issue connecting to the App Store. Please ensure you are signed in to your Apple ID in Settings and try again.',
+      technicalMessage: `StoreKit error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // App Store connection issues
+  if (combinedMessage.includes('cannot connect') ||
+    combinedMessage.includes('store connection') ||
+    combinedMessage.includes('app store') && combinedMessage.includes('error')) {
+    return {
+      userMessage: 'Cannot connect to the App Store. Please check your internet connection and Apple ID settings, then try again.',
+      technicalMessage: `App Store connection error: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Purchase not allowed (e.g., parental controls, restrictions)
+  if (combinedMessage.includes('not allowed') ||
+    combinedMessage.includes('restricted') ||
+    combinedMessage.includes('not permitted')) {
+    return {
+      userMessage: 'Purchases are not allowed on this device. Please check your device restrictions in Settings.',
+      technicalMessage: `Purchase not allowed: ${revenueCatError.message}`,
+      shouldRetry: false,
+    };
+  }
+
+  // Unknown product or offering errors
+  if (combinedMessage.includes('unknown product') ||
+    combinedMessage.includes('invalid product') ||
+    combinedMessage.includes('no product') ||
+    combinedMessage.includes('product_not_found')) {
+    return {
+      userMessage: 'This subscription is temporarily unavailable. Please try again in a few minutes.',
+      technicalMessage: `Product not found: ${revenueCatError.message}`,
+      shouldRetry: true,
+    };
+  }
+
+  // Generic unknown error with more helpful message and error code
+  const errorCode = revenueCatError.code || 'UNKNOWN';
+  console.error('⚠️ Unhandled error in parseRevenueCatError:', {
+    code: errorCode,
+    message: revenueCatError.message,
+    underlyingMessage: revenueCatError.underlyingErrorMessage,
+  });
   return {
-    userMessage: 'An unexpected error occurred. Please try again or contact support if this persists.',
-    technicalMessage: `Unknown error: ${revenueCatError.message || 'No error message'}`,
+    userMessage: 'Unable to complete purchase. Please ensure you are signed in to your Apple ID in Settings, then try again. If the problem persists, contact support.',
+    technicalMessage: `Unhandled error [${errorCode}]: ${revenueCatError.message || 'No error message'}`,
     shouldRetry: true,
   };
 }
@@ -514,12 +568,19 @@ class SubscriptionService {
     productIdentifier: string;
   }> {
     try {
-      console.log('🛒 Starting purchase for package:', packageToPurchase.identifier);
-      console.log('📦 Package details:', JSON.stringify({
-        identifier: packageToPurchase.identifier,
+      // Enhanced logging for debugging App Review issues
+      const purchaseContext = {
+        packageId: packageToPurchase.identifier,
         packageType: packageToPurchase.packageType,
-        product: packageToPurchase.product?.identifier,
-      }));
+        productId: packageToPurchase.product?.identifier,
+        productPrice: packageToPurchase.product?.priceString,
+        offeringId: packageToPurchase.offeringIdentifier,
+        platform: Platform.OS,
+        platformVersion: Platform.Version,
+        timestamp: new Date().toISOString(),
+      };
+      console.log('🛒 Starting purchase for package:', packageToPurchase.identifier);
+      console.log('📦 Purchase context:', JSON.stringify(purchaseContext, null, 2));
 
       const { customerInfo, productIdentifier } = await Purchases.purchasePackage(packageToPurchase);
 
