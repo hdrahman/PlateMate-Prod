@@ -200,11 +200,11 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingTop: 40,
         paddingBottom: 100,
+        paddingHorizontal: 20,
     },
     header: {
         alignItems: 'center',
         marginBottom: 40,
-        paddingHorizontal: 20,
     },
     headerIcon: {
         marginBottom: 16,
@@ -225,7 +225,6 @@ const styles = StyleSheet.create({
     },
     inputGroup: {
         marginBottom: 24,
-        paddingHorizontal: 20,
     },
     label: {
         fontSize: 16,
@@ -257,7 +256,6 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     button: {
-        marginHorizontal: 20,
         marginTop: 16,
         borderRadius: 12,
         overflow: 'hidden',
@@ -280,7 +278,7 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'center',
         marginTop: 24,
-        paddingHorizontal: 40,
+        paddingHorizontal: 20,
         lineHeight: 18,
     },
 });

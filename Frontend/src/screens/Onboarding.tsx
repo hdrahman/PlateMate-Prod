@@ -206,25 +206,9 @@ const Onboarding = () => {
                     </TouchableOpacity>
                 )}
             </View>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
-            >
-                {isScrollLockedStep ? (
-                    <View style={[styles.lockedContentContainer, ...contentPaddingStyle]}>
-                        {renderCurrentStep()}
-                    </View>
-                ) : (
-                    <ScrollView
-                        contentContainerStyle={contentPaddingStyle}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                        scrollEnabled={currentStep > 1 && currentStep < 10}
-                    >
-                        {renderCurrentStep()}
-                    </ScrollView>
-                )}
-            </KeyboardAvoidingView>
+            <View style={{ flex: 1 }}>
+                {renderCurrentStep()}
+            </View>
             {error && (
                 <View style={styles.errorContainer}>
                     <Text style={[styles.errorText, { color: theme.colors.text }]}>{error}</Text>

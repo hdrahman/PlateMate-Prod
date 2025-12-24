@@ -119,6 +119,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         paddingTop: 20,
+        paddingHorizontal: 20,
     },
     header: {
         marginBottom: 40,
@@ -180,7 +181,6 @@ const styles = StyleSheet.create({
         marginBottom: 40,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.06)',
-        marginHorizontal: 20,
     },
     infoText: {
         flex: 1,
@@ -192,7 +192,6 @@ const styles = StyleSheet.create({
     button: {
         borderRadius: 12,
         overflow: 'hidden',
-        marginHorizontal: 20,
     },
     buttonGradient: {
         flexDirection: 'row',

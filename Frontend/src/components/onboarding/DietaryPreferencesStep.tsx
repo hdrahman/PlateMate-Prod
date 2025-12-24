@@ -164,6 +164,7 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingTop: 20,
         paddingBottom: 40,
+        paddingHorizontal: 20,
     },
     header: {
         marginBottom: 30,

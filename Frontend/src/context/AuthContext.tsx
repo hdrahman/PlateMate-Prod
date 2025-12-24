@@ -33,7 +33,7 @@ interface AuthContextType {
     user: UserType | null;
     isLoading: boolean;
     isRestoringData: boolean;
-    signUp: (email: string, password: string) => Promise<void>;
+    signUp: (email: string, password: string, displayName?: string) => Promise<any>;
     signIn: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     signInWithGoogle: () => Promise<SocialSignInResult>;

@@ -809,6 +809,7 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingTop: 20,
         paddingBottom: 40,
+        paddingHorizontal: 20,
     },
     header: {
         marginBottom: 32,
@@ -988,7 +989,6 @@ const styles = StyleSheet.create({
         marginBottom: 30,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.06)',
-        marginHorizontal: 20,
     },
     infoText: {
         flex: 1,
@@ -1000,7 +1000,6 @@ const styles = StyleSheet.create({
     buttonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginHorizontal: 20,
     },
     skipButton: {
         padding: 16,
