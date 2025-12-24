@@ -221,6 +221,12 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         return totals;
     };
 
+    // Ref to hold the latest refreshLogs to avoid stale closures in debounced callbacks
+    const refreshLogsRef = useRef(refreshLogs);
+    useEffect(() => {
+        refreshLogsRef.current = refreshLogs;
+    }, [refreshLogs]);
+
     // Callback for when database changes are detected (debounced to prevent excessive refreshes)
     const handleDatabaseChange = useCallback(async () => {
         // Clear any pending debounce timer
@@ -231,13 +237,13 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         // Set a new debounce timer (300ms delay)
         debounceTimerRef.current = setTimeout(async () => {
             console.log('Database change detected, refreshing data');
-            await refreshLogs(currentDateRef.current);
+            await refreshLogsRef.current(currentDateRef.current);
             debounceTimerRef.current = null;
         }, 300);
     }, []);
 
     // Refresh logs for a specific date or today
-    const refreshLogs = async (date?: Date): Promise<void> => {
+    const refreshLogs = useCallback(async (date?: Date): Promise<void> => {
         try {
             // Implement refresh cooldown to prevent excessive manual refreshing
             const now = Date.now();
@@ -310,14 +316,14 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [lastRefreshTime, errorCount, foodLogs.length]);
 
-    // Load today's logs on mount
+    // Load today's logs on mount - only once
     useEffect(() => {
         // Initial load - just once
         const initialLoad = async () => {
             try {
-                await refreshLogs();
+                await refreshLogsRef.current();
                 resetErrorState();
             } catch (error) {
                 console.error("Initial load failed:", error);
@@ -336,10 +342,11 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
                 debounceTimerRef.current = null;
             }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Force a single refresh (for manual actions)
-    const forceSingleRefresh = async () => {
+    const forceSingleRefresh = useCallback(async () => {
         try {
             // No need to set loading state for manual refreshes
             // Keeps previous values during refresh to avoid flickering
@@ -364,14 +371,14 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
             console.error("Forced refresh failed:", error);
             setHasError(true);
         }
-    };
+    }, [resetErrorState]);
 
     // Start watching food logs
     const startWatchingFoodLogs = useCallback(() => {
         if (isWatching) return;
 
         console.log('Starting database watch');
-        const unsubscribe = subscribeToDatabaseChanges(handleDatabaseChange);
+        const unsubscribe = subscribeToDatabaseChanges(handleDatabaseChange, ['food_logs']);
         unsubscribeRef.current = unsubscribe;
         setIsWatching(true);
     }, [isWatching, handleDatabaseChange]);
@@ -387,7 +394,7 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
     }, [isWatching]);
 
     // Get logs for a specific date
-    const getLogsByDate = async (date: Date): Promise<FoodLogEntry[]> => {
+    const getLogsByDate = useCallback(async (date: Date): Promise<FoodLogEntry[]> => {
         try {
             const dateStr = formatDateToString(date);
             const logs = await getLocalFoodLogsByDate(dateStr) as FoodLogEntry[];
@@ -397,10 +404,10 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
             setHasError(true);
             return [];
         }
-    };
+    }, []);
 
     // Get nutrient totals for a specific date
-    const getTotalsByDate = async (date: Date): Promise<NutrientTotals> => {
+    const getTotalsByDate = useCallback(async (date: Date): Promise<NutrientTotals> => {
         try {
             const logs = await getLogsByDate(date);
             return calculateTotals(logs);
@@ -409,10 +416,10 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
             setHasError(true);
             return emptyTotals;
         }
-    };
+    }, [getLogsByDate]);
 
     // Add a new food log entry
-    const addFoodLog = async (foodLog: Omit<FoodLogEntry, 'id'>): Promise<number | undefined> => {
+    const addFoodLog = useCallback(async (foodLog: Omit<FoodLogEntry, 'id'>): Promise<number | undefined> => {
         // Immediately navigate the user to the FoodLog screen so they can see the new entry
         navigateToFoodLog();
 
@@ -462,7 +469,7 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
             // Notify other components in the background
             setTimeout(async () => {
                 try {
-                    await notifyDatabaseChanged();
+                    await notifyDatabaseChanged({ tables: ['food_logs'] });
                 } catch (notifyError) {
                     console.error('Error notifying database changes:', notifyError);
                     // Continue anyway
@@ -484,7 +491,7 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
 
             return undefined;
         }
-    };
+    }, [forceSingleRefresh, resetErrorState]);
 
     // Memoize context value to prevent unnecessary re-renders
     const contextValue = React.useMemo(() => ({

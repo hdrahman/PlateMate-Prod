@@ -77,7 +77,7 @@ class UnifiedStepTracker {
 
     private async initialize(): Promise<void> {
         try {
-    
+
             // Set up app state listener
             try {
                 this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
@@ -125,7 +125,7 @@ class UnifiedStepTracker {
                 // Android: Check existing permissions
                 const activityGranted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION);
                 this.state.hasPermissions = activityGranted;
-                
+
                 // Check native step counter availability
                 try {
                     this.state.nativeStepCounterAvailable = await NativeStepCounter.isAvailable();
@@ -160,7 +160,7 @@ class UnifiedStepTracker {
                 const activityGranted = granted[PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION] === PermissionsAndroid.RESULTS.GRANTED;
 
                 this.state.hasPermissions = activityGranted;
-                
+
                 // Check native step counter availability
                 try {
                     this.state.nativeStepCounterAvailable = await NativeStepCounter.isAvailable();
@@ -241,7 +241,7 @@ class UnifiedStepTracker {
         // Check every 30 seconds for better reliability
         this.midnightResetInterval = setInterval(checkTimeAndReset, 30000);
         console.log('⏰ Improved midnight reset timer started (checks every 30 seconds)');
-        
+
         // Also do an immediate check
         setTimeout(checkTimeAndReset, 1000);
     }
@@ -254,7 +254,7 @@ class UnifiedStepTracker {
             const resetStartTime = new Date();
             console.log('🌅 STARTING MIDNIGHT RESET...');
             console.log(`🌅 Reset triggered at: ${resetStartTime.toLocaleString()}`);
-            
+
             const { formatDateToString } = await import('../utils/dateUtils');
             const today = formatDateToString(new Date());
             const previousSteps = this.state.currentSteps;
@@ -316,7 +316,7 @@ class UnifiedStepTracker {
         try {
             const { formatDateToString } = await import('../utils/dateUtils');
             const today = formatDateToString(new Date());
-            
+
             // Try multiple data sources with retry logic
             let dbSteps = 0;
             let savedSteps = 0;
@@ -362,7 +362,7 @@ class UnifiedStepTracker {
 
             // Choose the highest reliable value with validation
             const candidates = [savedSteps, dbSteps, sensorSteps].filter(val => val > 0);
-            
+
             if (candidates.length > 0) {
                 this.state.currentSteps = Math.max(...candidates);
                 console.log(`✅ Loaded previous state: ${this.state.currentSteps} steps (from ${candidates.length} sources)`);
@@ -398,26 +398,26 @@ class UnifiedStepTracker {
             // App becoming active - perform recovery with debouncing
             const now = Date.now();
             const timeSinceLastRecovery = now - this.lastAppResumeRecovery;
-            
+
             // Prevent recovery spam - minimum 5 seconds between recoveries
             if (timeSinceLastRecovery < 5000) {
                 console.log(`⚠️ App resume recovery debounced (${timeSinceLastRecovery}ms since last recovery)`);
                 return;
             }
-            
+
             // Prevent concurrent recoveries
             if (this.isRecoveryRunning) {
                 console.log('⚠️ App resume recovery already running, skipping...');
                 return;
             }
-            
+
             // CRITICAL: Check for date change when app resumes
             // This catches cases where the app was backgrounded overnight
             console.log('📱 App resumed - checking for date changes...');
             this.checkDateAndResetIfNeeded().catch(error => {
                 console.error('❌ Date check failed on app resume:', error);
             });
-            
+
             this.performAppResumeRecovery();
         }
     }
@@ -475,7 +475,7 @@ class UnifiedStepTracker {
                 const preRecoverySteps = this.state.currentSteps;
                 await this.syncFromSensor();
                 const sensorSteps = this.state.currentSteps;
-                
+
                 // Only count sensor reading if it's different from what we had
                 if (sensorSteps !== preRecoverySteps && sensorSteps > 0) {
                     stepSources.push({ name: 'sensor', steps: sensorSteps });
@@ -486,14 +486,14 @@ class UnifiedStepTracker {
 
             // 2. Choose the most recent/highest valid value
             if (stepSources.length > 0) {
-                const highestSource = stepSources.reduce((max, current) => 
+                const highestSource = stepSources.reduce((max, current) =>
                     current.steps > max.steps ? current : max
                 );
-                
+
                 recoveredSteps = highestSource.steps;
                 console.log(`📊 Recovery sources found: ${stepSources.map(s => `${s.name}:${s.steps}`).join(', ')}`);
                 console.log(`✅ Using highest value: ${highestSource.steps} from ${highestSource.name}`);
-                
+
                 // Update state if we found a higher value
                 if (recoveredSteps > currentDisplayedSteps) {
                     console.log(`📈 Step count increased from ${currentDisplayedSteps} to ${recoveredSteps} during recovery`);
@@ -528,14 +528,14 @@ class UnifiedStepTracker {
             // 5. Trigger food log refresh by notifying of database change
             try {
                 const { notifyDatabaseChanged } = await import('../utils/databaseWatcher');
-                await notifyDatabaseChanged();
+                await notifyDatabaseChanged({ tables: ['exercises'] });
                 console.log('✅ Food log refresh triggered during recovery');
             } catch (error) {
                 console.warn('⚠️ Failed to trigger food log refresh during recovery:', error);
             }
 
             console.log('✅ App resume recovery completed');
-            
+
             // Additional safety check: Verify date consistency after recovery
             try {
                 console.log('🔍 Final safety check - verifying date consistency...');
@@ -543,7 +543,7 @@ class UnifiedStepTracker {
             } catch (error) {
                 console.error('❌ Final date consistency check failed:', error);
             }
-            
+
         } catch (error) {
             console.error('❌ App resume recovery failed:', error);
         } finally {
@@ -559,7 +559,7 @@ class UnifiedStepTracker {
 
         try {
             console.log('🚀 Starting unified step tracking...');
-            
+
             // Initialize if not already done
             if (!this.appStateSubscription) {
                 console.log('🔧 Performing deferred initialization...');
@@ -569,13 +569,13 @@ class UnifiedStepTracker {
             // Check if tracking was previously enabled and if we have permissions
             try {
                 const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
-                
+
                 if (wasEnabled === 'true') {
                     console.log('🔄 Step tracking was previously enabled, checking permissions...');
-                    
+
                     // Check if we already have permissions without requesting them
                     await this.checkExistingPermissions();
-                    
+
                     if (this.state.hasPermissions) {
                         console.log('✅ Permissions already granted, restarting step tracking');
                     }
@@ -630,13 +630,13 @@ class UnifiedStepTracker {
                     if (!started) {
                         throw new Error('Failed to start native step counter');
                     }
-                    
+
                     // Set up listener for native step counter events
                     this.pedometerSubscription = NativeStepCounter.addStepListener((data) => {
                         console.log('📊 Native step update:', data.steps);
                         this.updateStepCount(data.steps);
                     });
-                    
+
                     console.log('✅ Native Android step counter started');
                 } else {
                     throw new Error('Native step counter not available');
@@ -703,15 +703,15 @@ class UnifiedStepTracker {
                 console.warn('⚠️ Notification circuit breaker active - skipping update');
                 return;
             }
-            
+
             await StepNotificationService.updateNotification(this.state.currentSteps);
-            
+
             // Reset error count on success
             this.notificationErrorCount = 0;
         } catch (error) {
             console.error('❌ Error updating step notification:', error);
             this.notificationErrorCount++;
-            
+
             // If we hit too many errors, log it
             if (this.notificationErrorCount > 10) {
                 console.error('🛑 Too many notification failures - circuit breaker activated');
@@ -732,31 +732,31 @@ class UnifiedStepTracker {
                 console.warn('⚠️ [ANR PREVENTION] Skipping notification update - previous one still running');
                 return;
             }
-            
+
             // Move heavy operations off main thread to prevent ANR
             setTimeout(async () => {
                 if (this.isNotificationUpdateRunning) {
                     console.warn('⚠️ [ANR PREVENTION] Double-execution prevented');
                     return;
                 }
-                
+
                 this.isNotificationUpdateRunning = true;
                 const startTime = performance.now();
-                
+
                 try {
                     console.log('🔍 [ANR DEBUG] Starting notification update cycle');
                     const previousSteps = this.state.currentSteps;
-                    
+
                     // Sync latest step count from sensor
                     await this.syncFromSensor();
-                    
+
                     // Only update notification if steps changed or every 2 minutes to keep it alive
                     const stepChanged = this.state.currentSteps !== previousSteps;
                     const shouldUpdate = stepChanged || (Date.now() % 120000 < 15000); // Every 2 minutes
-                    
+
                     if (shouldUpdate) {
                         await this.updateNotification();
-                        
+
                         if (stepChanged) {
                             console.log(`🔄 Notification updated - steps changed: ${previousSteps} → ${this.state.currentSteps}`);
                         } else {
@@ -769,11 +769,11 @@ class UnifiedStepTracker {
                     const endTime = performance.now();
                     const duration = endTime - startTime;
                     console.log(`🔍 [ANR DEBUG] Notification cycle completed in ${duration.toFixed(2)}ms`);
-                    
+
                     if (duration > 10000) {
                         console.error(`🚨 [ANR CRITICAL] Update took ${duration.toFixed(2)}ms - ANR risk!`);
                     }
-                    
+
                     this.isNotificationUpdateRunning = false;
                 }
             }, 0);
@@ -811,12 +811,12 @@ class UnifiedStepTracker {
         }
 
         const previousSteps = this.state.currentSteps;
-        
+
         // Check for reasonable step increase (prevent massive jumps that might indicate errors)
         const stepIncrease = steps - previousSteps;
         if (stepIncrease > 10000 && previousSteps > 0) {
             console.warn(`⚠️ Large step increase detected: ${stepIncrease} steps. Validating...`);
-            
+
             // For large increases, we should validate against multiple sources
             // This is a safety check to prevent erroneous data from corrupting the count
             if (stepIncrease > 50000) {
@@ -938,7 +938,7 @@ class UnifiedStepTracker {
         trackingMethod: string;
     } {
         let trackingMethod = 'none';
-        
+
         if (Platform.OS === 'android') {
             if (this.state.nativeStepCounterAvailable) {
                 trackingMethod = 'native-android-sensor';
@@ -959,17 +959,17 @@ class UnifiedStepTracker {
     public addListener(callback: (steps: number) => void): () => void {
         if (!this.state.isInitialized) {
             console.warn('⚠️ addListener called before initialization complete, deferring...');
-            
+
             // Instead of failing, defer the listener setup
             const deferredSetup = async () => {
                 let retries = 0;
                 const maxRetries = 30;
-                
+
                 while (!this.state.isInitialized && retries < maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, 200));
                     retries++;
                 }
-                
+
                 if (this.state.isInitialized) {
                     this.listeners.add(callback);
                     console.log('✅ Deferred listener setup completed successfully');
@@ -977,15 +977,15 @@ class UnifiedStepTracker {
                     console.error('❌ Failed to setup deferred listener - tracker never initialized');
                 }
             };
-            
+
             deferredSetup();
-            
+
             // Return cleanup function that removes the listener when it's eventually added
             return () => this.listeners.delete(callback);
         }
-        
+
         this.listeners.add(callback);
-        
+
         // Immediately notify with current step count if available
         if (this.state.currentSteps > 0) {
             setTimeout(() => {
@@ -996,7 +996,7 @@ class UnifiedStepTracker {
                 }
             }, 0);
         }
-        
+
         return () => this.listeners.delete(callback);
     }
 

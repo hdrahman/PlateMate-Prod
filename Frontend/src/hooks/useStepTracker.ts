@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import UnifiedStepTracker from '../services/UnifiedStepTracker';
 import StepEventBus from '../services/StepEventBus';
@@ -51,7 +51,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             try {
                 // Start with immediate loading from available sources
                 let initialSteps = 0;
-                
+
                 // Try to get cached steps immediately (fastest) - use correct key
                 try {
                     const cached = await AsyncStorage.getItem('UNIFIED_LAST_STEP_COUNT');
@@ -69,11 +69,11 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
                 // Show cached data immediately, sync in background
                 let finalSteps = initialSteps;
-                
+
                 // Set initial history with cached data right away
                 const today = formatDateToString(new Date());
                 setStepHistory([{ date: today, steps: initialSteps }]);
-                
+
                 // If tracker isn't initialized yet, continue with cached data
                 if (!UnifiedStepTracker.isInitialized()) {
                     console.log('📱 Using cached steps while tracker initializes in background');
@@ -82,12 +82,12 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
                         // Give tracker time to initialize in background
                         let retries = 0;
                         const maxRetries = 10; // Reduced retries, non-blocking
-                        
+
                         while (!UnifiedStepTracker.isInitialized() && retries < maxRetries) {
                             await new Promise(resolve => setTimeout(resolve, 100));
                             retries++;
                         }
-                        
+
                         if (UnifiedStepTracker.isInitialized()) {
                             // Update with tracker data when ready
                             const trackerSteps = UnifiedStepTracker.getCurrentSteps();
@@ -103,15 +103,15 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
                 // Get authoritative steps from tracker
                 const trackerSteps = UnifiedStepTracker.getCurrentSteps();
-                
+
                 // Use the higher value between cached and tracker
                 finalSteps = Math.max(initialSteps, trackerSteps);
-                
+
                 if (finalSteps !== initialSteps) {
                     setTodaySteps(finalSteps);
                     console.log(`📊 Updated steps from tracker: ${initialSteps} → ${finalSteps}`);
                 }
-                
+
                 // Force a sync to ensure we have latest data
                 try {
                     await UnifiedStepTracker.forceSync();
@@ -127,7 +127,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
                 // Update step history with final synced data
                 setStepHistory([{ date: today, steps: finalSteps }]);
-                
+
                 console.log('✅ Step data loaded successfully');
             } catch (error) {
                 console.error('❌ Error loading step data:', error);
@@ -147,11 +147,11 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
     // Simple direct step counter subscription (replicates notification approach)
     useEffect(() => {
         let mounted = true;
-        
+
         // Direct subscription to EventBus - no complex initialization needed
         const unsubscribe = StepEventBus.subscribe((steps) => {
             if (!mounted) return; // Don't update if component unmounted
-            
+
             console.log(`📱 Direct step update received: ${steps}`);
             setTodaySteps(steps);
 
@@ -176,7 +176,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         if (UnifiedStepTracker.isInitialized()) {
             setIsTracking(UnifiedStepTracker.isTracking());
         }
-        
+
         console.log('✅ Direct step subscription set up successfully');
 
         // Simple cleanup on unmount
@@ -187,7 +187,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
     }, []);
 
     // Start tracking steps
-    const startTracking = async () => {
+    const startTracking = useCallback(async () => {
         if (!isAvailable) {
             console.warn('⚠️ Step tracking not available on this device');
             return;
@@ -205,10 +205,10 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         } catch (error) {
             console.error('❌ Error starting step tracking from hook:', error);
         }
-    };
+    }, [isAvailable]);
 
     // Stop tracking steps
-    const stopTracking = async () => {
+    const stopTracking = useCallback(async () => {
         if (!UnifiedStepTracker.isInitialized()) {
             console.warn('⚠️ UnifiedStepTracker not initialized, cannot stop tracking');
             return;
@@ -221,10 +221,10 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         } catch (error) {
             console.error('❌ Error stopping step tracking from hook:', error);
         }
-    };
+    }, []);
 
     // Refresh step data (useful when steps are manually added)
-    const refreshStepData = async () => {
+    const refreshStepData = useCallback(async () => {
         if (!UnifiedStepTracker.isInitialized()) {
             console.warn('⚠️ UnifiedStepTracker not initialized, cannot refresh data');
             return;
@@ -232,7 +232,7 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
 
         try {
             console.log('🔄 Refreshing step data...');
-            
+
             // Get updated today's steps
             const steps = UnifiedStepTracker.getCurrentSteps();
             setTodaySteps(steps);
@@ -241,20 +241,21 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
             const today = formatDateToString(new Date());
             const history = [{ date: today, steps }];
             setStepHistory(history);
-            
+
             console.log('✅ Step data refreshed');
         } catch (error) {
             console.error('❌ Error refreshing step data:', error);
         }
-    };
+    }, []);
 
     // Set calorie goal for notifications (simplified - UnifiedStepTracker doesn't have this method)
-    const setCalorieGoal = async (calories: number) => {
+    const setCalorieGoal = useCallback(async (calories: number) => {
         // UnifiedStepTracker focuses on step counting, not calorie goals
         console.log('Calorie goal setting not implemented in UnifiedStepTracker');
-    };
+    }, []);
 
-    return {
+    // Memoize the return value to prevent unnecessary re-renders
+    return useMemo(() => ({
         todaySteps,
         stepHistory,
         isAvailable,
@@ -264,5 +265,15 @@ export default function useStepTracker(historyDays: number = 7): UseStepTrackerR
         refreshStepData,
         setCalorieGoal,
         loading
-    };
+    }), [
+        todaySteps,
+        stepHistory,
+        isAvailable,
+        isTracking,
+        startTracking,
+        stopTracking,
+        refreshStepData,
+        setCalorieGoal,
+        loading
+    ]);
 } 

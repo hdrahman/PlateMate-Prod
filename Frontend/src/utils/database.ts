@@ -694,7 +694,7 @@ export const addFoodLog = async (foodData: {
 
         // Trigger notification for observers
         try {
-            await notifyDatabaseChanged();
+            await notifyDatabaseChanged({ tables: ['food_logs'] });
         } catch (notifyError) {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
@@ -786,7 +786,7 @@ export const updateFoodLog = async (id: number, updates: any) => {
 
         // Trigger notification for observers
         try {
-            await notifyDatabaseChanged();
+            await notifyDatabaseChanged({ tables: ['food_logs'] });
         } catch (notifyError) {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
@@ -839,7 +839,7 @@ export const deleteFoodLog = async (id: number) => {
 
         // Trigger notification for observers
         try {
-            await notifyDatabaseChanged();
+            await notifyDatabaseChanged({ tables: ['food_logs'] });
         } catch (notifyError) {
             console.error('⚠️ Error notifying database observers:', notifyError);
             // Continue anyway - the operation succeeded
@@ -1166,7 +1166,7 @@ export const addExercise = async (exercise: any) => {
         console.log('✅ Exercise added successfully:', result);
 
         // Emit change notification
-        notifyDatabaseChanged();
+        notifyDatabaseChanged({ tables: ['exercises'] });
 
         // Check and update streak for the user
         if (firebaseUserId && firebaseUserId !== 'anonymous') {
@@ -1295,7 +1295,7 @@ export const syncStepsWithExerciseLog = async (stepCount: number, date: string) 
         }
 
         // Emit change notification
-        notifyDatabaseChanged();
+        notifyDatabaseChanged({ tables: ['exercises'] });
 
         console.log(`🔄 ✅ Step-to-exercise sync completed for ${normalizedDate}`);
         return true;
@@ -1338,7 +1338,7 @@ export const addWaterIntake = async (amountMl: number, containerType: string = '
         console.log(`✅ Water intake added: ${amountMl}ml (${containerType})`);
 
         // Trigger database change notification
-        await notifyDatabaseChanged('addWaterIntake');
+        await notifyDatabaseChanged({ tables: ['water_intake'] });
 
         return result;
     } catch (error) {
@@ -1415,7 +1415,7 @@ export const deleteWaterIntake = async (id: number) => {
         await db.runAsync('DELETE FROM water_intake WHERE id = ?', [id]);
 
         // Trigger database change notification
-        await notifyDatabaseChanged('deleteWaterIntake');
+        await notifyDatabaseChanged({ tables: ['water_intake'] });
 
         console.log(`✅ Water intake deleted: ${id}`);
         return true;
@@ -2555,7 +2555,7 @@ export const updateUserGoals = async (firebaseUid: string, goals: UserGoals): Pr
         await updateUserProfile(firebaseUid, profileUpdates);
 
         // Notify listeners of the change
-        notifyDatabaseChanged();
+        notifyDatabaseChanged({ tables: ['user_profiles'] });
 
         console.log('✅ User goals updated successfully');
     } catch (error) {
@@ -3098,7 +3098,7 @@ export const addWeightEntryLocal = async (firebaseUid: string, weight: number, i
 
         // Only notify if this is a manual weight entry or if there was an actual change
         if (!isAutomatic && shouldNotify) {
-            notifyDatabaseChanged('weight_entry');
+            notifyDatabaseChanged({ tables: ['user_weights'] });
         }
     } catch (error) {
         console.error('❌ Error adding weight entry:', error);
@@ -3181,7 +3181,7 @@ export const clearWeightHistoryLocal = async (firebaseUid: string): Promise<void
         });
 
         console.log(`✅ Cleared weight history, kept ${idsToKeep.length} entries`);
-        notifyDatabaseChanged();
+        notifyDatabaseChanged({ tables: ['user_weights'] });
     } catch (error) {
         console.error('❌ Error clearing weight history:', error);
         throw error;
@@ -3753,7 +3753,7 @@ export const addMultipleFoodLogs = async (foodLogs: any[]) => {
         // Use setTimeout to avoid blocking and potential deadlocks
         setTimeout(async () => {
             try {
-                await notifyDatabaseChanged();
+                await notifyDatabaseChanged({ tables: ['food_logs'] });
             } catch (notifyError) {
                 console.warn('⚠️ Failed to notify database listeners:', notifyError);
             }
@@ -4934,7 +4934,7 @@ export const clearOldestMealImages = async (count: number): Promise<number> => {
         console.log(`✅ Cleared ${result.changes} food log entries`);
 
         // Notify any listeners that the database has changed
-        notifyDatabaseChanged();
+        await notifyDatabaseChanged({ tables: ['food_logs'] });
 
         return oldestMeals.length;
     } catch (error) {

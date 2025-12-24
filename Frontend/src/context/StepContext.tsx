@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
 import useStepTracker, { StepHistoryItem, UseStepTrackerResult } from '../hooks/useStepTracker';
 
 // Create the context with a default value
@@ -17,8 +17,22 @@ const StepContext = createContext<UseStepTrackerResult>({
 export const StepProvider = ({ children }: { children: ReactNode }) => {
     const stepTracker = useStepTracker();
 
+    // Memoize the context value to prevent unnecessary re-renders of consumers
+    // Only re-create when actual data values change
+    const contextValue = useMemo(() => stepTracker, [
+        stepTracker.todaySteps,
+        stepTracker.stepHistory,
+        stepTracker.isAvailable,
+        stepTracker.isTracking,
+        stepTracker.loading,
+        stepTracker.startTracking,
+        stepTracker.stopTracking,
+        stepTracker.refreshStepData,
+        stepTracker.setCalorieGoal
+    ]);
+
     return (
-        <StepContext.Provider value={stepTracker}>
+        <StepContext.Provider value={contextValue}>
             {children}
         </StepContext.Provider>
     );

@@ -1,197 +1,147 @@
 // databaseWatcher.ts
-// This file provides a purely event-driven notification system for database changes
-// It avoids timer-based polling for better performance and resource usage
+// This file provides an event-driven notification system for database changes
+// with support for table-specific subscriptions to minimize unnecessary re-renders.
 
-type DatabaseChangeListener = () => void;
+type DatabaseChangeListenerCallback = () => void | Promise<void>;
 
-// Store for all registered listeners
-const listeners: Set<DatabaseChangeListener> = new Set();
+// Store for all registered listeners and their specific table interests
+// Key: Listener function
+// Value: Array of table names to listen for (e.g., ['food_logs', 'water_intake'])
+//        OR null to listen for ALL changes (legacy behavior)
+const listeners: Map<DatabaseChangeListenerCallback, string[] | null> = new Map();
 
-// Debouncing and loop prevention - increased debounce for better performance
+// Debouncing and loop prevention
 let isNotifying = false;
 let notificationTimeout: NodeJS.Timeout | null = null;
-const DEBOUNCE_MS = 1000; // 1000ms debounce (increased from 500ms for better performance)
+const DEBOUNCE_MS = 1000;
+
+// Accumulate changed tables during debounce period
+let pendingChangedTables: Set<string> | null = new Set(); // null means "all tables/unknown"
+
+// Interface for notification options
+export interface NotificationOptions {
+    tables?: string[]; // Optional list of tables that changed
+}
 
 /**
- * Notify all registered listeners that the database has changed
- * This is called by database.ts functions after successful modifications
+ * Notify listeners that the database has changed.
+ * 
+ * @param options Object containing details about what changed (e.g., { tables: ['food_logs'] })
+ *                If options.tables is omitted, it is treated as a generic "everything changed" event.
  */
-export const notifyDatabaseChanged = async (source?: string): Promise<void> => {
-    // Prevent infinite loops by debouncing notifications
-    if (isNotifying) {
-        console.log('🔄 Skipping notification - already in progress');
-        return;
+export const notifyDatabaseChanged = async (options?: NotificationOptions | string): Promise<void> => {
+    // Handle legacy string argument (source) if passed (though we prefer object now)
+    const tables = (typeof options === 'object' && options.tables) ? options.tables : undefined;
+
+    // Add tables to the pending set
+    if (tables) {
+        // If we haven't already fallen back to "all tables" (null), add specific tables
+        if (pendingChangedTables !== null) {
+            tables.forEach(t => pendingChangedTables!.add(t));
+        }
+    } else {
+        // If no specific tables provided, marks as "all/unknown" change
+        pendingChangedTables = null;
     }
 
-    // Clear any pending notification
+    // Clear any pending notification timer to restart debounce
     if (notificationTimeout) {
         clearTimeout(notificationTimeout);
     }
 
-    // Debounce notifications to prevent rapid-fire changes
+    // Debounce notifications
     notificationTimeout = setTimeout(async () => {
+        if (isNotifying) {
+            console.log('🔄 Skipping notification - already in progress');
+            return;
+        }
+
         isNotifying = true;
 
         try {
-            console.log(`🔔 Notifying ${listeners.size} database change listeners${source ? ` (source: ${source})` : ''}`);
+            const affectedTables = pendingChangedTables ? Array.from(pendingChangedTables) : 'ALL';
+            console.log(`🔔 Notifying database change listeners. Affected tables: ${JSON.stringify(affectedTables)}`);
 
-            // Execute all listeners
-            listeners.forEach(listener => {
-                try {
-                    listener();
-                } catch (error) {
-                    console.error('❌ Error in database change listener:', error);
+            // Execute eligible listeners
+            // We need to clone the listeners to avoid concurrent modification issues if a listener unsubscribes during execution
+            const listenersToNotify = new Map(listeners);
+
+            listenersToNotify.forEach((subscribedTables, listener) => {
+                let shouldNotify = false;
+
+                if (pendingChangedTables === null) {
+                    // Global change occurred -> Notify everyone
+                    shouldNotify = true;
+                } else if (!subscribedTables) {
+                    // Listener wants everything -> Notify
+                    shouldNotify = true;
+                } else {
+                    // Listener wants specific tables -> Check intersection
+                    // If ANY of the changed tables matches ANY of the subscribed tables -> Notify
+                    for (const changedTable of pendingChangedTables) {
+                        if (subscribedTables.includes(changedTable)) {
+                            shouldNotify = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldNotify) {
+                    try {
+                        const result = listener();
+                        if (result instanceof Promise) {
+                            result.catch(err => console.error('❌ Error in async database change listener:', err));
+                        }
+                    } catch (error) {
+                        console.error('❌ Error in database change listener:', error);
+                    }
                 }
             });
         } finally {
             isNotifying = false;
+            // Reset pending tables for next batch
+            pendingChangedTables = new Set();
         }
     }, DEBOUNCE_MS);
 };
 
 /**
- * Subscribe to database changes
+ * Subscribe to database changes.
+ * 
  * @param listener Function to call when database changes
+ * @param tables Optional array of table names to listen for. If omitted, listens to ALL changes.
  * @returns Function to unsubscribe
  */
-export const subscribeToDatabaseChanges = (listener: DatabaseChangeListener): () => void => {
-    console.log('📲 Adding database change listener');
-    listeners.add(listener);
+export const subscribeToDatabaseChanges = (
+    listener: DatabaseChangeListenerCallback,
+    tables?: string[]
+): () => void => {
+    const tableLog = tables ? `[${tables.join(', ')}]` : 'ALL';
+    console.log(`📲 Adding database change listener for tables: ${tableLog}`);
 
-    // Return unsubscribe function for convenience
+    listeners.set(listener, tables || null);
+
+    // Return unsubscribe function
     return () => unsubscribeFromDatabaseChanges(listener);
 };
 
 /**
  * Unsubscribe from database changes
- * @param listener Function to remove from notification list
+ * @param listener Function to remove
  */
-export const unsubscribeFromDatabaseChanges = (listener: DatabaseChangeListener): void => {
+export const unsubscribeFromDatabaseChanges = (listener: DatabaseChangeListenerCallback): void => {
     console.log('📴 Removing database change listener');
     listeners.delete(listener);
 };
 
-// Helper to format date as YYYY-MM-DD
-function formatDateToString(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-// Compare logs to detect changes - returns true if changes found
-function haveLogsChanged(oldLogs: any[] = [], newLogs: any[] = []): boolean {
-    // If length changed, there's definitely a change
-    if (!oldLogs || !newLogs || oldLogs.length !== newLogs.length) {
-        return true;
-    }
-
-    // Sort logs by ID to ensure consistent comparison
-    const sortById = (a: any, b: any) => (a.id || 0) - (b.id || 0);
-    const sortedOldLogs = [...oldLogs].sort(sortById);
-    const sortedNewLogs = [...newLogs].sort(sortById);
-
-    // Compare all logs by ID and last_modified
-    for (let i = 0; i < sortedOldLogs.length; i++) {
-        const oldLog = sortedOldLogs[i];
-        const newLog = sortedNewLogs[i];
-
-        // If IDs don't match or last_modified changed, there's a change
-        if (
-            oldLog.id !== newLog.id ||
-            oldLog.last_modified !== newLog.last_modified
-        ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-// Check for database changes
-async function checkForChanges(): Promise<void> {
-    try {
-        // Only check today's logs for efficiency
-        const today = new Date();
-        const dateString = formatDateToString(today);
-
-        // Get the current state of logs
-        const currentLogs = await getFoodLogsByDate(dateString);
-
-        // If there's no previous state or the logs have changed
-        if (!lastLogs[dateString] || haveLogsChanged(lastLogs[dateString], currentLogs)) {
-            console.log('🔄 Database changes detected, notifying watchers');
-
-            // Update the cached state
-            lastLogs[dateString] = currentLogs;
-
-            // Notify all listeners
-            if (listeners.size > 0) {
-                await Promise.all(
-                    Array.from(listeners).map(listener => {
-                        try {
-                            return listener();
-                        } catch (error) {
-                            console.error('Error in database change listener:', error);
-                            return Promise.resolve();
-                        }
-                    })
-                );
-            }
-        }
-    } catch (error) {
-        console.error('Error checking for database changes:', error);
-    }
-}
-
-// Start polling for changes
-function startPolling(): void {
-    if (isPollingActive) return;
-
-    console.log('🔄 Starting database watch polling');
-    pollingInterval = setInterval(checkForChanges, POLLING_INTERVAL);
-    isPollingActive = true;
-}
-
-// Stop polling
-function stopPolling(): void {
-    if (!isPollingActive || !pollingInterval) return;
-
-    console.log('🔄 Stopping database watch polling');
-    clearInterval(pollingInterval);
-    pollingInterval = null;
-    isPollingActive = false;
-}
-
-// Manual trigger for database change notification (useful after CRUD operations)
+/**
+ * Manual trigger primarily for testing or legacy calls
+ */
 export async function notifyDatabaseChangedManually(): Promise<void> {
-    // Force refresh of the cache for today's date
-    const today = new Date();
-    const dateString = formatDateToString(today);
-    lastLogs[dateString] = await getFoodLogsByDate(dateString);
-
-    // Notify all listeners
-    if (listeners.size > 0) {
-        console.log(`🔄 Manually notifying ${listeners.size} database watchers`);
-        await Promise.all(
-            Array.from(listeners).map(listener => {
-                try {
-                    return listener();
-                } catch (error) {
-                    console.error('Error in database change listener:', error);
-                    return Promise.resolve();
-                }
-            })
-        );
-    }
+    await notifyDatabaseChanged(); // Generic update
 }
 
-// Last known database state
-let lastLogs: Record<string, any[]> = {};
-
-// Polling interval (in milliseconds) - increased for better performance
-const POLLING_INTERVAL = 30000; // 30 seconds, reduced frequency to prevent database locking conflicts and improve performance
-
-// Track if polling is active
-let pollingInterval: NodeJS.Timeout | null = null;
-let isPollingActive = false; 
+// Deprecated polling methods - strictly no-op now to prevent event storms
+// Keeping them exported but empty to avoid breaking legacy imports that might call them
+export const startPolling = () => { console.log('Polling is deprecated and disabled'); };
+export const stopPolling = () => { };
