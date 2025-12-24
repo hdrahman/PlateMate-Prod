@@ -377,7 +377,7 @@ async def upload_image(
         try:
             # Define analyze_food_image function inline
             async def analyze_food_image(image_data, mime_type):
-                """Analyzes a food image using OpenAI's GPT-4o model."""
+                """Analyzes a food image using OpenAI's GPT-5.2 model."""
                 api_start_time = time.time()
                 content = [
                     {"type": "text", "text": "Analyze this food image and provide nutrition data. CRITICAL: Respond with ONLY a valid JSON array - no explanatory text, no markdown formatting, no code blocks. Just the raw JSON array starting with [ and ending with ]."},
@@ -389,7 +389,7 @@ async def upload_image(
                 
                 print(f"📤 Sending request to OpenAI API")
                 response = await client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-5.2-2025-12-11",
                     messages=[
                         {
                             "role": "system",
@@ -727,7 +727,7 @@ Use this context to guide identification and portion estimation. Pay special att
             # Retry configuration
             max_retries = 3
             retry_delay = 1.0  # Start with 1 second
-            models_to_try = ["gpt-4o", "gpt-5-2025-08-07"]  # Fallback to GPT-5 if needed
+            models_to_try = ["gpt-5.2-2025-12-11", "gpt-4o-mini"]  # Fallback to GPT-4o-mini if needed
             
             response = None
             last_error = None

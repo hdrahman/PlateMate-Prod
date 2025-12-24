@@ -116,7 +116,7 @@ async def analyze_food(
         if len(valid_urls) > 1:
             logger.info(f"Multiple images detected ({len(valid_urls)}). Analyzing them together as part of the same meal.")
         
-        # Prepare the prompt for GPT-4o
+        # Prepare the prompt for GPT-5.2
         prompt = f"""
         Analyze these food images together as they are all part of the same {request.meal_type} meal.
         The meal appears to be {request.food_name}.
@@ -157,7 +157,7 @@ async def analyze_food(
         limiter = await get_ai_limiter()
         
         # Use AI limiter to prevent resource exhaustion
-        async with limiter.limit("OpenAI GPT-4o food analysis"):
+        async with limiter.limit("OpenAI GPT-5.2 food analysis"):
             response = await client.post(
                 "/chat/completions",
                 headers={
@@ -165,7 +165,7 @@ async def analyze_food(
                     "Authorization": f"Bearer {openai.api_key}"
                 },
                 json={
-                    "model": "gpt-4o",
+                    "model": "gpt-5.2-2025-12-11",
                     "messages": [
                         {
                             "role": "user",
@@ -263,7 +263,7 @@ async def analyze_meal(
         limiter = await get_ai_limiter()
         
         # Use AI limiter to prevent resource exhaustion
-        async with limiter.limit("OpenAI GPT-4o meal analysis"):
+        async with limiter.limit("OpenAI GPT-5.2 meal analysis"):
             response = await client.post(
                 "/chat/completions",
                 headers={
@@ -271,7 +271,7 @@ async def analyze_meal(
                     "Authorization": f"Bearer {openai.api_key}"
                 },
                 json={
-                    "model": "gpt-4o",
+                    "model": "gpt-5.2-2025-12-11",
                     "messages": [
                         {
                             "role": "system",
@@ -323,7 +323,7 @@ async def estimate_nutrition(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Estimate nutritional information for a food item using GPT-4o.
+    Estimate nutritional information for a food item using GPT-5.2.
     Provides calories, macronutrients, and additional nutrients based on food name and quantity.
     """
     if not openai.api_key:
@@ -340,7 +340,7 @@ async def estimate_nutrition(
         if not request.quantity.strip():
             raise HTTPException(status_code=400, detail="Quantity is required")
             
-        # Prepare the prompt for GPT-4o
+        # Prepare the prompt for GPT-5.2
         prompt = f"""
         You are a nutrition expert. Estimate the nutritional information for {request.quantity} {request.serving_unit} of {request.food_name}.
 
@@ -378,7 +378,7 @@ async def estimate_nutrition(
                     "Authorization": f"Bearer {openai.api_key}"
                 },
                 json={
-                    "model": "gpt-4o",
+                    "model": "gpt-5.2-2025-12-11",
                     "messages": [
                         {
                             "role": "system",
