@@ -67,9 +67,7 @@ import Nutrients from './src/screens/Nutrients';
 import BarcodeResults from './src/screens/BarcodeResults';
 import ScannedProduct from './src/screens/ScannedProduct';
 import Manual from './src/screens/Manual';
-import MealPlanner from "./src/screens/MealPlanner";
-import MealPlannerCamera from "./src/screens/MealPlannerCamera";
-import MealPlannerResults from "./src/screens/MealPlannerResults";
+// MealPlanner screens removed - using Analytics instead
 import RecipeDetails from "./src/screens/RecipeDetails";
 import RecipeResults from "./src/screens/RecipeResults";
 import SearchResults from "./src/screens/SearchResults";
@@ -328,12 +326,13 @@ function MainTabs() {
 
 
       <Tab.Screen
-        name="MealPlanner"
-        component={MealPlanner}
+        name="Analytics"
+        component={Analytics}
         options={{
-          tabBarLabel: "Meal Planner",
+          headerShown: false,
+          tabBarLabel: "Analytics",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="nutrition-outline" color={color} size={size} />
+            <Ionicons name="analytics-outline" color={color} size={size} />
           ),
         }}
       />
@@ -468,8 +467,7 @@ function AuthenticatedContent() {
         <Stack.Screen name="BarcodeResults" component={BarcodeResults} />
         <Stack.Screen name="ScannedProduct" component={ScannedProduct} />
         <Stack.Screen name="Manual" component={Manual} />
-        <Stack.Screen name="MealPlannerCamera" component={MealPlannerCamera} />
-        <Stack.Screen name="MealPlannerResults" component={MealPlannerResults} />
+
         <Stack.Screen name="RecipeDetails" component={RecipeDetails} />
         <Stack.Screen name="RecipeResults" component={RecipeResults} />
         <Stack.Screen name="SearchResults" component={SearchResults} />
