@@ -29,6 +29,8 @@ import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
 // Import Subscription Manager for automatic trials
 import SubscriptionManager from './src/utils/SubscriptionManager';
+// Import Notification Service for meal reminders
+import NotificationInitService from './src/services/NotificationInitService';
 
 // Conditional import for Android-only notifee module (prevents iOS crash)
 let notifee = null;
@@ -409,34 +411,43 @@ function AuthenticatedContent() {
     }
   }, [onboardingComplete]);
 
-  // Initialize step tracking after user is authenticated and onboarding is complete
+  // Initialize services (step tracking & notifications) after user is authenticated and onboarding is complete
   React.useEffect(() => {
-    const initializeStepTracking = async () => {
+    const initializeServices = async () => {
       if (onboardingComplete && hasCompletedOnboarding) {
+        // Check if we're running in Expo Go
+        const isExpoGo = global.isExpoGo === true || global.__expo?.isExpoGo === true;
+
+        // Initialize notification services
         try {
-          console.log('🚀 Initializing step tracking for authenticated user...');
+          console.log('🔔 Initializing notification services...');
+          await NotificationInitService.initializeAllNotificationServices();
+          console.log('✅ Notification services initialized successfully');
+        } catch (error) {
+          console.error('❌ Error initializing notification services:', error);
+          // Continue with other initializations even if notifications fail
+        }
 
-          // Check if we're running in Expo Go
-          const isExpoGo = global.isExpoGo === true || global.__expo?.isExpoGo === true;
-
-          if (!isExpoGo) {
-            // Initialize step tracking - this will now request permissions
+        // Initialize step tracking
+        if (!isExpoGo) {
+          try {
+            console.log('🚀 Initializing step tracking...');
             const success = await UnifiedStepTracker.startTracking();
             if (success) {
-              console.log('✅ Step tracking initialized successfully for authenticated user');
+              console.log('✅ Step tracking initialized successfully');
             } else {
               console.log('⚠️ Step tracking initialization failed (user may have denied permissions)');
             }
-          } else {
-            console.log('⚠️ Skipping step tracking initialization in Expo Go');
+          } catch (error) {
+            console.error('❌ Error initializing step tracking:', error);
           }
-        } catch (error) {
-          console.error('❌ Error initializing step tracking for authenticated user:', error);
+        } else {
+          console.log('⚠️ Skipping step tracking initialization in Expo Go');
         }
       }
     };
 
-    initializeStepTracking();
+    initializeServices();
   }, [onboardingComplete, hasCompletedOnboarding]);
 
   // Show loading screen while restoring data from cloud

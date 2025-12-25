@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     TouchableOpacity,
     StatusBar,
     Switch,
@@ -13,6 +12,7 @@ import {
     Platform,
     Linking
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
@@ -86,6 +86,7 @@ const GradientBorderCard: React.FC<GradientBorderCardProps> = ({ children, style
 export default function NotificationsScreen() {
     const navigation = useNavigation<any>();
     const { theme } = useContext(ThemeContext);
+    const insets = useSafeAreaInsets();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [hasPermission, setHasPermission] = useState(false);
@@ -445,543 +446,542 @@ export default function NotificationsScreen() {
     }
 
     return (
-        <View style={styles.container}>
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={28} color={WHITE} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Notifications</Text>
-                </View>
-                <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                    <View style={styles.content}>
-                        {/* Subtitle */}
-                        <Text style={styles.subtitle}>
-                            Customize your notification preferences
-                        </Text>
+        <View style={[styles.container, { backgroundColor: theme?.colors?.background || PRIMARY_BG }]}>
+            <StatusBar barStyle="light-content" backgroundColor={theme?.colors?.background || PRIMARY_BG} />
+            <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: theme?.colors?.background || PRIMARY_BG }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={28} color={theme?.colors?.text || WHITE} />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: theme?.colors?.text || WHITE }]}>Notifications</Text>
+            </View>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                <View style={styles.content}>
+                    {/* Subtitle */}
+                    <Text style={styles.subtitle}>
+                        Customize your notification preferences
+                    </Text>
 
-                        {/* Permission Status */}
-                        {permissionStatus !== 'granted' && (
-                            <GradientBorderCard theme={theme}>
-                                <View style={styles.permissionContent}>
-                                    <Ionicons name="warning" size={24} color={ACCENT_RED} />
-                                    <View style={styles.permissionText}>
-                                        <Text style={styles.permissionTitle}>Permission Required</Text>
-                                        <Text style={styles.permissionSubtitle}>
-                                            Enable notifications to receive reminders and updates
-                                        </Text>
-                                    </View>
-                                    <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
-                                        <Text style={styles.permissionButtonText}>Enable</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </GradientBorderCard>
-                        )}
-
-                        {isSaving && (
-                            <View style={styles.savingIndicator}>
-                                <ActivityIndicator size="small" color={ACCENT_BLUE} />
-                                <Text style={styles.savingText}>Saving changes...</Text>
-                            </View>
-                        )}
-
-                        {/* Master Toggle */}
+                    {/* Permission Status */}
+                    {permissionStatus !== 'granted' && (
                         <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="notifications" size={24} color={ACCENT_BLUE} />
-                                <Text style={styles.sectionTitle}>Master Control</Text>
-                            </View>
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Enable Notifications</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Turn all notifications on or off
+                            <View style={styles.permissionContent}>
+                                <Ionicons name="warning" size={24} color={ACCENT_RED} />
+                                <View style={styles.permissionText}>
+                                    <Text style={styles.permissionTitle}>Permission Required</Text>
+                                    <Text style={styles.permissionSubtitle}>
+                                        Enable notifications to receive reminders and updates
                                     </Text>
                                 </View>
-                                <Switch
-                                    value={settings.generalSettings.enabled}
-                                    onValueChange={(value) => handleToggle('generalSettings.enabled', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
-                                    thumbColor={settings.generalSettings.enabled ? '#fff' : '#f4f3f4'}
-                                />
+                                <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
+                                    <Text style={styles.permissionButtonText}>Enable</Text>
+                                </TouchableOpacity>
                             </View>
                         </GradientBorderCard>
+                    )}
 
-                        {/* Meal Reminders */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="restaurant" size={24} color={ACCENT_RED} />
-                                <Text style={styles.sectionTitle}>Meal Reminders</Text>
+                    {isSaving && (
+                        <View style={styles.savingIndicator}>
+                            <ActivityIndicator size="small" color={ACCENT_BLUE} />
+                            <Text style={styles.savingText}>Saving changes...</Text>
+                        </View>
+                    )}
+
+                    {/* Master Toggle */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="notifications" size={24} color={ACCENT_BLUE} />
+                            <Text style={styles.sectionTitle}>Master Control</Text>
+                        </View>
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Enable Notifications</Text>
+                                <Text style={styles.settingDescription}>
+                                    Turn all notifications on or off
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.generalSettings.enabled}
+                                onValueChange={(value) => handleToggle('generalSettings.enabled', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                thumbColor={settings.generalSettings.enabled ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </GradientBorderCard>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Meal Reminders</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Get reminded to log your meals
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.mealReminders.enabled}
-                                    onValueChange={(value) => handleToggle('mealReminders.enabled', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
-                                    thumbColor={settings.mealReminders.enabled ? '#fff' : '#f4f3f4'}
-                                />
+                    {/* Meal Reminders */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="restaurant" size={24} color={ACCENT_RED} />
+                            <Text style={styles.sectionTitle}>Meal Reminders</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Meal Reminders</Text>
+                                <Text style={styles.settingDescription}>
+                                    Get reminded to log your meals
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.mealReminders.enabled}
+                                onValueChange={(value) => handleToggle('mealReminders.enabled', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
+                                thumbColor={settings.mealReminders.enabled ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            {settings.mealReminders.enabled && (
-                                <>
-                                    <TouchableOpacity
-                                        style={styles.timeRow}
-                                        onPress={() => showTimePickerModal('mealReminders.breakfast', settings.mealReminders.breakfast)}
-                                    >
-                                        <Text style={styles.timeLabel}>🍳 Breakfast</Text>
-                                        <Text style={styles.timeValue}>{formatTime(settings.mealReminders.breakfast)}</Text>
-                                    </TouchableOpacity>
+                        {settings.mealReminders.enabled && (
+                            <>
+                                <TouchableOpacity
+                                    style={styles.timeRow}
+                                    onPress={() => showTimePickerModal('mealReminders.breakfast', settings.mealReminders.breakfast)}
+                                >
+                                    <Text style={styles.timeLabel}>🍳 Breakfast</Text>
+                                    <Text style={styles.timeValue}>{formatTime(settings.mealReminders.breakfast)}</Text>
+                                </TouchableOpacity>
 
-                                    <TouchableOpacity
-                                        style={styles.timeRow}
-                                        onPress={() => showTimePickerModal('mealReminders.lunch', settings.mealReminders.lunch)}
-                                    >
-                                        <Text style={styles.timeLabel}>🥗 Lunch</Text>
-                                        <Text style={styles.timeValue}>{formatTime(settings.mealReminders.lunch)}</Text>
-                                    </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.timeRow}
+                                    onPress={() => showTimePickerModal('mealReminders.lunch', settings.mealReminders.lunch)}
+                                >
+                                    <Text style={styles.timeLabel}>🥗 Lunch</Text>
+                                    <Text style={styles.timeValue}>{formatTime(settings.mealReminders.lunch)}</Text>
+                                </TouchableOpacity>
 
-                                    <TouchableOpacity
-                                        style={styles.timeRow}
-                                        onPress={() => showTimePickerModal('mealReminders.dinner', settings.mealReminders.dinner)}
-                                    >
-                                        <Text style={styles.timeLabel}>🍽️ Dinner</Text>
-                                        <Text style={styles.timeValue}>{formatTime(settings.mealReminders.dinner)}</Text>
-                                    </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.timeRow}
+                                    onPress={() => showTimePickerModal('mealReminders.dinner', settings.mealReminders.dinner)}
+                                >
+                                    <Text style={styles.timeLabel}>🍽️ Dinner</Text>
+                                    <Text style={styles.timeValue}>{formatTime(settings.mealReminders.dinner)}</Text>
+                                </TouchableOpacity>
 
-                                    <View style={styles.settingRow}>
-                                        <View style={styles.settingInfo}>
-                                            <Text style={styles.settingLabel}>Snack Reminders</Text>
-                                            <Text style={styles.settingDescription}>
-                                                Get reminded to log snacks too
-                                            </Text>
-                                        </View>
-                                        <Switch
-                                            value={settings.mealReminders.snacks}
-                                            onValueChange={(value) => handleToggle('mealReminders.snacks', value)}
-                                            trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
-                                            thumbColor={settings.mealReminders.snacks ? '#fff' : '#f4f3f4'}
-                                        />
-                                    </View>
-
-                                    {settings.mealReminders.snacks && settings.mealReminders.snackTimes && (
-                                        <>
-                                            {settings.mealReminders.snackTimes.map((time, index) => (
-                                                <TouchableOpacity
-                                                    key={`snack-${index}`}
-                                                    style={styles.timeRow}
-                                                    onPress={() => showTimePickerModal(`mealReminders.snackTimes[${index}]`, time)}
-                                                >
-                                                    <Text style={styles.timeLabel}>🍎 Snack {index + 1}</Text>
-                                                    <Text style={styles.timeValue}>{formatTime(time)}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </GradientBorderCard>
-
-                        {/* Water Reminders */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="water" size={24} color={ACCENT_TEAL} />
-                                <Text style={styles.sectionTitle}>Water Reminders</Text>
-                            </View>
-
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Water Reminders</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Stay hydrated throughout the day
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.waterReminders.enabled}
-                                    onValueChange={(value) => handleToggle('waterReminders.enabled', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_TEAL }}
-                                    thumbColor={settings.waterReminders.enabled ? '#fff' : '#f4f3f4'}
-                                />
-                            </View>
-
-                            {settings.waterReminders.enabled && (
                                 <View style={styles.settingRow}>
                                     <View style={styles.settingInfo}>
-                                        <Text style={styles.settingLabel}>Frequency</Text>
+                                        <Text style={styles.settingLabel}>Snack Reminders</Text>
                                         <Text style={styles.settingDescription}>
-                                            Every {settings.waterReminders.frequency} hours
+                                            Get reminded to log snacks too
                                         </Text>
                                     </View>
-                                    <View style={styles.frequencyButtons}>
-                                        {[1, 2, 3, 4].map((hours) => (
+                                    <Switch
+                                        value={settings.mealReminders.snacks}
+                                        onValueChange={(value) => handleToggle('mealReminders.snacks', value)}
+                                        trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
+                                        thumbColor={settings.mealReminders.snacks ? '#fff' : '#f4f3f4'}
+                                    />
+                                </View>
+
+                                {settings.mealReminders.snacks && settings.mealReminders.snackTimes && (
+                                    <>
+                                        {settings.mealReminders.snackTimes.map((time, index) => (
                                             <TouchableOpacity
-                                                key={hours}
-                                                style={[
-                                                    styles.frequencyButton,
-                                                    settings.waterReminders.frequency === hours && styles.frequencyButtonActive,
-                                                ]}
-                                                onPress={() => handleNumberSetting('waterReminders.frequency', hours)}
+                                                key={`snack-${index}`}
+                                                style={styles.timeRow}
+                                                onPress={() => showTimePickerModal(`mealReminders.snackTimes[${index}]`, time)}
                                             >
-                                                <Text
-                                                    style={[
-                                                        styles.frequencyButtonText,
-                                                        settings.waterReminders.frequency === hours && styles.frequencyButtonTextActive,
-                                                    ]}
-                                                >
-                                                    {hours}h
-                                                </Text>
+                                                <Text style={styles.timeLabel}>🍎 Snack {index + 1}</Text>
+                                                <Text style={styles.timeValue}>{formatTime(time)}</Text>
                                             </TouchableOpacity>
                                         ))}
-                                    </View>
-                                </View>
-                            )}
-                        </GradientBorderCard>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </GradientBorderCard>
 
-                        {/* Status Notifications */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="stats-chart" size={24} color={ACCENT_BLUE} />
-                                <Text style={styles.sectionTitle}>Progress Updates</Text>
+                    {/* Water Reminders */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="water" size={24} color={ACCENT_TEAL} />
+                            <Text style={styles.sectionTitle}>Water Reminders</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Water Reminders</Text>
+                                <Text style={styles.settingDescription}>
+                                    Stay hydrated throughout the day
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.waterReminders.enabled}
+                                onValueChange={(value) => handleToggle('waterReminders.enabled', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_TEAL }}
+                                thumbColor={settings.waterReminders.enabled ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
+                        {settings.waterReminders.enabled && (
                             <View style={styles.settingRow}>
                                 <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Daily Progress</Text>
+                                    <Text style={styles.settingLabel}>Frequency</Text>
                                     <Text style={styles.settingDescription}>
-                                        Evening updates on your daily goals
+                                        Every {settings.waterReminders.frequency} hours
                                     </Text>
                                 </View>
-                                <Switch
-                                    value={settings.statusNotifications.dailyProgress}
-                                    onValueChange={(value) => handleToggle('statusNotifications.dailyProgress', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
-                                    thumbColor={settings.statusNotifications.dailyProgress ? '#fff' : '#f4f3f4'}
-                                />
-                            </View>
-
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Goal Achievements</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Celebrate when you hit your targets
-                                    </Text>
+                                <View style={styles.frequencyButtons}>
+                                    {[1, 2, 3, 4].map((hours) => (
+                                        <TouchableOpacity
+                                            key={hours}
+                                            style={[
+                                                styles.frequencyButton,
+                                                settings.waterReminders.frequency === hours && styles.frequencyButtonActive,
+                                            ]}
+                                            onPress={() => handleNumberSetting('waterReminders.frequency', hours)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.frequencyButtonText,
+                                                    settings.waterReminders.frequency === hours && styles.frequencyButtonTextActive,
+                                                ]}
+                                            >
+                                                {hours}h
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
                                 </View>
-                                <Switch
-                                    value={settings.statusNotifications.goalAchievements}
-                                    onValueChange={(value) => handleToggle('statusNotifications.goalAchievements', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
-                                    thumbColor={settings.statusNotifications.goalAchievements ? '#fff' : '#f4f3f4'}
-                                />
                             </View>
+                        )}
+                    </GradientBorderCard>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Weekly Summary</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Sunday evening progress review
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.statusNotifications.weeklyProgress}
-                                    onValueChange={(value) => handleToggle('statusNotifications.weeklyProgress', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
-                                    thumbColor={settings.statusNotifications.weeklyProgress ? '#fff' : '#f4f3f4'}
-                                />
+                    {/* Status Notifications */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="stats-chart" size={24} color={ACCENT_BLUE} />
+                            <Text style={styles.sectionTitle}>Progress Updates</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Daily Progress</Text>
+                                <Text style={styles.settingDescription}>
+                                    Evening updates on your daily goals
+                                </Text>
                             </View>
-                        </GradientBorderCard>
+                            <Switch
+                                value={settings.statusNotifications.dailyProgress}
+                                onValueChange={(value) => handleToggle('statusNotifications.dailyProgress', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                thumbColor={settings.statusNotifications.dailyProgress ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                        {/* Engagement Notifications */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="trophy" size={24} color={ACCENT_ORANGE} />
-                                <Text style={styles.sectionTitle}>Motivation & Updates</Text>
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Goal Achievements</Text>
+                                <Text style={styles.settingDescription}>
+                                    Celebrate when you hit your targets
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.statusNotifications.goalAchievements}
+                                onValueChange={(value) => handleToggle('statusNotifications.goalAchievements', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                thumbColor={settings.statusNotifications.goalAchievements ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Achievements</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Celebrate your fitness milestones
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.engagementNotifications.achievements}
-                                    onValueChange={(value) => handleToggle('engagementNotifications.achievements', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
-                                    thumbColor={settings.engagementNotifications.achievements ? '#fff' : '#f4f3f4'}
-                                />
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Weekly Summary</Text>
+                                <Text style={styles.settingDescription}>
+                                    Sunday evening progress review
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.statusNotifications.weeklyProgress}
+                                onValueChange={(value) => handleToggle('statusNotifications.weeklyProgress', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_BLUE }}
+                                thumbColor={settings.statusNotifications.weeklyProgress ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </GradientBorderCard>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>New Features</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Learn about app updates and improvements
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.engagementNotifications.newFeatures}
-                                    onValueChange={(value) => handleToggle('engagementNotifications.newFeatures', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
-                                    thumbColor={settings.engagementNotifications.newFeatures ? '#fff' : '#f4f3f4'}
-                                />
+                    {/* Engagement Notifications */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="trophy" size={24} color={ACCENT_ORANGE} />
+                            <Text style={styles.sectionTitle}>Motivation & Updates</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Achievements</Text>
+                                <Text style={styles.settingDescription}>
+                                    Celebrate your fitness milestones
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.engagementNotifications.achievements}
+                                onValueChange={(value) => handleToggle('engagementNotifications.achievements', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
+                                thumbColor={settings.engagementNotifications.achievements ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Weekly Reports</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Detailed insights and tips
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.engagementNotifications.weeklyReports}
-                                    onValueChange={(value) => handleToggle('engagementNotifications.weeklyReports', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
-                                    thumbColor={settings.engagementNotifications.weeklyReports ? '#fff' : '#f4f3f4'}
-                                />
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>New Features</Text>
+                                <Text style={styles.settingDescription}>
+                                    Learn about app updates and improvements
+                                </Text>
                             </View>
-                        </GradientBorderCard>
+                            <Switch
+                                value={settings.engagementNotifications.newFeatures}
+                                onValueChange={(value) => handleToggle('engagementNotifications.newFeatures', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
+                                thumbColor={settings.engagementNotifications.newFeatures ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                        {/* Quiet Hours */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="moon" size={24} color={ACCENT_PURPLE} />
-                                <Text style={styles.sectionTitle}>Quiet Hours</Text>
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Weekly Reports</Text>
+                                <Text style={styles.settingDescription}>
+                                    Detailed insights and tips
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.engagementNotifications.weeklyReports}
+                                onValueChange={(value) => handleToggle('engagementNotifications.weeklyReports', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_ORANGE }}
+                                thumbColor={settings.engagementNotifications.weeklyReports ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </GradientBorderCard>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Enable Quiet Hours</Text>
-                                    <Text style={styles.settingDescription}>
-                                        No notifications during sleep time
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.generalSettings.quietHours}
-                                    onValueChange={(value) => handleToggle('generalSettings.quietHours', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
-                                    thumbColor={settings.generalSettings.quietHours ? '#fff' : '#f4f3f4'}
-                                />
+                    {/* Quiet Hours */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="moon" size={24} color={ACCENT_PURPLE} />
+                            <Text style={styles.sectionTitle}>Quiet Hours</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Enable Quiet Hours</Text>
+                                <Text style={styles.settingDescription}>
+                                    No notifications during sleep time
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.generalSettings.quietHours}
+                                onValueChange={(value) => handleToggle('generalSettings.quietHours', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                thumbColor={settings.generalSettings.quietHours ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            {settings.generalSettings.quietHours && (
-                                <>
-                                    <TouchableOpacity
-                                        style={styles.timeRow}
-                                        onPress={() => showTimePickerModal('generalSettings.quietStart', settings.generalSettings.quietStart)}
-                                    >
-                                        <Text style={styles.timeLabel}>🌙 Start Time</Text>
-                                        <Text style={styles.timeValue}>{formatTime(settings.generalSettings.quietStart)}</Text>
-                                    </TouchableOpacity>
+                        {settings.generalSettings.quietHours && (
+                            <>
+                                <TouchableOpacity
+                                    style={styles.timeRow}
+                                    onPress={() => showTimePickerModal('generalSettings.quietStart', settings.generalSettings.quietStart)}
+                                >
+                                    <Text style={styles.timeLabel}>🌙 Start Time</Text>
+                                    <Text style={styles.timeValue}>{formatTime(settings.generalSettings.quietStart)}</Text>
+                                </TouchableOpacity>
 
-                                    <TouchableOpacity
-                                        style={styles.timeRow}
-                                        onPress={() => showTimePickerModal('generalSettings.quietEnd', settings.generalSettings.quietEnd)}
-                                    >
-                                        <Text style={styles.timeLabel}>🌅 End Time</Text>
-                                        <Text style={styles.timeValue}>{formatTime(settings.generalSettings.quietEnd)}</Text>
-                                    </TouchableOpacity>
-                                </>
-                            )}
-                        </GradientBorderCard>
+                                <TouchableOpacity
+                                    style={styles.timeRow}
+                                    onPress={() => showTimePickerModal('generalSettings.quietEnd', settings.generalSettings.quietEnd)}
+                                >
+                                    <Text style={styles.timeLabel}>🌅 End Time</Text>
+                                    <Text style={styles.timeValue}>{formatTime(settings.generalSettings.quietEnd)}</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </GradientBorderCard>
 
-                        {/* Behavioral Notifications */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="pulse" size={24} color={ACCENT_PURPLE} />
-                                <Text style={styles.sectionTitle}>Smart Notifications</Text>
+                    {/* Behavioral Notifications */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="pulse" size={24} color={ACCENT_PURPLE} />
+                            <Text style={styles.sectionTitle}>Smart Notifications</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Missed Meal Detection</Text>
+                                <Text style={styles.settingDescription}>
+                                    Get reminded when you haven't logged meals
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.behavioralNotifications?.missedMeals || false}
+                                onValueChange={(value) => handleToggle('behavioralNotifications.missedMeals', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                thumbColor={settings.behavioralNotifications?.missedMeals ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Missed Meal Detection</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Get reminded when you haven't logged meals
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.behavioralNotifications?.missedMeals || false}
-                                    onValueChange={(value) => handleToggle('behavioralNotifications.missedMeals', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
-                                    thumbColor={settings.behavioralNotifications?.missedMeals ? '#fff' : '#f4f3f4'}
-                                />
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Unhealthy Food Warnings</Text>
+                                <Text style={styles.settingDescription}>
+                                    Alerts for high sodium, sugar, or processed foods
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.behavioralNotifications?.unhealthyFoodWarnings || false}
+                                onValueChange={(value) => handleToggle('behavioralNotifications.unhealthyFoodWarnings', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                thumbColor={settings.behavioralNotifications?.unhealthyFoodWarnings ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Unhealthy Food Warnings</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Alerts for high sodium, sugar, or processed foods
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.behavioralNotifications?.unhealthyFoodWarnings || false}
-                                    onValueChange={(value) => handleToggle('behavioralNotifications.unhealthyFoodWarnings', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
-                                    thumbColor={settings.behavioralNotifications?.unhealthyFoodWarnings ? '#fff' : '#f4f3f4'}
-                                />
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Streak Celebrations</Text>
+                                <Text style={styles.settingDescription}>
+                                    Celebrate your consistency milestones
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.behavioralNotifications?.streakCelebrations || false}
+                                onValueChange={(value) => handleToggle('behavioralNotifications.streakCelebrations', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                thumbColor={settings.behavioralNotifications?.streakCelebrations ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Streak Celebrations</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Celebrate your consistency milestones
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.behavioralNotifications?.streakCelebrations || false}
-                                    onValueChange={(value) => handleToggle('behavioralNotifications.streakCelebrations', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
-                                    thumbColor={settings.behavioralNotifications?.streakCelebrations ? '#fff' : '#f4f3f4'}
-                                />
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Plateau Breaking</Text>
+                                <Text style={styles.settingDescription}>
+                                    Get motivated when you've been inactive
+                                </Text>
                             </View>
+                            <Switch
+                                value={settings.behavioralNotifications?.plateauBreaking || false}
+                                onValueChange={(value) => handleToggle('behavioralNotifications.plateauBreaking', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
+                                thumbColor={settings.behavioralNotifications?.plateauBreaking ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
+                    </GradientBorderCard>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Plateau Breaking</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Get motivated when you've been inactive
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.behavioralNotifications?.plateauBreaking || false}
-                                    onValueChange={(value) => handleToggle('behavioralNotifications.plateauBreaking', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_PURPLE }}
-                                    thumbColor={settings.behavioralNotifications?.plateauBreaking ? '#fff' : '#f4f3f4'}
-                                />
+                    {/* Savage Mode */}
+                    <GradientBorderCard theme={theme}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="flame" size={24} color={ACCENT_RED} />
+                            <Text style={styles.sectionTitle}>Savage Mode</Text>
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Enable Savage Mode</Text>
+                                <Text style={styles.settingDescription}>
+                                    Get brutally honest, edgy notifications that call you out
+                                </Text>
                             </View>
-                        </GradientBorderCard>
+                            <Switch
+                                value={settings.generalSettings.savageMode}
+                                onValueChange={(value) => handleToggle('generalSettings.savageMode', value)}
+                                trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
+                                thumbColor={settings.generalSettings.savageMode ? '#fff' : '#f4f3f4'}
+                            />
+                        </View>
 
-                        {/* Savage Mode */}
-                        <GradientBorderCard theme={theme}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="flame" size={24} color={ACCENT_RED} />
-                                <Text style={styles.sectionTitle}>Savage Mode</Text>
+                        {settings.generalSettings.savageMode && (
+                            <View style={styles.warningContainer}>
+                                <Ionicons name="warning" size={20} color={ACCENT_ORANGE} />
+                                <Text style={styles.warningText}>
+                                    Savage Mode delivers blunt, no-nonsense notifications. We'll call you out when you're slacking!
+                                </Text>
                             </View>
+                        )}
+                    </GradientBorderCard>
 
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>Enable Savage Mode</Text>
-                                    <Text style={styles.settingDescription}>
-                                        Get brutally honest, edgy notifications that call you out
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={settings.generalSettings.savageMode}
-                                    onValueChange={(value) => handleToggle('generalSettings.savageMode', value)}
-                                    trackColor={{ false: '#3A3A3C', true: ACCENT_RED }}
-                                    thumbColor={settings.generalSettings.savageMode ? '#fff' : '#f4f3f4'}
-                                />
-                            </View>
-
-                            {settings.generalSettings.savageMode && (
-                                <View style={styles.warningContainer}>
-                                    <Ionicons name="warning" size={20} color={ACCENT_ORANGE} />
-                                    <Text style={styles.warningText}>
-                                        Savage Mode delivers blunt, no-nonsense notifications. We'll call you out when you're slacking!
-                                    </Text>
-                                </View>
-                            )}
-                        </GradientBorderCard>
-
-                        {/* Reset Button */}
-                        <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
-                            <Ionicons name="refresh" size={20} color={ACCENT_RED} />
-                            <Text style={styles.resetButtonText}>Reset to Defaults</Text>
-                        </TouchableOpacity>
+                    {/* Reset Button */}
+                    <TouchableOpacity style={styles.resetButton} onPress={resetToDefaults}>
+                        <Ionicons name="refresh" size={20} color={ACCENT_RED} />
+                        <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+                    </TouchableOpacity>
 
 
-                        <View style={styles.bottomSpacer} />
-                    </View>
-                </ScrollView>
+                    <View style={styles.bottomSpacer} />
+                </View>
+            </ScrollView>
 
-                {/* Time Picker Modal */}
-                {showTimePicker.visible && (
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.timePickerModal}>
-                            <LinearGradient
-                                colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.pickerHeader}
+            {/* Time Picker Modal */}
+            {showTimePicker.visible && (
+                <View style={styles.modalOverlay}>
+                    <View style={styles.timePickerModal}>
+                        <LinearGradient
+                            colors={['rgba(92, 0, 221, 0.8)', 'rgba(0, 116, 221, 0.6)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.pickerHeader}
+                        >
+                            <Text style={styles.pickerTitle}>Set Time</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowTimePicker({ visible: false, type: '', currentTime: '' })}
+                                style={styles.pickerCloseIcon}
                             >
-                                <Text style={styles.pickerTitle}>Set Time</Text>
-                                <TouchableOpacity
-                                    onPress={() => setShowTimePicker({ visible: false, type: '', currentTime: '' })}
-                                    style={styles.pickerCloseIcon}
-                                >
-                                    <Ionicons name="close" size={24} color={WHITE} />
-                                </TouchableOpacity>
-                            </LinearGradient>
+                                <Ionicons name="close" size={24} color={WHITE} />
+                            </TouchableOpacity>
+                        </LinearGradient>
 
-                            <View style={styles.timePickerContent}>
-                                <View style={styles.timePickerRow}>
-                                    <View style={styles.timePickerColumn}>
-                                        <Text style={styles.timePickerLabel}>Hour</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <WheelPicker
-                                                data={hourData}
-                                                selectedValue={selectedHour}
-                                                onValueChange={(value) => setSelectedHour(value)}
-                                                itemHeight={40}
-                                                containerStyle={{ width: 80 }}
-                                            />
-                                        </View>
-                                    </View>
-
-                                    <Text style={styles.timePickerSeparator}>:</Text>
-
-                                    <View style={styles.timePickerColumn}>
-                                        <Text style={styles.timePickerLabel}>Minute</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <WheelPicker
-                                                data={minuteData}
-                                                selectedValue={selectedMinute}
-                                                onValueChange={(value) => setSelectedMinute(value)}
-                                                itemHeight={40}
-                                                containerStyle={{ width: 80 }}
-                                            />
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.timePickerColumn}>
-                                        <Text style={styles.timePickerLabel}>AM/PM</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <WheelPicker
-                                                data={amPmData}
-                                                selectedValue={selectedAmPm}
-                                                onValueChange={(value) => setSelectedAmPm(value)}
-                                                itemHeight={40}
-                                                containerStyle={{ width: 80 }}
-                                            />
-                                        </View>
+                        <View style={styles.timePickerContent}>
+                            <View style={styles.timePickerRow}>
+                                <View style={styles.timePickerColumn}>
+                                    <Text style={styles.timePickerLabel}>Hour</Text>
+                                    <View style={styles.pickerContainer}>
+                                        <WheelPicker
+                                            data={hourData}
+                                            selectedValue={selectedHour}
+                                            onValueChange={(value) => setSelectedHour(value)}
+                                            itemHeight={40}
+                                            containerStyle={{ width: 80 }}
+                                        />
                                     </View>
                                 </View>
 
-                                <TouchableOpacity
-                                    style={styles.timePickerSave}
-                                    onPress={() => handleTimeChange(`${selectedHour}:${selectedMinute} ${selectedAmPm}`)}
-                                    disabled={isSaving}
-                                >
-                                    {isSaving ? (
-                                        <ActivityIndicator size="small" color={WHITE} />
-                                    ) : (
-                                        <Text style={styles.timePickerSaveText}>Save</Text>
-                                    )}
-                                </TouchableOpacity>
+                                <Text style={styles.timePickerSeparator}>:</Text>
+
+                                <View style={styles.timePickerColumn}>
+                                    <Text style={styles.timePickerLabel}>Minute</Text>
+                                    <View style={styles.pickerContainer}>
+                                        <WheelPicker
+                                            data={minuteData}
+                                            selectedValue={selectedMinute}
+                                            onValueChange={(value) => setSelectedMinute(value)}
+                                            itemHeight={40}
+                                            containerStyle={{ width: 80 }}
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.timePickerColumn}>
+                                    <Text style={styles.timePickerLabel}>AM/PM</Text>
+                                    <View style={styles.pickerContainer}>
+                                        <WheelPicker
+                                            data={amPmData}
+                                            selectedValue={selectedAmPm}
+                                            onValueChange={(value) => setSelectedAmPm(value)}
+                                            itemHeight={40}
+                                            containerStyle={{ width: 80 }}
+                                        />
+                                    </View>
+                                </View>
                             </View>
+
+                            <TouchableOpacity
+                                style={styles.timePickerSave}
+                                onPress={() => handleTimeChange(`${selectedHour}:${selectedMinute} ${selectedAmPm}`)}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color={WHITE} />
+                                ) : (
+                                    <Text style={styles.timePickerSaveText}>Save</Text>
+                                )}
+                            </TouchableOpacity>
                         </View>
                     </View>
-                )}
-            </SafeAreaView>
+                </View>
+            )}
         </View>
     );
 }
@@ -991,14 +991,11 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: PRIMARY_BG,
     },
-    safeArea: {
-        flex: 1,
-    },
     header: {
         flexDirection: "row",
         alignItems: "center",
-        height: 60,
         paddingHorizontal: 16,
+        paddingBottom: 12,
         backgroundColor: PRIMARY_BG,
     },
     backButton: {
