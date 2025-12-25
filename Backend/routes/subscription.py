@@ -1227,7 +1227,7 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
     try:
         firebase_uid = current_user["supabase_uid"]
 
-        logger.info(f"✨ Attempting to grant 10-day extended trial to user: {firebase_uid}")
+        logger.info(f"✨ Attempting to grant 14-day extended trial to user: {firebase_uid}")
 
         # Step 1: Check if user already has extended trial
         try:
@@ -1254,7 +1254,7 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
                 logger.warning(f"User {firebase_uid} already has active extended trial")
                 return {
                     "success": False,
-                    "message": "User already has active 10-day extended trial",
+                    "message": "User already has active 14-day extended trial",
                     "trial_granted": False
                 }
 
@@ -1279,10 +1279,14 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
                 "trial_granted": False
             }
 
-        # Step 2: Grant 10-day extended trial via RevenueCat API
+        # Step 2: Grant 14-day extended trial via RevenueCat API
         # Use RevenueCat's promotional entitlement grant API
-        # Calculate end time in milliseconds (now + 10 days)
-        trial_end = datetime.now(timezone.utc) + timedelta(days=10)
+        # IMPORTANT: Stack with remaining promotional trial days
+        # Calculate end time from promotional trial end date (not now) to stack properly
+        # e.g., if user has 12 days left on promo trial, they get 12 + 14 = 26 days total
+        now = datetime.now(timezone.utc)
+        trial_end = promo_expires + timedelta(days=14)  # Stack: promo end date + 14 bonus days
+        total_days_granted = (trial_end - now).days  # Calculate actual days user will have
         end_time_ms = int(trial_end.timestamp() * 1000)
 
         grant_data = {
@@ -1301,14 +1305,15 @@ async def grant_extended_trial(current_user: dict = Depends(get_current_user)):
             idempotency_headers
         )
 
-        logger.info(f"✅ Successfully granted 10-day extended trial to user {firebase_uid}")
+        logger.info(f"✅ Successfully granted 14-day extended trial to user {firebase_uid} (stacked: {total_days_granted} total days)")
 
         return {
             "success": True,
-            "message": "10-day extended trial granted (30 days total with promo trial)",
+            "message": f"14-day extended trial granted ({total_days_granted} days total with remaining promo trial)",
             "trial_granted": True,
             "trial_end_date": trial_end.isoformat(),
-            "trial_days": 10,
+            "trial_days": 14,
+            "total_days_remaining": total_days_granted,
             "revenuecat_response": result
         }
 

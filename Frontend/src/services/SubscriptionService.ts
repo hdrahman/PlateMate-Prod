@@ -259,7 +259,7 @@ export const PRODUCT_IDS = {
 export const ENTITLEMENTS = {
   PREMIUM: 'Premium',           // Full premium access from paid subscription (capital P - matches RevenueCat)
   PROMOTIONAL_TRIAL: 'promotional_trial', // 14-day backend-granted trial (automatic for new users)
-  EXTENDED_TRIAL: 'extended_trial', // Additional 10-day trial when user starts subscription trial
+  EXTENDED_TRIAL: 'extended_trial', // Additional 14-day trial when user starts subscription trial
 } as const;
 
 class SubscriptionService {
@@ -770,7 +770,7 @@ class SubscriptionService {
       };
     }
 
-    // Check for extended trial (10-day trial when subscribing)
+    // Check for extended trial (14-day trial when subscribing)
     const extendedTrial = entitlements[ENTITLEMENTS.EXTENDED_TRIAL];
     if (extendedTrial && extendedTrial.isActive) {
       return {
@@ -883,7 +883,7 @@ class SubscriptionService {
         };
       }
 
-      // PRIORITY 2: Check for extended trial (10-day trial when subscribing)
+      // PRIORITY 2: Check for extended trial (14-day trial when subscribing)
       const extendedTrial = activeEntitlements[ENTITLEMENTS.EXTENDED_TRIAL];
       if (extendedTrial && extendedTrial.isActive) {
         const trialEndDate = extendedTrial.expirationDate ? new Date(extendedTrial.expirationDate) : new Date();
@@ -1044,7 +1044,7 @@ class SubscriptionService {
       // Check for active promotional trial (14-day backend-granted, automatic for new users)
       const hasPromotionalTrial = customerInfo.entitlements.active[ENTITLEMENTS.PROMOTIONAL_TRIAL]?.isActive || false;
 
-      // Check for active extended trial (additional 10-day when user starts subscription trial)
+      // Check for active extended trial (additional 14-day when user starts subscription trial)
       const hasExtendedTrial = customerInfo.entitlements.active[ENTITLEMENTS.EXTENDED_TRIAL]?.isActive || false;
 
       // Check for store trial (in-app purchase trial period)
@@ -1166,7 +1166,7 @@ class SubscriptionService {
       if (promoTrial && promoTrial.isActive) {
         tier = 'promotional_trial';
       }
-      // Check extended trial (10-day when subscribing)
+      // Check extended trial (14-day when subscribing)
       else if (entitlements[ENTITLEMENTS.EXTENDED_TRIAL]?.isActive) {
         tier = 'extended_trial';
       }

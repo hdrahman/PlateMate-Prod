@@ -71,7 +71,7 @@ export default function TrialCountdown({ visible = true, style, compact = false 
           canUpgrade: promoTrialStatus.daysRemaining <= 15, // Show upgrade after 5 days
         };
       } else if (subscriptionStatus.isInTrial) {
-        // User is in 10-day store trial
+        // User is in 14-day store trial
         status = {
           isInTrial: true,
           trialType: 'store' as const,
