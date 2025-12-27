@@ -536,16 +536,16 @@ class NotificationService {
         }
     }
 
-    // Message generation methods - Engaging, playful personality by default
+    // Message generation methods - Snarky by default
     private getMealReminderMessage(mealName: string, savageMode: boolean): string {
         const messages = [
-            `Stop hiding and log your ${mealName.toLowerCase()}! 🍽️`,
-            `We see you avoiding the food log... 👀`,
-            `Your ${mealName.toLowerCase()} isn't going to log itself! 📱`,
-            `Seriously? Still no ${mealName.toLowerCase()} logged? 🤨`,
-            `The food log is feeling lonely without your ${mealName.toLowerCase()}...`,
-            `Hey! Your ${mealName.toLowerCase()} is getting cold AND unlogged 😤`,
-            `Time to confess your ${mealName.toLowerCase()} sins 🙏`,
+            `It's time for ${mealName.toLowerCase()}... I know you've been waiting 😏`,
+            `Time to log your ${mealName.toLowerCase()}. Don't pretend you didn't hear me 📱`,
+            `Your ${mealName.toLowerCase()} is waiting. And so am I ⏱️`,
+            `Just a friendly reminder to log your ${mealName.toLowerCase()}. Or else... 👀`,
+            `Log your ${mealName.toLowerCase()}. It's not that hard, is it? 💅`,
+            `Hey! ${mealName} time. You know the drill 🙄`,
+            `I see you eyeing that food. Log the ${mealName.toLowerCase()} first 📝`,
         ];
 
         return messages[Math.floor(Math.random() * messages.length)];
@@ -553,11 +553,11 @@ class NotificationService {
 
     private getMissedMealMessage(mealName: string, savageMode: boolean): string {
         const messages = [
-            `Still haven't logged ${mealName.toLowerCase()}? We're disappointed 😤`,
-            `${mealName} happened 2 hours ago and still no log? Come on! 🙄`,
-            `Did you think we'd forget about your missing ${mealName.toLowerCase()}? Think again! 😏`,
-            `Your ${mealName.toLowerCase()} is playing hide and seek with the food log 🙈`,
-            `The ${mealName.toLowerCase()} ghosted the food log. Don't be like that 👻`,
+            `Don't try to hide your shame. Log that ${mealName.toLowerCase()} 😤`,
+            `We know you ate. Why isn't it logged? 👀`,
+            `Trying to hide that ${mealName.toLowerCase()}? Cute. Log it. 💅`,
+            `Your secret is not safe with me. Log the ${mealName.toLowerCase()} 📝`,
+            `Missing: Your ${mealName.toLowerCase()} log. Reward: My silence 🤐`,
         ];
 
         return messages[Math.floor(Math.random() * messages.length)];
@@ -593,12 +593,14 @@ class NotificationService {
 
     // Behavioral notification methods
     async showMissedMealNotification(mealName: string, hoursLate: number, savageMode: boolean): Promise<void> {
-        const title = `${mealName} MIA! 🚨`;
+        const title = `Missed ${mealName}? 🤨`;
 
         const bodies = [
-            `It's been ${hoursLate} hours since ${mealName.toLowerCase()} time. Still alive? 😴`,
-            `${hoursLate} hours late logging ${mealName.toLowerCase()}? Bold strategy 🤔`,
-            `Your ${mealName.toLowerCase()} has been missing for ${hoursLate} hours. File a report! 🔍`,
+            `Don't try to hide your shame. Log that ${mealName.toLowerCase()} 😤`,
+            `We know you ate. Why isn't it logged? 👀`,
+            `Trying to hide that ${mealName.toLowerCase()}? Cute. Log it. 💅`,
+            `Your secret is not safe with me. Log the ${mealName.toLowerCase()} 📝`,
+            `Missing: Your ${mealName.toLowerCase()} log. Reward: My silence 🤐`,
         ];
 
         const body = bodies[Math.floor(Math.random() * bodies.length)];
