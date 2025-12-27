@@ -63,7 +63,7 @@ export const supabaseAuth = {
                 console.error('❌ Supabase signUp error:', error);
                 throw error;
             }
-            
+
             // Log user creation details
             if (data.user) {
                 console.log('✅ User created successfully in Supabase Auth:', {
@@ -72,7 +72,7 @@ export const supabaseAuth = {
                     confirmed: data.user.confirmed_at ? 'YES' : 'NO (email verification required)',
                     created: data.user.created_at
                 });
-                
+
                 // IMPORTANT: If email confirmation is enabled in Supabase, the user won't appear
                 // in the Auth Users tab until they click the confirmation link in their email.
                 // To disable email confirmation: Supabase Dashboard > Authentication > Providers > 
@@ -85,7 +85,7 @@ export const supabaseAuth = {
             } else {
                 console.warn('⚠️ SignUp succeeded but no user object returned');
             }
-            
+
             return data.user;
         } catch (error) {
             console.error('❌ Error signing up with email and password:', error);
