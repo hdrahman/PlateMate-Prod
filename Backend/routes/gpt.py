@@ -172,7 +172,7 @@ async def analyze_food(
                             "content": content
                         }
                     ],
-                    "max_tokens": 1000,
+                    "max_completion_tokens": 1000,
                     "temperature": 0.7
                 },
                 timeout=60.0  # Increased timeout for image analysis
@@ -282,7 +282,7 @@ async def analyze_meal(
                             "content": prompt
                         }
                     ],
-                    "max_tokens": 1000,
+                    "max_completion_tokens": 1000,
                     "temperature": 0.7
                 },
                 timeout=30.0
@@ -389,7 +389,7 @@ async def estimate_nutrition(
                             "content": prompt
                         }
                     ],
-                    "max_tokens": 500,
+                    "max_completion_tokens": 500,
                     "temperature": 0.3  # Lower temperature for more consistent results
                 },
                 timeout=30.0
