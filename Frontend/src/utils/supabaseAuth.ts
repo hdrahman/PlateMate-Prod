@@ -113,8 +113,9 @@ export const supabaseAuth = {
     resetPasswordForEmail: async (email: string, redirectTo?: string) => {
         try {
             console.log('🔐 Sending password reset email to:', email);
+            console.log('🔗 Redirect URL:', redirectTo);
             const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: redirectTo || undefined,
+                redirectTo: redirectTo || 'https://tryplatemate.app/reset-password.html',
             });
 
             if (error) {

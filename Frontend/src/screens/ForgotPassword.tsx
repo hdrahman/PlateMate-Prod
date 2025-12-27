@@ -44,7 +44,9 @@ export default function ForgotPassword() {
         setIsLoading(true);
 
         try {
-            await resetPasswordForEmail(email.trim().toLowerCase());
+            // Redirect to web-based password reset page
+            const redirectUrl = 'https://tryplatemate.app/reset-password.html';
+            await resetPasswordForEmail(email.trim().toLowerCase(), redirectUrl);
             setEmailSent(true);
             Alert.alert(
                 'Check Your Email',
