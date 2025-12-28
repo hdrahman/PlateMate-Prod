@@ -43,7 +43,7 @@ const SubscriptionManagementScreen: React.FC = () => {
         {
             id: 'monthly',
             title: 'Premium Monthly',
-            price: '$9.99',
+            price: '$5.99',
             period: 'per month',
             productId: PRODUCT_IDS.MONTHLY,
             features: [
@@ -58,10 +58,8 @@ const SubscriptionManagementScreen: React.FC = () => {
         {
             id: 'annual',
             title: 'Premium Annual',
-            price: '$89.99',
-            originalPrice: '$119.88',
+            price: '$19.99',
             period: 'per year',
-            discount: 'Save 25%',
             isPopular: true,
             productId: PRODUCT_IDS.ANNUAL,
             features: [

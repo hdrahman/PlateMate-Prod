@@ -75,7 +75,7 @@ const PremiumSubscription = () => {
         {
             id: 'premium_monthly',
             title: 'Premium Monthly',
-            monthlyPrice: 6.99,
+            monthlyPrice: 5.99,
             annualPrice: 0,
             gradient: ['#5856D6', '#007AFF'],
             subscriptionType: 'premium_monthly',
@@ -86,12 +86,12 @@ const PremiumSubscription = () => {
             id: 'premium_annual',
             title: 'Premium Annual',
             monthlyPrice: 0,
-            annualPrice: 59.99,
+            annualPrice: 19.99,
             gradient: ['#FF2D92', '#9B00FF'],
             subscriptionType: 'premium_annual',
             bestValue: true,
             imageUploads: 'Annual billing',
-            features: ['Save 30% vs monthly', 'Best value']
+            features: ['Save 72% vs monthly', 'Best value']
         }
     ];
 
@@ -116,7 +116,7 @@ const PremiumSubscription = () => {
                         tier === 'extended_trial' ? 'Extended Trial' : 'Free Plan',
             isActive: ['premium_monthly', 'premium_annual', 'promotional_trial', 'extended_trial'].includes(tier),
             statusText: tier === 'premium_monthly' ? 'Renews monthly' :
-                tier === 'premium_annual' ? 'Renews annually - Save 30%' :
+                tier === 'premium_annual' ? 'Renews annually - Save 72%' :
                     tier === 'promotional_trial' ? `${subscription.daysRemaining || 0} days remaining` :
                         tier === 'extended_trial' ? `${subscription.daysRemaining || 0} days remaining` :
                             'Limited to 1 image upload per day',
@@ -376,7 +376,7 @@ const PremiumSubscription = () => {
         const period = plan.id === 'premium_annual' ? '/year' : '/month';
 
         // Calculate monthly equivalent for annual plan
-        const monthlyEquivalent = plan.id === 'premium_annual' ? '$5.00/month' : null;
+        const monthlyEquivalent = plan.id === 'premium_annual' ? '$1.67/month' : null;
 
         // Check if user is currently on this plan
         const isPlanActive =
@@ -958,7 +958,6 @@ const styles = StyleSheet.create({
     // Current Plan Status Card Styles - IMPROVED UX
     currentPlanCard: {
         borderRadius: 16,
-        marginHorizontal: 20,
         marginBottom: 20,
         borderWidth: 1,
         borderColor: '#333',

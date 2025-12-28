@@ -45,7 +45,7 @@ const subscriptionPlans = [
     {
         id: 'premium_monthly',
         title: 'Premium Monthly',
-        price: '$9.99/month',
+        price: '$5.99/month',
         description: 'Full access to all premium features',
         features: [
             'AI-powered meal recommendations',
@@ -61,8 +61,8 @@ const subscriptionPlans = [
     {
         id: 'premium_annual',
         title: 'Premium Annual',
-        price: '$89.99/year',
-        description: 'Save 25% with annual billing',
+        price: '$19.99/year',
+        description: 'Best value with annual billing',
         features: [
             'All Premium Monthly features',
             '25% discount compared to monthly',
