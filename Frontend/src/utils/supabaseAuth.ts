@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@env';
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '@env';
 import { Platform } from 'react-native';
 
 // Import Google Sign In safely - only available in dev builds, not Expo Go
@@ -12,11 +12,13 @@ try {
         console.log('Google Sign-In module loaded, available methods:', Object.keys(GoogleSignin));
 
         // Configure Google Sign In for Supabase with minimal configuration
+        // iOS client ID is handled by the Expo plugin via iosUrlScheme in app.config.js
+        // Android requires explicit client ID configuration
         // Wrap in try-catch in case native module isn't fully available
         try {
             GoogleSignin.configure({
                 webClientId: GOOGLE_WEB_CLIENT_ID,
-                iosClientId: GOOGLE_IOS_CLIENT_ID,
+                androidClientId: GOOGLE_ANDROID_CLIENT_ID,
                 offlineAccess: true,
             });
             console.log('Google Sign-In configured for Supabase Auth');

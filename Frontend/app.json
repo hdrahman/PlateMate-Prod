@@ -102,7 +102,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.733542950842-rhdunis2qkjeicinjgmcmcf6lp3qt69v"
+          "iosUrlScheme": "com.googleusercontent.apps.570062506772-qtvk2v9k0utvi7j0fuuho8auk549eh45"
         }
       ],
       "expo-sqlite",
