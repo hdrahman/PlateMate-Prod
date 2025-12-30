@@ -194,23 +194,24 @@ export const FoodLogProvider: React.FC<{ children: ReactNode }> = ({ children })
         const totals = { ...emptyTotals };
 
         logs.forEach(log => {
-            totals.protein += log.proteins || 0;
-            totals.carbs += log.carbs || 0;
-            totals.fat += log.fats || 0;
-            totals.calories += log.calories || 0;
-            totals.fiber += log.fiber || 0;
-            totals.sugar += log.sugar || 0;
-            totals.saturatedFat += log.saturated_fat || 0;
-            totals.polyunsaturatedFat += log.polyunsaturated_fat || 0;
-            totals.monounsaturatedFat += log.monounsaturated_fat || 0;
-            totals.transFat += log.trans_fat || 0;
-            totals.cholesterol += log.cholesterol || 0;
-            totals.sodium += log.sodium || 0;
-            totals.potassium += log.potassium || 0;
-            totals.vitaminA += log.vitamin_a || 0;
-            totals.vitaminC += log.vitamin_c || 0;
-            totals.calcium += log.calcium || 0;
-            totals.iron += log.iron || 0;
+            // Only add positive values to avoid including -1 sentinel values in totals
+            totals.protein += (log.proteins > 0) ? log.proteins : 0;
+            totals.carbs += (log.carbs > 0) ? log.carbs : 0;
+            totals.fat += (log.fats > 0) ? log.fats : 0;
+            totals.calories += (log.calories > 0) ? log.calories : 0;
+            totals.fiber += (log.fiber > 0) ? log.fiber : 0;
+            totals.sugar += (log.sugar > 0) ? log.sugar : 0;
+            totals.saturatedFat += (log.saturated_fat > 0) ? log.saturated_fat : 0;
+            totals.polyunsaturatedFat += (log.polyunsaturated_fat > 0) ? log.polyunsaturated_fat : 0;
+            totals.monounsaturatedFat += (log.monounsaturated_fat > 0) ? log.monounsaturated_fat : 0;
+            totals.transFat += (log.trans_fat > 0) ? log.trans_fat : 0;
+            totals.cholesterol += (log.cholesterol > 0) ? log.cholesterol : 0;
+            totals.sodium += (log.sodium > 0) ? log.sodium : 0;
+            totals.potassium += (log.potassium > 0) ? log.potassium : 0;
+            totals.vitaminA += (log.vitamin_a > 0) ? log.vitamin_a : 0;
+            totals.vitaminC += (log.vitamin_c > 0) ? log.vitamin_c : 0;
+            totals.calcium += (log.calcium > 0) ? log.calcium : 0;
+            totals.iron += (log.iron > 0) ? log.iron : 0;
         });
 
         // Round values for display

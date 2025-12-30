@@ -324,11 +324,11 @@ const DiaryScreen: React.FC = () => {
                 normalizedMealType :
                 'Snacks'; // Default to Snacks if unknown type
 
-            // Add food entry to respective meal
-            mealDict[validMealType].total += entry.calories || 0;
-            mealDict[validMealType].macros.carbs += entry.carbs || 0;
-            mealDict[validMealType].macros.fat += entry.fats || 0;
-            mealDict[validMealType].macros.protein += entry.proteins || 0;
+            // Add food entry to respective meal (excluding negative sentinel values)
+            mealDict[validMealType].total += (entry.calories > 0) ? entry.calories : 0;
+            mealDict[validMealType].macros.carbs += (entry.carbs > 0) ? entry.carbs : 0;
+            mealDict[validMealType].macros.fat += (entry.fats > 0) ? entry.fats : 0;
+            mealDict[validMealType].macros.protein += (entry.proteins > 0) ? entry.proteins : 0;
 
             // Format the item name with appropriate nutritional info
             const weightInfo = entry.weight ? `Weight: ${entry.weight}${entry.weight_unit || 'g'}` : '';

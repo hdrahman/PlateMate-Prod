@@ -1632,7 +1632,7 @@ export const getTodayCalories = async () => {
 
     try {
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(calories) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            `SELECT SUM(CASE WHEN calories > 0 THEN calories ELSE 0 END) as total FROM food_logs WHERE date = ? AND user_id = ?`,
             [today, firebaseUserId]
         );
         return result?.total || 0;
@@ -1654,7 +1654,7 @@ export const getTodayProtein = async () => {
 
     try {
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(proteins) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            `SELECT SUM(CASE WHEN proteins > 0 THEN proteins ELSE 0 END) as total FROM food_logs WHERE date = ? AND user_id = ?`,
             [today, firebaseUserId]
         );
         return result?.total || 0;
@@ -1676,7 +1676,7 @@ export const getTodayCarbs = async () => {
 
     try {
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(carbs) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            `SELECT SUM(CASE WHEN carbs > 0 THEN carbs ELSE 0 END) as total FROM food_logs WHERE date = ? AND user_id = ?`,
             [today, firebaseUserId]
         );
         return result?.total || 0;
@@ -1698,7 +1698,7 @@ export const getTodayFats = async () => {
 
     try {
         const result = await db.getFirstAsync<{ total: number }>(
-            `SELECT SUM(fats) as total FROM food_logs WHERE date = ? AND user_id = ?`,
+            `SELECT SUM(CASE WHEN fats > 0 THEN fats ELSE 0 END) as total FROM food_logs WHERE date = ? AND user_id = ?`,
             [today, firebaseUserId]
         );
         return result?.total || 0;

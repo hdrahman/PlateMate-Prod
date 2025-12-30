@@ -473,15 +473,17 @@ export default function Analytics() {
                 };
 
                 logs.forEach((log: any) => {
-                    dayData.calories += log.calories || 0;
-                    dayData.protein += log.protein || 0;
-                    dayData.carbs += log.carbohydrates || 0;
-                    dayData.fat += log.fat || 0;
+                    // Exclude negative sentinel values from aggregations
+                    dayData.calories += (log.calories > 0) ? log.calories : 0;
+                    dayData.protein += (log.protein > 0) ? log.protein : 0;
+                    dayData.carbs += (log.carbohydrates > 0) ? log.carbohydrates : 0;
+                    dayData.fat += (log.fat > 0) ? log.fat : 0;
 
                     const mealType = (log.meal_type || 'snack').toLowerCase();
                     if (i < 7) {
-                        dayData.mealBreakdown[mealType] = (dayData.mealBreakdown[mealType] || 0) + (log.calories || 0);
-                        mealTotals[mealType] = (mealTotals[mealType] || 0) + (log.calories || 0);
+                        const mealCalories = (log.calories > 0) ? log.calories : 0;
+                        dayData.mealBreakdown[mealType] = (dayData.mealBreakdown[mealType] || 0) + mealCalories;
+                        mealTotals[mealType] = (mealTotals[mealType] || 0) + mealCalories;
                     }
                 });
 

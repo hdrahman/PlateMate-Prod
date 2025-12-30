@@ -83,20 +83,20 @@ export default function NutritionFactsResult() {
 
     // Calculate total nutrition if multiple items
     const totalNutrition = isMultipleItems ? {
-        calories: nutritionData.reduce((sum, item) => sum + (item.calories || 0), 0),
-        proteins: nutritionData.reduce((sum, item) => sum + (item.proteins || 0), 0),
-        carbs: nutritionData.reduce((sum, item) => sum + (item.carbs || 0), 0),
-        fats: nutritionData.reduce((sum, item) => sum + (item.fats || 0), 0),
-        fiber: nutritionData.reduce((sum, item) => sum + (item.fiber || 0), 0),
-        sugar: nutritionData.reduce((sum, item) => sum + (item.sugar || 0), 0),
-        saturated_fat: nutritionData.reduce((sum, item) => sum + (item.saturated_fat || 0), 0),
-        sodium: nutritionData.reduce((sum, item) => sum + (item.sodium || 0), 0),
-        cholesterol: nutritionData.reduce((sum, item) => sum + (item.cholesterol || 0), 0),
-        potassium: nutritionData.reduce((sum, item) => sum + (item.potassium || 0), 0),
-        vitamin_a: nutritionData.reduce((sum, item) => sum + (item.vitamin_a || 0), 0),
-        vitamin_c: nutritionData.reduce((sum, item) => sum + (item.vitamin_c || 0), 0),
-        calcium: nutritionData.reduce((sum, item) => sum + (item.calcium || 0), 0),
-        iron: nutritionData.reduce((sum, item) => sum + (item.iron || 0), 0),
+        calories: nutritionData.reduce((sum, item) => sum + (item.calories > 0 ? item.calories : 0), 0),
+        proteins: nutritionData.reduce((sum, item) => sum + (item.proteins > 0 ? item.proteins : 0), 0),
+        carbs: nutritionData.reduce((sum, item) => sum + (item.carbs > 0 ? item.carbs : 0), 0),
+        fats: nutritionData.reduce((sum, item) => sum + (item.fats > 0 ? item.fats : 0), 0),
+        fiber: nutritionData.reduce((sum, item) => sum + (item.fiber > 0 ? item.fiber : 0), 0),
+        sugar: nutritionData.reduce((sum, item) => sum + (item.sugar > 0 ? item.sugar : 0), 0),
+        saturated_fat: nutritionData.reduce((sum, item) => sum + (item.saturated_fat > 0 ? item.saturated_fat : 0), 0),
+        sodium: nutritionData.reduce((sum, item) => sum + (item.sodium > 0 ? item.sodium : 0), 0),
+        cholesterol: nutritionData.reduce((sum, item) => sum + (item.cholesterol > 0 ? item.cholesterol : 0), 0),
+        potassium: nutritionData.reduce((sum, item) => sum + (item.potassium > 0 ? item.potassium : 0), 0),
+        vitamin_a: nutritionData.reduce((sum, item) => sum + (item.vitamin_a > 0 ? item.vitamin_a : 0), 0),
+        vitamin_c: nutritionData.reduce((sum, item) => sum + (item.vitamin_c > 0 ? item.vitamin_c : 0), 0),
+        calcium: nutritionData.reduce((sum, item) => sum + (item.calcium > 0 ? item.calcium : 0), 0),
+        iron: nutritionData.reduce((sum, item) => sum + (item.iron > 0 ? item.iron : 0), 0),
     } : displayFood;
 
     // Handle adding food to log

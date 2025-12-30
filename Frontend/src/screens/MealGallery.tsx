@@ -115,8 +115,8 @@ const MealGallery: React.FC = () => {
 
         const meals = Array.from(uniqueMeals.values());
 
-        // Calculate total calories
-        const totalCalories = meals.reduce((sum, meal) => sum + (meal.calories || 0), 0);
+        // Calculate total calories (excluding negative sentinel values)
+        const totalCalories = meals.reduce((sum, meal) => sum + (meal.calories > 0 ? meal.calories : 0), 0);
 
         // Find most frequent food
         const foodCounts = new Map();

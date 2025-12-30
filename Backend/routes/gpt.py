@@ -227,12 +227,12 @@ async def analyze_meal(
         
         logger.info(f"Analyzing meal with {len(request.food_items)} food items (user: {current_user['supabase_uid']})")
         
-        # Extract meal information from provided data
+        # Extract meal information from provided data, excluding negative sentinel values (-1)
         food_names = [item.get('food_name', 'Unknown food') for item in request.food_items]
-        total_calories = sum(item.get('calories', 0) for item in request.food_items)
-        total_protein = sum(item.get('proteins', 0) for item in request.food_items)
-        total_carbs = sum(item.get('carbs', 0) for item in request.food_items)
-        total_fat = sum(item.get('fats', 0) for item in request.food_items)
+        total_calories = sum(max(0, item.get('calories', 0)) for item in request.food_items)
+        total_protein = sum(max(0, item.get('proteins', 0)) for item in request.food_items)
+        total_carbs = sum(max(0, item.get('carbs', 0)) for item in request.food_items)
+        total_fat = sum(max(0, item.get('fats', 0)) for item in request.food_items)
         
         # Prepare prompt for GPT
         prompt = f"""

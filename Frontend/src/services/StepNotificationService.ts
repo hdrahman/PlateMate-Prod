@@ -166,7 +166,7 @@ class StepNotificationService {
 
       // Try today first
       let result = await db.getFirstAsync<{ totalProtein: number }>(
-        `SELECT SUM(proteins) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+        `SELECT SUM(CASE WHEN proteins > 0 THEN proteins ELSE 0 END) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
         [`${todayDate}%`, firebaseUserId]
       );
       
@@ -176,7 +176,7 @@ class StepNotificationService {
       // If no protein for today, try yesterday (user might be viewing yesterday's data)
       if (consumedProtein === 0) {
         const yesterdayResult = await db.getFirstAsync<{ totalProtein: number }>(
-          `SELECT SUM(proteins) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+          `SELECT SUM(CASE WHEN proteins > 0 THEN proteins ELSE 0 END) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
           [`${yesterdayDate}%`, firebaseUserId]
         );
         const yesterdayProtein = yesterdayResult?.totalProtein || 0;
@@ -273,7 +273,7 @@ class StepNotificationService {
 
       // Try today first
       let result = await db.getFirstAsync<{ totalCalories: number }>(
-        `SELECT SUM(calories) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+        `SELECT SUM(CASE WHEN calories > 0 THEN calories ELSE 0 END) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
         [`${todayDate}%`, firebaseUserId]
       );
       
@@ -284,7 +284,7 @@ class StepNotificationService {
       // If no calories for today, try yesterday (user might be viewing yesterday's data)
       if (consumedCalories === 0) {
         const yesterdayResult = await db.getFirstAsync<{ totalCalories: number }>(
-          `SELECT SUM(calories) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
+          `SELECT SUM(CASE WHEN calories > 0 THEN calories ELSE 0 END) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
           [`${yesterdayDate}%`, firebaseUserId]
         );
         const yesterdayCalories = yesterdayResult?.totalCalories || 0;

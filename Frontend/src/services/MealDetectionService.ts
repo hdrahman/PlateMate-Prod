@@ -152,9 +152,9 @@ class MealDetectionService {
             let processedFoodCount = 0;
 
             for (const item of foodItems) {
-                // Simulate nutritional analysis
-                totalSodium += item.sodium || 0;
-                totalSugar += item.sugar || 0;
+                // Simulate nutritional analysis (exclude negative sentinel values)
+                totalSodium += (item.sodium > 0) ? item.sodium : 0;
+                totalSugar += (item.sugar > 0) ? item.sugar : 0;
                 if (item.processed) processedFoodCount++;
             }
 
