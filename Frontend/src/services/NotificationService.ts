@@ -231,7 +231,8 @@ class NotificationService {
                             data: {
                                 type: 'meal_reminder',
                                 meal: meal.name.toLowerCase(),
-                                action: 'open_app'
+                                screen: 'Scanner',
+                                action: 'open_scanner'
                             },
                             sound: true,
                         },
@@ -272,7 +273,8 @@ class NotificationService {
                                 data: {
                                     type: 'snack_reminder',
                                     time,
-                                    action: 'open_app'
+                                    screen: 'Scanner',
+                                    action: 'open_scanner'
                                 },
                                 sound: true,
                             },
@@ -609,7 +611,8 @@ class NotificationService {
             type: 'missed_meal',
             meal: mealName.toLowerCase(),
             hoursLate,
-            action: 'open_app'
+            screen: 'Manual',
+            action: 'open_manual'
         });
     }
 

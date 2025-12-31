@@ -144,10 +144,10 @@ class StepNotificationService {
       // Get consumed protein from food log - try today first, then yesterday
       const todayDate = formatDateToString(new Date());
       const yesterdayDate = formatDateToString(new Date(Date.now() - 24 * 60 * 60 * 1000));
-      
+
       // Use cached user ID (same pattern as getTodayExerciseCalories)
       let firebaseUserId = getCurrentUserId();
-      
+
       // Validate we have a valid user ID  
       if (!firebaseUserId || firebaseUserId === 'anonymous') {
         console.warn('⚠️ No valid cached user ID for protein data, trying async fallback');
@@ -169,10 +169,10 @@ class StepNotificationService {
         `SELECT SUM(CASE WHEN proteins > 0 THEN proteins ELSE 0 END) as totalProtein FROM food_logs WHERE date LIKE ? AND user_id = ?`,
         [`${todayDate}%`, firebaseUserId]
       );
-      
+
       let consumedProtein = result?.totalProtein || 0;
       let activeDate = todayDate;
-      
+
       // If no protein for today, try yesterday (user might be viewing yesterday's data)
       if (consumedProtein === 0) {
         const yesterdayResult = await db.getFirstAsync<{ totalProtein: number }>(
@@ -180,7 +180,7 @@ class StepNotificationService {
           [`${yesterdayDate}%`, firebaseUserId]
         );
         const yesterdayProtein = yesterdayResult?.totalProtein || 0;
-        
+
         if (yesterdayProtein > 0) {
           consumedProtein = yesterdayProtein;
           activeDate = yesterdayDate;
@@ -188,8 +188,8 @@ class StepNotificationService {
         }
       }
 
-      console.log('🥩 Protein data for notification:', { 
-        userId: firebaseUserId, 
+      console.log('🥩 Protein data for notification:', {
+        userId: firebaseUserId,
         consumed: consumedProtein,
         activeDate: activeDate,
         todayResult: result?.totalProtein || 'null',
@@ -199,7 +199,7 @@ class StepNotificationService {
       return Math.round(consumedProtein);
     } catch (error) {
       console.error('❌ Error getting protein data for notification:', error);
-      
+
       // Log specific error details
       if (error instanceof Error) {
         if (error.message.includes('not authenticated')) {
@@ -210,7 +210,7 @@ class StepNotificationService {
           console.error('❌ Unknown error in protein data retrieval:', error.message);
         }
       }
-      
+
       console.warn('⚠️ Using fallback protein value (0) in notification');
       return 0;
     }
@@ -225,7 +225,7 @@ class StepNotificationService {
       // Use cached user ID (same pattern as getTodayExerciseCalories)
       // This avoids Supabase auth issues in foreground service context
       let firebaseUserId = getCurrentUserId();
-      
+
       // Validate we have a valid user ID
       if (!firebaseUserId || firebaseUserId === 'anonymous') {
         console.warn('⚠️ No valid cached user ID in notification service, trying async fallback');
@@ -237,12 +237,12 @@ class StepNotificationService {
           throw new Error('User not authenticated in notification context');
         }
       }
-      
+
       // Get user goals using the SAME method as Home screen (BMR daily target)
       const { getUserBMRData } = await import('../utils/database');
       const bmrData = await getUserBMRData(firebaseUserId);
       let baseCaloriesGoal = 2000; // fallback
-      
+
       if (bmrData?.dailyTarget && bmrData.dailyTarget > 0) {
         baseCaloriesGoal = bmrData.dailyTarget;
         console.log(`📋 Using BMR daily target as notification calorie goal: ${baseCaloriesGoal}`);
@@ -252,7 +252,7 @@ class StepNotificationService {
         baseCaloriesGoal = userGoals?.calories || 2000;
         console.log(`📋 Using user goals as notification calorie goal: ${baseCaloriesGoal}`);
       }
-      
+
       // Validate base calorie goal is reasonable (between 1000-5000)
       if (baseCaloriesGoal < 1000 || baseCaloriesGoal > 5000) {
         console.warn(`⚠️ Unreasonable base calorie goal: ${baseCaloriesGoal}, using default 2000`);
@@ -263,7 +263,7 @@ class StepNotificationService {
       // The user might be viewing yesterday's data in the app
       const todayDate = formatDateToString(new Date());
       const yesterdayDate = formatDateToString(new Date(Date.now() - 24 * 60 * 60 * 1000));
-      
+
       console.log(`📅 Checking food logs for dates: today=${todayDate}, yesterday=${yesterdayDate}`);
       console.log(`👤 Using Firebase UID: ${firebaseUserId}`);
 
@@ -276,11 +276,11 @@ class StepNotificationService {
         `SELECT SUM(CASE WHEN calories > 0 THEN calories ELSE 0 END) as totalCalories FROM food_logs WHERE date LIKE ? AND user_id = ?`,
         [`${todayDate}%`, firebaseUserId]
       );
-      
+
       let consumedCalories = result?.totalCalories || 0;
       let activeDate = todayDate;
       console.log(`📊 Today's calories query result: ${consumedCalories} for date ${todayDate}`);
-      
+
       // If no calories for today, try yesterday (user might be viewing yesterday's data)
       if (consumedCalories === 0) {
         const yesterdayResult = await db.getFirstAsync<{ totalCalories: number }>(
@@ -288,7 +288,7 @@ class StepNotificationService {
           [`${yesterdayDate}%`, firebaseUserId]
         );
         const yesterdayCalories = yesterdayResult?.totalCalories || 0;
-        
+
         console.log(`📊 Yesterday's calories query result: ${yesterdayCalories} for date ${yesterdayDate}`);
         if (yesterdayCalories > 0) {
           consumedCalories = yesterdayCalories;
@@ -298,7 +298,7 @@ class StepNotificationService {
           console.log(`⚠️ No calories found for either today or yesterday`);
         }
       }
-      
+
       console.log(`📊 Food log calories: ${consumedCalories} from date ${activeDate}`);
 
       // Get today's exercise calories - use same user ID as other queries
@@ -310,7 +310,7 @@ class StepNotificationService {
           [firebaseUserId]
         );
         const userId = userIdResult?.id || 1;
-        
+
         // Query exercises table directly with our known user info
         const today = formatDateToString(new Date());
         const exerciseResult = await db.getFirstAsync<{ total: number }>(
@@ -318,13 +318,13 @@ class StepNotificationService {
           [today, userId]
         );
         exerciseCalories = exerciseResult?.total || 0;
-        
+
         console.log(`🏃 Exercise calories: ${exerciseCalories} for user ${firebaseUserId} (numeric id: ${userId})`);
       } catch (exerciseError) {
         console.warn('⚠️ Failed to get exercise calories, using fallback:', exerciseError);
         exerciseCalories = await getTodayExerciseCalories();
       }
-      
+
       // Validate exercise calories are reasonable (between 0-2000)
       if (exerciseCalories < 0 || exerciseCalories > 2000) {
         console.warn(`⚠️ Unreasonable exercise calories: ${exerciseCalories}, capping to reasonable range`);
@@ -334,7 +334,7 @@ class StepNotificationService {
       // Calculate adjusted goal (base + exercise calories) - matches Home screen logic
       const adjustedCaloriesGoal = baseCaloriesGoal + exerciseCalories;
       const remainingCalories = adjustedCaloriesGoal - consumedCalories;
-      
+
       // Validate final calculations are reasonable
       if (adjustedCaloriesGoal > 8000) {
         console.warn(`⚠️ Adjusted calorie goal seems too high: ${adjustedCaloriesGoal}`);
@@ -343,12 +343,12 @@ class StepNotificationService {
         console.warn(`⚠️ Consumed calories seem too high: ${consumedCalories}`);
       }
 
-      console.log('📊 Calorie data for notification:', { 
+      console.log('📊 Calorie data for notification:', {
         userId: firebaseUserId,
-        baseGoal: baseCaloriesGoal, 
-        exerciseCalories, 
-        adjustedGoal: adjustedCaloriesGoal, 
-        consumed: consumedCalories, 
+        baseGoal: baseCaloriesGoal,
+        exerciseCalories,
+        adjustedGoal: adjustedCaloriesGoal,
+        consumed: consumedCalories,
         remaining: remainingCalories,
         bmrDataFound: !!bmrData?.dailyTarget
       });
@@ -360,7 +360,7 @@ class StepNotificationService {
       };
     } catch (error) {
       console.error('❌ Error getting calorie data for notification:', error);
-      
+
       // Log specific error details
       if (error instanceof Error) {
         if (error.message.includes('not authenticated')) {
@@ -373,7 +373,7 @@ class StepNotificationService {
           console.error('❌ Unknown error in calorie data retrieval:', error.message);
         }
       }
-      
+
       // Return safe fallback values
       console.warn('⚠️ Using fallback calorie values in notification');
       return { goal: 2000, consumed: 0, remaining: 2000 };
@@ -442,7 +442,7 @@ class StepNotificationService {
   private async getNotificationData(steps: number): Promise<NotificationData> {
     console.log('🔍 [ANR DEBUG] Starting getNotificationData - 6 DB queries incoming');
     const startTime = performance.now();
-    
+
     const [calorieData, protein, nextMealTime] = await Promise.all([
       this.getCalorieData(),
       this.getProteinData(),
@@ -452,7 +452,7 @@ class StepNotificationService {
     const endTime = performance.now();
     const duration = endTime - startTime;
     console.log(`🔍 [ANR DEBUG] getNotificationData completed in ${duration.toFixed(2)}ms`);
-    
+
     if (duration > 1000) {
       console.warn(`⚠️ [ANR WARNING] Notification data took ${duration.toFixed(2)}ms - this could cause ANR!`);
     }
@@ -473,7 +473,7 @@ class StepNotificationService {
     const { steps, caloriesRemaining, protein, nextMealTime } = data;
 
     // Title shows calories remaining or over
-    const title = caloriesRemaining >= 0 
+    const title = caloriesRemaining >= 0
       ? `${caloriesRemaining} calories remaining`
       : `${Math.abs(caloriesRemaining)} calories over`;
 
@@ -535,9 +535,18 @@ class StepNotificationService {
       // Display notification as foreground service
       await notifee.displayNotification({
         ...notification,
+        data: {
+          type: 'persistent_step_tracking',
+          screen: 'Home',
+          action: 'open_home'
+        },
         android: {
           ...notification.android,
           asForegroundService: true, // This now works with proper service registration
+          pressAction: {
+            id: 'open_home',
+            launchActivity: 'default',
+          },
           actions: [
             {
               title: 'Stop',
@@ -549,18 +558,18 @@ class StepNotificationService {
         }
       });
       console.log('🚀 Foreground service notification displayed');
-      
+
       this.currentNotificationId = NOTIFICATION_ID;
       console.log('✅ Step tracking service active:', { steps, title, body });
     } catch (error) {
       console.error('❌ Error starting foreground service:', error);
-      
+
       // Stop infinite retry loops by checking error type
       if (error instanceof Error && error.message.includes('sound')) {
         console.error('🛑 Sound configuration error - notification service needs reconfiguration');
         return;
       }
-      
+
       // Fallback to regular notification
       try {
         const fallbackNotification = {
@@ -583,9 +592,18 @@ class StepNotificationService {
 
         await notifee.displayNotification({
           ...fallbackNotification,
+          data: {
+            type: 'persistent_step_tracking',
+            screen: 'Home',
+            action: 'open_home'
+          },
           android: {
             ...fallbackNotification.android,
             asForegroundService: true,
+            pressAction: {
+              id: 'open_home',
+              launchActivity: 'default',
+            },
             actions: [
               {
                 title: 'Stop',
@@ -596,12 +614,12 @@ class StepNotificationService {
             ],
           }
         });
-        
+
         this.currentNotificationId = NOTIFICATION_ID;
         console.log('🔔 Fallback foreground service started:', { steps });
       } catch (fallbackError) {
         console.error('❌ Even fallback foreground service failed:', fallbackError);
-        
+
         // Prevent infinite error loops by disabling notifications temporarily
         if (fallbackError instanceof Error && fallbackError.message.includes('sound')) {
           console.error('🛑 Critical notification error - disabling for this session');
@@ -629,7 +647,7 @@ class StepNotificationService {
       console.warn('⚠️ Notifications disabled due to previous errors, skipping update');
       return;
     }
-    
+
     // Check if notification is still active, recreate if needed
     const isActive = await this.isNotificationActive();
     if (!isActive) {

@@ -648,16 +648,28 @@ export default function App() {
   const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
-    // Set up notification response listener
+    // Set up notification response listener for expo-notifications (iOS + Android scheduled notifications)
     const notificationListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification tapped:', response);
+      console.log('📱 Notification tapped:', response);
 
-      // Handle different notification types
+      // Handle different notification types based on screen target
       const data = response.notification.request.content.data;
-      if (data?.action === 'open_app') {
-        // App is already open due to the tap, just navigate to home if needed
-        if (navigationRef.current) {
-          // Navigate to main screen (Home)
+      const screen = data?.screen;
+      const mealType = data?.meal;
+
+      if (navigationRef.current) {
+        if (screen === 'Scanner') {
+          // Initial meal reminder → open Scanner
+          console.log('📸 Opening Scanner from meal reminder notification');
+          navigationRef.current.navigate('Scanner', { mode: 'camera' });
+        } else if (screen === 'Manual') {
+          // Missed meal followup → open Manual entry
+          console.log('✍️ Opening Manual entry from missed meal notification');
+          const capitalizedMeal = mealType ? mealType.charAt(0).toUpperCase() + mealType.slice(1) : 'Snack';
+          navigationRef.current.navigate('Manual', { mealType: capitalizedMeal, sourcePage: 'notification' });
+        } else {
+          // Default: persistent notification or other → Home
+          console.log('🏠 Opening Home from notification');
           navigationRef.current.navigate('Main', { screen: 'Home' });
         }
       }
@@ -689,8 +701,16 @@ export default function App() {
               return new Promise(() => {
                 console.log('🚀 Foreground service registered and running');
 
-                // Handle foreground service events (stop button, etc.)
+                // Handle foreground service events (notification tap, stop button, etc.)
                 notifee.onForegroundEvent(({ type, detail }) => {
+                  // Handle notification body tap → navigate to Home
+                  if (type === EventType.PRESS) {
+                    console.log('🏠 Persistent notification tapped, opening Home');
+                    if (navigationRef.current) {
+                      navigationRef.current.navigate('Main', { screen: 'Home' });
+                    }
+                  }
+                  // Handle stop button press
                   if (type === EventType.ACTION_PRESS && detail.pressAction.id === 'stop') {
                     console.log('🛑 Stop action pressed, stopping step tracking');
                     // Stop both trackers

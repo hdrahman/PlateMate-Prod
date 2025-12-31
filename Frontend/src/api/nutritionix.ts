@@ -57,6 +57,35 @@ export interface NutritionixResponse {
     common: NutritionixSearchResult[];
 }
 
+export interface Serving {
+    serving_id?: string;
+    serving_description: string;
+    number_of_units?: number;
+    measurement_description?: string;
+    metric_serving_amount: number;
+    metric_serving_unit: string;
+    is_default?: boolean;
+    calories: number;
+    protein: number;
+    carbohydrate: number;
+    fat: number;
+    fiber?: number;
+    sugar?: number;
+    saturated_fat?: number;
+    polyunsaturated_fat?: number;
+    monounsaturated_fat?: number;
+    trans_fat?: number;
+    cholesterol?: number;
+    sodium?: number;
+    potassium?: number;
+    vitamin_a?: number;
+    vitamin_c?: number;
+    calcium?: number;
+    iron?: number;
+    vitamin_d?: number;
+    added_sugars?: number;
+}
+
 export interface FoodItem {
     food_name: string;
     brand_name?: string;
@@ -83,6 +112,7 @@ export interface FoodItem {
     serving_qty: number;
     healthiness_rating?: number;
     notes?: string;
+    all_servings?: Serving[];  // Array of all available servings from API
 }
 
 /**

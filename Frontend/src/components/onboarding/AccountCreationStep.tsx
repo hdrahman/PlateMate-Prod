@@ -413,37 +413,42 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                     </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Divider */}
-                <View style={styles.dividerContainer}>
-                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-                    <Text style={[styles.orText, { color: theme.colors.textSecondary }]}>or continue with</Text>
-                    <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-                </View>
+                {/* Divider - only show on iOS where social sign-in is available */}
+                {Platform.OS === 'ios' && (
+                    <View style={styles.dividerContainer}>
+                        <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                        <Text style={[styles.orText, { color: theme.colors.textSecondary }]}>or continue with</Text>
+                        <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                    </View>
+                )}
 
-                {/* Social Sign-In Buttons */}
-                <View style={styles.socialSection}>
-                    <TouchableOpacity
-                        style={[styles.socialButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
-                        onPress={handleGoogleSignIn}
-                        disabled={isLoading}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="logo-google" size={20} color={theme.colors.text} style={styles.socialIcon} />
-                        <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Google</Text>
-                    </TouchableOpacity>
-
-                    {isAppleAuthAvailable && (
+                {/* Social Sign-In Buttons - iOS only */}
+                {Platform.OS === 'ios' && (
+                    <View style={styles.socialSection}>
+                        {/* Google Sign-In (iOS only - disabled on Android due to OAuth config issues) */}
                         <TouchableOpacity
-                            style={[styles.socialButton, styles.appleButton, { borderColor: theme.colors.border }]}
-                            onPress={handleAppleSignIn}
+                            style={[styles.socialButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
+                            onPress={handleGoogleSignIn}
                             disabled={isLoading}
                             activeOpacity={0.8}
                         >
-                            <Ionicons name="logo-apple" size={22} color={theme.colors.text} style={styles.socialIcon} />
-                            <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Apple</Text>
+                            <Ionicons name="logo-google" size={20} color={theme.colors.text} style={styles.socialIcon} />
+                            <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Google</Text>
                         </TouchableOpacity>
-                    )}
-                </View>
+
+                        {isAppleAuthAvailable && (
+                            <TouchableOpacity
+                                style={[styles.socialButton, styles.appleButton, { borderColor: theme.colors.border }]}
+                                onPress={handleAppleSignIn}
+                                disabled={isLoading}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="logo-apple" size={22} color={theme.colors.text} style={styles.socialIcon} />
+                                <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Apple</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </ScrollView>
         </KeyboardAvoidingView>
     );

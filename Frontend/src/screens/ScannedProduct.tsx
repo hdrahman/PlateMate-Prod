@@ -34,6 +34,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 import { ThemeContext } from '../ThemeContext';
+import { Serving } from '../services/BarcodeService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -95,6 +96,8 @@ const ScannedProduct: React.FC = () => {
     const [availableUnits, setAvailableUnits] = useState<FoodUnit[]>([]);
     const [currentNutrition, setCurrentNutrition] = useState(foodData);
     const [dailyGoals, setDailyGoals] = useState<UserGoals | null>(null);
+    const [selectedServing, setSelectedServing] = useState<Serving | null>(null);
+    const [apiServings, setApiServings] = useState<Serving[]>([]);
 
     const mealTypes = [
         { name: 'Breakfast', icon: 'sunny-outline', color: ACCENT_COLORS.ACCENT_ORANGE },
@@ -130,6 +133,16 @@ const ScannedProduct: React.FC = () => {
     useEffect(() => {
         const foodName = foodData?.food_name || '';
         const units = getSuggestedUnitsForFood(foodName);
+        
+        // Extract API servings if available
+        if (foodData?.all_servings && Array.isArray(foodData.all_servings) && foodData.all_servings.length > 0) {
+            setApiServings(foodData.all_servings);
+            
+            // Find the default serving or use the first one
+            const defaultServing = foodData.all_servings.find((s: Serving) => s.is_default);
+            setSelectedServing(defaultServing || foodData.all_servings[0]);
+        }
+        
         setAvailableUnits(units);
 
         // Ensure current unit is in available units, if not add it
@@ -176,9 +189,54 @@ const ScannedProduct: React.FC = () => {
     const sugar = currentNutrition?.sugar || -1;
     const sodium = currentNutrition?.sodium || -1;
 
+    // Find an API serving that matches the requested unit
+    const findMatchingApiServing = (requestedUnit: string): Serving | null => {
+        if (!apiServings || apiServings.length === 0) {
+            return null;
+        }
+
+        // Normalize the requested unit for comparison
+        const normalizedUnit = requestedUnit.toLowerCase().trim();
+
+        // Try exact matching first
+        for (const serving of apiServings) {
+            const servingDesc = serving.serving_description?.toLowerCase() || '';
+            const metricUnit = serving.metric_serving_unit?.toLowerCase() || '';
+
+            // Match based on metric unit (e.g., "g", "ml", "oz")
+            if (metricUnit === normalizedUnit) {
+                return serving;
+            }
+
+            // Match gram-based servings (e.g., "100g", "100 g")
+            if (normalizedUnit === 'g' || normalizedUnit === 'gram' || normalizedUnit === 'grams') {
+                if (servingDesc.includes('g') && !servingDesc.includes('kg')) {
+                    return serving;
+                }
+            }
+
+            // Match descriptions containing the unit
+            if (servingDesc.includes(normalizedUnit)) {
+                return serving;
+            }
+        }
+
+        return null;
+    };
+
     // Handle unit change
     const handleUnitChange = (newUnit: string) => {
         const foodName = foodData?.food_name || '';
+
+        // First, check if there's an API serving that matches this unit
+        const matchingServing = findMatchingApiServing(newUnit);
+        
+        if (matchingServing) {
+            // Use the API serving instead of converting
+            console.log(`Found matching API serving: ${matchingServing.serving_description}`);
+            handleServingSelection(matchingServing);
+            return;
+        }
 
         // Validate if the unit is appropriate for this food
         if (!isValidUnitForFood(foodName, newUnit)) {
@@ -191,7 +249,7 @@ const ScannedProduct: React.FC = () => {
         }
 
         try {
-            // Convert current quantity to new unit
+            // Convert current quantity to new unit (fallback when no API serving matches)
             const currentQuantityNum = parseFloat(quantity) || 1;
             const convertedQuantity = convertFoodUnit(
                 currentQuantityNum,
@@ -208,6 +266,44 @@ const ScannedProduct: React.FC = () => {
             console.error('Error converting units:', error);
             Alert.alert('Conversion Error', 'Unable to convert to the selected unit.');
         }
+    };
+
+    // Handle selecting a serving from API servings
+    const handleServingSelection = (serving: Serving) => {
+        setSelectedServing(serving);
+        
+        // Update nutrition to match the selected serving
+        const updatedNutrition = {
+            ...foodData,
+            calories: serving.calories || 0,
+            proteins: serving.protein || 0,
+            carbs: serving.carbohydrate || 0,
+            fats: serving.fat || 0,
+            fiber: serving.fiber || 0,
+            sugar: serving.sugar || 0,
+            saturated_fat: serving.saturated_fat || 0,
+            polyunsaturated_fat: serving.polyunsaturated_fat || 0,
+            monounsaturated_fat: serving.monounsaturated_fat || 0,
+            trans_fat: serving.trans_fat || 0,
+            cholesterol: serving.cholesterol || 0,
+            sodium: serving.sodium || 0,
+            potassium: serving.potassium || 0,
+            vitamin_a: serving.vitamin_a || 0,
+            vitamin_c: serving.vitamin_c || 0,
+            calcium: serving.calcium || 0,
+            iron: serving.iron || 0,
+            serving_unit: serving.serving_description || 'serving',
+            serving_weight_grams: serving.metric_serving_amount || 100,
+            serving_qty: serving.number_of_units || 1
+        };
+        
+        setCurrentNutrition(updatedNutrition);
+        setQuantity('1');
+        setServingUnit(serving.serving_description || 'serving');
+        setShowUnitModal(false);
+        
+        // Haptic feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
     // Increment/decrement with smart step sizes
@@ -639,33 +735,82 @@ const ScannedProduct: React.FC = () => {
                                 style={styles.modalGradient}
                             >
                                 <View style={styles.modalHeader}>
-                                    <Text style={styles.modalTitle}>Select Unit</Text>
+                                    <Text style={styles.modalTitle}>Select Serving Size</Text>
                                     <TouchableOpacity onPress={() => setShowUnitModal(false)}>
                                         <Ionicons name="close" size={24} color={COLORS.GRAY_LIGHT} />
                                     </TouchableOpacity>
                                 </View>
 
                                 <ScrollView style={styles.unitsList}>
-                                    {availableUnits.map((unit) => (
-                                        <TouchableOpacity
-                                            key={unit.key}
-                                            style={[
-                                                styles.unitOption,
-                                                servingUnit === unit.key && styles.selectedUnitOption
-                                            ]}
-                                            onPress={() => handleUnitChange(unit.key)}
-                                        >
-                                            <Text style={[
-                                                styles.unitOptionText,
-                                                servingUnit === unit.key && styles.selectedUnitOptionText
-                                            ]}>
-                                                {unit.label}
-                                            </Text>
-                                            {servingUnit === unit.key && (
-                                                <Ionicons name="checkmark" size={20} color={COLORS.ACCENT_BLUE} />
-                                            )}
-                                        </TouchableOpacity>
-                                    ))}
+                                    {/* Show API servings first if available */}
+                                    {apiServings.length > 0 && (
+                                        <>
+                                            <Text style={styles.sectionHeader}>Available Servings</Text>
+                                            {apiServings.map((serving, index) => {
+                                                // Check if this serving is selected by ID or by matching description
+                                                const isSelected = 
+                                                    selectedServing?.serving_id === serving.serving_id ||
+                                                    servingUnit === serving.serving_description;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={serving.serving_id || `serving-${index}`}
+                                                        style={[
+                                                            styles.unitOption,
+                                                            isSelected && styles.selectedUnitOption
+                                                        ]}
+                                                        onPress={() => handleServingSelection(serving)}
+                                                    >
+                                                        <View style={styles.servingOptionContent}>
+                                                            <Text style={[
+                                                                styles.unitOptionText,
+                                                                isSelected && styles.selectedUnitOptionText
+                                                            ]}>
+                                                                {serving.serving_description}
+                                                            </Text>
+                                                            <Text style={styles.servingNutritionText}>
+                                                                {Math.round(serving.calories)} cal
+                                                            </Text>
+                                                        </View>
+                                                        {isSelected && (
+                                                            <Ionicons name="checkmark" size={20} color={COLORS.ACCENT_BLUE} />
+                                                        )}
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                            <View style={styles.sectionDivider} />
+                                            <Text style={styles.sectionHeader}>Custom Units</Text>
+                                        </>
+                                    )}
+                                    
+                                    {/* Standard unit conversion options */}
+                                    {availableUnits.map((unit) => {
+                                        // Check if this unit is selected (but not if an API serving is currently selected)
+                                        const isApiServingActive = apiServings.some(s => 
+                                            s.serving_description === servingUnit
+                                        );
+                                        const isSelected = !isApiServingActive && servingUnit === unit.key;
+                                        
+                                        return (
+                                            <TouchableOpacity
+                                                key={unit.key}
+                                                style={[
+                                                    styles.unitOption,
+                                                    isSelected && styles.selectedUnitOption
+                                                ]}
+                                                onPress={() => handleUnitChange(unit.key)}
+                                            >
+                                                <Text style={[
+                                                    styles.unitOptionText,
+                                                    isSelected && styles.selectedUnitOptionText
+                                                ]}>
+                                                    {unit.label}
+                                                </Text>
+                                                {isSelected && (
+                                                    <Ionicons name="checkmark" size={20} color={COLORS.ACCENT_BLUE} />
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </ScrollView>
                             </LinearGradient>
                         </TouchableOpacity>
@@ -1095,6 +1240,28 @@ const styles = StyleSheet.create({
     selectedUnitOptionText: {
         color: COLORS.ACCENT_BLUE,
         fontWeight: '600',
+    },
+    sectionHeader: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.GRAY_LIGHT,
+        marginTop: 12,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    sectionDivider: {
+        height: 1,
+        backgroundColor: COLORS.GRAY_DARK,
+        marginVertical: 16,
+    },
+    servingOptionContent: {
+        flex: 1,
+    },
+    servingNutritionText: {
+        fontSize: 12,
+        color: COLORS.GRAY_LIGHT,
+        marginTop: 2,
     },
 
     // Daily Goals Progress

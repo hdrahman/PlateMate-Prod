@@ -524,37 +524,43 @@ const Auth = ({ navigation, route }: any) => {
                                 { opacity: socialButtonsOpacity }
                             ]}
                         >
-                            <View style={styles.dividerContainer}>
-                                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-                                <Text style={[styles.orText, { color: theme.colors.textSecondary }]}>or continue with</Text>
-                                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-                            </View>
-
-                            <TouchableOpacity
-                                style={[styles.socialButton, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
-                                onPress={handleGoogleSignIn}
-                                disabled={isLoading}
-                                activeOpacity={0.8}
-                            >
-                                <View style={styles.socialButtonContent}>
-                                    <Ionicons name="logo-google" size={20} color={theme.colors.text} style={styles.socialIcon} />
-                                    <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Google</Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            {/* Apple Sign-In (iOS only) */}
-                            {isAppleAuthAvailable && (
-                                <TouchableOpacity
-                                    style={[styles.socialButton, styles.appleButton, { borderColor: theme.colors.border }]}
-                                    onPress={handleAppleSignIn}
-                                    disabled={isLoading}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={styles.socialButtonContent}>
-                                        <Ionicons name="logo-apple" size={22} color="#FFF" style={styles.socialIcon} />
-                                        <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                            {/* Only show social sign-in section on iOS */}
+                            {Platform.OS === 'ios' && (
+                                <>
+                                    <View style={styles.dividerContainer}>
+                                        <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                                        <Text style={[styles.orText, { color: theme.colors.textSecondary }]}>or continue with</Text>
+                                        <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
                                     </View>
-                                </TouchableOpacity>
+
+                                    {/* Google Sign-In (iOS only - disabled on Android due to OAuth config issues) */}
+                                    <TouchableOpacity
+                                        style={[styles.socialButton, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}
+                                        onPress={handleGoogleSignIn}
+                                        disabled={isLoading}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={styles.socialButtonContent}>
+                                            <Ionicons name="logo-google" size={20} color={theme.colors.text} style={styles.socialIcon} />
+                                            <Text style={[styles.socialButtonText, { color: theme.colors.text }]}>Continue with Google</Text>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {/* Apple Sign-In (iOS only) */}
+                                    {isAppleAuthAvailable && (
+                                        <TouchableOpacity
+                                            style={[styles.socialButton, styles.appleButton, { borderColor: theme.colors.border }]}
+                                            onPress={handleAppleSignIn}
+                                            disabled={isLoading}
+                                            activeOpacity={0.8}
+                                        >
+                                            <View style={styles.socialButtonContent}>
+                                                <Ionicons name="logo-apple" size={22} color="#FFF" style={styles.socialIcon} />
+                                                <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    )}
+                                </>
                             )}
                         </Animated.View>
                     )}

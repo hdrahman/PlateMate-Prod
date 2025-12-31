@@ -358,6 +358,64 @@ async def search_by_barcode(barcode: str) -> Optional[Dict[str, Any]]:
         logger.error(f"Error searching FatSecret by barcode: {str(e)}")
         return None
 
+def parse_serving(serving: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse a single serving into a standardized format
+    
+    Args:
+        serving: FatSecret serving data
+        
+    Returns:
+        Parsed serving with nutritional information
+    """
+    def safe_float(value):
+        """Convert value to float if possible, otherwise return None"""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+    
+    # Extract serving metadata
+    serving_id = serving.get("serving_id")
+    serving_description = serving.get("serving_description")
+    number_of_units = safe_float(serving.get("number_of_units"))
+    measurement_description = serving.get("measurement_description")
+    metric_serving_amount = safe_float(serving.get("metric_serving_amount"))
+    metric_serving_unit = serving.get("metric_serving_unit")
+    is_default = serving.get("is_default") == 1 or serving.get("is_default") == "1"
+    
+    # Extract nutritional values
+    return {
+        "serving_id": serving_id,
+        "serving_description": serving_description,
+        "number_of_units": number_of_units,
+        "measurement_description": measurement_description,
+        "metric_serving_amount": metric_serving_amount,
+        "metric_serving_unit": metric_serving_unit,
+        "is_default": is_default,
+        "calories": safe_float(serving.get("calories")),
+        "protein": safe_float(serving.get("protein")),
+        "carbohydrate": safe_float(serving.get("carbohydrate")),
+        "fat": safe_float(serving.get("fat")),
+        "fiber": safe_float(serving.get("fiber")),
+        "sugar": safe_float(serving.get("sugar")),
+        "saturated_fat": safe_float(serving.get("saturated_fat")),
+        "polyunsaturated_fat": safe_float(serving.get("polyunsaturated_fat")),
+        "monounsaturated_fat": safe_float(serving.get("monounsaturated_fat")),
+        "trans_fat": safe_float(serving.get("trans_fat")),
+        "cholesterol": safe_float(serving.get("cholesterol")),
+        "sodium": safe_float(serving.get("sodium")),
+        "potassium": safe_float(serving.get("potassium")),
+        "vitamin_a": safe_float(serving.get("vitamin_a")),
+        "vitamin_c": safe_float(serving.get("vitamin_c")),
+        "calcium": safe_float(serving.get("calcium")),
+        "iron": safe_float(serving.get("iron")),
+        "vitamin_d": safe_float(serving.get("vitamin_d")),
+        "added_sugars": safe_float(serving.get("added_sugars"))
+    }
+
 def map_food_item(food: Dict[str, Any]) -> Dict[str, Any]:
     """
     Map FatSecret food response to our FoodItem format
@@ -374,19 +432,33 @@ def map_food_item(food: Dict[str, Any]) -> Dict[str, Any]:
     brand_name = food.get("brand_name", "")
     food_type = food.get("food_type", "")
     
-    # Extract serving information
+    # Extract ALL servings from the API response
     servings = food.get("servings", {})
-    serving = {}
+    all_servings = []
+    default_serving = None
     
     if isinstance(servings, dict) and "serving" in servings:
         serving_data = servings["serving"]
         
         # Handle single serving or multiple servings
         if isinstance(serving_data, list):
-            # Use the first serving if multiple are available
-            serving = serving_data[0] if serving_data else {}
+            # Parse all servings
+            all_servings = [parse_serving(s) for s in serving_data]
         else:
-            serving = serving_data
+            # Single serving
+            all_servings = [parse_serving(serving_data)]
+    
+    # Find the default serving (or use first one as fallback)
+    for serving in all_servings:
+        if serving.get("is_default"):
+            default_serving = serving
+            break
+    
+    if not default_serving and all_servings:
+        default_serving = all_servings[0]
+    
+    # Use default serving for backward compatibility
+    serving = default_serving if default_serving else {}
     
     # Extract nutritional information - use None when data is missing
     # Do not set default values to zero - pass through null values
@@ -492,7 +564,8 @@ def map_food_item(food: Dict[str, Any]) -> Dict[str, Any]:
         "serving_unit": serving_unit,
         "serving_weight_grams": serving_weight_grams,
         "serving_qty": serving_qty,
-        "healthiness_rating": healthiness_rating
+        "healthiness_rating": healthiness_rating,
+        "all_servings": all_servings  # Include all available servings
     }
 
     return result

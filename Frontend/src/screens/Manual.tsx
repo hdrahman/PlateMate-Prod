@@ -108,22 +108,23 @@ const searchFood = async (query: string, minHealthiness: number = 0): Promise<Fo
 
 /**
  * Get detailed nutrition information for a food using the backend API
- * @param query - The food name
- * @returns Detailed nutrition information
+ * @param food_id - The FatSecret food ID
+ * @returns Detailed nutrition information with complete nutrient data
  */
-const getFoodDetails = async (query: string): Promise<FoodItemType | null> => {
+const getFoodDetails = async (food_id: string): Promise<FoodItemType | null> => {
     try {
         const headers = await getAuthHeaders();
 
         const response = await axios.post(
             `${BACKEND_BASE_URL}/food/details`,
             {
-                food_name: query
+                food_id: food_id
             },
             { headers }
         );
 
-        return response.data || null;
+        // Extract food from response wrapper
+        return response.data?.food || null;
     } catch (error) {
         console.error('Error getting food details:', error);
         if (axios.isAxiosError(error)) {
@@ -302,12 +303,31 @@ export default function Manual() {
                 return;
             }
 
-            // For search results, show the modal
+            // For search results, fetch full nutritional details
             setIsLoading(true);
-            setSelectedFood(food);
+            
+            // If food has a food_id, fetch complete details from FatSecret
+            // This ensures we get fiber, sugar, vitamins, and minerals
+            if (food.food_id) {
+                console.log(`Fetching detailed nutrition for food_id: ${food.food_id}`);
+                const detailedFood = await getFoodDetails(food.food_id);
+                
+                if (detailedFood) {
+                    console.log('Successfully fetched detailed nutrition data');
+                    setSelectedFood(detailedFood);
+                } else {
+                    console.warn('Could not fetch details, using search data');
+                    setSelectedFood(food);
+                }
+            } else {
+                // No food_id available, use search data
+                setSelectedFood(food);
+            }
+            
             setShowFoodDetails(true);
         } catch (error) {
             console.error('Error selecting food:', error);
+            // Fallback to search data if details fetch fails
             setSelectedFood(food);
             setShowFoodDetails(true);
         } finally {
