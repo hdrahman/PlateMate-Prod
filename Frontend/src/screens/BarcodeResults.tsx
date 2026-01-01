@@ -407,6 +407,9 @@ const BarcodeResults: React.FC = () => {
                     </View>
                 </View>
 
+                {/* Visual Divider */}
+                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
                 {/* Main Content Container */}
                 <View style={[styles.contentContainer, { backgroundColor: theme.colors.background }]}>
                     {/* Calories Section */}
@@ -611,13 +614,14 @@ const styles = StyleSheet.create({
     foodName: { fontSize: 36, fontWeight: '800', color: '#FFFFFF', marginBottom: 6, textAlign: 'center', textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
     brandName: { fontSize: 18, fontWeight: '500', color: '#CCCCCC', textAlign: 'center', textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
     contentContainer: { paddingTop: 0, paddingHorizontal: 16, paddingBottom: 40 },
+    divider: { width: 60, height: 1, alignSelf: 'center', marginTop: 20, marginBottom: 8, opacity: 0.2 },
     quantityAndAddRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, marginTop: 0, paddingHorizontal: 8 },
-    quantityControlsInline: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    quantityButtonInline: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-    quantityInputInline: { width: 60, height: 40, borderRadius: 20, textAlign: 'center', fontSize: 16, fontWeight: '600', paddingHorizontal: 8 },
-    unitSelectorInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20, gap: 4 },
+    quantityControlsInline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    quantityButtonInline: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    quantityInputInline: { width: 55, height: 36, borderRadius: 18, textAlign: 'center', fontSize: 16, fontWeight: '600', paddingHorizontal: 8 },
+    unitSelectorInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 36, borderRadius: 18, gap: 4 },
     unitTextInline: { fontSize: 14, fontWeight: '600' },
-    addButtonInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 40, borderRadius: 20, borderWidth: 2, gap: 6 },
+    addButtonInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 36, borderRadius: 18, borderWidth: 2, gap: 6 },
     addButtonInlineText: { fontSize: 16, fontWeight: '700' },
     calorieSection: { alignItems: 'center', marginBottom: 12, marginTop: 16 },
     calorieAlignmentContainer: { alignItems: 'center' },

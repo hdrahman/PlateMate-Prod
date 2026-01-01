@@ -417,6 +417,9 @@ const ScannedProduct: React.FC = () => {
                     </View>
                 </View>
 
+                {/* Visual Divider */}
+                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
                 {/* Main Content Container */}
                 <View style={[styles.contentContainer, { backgroundColor: theme.colors.background }]}>
                     {/* Calories Section */}
@@ -695,6 +698,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 40,
     },
+    divider: {
+        width: 60,
+        height: 1,
+        alignSelf: 'center',
+        marginTop: 20,
+        marginBottom: 8,
+        opacity: 0.2,
+    },
     quantityAndAddRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -706,19 +717,19 @@ const styles = StyleSheet.create({
     quantityControlsInline: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
     },
     quantityButtonInline: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },
     quantityInputInline: {
-        width: 60,
-        height: 40,
-        borderRadius: 20,
+        width: 55,
+        height: 36,
+        borderRadius: 18,
         textAlign: 'center',
         fontSize: 16,
         fontWeight: '600',
@@ -728,8 +739,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 20,
+        height: 36,
+        borderRadius: 18,
         gap: 4,
     },
     unitTextInline: {
@@ -739,9 +750,9 @@ const styles = StyleSheet.create({
     addButtonInline: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        height: 40,
-        borderRadius: 20,
+        paddingHorizontal: 16,
+        height: 36,
+        borderRadius: 18,
         borderWidth: 2,
         gap: 6,
     },
