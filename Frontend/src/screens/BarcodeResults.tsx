@@ -5,22 +5,19 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    Image,
     TextInput,
     StatusBar,
     Alert,
     ActivityIndicator,
     Dimensions,
     Modal,
-    Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import { addFoodLog } from '../utils/database';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { addFoodLog, getUserGoals, UserGoals } from '../utils/database';
 import { useAuth } from '../context/AuthContext';
 import {
     getSuggestedUnitsForFood,
@@ -30,12 +27,18 @@ import {
     isValidUnitForFood,
     FoodUnit
 } from '../utils/foodUnitConversion';
-import { getUserGoals, UserGoals } from '../utils/database';
 import * as Haptics from 'expo-haptics';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 import { ThemeContext } from '../ThemeContext';
 
-const { width, height } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
+
+// Theme colors matching FoodDetail.tsx
+const MACRO_COLORS = {
+    carbs: '#4FC3F7',
+    protein: '#66BB6A',
+    fat: '#FFB74D'
+};
 
 // Navigation types
 type RootStackParamList = {
@@ -47,24 +50,6 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'BarcodeResults'>;
 
-// Accent colors that stay constant
-const ACCENT_BLUE = '#0084ff';
-const ACCENT_GREEN = '#32D74B';
-const ACCENT_ORANGE = '#FF9500';
-const ACCENT_RED = '#FF3B30';
-const ACCENT_PURPLE = '#AF52DE';
-const ACCENT_PINK = '#FF2D92';
-
-// Fallback colors (used in StyleSheet, overridden inline with theme where possible)
-const PRIMARY_BG = '#121212';
-const SECONDARY_BG = '#111111';
-const CARD_BG = '#1E1E1E';
-const WHITE = '#FFFFFF';
-const SUBDUED = '#AAAAAA';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#808080';
-const GRAY_LIGHT = '#B0B0B0';
-
 const BarcodeResults: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
@@ -74,7 +59,6 @@ const BarcodeResults: React.FC = () => {
 
     // State management
     const [mealType, setMealType] = useState(initialMealType || 'Breakfast');
-    const [showMealTypeDropdown, setShowMealTypeDropdown] = useState(false);
     const [quantity, setQuantity] = useState(foodData?.serving_qty ? String(foodData.serving_qty) : '1');
     const [servingUnit, setServingUnit] = useState(foodData?.serving_unit || 'serving');
     const [notes, setNotes] = useState('');
@@ -84,18 +68,14 @@ const BarcodeResults: React.FC = () => {
     const [currentNutrition, setCurrentNutrition] = useState(foodData);
     const [dailyGoals, setDailyGoals] = useState<UserGoals | null>(null);
 
-    const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
-
     // Fetch user's daily goals
     const fetchDailyGoals = useCallback(async () => {
         if (user?.uid) {
             try {
                 const goals = await getUserGoals(user.uid);
                 setDailyGoals(goals);
-                console.log('📊 BarcodeResults updated daily goals:', goals);
             } catch (error) {
                 console.error('Error fetching daily goals:', error);
-                // Set default goals if fetch fails
                 setDailyGoals({
                     calorieGoal: 2000,
                     proteinGoal: 100,
@@ -104,27 +84,20 @@ const BarcodeResults: React.FC = () => {
                 });
             }
         }
-    }, [user]);
+    }, [user?.uid]);
 
-    useEffect(() => {
-        fetchDailyGoals();
-    }, [fetchDailyGoals]);
-
-    // Add focus effect to refresh goals when returning from other screens  
     useFocusEffect(
         useCallback(() => {
-            console.log('BarcodeResults screen focused, refreshing goals...');
             fetchDailyGoals();
         }, [fetchDailyGoals])
     );
 
-    // Initialize available units and nutrition on mount
+    // Initialize available units on mount
     useEffect(() => {
         const foodName = foodData?.food_name || '';
         const units = getSuggestedUnitsForFood(foodName);
         setAvailableUnits(units);
 
-        // Ensure current unit is in available units, if not add it
         const currentUnitExists = units.some(unit => unit.key === servingUnit);
         if (!currentUnitExists && servingUnit) {
             if (isValidUnitForFood(foodName, servingUnit)) {
@@ -158,17 +131,123 @@ const BarcodeResults: React.FC = () => {
         }
     }, [quantity, servingUnit, foodData]);
 
-    // Calculate nutrition values based on current quantity and unit
+    // Calculate nutrition values
+    const calculateNutrient = (value: number) => {
+        return Math.round(value || 0);
+    };
+
     const calories = currentNutrition?.calories || 0;
     const proteins = currentNutrition?.proteins || 0;
     const carbs = currentNutrition?.carbs || 0;
     const fats = currentNutrition?.fats || 0;
 
+    // Helper function to get color based on healthiness rating
+    const getHealthinessColor = (rating: number): string => {
+        if (rating <= 4) return theme.colors.error;
+        if (rating <= 7) return theme.colors.warning;
+        return theme.colors.success;
+    };
+
+    // Helper function to format macro percentages
+    const getMacroPercentages = () => {
+        const totalCals = calories;
+        if (totalCals === 0) return { carbs: 0, fat: 0, protein: 0 };
+
+        const carbCals = carbs * 4;
+        const fatCals = fats * 9;
+        const proteinCals = proteins * 4;
+
+        return {
+            carbs: Math.round((carbCals / totalCals) * 100),
+            fat: Math.round((fatCals / totalCals) * 100),
+            protein: Math.round((proteinCals / totalCals) * 100)
+        };
+    };
+
+    // Daily value percentages
+    const getDailyValuePercentage = (nutrient: string, value: number): number => {
+        const dailyValues: { [key: string]: number } = {
+            fiber: 25,
+            sugar: 50,
+            saturated_fat: 20,
+            cholesterol: 300,
+            sodium: 2300,
+            potassium: 3500,
+            vitamin_a: 900,
+            vitamin_c: 90,
+            calcium: 1000,
+            iron: 18
+        };
+
+        const dv = dailyValues[nutrient];
+        if (!dv) return 0;
+        return Math.min(Math.round((value / dv) * 100), 100);
+    };
+
+    // Render nutrient row with progress bar
+    const renderNutrientRowWithProgress = (
+        icon: string,
+        label: string,
+        value: number,
+        unit: string = 'g',
+        color: string = theme.colors.textSecondary,
+        showProgress: boolean = false,
+        nutrientKey?: string
+    ) => {
+        const calcValue = calculateNutrient(value);
+        const percentage = nutrientKey ? getDailyValuePercentage(nutrientKey, calcValue) : 0;
+
+        if (!hasNutritionalValue(value)) return null;
+
+        return (
+            <View style={styles.nutrientRowWithProgress}>
+                <View style={styles.nutrientRowHeader}>
+                    <View style={styles.nutrientRowLeft}>
+                        <Ionicons name={icon as any} size={16} color={color} style={styles.nutrientIcon} />
+                        <Text style={[styles.nutrientLabel, { color: theme.colors.text }]}>{label}</Text>
+                    </View>
+                    <View style={styles.nutrientRowRight}>
+                        <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>
+                            {formatNutritionalValue(calcValue, unit, calcValue < 1 && calcValue > 0 ? 1 : 0)}
+                        </Text>
+                        {showProgress && percentage > 0 && (
+                            <Text style={[styles.percentageText, { color: theme.colors.textSecondary }]}>{percentage}%</Text>
+                        )}
+                    </View>
+                </View>
+                {showProgress && percentage > 0 && (
+                    <View style={styles.progressBarContainer}>
+                        <View style={[styles.progressBarBackground, { backgroundColor: theme.colors.border }]}>
+                            <View
+                                style={[
+                                    styles.progressBarFill,
+                                    { width: `${percentage}%`, backgroundColor: color }
+                                ]}
+                            />
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    // Render macro circle
+    const renderMacroCircle = (label: string, value: number, unit: string, percentage: number, color: string) => (
+        <View style={styles.macroCircle}>
+            <View style={[styles.macroCircleInner, { borderColor: color }]}>
+                <Text style={[styles.macroValue, { color: theme.colors.text }]}>{formatNutritionalValue(calculateNutrient(value), unit)}</Text>
+                {hasNutritionalValue(value) && (
+                    <Text style={[styles.macroPercentage, { color: theme.colors.textSecondary }]}>{percentage}%</Text>
+                )}
+            </View>
+            <Text style={[styles.macroLabel, { color: theme.colors.text }]}>{label}</Text>
+        </View>
+    );
+
     // Handle unit change
     const handleUnitChange = (newUnit: string) => {
         const foodName = foodData?.food_name || '';
 
-        // Validate if the unit is appropriate for this food
         if (!isValidUnitForFood(foodName, newUnit)) {
             Alert.alert(
                 'Invalid Unit',
@@ -179,7 +258,6 @@ const BarcodeResults: React.FC = () => {
         }
 
         try {
-            // Convert current quantity to new unit
             const currentQuantityNum = parseFloat(quantity) || 1;
             const convertedQuantity = convertFoodUnit(
                 currentQuantityNum,
@@ -192,13 +270,14 @@ const BarcodeResults: React.FC = () => {
             setQuantity(convertedQuantity.toFixed(2).replace(/\.?0+$/, ''));
             setServingUnit(newUnit);
             setShowUnitModal(false);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         } catch (error) {
             console.error('Error converting units:', error);
             Alert.alert('Conversion Error', 'Unable to convert to the selected unit.');
         }
     };
 
-    // Increment/decrement with smart step sizes
+    // Increment/decrement quantity
     const getStepSize = (unit: string): number => {
         const stepSizes: Record<string, number> = {
             'tsp': 0.25,
@@ -220,79 +299,27 @@ const BarcodeResults: React.FC = () => {
         const step = getStepSize(servingUnit);
         const newQty = increment ? currentQty + step : Math.max(step, currentQty - step);
         setQuantity(newQty.toString().replace(/\.?0+$/, ''));
-
-        // Haptic feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    };
-
-    // Macronutrient data for pie chart
-    const macroData = [
-        {
-            name: 'Carbs',
-            population: carbs * 4, // 4 cal per gram
-            color: ACCENT_BLUE,
-            legendFontColor: GRAY_LIGHT,
-            legendFontSize: 12,
-        },
-        {
-            name: 'Protein',
-            population: proteins * 4, // 4 cal per gram
-            color: ACCENT_GREEN,
-            legendFontColor: GRAY_LIGHT,
-            legendFontSize: 12,
-        },
-        {
-            name: 'Fat',
-            population: fats * 9, // 9 cal per gram
-            color: ACCENT_ORANGE,
-            legendFontColor: GRAY_LIGHT,
-            legendFontSize: 12,
-        },
-    ].filter(item => item.population > 0);
-
-    // Progress data for individual macro circles
-    const progressData = {
-        labels: ['Carbs', 'Protein', 'Fat'],
-        data: [
-            carbs / Math.max(carbs, proteins, fats, 50), // Normalize to highest value or minimum 50g
-            proteins / Math.max(carbs, proteins, fats, 50),
-            fats / Math.max(carbs, proteins, fats, 50),
-        ],
-        colors: [ACCENT_BLUE, ACCENT_GREEN, ACCENT_ORANGE]
-    };
-
-    // Chart configuration
-    const chartConfig = {
-        backgroundColor: 'transparent',
-        backgroundGradientFrom: 'transparent',
-        backgroundGradientTo: 'transparent',
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-        strokeWidth: 3,
-        barPercentage: 0.5,
-        useShadowColorFromDataset: false,
     };
 
     const handleSubmit = async () => {
         try {
             setLoading(true);
 
-            // Format current date as ISO string (YYYY-MM-DD) - same as ImageCapture
             const today = new Date();
             const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-            console.log(`Saving food log from barcode with date: ${formattedDate}`);
 
-            // Create food log entry using the EXACT same structure as ImageCapture
             const foodLog = {
-                meal_id: Date.now().toString(), // Generate a unique meal ID - same as ImageCapture
+                meal_id: Date.now().toString(),
                 food_name: foodData.food_name || 'Unknown Food',
                 brand_name: foodData.brand_name || '',
                 meal_type: mealType,
-                date: formattedDate, // Use formatted date, not timestamp
+                date: formattedDate,
                 quantity: `${quantity} ${servingUnit}`,
                 weight: null,
                 weight_unit: 'g',
-                calories: calories || 0, // Keep calories as 0 since it's mandatory
-                proteins: proteins || -1, // Use -1 for missing data
+                calories: calories || 0,
+                proteins: proteins || -1,
                 carbs: carbs || -1,
                 fats: fats || -1,
                 fiber: currentNutrition?.fiber || -1,
@@ -309,19 +336,16 @@ const BarcodeResults: React.FC = () => {
                 calcium: currentNutrition?.calcium || -1,
                 iron: currentNutrition?.iron || -1,
                 healthiness_rating: foodData.healthiness_rating || 5,
-                notes: notes ? `${notes} | Scanned barcode` : 'Scanned barcode',
-                image_url: foodData.image || '', // Required field
-                file_key: 'default_key' // Required field
+                notes: notes ? `${notes} | Scanned product` : 'Scanned product',
+                image_url: foodData.image || '',
+                file_key: 'default_key'
             };
 
-            console.log('Saving barcode food log to local database:', foodLog);
-
-            // Navigate immediately while database operation runs in background - same as ImageCapture
             const refreshTimestamp = Date.now();
             navigation.navigate('FoodLog', { refresh: refreshTimestamp });
 
-            // Continue with database operation after navigation has started - same as ImageCapture
             await addFoodLog(foodLog);
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         } catch (error) {
             console.error('Error adding food to log:', error);
@@ -331,961 +355,308 @@ const BarcodeResults: React.FC = () => {
         }
     };
 
-    const handleMealTypeSelect = (type: string) => {
-        setMealType(type);
-        setShowMealTypeDropdown(false);
-    };
+    const macroPercentages = getMacroPercentages();
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <StatusBar barStyle="light-content" backgroundColor={PRIMARY_BG} />
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <Ionicons name="arrow-back" size={24} color={WHITE} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Nutrition Facts</Text>
-                <TouchableOpacity style={styles.headerButton}>
-                    <Ionicons name="bookmark-outline" size={24} color={GRAY_LIGHT} />
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* Single Main Nutrition Card */}
-                <View style={styles.mainCard}>
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+            >
+                {/* Image Section (Dark Background with Controls) */}
+                <View style={styles.imageSection}>
                     <LinearGradient
-                        colors={[CARD_BG, SECONDARY_BG]}
-                        style={styles.cardGradient}
-                    >
-                        {/* Product Header Section */}
-                        <View style={styles.productSection}>
-                            <View style={styles.productInfo}>
-                                <Text style={styles.productName} numberOfLines={2}>
-                                    {foodData.food_name || 'Unknown Product'}
-                                </Text>
-                                {foodData.brand_name && (
-                                    <Text style={styles.brandName}>{foodData.brand_name}</Text>
-                                )}
+                        colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
+                        style={styles.imageSectionGradient}
+                    />
 
-                                {/* Serving Controls - Inline */}
-                                <View style={styles.servingControls}>
-                                    <TouchableOpacity
-                                        style={styles.quantityButton}
-                                        onPress={() => adjustQuantity(false)}
-                                    >
-                                        <Ionicons name="remove" size={14} color={ACCENT_BLUE} />
-                                    </TouchableOpacity>
-                                    <TextInput
-                                        style={styles.quantityInput}
-                                        value={quantity}
-                                        onChangeText={setQuantity}
-                                        keyboardType="numeric"
-                                        selectTextOnFocus
-                                    />
-                                    <TouchableOpacity
-                                        style={styles.quantityButton}
-                                        onPress={() => adjustQuantity(true)}
-                                    >
-                                        <Ionicons name="add" size={14} color={ACCENT_BLUE} />
-                                    </TouchableOpacity>
-                                    <Text style={styles.servingUnit}>{servingUnit}</Text>
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', theme.colors.background]}
+                        style={styles.bottomGradient}
+                    />
+
+                    {/* Header with safe area padding */}
+                    <SafeAreaView style={styles.headerContainer} edges={['top']}>
+                        <View style={styles.header}>
+                            <TouchableOpacity
+                                onPress={() => navigation.goBack()}
+                                style={styles.headerButton}
+                            >
+                                <View style={[styles.headerButtonBackground, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                    <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
                                 </View>
-                            </View>
+                            </TouchableOpacity>
+                            <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                            <TouchableOpacity style={styles.headerButton}>
+                                <View style={[styles.headerButtonBackground, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                    <Ionicons name="heart-outline" size={22} color="#FFFFFF" />
+                                </View>
+                            </TouchableOpacity>
                         </View>
+                    </SafeAreaView>
 
-                        {/* Divider */}
-                        <View style={styles.sectionDivider} />
-
-                        {/* Calories & Macros Section */}
-                        <View style={styles.nutritionSection}>
-                            {/* Large Calorie Display */}
-                            <View style={styles.caloriesContainer}>
-                                <Text style={styles.caloriesValue}>{calories}</Text>
-                                <Text style={styles.caloriesLabel}>calories</Text>
-                            </View>
-
-                            {/* Macros Row */}
-                            <View style={styles.macrosRow}>
-                                <View style={styles.macroItem}>
-                                    <Text style={styles.macroValue}>{carbs}g</Text>
-                                    <Text style={styles.macroLabel}>Carbs</Text>
-                                    <View style={[styles.macroBar, { backgroundColor: ACCENT_BLUE + '30' }]}>
-                                        <View style={[styles.macroProgress, {
-                                            width: `${Math.min(100, (carbs / Math.max(carbs, proteins, fats, 50)) * 100)}%`,
-                                            backgroundColor: ACCENT_BLUE
-                                        }]} />
-                                    </View>
-                                </View>
-
-                                <View style={styles.macroItem}>
-                                    <Text style={styles.macroValue}>{proteins}g</Text>
-                                    <Text style={styles.macroLabel}>Protein</Text>
-                                    <View style={[styles.macroBar, { backgroundColor: ACCENT_GREEN + '30' }]}>
-                                        <View style={[styles.macroProgress, {
-                                            width: `${Math.min(100, (proteins / Math.max(carbs, proteins, fats, 50)) * 100)}%`,
-                                            backgroundColor: ACCENT_GREEN
-                                        }]} />
-                                    </View>
-                                </View>
-
-                                <View style={styles.macroItem}>
-                                    <Text style={styles.macroValue}>{fats}g</Text>
-                                    <Text style={styles.macroLabel}>Fat</Text>
-                                    <View style={[styles.macroBar, { backgroundColor: ACCENT_ORANGE + '30' }]}>
-                                        <View style={[styles.macroProgress, {
-                                            width: `${Math.min(100, (fats / Math.max(carbs, proteins, fats, 50)) * 100)}%`,
-                                            backgroundColor: ACCENT_ORANGE
-                                        }]} />
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Additional Nutrients - Compact */}
-                        {(foodData.fiber || foodData.sugar || foodData.sodium) && (
-                            <>
-                                <View style={styles.sectionDivider} />
-                                <View style={styles.additionalNutrients}>
-                                    <Text style={styles.sectionSubtitle}>Additional Info</Text>
-                                    <View style={styles.nutrientGrid}>
-                                        {hasNutritionalValue(foodData.fiber) && (
-                                            <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(currentNutrition?.fiber, 'g')}</Text>
-                                                <Text style={styles.nutrientLabel}>Fiber</Text>
-                                            </View>
-                                        )}
-                                        {hasNutritionalValue(foodData.sugar) && (
-                                            <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(currentNutrition?.sugar, 'g')}</Text>
-                                                <Text style={styles.nutrientLabel}>Sugar</Text>
-                                            </View>
-                                        )}
-                                        {hasNutritionalValue(foodData.sodium) && (
-                                            <View style={styles.nutrientItem}>
-                                                <Text style={styles.nutrientValue}>{formatNutritionalValue(currentNutrition?.sodium, 'mg')}</Text>
-                                                <Text style={styles.nutrientLabel}>Sodium</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
-                            </>
+                    {/* Food Details Overlay - Centered Name + Brand */}
+                    <View style={styles.foodInfoOverlay}>
+                        <Text style={styles.foodName}>{foodData.food_name || 'Unknown Product'}</Text>
+                        {foodData.brand_name && (
+                            <Text style={styles.brandName}>{foodData.brand_name}</Text>
                         )}
-
-                        {/* Divider */}
-                        <View style={styles.sectionDivider} />
-
-                        {/* Enhanced Serving Controls */}
-                        <View style={styles.servingSection}>
-                            <Text style={styles.sectionSubtitle}>Serving Size</Text>
-                            <View style={styles.servingControls}>
-                                <TouchableOpacity
-                                    style={styles.quantityButton}
-                                    onPress={() => adjustQuantity(false)}
-                                >
-                                    <Ionicons name="remove" size={14} color={ACCENT_BLUE} />
-                                </TouchableOpacity>
-
-                                <View style={styles.quantityInputContainer}>
-                                    <TextInput
-                                        style={styles.quantityInput}
-                                        value={quantity}
-                                        onChangeText={setQuantity}
-                                        keyboardType="decimal-pad"
-                                        selectTextOnFocus
-                                    />
-                                </View>
-
-                                <TouchableOpacity
-                                    style={styles.quantityButton}
-                                    onPress={() => adjustQuantity(true)}
-                                >
-                                    <Ionicons name="add" size={14} color={ACCENT_BLUE} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.unitSelector}
-                                    onPress={() => setShowUnitModal(true)}
-                                >
-                                    <Text style={styles.servingUnit}>
-                                        {formatUnitName(servingUnit, parseFloat(quantity) || 1)}
-                                    </Text>
-                                    <Ionicons name="chevron-down" size={12} color={GRAY_LIGHT} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        {/* Meal Selection & Notes - Compact */}
-                        <View style={styles.bottomSection}>
-                            <View style={styles.mealSelection}>
-                                <Text style={styles.sectionSubtitle}>Add to</Text>
-                                <TouchableOpacity
-                                    style={styles.mealSelector}
-                                    onPress={() => setShowMealTypeDropdown(true)}
-                                >
-                                    <MaterialIcons
-                                        name={
-                                            mealType === 'Breakfast' ? 'wb-sunny' :
-                                                mealType === 'Lunch' ? 'lunch-dining' :
-                                                    mealType === 'Dinner' ? 'dinner-dining' : 'local-cafe'
-                                        }
-                                        size={16}
-                                        color={ACCENT_BLUE}
-                                    />
-                                    <Text style={styles.mealText}>{mealType}</Text>
-                                    <Ionicons name="chevron-down" size={16} color={GRAY_LIGHT} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.notesSection}>
-                                <Text style={styles.sectionSubtitle}>Notes</Text>
-                                <TextInput
-                                    style={styles.notesInput}
-                                    value={notes}
-                                    onChangeText={setNotes}
-                                    placeholder="Optional notes..."
-                                    placeholderTextColor={GRAY_MEDIUM}
-                                    multiline
-                                    numberOfLines={2}
-                                    textAlignVertical="top"
-                                />
-                            </View>
-                        </View>
-                    </LinearGradient>
-                </View>
-
-                {/* Daily Goals Progress */}
-                {dailyGoals && (
-                    <View style={styles.dailyGoalsCard}>
-                        <LinearGradient
-                            colors={[CARD_BG, SECONDARY_BG]}
-                            style={styles.cardGradient}
-                        >
-                            <Text style={styles.sectionTitle}>Impact on Daily Goals</Text>
-
-                            {/* Circular Progress for Calories */}
-                            <View style={styles.calorieProgressContainer}>
-                                <View style={styles.circularProgress}>
-                                    <View style={styles.circularProgressInner}>
-                                        <Text style={styles.calorieProgressValue}>{calories}</Text>
-                                        <Text style={styles.calorieProgressLabel}>Cal</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.calorieProgressInfo}>
-                                    <Text style={styles.calorieGoalText}>
-                                        {Math.round(((calories / (dailyGoals.calorieGoal || 2000)) * 100))}% of daily goal
-                                    </Text>
-                                    <Text style={styles.calorieGoalSubtext}>
-                                        {dailyGoals.calorieGoal || 2000} cal target
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* Macro Progress Bars */}
-                            <View style={styles.macroProgressSection}>
-                                <View style={styles.macroProgressItem}>
-                                    <View style={styles.macroProgressHeader}>
-                                        <Text style={styles.macroProgressLabel}>Carbs</Text>
-                                        <Text style={styles.macroProgressValue}>
-                                            {Math.round(((carbs / (dailyGoals.carbGoal || 250)) * 100))}%
-                                        </Text>
-                                    </View>
-                                    <View style={styles.macroProgressBarContainer}>
-                                        <View
-                                            style={[
-                                                styles.macroProgressBar,
-                                                {
-                                                    width: `${Math.min(100, (carbs / (dailyGoals.carbGoal || 250)) * 100)}%`,
-                                                    backgroundColor: ACCENT_BLUE
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={styles.macroProgressSubtext}>
-                                        {carbs}g / {dailyGoals.carbGoal || 250}g
-                                    </Text>
-                                </View>
-
-                                <View style={styles.macroProgressItem}>
-                                    <View style={styles.macroProgressHeader}>
-                                        <Text style={styles.macroProgressLabel}>Protein</Text>
-                                        <Text style={styles.macroProgressValue}>
-                                            {Math.round(((proteins / (dailyGoals.proteinGoal || 100)) * 100))}%
-                                        </Text>
-                                    </View>
-                                    <View style={styles.macroProgressBarContainer}>
-                                        <View
-                                            style={[
-                                                styles.macroProgressBar,
-                                                {
-                                                    width: `${Math.min(100, (proteins / (dailyGoals.proteinGoal || 100)) * 100)}%`,
-                                                    backgroundColor: ACCENT_GREEN
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={styles.macroProgressSubtext}>
-                                        {proteins}g / {dailyGoals.proteinGoal || 100}g
-                                    </Text>
-                                </View>
-
-                                <View style={styles.macroProgressItem}>
-                                    <View style={styles.macroProgressHeader}>
-                                        <Text style={styles.macroProgressLabel}>Fat</Text>
-                                        <Text style={styles.macroProgressValue}>
-                                            {Math.round(((fats / (dailyGoals.fatGoal || 67)) * 100))}%
-                                        </Text>
-                                    </View>
-                                    <View style={styles.macroProgressBarContainer}>
-                                        <View
-                                            style={[
-                                                styles.macroProgressBar,
-                                                {
-                                                    width: `${Math.min(100, (fats / (dailyGoals.fatGoal || 67)) * 100)}%`,
-                                                    backgroundColor: ACCENT_ORANGE
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text style={styles.macroProgressSubtext}>
-                                        {fats}g / {dailyGoals.fatGoal || 67}g
-                                    </Text>
-                                </View>
-                            </View>
-                        </LinearGradient>
                     </View>
-                )}
-
-                {/* FatSecret Attribution */}
-                <View style={styles.attributionContainer}>
-                    <Text
-                        style={styles.attributionText}
-                        onPress={() => {
-                            Linking.openURL('https://www.fatsecret.com');
-                        }}
-                    >
-                        Powered by fatsecret
-                    </Text>
                 </View>
 
-                {/* Bottom spacing for fixed button */}
-                <View style={{ height: 100 }} />
-            </ScrollView>
+                {/* Main Content Container */}
+                <View style={[styles.contentContainer, { backgroundColor: theme.colors.background }]}>
+                    {/* Calories Section */}
+                    <View style={styles.calorieSection}>
+                        <View style={styles.calorieAlignmentContainer}>
+                            <View style={styles.calorieRow}>
+                                <Text style={[styles.calorieNumber, { color: theme.colors.text }]}>{calories}</Text>
+                                <Text style={[styles.calorieLabel, { color: theme.colors.textSecondary }]}>calories</Text>
+                            </View>
+                        </View>
+                    </View>
 
-            {/* Fixed Bottom Action */}
-            <View style={styles.bottomContainer}>
-                <LinearGradient
-                    colors={[PRIMARY_BG + 'F0', PRIMARY_BG]}
-                    style={styles.bottomGradient}
-                >
-                    <TouchableOpacity
-                        style={[styles.addButton, loading && styles.addButtonDisabled]}
-                        onPress={handleSubmit}
-                        disabled={loading}
-                    >
-                        <LinearGradient
-                            colors={loading ? [GRAY_MEDIUM, GRAY_DARK] : [ACCENT_BLUE, ACCENT_PURPLE]}
-                            style={styles.addButtonGradient}
+                    {/* Quantity controls and Add button row - inline (below calories) */}
+                    <View style={styles.quantityAndAddRow}>
+                        <View style={styles.quantityControlsInline}>
+                            <TouchableOpacity
+                                style={[styles.quantityButtonInline, { backgroundColor: theme.colors.border }]}
+                                onPress={() => adjustQuantity(false)}
+                            >
+                                <Ionicons name="remove" size={18} color={theme.colors.text} />
+                            </TouchableOpacity>
+                            <TextInput
+                                style={[styles.quantityInputInline, { backgroundColor: theme.colors.border, color: theme.colors.text }]}
+                                value={quantity}
+                                onChangeText={setQuantity}
+                                keyboardType="decimal-pad"
+                                selectTextOnFocus
+                            />
+                            <TouchableOpacity
+                                style={[styles.quantityButtonInline, { backgroundColor: theme.colors.border }]}
+                                onPress={() => adjustQuantity(true)}
+                            >
+                                <Ionicons name="add" size={18} color={theme.colors.text} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.unitSelectorInline, { backgroundColor: theme.colors.border }]}
+                                onPress={() => setShowUnitModal(true)}
+                            >
+                                <Text style={[styles.unitTextInline, { color: theme.colors.text }]}>
+                                    {formatUnitName(servingUnit, parseFloat(quantity) || 1)}
+                                </Text>
+                                <Ionicons name="chevron-down" size={14} color={theme.colors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Add button on the right */}
+                        <TouchableOpacity
+                            style={[styles.addButtonInline, { backgroundColor: theme.colors.success }]}
+                            onPress={handleSubmit}
+                            disabled={loading}
                         >
                             {loading ? (
-                                <ActivityIndicator size="small" color={WHITE} />
+                                <ActivityIndicator size="small" color="#FFFFFF" />
                             ) : (
                                 <>
-                                    <Ionicons name="add" size={20} color={WHITE} />
-                                    <Text style={styles.addButtonText}>Add to {mealType}</Text>
+                                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                                    <Text style={styles.addButtonInlineText}>Add</Text>
                                 </>
                             )}
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </LinearGradient>
-            </View>
+                        </TouchableOpacity>
+                    </View>
 
-            {/* Meal Type Modal */}
-            <Modal
-                visible={showMealTypeDropdown}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setShowMealTypeDropdown(false)}
-            >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setShowMealTypeDropdown(false)}
-                >
-                    <TouchableOpacity
-                        style={styles.modalContent}
-                        activeOpacity={1}
-                        onPress={() => { }}
-                    >
-                        <LinearGradient
-                            colors={[CARD_BG, SECONDARY_BG]}
-                            style={styles.modalGradient}
-                        >
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Select Meal</Text>
-                                <TouchableOpacity onPress={() => setShowMealTypeDropdown(false)}>
-                                    <Ionicons name="close" size={24} color={GRAY_LIGHT} />
-                                </TouchableOpacity>
+                    {/* Macros Visual Section with Circular Progress */}
+                    <View style={styles.macrosSection}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="fitness" size={20} color={theme.colors.primary} />
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Macronutrients</Text>
+                        </View>
+                        <View style={styles.macrosRow}>
+                            {renderMacroCircle('Carbs', carbs, 'g', macroPercentages.carbs, MACRO_COLORS.carbs)}
+                            {renderMacroCircle('Protein', proteins, 'g', macroPercentages.protein, MACRO_COLORS.protein)}
+                            {renderMacroCircle('Fat', fats, 'g', macroPercentages.fat, MACRO_COLORS.fat)}
+                        </View>
+                    </View>
+
+                    {/* Enhanced Nutrition Facts */}
+                    <View style={styles.detailsSection}>
+                        {/* Main Macros with Progress */}
+                        <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                            {renderNutrientRowWithProgress('leaf', 'Total Carbohydrates', carbs, 'g', MACRO_COLORS.carbs)}
+                            {renderNutrientRowWithProgress('git-branch', 'Dietary Fiber', currentNutrition?.fiber, 'g', '#8BC34A', true, 'fiber')}
+                            {renderNutrientRowWithProgress('cafe', 'Total Sugars', currentNutrition?.sugar, 'g', '#FF7043', true, 'sugar')}
+                            {renderNutrientRowWithProgress('fitness', 'Protein', proteins, 'g', MACRO_COLORS.protein)}
+                            {renderNutrientRowWithProgress('water', 'Total Fat', fats, 'g', MACRO_COLORS.fat)}
+                        </View>
+
+                        {/* Fat Breakdown */}
+                        {(hasNutritionalValue(currentNutrition?.saturated_fat) || hasNutritionalValue(currentNutrition?.trans_fat) || 
+                          hasNutritionalValue(currentNutrition?.polyunsaturated_fat) || hasNutritionalValue(currentNutrition?.monounsaturated_fat)) && (
+                            <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                                <View style={styles.subSectionHeader}>
+                                    <Ionicons name="ellipse" size={16} color={MACRO_COLORS.fat} />
+                                    <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Fat Breakdown</Text>
+                                </View>
+                                {renderNutrientRowWithProgress('warning', 'Saturated Fat', currentNutrition?.saturated_fat, 'g', '#FF5722', true, 'saturated_fat')}
+                                {renderNutrientRowWithProgress('close', 'Trans Fat', currentNutrition?.trans_fat, 'g', '#F44336')}
+                                {renderNutrientRowWithProgress('leaf', 'Polyunsaturated Fat', currentNutrition?.polyunsaturated_fat, 'g', '#FF9800')}
+                                {renderNutrientRowWithProgress('leaf-outline', 'Monounsaturated Fat', currentNutrition?.monounsaturated_fat, 'g', '#FFC107')}
                             </View>
-                            {mealTypes.map((type) => (
-                                <TouchableOpacity
-                                    key={type}
-                                    style={[
-                                        styles.modalOption,
-                                        mealType === type && styles.selectedModalOption
-                                    ]}
-                                    onPress={() => handleMealTypeSelect(type)}
-                                >
-                                    <View style={styles.modalOptionContent}>
-                                        <MaterialIcons
-                                            name={
-                                                type === 'Breakfast' ? 'wb-sunny' :
-                                                    type === 'Lunch' ? 'lunch-dining' :
-                                                        type === 'Dinner' ? 'dinner-dining' : 'local-cafe'
-                                            }
-                                            size={20}
-                                            color={mealType === type ? ACCENT_BLUE : GRAY_MEDIUM}
-                                        />
-                                        <Text style={[
-                                            styles.modalOptionText,
-                                            mealType === type && styles.selectedModalOptionText
-                                        ]}>
-                                            {type}
-                                        </Text>
-                                    </View>
-                                    {mealType === type && (
-                                        <Ionicons name="checkmark" size={20} color={ACCENT_BLUE} />
-                                    )}
-                                </TouchableOpacity>
-                            ))}
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </TouchableOpacity>
-            </Modal>
+                        )}
+
+                        {/* Vitamins & Minerals with Progress */}
+                        {(hasNutritionalValue(currentNutrition?.cholesterol) || hasNutritionalValue(currentNutrition?.sodium) || 
+                          hasNutritionalValue(currentNutrition?.potassium) || hasNutritionalValue(currentNutrition?.vitamin_a) || 
+                          hasNutritionalValue(currentNutrition?.vitamin_c) || hasNutritionalValue(currentNutrition?.calcium) || 
+                          hasNutritionalValue(currentNutrition?.iron)) && (
+                            <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                                <View style={styles.subSectionHeader}>
+                                    <Ionicons name="sparkles" size={16} color="#FFA726" />
+                                    <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Vitamins & Minerals</Text>
+                                </View>
+                                {renderNutrientRowWithProgress('heart', 'Cholesterol', currentNutrition?.cholesterol, 'mg', '#E91E63', true, 'cholesterol')}
+                                {renderNutrientRowWithProgress('water', 'Sodium', currentNutrition?.sodium, 'mg', '#2196F3', true, 'sodium')}
+                                {renderNutrientRowWithProgress('flash', 'Potassium', currentNutrition?.potassium, 'mg', '#9C27B0', true, 'potassium')}
+                                {renderNutrientRowWithProgress('eye', 'Vitamin A', currentNutrition?.vitamin_a, 'mcg', '#FF7043', true, 'vitamin_a')}
+                                {renderNutrientRowWithProgress('sunny', 'Vitamin C', currentNutrition?.vitamin_c, 'mg', '#FFA726', true, 'vitamin_c')}
+                                {renderNutrientRowWithProgress('diamond', 'Calcium', currentNutrition?.calcium, 'mg', '#AB47BC', true, 'calcium')}
+                                {renderNutrientRowWithProgress('magnet', 'Iron', currentNutrition?.iron, 'mg', '#EF5350', true, 'iron')}
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Notes Section */}
+                    <View style={[styles.notesInputSection, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="create" size={20} color={theme.colors.primary} />
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notes (Optional)</Text>
+                        </View>
+                        <TextInput
+                            style={[styles.notesTextInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                            value={notes}
+                            onChangeText={setNotes}
+                            placeholder="Add any notes about this food..."
+                            placeholderTextColor={theme.colors.textSecondary}
+                            multiline
+                            numberOfLines={3}
+                        />
+                    </View>
+
+                </View>
+            </ScrollView>
 
             {/* Unit Selection Modal */}
             <Modal
                 visible={showUnitModal}
-                transparent
                 animationType="slide"
+                transparent={true}
                 onRequestClose={() => setShowUnitModal(false)}
             >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setShowUnitModal(false)}
-                >
-                    <TouchableOpacity
-                        style={styles.modalContent}
-                        activeOpacity={1}
-                        onPress={() => { }}
-                    >
-                        <LinearGradient
-                            colors={[CARD_BG, SECONDARY_BG]}
-                            style={styles.modalGradient}
-                        >
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Select Unit</Text>
-                                <TouchableOpacity onPress={() => setShowUnitModal(false)}>
-                                    <Ionicons name="close" size={24} color={GRAY_LIGHT} />
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Unit</Text>
+                            <TouchableOpacity onPress={() => setShowUnitModal(false)}>
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalScroll}>
+                            {availableUnits.map((unit) => (
+                                <TouchableOpacity
+                                    key={unit.key}
+                                    style={[
+                                        styles.unitOption,
+                                        { borderBottomColor: theme.colors.border },
+                                        servingUnit === unit.key && { backgroundColor: theme.colors.border }
+                                    ]}
+                                    onPress={() => handleUnitChange(unit.key)}
+                                >
+                                    <Text style={[
+                                        styles.unitOptionText,
+                                        { color: theme.colors.text },
+                                        servingUnit === unit.key && { fontWeight: '700' }
+                                    ]}>
+                                        {unit.name}
+                                    </Text>
+                                    {servingUnit === unit.key && (
+                                        <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                                    )}
                                 </TouchableOpacity>
-                            </View>
-
-                            <ScrollView style={styles.unitsList}>
-                                {availableUnits.map((unit) => (
-                                    <TouchableOpacity
-                                        key={unit.key}
-                                        style={[
-                                            styles.modalOption,
-                                            servingUnit === unit.key && styles.selectedModalOption
-                                        ]}
-                                        onPress={() => handleUnitChange(unit.key)}
-                                    >
-                                        <Text style={[
-                                            styles.modalOptionText,
-                                            servingUnit === unit.key && styles.selectedModalOptionText
-                                        ]}>
-                                            {unit.label}
-                                        </Text>
-                                        {servingUnit === unit.key && (
-                                            <Ionicons name="checkmark" size={20} color={ACCENT_BLUE} />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
             </Modal>
-        </SafeAreaView>
+        </View>
     );
 };
 
+// Styles are identical to ScannedProduct
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: PRIMARY_BG,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: PRIMARY_BG,
-        borderBottomWidth: 1,
-        borderBottomColor: GRAY_DARK,
-    },
-    headerButton: {
-        width: 36,
-        height: 36,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 17,
-        fontWeight: '600',
-        color: WHITE,
-    },
-    scrollView: {
-        flex: 1,
-        backgroundColor: PRIMARY_BG,
-    },
-
-    // Single Main Nutrition Card
-    mainCard: {
-        margin: 16,
-        borderRadius: 14,
-        overflow: 'hidden',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-    },
-    cardGradient: {
-        padding: 16,
-    },
-    productSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    productInfo: {
-        flex: 1,
-        justifyContent: 'space-between',
-    },
-    productName: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: WHITE,
-        lineHeight: 20,
-        marginBottom: 4,
-    },
-    brandName: {
-        fontSize: 12,
-        color: GRAY_LIGHT,
-        fontWeight: '500',
-        marginBottom: 8,
-    },
-    servingControls: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    quantityButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: ACCENT_BLUE + '20',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: ACCENT_BLUE + '40',
-    },
-    quantityInput: {
-        width: 40,
-        height: 28,
-        backgroundColor: GRAY_DARK,
-        borderRadius: 6,
-        marginHorizontal: 6,
-        textAlign: 'center',
-        color: WHITE,
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    servingUnit: {
-        fontSize: 12,
-        color: GRAY_LIGHT,
-        fontWeight: '500',
-        marginLeft: 6,
-    },
-
-    // Section Divider
-    sectionDivider: {
-        height: 1,
-        backgroundColor: GRAY_DARK,
-        marginVertical: 16,
-    },
-
-    // Nutrition Section
-    nutritionSection: {
-        marginBottom: 16,
-    },
-    caloriesContainer: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    caloriesValue: {
-        fontSize: 36,
-        fontWeight: '800',
-        color: WHITE,
-        lineHeight: 42,
-    },
-    caloriesLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: GRAY_LIGHT,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    macrosRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 10,
-    },
-    macroItem: {
-        alignItems: 'center',
-        flex: 1,
-    },
-    macroValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: WHITE,
-        marginBottom: 4,
-    },
-    macroLabel: {
-        fontSize: 11,
-        color: GRAY_LIGHT,
-        fontWeight: '500',
-        marginBottom: 6,
-    },
-    macroBar: {
-        width: 60,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: GRAY_DARK,
-        overflow: 'hidden',
-    },
-    macroProgress: {
-        height: '100%',
-        borderRadius: 2,
-    },
-
-    // Additional Nutrients
-    additionalNutrients: {
-        marginBottom: 16,
-    },
-    sectionSubtitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: WHITE,
-        marginBottom: 12,
-    },
-    nutrientGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-    },
-    nutrientItem: {
-        alignItems: 'center',
-    },
-    nutrientValue: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: WHITE,
-        marginBottom: 2,
-    },
-    nutrientLabel: {
-        fontSize: 11,
-        color: GRAY_LIGHT,
-        fontWeight: '500',
-    },
-
-    // Bottom Section
-    bottomSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    mealSelection: {
-        flex: 1,
-        marginRight: 16,
-    },
-    mealSelector: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: GRAY_DARK,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 8,
-    },
-    mealText: {
-        fontSize: 14,
-        color: WHITE,
-        fontWeight: '600',
-        marginHorizontal: 8,
-    },
-    notesSection: {
-        flex: 1,
-    },
-    notesInput: {
-        backgroundColor: GRAY_DARK,
-        borderRadius: 8,
-        padding: 10,
-        color: WHITE,
-        fontSize: 13,
-        minHeight: 60,
-        textAlignVertical: 'top',
-    },
-
-    // Bottom Container
-    bottomContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingBottom: 20,
-    },
-    bottomGradient: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-    },
-    addButton: {
-        borderRadius: 12,
-        overflow: 'hidden',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-    },
-    addButtonDisabled: {
-        opacity: 0.6,
-    },
-    addButtonGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 32,
-    },
-    addButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: WHITE,
-        marginLeft: 8,
-    },
-
-    // Modal Styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        overflow: 'hidden',
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-    },
-    modalGradient: {
-        paddingTop: 20,
-        paddingBottom: 40,
-        paddingHorizontal: 20,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: WHITE,
-    },
-    modalOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        marginVertical: 4,
-    },
-    selectedModalOption: {
-        backgroundColor: ACCENT_BLUE + '20',
-        borderColor: ACCENT_BLUE + '40',
-        borderWidth: 1,
-    },
-    modalOptionContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    modalOptionText: {
-        fontSize: 16,
-        color: WHITE,
-        marginLeft: 12,
-        fontWeight: '500',
-    },
-    selectedModalOptionText: {
-        color: ACCENT_BLUE,
-        fontWeight: '600',
-    },
-
-    // Serving Section
-    servingSection: {
-        marginBottom: 16,
-    },
-    quantityInputContainer: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: ACCENT_BLUE + '40',
-        borderRadius: 6,
-        marginHorizontal: 6,
-    },
-    unitSelector: {
-        padding: 10,
-        borderWidth: 1,
-        borderColor: ACCENT_BLUE + '40',
-        borderRadius: 6,
-    },
-
-    // Unit Modal
-    unitsList: {
-        maxHeight: height * 0.4,
-    },
-
-    // Daily Goals Progress
-    dailyGoalsCard: {
-        margin: 16,
-        borderRadius: 14,
-        overflow: 'hidden',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: WHITE,
-        marginBottom: 16,
-    },
-    calorieProgressContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    circularProgress: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 2,
-        borderColor: GRAY_DARK,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    circularProgressInner: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: GRAY_DARK,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    calorieProgressValue: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: WHITE,
-        lineHeight: 28,
-    },
-    calorieProgressLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: GRAY_LIGHT,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    calorieProgressInfo: {
-        marginLeft: 16,
-    },
-    calorieGoalText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: WHITE,
-        marginBottom: 4,
-    },
-    calorieGoalSubtext: {
-        fontSize: 12,
-        color: GRAY_LIGHT,
-        fontWeight: '500',
-    },
-    macroProgressSection: {
-        marginBottom: 16,
-    },
-    macroProgressItem: {
-        marginBottom: 8,
-    },
-    macroProgressHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    macroProgressLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: WHITE,
-    },
-    macroProgressValue: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: WHITE,
-    },
-    macroProgressBarContainer: {
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: GRAY_DARK,
-        overflow: 'hidden',
-        marginVertical: 4,
-    },
-    macroProgressBar: {
-        height: '100%',
-        borderRadius: 6,
-    },
-    macroProgressSubtext: {
-        fontSize: 12,
-        color: GRAY_LIGHT,
-        fontWeight: '500',
-    },
-    attributionContainer: {
-        alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        marginTop: 20,
-        marginBottom: 20,
-    },
-    attributionText: {
-        fontSize: 12,
-        color: GRAY_MEDIUM,
-        textDecorationLine: 'underline',
-        opacity: 0.8,
-    },
+    container: { flex: 1 },
+    scrollView: { flex: 1 },
+    imageSection: { width: screenWidth, height: 280, position: 'relative', backgroundColor: '#000000' },
+    imageSectionGradient: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+    bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 150 },
+    headerContainer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
+    headerButton: { padding: 8 },
+    headerButtonBackground: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', textAlign: 'center', flex: 1 },
+    foodInfoOverlay: { position: 'absolute', bottom: 40, left: 0, right: 0, paddingHorizontal: 20, zIndex: 5 },
+    foodName: { fontSize: 36, fontWeight: '800', color: '#FFFFFF', marginBottom: 6, textAlign: 'center', textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+    brandName: { fontSize: 18, fontWeight: '500', color: '#CCCCCC', textAlign: 'center', textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+    contentContainer: { paddingTop: 0, paddingHorizontal: 16, paddingBottom: 40 },
+    quantityAndAddRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, marginTop: 0, paddingHorizontal: 8 },
+    quantityControlsInline: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    quantityButtonInline: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    quantityInputInline: { width: 60, height: 40, borderRadius: 20, textAlign: 'center', fontSize: 16, fontWeight: '600', paddingHorizontal: 8 },
+    unitSelectorInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20, gap: 4 },
+    unitTextInline: { fontSize: 14, fontWeight: '600' },
+    addButtonInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, gap: 6 },
+    addButtonInlineText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+    calorieSection: { alignItems: 'center', marginBottom: 12, marginTop: 16 },
+    calorieAlignmentContainer: { alignItems: 'center' },
+    calorieRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+    calorieNumber: { fontSize: 56, fontWeight: '800', lineHeight: 64 },
+    calorieLabel: { fontSize: 18, fontWeight: '500', marginBottom: 4 },
+    macrosSection: { marginBottom: 24 },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    sectionTitle: { fontSize: 18, fontWeight: '700' },
+    macrosRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+    macroCircle: { alignItems: 'center' },
+    macroCircleInner: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    macroValue: { fontSize: 18, fontWeight: '700' },
+    macroPercentage: { fontSize: 12, fontWeight: '600' },
+    macroLabel: { fontSize: 14, fontWeight: '600' },
+    detailsSection: { gap: 16, marginBottom: 20 },
+    nutrientGroup: { borderRadius: 12, padding: 16, borderWidth: 1 },
+    subSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+    subSectionTitle: { fontSize: 16, fontWeight: '700' },
+    nutrientRowWithProgress: { marginBottom: 12 },
+    nutrientRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    nutrientRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+    nutrientIcon: { width: 20 },
+    nutrientLabel: { fontSize: 14, fontWeight: '500' },
+    nutrientRowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    nutrientValue: { fontSize: 14, fontWeight: '700' },
+    percentageText: { fontSize: 12, fontWeight: '600', minWidth: 35, textAlign: 'right' },
+    progressBarContainer: { width: '100%' },
+    progressBarBackground: { width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
+    progressBarFill: { height: '100%', borderRadius: 3 },
+    notesInputSection: { borderRadius: 12, padding: 16, borderWidth: 1, marginBottom: 16 },
+    notesTextInput: { fontSize: 14, padding: 12, borderWidth: 1, borderRadius: 8, minHeight: 80, textAlignVertical: 'top' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%', paddingBottom: 20 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)' },
+    modalTitle: { fontSize: 18, fontWeight: '700' },
+    modalScroll: { maxHeight: 400 },
+    unitOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+    unitOptionText: { fontSize: 16, fontWeight: '500' },
 });
 
-export default BarcodeResults; 
+export default BarcodeResults;

@@ -7,8 +7,8 @@ import {
     TouchableOpacity,
     TextInput,
     Modal,
-    Alert,
-    StatusBar
+    StatusBar,
+    Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +17,8 @@ import { FoodItem } from '../services/BarcodeService';
 import { formatNutritionalValue, hasNutritionalValue } from '../utils/helpers';
 import { ThemeContext } from '../ThemeContext';
 
+const { width: screenWidth } = Dimensions.get('window');
+
 interface FoodDetailsProps {
     food: FoodItem;
     visible: boolean;
@@ -24,36 +26,127 @@ interface FoodDetailsProps {
     onAddFood: (food: FoodItem, mealType: string, quantity: number) => void;
 }
 
-// GradientBorderCard component matching the app's design system
-const GradientBorderCard: React.FC<{ children: React.ReactNode; style?: any; cardBackground: string }> = ({ children, style, cardBackground }) => {
-    return (
-        <View style={[styles.gradientBorderContainer, style]}>
-            <LinearGradient
-                colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                style={styles.gradientBorder}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-            />
-            <View style={[styles.gradientBorderInner, { backgroundColor: cardBackground }]}>
-                {children}
-            </View>
-        </View>
-    );
+// Theme colors matching FoodDetail.tsx
+const MACRO_COLORS = {
+    carbs: '#4FC3F7',
+    protein: '#66BB6A',
+    fat: '#FFB74D'
 };
 
 export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodDetailsProps) {
     const { theme, isDarkTheme } = useContext(ThemeContext);
     const [quantity, setQuantity] = useState('1');
-    const [selectedMeal, setSelectedMeal] = useState('Breakfast');
+    const [selectedMealType, setSelectedMealType] = useState('Breakfast');
     const [notes, setNotes] = useState('');
-
-    const meals = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
     // Calculate nutrient based on quantity
     const calculateNutrient = (value: number) => {
         const qtyValue = parseFloat(quantity) || 1;
         return Math.round(value * qtyValue);
     };
+
+    // Helper function to get color based on healthiness rating
+    const getHealthinessColor = (rating: number): string => {
+        if (rating <= 4) return theme.colors.error; // Red for unhealthy (0-4)
+        if (rating <= 7) return theme.colors.warning; // Yellow for moderate (5-7)
+        return theme.colors.success; // Green for healthy (8-10)
+    };
+
+    // Helper function to format macro percentages
+    const getMacroPercentages = () => {
+        const totalCals = calculateNutrient(food.calories);
+        if (totalCals === 0) return { carbs: 0, fat: 0, protein: 0 };
+
+        const carbCals = calculateNutrient(food.carbs) * 4;
+        const fatCals = calculateNutrient(food.fats) * 9;
+        const proteinCals = calculateNutrient(food.proteins) * 4;
+
+        return {
+            carbs: Math.round((carbCals / totalCals) * 100),
+            fat: Math.round((fatCals / totalCals) * 100),
+            protein: Math.round((proteinCals / totalCals) * 100)
+        };
+    };
+
+    // Daily value percentages (simplified estimates)
+    const getDailyValuePercentage = (nutrient: string, value: number): number => {
+        const dailyValues: { [key: string]: number } = {
+            fiber: 25,
+            sugar: 50,
+            saturated_fat: 20,
+            cholesterol: 300,
+            sodium: 2300,
+            potassium: 3500,
+            vitamin_a: 900,
+            vitamin_c: 90,
+            calcium: 1000,
+            iron: 18
+        };
+
+        const dv = dailyValues[nutrient];
+        if (!dv) return 0;
+        return Math.min(Math.round((value / dv) * 100), 100);
+    };
+
+    // Render nutrient row with progress bar
+    const renderNutrientRowWithProgress = (
+        icon: string,
+        label: string,
+        value: number,
+        unit: string = 'g',
+        color: string = theme.colors.textSecondary,
+        showProgress: boolean = false,
+        nutrientKey?: string
+    ) => {
+        const calcValue = calculateNutrient(value);
+        const percentage = nutrientKey ? getDailyValuePercentage(nutrientKey, calcValue) : 0;
+
+        if (!hasNutritionalValue(value)) return null;
+
+        return (
+            <View style={styles.nutrientRowWithProgress}>
+                <View style={styles.nutrientRowHeader}>
+                    <View style={styles.nutrientRowLeft}>
+                        <Ionicons name={icon as any} size={16} color={color} style={styles.nutrientIcon} />
+                        <Text style={[styles.nutrientLabel, { color: theme.colors.text }]}>{label}</Text>
+                    </View>
+                    <View style={styles.nutrientRowRight}>
+                        <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>
+                            {formatNutritionalValue(calcValue, unit, calcValue < 1 && calcValue > 0 ? 1 : 0)}
+                        </Text>
+                        {showProgress && percentage > 0 && (
+                            <Text style={[styles.percentageText, { color: theme.colors.textSecondary }]}>{percentage}%</Text>
+                        )}
+                    </View>
+                </View>
+                {showProgress && percentage > 0 && (
+                    <View style={styles.progressBarContainer}>
+                        <View style={[styles.progressBarBackground, { backgroundColor: theme.colors.border }]}>
+                            <View
+                                style={[
+                                    styles.progressBarFill,
+                                    { width: `${percentage}%`, backgroundColor: color }
+                                ]}
+                            />
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    // Render macro circle (matching FoodDetail.tsx exactly)
+    const renderMacroCircle = (label: string, value: number, unit: string, percentage: number, color: string) => (
+        <View style={styles.macroCircle}>
+            <View style={[styles.macroCircleInner, { borderColor: color }]}>
+                <Text style={[styles.macroValue, { color: theme.colors.text }]}>{formatNutritionalValue(calculateNutrient(value), unit)}</Text>
+                {hasNutritionalValue(value) && (
+                    <Text style={[styles.macroPercentage, { color: theme.colors.textSecondary }]}>{percentage}%</Text>
+                )}
+            </View>
+            <Text style={[styles.macroLabel, { color: theme.colors.text }]}>{label}</Text>
+        </View>
+    );
 
     const handleAddFood = () => {
         const qtyValue = parseFloat(quantity) || 1;
@@ -81,17 +174,10 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
             notes: notes
         };
 
-        onAddFood(adjustedFood, selectedMeal, qtyValue);
+        onAddFood(adjustedFood, selectedMealType, qtyValue);
     };
 
-    // Check if a value is present (using our helper function)
-    const hasValue = (value: number) => hasNutritionalValue(value);
-
-    // Calculate macro percentages
-    const totalMacroCalories = (food.proteins * 4) + (food.carbs * 4) + (food.fats * 9);
-    const proteinPercent = totalMacroCalories > 0 ? Math.round((food.proteins * 4 / totalMacroCalories) * 100) : 0;
-    const carbPercent = totalMacroCalories > 0 ? Math.round((food.carbs * 4 / totalMacroCalories) * 100) : 0;
-    const fatPercent = totalMacroCalories > 0 ? Math.round((food.fats * 9 / totalMacroCalories) * 100) : 0;
+    const macroPercentages = getMacroPercentages();
 
     return (
         <Modal
@@ -99,301 +185,178 @@ export default function FoodDetails({ food, visible, onClose, onAddFood }: FoodD
             animationType="slide"
             presentationStyle="fullScreen"
         >
-            <LinearGradient
-                colors={[theme.colors.background, theme.colors.cardBackground]}
-                style={styles.container}
-            >
-                <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-                    <StatusBar barStyle={isDarkTheme ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} />
+            <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+                <StatusBar barStyle={isDarkTheme ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity style={[styles.closeButton, { backgroundColor: theme.colors.border }]} onPress={onClose}>
-                            <Ionicons name="close" size={24} color={theme.colors.text} />
-                        </TouchableOpacity>
-                        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition Facts</Text>
-                        <View style={styles.placeholder} />
+                <ScrollView
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                >
+                    {/* Image Section (Dark Background with Controls) - Matching FoodDetail.tsx */}
+                    <View style={styles.imageSection}>
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.5)']}
+                            style={styles.imageSectionGradient}
+                        />
+
+                        <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', theme.colors.background]}
+                            style={styles.bottomGradient}
+                        />
+
+                        {/* Header with safe area padding */}
+                        <SafeAreaView style={styles.headerContainer} edges={['top']}>
+                            <View style={styles.header}>
+                                <TouchableOpacity
+                                    onPress={onClose}
+                                    style={styles.headerButton}
+                                >
+                                    <View style={[styles.headerButtonBackground, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                        <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                                    </View>
+                                </TouchableOpacity>
+                                <Text style={styles.headerTitle}>Nutrition Facts</Text>
+                                <TouchableOpacity style={styles.headerButton}>
+                                    <View style={[styles.headerButtonBackground, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                        <Ionicons name="heart-outline" size={22} color="#FFFFFF" />
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </SafeAreaView>
+
+                        {/* Food Details Overlay - Centered Name + Brand */}
+                        <View style={styles.foodInfoOverlay}>
+                            <Text style={styles.foodName}>{food.food_name}</Text>
+                            {food.brand_name && (
+                                <Text style={styles.brandName}>{food.brand_name}</Text>
+                            )}
+                        </View>
                     </View>
 
-                    <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollViewContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {/* Combined Food Info & Controls Card */}
-                        <GradientBorderCard style={styles.cardMargin} cardBackground={theme.colors.cardBackground}>
-                            <View style={styles.combinedSection}>
-
-                                {/* Food Info */}
-                                <View style={styles.foodInfoSection}>
-                                    <Text style={[styles.foodName, { color: theme.colors.text }]}>{food.food_name}</Text>
-                                    {food.brand_name && (
-                                        <Text style={[styles.brandName, { color: theme.colors.textSecondary }]}>{food.brand_name}</Text>
-                                    )}
-                                    <View style={styles.servingContainer}>
-                                        <Text style={[styles.servingLabel, { color: theme.colors.textSecondary }]}>Per serving:</Text>
-                                        <Text style={[styles.servingText, { color: theme.colors.text }]}>
-                                            {food.serving_qty} {food.serving_unit}
-                                            {food.serving_weight_grams > 0 ? ` (${food.serving_weight_grams}g)` : ''}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Divider */}
-                                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-
-                                {/* Controls */}
-                                <View style={styles.controlsSection}>
-                                    {/* Quantity */}
-                                    <View style={styles.controlRow}>
-                                        <Text style={[styles.controlLabel, { color: theme.colors.text }]}>Quantity</Text>
-                                        <View style={styles.quantityContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.quantityButton, { backgroundColor: theme.colors.border }]}
-                                                onPress={() => setQuantity(String(Math.max(0.25, parseFloat(quantity) - 0.25)))}
-                                            >
-                                                <Ionicons name="remove" size={18} color={theme.colors.text} />
-                                            </TouchableOpacity>
-                                            <TextInput
-                                                style={[styles.quantityInput, { backgroundColor: theme.colors.border, color: theme.colors.text }]}
-                                                value={quantity}
-                                                onChangeText={setQuantity}
-                                                keyboardType="numeric"
-                                                textAlign="center"
-                                            />
-                                            <TouchableOpacity
-                                                style={[styles.quantityButton, { backgroundColor: theme.colors.border }]}
-                                                onPress={() => setQuantity(String(parseFloat(quantity) + 0.25))}
-                                            >
-                                                <Ionicons name="add" size={18} color={theme.colors.text} />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-
-                                    {/* Meal Selection */}
-                                    <View style={styles.controlRow}>
-                                        <Text style={[styles.controlLabel, { color: theme.colors.text }]}>Meal</Text>
-                                        <View style={styles.mealContainer}>
-                                            {meals.map((meal) => (
-                                                <TouchableOpacity
-                                                    key={meal}
-                                                    style={[
-                                                        styles.mealOption,
-                                                        { backgroundColor: theme.colors.border },
-                                                        selectedMeal === meal && { backgroundColor: theme.colors.primary }
-                                                    ]}
-                                                    onPress={() => setSelectedMeal(meal)}
-                                                >
-                                                    <Text style={[
-                                                        styles.mealOptionText,
-                                                        { color: theme.colors.textSecondary },
-                                                        selectedMeal === meal && { color: theme.colors.text }
-                                                    ]}>
-                                                        {meal}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    </View>
-
-                                    {/* Notes */}
-                                    <View style={styles.notesContainer}>
-                                        <Text style={[styles.controlLabel, { color: theme.colors.text }]}>Notes (Optional)</Text>
-                                        <TextInput
-                                            style={[styles.notesInput, { backgroundColor: theme.colors.border, color: theme.colors.text }]}
-                                            value={notes}
-                                            onChangeText={setNotes}
-                                            placeholder="Add notes..."
-                                            placeholderTextColor={theme.colors.textSecondary}
-                                            multiline
-                                        />
-                                    </View>
-
-                                    {/* Add Button */}
-                                    <TouchableOpacity style={styles.addButton} onPress={handleAddFood}>
-                                        <LinearGradient
-                                            colors={["#0074dd", "#5c00dd", "#dd0095"]}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={styles.addButtonGradient}
-                                        >
-                                            <Ionicons name="add" size={20} color="#FFFFFF" />
-                                            <Text style={styles.addButtonText}>Add to {selectedMeal}</Text>
-                                        </LinearGradient>
-                                    </TouchableOpacity>
+                    {/* Main Content Container */}
+                    <View style={[styles.contentContainer, { backgroundColor: theme.colors.background }]}>
+                        {/* Calories Section */}
+                        <View style={styles.calorieSection}>
+                            <View style={styles.calorieAlignmentContainer}>
+                                <View style={styles.calorieRow}>
+                                    <Text style={[styles.calorieNumber, { color: theme.colors.text }]}>{calculateNutrient(food.calories)}</Text>
+                                    <Text style={[styles.calorieLabel, { color: theme.colors.textSecondary }]}>calories</Text>
                                 </View>
                             </View>
-                        </GradientBorderCard>
+                        </View>
 
-                        {/* Calories & Macros Card */}
-                        <GradientBorderCard style={styles.cardMargin} cardBackground={theme.colors.cardBackground}>
-                            <View style={styles.nutritionSection}>
-                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Calories & Macronutrients</Text>
-
-                                {/* Calories */}
-                                <View style={styles.caloriesContainer}>
-                                    <Text style={[styles.caloriesValue, { color: theme.colors.text }]}>{calculateNutrient(food.calories)}</Text>
-                                    <Text style={[styles.caloriesLabel, { color: theme.colors.textSecondary }]}>calories</Text>
-                                </View>
-
-                                {/* Macro Breakdown */}
-                                <View style={styles.macrosGrid}>
-                                    <View style={[styles.macroCard, { backgroundColor: theme.colors.border }]}>
-                                        <View style={[styles.macroDot, { backgroundColor: '#32D74B' }]} />
-                                        <Text style={[styles.macroValue, { color: theme.colors.text }]}>{calculateNutrient(food.proteins)}g</Text>
-                                        <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
-                                        <Text style={[styles.macroPercent, { color: theme.colors.primary }]}>{proteinPercent}%</Text>
-                                        <Text style={[styles.macroCalories, { color: theme.colors.textSecondary }]}>{Math.round(calculateNutrient(food.proteins) * 4)} cal</Text>
-                                    </View>
-                                    <View style={[styles.macroCard, { backgroundColor: theme.colors.border }]}>
-                                        <View style={[styles.macroDot, { backgroundColor: '#0084ff' }]} />
-                                        <Text style={[styles.macroValue, { color: theme.colors.text }]}>{calculateNutrient(food.carbs)}g</Text>
-                                        <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
-                                        <Text style={[styles.macroPercent, { color: theme.colors.primary }]}>{carbPercent}%</Text>
-                                        <Text style={[styles.macroCalories, { color: theme.colors.textSecondary }]}>{Math.round(calculateNutrient(food.carbs) * 4)} cal</Text>
-                                    </View>
-                                    <View style={[styles.macroCard, { backgroundColor: theme.colors.border }]}>
-                                        <View style={[styles.macroDot, { backgroundColor: '#FF9500' }]} />
-                                        <Text style={[styles.macroValue, { color: theme.colors.text }]}>{calculateNutrient(food.fats)}g</Text>
-                                        <Text style={[styles.macroLabel, { color: theme.colors.textSecondary }]}>Fat</Text>
-                                        <Text style={[styles.macroPercent, { color: theme.colors.primary }]}>{fatPercent}%</Text>
-                                        <Text style={[styles.macroCalories, { color: theme.colors.textSecondary }]}>{Math.round(calculateNutrient(food.fats) * 9)} cal</Text>
-                                    </View>
-                                </View>
+                        {/* Quantity controls and Add button row - inline (below calories) */}
+                        <View style={styles.quantityAndAddRow}>
+                            <View style={styles.quantityControlsInline}>
+                                <TouchableOpacity
+                                    style={[styles.quantityButtonInline, { backgroundColor: theme.colors.border }]}
+                                    onPress={() => setQuantity(String(Math.max(0.25, parseFloat(quantity) - 0.25)))}
+                                >
+                                    <Ionicons name="remove" size={18} color={theme.colors.text} />
+                                </TouchableOpacity>
+                                <TextInput
+                                    style={[styles.quantityInputInline, { backgroundColor: theme.colors.border, color: theme.colors.text }]}
+                                    value={quantity}
+                                    onChangeText={setQuantity}
+                                    keyboardType="decimal-pad"
+                                    selectTextOnFocus
+                                />
+                                <TouchableOpacity
+                                    style={[styles.quantityButtonInline, { backgroundColor: theme.colors.border }]}
+                                    onPress={() => setQuantity(String(parseFloat(quantity) + 0.25))}
+                                >
+                                    <Ionicons name="add" size={18} color={theme.colors.text} />
+                                </TouchableOpacity>
+                                <Text style={[styles.unitTextInline, { color: theme.colors.text }]}>{food.serving_unit}</Text>
                             </View>
-                        </GradientBorderCard>
 
-                        {/* Detailed Nutrition Card */}
-                        <GradientBorderCard style={styles.cardMargin} cardBackground={theme.colors.cardBackground}>
-                            <View style={styles.detailedSection}>
-                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Detailed Nutrition</Text>
+                            {/* Add button on the right */}
+                            <TouchableOpacity
+                                style={[styles.addButtonInline, { backgroundColor: theme.colors.success }]}
+                                onPress={handleAddFood}
+                            >
+                                <Ionicons name="add" size={18} color="#FFFFFF" />
+                                <Text style={styles.addButtonInlineText}>Add</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                                {/* Carbohydrate Details */}
-                                {(hasValue(food.fiber) || hasValue(food.sugar)) && (
-                                    <View style={[styles.nutritionCategory, { borderBottomColor: theme.colors.border }]}>
-                                        <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Carbohydrates</Text>
-                                        <View style={styles.categoryContent}>
-                                            <View style={styles.nutrientRow}>
-                                                <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Total Carbohydrates</Text>
-                                                <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.carbs)}g</Text>
-                                            </View>
-                                            {hasValue(food.fiber) && (
-                                                <View style={styles.nutrientRowIndented}>
-                                                    <Text style={[styles.nutrientNameSub, { color: theme.colors.textSecondary }]}>Dietary Fiber</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{formatNutritionalValue(calculateNutrient(food.fiber), 'g')}</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.sugar) && (
-                                                <View style={styles.nutrientRowIndented}>
-                                                    <Text style={[styles.nutrientNameSub, { color: theme.colors.textSecondary }]}>Total Sugars</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{formatNutritionalValue(calculateNutrient(food.sugar), 'g')}</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-                                )}
-
-                                {/* Fat Details */}
-                                {(hasValue(food.saturated_fat) || hasValue(food.polyunsaturated_fat) || hasValue(food.monounsaturated_fat) || hasValue(food.trans_fat)) && (
-                                    <View style={[styles.nutritionCategory, { borderBottomColor: theme.colors.border }]}>
-                                        <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Fats</Text>
-                                        <View style={styles.categoryContent}>
-                                            <View style={styles.nutrientRow}>
-                                                <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Total Fat</Text>
-                                                <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.fats)}g</Text>
-                                            </View>
-                                            {hasValue(food.saturated_fat) && (
-                                                <View style={styles.nutrientRowIndented}>
-                                                    <Text style={[styles.nutrientNameSub, { color: theme.colors.textSecondary }]}>Saturated Fat</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.saturated_fat)}g</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.polyunsaturated_fat) && (
-                                                <View style={styles.nutrientRowIndented}>
-                                                    <Text style={[styles.nutrientNameSub, { color: theme.colors.textSecondary }]}>Polyunsaturated Fat</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.polyunsaturated_fat)}g</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.monounsaturated_fat) && (
-                                                <View style={styles.nutrientRowIndented}>
-                                                    <Text style={[styles.nutrientNameSub, { color: theme.colors.textSecondary }]}>Monounsaturated Fat</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.monounsaturated_fat)}g</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.trans_fat) && (
-                                                <View style={styles.nutrientRowIndented}>
-                                                    <Text style={[styles.nutrientNameSub, { color: theme.colors.textSecondary }]}>Trans Fat</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.trans_fat)}g</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-                                )}
-
-                                {/* Other Nutrients */}
-                                {(hasValue(food.cholesterol) || hasValue(food.sodium) || hasValue(food.potassium)) && (
-                                    <View style={[styles.nutritionCategory, { borderBottomColor: theme.colors.border }]}>
-                                        <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Other</Text>
-                                        <View style={styles.categoryContent}>
-                                            {hasValue(food.cholesterol) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Cholesterol</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.cholesterol)}mg</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.sodium) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Sodium</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.sodium)}mg</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.potassium) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Potassium</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.potassium)}mg</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-                                )}
-
-                                {/* Vitamins & Minerals */}
-                                {(hasValue(food.vitamin_a) || hasValue(food.vitamin_c) || hasValue(food.calcium) || hasValue(food.iron)) && (
-                                    <View style={[styles.nutritionCategory, { borderBottomColor: theme.colors.border }]}>
-                                        <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Vitamins & Minerals</Text>
-                                        <View style={styles.categoryContent}>
-                                            {hasValue(food.vitamin_a) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Vitamin A</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.vitamin_a)}mcg</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.vitamin_c) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Vitamin C</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.vitamin_c)}mg</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.calcium) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Calcium</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.calcium)}mg</Text>
-                                                </View>
-                                            )}
-                                            {hasValue(food.iron) && (
-                                                <View style={styles.nutrientRow}>
-                                                    <Text style={[styles.nutrientName, { color: theme.colors.text }]}>Iron</Text>
-                                                    <Text style={[styles.nutrientValue, { color: theme.colors.text }]}>{calculateNutrient(food.iron)}mg</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-                                )}
+                        {/* Macros Visual Section with Circular Progress */}
+                        <View style={styles.macrosSection}>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="fitness" size={20} color={theme.colors.primary} />
+                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Macronutrients</Text>
                             </View>
-                        </GradientBorderCard>
-                    </ScrollView>
-                </SafeAreaView>
-            </LinearGradient>
+                            <View style={styles.macrosRow}>
+                                {renderMacroCircle('Carbs', food.carbs, 'g', macroPercentages.carbs, MACRO_COLORS.carbs)}
+                                {renderMacroCircle('Protein', food.proteins, 'g', macroPercentages.protein, MACRO_COLORS.protein)}
+                                {renderMacroCircle('Fat', food.fats, 'g', macroPercentages.fat, MACRO_COLORS.fat)}
+                            </View>
+                        </View>
+
+                        {/* Enhanced Nutrition Facts */}
+                        <View style={styles.detailsSection}>
+                            {/* Main Macros with Progress */}
+                            <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                                {renderNutrientRowWithProgress('leaf', 'Total Carbohydrates', food.carbs, 'g', MACRO_COLORS.carbs)}
+                                {renderNutrientRowWithProgress('git-branch', 'Dietary Fiber', food.fiber, 'g', '#8BC34A', true, 'fiber')}
+                                {renderNutrientRowWithProgress('cafe', 'Total Sugars', food.sugar, 'g', '#FF7043', true, 'sugar')}
+                                {renderNutrientRowWithProgress('fitness', 'Protein', food.proteins, 'g', MACRO_COLORS.protein)}
+                                {renderNutrientRowWithProgress('water', 'Total Fat', food.fats, 'g', MACRO_COLORS.fat)}
+                            </View>
+
+                            {/* Fat Breakdown */}
+                            {(hasNutritionalValue(food.saturated_fat) || hasNutritionalValue(food.trans_fat) || hasNutritionalValue(food.polyunsaturated_fat) || hasNutritionalValue(food.monounsaturated_fat)) && (
+                                <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                                    <View style={styles.subSectionHeader}>
+                                        <Ionicons name="ellipse" size={16} color={MACRO_COLORS.fat} />
+                                        <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Fat Breakdown</Text>
+                                    </View>
+                                    {renderNutrientRowWithProgress('warning', 'Saturated Fat', food.saturated_fat, 'g', '#FF5722', true, 'saturated_fat')}
+                                    {renderNutrientRowWithProgress('close', 'Trans Fat', food.trans_fat, 'g', '#F44336')}
+                                    {renderNutrientRowWithProgress('leaf', 'Polyunsaturated Fat', food.polyunsaturated_fat, 'g', '#FF9800')}
+                                    {renderNutrientRowWithProgress('leaf-outline', 'Monounsaturated Fat', food.monounsaturated_fat, 'g', '#FFC107')}
+                                </View>
+                            )}
+
+                            {/* Vitamins & Minerals with Progress */}
+                            {(hasNutritionalValue(food.cholesterol) || hasNutritionalValue(food.sodium) || hasNutritionalValue(food.potassium) || hasNutritionalValue(food.vitamin_a) || hasNutritionalValue(food.vitamin_c) || hasNutritionalValue(food.calcium) || hasNutritionalValue(food.iron)) && (
+                                <View style={[styles.nutrientGroup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                                    <View style={styles.subSectionHeader}>
+                                        <Ionicons name="sparkles" size={16} color="#FFA726" />
+                                        <Text style={[styles.subSectionTitle, { color: theme.colors.primary }]}>Vitamins & Minerals</Text>
+                                    </View>
+                                    {renderNutrientRowWithProgress('heart', 'Cholesterol', food.cholesterol, 'mg', '#E91E63', true, 'cholesterol')}
+                                    {renderNutrientRowWithProgress('water', 'Sodium', food.sodium, 'mg', '#2196F3', true, 'sodium')}
+                                    {renderNutrientRowWithProgress('flash', 'Potassium', food.potassium, 'mg', '#9C27B0', true, 'potassium')}
+                                    {renderNutrientRowWithProgress('eye', 'Vitamin A', food.vitamin_a, 'mcg', '#FF7043', true, 'vitamin_a')}
+                                    {renderNutrientRowWithProgress('sunny', 'Vitamin C', food.vitamin_c, 'mg', '#FFA726', true, 'vitamin_c')}
+                                    {renderNutrientRowWithProgress('diamond', 'Calcium', food.calcium, 'mg', '#AB47BC', true, 'calcium')}
+                                    {renderNutrientRowWithProgress('magnet', 'Iron', food.iron, 'mg', '#EF5350', true, 'iron')}
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Notes Section */}
+                        <View style={[styles.notesInputSection, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="create" size={20} color={theme.colors.primary} />
+                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notes (Optional)</Text>
+                            </View>
+                            <TextInput
+                                style={[styles.notesTextInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                                value={notes}
+                                onChangeText={setNotes}
+                                placeholder="Add any notes about this food..."
+                                placeholderTextColor={theme.colors.textSecondary}
+                                multiline
+                                numberOfLines={3}
+                            />
+                        </View>
+
+                    </View>
+                </ScrollView>
+            </View>
         </Modal>
     );
 }
@@ -402,268 +365,291 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 20,
-    },
-    closeButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    placeholder: {
-        width: 36,
-    },
     scrollView: {
         flex: 1,
-        paddingHorizontal: 16,
-        paddingTop: 10,
     },
-    scrollViewContent: {
-        paddingBottom: 60,
-        flexGrow: 1,
-    },
-    cardMargin: {
-        marginBottom: 16,
-    },
-    gradientBorderContainer: {
-        borderRadius: 10,
+    // Image Section Styles (matching FoodDetail.tsx)
+    imageSection: {
+        width: screenWidth,
+        height: 280,
         position: 'relative',
+        backgroundColor: '#000000',
     },
-    gradientBorder: {
+    imageSectionGradient: {
         position: 'absolute',
         left: 0,
         right: 0,
         top: 0,
         bottom: 0,
-        borderRadius: 10,
     },
-    gradientBorderInner: {
-        margin: 1,
-        borderRadius: 9,
-        padding: 16,
+    bottomGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 150,
     },
-    combinedSection: {
-        gap: 16,
+    headerContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
     },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: '800',
-        textAlign: 'center',
-        flex: 1,
-        letterSpacing: 0.5,
-    },
-    foodInfoSection: {
-        alignItems: 'center',
-    },
-    foodName: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        marginBottom: 6,
-    },
-    brandName: {
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 8,
-    },
-    servingContainer: {
-        alignItems: 'center',
-    },
-    servingLabel: {
-        fontSize: 12,
-        marginBottom: 4,
-    },
-    servingText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    divider: {
-        height: 1,
-        marginVertical: 8,
-    },
-    controlsSection: {
-        gap: 16,
-    },
-    controlRow: {
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
     },
-    controlLabel: {
-        fontSize: 14,
-        fontWeight: '600',
+    headerButton: {
+        padding: 8,
     },
-    quantityContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    quantityButton: {
+    headerButtonBackground: {
         width: 36,
         height: 36,
         borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    quantityInput: {
-        width: 70,
-        height: 36,
-        borderRadius: 18,
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFFFFF',
         textAlign: 'center',
-        fontSize: 14,
+        flex: 1,
+    },
+    foodInfoOverlay: {
+        position: 'absolute',
+        bottom: 40,
+        left: 0,
+        right: 0,
+        paddingHorizontal: 20,
+        zIndex: 5,
+    },
+    foodName: {
+        fontSize: 36,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        marginBottom: 6,
+        textAlign: 'center',
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
+    },
+    brandName: {
+        fontSize: 18,
+        fontWeight: '500',
+        color: '#CCCCCC',
+        textAlign: 'center',
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
+    },
+    // Content Container Styles
+    contentContainer: {
+        paddingTop: 0,
+        paddingHorizontal: 16,
+        paddingBottom: 40,
+    },
+    quantityAndAddRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 24,
+        marginTop: 0,
+        paddingHorizontal: 8,
+    },
+    quantityControlsInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    quantityButtonInline: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quantityInputInline: {
+        width: 60,
+        height: 40,
+        borderRadius: 20,
+        textAlign: 'center',
+        fontSize: 16,
         fontWeight: '600',
         paddingHorizontal: 8,
     },
-    mealContainer: {
+    unitTextInline: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    addButtonInline: {
         flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 20,
         gap: 6,
-        flexWrap: 'wrap',
     },
-    mealOption: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 16,
+    addButtonInlineText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
-    selectedMealOption: {
-        // Now handled dynamically with theme.colors.primary
+    // Calorie Section
+    calorieSection: {
+        alignItems: 'center',
+        marginBottom: 12,
+        marginTop: 16,
     },
-    mealOptionText: {
-        fontSize: 12,
-        fontWeight: '500',
+    calorieAlignmentContainer: {
+        alignItems: 'center',
     },
-    selectedMealOptionText: {
-        // Now handled dynamically with theme.colors.text
-    },
-    notesContainer: {
+    calorieRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
         gap: 8,
     },
-    notesInput: {
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 14,
-        minHeight: 60,
-        textAlignVertical: 'top',
+    calorieNumber: {
+        fontSize: 56,
+        fontWeight: '800',
+        lineHeight: 64,
     },
-    addButton: {
-        borderRadius: 10,
-        overflow: 'hidden',
-        marginTop: 4,
+    calorieLabel: {
+        fontSize: 18,
+        fontWeight: '500',
+        marginBottom: 4,
     },
-    addButtonGradient: {
+    // Macros Section with Circular Progress
+    macrosSection: {
+        marginBottom: 24,
+    },
+    sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-    },
-    addButtonText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
-        marginLeft: 6,
-    },
-    nutritionSection: {
-        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 16,
-        textAlign: 'center',
+        fontWeight: '700',
     },
-    caloriesContainer: {
+    macrosRow: {
         flexDirection: 'row',
-        alignItems: 'baseline',
-        justifyContent: 'center',
-        marginBottom: 20,
-    },
-    caloriesValue: {
-        fontSize: 32,
-        fontWeight: 'bold',
-    },
-    caloriesLabel: {
-        fontSize: 16,
-        marginLeft: 8,
-    },
-    macrosGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-        gap: 8,
-    },
-    macroCard: {
-        flex: 1,
+        justifyContent: 'space-around',
         alignItems: 'center',
-        borderRadius: 8,
-        padding: 12,
     },
-    macroDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+    macroCircle: {
+        alignItems: 'center',
+    },
+    macroCircleInner: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 3,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: 8,
     },
     macroValue: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 2,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    macroPercentage: {
+        fontSize: 12,
+        fontWeight: '600',
     },
     macroLabel: {
-        fontSize: 12,
-        marginBottom: 4,
-    },
-    macroPercent: {
-        fontSize: 11,
+        fontSize: 14,
         fontWeight: '600',
-        marginBottom: 2,
     },
-    macroCalories: {
-        fontSize: 10,
-    },
-    detailedSection: {
+    // Details Section
+    detailsSection: {
         gap: 16,
+        marginBottom: 20,
     },
-    nutritionCategory: {
-        borderBottomWidth: 1,
-        paddingBottom: 12,
+    nutrientGroup: {
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
     },
-    categoryTitle: {
+    subSectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    subSectionTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 8,
+        fontWeight: '700',
     },
-    categoryContent: {
-        gap: 6,
+    nutrientRowWithProgress: {
+        marginBottom: 12,
     },
-    nutrientRow: {
+    nutrientRowHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 4,
+        marginBottom: 6,
     },
-    nutrientRowIndented: {
+    nutrientRowLeft: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 3,
-        paddingLeft: 16,
+        gap: 8,
+        flex: 1,
     },
-    nutrientName: {
+    nutrientIcon: {
+        width: 20,
+    },
+    nutrientLabel: {
         fontSize: 14,
         fontWeight: '500',
     },
-    nutrientNameSub: {
-        fontSize: 13,
+    nutrientRowRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     nutrientValue: {
         fontSize: 14,
+        fontWeight: '700',
+    },
+    percentageText: {
+        fontSize: 12,
         fontWeight: '600',
+        minWidth: 35,
+        textAlign: 'right',
+    },
+    progressBarContainer: {
+        width: '100%',
+    },
+    progressBarBackground: {
+        width: '100%',
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    // Notes Section
+    notesInputSection: {
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        marginBottom: 16,
+    },
+    notesTextInput: {
+        fontSize: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderRadius: 8,
+        minHeight: 80,
+        textAlignVertical: 'top',
     },
 });
