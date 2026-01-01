@@ -464,16 +464,16 @@ const ScannedProduct: React.FC = () => {
 
                         {/* Add button on the right */}
                         <TouchableOpacity
-                            style={[styles.addButtonInline, { backgroundColor: theme.colors.success }]}
+                            style={[styles.addButtonInline, { borderColor: theme.colors.success }]}
                             onPress={handleSubmit}
                             disabled={loading}
                         >
                             {loading ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                <ActivityIndicator size="small" color={theme.colors.success} />
                             ) : (
                                 <>
-                                    <Ionicons name="add" size={18} color="#FFFFFF" />
-                                    <Text style={styles.addButtonInlineText}>Add</Text>
+                                    <Ionicons name="add" size={18} color={theme.colors.success} />
+                                    <Text style={[styles.addButtonInlineText, { color: theme.colors.success }]}>Add</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -740,14 +740,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 10,
+        height: 40,
         borderRadius: 20,
+        borderWidth: 2,
         gap: 6,
     },
     addButtonInlineText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#FFFFFF',
     },
     calorieSection: {
         alignItems: 'center',

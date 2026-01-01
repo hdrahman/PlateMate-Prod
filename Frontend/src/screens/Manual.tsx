@@ -22,7 +22,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FoodItem from '../components/FoodItem';
-import FoodDetails from '../components/FoodDetails';
 import ManualFoodEntry from '../components/ManualFoodEntry';
 import { FoodItem as FoodItemType } from '../services/BarcodeService';
 import { getRecentFoodEntries, FoodLogEntry } from '../api/foodLog';
@@ -41,6 +40,7 @@ type RootStackParamList = {
     Scanner: { mode?: 'camera' | 'barcode' };
     ImageCapture: { mealType: string; photoUri?: string; sourcePage?: string };
     FoodDetail: { foodId: number };
+    ScannedProduct: { foodData: any; mealType: string };
 };
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -232,8 +232,6 @@ export default function Manual() {
     const [isSearching, setIsSearching] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [selectedFood, setSelectedFood] = useState<FoodItemType | null>(null);
-    const [showFoodDetails, setShowFoodDetails] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
     const [selectedMealCategory, setSelectedMealCategory] = useState(defaultMealType);
 
@@ -306,6 +304,8 @@ export default function Manual() {
             // For search results, fetch full nutritional details
             setIsLoading(true);
             
+            let foodData = food;
+            
             // If food has a food_id, fetch complete details from FatSecret
             // This ensures we get fiber, sugar, vitamins, and minerals
             if (food.food_id) {
@@ -314,22 +314,24 @@ export default function Manual() {
                 
                 if (detailedFood) {
                     console.log('Successfully fetched detailed nutrition data');
-                    setSelectedFood(detailedFood);
+                    foodData = detailedFood;
                 } else {
                     console.warn('Could not fetch details, using search data');
-                    setSelectedFood(food);
                 }
-            } else {
-                // No food_id available, use search data
-                setSelectedFood(food);
             }
             
-            setShowFoodDetails(true);
+            // Navigate to ScannedProduct screen (same as barcode scan)
+            navigation.navigate('ScannedProduct', {
+                foodData: foodData,
+                mealType: selectedMealCategory
+            });
         } catch (error) {
             console.error('Error selecting food:', error);
-            // Fallback to search data if details fetch fails
-            setSelectedFood(food);
-            setShowFoodDetails(true);
+            // Fallback to search data and navigate anyway
+            navigation.navigate('ScannedProduct', {
+                foodData: food,
+                mealType: selectedMealCategory
+            });
         } finally {
             setIsLoading(false);
         }
@@ -620,16 +622,6 @@ export default function Manual() {
                     </>
                 )}
             </View>
-
-            {/* Food Details Modal */}
-            {selectedFood && (
-                <FoodDetails
-                    visible={showFoodDetails}
-                    food={selectedFood}
-                    onClose={() => setShowFoodDetails(false)}
-                    onAddFood={(food, mealType, quantity) => handleAddFood(food, mealType || selectedMealCategory, quantity)}
-                />
-            )}
 
             {/* Manual Food Entry Modal */}
             <ManualFoodEntry

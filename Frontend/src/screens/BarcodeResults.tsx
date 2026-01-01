@@ -454,16 +454,16 @@ const BarcodeResults: React.FC = () => {
 
                         {/* Add button on the right */}
                         <TouchableOpacity
-                            style={[styles.addButtonInline, { backgroundColor: theme.colors.success }]}
+                            style={[styles.addButtonInline, { borderColor: theme.colors.success }]}
                             onPress={handleSubmit}
                             disabled={loading}
                         >
                             {loading ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                <ActivityIndicator size="small" color={theme.colors.success} />
                             ) : (
                                 <>
-                                    <Ionicons name="add" size={18} color="#FFFFFF" />
-                                    <Text style={styles.addButtonInlineText}>Add</Text>
+                                    <Ionicons name="add" size={18} color={theme.colors.success} />
+                                    <Text style={[styles.addButtonInlineText, { color: theme.colors.success }]}>Add</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -617,8 +617,8 @@ const styles = StyleSheet.create({
     quantityInputInline: { width: 60, height: 40, borderRadius: 20, textAlign: 'center', fontSize: 16, fontWeight: '600', paddingHorizontal: 8 },
     unitSelectorInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20, gap: 4 },
     unitTextInline: { fontSize: 14, fontWeight: '600' },
-    addButtonInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, gap: 6 },
-    addButtonInlineText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+    addButtonInline: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 40, borderRadius: 20, borderWidth: 2, gap: 6 },
+    addButtonInlineText: { fontSize: 16, fontWeight: '700' },
     calorieSection: { alignItems: 'center', marginBottom: 12, marginTop: 16 },
     calorieAlignmentContainer: { alignItems: 'center' },
     calorieRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
