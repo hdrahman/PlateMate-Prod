@@ -241,7 +241,11 @@ async def search_food(query: str, max_results: int = 50) -> List[Dict[str, Any]]
 @cache_response(ttl_seconds=600)  # Cache for 10 minutes
 async def get_food_details(food_id: str) -> Optional[Dict[str, Any]]:
     """
-    Get detailed information about a specific food
+    Get detailed information about a specific food using food.get.v5
+    
+    v5 provides additional standardized servings for Brand foods:
+    - 100g serving (always)
+    - 1oz serving (when applicable)
     
     Args:
         food_id: FatSecret food ID
@@ -264,22 +268,24 @@ async def get_food_details(food_id: str) -> Optional[Dict[str, Any]]:
         # Get the FatSecret API client from pool
         api_client = await get_http_client("fatsecret_api")
 
-        # Make the food details request with retry logic
-        logger.info(f"Getting FatSecret API food details for ID: {food_id}")
+        # Make the food details request with retry logic using v5
+        # v5 provides additional standardized servings (100g, 1oz) for Brand foods
+        logger.info(f"Getting FatSecret API food details (v5) for ID: {food_id}")
         details_response = await request_with_retry(
             "GET",
             "https://platform.fatsecret.com/rest/server.api",
             api_client,
             headers={"Authorization": f"Bearer {access_token}"},
             params={
-                "method": "food.get.v2",
+                "method": "food.get.v5",
                 "food_id": food_id,
+                "flag_default_serving": "true",
                 "format": "json"
             }
         )
 
         data = details_response.json()
-        logger.info(f"FatSecret API food details response for ID {food_id}")
+        logger.info(f"FatSecret API food details (v5) response for ID {food_id}")
 
         # Extract food from response
         food_data = data.get("food", {})
@@ -296,13 +302,17 @@ async def get_food_details(food_id: str) -> Optional[Dict[str, Any]]:
 @cache_response(ttl_seconds=600)  # Cache for 10 minutes
 async def search_by_barcode(barcode: str) -> Optional[Dict[str, Any]]:
     """
-    Search for a food by barcode
+    Search for a food by barcode using food.find_id_for_barcode.v2
+    
+    v2 returns full food details directly (same format as food.get.v5),
+    eliminating the need for a second API call.
+    Includes multiple serving sizes: default serving, 100g, 1oz, etc.
     
     Args:
-        barcode: UPC/EAN barcode
+        barcode: UPC/EAN barcode (GTIN-13 format)
         
     Returns:
-        Food details or None if not found
+        Food details with all serving sizes, or None if not found
     """
     try:
         # Use connection pool for improved performance
@@ -313,47 +323,71 @@ async def search_by_barcode(barcode: str) -> Optional[Dict[str, Any]]:
             logger.error("FatSecret API credentials are not configured properly")
             return None
 
+        # Clean and validate the barcode - ensure GTIN-13 format
+        clean_barcode = barcode.strip()
+        if len(clean_barcode) < 13:
+            clean_barcode = clean_barcode.zfill(13)
+
         # Get OAuth token using connection pool
         access_token = await get_oauth_token()
 
         # Get the FatSecret API client from pool
         api_client = await get_http_client("fatsecret_api")
 
-        # Make the barcode search request with retry logic
-        logger.info(f"Searching FatSecret API for barcode: {barcode}")
+        # Use v2 barcode API which returns full food details directly
+        # This eliminates the need for a second API call to get_food_details
+        logger.info(f"Searching FatSecret API (v2) for barcode: {clean_barcode}")
         search_response = await request_with_retry(
             "GET",
             "https://platform.fatsecret.com/rest/server.api",
             api_client,
             headers={"Authorization": f"Bearer {access_token}"},
             params={
-                "method": "food.find_id_for_barcode",
-                "barcode": barcode,
+                "method": "food.find_id_for_barcode.v2",
+                "barcode": clean_barcode,
+                "flag_default_serving": "true",
                 "format": "json"
             }
         )
 
         data = search_response.json()
-        logger.info(f"FatSecret API barcode response received")
+        logger.info(f"FatSecret API barcode (v2) response received")
 
-        # Extract food ID from response
-        food_id = data.get("food_id")
-        if not food_id:
-            logger.warning(f"No food_id found for barcode: {barcode}")
+        # v2 returns food data directly (same format as food.get.v5)
+        # Check for error responses
+        if "error" in data:
+            error_code = data["error"].get("code")
+            error_message = data["error"].get("message", "Unknown error")
+            if error_code == 211:
+                logger.warning(f"No food item detected for barcode: {barcode}")
+                return None
+            logger.error(f"FatSecret API error: {error_code} - {error_message}")
             return None
 
-        # Handle different response formats for food_id
-        if isinstance(food_id, dict) and 'value' in food_id:
-            food_id = food_id['value']
-        elif isinstance(food_id, dict):
-            food_id = str(food_id)
-        else:
-            food_id = str(food_id)
+        # v2 returns the food object directly at the root level
+        food_data = data.get("food", data)  # Try 'food' key first, fallback to root
+        
+        if not food_data or not food_data.get("food_id"):
+            # Fallback: v2 might still return just food_id in some cases
+            food_id = data.get("food_id")
+            if food_id:
+                # Handle different response formats for food_id
+                if isinstance(food_id, dict) and 'value' in food_id:
+                    food_id = food_id['value']
+                elif isinstance(food_id, dict):
+                    food_id = str(food_id)
+                else:
+                    food_id = str(food_id)
+                logger.info(f"v2 returned food_id only, fetching details: {food_id}")
+                return await get_food_details(food_id)
+            
+            logger.warning(f"No food data found for barcode: {barcode}")
+            return None
 
-        logger.info(f"Found food_id: {food_id} for barcode: {barcode}")
-
-        # Get food details using the food_id
-        return await get_food_details(food_id)
+        logger.info(f"Found food via barcode v2: {food_data.get('food_name', 'Unknown')}")
+        
+        # Map the response to our format
+        return map_food_item(food_data)
     except Exception as e:
         logger.error(f"Error searching FatSecret by barcode: {str(e)}")
         return None

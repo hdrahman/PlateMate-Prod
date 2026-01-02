@@ -15,8 +15,6 @@ def main():
         port=args.port, 
         reload=args.reload,
         timeout_keep_alive=65,      # Keep-alive timeout for idle connections
-        timeout_notify=65,         # Changed from default 30 seconds to 65
-        timeout_graceful_shutdown=120,  # Allow 2 minutes for graceful shutdown
     )
 
 if __name__ == "__main__":
