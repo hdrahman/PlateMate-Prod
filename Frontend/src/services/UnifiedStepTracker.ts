@@ -1014,7 +1014,82 @@ class UnifiedStepTracker {
 
     public async forceSync(): Promise<void> {
         await this.syncFromSensor();
+        await this.syncFromWearable();
         await this.syncToDatabase();
+    }
+
+    /**
+     * Sync steps from wearable health service (Apple Health / Health Connect)
+     * Wearable data takes priority over phone sensor data
+     */
+    public async syncFromWearable(): Promise<number | null> {
+        try {
+            // Dynamically import to avoid circular dependencies
+            const WearableHealthService = (await import('./WearableHealthService')).default;
+            
+            // Check if wearable is connected
+            if (!WearableHealthService.isConnected()) {
+                return null;
+            }
+
+            const settings = WearableHealthService.getSettings();
+            if (!settings.enabled || !settings.syncSteps) {
+                return null;
+            }
+
+            console.log('⌚ Syncing steps from wearable...');
+            
+            const { steps, source } = await WearableHealthService.getTodaySteps();
+            
+            if (steps > 0) {
+                console.log(`⌚ Wearable sync: ${steps} steps from ${source}`);
+                
+                // If wearable steps are higher, use them (wearable has priority)
+                if (settings.preferWearableOverPhone && steps > this.state.currentSteps) {
+                    this.updateStepCount(steps);
+                    console.log(`✅ Updated to wearable step count: ${steps}`);
+                } else if (steps > this.state.currentSteps) {
+                    // Even without preference, use higher count
+                    this.updateStepCount(steps);
+                }
+                
+                return steps;
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('⚠️ Error syncing from wearable:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get the best step count from all available sources
+     * Priority: Wearable > Phone Sensor > Database
+     */
+    public async getBestStepCount(): Promise<{ steps: number; source: string }> {
+        try {
+            // Try wearable first
+            const wearableSteps = await this.syncFromWearable();
+            if (wearableSteps !== null && wearableSteps > 0) {
+                return { steps: wearableSteps, source: 'wearable' };
+            }
+
+            // Fall back to current state (from sensor)
+            if (this.state.currentSteps > 0) {
+                return { steps: this.state.currentSteps, source: 'sensor' };
+            }
+
+            // Try database as last resort
+            const { formatDateToString } = await import('../utils/dateUtils');
+            const today = formatDateToString(new Date());
+            const dbSteps = await getStepsForDate(today);
+            
+            return { steps: dbSteps || 0, source: 'database' };
+        } catch (error) {
+            console.error('❌ Error getting best step count:', error);
+            return { steps: this.state.currentSteps, source: 'cached' };
+        }
     }
 
     public async addManualSteps(stepsToAdd: number): Promise<number> {

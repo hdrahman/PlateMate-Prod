@@ -33,17 +33,22 @@
           "UIInterfaceOrientationLandscapeRight"
         ],
         "UIBackgroundModes": [
-          "fetch"
+          "fetch",
+          "processing"
         ],
         "NSMotionUsageDescription": "PlateMate uses your device's Motion & Fitness sensors to automatically count your daily steps and help you achieve your fitness goals. Your step data is stored privately on your device for fitness tracking purposes.",
         "NSCameraUsageDescription": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
         "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
+        "NSHealthShareUsageDescription": "PlateMate reads your health data from Apple Health to track your steps, heart rate, workouts, and other fitness metrics. This helps provide personalized nutrition and fitness insights.",
+        "NSHealthUpdateUsageDescription": "PlateMate may save your workout and nutrition data to Apple Health to help you track your overall health and fitness progress.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.applesignin": [
           "Default"
-        ]
+        ],
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true
       },
       "associatedDomains": [
         "applinks:platemate.app"
@@ -74,11 +79,19 @@
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.BODY_SENSORS",
         "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_HEALTH",
         "android.permission.WAKE_LOCK",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_DISTANCE"
       ],
       "runtimeVersion": "1.0.0"
     },
@@ -111,7 +124,19 @@
       "./notifee.plugin.js",
       "expo-font",
       "expo-asset",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "react-native-health",
+        {
+          "isClinicalDataEnabled": false
+        }
+      ],
+      [
+        "react-native-health-connect",
+        {
+          "requestPermissionsRationale": "PlateMate uses Health Connect to sync your health data including steps, heart rate, workouts, and sleep for personalized nutrition and fitness tracking."
+        }
+      ]
     ],
     "owner": "haamed",
     "extra": {

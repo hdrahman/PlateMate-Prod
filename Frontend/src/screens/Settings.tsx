@@ -228,29 +228,6 @@ const SettingsScreen = () => {
                             <Text style={[styles.itemText, { color: theme.colors.text }]}>Edit Goals</Text>
                             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
-                        <View style={styles.itemRow}>
-                            <View style={styles.iconTextContainer}>
-                                <View style={[styles.iconBubble, { backgroundColor: '#FF00F530' }]}>
-                                    <Ionicons name="footsteps-outline" size={20} color="#FF00F5" />
-                                </View>
-                                <View style={styles.stepTrackingTextContainer}>
-                                    <Text style={[styles.itemText, { color: theme.colors.text }]}>Always-On Step Tracking</Text>
-                                    <Text style={[styles.itemSubtext, { color: theme.colors.textSecondary }]}>
-                                        Keep counting steps even when app is closed
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={styles.switchContainer}>
-                                <Switch
-                                    value={isPersistentTrackingEnabled}
-                                    onValueChange={handlePersistentTrackingToggle}
-                                    disabled={isLoadingStepSettings}
-                                    trackColor={{ false: "#3e3e3e", true: "#FF00F540" }}
-                                    thumbColor={isPersistentTrackingEnabled ? "#FF00F5" : "#f4f3f4"}
-                                    ios_backgroundColor="#3e3e3e"
-                                />
-                            </View>
-                        </View>
                         <TouchableOpacity
                             style={[styles.item, { borderBottomColor: theme.colors.border }]}
                             onPress={() => {
@@ -288,6 +265,46 @@ const SettingsScreen = () => {
                             <Text style={[styles.itemText, { color: theme.colors.text }]}>Record Future Self Message</Text>
                             <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Health & Wearables Section */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Health & Wearables</Text>
+                    <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+                        <TouchableOpacity
+                            style={[styles.item, { borderBottomColor: theme.colors.border }]}
+                            onPress={() => navigation.navigate("ConnectedDevices")}
+                        >
+                            <View style={[styles.iconBubble, { backgroundColor: '#FF3B3030' }]}>
+                                <Ionicons name="watch-outline" size={20} color="#FF3B30" />
+                            </View>
+                            <Text style={[styles.itemText, { color: theme.colors.text }]}>Connected Devices</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} style={styles.chevron} />
+                        </TouchableOpacity>
+                        <View style={styles.itemRow}>
+                            <View style={styles.iconTextContainer}>
+                                <View style={[styles.iconBubble, { backgroundColor: '#FF00F530' }]}>
+                                    <Ionicons name="footsteps-outline" size={20} color="#FF00F5" />
+                                </View>
+                                <View style={styles.stepTrackingTextContainer}>
+                                    <Text style={[styles.itemText, { color: theme.colors.text }]}>Always-On Step Tracking</Text>
+                                    <Text style={[styles.itemSubtext, { color: theme.colors.textSecondary }]}>
+                                        Keep counting steps even when app is closed
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.switchContainer}>
+                                <Switch
+                                    value={isPersistentTrackingEnabled}
+                                    onValueChange={handlePersistentTrackingToggle}
+                                    disabled={isLoadingStepSettings}
+                                    trackColor={{ false: "#3e3e3e", true: "#FF00F540" }}
+                                    thumbColor={isPersistentTrackingEnabled ? "#FF00F5" : "#f4f3f4"}
+                                    ios_backgroundColor="#3e3e3e"
+                                />
+                            </View>
+                        </View>
                     </View>
                 </View>
 

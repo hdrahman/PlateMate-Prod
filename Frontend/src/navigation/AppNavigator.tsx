@@ -31,6 +31,7 @@ import Home from '../screens/Home';
 import FutureSelfRecordingSimple from '../screens/FutureSelfRecordingSimple';
 import FeatureRequestsScreen from '../screens/FeatureRequests';
 import CreateFeatureRequestScreen from '../screens/CreateFeatureRequest';
+import ConnectedDevicesScreen from '../screens/ConnectedDevicesScreen';
 // Import other screens as needed - these would be your existing screens
 // import ExerciseScreen from '../screens/ExerciseScreen';
 
@@ -70,6 +71,7 @@ type RootStackParamList = {
     FutureSelfRecordingSimple: undefined;
     FeatureRequests: undefined;
     CreateFeatureRequest: undefined;
+    ConnectedDevices: undefined;
     // Add other screens as needed
 };
 
@@ -154,6 +156,7 @@ const AppNavigator = () => {
                 <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />
                 <Stack.Screen name="FeatureRequests" component={FeatureRequestsScreen} />
                 <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequestScreen} />
+                <Stack.Screen name="ConnectedDevices" component={ConnectedDevicesScreen} />
                 {/* Add your other screens here */}
             </Stack.Navigator>
         </NavigationContainer>

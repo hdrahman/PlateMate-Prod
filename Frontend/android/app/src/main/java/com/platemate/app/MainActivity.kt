@@ -17,6 +17,16 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
+    
+    // Initialize Health Connect permission delegate
+    try {
+      val healthConnectClass = Class.forName("dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate")
+      val setPermissionDelegateMethod = healthConnectClass.getMethod("setPermissionDelegate", android.app.Activity::class.java)
+      setPermissionDelegateMethod.invoke(null, this)
+    } catch (e: Exception) {
+      // Health Connect not available or not installed - this is fine
+      android.util.Log.d("MainActivity", "Health Connect delegate not available: ${e.message}")
+    }
   }
 
   /**
