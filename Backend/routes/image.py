@@ -409,11 +409,11 @@ Carefully observe the image and consider:
 â€¢ Visual indicators of cooking methods and added fats
 â€¢ Whether what appears as one item might actually be multiple portions touching
 
-When estimating portions, remember that food piled high or densely packed contains significantly more calories than flat plating. Trust your visual assessment of the actual volume present.
+When estimating portions, remember that food piled high or densely packed contains significantly more calories than flat plating. Trust your visual assessment of the actual volume present(be careful of perception).
 
 For oil and fat content, look for visual cues like glossy surfaces, crispy textures, or visible oil. Many cooked foods, especially restaurant preparations, contain more added fats than initially apparent. Don't hesitate to account for this.
 
-If you see what might be multiple items touching or connected, consider whether they're actually separate portions. Look for natural divisions, crust edges, cut lines, or size that seems unusually large for a single serving.
+If you see what might be multiple items touching or connected, consider whether they're actually separate portions. Look for natural divisions, crust edges, cut lines, or size that seems unusually large for a single serving and account for the fact that its more than one serving.
 
 NUTRITIONAL REFERENCE VALUES (per 100g cooked):
 
@@ -480,7 +480,6 @@ Return ONLY a raw JSON array. No markdown, no code fences, no explanatory textâ€
                             "content": content
                         }
                     ],
-                    max_tokens=4000,
                     temperature=0.2  # Slight variation to prevent caching identical results
                 )
                 
@@ -793,7 +792,6 @@ Return ONLY a raw JSON array. No markdown, no code fences, no explanatory textâ€
                                     "content": content
                                 }
                             ],
-                            max_tokens=4000,
                             temperature=0.2  # Slight variation to prevent caching identical results
                         )
                         
