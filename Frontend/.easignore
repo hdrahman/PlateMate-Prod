@@ -1,21 +1,28 @@
-# Gradle cache and lock files
-android/.gradle/
-android/.kotlin/
-android/build/
-android/app/build/
-android/app/.cxx/
-android/local.properties
-android/*.hprof
-android/*.iml
+# Exclude entire Android folder (not needed for iOS builds)
+android/
 
 # Node modules (already ignored by default but just in case)
 node_modules/
+
+# iOS build artifacts and pods
+ios/build/
+ios/Pods/
+ios/**/*.xcworkspace/xcuserdata/
+ios/**/*.xcodeproj/xcuserdata/
+ios/**/*.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Other build artifacts
 .expo/
 dist/
 build/
 .metro-health-check*
+
+# Backend folder (not needed for frontend builds)
+../Backend/
+
+# Other project root folders
+../docs/
+../supabase/
 
 # Documentation files (not needed for builds)
 *.md
@@ -67,12 +74,16 @@ yarn-error.log*
 # Misc development files
 .nvmrc
 .npmrc
-patches/
-plugins/
-scripts/
 
-# Build configuration files (processed before upload)
-babel.config.js
-metro.config.js
-tsconfig.json
-expo.json
+# Large directories to exclude
+uploads/
+android/app/build/
+android/.gradle/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Build configuration files should NOT be excluded - removing this section
+# These files are needed for the build process

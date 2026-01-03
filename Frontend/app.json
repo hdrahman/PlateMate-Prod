@@ -54,7 +54,7 @@
     },
     "android": {
       "package": "com.platemate.app",
-      "versionCode": 10,
+      "versionCode": 12,
       "intentFilters": [
         {
           "action": "VIEW",

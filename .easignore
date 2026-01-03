@@ -1,0 +1,31 @@
+# EAS is running from workspace root, so exclude everything except Frontend essentials
+
+# Exclude Backend completely
+Backend/
+
+# Exclude workspace root files
+*.md
+*.sql
+*.txt
+*.py
+pytest.ini
+run_tests.py
+
+# Exclude other root folders
+supabase/
+docs/
+
+# Within Frontend, exclude these:
+Frontend/node_modules/
+Frontend/android/
+Frontend/.expo/
+Frontend/build/
+Frontend/dist/
+Frontend/.gradle/
+Frontend/.kotlin/
+Frontend/.claude/
+Frontend/docs/
+Frontend/database_migrations/
+Frontend/patches/
+Frontend/plugins/
+Frontend/scripts/
