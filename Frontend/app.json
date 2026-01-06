@@ -36,6 +36,9 @@
           "fetch",
           "processing"
         ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.zentraai.platematepro.WEARABLE_HEALTH_SYNC_TASK"
+        ],
         "NSMotionUsageDescription": "PlateMate uses your device's Motion & Fitness sensors to automatically count your daily steps and help you achieve your fitness goals. Your step data is stored privately on your device for fitness tracking purposes.",
         "NSCameraUsageDescription": "PlateMate needs camera access to capture photos of your meals for food logging, scan food barcodes for quick nutrition lookup, and help you track your dietary goals visually.",
         "NSLocationWhenInUseUsageDescription": "Location access is not actively used by PlateMate. This permission is required by underlying system frameworks.",
