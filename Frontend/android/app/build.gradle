@@ -90,9 +90,9 @@ android {
     namespace 'com.platemate.app'
         defaultConfig {
         applicationId 'com.platemate.app'
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 26  // Updated from 24 to 26 for Health Connect support
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
+        versionCode 13
         versionName "1.0.12"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""

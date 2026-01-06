@@ -126,23 +126,112 @@ const ConnectedDevicesScreen = () => {
             setIsConnecting(true);
             
             // Initialize service
-            await WearableHealthService.initialize();
+            const initialized = await WearableHealthService.initialize();
             
-            // Request permissions
+            console.log('🔐 Initialization result:', initialized);
+
+            // On Android, check Health Connect availability first
+            if (Platform.OS === 'android') {
+                const availability = await WearableHealthService.isHealthConnectAvailable();
+                console.log('📱 Health Connect availability:', availability);
+                
+                if (!availability.available) {
+                    let alertMessage = availability.message;
+                    let buttons: any[] = [{ text: 'Cancel', style: 'cancel' }];
+                    
+                    if (availability.status === 'update_required') {
+                        alertMessage = 'Health Connect needs to be updated to work with PlateMate.\n\nPlease update Health Connect from the Play Store.';
+                        buttons.push({
+                            text: 'Open Play Store',
+                            onPress: () => {
+                                Linking.openURL('market://details?id=com.google.android.apps.healthdata');
+                            }
+                        });
+                    } else if (availability.status === 'unavailable') {
+                        alertMessage = 'Health Connect is not available on this device.\n\n' +
+                            'On Android 13 and below: Install "Health Connect by Google" from Play Store.\n\n' +
+                            'On Android 14+: Health Connect should be built-in. If using an emulator, ensure it has Google Play Services.';
+                        buttons.push({
+                            text: 'Open Play Store',
+                            onPress: () => {
+                                Linking.openURL('market://details?id=com.google.android.apps.healthdata');
+                            }
+                        });
+                    }
+                    
+                    Alert.alert('Health Connect Not Available', alertMessage, buttons);
+                    return;
+                }
+            }
+            
+            if (!initialized) {
+                Alert.alert(
+                    'Health Connect Required',
+                    'Health Connect could not be initialized. Please make sure:\n\n1. Health Connect app is installed from Play Store\n2. Health Connect is up to date\n3. Your device supports Health Connect (Android 14+ or updated Play Services)',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { 
+                            text: 'Open Play Store',
+                            onPress: () => {
+                                Linking.openURL('market://details?id=com.google.android.apps.healthdata');
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+            
+            console.log('🔐 Requesting health permissions...');
+            
+            // Request permissions - this will open Health Connect permission dialog
+            // and then verify what was actually granted
             const granted = await WearableHealthService.requestPermissions();
             
-            if (granted) {
-                // Update settings to enabled
+            console.log('🔐 Permission request result:', granted);
+            
+            // After permission request, always verify current permissions
+            // This catches cases where user granted permissions but we didn't detect it
+            if (Platform.OS === 'android') {
+                const grantedPermissions = await WearableHealthService.checkGrantedPermissions();
+                console.log('🔍 Verified granted permissions:', grantedPermissions);
+                
+                if (grantedPermissions.length > 0) {
+                    // Permissions were granted! Update UI
+                    await WearableHealthService.updateSettings({ enabled: true });
+                    setSettings(prev => ({ ...prev, enabled: true }));
+                    
+                    // Reload connection status
+                    const status = WearableHealthService.getConnectionStatus();
+                    setConnectionStatus(status);
+                    
+                    console.log('✅ Connection successful, status:', status);
+                    
+                    // Enable background sync
+                    await WearableBackgroundSync.registerBackgroundTask();
+                    
+                    // Start foreground sync
+                    WearableBackgroundSync.startForegroundSync();
+                    
+                    // Perform initial sync
+                    await handleSync();
+                    
+                    Alert.alert(
+                        'Connected!',
+                        `Successfully connected to ${platformName}. Your health data will now sync automatically.\n\nGranted: ${grantedPermissions.join(', ')}`,
+                        [{ text: 'OK' }]
+                    );
+                    return;
+                }
+            } else if (granted) {
+                // iOS - simpler flow
                 await WearableHealthService.updateSettings({ enabled: true });
                 setSettings(prev => ({ ...prev, enabled: true }));
                 
-                // Enable background sync
+                const status = WearableHealthService.getConnectionStatus();
+                setConnectionStatus(status);
+                
                 await WearableBackgroundSync.registerBackgroundTask();
-                
-                // Start foreground sync
                 WearableBackgroundSync.startForegroundSync();
-                
-                // Perform initial sync
                 await handleSync();
                 
                 Alert.alert(
@@ -150,19 +239,57 @@ const ConnectedDevicesScreen = () => {
                     `Successfully connected to ${platformName}. Your health data will now sync automatically.`,
                     [{ text: 'OK' }]
                 );
+                return;
+            }
+            
+            // If we reach here, no permissions were granted
+            console.warn('⚠️ No permissions granted');
+            
+            if (Platform.OS === 'android') {
+                Alert.alert(
+                    'Permissions Required',
+                    'PlateMate needs permission to read your health data from Health Connect.\n\nWould you like to open Health Connect to grant permissions?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { 
+                            text: 'Open Health Connect', 
+                            onPress: async () => {
+                                // Open Health Connect data management (closest to permissions screen)
+                                await WearableHealthService.openHealthConnectDataManagement();
+                                
+                                // After user comes back, check if they granted permissions
+                                setTimeout(async () => {
+                                    const grantedPermissions = await WearableHealthService.checkGrantedPermissions();
+                                    if (grantedPermissions.length > 0) {
+                                        // User granted permissions! Reload the screen
+                                        await loadData();
+                                        Alert.alert('Success!', 'Permissions granted. Health Connect is now connected.');
+                                    }
+                                }, 1000);
+                            }
+                        },
+                        { 
+                            text: 'Try Again', 
+                            onPress: () => {
+                                setIsConnecting(false);
+                                setTimeout(() => handleConnect(), 500);
+                            }
+                        },
+                    ]
+                );
             } else {
                 Alert.alert(
                     'Permission Required',
-                    `Please grant access to ${platformName} to use wearable features. You can enable this in your device settings.`,
-                    [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Open Settings', onPress: () => Linking.openSettings() },
-                    ]
+                    `Please grant access to ${platformName} to use wearable features.`,
+                    [{ text: 'OK' }]
                 );
             }
         } catch (error) {
             console.error('Error connecting:', error);
-            Alert.alert('Connection Failed', 'Unable to connect to health service. Please try again.');
+            Alert.alert(
+                'Connection Failed', 
+                `Unable to connect to health service: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease check if Health Connect is installed and up to date.`
+            );
         } finally {
             setIsConnecting(false);
         }
@@ -514,11 +641,19 @@ const ConnectedDevicesScreen = () => {
                             <View style={styles.settingRow}>
                                 <View style={styles.settingInfo}>
                                     <Ionicons name="swap-vertical-outline" size={20} color={theme.colors.primary} />
-                                    <View>
+                                    <View style={{ flex: 1 }}>
                                         <Text style={[styles.settingLabel, { color: theme.colors.text }]}>Prefer Wearable Data</Text>
                                         <Text style={[styles.settingDescription, { color: theme.colors.textSecondary }]}>
                                             Use wearable steps over phone pedometer
                                         </Text>
+                                        {settings.preferWearableOverPhone && settings.syncSteps && (
+                                            <View style={[styles.statusBadge, { backgroundColor: '#4CAF50' + '20', marginTop: 6 }]}>
+                                                <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                                                <Text style={[styles.statusBadgeText, { color: '#4CAF50' }]}>
+                                                    Native step tracking disabled
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                                 <Switch
@@ -736,6 +871,19 @@ const styles = StyleSheet.create({
     settingDescription: {
         fontSize: 12,
         marginTop: 2,
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+        gap: 4,
+    },
+    statusBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
     },
     supportedDevicesIntro: {
         fontSize: 14,

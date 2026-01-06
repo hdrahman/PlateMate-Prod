@@ -566,6 +566,24 @@ class UnifiedStepTracker {
                 await this.initialize();
             }
 
+            // Check if wearable is connected and should be preferred
+            const shouldUseWearable = await this.shouldUseWearableForSteps();
+            
+            if (shouldUseWearable) {
+                console.log('⌚ Wearable device is connected and preferred - skipping native step tracking');
+                console.log('📊 Steps will be synced from wearable health service');
+                
+                // Mark as enabled but don't start native tracking
+                await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'true');
+                this.state.isTracking = true;
+                
+                // Sync from wearable immediately
+                await this.syncFromWearable();
+                
+                console.log('✅ Wearable-only step tracking activated');
+                return true;
+            }
+
             // Check if tracking was previously enabled and if we have permissions
             try {
                 const wasEnabled = await AsyncStorage.getItem(STEP_TRACKER_ENABLED_KEY);
@@ -660,6 +678,13 @@ class UnifiedStepTracker {
 
     private async syncFromSensor(): Promise<void> {
         try {
+            // Check if wearable should be used instead of native sensors
+            const shouldUseWearable = await this.shouldUseWearableForSteps();
+            if (shouldUseWearable) {
+                console.log('⌚ Skipping sensor sync - using wearable data');
+                return;
+            }
+
             if (Platform.OS === 'android') {
                 // Use native Android step counter if available
                 if (this.state.nativeStepCounterAvailable) {
@@ -1016,6 +1041,29 @@ class UnifiedStepTracker {
         await this.syncFromSensor();
         await this.syncFromWearable();
         await this.syncToDatabase();
+    }
+
+    /**
+     * Check if wearable should be used for step tracking (deduplication logic)
+     */
+    private async shouldUseWearableForSteps(): Promise<boolean> {
+        try {
+            // Dynamically import to avoid circular dependencies
+            const WearableHealthService = (await import('./WearableHealthService')).default;
+            
+            // Check if wearable is connected
+            if (!WearableHealthService.isConnected()) {
+                return false;
+            }
+
+            const settings = WearableHealthService.getSettings();
+            
+            // Use wearable if enabled, syncing steps, and preferring wearable over phone
+            return settings.enabled && settings.syncSteps && settings.preferWearableOverPhone;
+        } catch (error) {
+            console.warn('⚠️ Error checking wearable status:', error);
+            return false;
+        }
     }
 
     /**

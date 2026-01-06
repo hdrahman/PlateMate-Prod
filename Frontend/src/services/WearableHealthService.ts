@@ -11,11 +11,13 @@
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getWorkoutTypeFromHealthConnect, getWorkoutTypeFromAppleHealth, estimateCalories } from '../utils/workoutTypeMapping';
 
 // Storage keys
 const WEARABLE_SETTINGS_KEY = 'WEARABLE_HEALTH_SETTINGS';
 const WEARABLE_LAST_SYNC_KEY = 'WEARABLE_LAST_SYNC';
 const WEARABLE_CONNECTION_KEY = 'WEARABLE_CONNECTION_STATUS';
+const WEARABLE_SYNCED_WORKOUTS_KEY = 'WEARABLE_SYNCED_WORKOUTS';
 
 // Types for health data
 export interface HealthDataPoint {
@@ -198,6 +200,42 @@ class WearableHealthService {
     }
 
     /**
+     * Check if Health Connect is available on this device
+     * Returns detailed status about availability
+     */
+    public async isHealthConnectAvailable(): Promise<{ available: boolean; status: string; message: string }> {
+        if (Platform.OS !== 'android') {
+            return { available: false, status: 'wrong_platform', message: 'Health Connect is only available on Android' };
+        }
+
+        if (!HealthConnect) {
+            try {
+                HealthConnect = require('react-native-health-connect');
+            } catch (e) {
+                return { available: false, status: 'module_not_loaded', message: 'Health Connect module could not be loaded' };
+            }
+        }
+
+        try {
+            const sdkStatus = await HealthConnect.getSdkStatus();
+            
+            if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_AVAILABLE || sdkStatus === 1) {
+                return { available: true, status: 'available', message: 'Health Connect is available' };
+            } else if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED || sdkStatus === 3) {
+                return { available: false, status: 'update_required', message: 'Health Connect requires an update from Play Store' };
+            } else {
+                return { 
+                    available: false, 
+                    status: 'unavailable', 
+                    message: 'Health Connect is not available. On Android 13 and below, install from Play Store. On Android 14+, it should be built-in but may not be present on emulators without Google Play.' 
+                };
+            }
+        } catch (error) {
+            return { available: false, status: 'error', message: `Error checking availability: ${error}` };
+        }
+    }
+
+    /**
      * Request permissions for health data access
      */
     public async requestPermissions(): Promise<boolean> {
@@ -261,6 +299,36 @@ class WearableHealthService {
         }
 
         try {
+            // First, check SDK availability
+            const sdkStatus = await HealthConnect.getSdkStatus();
+            console.log('📱 Health Connect SDK status:', sdkStatus);
+            
+            // SDK status codes from react-native-health-connect:
+            // 1 = SDK_AVAILABLE
+            // 2 = SDK_UNAVAILABLE  
+            // 3 = SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
+            if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_UNAVAILABLE || sdkStatus === 2) {
+                console.warn('⚠️ Health Connect is not available on this device.');
+                console.warn('📱 This may be because:');
+                console.warn('   - Running on an emulator without Google Play Services');
+                console.warn('   - Health Connect app is not installed (Android 13 and below)');
+                console.warn('   - Health Connect framework module is not present (Android 14+)');
+                // Don't throw error, just return false gracefully
+                return false;
+            }
+            
+            if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED || sdkStatus === 3) {
+                console.warn('⚠️ Health Connect requires an update. Please update via Play Store.');
+                // Try to open Play Store for update (handled by the library)
+                try {
+                    await HealthConnect.openHealthConnectSettings();
+                } catch (e) {
+                    console.warn('Could not open Health Connect settings:', e);
+                }
+                return false;
+            }
+
+            // Define the permissions we need
             const permissions = [
                 { accessType: 'read', recordType: 'Steps' },
                 { accessType: 'read', recordType: 'HeartRate' },
@@ -271,21 +339,134 @@ class WearableHealthService {
                 { accessType: 'read', recordType: 'Distance' },
             ];
 
-            const granted = await HealthConnect.requestPermission(permissions);
+            console.log('📱 Requesting Health Connect permissions...');
             
-            if (granted && granted.length > 0) {
+            // Request permissions - this will automatically open the Health Connect permission dialog
+            // IMPORTANT: requestPermission returns an ARRAY of granted permissions, not a boolean
+            const result = await HealthConnect.requestPermission(permissions);
+            
+            console.log('✅ Permission request completed');
+            console.log('📋 Request result:', result);
+            
+            // After user returns from permission dialog, verify what was actually granted
+            // This is critical because the user may have granted permissions after the initial request
+            const actuallyGrantedPermissions = await HealthConnect.getGrantedPermissions();
+            console.log('📋 Actually granted permissions (verified):', actuallyGrantedPermissions);
+            
+            // Check if any permissions were granted
+            if (actuallyGrantedPermissions && actuallyGrantedPermissions.length > 0) {
+                // Map the granted permissions to our internal format
+                const grantedTypes: string[] = [];
+                
+                actuallyGrantedPermissions.forEach((permission: any) => {
+                    const recordType = permission.recordType;
+                    if (recordType === 'Steps') grantedTypes.push('steps');
+                    if (recordType === 'HeartRate') grantedTypes.push('heart_rate');
+                    if (recordType === 'ActiveCaloriesBurned' || recordType === 'TotalCaloriesBurned') {
+                        if (!grantedTypes.includes('active_calories')) grantedTypes.push('active_calories');
+                    }
+                    if (recordType === 'ExerciseSession') grantedTypes.push('workouts');
+                    if (recordType === 'SleepSession') grantedTypes.push('sleep');
+                    if (recordType === 'Distance') grantedTypes.push('distance');
+                });
+                
+                console.log('✅ Mapped granted types:', grantedTypes);
+                
+                // Update connection status
                 this.connectionStatus.isConnected = true;
                 this.connectionStatus.platform = 'health_connect';
-                this.connectionStatus.permissionsGranted = granted.map((p: any) => p.recordType.toLowerCase());
-                this.saveConnectionStatus();
+                this.connectionStatus.permissionsGranted = grantedTypes;
+                await this.saveConnectionStatus();
                 this.notifyListeners();
-                console.log('✅ Health Connect permissions granted:', granted);
+                console.log('✅ Health Connect permissions granted and saved');
                 return true;
             }
+            
+            console.warn('⚠️ No Health Connect permissions granted');
             return false;
+        } catch (error: any) {
+            // Handle specific error cases
+            const errorMessage = error?.message || String(error);
+            
+            if (errorMessage.includes('ActivityNotFoundException') || 
+                errorMessage.includes('No Activity found')) {
+                console.warn('⚠️ Health Connect permission dialog could not be opened.');
+                console.warn('📱 This typically means Health Connect is not properly installed.');
+                console.warn('   - On Android 14+, Health Connect should be built-in');
+                console.warn('   - On Android 13 and below, install "Health Connect" from Play Store');
+                console.warn('   - On emulators, ensure you have Google Play Services');
+            } else {
+                console.error('❌ Health Connect permission error:', error);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Check what permissions are currently granted for Health Connect
+     * Call this to verify permissions after user returns from Health Connect settings
+     */
+    public async checkGrantedPermissions(): Promise<string[]> {
+        if (Platform.OS !== 'android' || !HealthConnect) {
+            return [];
+        }
+
+        try {
+            const grantedPermissions = await HealthConnect.getGrantedPermissions();
+            console.log('📋 Currently granted permissions:', grantedPermissions);
+            
+            const grantedTypes: string[] = [];
+            
+            grantedPermissions.forEach((permission: any) => {
+                const recordType = permission.recordType;
+                if (recordType === 'Steps') grantedTypes.push('steps');
+                if (recordType === 'HeartRate') grantedTypes.push('heart_rate');
+                if (recordType === 'ActiveCaloriesBurned' || recordType === 'TotalCaloriesBurned') {
+                    if (!grantedTypes.includes('active_calories')) grantedTypes.push('active_calories');
+                }
+                if (recordType === 'ExerciseSession') grantedTypes.push('workouts');
+                if (recordType === 'SleepSession') grantedTypes.push('sleep');
+                if (recordType === 'Distance') grantedTypes.push('distance');
+            });
+            
+            // Update connection status if permissions exist
+            if (grantedTypes.length > 0) {
+                this.connectionStatus.isConnected = true;
+                this.connectionStatus.platform = 'health_connect';
+                this.connectionStatus.permissionsGranted = grantedTypes;
+                await this.saveConnectionStatus();
+                this.notifyListeners();
+            }
+            
+            return grantedTypes;
         } catch (error) {
-            console.error('❌ Health Connect permission error:', error);
-            return false;
+            console.error('❌ Error checking granted permissions:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Open Health Connect data management screen for PlateMate
+     * This is the closest we can get to opening directly to permissions
+     * (Android doesn't provide an intent to open directly to permission request)
+     */
+    public async openHealthConnectDataManagement(): Promise<void> {
+        if (Platform.OS !== 'android' || !HealthConnect) {
+            console.warn('⚠️ Health Connect data management only available on Android');
+            return;
+        }
+
+        try {
+            await HealthConnect.openHealthConnectDataManagement();
+            console.log('📱 Opened Health Connect data management');
+        } catch (error) {
+            console.error('❌ Error opening Health Connect data management:', error);
+            // Fallback: try to open general Health Connect settings
+            try {
+                await HealthConnect.openHealthConnectSettings();
+            } catch (fallbackError) {
+                console.error('❌ Fallback also failed:', fallbackError);
+            }
         }
     }
 
@@ -923,6 +1104,128 @@ class WearableHealthService {
     private notifyListeners(): void {
         const status = this.getConnectionStatus();
         this.listeners.forEach(callback => callback(status));
+    }
+
+    /**
+     * Sync workouts from wearable to local exercise log
+     * Returns the number of workouts synced
+     */
+    public async syncWorkoutsToExerciseLog(): Promise<number> {
+        try {
+            if (!this.connectionStatus.isConnected || !this.settings.syncWorkouts) {
+                console.log('⌚ Workout sync disabled or not connected');
+                return 0;
+            }
+
+            console.log('🏃 Syncing workouts to exercise log...');
+
+            // Get today's workouts
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const now = new Date();
+
+            const workouts = await this.getWorkouts(today, now);
+            
+            if (workouts.length === 0) {
+                console.log('✅ No new workouts to sync');
+                return 0;
+            }
+
+            // Load previously synced workout IDs to avoid duplicates
+            const syncedWorkoutsJson = await AsyncStorage.getItem(WEARABLE_SYNCED_WORKOUTS_KEY);
+            const syncedWorkouts: Set<string> = new Set(syncedWorkoutsJson ? JSON.parse(syncedWorkoutsJson) : []);
+
+            // Dynamically import database functions to avoid circular dependencies
+            const { addExercise, getExercisesByDate } = await import('../utils/database');
+            const { formatDateToString } = await import('../utils/dateUtils');
+
+            let syncCount = 0;
+
+            for (const workout of workouts) {
+                // Create a unique ID for this workout based on start time and type
+                const workoutId = `${workout.source}_${workout.startDate.getTime()}_${workout.type}`;
+
+                // Skip if already synced
+                if (syncedWorkouts.has(workoutId)) {
+                    continue;
+                }
+
+                // Normalize workout type
+                let workoutType: string;
+                if (Platform.OS === 'ios') {
+                    workoutType = getWorkoutTypeFromAppleHealth(workout.type);
+                } else {
+                    // Health Connect may provide numeric codes or strings
+                    const typeNum = parseInt(workout.type);
+                    workoutType = isNaN(typeNum) ? workout.type : getWorkoutTypeFromHealthConnect(typeNum);
+                }
+
+                // Estimate calories if not provided
+                const calories = workout.calories > 0 
+                    ? Math.round(workout.calories) 
+                    : estimateCalories(workoutType, workout.duration);
+
+                // Check if exercise already exists for this date and time
+                const dateStr = formatDateToString(workout.startDate);
+                const existingExercises = await getExercisesByDate(dateStr);
+                
+                const isDuplicate = existingExercises.some((ex: any) => {
+                    // Check if there's an exercise with similar name and time
+                    const exerciseTime = new Date(ex.date || ex.start_time).getTime();
+                    const workoutTime = workout.startDate.getTime();
+                    const timeDiff = Math.abs(exerciseTime - workoutTime);
+                    
+                    // Consider duplicate if within 5 minutes and similar name
+                    return timeDiff < 5 * 60 * 1000 && 
+                           ex.exercise_name?.toLowerCase().includes(workoutType.toLowerCase());
+                });
+
+                if (isDuplicate) {
+                    console.log(`⚠️ Workout already exists in log: ${workoutType}`);
+                    syncedWorkouts.add(workoutId);
+                    continue;
+                }
+
+                // Add to exercise log
+                try {
+                    await addExercise({
+                        exercise_name: workoutType,
+                        calories_burned: calories,
+                        duration: Math.round(workout.duration),
+                        date: workout.startDate.toISOString(),
+                        notes: `Synced from ${workout.source}${workout.distance ? ` • ${(workout.distance / 1000).toFixed(2)}km` : ''}`,
+                    });
+
+                    syncedWorkouts.add(workoutId);
+                    syncCount++;
+                    
+                    console.log(`✅ Synced workout: ${workoutType} (${Math.round(workout.duration)}min, ${calories}cal)`);
+                } catch (error) {
+                    console.error(`❌ Failed to sync workout ${workoutType}:`, error);
+                }
+            }
+
+            // Save synced workout IDs
+            await AsyncStorage.setItem(WEARABLE_SYNCED_WORKOUTS_KEY, JSON.stringify(Array.from(syncedWorkouts)));
+
+            console.log(`✅ Workout sync complete: ${syncCount} new workouts added`);
+            return syncCount;
+        } catch (error) {
+            console.error('❌ Error syncing workouts to exercise log:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * Clear synced workout history (useful for testing or manual re-sync)
+     */
+    public async clearSyncedWorkoutHistory(): Promise<void> {
+        try {
+            await AsyncStorage.removeItem(WEARABLE_SYNCED_WORKOUTS_KEY);
+            console.log('✅ Cleared synced workout history');
+        } catch (error) {
+            console.error('❌ Error clearing synced workout history:', error);
+        }
     }
 }
 

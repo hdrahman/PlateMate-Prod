@@ -18,14 +18,41 @@ class MainActivity : ReactActivity() {
     setTheme(R.style.AppTheme);
     super.onCreate(null)
     
-    // Initialize Health Connect permission delegate
+    // In order to handle permission contract results, we need to set the permission delegate.
+    // This is CRITICAL for Health Connect permission dialogs to work properly on Android 14+
+    // The delegate requires BOTH the activity AND the provider package name
     try {
-      val healthConnectClass = Class.forName("dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate")
-      val setPermissionDelegateMethod = healthConnectClass.getMethod("setPermissionDelegate", android.app.Activity::class.java)
-      setPermissionDelegateMethod.invoke(null, this)
+      val delegateClass = Class.forName("dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate")
+      val instanceField = delegateClass.getField("INSTANCE")
+      val delegateInstance = instanceField.get(null)
+      
+      val setDelegateMethod = delegateClass.getDeclaredMethod(
+        "setPermissionDelegate",
+        Class.forName("androidx.activity.ComponentActivity"),
+        String::class.java
+      )
+      // Pass the Health Connect provider package name (required for Android 14+)
+      setDelegateMethod.invoke(delegateInstance, this, "com.google.android.apps.healthdata")
+      android.util.Log.d("MainActivity", "Health Connect permission delegate set successfully")
+    } catch (e: ClassNotFoundException) {
+      android.util.Log.w("MainActivity", "Health Connect library not found - this is OK if not using Health Connect")
+    } catch (e: NoSuchMethodException) {
+      // Try the old method signature for backwards compatibility
+      try {
+        val delegateClass = Class.forName("dev.matinzd.healthconnect.permissions.HealthConnectPermissionDelegate")
+        val instanceField = delegateClass.getField("INSTANCE")
+        val delegateInstance = instanceField.get(null)
+        val setDelegateMethod = delegateClass.getDeclaredMethod(
+          "setPermissionDelegate",
+          Class.forName("androidx.activity.ComponentActivity")
+        )
+        setDelegateMethod.invoke(delegateInstance, this)
+        android.util.Log.d("MainActivity", "Health Connect permission delegate set (legacy)")
+      } catch (e2: Exception) {
+        android.util.Log.e("MainActivity", "Error setting Health Connect permission delegate: ${e2.message}")
+      }
     } catch (e: Exception) {
-      // Health Connect not available or not installed - this is fine
-      android.util.Log.d("MainActivity", "Health Connect delegate not available: ${e.message}")
+      android.util.Log.e("MainActivity", "Error setting Health Connect permission delegate: ${e.message}")
     }
   }
 

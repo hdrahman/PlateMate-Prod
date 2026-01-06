@@ -96,6 +96,10 @@ class WearableBackgroundSync {
                 // Perform sync
                 const data = await WearableHealthService.syncAll();
 
+                // Sync workouts to exercise log
+                const workoutsSynced = await WearableHealthService.syncWorkoutsToExerciseLog();
+                console.log(`📊 Background task: Synced ${workoutsSynced} workouts to exercise log`);
+
                 // Save last sync time
                 await AsyncStorage.setItem(LAST_BACKGROUND_SYNC_KEY, new Date().toISOString());
 
@@ -224,8 +228,12 @@ class WearableBackgroundSync {
                 return result;
             }
 
-            // Perform sync
+            // Perform health data sync
             const data = await WearableHealthService.syncAll();
+
+            // Sync workouts to exercise log
+            const workoutsSynced = await WearableHealthService.syncWorkoutsToExerciseLog();
+            console.log(`📊 Synced ${workoutsSynced} workouts to exercise log`);
 
             const result: SyncResult = {
                 success: true,

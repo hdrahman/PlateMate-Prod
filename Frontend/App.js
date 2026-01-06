@@ -84,6 +84,7 @@ import CreateFeatureRequest from './src/screens/CreateFeatureRequest';
 import { navigationRef } from './src/navigation/RootNavigation';
 import FutureSelfRecordingSimple from './src/screens/FutureSelfRecordingSimple';
 import StepTrackingSettings from './src/screens/StepTrackingSettings';
+import ConnectedDevicesScreen from './src/screens/ConnectedDevicesScreen';
 
 const { width } = Dimensions.get("window");
 
@@ -501,6 +502,7 @@ function AuthenticatedContent() {
         <Stack.Screen name="CreateFeatureRequest" component={CreateFeatureRequest} />
         <Stack.Screen name="FutureSelfRecordingSimple" component={FutureSelfRecordingSimple} />
         <Stack.Screen name="StepTrackingSettings" component={StepTrackingSettings} />
+        <Stack.Screen name="ConnectedDevices" component={ConnectedDevicesScreen} />
       </Stack.Navigator>
     </>
   );
