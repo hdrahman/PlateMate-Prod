@@ -568,18 +568,18 @@ class UnifiedStepTracker {
 
             // Check if wearable is connected and should be preferred
             const shouldUseWearable = await this.shouldUseWearableForSteps();
-            
+
             if (shouldUseWearable) {
                 console.log('⌚ Wearable device is connected and preferred - skipping native step tracking');
                 console.log('📊 Steps will be synced from wearable health service');
-                
+
                 // Mark as enabled but don't start native tracking
                 await AsyncStorage.setItem(STEP_TRACKER_ENABLED_KEY, 'true');
                 this.state.isTracking = true;
-                
+
                 // Sync from wearable immediately
                 await this.syncFromWearable();
-                
+
                 console.log('✅ Wearable-only step tracking activated');
                 return true;
             }
@@ -1050,14 +1050,14 @@ class UnifiedStepTracker {
         try {
             // Dynamically import to avoid circular dependencies
             const WearableHealthService = (await import('./WearableHealthService')).default;
-            
+
             // Check if wearable is connected
             if (!WearableHealthService.isConnected()) {
                 return false;
             }
 
             const settings = WearableHealthService.getSettings();
-            
+
             // Use wearable if enabled, syncing steps, and preferring wearable over phone
             return settings.enabled && settings.syncSteps && settings.preferWearableOverPhone;
         } catch (error) {
@@ -1074,7 +1074,7 @@ class UnifiedStepTracker {
         try {
             // Dynamically import to avoid circular dependencies
             const WearableHealthService = (await import('./WearableHealthService')).default;
-            
+
             // Check if wearable is connected
             if (!WearableHealthService.isConnected()) {
                 return null;
@@ -1086,12 +1086,12 @@ class UnifiedStepTracker {
             }
 
             console.log('⌚ Syncing steps from wearable...');
-            
+
             const { steps, source } = await WearableHealthService.getTodaySteps();
-            
+
             if (steps > 0) {
                 console.log(`⌚ Wearable sync: ${steps} steps from ${source}`);
-                
+
                 // If wearable steps are higher, use them (wearable has priority)
                 if (settings.preferWearableOverPhone && steps > this.state.currentSteps) {
                     this.updateStepCount(steps);
@@ -1100,10 +1100,10 @@ class UnifiedStepTracker {
                     // Even without preference, use higher count
                     this.updateStepCount(steps);
                 }
-                
+
                 return steps;
             }
-            
+
             return null;
         } catch (error) {
             console.warn('⚠️ Error syncing from wearable:', error);
@@ -1132,7 +1132,7 @@ class UnifiedStepTracker {
             const { formatDateToString } = await import('../utils/dateUtils');
             const today = formatDateToString(new Date());
             const dbSteps = await getStepsForDate(today);
-            
+
             return { steps: dbSteps || 0, source: 'database' };
         } catch (error) {
             console.error('❌ Error getting best step count:', error);

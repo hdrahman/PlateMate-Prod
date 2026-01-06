@@ -42,7 +42,7 @@ class WearableBackgroundSync {
     private isInitialized = false;
     private listeners: Set<(result: SyncResult) => void> = new Set();
 
-    private constructor() {}
+    private constructor() { }
 
     public static getInstance(): WearableBackgroundSync {
         if (!WearableBackgroundSync.instance) {
@@ -119,7 +119,7 @@ class WearableBackgroundSync {
         try {
             // Check if already registered
             const status = await BackgroundFetch.getStatusAsync();
-            
+
             if (status === BackgroundFetch.BackgroundFetchStatus.Restricted) {
                 console.warn('⚠️ Background fetch is restricted on this device');
                 return false;
@@ -152,7 +152,7 @@ class WearableBackgroundSync {
     public async unregisterBackgroundTask(): Promise<void> {
         try {
             const isRegistered = await TaskManager.isTaskRegisteredAsync(WEARABLE_HEALTH_SYNC_TASK);
-            
+
             if (isRegistered) {
                 await BackgroundFetch.unregisterTaskAsync(WEARABLE_HEALTH_SYNC_TASK);
             }
@@ -274,7 +274,7 @@ class WearableBackgroundSync {
     public async getBackgroundFetchStatus(): Promise<string> {
         try {
             const status = await BackgroundFetch.getStatusAsync();
-            
+
             switch (status) {
                 case BackgroundFetch.BackgroundFetchStatus.Available:
                     return 'available';

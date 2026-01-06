@@ -105,7 +105,7 @@ class WearableHealthService {
     private isInitialized = false;
     private listeners: Set<(status: ConnectionStatus) => void> = new Set();
 
-    private constructor() {}
+    private constructor() { }
 
     public static getInstance(): WearableHealthService {
         if (!WearableHealthService.instance) {
@@ -151,7 +151,7 @@ class WearableHealthService {
             // Dynamically import to avoid errors on Android
             const healthKitModule = require('react-native-health');
             AppleHealthKit = healthKitModule.default || healthKitModule;
-            
+
             // Check if HealthKit is available
             const isAvailable = await new Promise<boolean>((resolve) => {
                 AppleHealthKit.isAvailable((error: any, available: boolean) => {
@@ -179,10 +179,10 @@ class WearableHealthService {
         try {
             // Dynamically import to avoid errors on iOS
             HealthConnect = require('react-native-health-connect');
-            
+
             // Check SDK availability
             const sdkStatus = await HealthConnect.getSdkStatus();
-            
+
             if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_AVAILABLE) {
                 await HealthConnect.initialize();
                 this.connectionStatus.availableDataTypes = [
@@ -218,16 +218,16 @@ class WearableHealthService {
 
         try {
             const sdkStatus = await HealthConnect.getSdkStatus();
-            
+
             if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_AVAILABLE || sdkStatus === 1) {
                 return { available: true, status: 'available', message: 'Health Connect is available' };
             } else if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED || sdkStatus === 3) {
                 return { available: false, status: 'update_required', message: 'Health Connect requires an update from Play Store' };
             } else {
-                return { 
-                    available: false, 
-                    status: 'unavailable', 
-                    message: 'Health Connect is not available. On Android 13 and below, install from Play Store. On Android 14+, it should be built-in but may not be present on emulators without Google Play.' 
+                return {
+                    available: false,
+                    status: 'unavailable',
+                    message: 'Health Connect is not available. On Android 13 and below, install from Play Store. On Android 14+, it should be built-in but may not be present on emulators without Google Play.'
                 };
             }
         } catch (error) {
@@ -302,7 +302,7 @@ class WearableHealthService {
             // First, check SDK availability
             const sdkStatus = await HealthConnect.getSdkStatus();
             console.log('📱 Health Connect SDK status:', sdkStatus);
-            
+
             // SDK status codes from react-native-health-connect:
             // 1 = SDK_AVAILABLE
             // 2 = SDK_UNAVAILABLE  
@@ -316,7 +316,7 @@ class WearableHealthService {
                 // Don't throw error, just return false gracefully
                 return false;
             }
-            
+
             if (sdkStatus === HealthConnect.SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED || sdkStatus === 3) {
                 console.warn('⚠️ Health Connect requires an update. Please update via Play Store.');
                 // Try to open Play Store for update (handled by the library)
@@ -340,24 +340,24 @@ class WearableHealthService {
             ];
 
             console.log('📱 Requesting Health Connect permissions...');
-            
+
             // Request permissions - this will automatically open the Health Connect permission dialog
             // IMPORTANT: requestPermission returns an ARRAY of granted permissions, not a boolean
             const result = await HealthConnect.requestPermission(permissions);
-            
+
             console.log('✅ Permission request completed');
             console.log('📋 Request result:', result);
-            
+
             // After user returns from permission dialog, verify what was actually granted
             // This is critical because the user may have granted permissions after the initial request
             const actuallyGrantedPermissions = await HealthConnect.getGrantedPermissions();
             console.log('📋 Actually granted permissions (verified):', actuallyGrantedPermissions);
-            
+
             // Check if any permissions were granted
             if (actuallyGrantedPermissions && actuallyGrantedPermissions.length > 0) {
                 // Map the granted permissions to our internal format
                 const grantedTypes: string[] = [];
-                
+
                 actuallyGrantedPermissions.forEach((permission: any) => {
                     const recordType = permission.recordType;
                     if (recordType === 'Steps') grantedTypes.push('steps');
@@ -369,9 +369,9 @@ class WearableHealthService {
                     if (recordType === 'SleepSession') grantedTypes.push('sleep');
                     if (recordType === 'Distance') grantedTypes.push('distance');
                 });
-                
+
                 console.log('✅ Mapped granted types:', grantedTypes);
-                
+
                 // Update connection status
                 this.connectionStatus.isConnected = true;
                 this.connectionStatus.platform = 'health_connect';
@@ -381,14 +381,14 @@ class WearableHealthService {
                 console.log('✅ Health Connect permissions granted and saved');
                 return true;
             }
-            
+
             console.warn('⚠️ No Health Connect permissions granted');
             return false;
         } catch (error: any) {
             // Handle specific error cases
             const errorMessage = error?.message || String(error);
-            
-            if (errorMessage.includes('ActivityNotFoundException') || 
+
+            if (errorMessage.includes('ActivityNotFoundException') ||
                 errorMessage.includes('No Activity found')) {
                 console.warn('⚠️ Health Connect permission dialog could not be opened.');
                 console.warn('📱 This typically means Health Connect is not properly installed.');
@@ -414,9 +414,9 @@ class WearableHealthService {
         try {
             const grantedPermissions = await HealthConnect.getGrantedPermissions();
             console.log('📋 Currently granted permissions:', grantedPermissions);
-            
+
             const grantedTypes: string[] = [];
-            
+
             grantedPermissions.forEach((permission: any) => {
                 const recordType = permission.recordType;
                 if (recordType === 'Steps') grantedTypes.push('steps');
@@ -428,7 +428,7 @@ class WearableHealthService {
                 if (recordType === 'SleepSession') grantedTypes.push('sleep');
                 if (recordType === 'Distance') grantedTypes.push('distance');
             });
-            
+
             // Update connection status if permissions exist
             if (grantedTypes.length > 0) {
                 this.connectionStatus.isConnected = true;
@@ -437,7 +437,7 @@ class WearableHealthService {
                 await this.saveConnectionStatus();
                 this.notifyListeners();
             }
-            
+
             return grantedTypes;
         } catch (error) {
             console.error('❌ Error checking granted permissions:', error);
@@ -478,11 +478,11 @@ class WearableHealthService {
         this.connectionStatus.platform = null;
         this.connectionStatus.permissionsGranted = [];
         this.settings.enabled = false;
-        
+
         await this.saveSettings();
         await this.saveConnectionStatus();
         this.notifyListeners();
-        
+
         console.log('🔌 Disconnected from health service');
     }
 
@@ -891,7 +891,7 @@ class WearableHealthService {
         const now = new Date();
 
         const stepData = await this.getSteps(today, now);
-        
+
         if (stepData.length === 0) {
             return { steps: 0, source: 'none' };
         }
@@ -929,15 +929,15 @@ class WearableHealthService {
         for (const [source, points] of Object.entries(bySource)) {
             // Sort by start date
             points.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-            
+
             // Sum non-overlapping intervals
             let total = 0;
             let lastEndTime = 0;
-            
+
             for (const point of points) {
                 const startTime = point.startDate.getTime();
                 const endTime = point.endDate.getTime();
-                
+
                 if (startTime >= lastEndTime) {
                     // No overlap, add full value
                     total += point.value;
@@ -950,7 +950,7 @@ class WearableHealthService {
                 }
                 // Fully contained in previous interval, skip
             }
-            
+
             sourceTotals[source] = total;
         }
 
@@ -961,7 +961,7 @@ class WearableHealthService {
 
         for (const [source, total] of Object.entries(sourceTotals)) {
             const isWearable = wearableSources.some(ws => source.toLowerCase().includes(ws.toLowerCase()));
-            
+
             if (isWearable && total > 0) {
                 primarySource = source;
                 maxSteps = Math.max(maxSteps, total);
@@ -1001,7 +1001,7 @@ class WearableHealthService {
 
         // Calculate average heart rate
         const heartRates = heartRateData.map(d => d.value).filter(v => v > 0);
-        const heartRateAvg = heartRates.length > 0 
+        const heartRateAvg = heartRates.length > 0
             ? Math.round(heartRates.reduce((a, b) => a + b, 0) / heartRates.length)
             : 0;
 
@@ -1125,7 +1125,7 @@ class WearableHealthService {
             const now = new Date();
 
             const workouts = await this.getWorkouts(today, now);
-            
+
             if (workouts.length === 0) {
                 console.log('✅ No new workouts to sync');
                 return 0;
@@ -1161,23 +1161,23 @@ class WearableHealthService {
                 }
 
                 // Estimate calories if not provided
-                const calories = workout.calories > 0 
-                    ? Math.round(workout.calories) 
+                const calories = workout.calories > 0
+                    ? Math.round(workout.calories)
                     : estimateCalories(workoutType, workout.duration);
 
                 // Check if exercise already exists for this date and time
                 const dateStr = formatDateToString(workout.startDate);
                 const existingExercises = await getExercisesByDate(dateStr);
-                
+
                 const isDuplicate = existingExercises.some((ex: any) => {
                     // Check if there's an exercise with similar name and time
                     const exerciseTime = new Date(ex.date || ex.start_time).getTime();
                     const workoutTime = workout.startDate.getTime();
                     const timeDiff = Math.abs(exerciseTime - workoutTime);
-                    
+
                     // Consider duplicate if within 5 minutes and similar name
-                    return timeDiff < 5 * 60 * 1000 && 
-                           ex.exercise_name?.toLowerCase().includes(workoutType.toLowerCase());
+                    return timeDiff < 5 * 60 * 1000 &&
+                        ex.exercise_name?.toLowerCase().includes(workoutType.toLowerCase());
                 });
 
                 if (isDuplicate) {
@@ -1198,7 +1198,7 @@ class WearableHealthService {
 
                     syncedWorkouts.add(workoutId);
                     syncCount++;
-                    
+
                     console.log(`✅ Synced workout: ${workoutType} (${Math.round(workout.duration)}min, ${calories}cal)`);
                 } catch (error) {
                     console.error(`❌ Failed to sync workout ${workoutType}:`, error);
