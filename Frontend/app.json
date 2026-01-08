@@ -8,6 +8,7 @@
     "scheme": "platemate",
     "userInterfaceStyle": "light",
     "sdkVersion": "54.0.0",
+    "privacy": "public",
     "splash": {
       "image": "./assets/icon2-edited.png",
       "resizeMode": "contain",
@@ -20,7 +21,7 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "0",
+      "buildNumber": "2",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
