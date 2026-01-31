@@ -145,10 +145,58 @@ def convert_heic_to_jpeg(image_data: bytes) -> bytes:
         raise ValueError(f"Failed to convert HEIC to JPEG: {str(e)}")
 
 
+def resize_image_if_needed(image_data: bytes, max_dimension: int = 2048) -> tuple:
+    """
+    Resize image if dimensions exceed max_dimension.
+    This is a SAFETY NET for old app versions that don't optimize images client-side.
+    Returns tuple of (image_data, was_resized).
+    """
+    try:
+        import io
+        from PIL import Image
+        
+        img = Image.open(io.BytesIO(image_data))
+        width, height = img.size
+        
+        # Check if resize is needed
+        if width <= max_dimension and height <= max_dimension:
+            return image_data, False
+        
+        print(f"📐 Backend safety net: Resizing image from {width}x{height} to max {max_dimension}px")
+        start_time = time.time()
+        
+        # Calculate new dimensions maintaining aspect ratio
+        ratio = min(max_dimension / width, max_dimension / height)
+        new_width = int(width * ratio)
+        new_height = int(height * ratio)
+        
+        # Convert to RGB if needed
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Resize using high-quality LANCZOS resampling
+        img = img.resize((new_width, new_height), Image.LANCZOS)
+        
+        # Save as JPEG
+        output_buffer = io.BytesIO()
+        img.save(output_buffer, format='JPEG', quality=85, optimize=True)
+        resized_data = output_buffer.getvalue()
+        
+        print(f"✅ Resize completed in {time.time() - start_time:.2f}s: {width}x{height} → {new_width}x{new_height}")
+        print(f"📊 Size: {len(image_data)} → {len(resized_data)} bytes ({100 - (len(resized_data)/len(image_data)*100):.0f}% reduction)")
+        
+        return resized_data, True
+        
+    except Exception as e:
+        print(f"⚠️ Resize failed, using original: {e}")
+        return image_data, False
+
+
 async def encode_image(image_file):
     """
     Encodes image file to base64 and detects the image format.
     Converts HEIC to JPEG if needed for better compatibility.
+    Enforces file size limits and performs fallback resize if needed.
     Returns tuple of (base64_string, mime_type)
     """
     try:
@@ -169,8 +217,19 @@ async def encode_image(image_file):
         if len(image_data) < 100:
             raise ValueError(f"Image data too small ({len(image_data)} bytes) - likely corrupted or not a valid image")
 
-        if len(image_data) > 20 * 1024 * 1024:  # 20MB limit
-            print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB)")
+        # SAFETY NET: Hard reject files over 10MB
+        # Frontend should optimize images, but this catches old app versions or bypass attempts
+        MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+        if len(image_data) > MAX_IMAGE_SIZE:
+            size_mb = len(image_data) / (1024 * 1024)
+            print(f"❌ Image rejected: {size_mb:.1f}MB exceeds {MAX_IMAGE_SIZE / (1024*1024):.0f}MB limit")
+            raise HTTPException(
+                status_code=413,
+                detail=f"Image too large ({size_mb:.0f}MB). Maximum size is 10MB. Please update your app or use a smaller image."
+            )
+
+        if len(image_data) > 4 * 1024 * 1024:  # 4MB warning threshold
+            print(f"⚠️ Warning: Large image file ({len(image_data) / (1024*1024):.1f}MB) - frontend may not have optimized it")
 
         # Detect image format before encoding
         mime_type = detect_image_format(image_data)
@@ -182,6 +241,18 @@ async def encode_image(image_file):
             image_data = await loop.run_in_executor(None, convert_heic_to_jpeg, image_data)
             mime_type = "image/jpeg"
             print("✅ Converted HEIC to JPEG successfully")
+        
+        # SAFETY NET: Resize if image dimensions exceed 2048px (for old app versions)
+        # This prevents memory issues from very high resolution images
+        image_data, was_resized = await loop.run_in_executor(
+            None,
+            resize_image_if_needed,
+            image_data,
+            2048  # Max dimension
+        )
+        if was_resized:
+            print("📐 Image was resized by backend safety net (old app version?)")
+            mime_type = "image/jpeg"  # resize_image_if_needed outputs JPEG
 
         # Base64 encoding is CPU-intensive, run in thread pool
         encoded_string = await loop.run_in_executor(

@@ -23,8 +23,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { launchCameraAsync, MediaTypeOptions } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import RNHeicConverter from 'react-native-heic-converter';
 import { LinearGradient } from 'expo-linear-gradient';
+import { optimizeImageForUpload, OptimizationResult } from '../utils/imageOptimizer';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addFoodLog, addMultipleFoodLogs, getCurrentUserId } from '../utils/database';
@@ -198,49 +198,40 @@ const ImageCapture: React.FC = () => {
         });
     }, []);
 
-    // Function to detect if image is HEIC format
-    const isHeicImage = (uri: string): boolean => {
-        const lowerUri = uri.toLowerCase();
-        return lowerUri.endsWith('.heic') || lowerUri.endsWith('.heif');
-    };
-
-    // Function to convert HEIC to JPEG
-    const convertHeicToJpeg = async (uri: string): Promise<string> => {
+    /**
+     * Optimize image for upload using the centralized imageOptimizer utility.
+     * Handles HEIC conversion, resizing to max 2048px, and JPEG compression.
+     * Returns the optimized image URI or null if optimization failed with a user-facing error.
+     */
+    const optimizeImage = async (uri: string): Promise<string | null> => {
         try {
-            console.log('Converting HEIC image to JPEG:', uri);
-            const result = await RNHeicConverter.convert({
-                path: uri,
-                quality: 0.9, // High quality conversion (0.0 - 1.0)
-            });
+            console.log('🖼️ Optimizing image for upload:', uri);
 
-            console.log('HEIC conversion successful:', result.path);
-            return result.path;
-        } catch (error) {
-            console.error('HEIC conversion failed:', error);
-            // Return original URI if conversion fails - backend will handle it as fallback
-            console.warn('Falling back to original HEIC image, backend will handle conversion');
-            return uri;
-        }
-    };
+            const result: OptimizationResult = await optimizeImageForUpload(uri);
 
-    const optimizeImage = async (uri: string): Promise<string> => {
-        try {
-            console.log('Processing image:', uri);
-
-            // Check if image is HEIC format and convert to JPEG
-            if (isHeicImage(uri)) {
-                console.log('HEIC format detected, converting to JPEG...');
-                const convertedUri = await convertHeicToJpeg(uri);
-                return convertedUri;
+            if (!result.success) {
+                // Show user-friendly error message
+                console.error('❌ Image optimization failed:', result.error);
+                Alert.alert(
+                    'Image Problem',
+                    result.userMessage || 'Unable to process this image. Please try a different photo.',
+                    [{ text: 'OK' }]
+                );
+                return null;
             }
 
-            console.log('Using optimized image...');
-            // For now, return the original URI since expo-image-picker already provides compressed images
-            // This can be enhanced later with expo-image or other image processing libraries
-            return uri;
+            if (result.image) {
+                const savings = result.image.originalSize && result.image.optimizedSize
+                    ? ((1 - result.image.optimizedSize / result.image.originalSize) * 100).toFixed(0)
+                    : 'N/A';
+                console.log(`✅ Image optimized: ${result.image.width}x${result.image.height}, ${savings}% size reduction`);
+                return result.image.uri;
+            }
+
+            return uri; // Fallback to original
         } catch (error) {
-            console.error('Error processing image:', error);
-            // Fall back to original image if processing fails
+            console.error('Error in optimizeImage:', error);
+            // Fall back to original image if processing fails unexpectedly
             return uri;
         }
     };
@@ -258,8 +249,14 @@ const ImageCapture: React.FC = () => {
                     });
 
                     if (!result.canceled) {
-                        // Optimize image while keeping high quality
+                        // Optimize image (resize, compress, HEIC conversion)
                         const optimizedUri = await optimizeImage(result.assets[0].uri);
+
+                        // If optimization returned null, image was rejected (too large, etc.)
+                        // User has already been shown an alert, so just return
+                        if (optimizedUri === null) {
+                            return;
+                        }
 
                         const newImages = [...images];
                         newImages[index] = {
@@ -277,7 +274,7 @@ const ImageCapture: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error taking photo:', error);
-                    Alert.alert('Error', 'Failed to take photo');
+                    Alert.alert('Error', 'Failed to take photo. Please try again.');
                 }
             },
             'image_capture_additional',
@@ -307,8 +304,14 @@ const ImageCapture: React.FC = () => {
                     });
 
                     if (!result.canceled) {
-                        // Optimize image while keeping high quality
+                        // Optimize image (resize, compress, HEIC conversion)
                         const optimizedUri = await optimizeImage(result.assets[0].uri);
+
+                        // If optimization returned null, image was rejected (too large, etc.)
+                        // User has already been shown an alert, so just return
+                        if (optimizedUri === null) {
+                            return;
+                        }
 
                         const newImages = [...images];
                         newImages[index] = {
@@ -326,7 +329,7 @@ const ImageCapture: React.FC = () => {
                     }
                 } catch (error) {
                     console.error('Error picking image:', error);
-                    Alert.alert('Error', 'Failed to pick image');
+                    Alert.alert('Error', 'Failed to select image. Please try again.');
                 }
             },
             'image_capture_gallery',
@@ -714,6 +717,12 @@ const ImageCapture: React.FC = () => {
                 console.error(`❌ Upload failed with status ${response.status}:`, errorText);
 
                 // Handle specific error cases
+                if (response.status === 413) {
+                    // Image too large - backend safety net caught it
+                    console.error('❌ Image rejected by server: too large');
+                    throw new Error('IMAGE_TOO_LARGE');
+                }
+
                 if (response.status === 400) {
                     try {
                         const errorData = JSON.parse(errorText);
@@ -721,12 +730,23 @@ const ImageCapture: React.FC = () => {
                         if (errorData.detail && errorData.detail.includes('image cannot be analyzed')) {
                             throw new Error('IMAGE_CONTENT_POLICY');
                         }
+                        // Check for size-related errors
+                        if (errorData.detail && (
+                            errorData.detail.includes('too large') ||
+                            errorData.detail.includes('exceeds') ||
+                            errorData.detail.includes('maximum size')
+                        )) {
+                            throw new Error('IMAGE_TOO_LARGE');
+                        }
                     } catch (parseError) {
                         // If we can't parse the error, check the raw text
                         if (errorText.includes('image cannot be analyzed') ||
                             errorText.includes('inappropriate content') ||
                             errorText.includes('better lighting')) {
                             throw new Error('IMAGE_CONTENT_POLICY');
+                        }
+                        if (errorText.includes('too large') || errorText.includes('exceeds')) {
+                            throw new Error('IMAGE_TOO_LARGE');
                         }
                     }
                 }
@@ -959,6 +979,22 @@ const ImageCapture: React.FC = () => {
                 Alert.alert(
                     'Image Cannot Be Analyzed',
                     'OpenAI could not process this image. Common reasons:\n\n• Image is too blurry or dark\n• No food clearly visible\n• Image contains people or faces\n• Poor lighting or focus\n\nPlease take a clearer photo focused only on the food.',
+                    [
+                        {
+                            text: 'Retake Photo', onPress: () => {
+                                // Reset the first image to allow retaking
+                                const newImages = [...images];
+                                newImages[0] = { uri: '', type: 'top', uploaded: false };
+                                setImages(newImages);
+                            }
+                        },
+                        { text: 'OK', style: 'default' }
+                    ]
+                );
+            } else if (error instanceof Error && error.message === 'IMAGE_TOO_LARGE') {
+                Alert.alert(
+                    'Image Too Large',
+                    'One or more images are too large to process. This can happen with very high resolution photos.\n\nTry these solutions:\n• Take a new photo at lower resolution\n• Update your app to the latest version\n• Reduce camera quality in your phone settings',
                     [
                         {
                             text: 'Retake Photo', onPress: () => {
