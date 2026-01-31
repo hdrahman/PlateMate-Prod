@@ -254,7 +254,28 @@ class WearableHealthService {
 
     private async requestAppleHealthPermissions(): Promise<boolean> {
         if (!AppleHealthKit) {
-            console.warn('⚠️ AppleHealthKit not loaded');
+            console.error('❌ AppleHealthKit module not loaded');
+            console.error('   Make sure react-native-health is installed and linked');
+            return false;
+        }
+
+        console.log('📱 AppleHealthKit module loaded, checking availability...');
+
+        // Verify HealthKit is available before requesting permissions
+        const isAvailable = await new Promise<boolean>((resolve) => {
+            AppleHealthKit.isAvailable((error: any, available: boolean) => {
+                if (error) {
+                    console.error('❌ Error checking HealthKit availability:', error);
+                    resolve(false);
+                } else {
+                    console.log('✅ HealthKit available:', available);
+                    resolve(available);
+                }
+            });
+        });
+
+        if (!isAvailable) {
+            console.error('❌ HealthKit is not available on this device');
             return false;
         }
 
@@ -272,10 +293,13 @@ class WearableHealthService {
             },
         };
 
+        console.log('🔐 Requesting HealthKit permissions...');
+
         return new Promise((resolve) => {
             AppleHealthKit.initHealthKit(permissions, (error: any) => {
                 if (error) {
                     console.error('❌ Apple HealthKit permission error:', error);
+                    console.error('   Error details:', JSON.stringify(error));
                     resolve(false);
                 } else {
                     this.connectionStatus.isConnected = true;

@@ -130,6 +130,18 @@ const ConnectedDevicesScreen = () => {
 
             console.log('🔐 Initialization result:', initialized);
 
+            if (!initialized) {
+                Alert.alert(
+                    'Initialization Failed',
+                    Platform.OS === 'ios'
+                        ? 'Unable to initialize Apple Health. Please make sure:\n\n1. You are on a physical iOS device (not simulator)\n2. The Health app is available on your device\n3. PlateMate has the required permissions in Info.plist'
+                        : 'Unable to initialize Health Connect. Please try again.',
+                    [{ text: 'OK' }]
+                );
+                setIsConnecting(false);
+                return;
+            }
+
             // On Android, check Health Connect availability first
             if (Platform.OS === 'android') {
                 const availability = await WearableHealthService.isHealthConnectAvailable();
@@ -278,10 +290,20 @@ const ConnectedDevicesScreen = () => {
                     ]
                 );
             } else {
+                // iOS - provide guidance to open Health app
                 Alert.alert(
                     'Permission Required',
-                    `Please grant access to ${platformName} to use wearable features.`,
-                    [{ text: 'OK' }]
+                    `PlateMate needs permission to read your health data from ${platformName}.\n\nTo grant access:\n1. Open the Health app on your iPhone\n2. Tap your profile picture (top right)\n3. Tap "Apps & Services" or "Apps"\n4. Tap "PlateMate"\n5. Enable the data types you want to sync\n\nThen come back and tap "Try Again"`,
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Try Again',
+                            onPress: () => {
+                                setIsConnecting(false);
+                                setTimeout(() => handleConnect(), 500);
+                            }
+                        },
+                    ]
                 );
             }
         } catch (error) {

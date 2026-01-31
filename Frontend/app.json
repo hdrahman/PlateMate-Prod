@@ -21,7 +21,7 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.zentraai.platematepro",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",

@@ -43,6 +43,22 @@ export default function ResetPassword() {
             return;
         }
 
+        // Validate password contains lowercase, uppercase, and number
+        if (!/[a-z]/.test(newPassword)) {
+            Alert.alert('Error', 'Password must contain at least one lowercase letter');
+            return;
+        }
+
+        if (!/[A-Z]/.test(newPassword)) {
+            Alert.alert('Error', 'Password must contain at least one uppercase letter');
+            return;
+        }
+
+        if (!/[0-9]/.test(newPassword)) {
+            Alert.alert('Error', 'Password must contain at least one number');
+            return;
+        }
+
         setIsLoading(true);
 
         try {

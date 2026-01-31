@@ -109,26 +109,23 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
         errors: string[];
         checks: {
             minLength: boolean;
-            hasUppercase: boolean;
             hasLowercase: boolean;
+            hasUppercase: boolean;
             hasNumber: boolean;
-            hasSpecialChar: boolean;
         }
     } => {
         const checks = {
             minLength: password.length >= 8,
-            hasUppercase: /[A-Z]/.test(password),
             hasLowercase: /[a-z]/.test(password),
+            hasUppercase: /[A-Z]/.test(password),
             hasNumber: /[0-9]/.test(password),
-            hasSpecialChar: /[^A-Za-z0-9]/.test(password),
         };
 
         const errors: string[] = [];
         if (!checks.minLength) errors.push('At least 8 characters');
-        if (!checks.hasUppercase) errors.push('One uppercase letter');
-        if (!checks.hasLowercase) errors.push('One lowercase letter');
-        if (!checks.hasNumber) errors.push('One number');
-        if (!checks.hasSpecialChar) errors.push('One special character');
+        if (!checks.hasLowercase) errors.push('At least one lowercase letter');
+        if (!checks.hasUppercase) errors.push('At least one uppercase letter');
+        if (!checks.hasNumber) errors.push('At least one number');
 
         return {
             isValid: Object.values(checks).every(check => check),
@@ -336,20 +333,16 @@ const AccountCreationStep: React.FC<AccountCreationStepProps> = ({ profile, upda
                                     met={validatePassword(password).checks.minLength}
                                 />
                                 <PasswordRequirement
-                                    text="One uppercase letter"
-                                    met={validatePassword(password).checks.hasUppercase}
-                                />
-                                <PasswordRequirement
-                                    text="One lowercase letter"
+                                    text="Contains a lowercase letter"
                                     met={validatePassword(password).checks.hasLowercase}
                                 />
                                 <PasswordRequirement
-                                    text="One number"
-                                    met={validatePassword(password).checks.hasNumber}
+                                    text="Contains an uppercase letter"
+                                    met={validatePassword(password).checks.hasUppercase}
                                 />
                                 <PasswordRequirement
-                                    text="One special character (!@#$%^&*)"
-                                    met={validatePassword(password).checks.hasSpecialChar}
+                                    text="Contains a number"
+                                    met={validatePassword(password).checks.hasNumber}
                                 />
                             </View>
                         )}
